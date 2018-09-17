@@ -1,0 +1,38 @@
+{
+  "name": "cubejs-client",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/cubejs-client.js",
+  "browser": "dist/cubejs-client.umd.js",
+  "browserMin": "dist/cubejs-client.umd.min.js",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c -w",
+    "example": "http-server"
+  },
+  "author": "Statsbot, Inc.",
+  "dependencies": {
+    "@babel/runtime-corejs2": "^7.0.0",
+    "core-js": "^2.5.3",
+    "whatwg-fetch": "^3.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@babel/core": "^7.0.1",
+    "@babel/plugin-transform-runtime": "^7.0.0",
+    "@babel/preset-env": "^7.0.0",
+    "@babel/runtime": "^7.0.0",
+    "babel-runtime": "^6.26.0",
+    "babelrc-rollup": "^3.0.0",
+    "http-server": "^0.11.1",
+    "rollup": "^0.65.2",
+    "rollup-plugin-alias": "^1.4.0",
+    "rollup-plugin-babel": "^4.0.3",
+    "rollup-plugin-commonjs": "^9.1.6",
+    "rollup-plugin-node-resolve": "^3.4.0",
+    "rollup-plugin-replace": "^2.0.0",
+    "rollup-plugin-uglify": "^5.0.2"
+  }
+}

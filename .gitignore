@@ -1,0 +1,7 @@
+node_modules
+/.idea
+newrelic_agent.log
+.ruby-version
+/.DS_Store
+.DS_Store
+package-lock.json

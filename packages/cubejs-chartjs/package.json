@@ -1,0 +1,12 @@
+{
+  "name": "@cubejs-client/chartjs",
+  "version": "1.0.0",
+  "description": "Chart.js adapter for cube.js",
+  "author": "Statsbot, Inc.",
+  "dependencies": {
+    "cubejs-client": "*"
+  },
+  "files": [
+    "dist"
+  ]
+}
