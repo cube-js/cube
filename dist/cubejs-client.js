@@ -62,6 +62,9 @@ class CubejsApi {
 
     const loadImpl = async () => {
       const res = await this.request(`/load?query=${JSON.stringify(query)}`);
+      if (res.status === 502) {
+        return loadImpl(); // TODO backoff wait
+      }
       const response = await res.json();
       if (response.error === 'Continue wait') {
         return loadImpl();

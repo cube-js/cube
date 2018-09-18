@@ -4,7 +4,7 @@ class LikeButton extends React.Component {
   constructor(props) {
     super(props);
     this.state = { loading: false };
-    this.api = cubejs('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpIjoiMTQzIn0.6bn_WAIzJZzatu8H2XJcTyyNU9Qhj6WP2yM5Fw1nDUw');
+    this.api = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
   }
 
   render() {
@@ -21,16 +21,16 @@ class LikeButton extends React.Component {
   load() {
     this.setState({ loading: true });
     this.api.load({
-      measures: ["Bots.count"],
-      dimensions: ["Integrations.kind"],
+      measures: ["Stories.count"],
       timeDimensions: [{
-        dimension: "Bots.createdAt",
-        dateRange: ["2018-01-01", "2018-02-01"]
+        dimension: "Stories.time",
+        dateRange: ["2015-01-01", "2016-01-01"],
+        granularity: 'month'
       }]
     })
       .then(r => {
         const context = document.getElementById("myChart");
-        const config = cubejs.chartjsConfig(r, { type: 'pie' });
+        const config = cubejs.chartjsConfig(r);
         this.setState({ result: JSON.stringify(config) });
         new Chart(context, config);
       })

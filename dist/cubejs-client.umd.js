@@ -1918,23 +1918,32 @@
 
 	                case 2:
 	                  res = _context.sent;
-	                  _context.next = 5;
-	                  return res.json();
 
-	                case 5:
-	                  response = _context.sent;
-
-	                  if (!(response.error === 'Continue wait')) {
-	                    _context.next = 8;
+	                  if (!(res.status === 502)) {
+	                    _context.next = 5;
 	                    break;
 	                  }
 
 	                  return _context.abrupt("return", loadImpl());
 
-	                case 8:
+	                case 5:
+	                  _context.next = 7;
+	                  return res.json();
+
+	                case 7:
+	                  response = _context.sent;
+
+	                  if (!(response.error === 'Continue wait')) {
+	                    _context.next = 10;
+	                    break;
+	                  }
+
+	                  return _context.abrupt("return", loadImpl());
+
+	                case 10:
 	                  return _context.abrupt("return", new ResultSet(response));
 
-	                case 9:
+	                case 11:
 	                case "end":
 	                  return _context.stop();
 	              }
