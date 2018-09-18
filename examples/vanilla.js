@@ -20,20 +20,19 @@ class LikeButton extends React.Component {
 
   load() {
     this.setState({ loading: true });
-    this.api.load('chart', {
-      "timezone": "America/Los_Angeles",
-      "measures": ["Bots.count"],
-      "timeDimensions": [{
-        "dimension": "Bots.createdAt",
-        "granularity": "day",
-        "dateRange": ["2018-01-01", "2018-02-01"]
+    this.api.load({
+      measures: ["Bots.count"],
+      dimensions: ["Integrations.kind"],
+      timeDimensions: [{
+        dimension: "Bots.createdAt",
+        dateRange: ["2018-01-01", "2018-02-01"]
       }]
     })
       .then(r => {
         const context = document.getElementById("myChart");
-        const resultSet = cubejs.chartjs(r);
-        this.setState({ result: JSON.stringify(resultSet.timeSeries()) });
-        var myChart = new Chart(context, resultSet.timeSeries());
+        const config = cubejs.chartjsConfig(r, { type: 'pie' });
+        this.setState({ result: JSON.stringify(config) });
+        new Chart(context, config);
       })
   }
 }

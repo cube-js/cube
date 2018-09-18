@@ -11,9 +11,6 @@ const bundle = (name, baseConfig) => {
   baseConfig = {
     ...baseConfig,
     plugins: [
-      alias({
-        'cubejs-client': 'src/index.js'
-      }),
       replace({
         "process.env.CUBEJS_API_URL": `"${process.env.CUBEJS_API_URL || "https://statsbot.co/cubejs-api/v1"}"`
       }),
@@ -39,6 +36,9 @@ const bundle = (name, baseConfig) => {
       }),
       resolve({
         module: true
+      }),
+      alias({
+        'cubejs-client': 'src/index.js'
       }),
       commonjs()
     ]

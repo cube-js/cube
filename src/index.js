@@ -15,10 +15,18 @@ class CubejsApi {
     )
   }
 
-  load(jobId, query, callback) {
+  load(query, options, callback) {
+    if (typeof options === 'function' && !callback) {
+      callback = options;
+      options = undefined;
+    }
+
     const loadImpl = async () => {
       const res = await this.request(`/load?query=${JSON.stringify(query)}`);
       const response = await res.json();
+      if (response.error === 'Continue wait') {
+        return loadImpl();
+      }
       return new ResultSet(response);
     };
     if (callback) {

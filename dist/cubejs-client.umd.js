@@ -1778,6 +1778,15 @@
 	  });
 	};
 
+	var $filter = _arrayMethods(2);
+
+	_export(_export.P + _export.F * !_strictMethod([].filter, true), 'Array', {
+	  // 22.1.3.7 / 15.4.4.20 Array.prototype.filter(callbackfn [, thisArg])
+	  filter: function filter(callbackfn /* , thisArg */) {
+	    return $filter(this, callbackfn, arguments[1]);
+	  }
+	});
+
 	var $map = _arrayMethods(1);
 
 	_export(_export.P + _export.F * !_strictMethod([].map, true), 'Array', {
@@ -1804,15 +1813,46 @@
 	      var query = this.loadResponse.query;
 	      return query.measures.map(function (measure) {
 	        return {
-	          name: measure,
-	          series: _this.loadResponse.data.map(function (row) {
-	            var dimensionValues = (query.dimensions || []).map(function (d) {
-	              return row[d];
-	            }).concat((query.timeDimensions || []).map(function (td) {
-	              return row[td.dimension];
-	            }));
-	            return [dimensionValues.join(', '), row[measure]];
+	          title: _this.loadResponse.annotation.measures[measure].title,
+	          series: _this.categories().map(function (_ref) {
+	            var row = _ref.row,
+	                category = _ref.category;
+	            return {
+	              value: row[measure],
+	              category: category
+	            };
 	          })
+	        };
+	      });
+	    }
+	  }, {
+	    key: "categoryFn",
+	    value: function categoryFn() {
+	      var query = this.loadResponse.query;
+	      return function (row) {
+	        var dimensionValues = (query.dimensions || []).map(function (d) {
+	          return row[d];
+	        }).concat((query.timeDimensions || []).filter(function (td) {
+	          return !!td.granularity;
+	        }).map(function (td) {
+	          return row[td.dimension];
+	        }));
+	        return dimensionValues.map(function (v) {
+	          return v || '∅';
+	        }).join(', ');
+	      };
+	    }
+	  }, {
+	    key: "categories",
+	    value: function categories() {
+	      var _this2 = this;
+
+	      var query = this.loadResponse.query; // TODO missing date filling
+
+	      return this.loadResponse.data.map(function (row) {
+	        return {
+	          row: row,
+	          category: _this2.categoryFn()(row)
 	        };
 	      });
 	    }
@@ -1854,8 +1894,13 @@
 	    }
 	  }, {
 	    key: "load",
-	    value: function load(jobId, query, callback) {
+	    value: function load(query, options, callback) {
 	      var _this = this;
+
+	      if (typeof options === 'function' && !callback) {
+	        callback = options;
+	        options = undefined;
+	      }
 
 	      var loadImpl =
 	      /*#__PURE__*/
@@ -1878,9 +1923,18 @@
 
 	                case 5:
 	                  response = _context.sent;
+
+	                  if (!(response.error === 'Continue wait')) {
+	                    _context.next = 8;
+	                    break;
+	                  }
+
+	                  return _context.abrupt("return", loadImpl());
+
+	                case 8:
 	                  return _context.abrupt("return", new ResultSet(response));
 
-	                case 7:
+	                case 9:
 	                case "end":
 	                  return _context.stop();
 	              }

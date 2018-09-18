@@ -1,16 +1,17 @@
 import cubejs from 'cubejs-client';
 
 class ChartjsResultSet {
-  constructor(resultSet) {
+  constructor(resultSet, userConfig) {
     this.resultSet = resultSet;
+    this.userConfig = userConfig;
   }
 
-  timeSeries(config) {
+  timeSeries() {
     return {
       type: 'line',
       data: {
         datasets: this.resultSet.series()
-          .map(s => ({ label: s.name, data: s.series.map(r => ({ t: r[0], y: r[1] }) ) }) )
+          .map(s => ({ label: s.title, data: s.series.map(r => ({ t: r.category, y: r.value }) ) }) )
       },
       options: {
         scales: {
@@ -22,13 +23,33 @@ class ChartjsResultSet {
           }]
         }
       },
-      ...config
+      ...this.userConfig
+    }
+  }
+
+  categories() {
+    return {
+      type: 'bar',
+      data: {
+        labels: this.resultSet.categories().map(c => c.category),
+        datasets: this.resultSet.series()
+          .map(s => ({ label: s.title, data: s.series.map(r => r.value) }) )
+      },
+      ...this.userConfig
+    }
+  }
+
+  prepareConfig() {
+    if ((this.resultSet.query().timeDimensions || []).find(td => !!td.granularity)) {
+      return this.timeSeries();
+    } else {
+      return this.categories();
     }
   }
 }
 
-cubejs.chartjs = (resultSet) => {
-  return new ChartjsResultSet(resultSet);
+cubejs.chartjsConfig = (resultSet, userConfig) => {
+  return new ChartjsResultSet(resultSet, userConfig).prepareConfig();
 };
 
 export default cubejs;
