@@ -7,7 +7,7 @@ import pkg from "./package.json";
 import uglify from "rollup-plugin-uglify";
 import alias from 'rollup-plugin-alias';
 
-const bundle = (name, baseConfig) => {
+const bundle = (name, globalName, baseConfig) => {
   baseConfig = {
     ...baseConfig,
     plugins: [
@@ -25,6 +25,7 @@ const bundle = (name, baseConfig) => {
         exclude: 'node_modules/**',
         runtimeHelpers: true,
         "presets": [
+          '@babel/preset-react',
           [
             "@babel/preset-env",
             {
@@ -52,7 +53,7 @@ const bundle = (name, baseConfig) => {
         {
           file: `dist/${name}.umd.js`,
           format: "umd",
-          name: "cubejs"
+          name: globalName
         }
       ]
     },
@@ -72,8 +73,14 @@ const bundle = (name, baseConfig) => {
   ]
 };
 
-export default bundle('cubejs-client', {
+export default bundle('cubejs-client', 'cubejs', {
   input: "src/index.js",
-}).concat(bundle('cubejs-chartjs-client', {
+}).concat(bundle('cubejs-chartjs-client', 'cubejs', {
   input: "packages/cubejs-chartjs/src/index.js",
+})).concat(bundle('cubejs-react', 'cubejsReact', {
+  input: "packages/cubejs-react/src/index.js",
+  external: [
+    'react',
+    'prop-types'
+  ],
 }));

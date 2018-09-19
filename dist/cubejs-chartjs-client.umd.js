@@ -1927,6 +1927,30 @@
 	  return ResultSet;
 	}();
 
+	var ProgressResult =
+	/*#__PURE__*/
+	function () {
+	  function ProgressResult(progressResponse) {
+	    _classCallCheck(this, ProgressResult);
+
+	    this.progressResponse = progressResponse;
+	  }
+
+	  _createClass(ProgressResult, [{
+	    key: "stage",
+	    value: function stage() {
+	      return this.progressResponse.stage;
+	    }
+	  }, {
+	    key: "timeElapsed",
+	    value: function timeElapsed() {
+	      return this.progressResponse.timeElapsed;
+	    }
+	  }]);
+
+	  return ProgressResult;
+	}();
+
 	var API_URL = "https://statsbot.co/cubejs-api/v1";
 
 	var CubejsApi =
@@ -1964,7 +1988,7 @@
 	        var _ref = _asyncToGenerator(
 	        /*#__PURE__*/
 	        regeneratorRuntime.mark(function _callee() {
-	          var res, response;
+	          var response, body;
 	          return regeneratorRuntime.wrap(function _callee$(_context) {
 	            while (1) {
 	              switch (_context.prev = _context.next) {
@@ -1973,9 +1997,9 @@
 	                  return _this.request("/load?query=".concat(JSON.stringify(query)));
 
 	                case 2:
-	                  res = _context.sent;
+	                  response = _context.sent;
 
-	                  if (!(res.status === 502)) {
+	                  if (!(response.status === 502)) {
 	                    _context.next = 5;
 	                    break;
 	                  }
@@ -1984,22 +2008,34 @@
 
 	                case 5:
 	                  _context.next = 7;
-	                  return res.json();
+	                  return response.json();
 
 	                case 7:
-	                  response = _context.sent;
+	                  body = _context.sent;
 
-	                  if (!(response.error === 'Continue wait')) {
-	                    _context.next = 10;
+	                  if (!(body.error === 'Continue wait')) {
+	                    _context.next = 11;
 	                    break;
+	                  }
+
+	                  if (options.progressCallback) {
+	                    options.progressCallback(new ProgressResult(body));
 	                  }
 
 	                  return _context.abrupt("return", loadImpl());
 
-	                case 10:
-	                  return _context.abrupt("return", new ResultSet(response));
-
 	                case 11:
+	                  if (!(response.status !== 200)) {
+	                    _context.next = 13;
+	                    break;
+	                  }
+
+	                  throw new Error(body.error);
+
+	                case 13:
+	                  return _context.abrupt("return", new ResultSet(body));
+
+	                case 14:
 	                case "end":
 	                  return _context.stop();
 	              }

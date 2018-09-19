@@ -40,6 +40,20 @@ class ResultSet {
   }
 }
 
+class ProgressResult {
+  constructor(progressResponse) {
+    this.progressResponse = progressResponse;
+  }
+
+  stage() {
+    return this.progressResponse.stage;
+  }
+
+  timeElapsed() {
+    return this.progressResponse.timeElapsed;
+  }
+}
+
 const API_URL = "https://statsbot.co/cubejs-api/v1";
 
 class CubejsApi {
@@ -61,15 +75,21 @@ class CubejsApi {
     }
 
     const loadImpl = async () => {
-      const res = await this.request(`/load?query=${JSON.stringify(query)}`);
-      if (res.status === 502) {
+      const response = await this.request(`/load?query=${JSON.stringify(query)}`);
+      if (response.status === 502) {
         return loadImpl(); // TODO backoff wait
       }
-      const response = await res.json();
-      if (response.error === 'Continue wait') {
+      const body = await response.json();
+      if (body.error === 'Continue wait') {
+        if (options.progressCallback) {
+          options.progressCallback(new ProgressResult(body));
+        }
         return loadImpl();
       }
-      return new ResultSet(response);
+      if (response.status !== 200) {
+        throw new Error(body.error); // TODO error class
+      }
+      return new ResultSet(body);
     };
     if (callback) {
       loadImpl().then(r => callback(null, r), e => callback(e));
