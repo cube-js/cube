@@ -1,3 +1,3 @@
 import QueryRenderer from './QueryRenderer.jsx';
 
-export default { QueryRenderer };
+export { QueryRenderer };

@@ -1,0 +1,26 @@
+{
+  "name": "react-chartjs-2",
+  "version": "1.0.0",
+  "description": "Cube.js example with React and Chart.js 2",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "webpack-dev-server --progress --mode development"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.1.0",
+    "@babel/preset-env": "^7.1.0",
+    "@babel/preset-react": "^7.0.0",
+    "@cubejs-client/react": "../../packages/cubejs-react",
+    "babel-loader": "^8.0.2",
+    "chart.js": "^2.7.2",
+    "cubejs-client": "../../",
+    "react": "^16.5.2",
+    "react-chartjs-2": "^2.7.4",
+    "react-dom": "^16.5.2",
+    "react-json-pretty": "^1.7.9",
+    "webpack": "^4.19.1",
+    "webpack-cli": "^3.1.0",
+    "webpack-dev-server": "^3.1.8"
+  }
+}

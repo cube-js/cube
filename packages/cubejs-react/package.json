@@ -4,13 +4,11 @@
   "description": "React components for cube.js",
   "author": "Statsbot, Inc.",
   "dependencies": {
+    "prop-types": "^15.6.2",
     "ramda": "^0.25.0",
-    "react": "^16.5.1"
+    "react": "^16.5.2"
   },
   "files": [
     "dist"
-  ],
-  "devDependencies": {
-    "prop-types": "^15.6.2"
-  }
+  ]
 }
