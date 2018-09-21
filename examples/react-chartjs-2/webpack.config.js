@@ -27,13 +27,19 @@ module.exports = {
     },
   },
   module: {
-    rules: [{
-      test: /\.js$/,
-      loaders: ['babel-loader'],
-      include: [
-        __dirname,
-        path.join(__dirname, '..', 'src'),
-      ],
-    }],
+    rules: [
+      {
+        test: /\.js$/,
+        loaders: ['babel-loader'],
+        include: [
+          __dirname,
+          path.join(__dirname, '..', 'src'),
+        ],
+      },
+      {
+        test: /\.css$/,
+        loaders: ['style-loader', 'css-loader'],
+      },
+    ],
   },
 };
