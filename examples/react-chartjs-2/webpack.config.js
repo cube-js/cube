@@ -21,7 +21,6 @@ module.exports = {
   ],
   resolve: {
     alias: {
-      'cubejs-chartjs': path.join(__dirname, '../..', 'packages/cubejs-chartjs/src/index.js'),
       'cubejs-client': path.join(__dirname, '../..', 'src/index.js'),
       '@cubejs-client/react': path.join(__dirname, '../..', 'packages/cubejs-react/src/index.js'),
     },
