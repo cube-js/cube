@@ -33,7 +33,7 @@ class App extends React.Component {
             <Menu.Item key="pie">Pie</Menu.Item>
           </Menu>
         </Header>
-        <Content style={{ padding: '0 50px', margin: '50px 0' }}>
+        <Content style={{ padding: '30px', margin: '30px', background: '#fff' }}>
           { chartsExamples[this.state.activeChart].render() }
         </Content>
       </Layout>

@@ -8,7 +8,33 @@ const chartsExamples = {
     title: 'Line',
     render: () => (
       <Chart
-        query={{ measures: ['Stories.count'], timeDimensions: [{dimension: 'Stories.time', granularity: 'month', dateRange: ["2015-01-01", "2015-08-01"] }] }}
+        query={{
+          measures: ['Stories.count'], timeDimensions: [{dimension: 'Stories.time', granularity: 'month', dateRange: ["2015-01-01", "2015-08-01"] }]
+        }}
+        codeExample={
+          `
+import { default as cubejs, toChartjsData } from 'cubejs-client';
+import { QueryRenderer } from '@cubejs-client/react';
+import { Line } from 'react-chartjs-2';
+
+ReactDOM.render(
+  <QueryRenderer
+    query={{
+      measures: ['Stories.count'], dimensions: ['Stories.date.month']
+    }}
+    cubejsApi={cubejs('API_KEY')}
+    render={ ({ resultSet }) => (
+      <Line
+        data={toChartjsData('line', resultSet)}
+        options={{
+          scales: { xAxes: [{ type: 'time', time: { unit: 'month' }}] }
+        }}
+      />
+    )
+  />
+)
+          `
+        }
         render={ ({ resultSet }) => (
           <Line data={toChartjsData('line', resultSet)} options={{ scales: { xAxes: [{ type: `time`, time: { unit: 'month' }}] }}} />
         )}
