@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row, Col, Tabs, Spin } from 'antd';
+import { Row, Col, Tabs, Spin, Card } from 'antd';
 import { QueryRenderer } from '@cubejs-client/react';
 import JSONPretty from 'react-json-pretty';
 import cubejs from 'cubejs-client';
@@ -33,6 +33,10 @@ class PrismCode extends React.Component {
     Prism.highlightAll();
   }
 
+  componentDidUpdate() {
+    Prism.highlightAll();
+  }
+
   render() {
     return (
       <pre>
@@ -41,6 +45,44 @@ class PrismCode extends React.Component {
         </code>
       </pre>
     )
+  }
+}
+
+const tabList = [{
+  key: 'code',
+  tab: 'Code'
+}, {
+  key: 'response',
+  tab: 'Response'
+}]
+
+class CodeExample extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = { activeTabKey: 'code' };
+  }
+
+  onTabChange(key) {
+    this.setState({ activeTabKey: key });
+  }
+
+  render() {
+    const { codeExample, resultSet } = this.props;
+    const contentList = {
+      code: <PrismCode code={codeExample} />,
+      response: <PrismCode code={JSON.stringify(resultSet, null, 2)} />
+    };
+
+    return (<Col span={12} style={{ "padding": 10 }}>
+      <Card
+        tabList={tabList}
+        activeTabKey={this.state.activeTabKey}
+        onTabChange={(key) => { this.onTabChange(key, 'key'); }}
+      >
+        { contentList[this.state.activeTabKey] }
+      </Card>
+    </Col>);
   }
 }
 
@@ -53,26 +95,14 @@ const Chart = ({ query, codeExample, render }) => (
       render={ ({ resultSet, error }) => {
         if (resultSet) {
           return [
-            <Col span={12}>
-              <div style={{ padding: "30px" }}>
+            <Col span={12} style={{ "padding": 10 }}>
+              <Card
+                title="Line Chart"
+              >
                 {render({ resultSet, error })}
-              </div>
+              </Card>
             </Col>,
-            <Col span={12}>
-              <div>
-                <Tabs defaultActiveKey="query" type="card">
-                  <TabPane tab="Query" key="query">
-                    <PrismCode code={JSON.stringify(query, null, 2)} />
-                  </TabPane>
-                  <TabPane tab="Response" key="response">
-                    <PrismCode code={JSON.stringify(resultSet, null, 2)} />
-                  </TabPane>
-                  <TabPane tab="Code" key="code">
-                    <PrismCode code={codeExample} />
-                  </TabPane>
-                </Tabs>
-              </div>
-            </Col>
+            <CodeExample resultSet={resultSet} codeExample={codeExample} />
           ];
         }
         return <Spin style={{ textAlign: 'center' }} />;

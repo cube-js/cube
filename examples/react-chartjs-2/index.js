@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Layout, Row, Col, Menu } from 'antd';
 import chartsExamples from './chartsExamples';
 import 'antd/dist/antd.css';
+import './style.css';
 
 const { Header, Footer, Sider, Content } = Layout;
 class App extends React.Component {
