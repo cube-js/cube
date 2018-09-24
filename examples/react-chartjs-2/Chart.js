@@ -6,26 +6,6 @@ import cubejs from 'cubejs-client';
 import Prism from "prismjs";
 import "./prism.css";
 
-
-// Minimal Example:
-//
-// import { default as cubejs, toChartjsData } from 'cubejs-client';
-// import { QueryRenderer } from '@cubejs-client/react';
-// import { Pie } from 'react-chartjs-2';
-
-// ReactDOM.render(
-//   <QueryRenderer
-//     query={{ measures: ['Stories.count'], dimensions: ['Stories.date.month'] }}
-//     cubejsApi={cubejs('API_KEY')}
-//     render={ ({ resultSet }) => (
-//       <Line
-//         data={toChartjsData('line', resultSet)}
-//         options={{ scales: { xAxes: [{ type: `time`, time: { unit: 'month' }}] }}}
-//       />
-//     )
-//   />
-// )
-
 const HACKER_NEWS_DATASET_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw'
 
 class PrismCode extends React.Component {
@@ -92,7 +72,11 @@ const Chart = ({ query, codeExample, render }) => (
     <QueryRenderer
       query={query}
       cubejsApi={cubejs(HACKER_NEWS_DATASET_API_KEY)}
-      render={ ({ resultSet, error }) => {
+      render={ ({ resultSet, error, loadingState }) => {
+        if (loadingState.isLoading) {
+          return <Spin style={{ textAlign: 'center' }} />;
+        }
+
         if (resultSet) {
           return [
             <Col span={12} style={{ "padding": 10 }}>

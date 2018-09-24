@@ -1,5 +1,13 @@
 const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
 
+const toChartjsOptions = (chartType, resultSet) => {
+  if (chartType === 'line' || chartType === 'bar') {
+    return { scales: { xAxes: [{ type: `time`, time: { unit: 'month' }}] }};
+  }
+
+  return {}
+}
+
 const toChartjsData = (chartType, resultSet) => {
   if (chartType === 'pie') {
     return {
@@ -55,4 +63,12 @@ const toChartjsData = (chartType, resultSet) => {
 
 }
 
-export default toChartjsData;
+const chartjsConfig = (chartType, resultSet) => (
+  {
+    data: toChartjsData(chartType, resultSet),
+    options: toChartjsOptions(chartType, resultSet),
+    type: chartType
+  }
+)
+
+export default chartjsConfig;
