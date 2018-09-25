@@ -13,7 +13,7 @@ const TimeSeriesChart = ({ resultSet }) => {
     <CartesianGrid strokeDasharray="3 3"/>
     <Tooltip/>
     <Legend />
-    {resultSet.seriesNames().map(({key}) => <Line type="monotone" dataKey={key} stroke="#8884d8" id={key}/>)}
+    {resultSet.seriesNames().map(({ key, title }) => <Line type="monotone" dataKey={key} id={key} name={title}/>)}
   </LineChart>);
 };
 
