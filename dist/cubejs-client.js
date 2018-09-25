@@ -5,7 +5,7 @@ class ResultSet {
     this.loadResponse = loadResponse;
   }
 
-  series() {
+  series(pivotConfig) {
     const query = this.loadResponse.query;
     return query.measures.map(measure => ({
       title: this.loadResponse.annotation.measures[measure].title,
@@ -15,20 +15,80 @@ class ResultSet {
     }))
   }
 
-  categoryFn() {
+  axisValues(axis) {
     const query = this.loadResponse.query;
     return row => {
-      const dimensionValues = (query.dimensions || []).map(d => row[d]).concat(
-        (query.timeDimensions || []).filter(td => !!td.granularity).map(td => row[td.dimension])
-      );
-      return dimensionValues.map(v => v || '∅').join(', ');
+      const value = (measure) =>
+        axis.filter(d => d !== 'measures')
+        .map(d => row[d]).concat(measure ? [measure] : [])
+        .map(v => v != null ? v : '∅').join(', ');
+      if (axis.find(d => d === 'measures') && (query.measures || []).length) {
+        return query.measures.map(value);
+      }
+      return [value()];
     };
   }
 
-  categories() {
+  axisKeys(axis) {
     const query = this.loadResponse.query;
+    if (axis.find(d => d === 'measures') && (query.measures || []).length) {
+      let withoutMeasures = axis.filter(d => d !== 'measures');
+      return query.measures.map(measure => withoutMeasures.concat(measure).join(', '));
+    } else {
+      return [axis.join(', ')];
+    }
+  }
+
+  normalizePivotConfig(pivotConfig) {
+    const query = this.loadResponse.query;
+    pivotConfig = pivotConfig || {
+      x: (query.timeDimensions || []).filter(td => !!td.granularity).map(td => td.dimension),
+      y: query.dimensions || []
+    };
+    if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
+      pivotConfig.y = pivotConfig.y.concat(['measures']);
+    }
+    return pivotConfig;
+  }
+
+  static measureFromAxis(axis) {
+    const axisValues = axis.split(', ');
+    return axisValues[axisValues.length - 1];
+  };
+
+  pivotedRows(pivotConfig) {
     // TODO missing date filling
-    return this.loadResponse.data.map(row => ({ row, category: this.categoryFn()(row) }));
+    pivotConfig = this.normalizePivotConfig(pivotConfig);
+    return this.loadResponse.data.map(row =>
+      this.axisValues(pivotConfig.x)(row).map(category => ({
+        row,
+        category,
+        ...(this.axisValues(pivotConfig.y)(row).map(series =>{
+            let measure = pivotConfig.x.find(d => d === 'measures') ?
+              ResultSet.measureFromAxis(category) :
+              ResultSet.measureFromAxis(series);
+            return {
+            [pivotConfig.y.filter(d => d !== 'measures').concat(measure).join(', ')]: row[measure]
+          }
+          }).reduce((a, b) => Object.assign(a, b), {})
+        )
+      }))
+    ).reduce((a, b) => a.concat(b), []);
+  }
+
+  categories(pivotConfig) { //TODO
+    return this.pivotedRows(pivotConfig);
+  }
+
+  seriesNames(pivotConfig) {
+    pivotConfig = this.normalizePivotConfig(pivotConfig);
+    return this.axisKeys(pivotConfig.y).map(axis => ({
+      title: pivotConfig.y.find(d => d === 'measures') ? axis.replace(
+        ResultSet.measureFromAxis(axis),
+        this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axis)].title
+      ) : axis,
+      key: axis
+    }))
   }
 
   query() {

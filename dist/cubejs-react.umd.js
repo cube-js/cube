@@ -1,8 +1,8 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react'), require('prop-types')) :
-  typeof define === 'function' && define.amd ? define(['react', 'prop-types'], factory) :
-  (global.cubejsReact = factory(global.React,global.PropTypes));
-}(this, (function (React,PropTypes) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react'), require('prop-types')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react', 'prop-types'], factory) :
+  (factory((global.cubejsReact = {}),global.React,global.PropTypes));
+}(this, (function (exports,React,PropTypes) { 'use strict';
 
   React = React && React.hasOwnProperty('default') ? React['default'] : React;
 
@@ -449,7 +449,7 @@
     return store[key] || (store[key] = value !== undefined ? value : {});
   })('versions', []).push({
     version: _core.version,
-    mode: 'global',
+    mode: _library ? 'pure' : 'global',
     copyright: '© 2018 Denis Pushkarev (zloirock.ru)'
   });
   });
@@ -1284,7 +1284,7 @@
 
   var defineProperty = _objectDp.f;
   var _wksDefine = function (name) {
-    var $Symbol = _core.Symbol || (_core.Symbol = _global.Symbol || {});
+    var $Symbol = _core.Symbol || (_core.Symbol = _library ? {} : _global.Symbol || {});
     if (name.charAt(0) != '_' && !(name in $Symbol)) defineProperty($Symbol, name, { value: _wksExt.f(name) });
   };
 
@@ -5739,10 +5739,8 @@
     query: PropTypes.object
   };
 
-  var index = {
-    QueryRenderer: QueryRenderer
-  };
+  exports.QueryRenderer = QueryRenderer;
 
-  return index;
+  Object.defineProperty(exports, '__esModule', { value: true });
 
 })));

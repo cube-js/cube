@@ -45,6 +45,4 @@ QueryRenderer.propTypes = {
   query: object
 };
 
-var index = { QueryRenderer };
-
-export default index;
+export { QueryRenderer };

@@ -1843,6 +1843,151 @@
 	  self.Response = Response;
 	}
 
+	var _fixReWks = function (KEY, length, exec) {
+	  var SYMBOL = _wks(KEY);
+	  var fns = exec(_defined, SYMBOL, ''[KEY]);
+	  var strfn = fns[0];
+	  var rxfn = fns[1];
+	  if (_fails(function () {
+	    var O = {};
+	    O[SYMBOL] = function () { return 7; };
+	    return ''[KEY](O) != 7;
+	  })) {
+	    _redefine(String.prototype, KEY, strfn);
+	    _hide(RegExp.prototype, SYMBOL, length == 2
+	      // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
+	      // 21.2.5.11 RegExp.prototype[@@split](string, limit)
+	      ? function (string, arg) { return rxfn.call(string, this, arg); }
+	      // 21.2.5.6 RegExp.prototype[@@match](string)
+	      // 21.2.5.9 RegExp.prototype[@@search](string)
+	      : function (string) { return rxfn.call(string, this); }
+	    );
+	  }
+	};
+
+	// 7.2.8 IsRegExp(argument)
+
+
+	var MATCH = _wks('match');
+	var _isRegexp = function (it) {
+	  var isRegExp;
+	  return _isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : _cof(it) == 'RegExp');
+	};
+
+	// @@split logic
+	_fixReWks('split', 2, function (defined, SPLIT, $split) {
+	  var isRegExp = _isRegexp;
+	  var _split = $split;
+	  var $push = [].push;
+	  var $SPLIT = 'split';
+	  var LENGTH = 'length';
+	  var LAST_INDEX = 'lastIndex';
+	  if (
+	    'abbc'[$SPLIT](/(b)*/)[1] == 'c' ||
+	    'test'[$SPLIT](/(?:)/, -1)[LENGTH] != 4 ||
+	    'ab'[$SPLIT](/(?:ab)*/)[LENGTH] != 2 ||
+	    '.'[$SPLIT](/(.?)(.?)/)[LENGTH] != 4 ||
+	    '.'[$SPLIT](/()()/)[LENGTH] > 1 ||
+	    ''[$SPLIT](/.?/)[LENGTH]
+	  ) {
+	    var NPCG = /()??/.exec('')[1] === undefined; // nonparticipating capturing group
+	    // based on es5-shim implementation, need to rework it
+	    $split = function (separator, limit) {
+	      var string = String(this);
+	      if (separator === undefined && limit === 0) return [];
+	      // If `separator` is not a regex, use native split
+	      if (!isRegExp(separator)) return _split.call(string, separator, limit);
+	      var output = [];
+	      var flags = (separator.ignoreCase ? 'i' : '') +
+	                  (separator.multiline ? 'm' : '') +
+	                  (separator.unicode ? 'u' : '') +
+	                  (separator.sticky ? 'y' : '');
+	      var lastLastIndex = 0;
+	      var splitLimit = limit === undefined ? 4294967295 : limit >>> 0;
+	      // Make `global` and avoid `lastIndex` issues by working with a copy
+	      var separatorCopy = new RegExp(separator.source, flags + 'g');
+	      var separator2, match, lastIndex, lastLength, i;
+	      // Doesn't need flags gy, but they don't hurt
+	      if (!NPCG) separator2 = new RegExp('^' + separatorCopy.source + '$(?!\\s)', flags);
+	      while (match = separatorCopy.exec(string)) {
+	        // `separatorCopy.lastIndex` is not reliable cross-browser
+	        lastIndex = match.index + match[0][LENGTH];
+	        if (lastIndex > lastLastIndex) {
+	          output.push(string.slice(lastLastIndex, match.index));
+	          // Fix browsers whose `exec` methods don't consistently return `undefined` for NPCG
+	          // eslint-disable-next-line no-loop-func
+	          if (!NPCG && match[LENGTH] > 1) match[0].replace(separator2, function () {
+	            for (i = 1; i < arguments[LENGTH] - 2; i++) if (arguments[i] === undefined) match[i] = undefined;
+	          });
+	          if (match[LENGTH] > 1 && match.index < string[LENGTH]) $push.apply(output, match.slice(1));
+	          lastLength = match[0][LENGTH];
+	          lastLastIndex = lastIndex;
+	          if (output[LENGTH] >= splitLimit) break;
+	        }
+	        if (separatorCopy[LAST_INDEX] === match.index) separatorCopy[LAST_INDEX]++; // Avoid an infinite loop
+	      }
+	      if (lastLastIndex === string[LENGTH]) {
+	        if (lastLength || !separatorCopy.test('')) output.push('');
+	      } else output.push(string.slice(lastLastIndex));
+	      return output[LENGTH] > splitLimit ? output.slice(0, splitLimit) : output;
+	    };
+	  // Chakra, V8
+	  } else if ('0'[$SPLIT](undefined, 0)[LENGTH]) {
+	    $split = function (separator, limit) {
+	      return separator === undefined && limit === 0 ? [] : _split.call(this, separator, limit);
+	    };
+	  }
+	  // 21.1.3.17 String.prototype.split(separator, limit)
+	  return [function split(separator, limit) {
+	    var O = defined(this);
+	    var fn = separator == undefined ? undefined : separator[SPLIT];
+	    return fn !== undefined ? fn.call(separator, O, limit) : $split.call(String(O), separator, limit);
+	  }, $split];
+	});
+
+	// @@replace logic
+	_fixReWks('replace', 2, function (defined, REPLACE, $replace) {
+	  // 21.1.3.14 String.prototype.replace(searchValue, replaceValue)
+	  return [function replace(searchValue, replaceValue) {
+	    var O = defined(this);
+	    var fn = searchValue == undefined ? undefined : searchValue[REPLACE];
+	    return fn !== undefined
+	      ? fn.call(searchValue, O, replaceValue)
+	      : $replace.call(String(O), searchValue, replaceValue);
+	  }, $replace];
+	});
+
+	var _arrayReduce = function (that, callbackfn, aLen, memo, isRight) {
+	  _aFunction(callbackfn);
+	  var O = _toObject(that);
+	  var self = _iobject(O);
+	  var length = _toLength(O.length);
+	  var index = isRight ? length - 1 : 0;
+	  var i = isRight ? -1 : 1;
+	  if (aLen < 2) for (;;) {
+	    if (index in self) {
+	      memo = self[index];
+	      index += i;
+	      break;
+	    }
+	    index += i;
+	    if (isRight ? index < 0 : length <= index) {
+	      throw TypeError('Reduce of empty array with no initial value');
+	    }
+	  }
+	  for (;isRight ? index >= 0 : length > index; index += i) if (index in self) {
+	    memo = callbackfn(memo, self[index], index, O);
+	  }
+	  return memo;
+	};
+
+	_export(_export.P + _export.F * !_strictMethod([].reduce, true), 'Array', {
+	  // 22.1.3.18 / 15.4.4.21 Array.prototype.reduce(callbackfn [, initialValue])
+	  reduce: function reduce(callbackfn /* , initialValue */) {
+	    return _arrayReduce(this, callbackfn, arguments.length, arguments[1], false);
+	  }
+	});
+
 	var $filter = _arrayMethods(2);
 
 	_export(_export.P + _export.F * !_strictMethod([].filter, true), 'Array', {
@@ -1863,7 +2008,7 @@
 
 	  _createClass(ResultSet, [{
 	    key: "series",
-	    value: function series() {
+	    value: function series(pivotConfig) {
 	      var _this = this;
 
 	      var query = this.loadResponse.query;
@@ -1882,33 +2027,113 @@
 	      });
 	    }
 	  }, {
-	    key: "categoryFn",
-	    value: function categoryFn() {
+	    key: "axisValues",
+	    value: function axisValues(axis) {
 	      var query = this.loadResponse.query;
 	      return function (row) {
-	        var dimensionValues = (query.dimensions || []).map(function (d) {
-	          return row[d];
-	        }).concat((query.timeDimensions || []).filter(function (td) {
-	          return !!td.granularity;
-	        }).map(function (td) {
-	          return row[td.dimension];
-	        }));
-	        return dimensionValues.map(function (v) {
-	          return v || '∅';
-	        }).join(', ');
+	        var value = function value(measure) {
+	          return axis.filter(function (d) {
+	            return d !== 'measures';
+	          }).map(function (d) {
+	            return row[d];
+	          }).concat(measure ? [measure] : []).map(function (v) {
+	            return v != null ? v : '∅';
+	          }).join(', ');
+	        };
+
+	        if (axis.find(function (d) {
+	          return d === 'measures';
+	        }) && (query.measures || []).length) {
+	          return query.measures.map(value);
+	        }
+
+	        return [value()];
 	      };
 	    }
 	  }, {
-	    key: "categories",
-	    value: function categories() {
+	    key: "axisKeys",
+	    value: function axisKeys(axis) {
+	      var query = this.loadResponse.query;
+
+	      if (axis.find(function (d) {
+	        return d === 'measures';
+	      }) && (query.measures || []).length) {
+	        var withoutMeasures = axis.filter(function (d) {
+	          return d !== 'measures';
+	        });
+	        return query.measures.map(function (measure) {
+	          return withoutMeasures.concat(measure).join(', ');
+	        });
+	      } else {
+	        return [axis.join(', ')];
+	      }
+	    }
+	  }, {
+	    key: "normalizePivotConfig",
+	    value: function normalizePivotConfig(pivotConfig) {
+	      var query = this.loadResponse.query;
+	      pivotConfig = pivotConfig || {
+	        x: (query.timeDimensions || []).filter(function (td) {
+	          return !!td.granularity;
+	        }).map(function (td) {
+	          return td.dimension;
+	        }),
+	        y: query.dimensions || []
+	      };
+
+	      if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
+	        return d === 'measures';
+	      })) {
+	        pivotConfig.y = pivotConfig.y.concat(['measures']);
+	      }
+
+	      return pivotConfig;
+	    }
+	  }, {
+	    key: "pivotedRows",
+	    value: function pivotedRows(pivotConfig) {
 	      var _this2 = this;
 
-	      var query = this.loadResponse.query; // TODO missing date filling
-
+	      // TODO missing date filling
+	      pivotConfig = this.normalizePivotConfig(pivotConfig);
 	      return this.loadResponse.data.map(function (row) {
+	        return _this2.axisValues(pivotConfig.x)(row).map(function (category) {
+	          return _objectSpread({
+	            row: row,
+	            category: category
+	          }, _this2.axisValues(pivotConfig.y)(row).map(function (series) {
+	            var measure = pivotConfig.x.find(function (d) {
+	              return d === 'measures';
+	            }) ? ResultSet.measureFromAxis(category) : ResultSet.measureFromAxis(series);
+	            return _defineProperty({}, pivotConfig.y.filter(function (d) {
+	              return d !== 'measures';
+	            }).concat(measure).join(', '), row[measure]);
+	          }).reduce(function (a, b) {
+	            return Object.assign(a, b);
+	          }, {}));
+	        });
+	      }).reduce(function (a, b) {
+	        return a.concat(b);
+	      }, []);
+	    }
+	  }, {
+	    key: "categories",
+	    value: function categories(pivotConfig) {
+	      //TODO
+	      return this.pivotedRows(pivotConfig);
+	    }
+	  }, {
+	    key: "seriesNames",
+	    value: function seriesNames(pivotConfig) {
+	      var _this3 = this;
+
+	      pivotConfig = this.normalizePivotConfig(pivotConfig);
+	      return this.axisKeys(pivotConfig.y).map(function (axis) {
 	        return {
-	          row: row,
-	          category: _this2.categoryFn()(row)
+	          title: pivotConfig.y.find(function (d) {
+	            return d === 'measures';
+	          }) ? axis.replace(ResultSet.measureFromAxis(axis), _this3.loadResponse.annotation.measures[ResultSet.measureFromAxis(axis)].title) : axis,
+	          key: axis
 	        };
 	      });
 	    }
@@ -1921,6 +2146,12 @@
 	    key: "rawData",
 	    value: function rawData() {
 	      return this.loadResponse.data;
+	    }
+	  }], [{
+	    key: "measureFromAxis",
+	    value: function measureFromAxis(axis) {
+	      var axisValues = axis.split(', ');
+	      return axisValues[axisValues.length - 1];
 	    }
 	  }]);
 

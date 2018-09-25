@@ -6,7 +6,7 @@ const {LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend} = Recharts
 class ReactExample extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { loading: false };
+    this.state = {};
     this.api = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
     this.chartRef = React.createRef();
   }
@@ -44,19 +44,6 @@ class ReactExample extends React.Component {
       }
       />
     </div>);
-  }
-
-  load() {
-    this.setState({
-      query: {
-        measures: ["Stories.count"],
-        timeDimensions: [{
-          dimension: "Stories.time",
-          dateRange: ["2015-01-01", "2016-01-01"],
-          granularity: 'month'
-        }]
-      }
-    })
   }
 }
 
