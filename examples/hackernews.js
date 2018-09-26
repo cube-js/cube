@@ -125,6 +125,18 @@ class HackerNewsExample extends React.Component {
       />
       <QueryRenderer
         query={{
+          measures: ["Stories.percentageOfDead"],
+          dimensions: ['Stories.time.week'],
+          filters: [{
+            dimension: 'Stories.time',
+            operator: 'set'
+          }]
+        }}
+        cubejsApi={this.api}
+        render={renderChart(TimeSeriesRenderer)}
+      />
+      <QueryRenderer
+        query={{
           measures: ["Stories.count"],
           dimensions: ['Stories.time.month', 'Stories.category'],
           filters: [{
@@ -134,6 +146,14 @@ class HackerNewsExample extends React.Component {
         }}
         cubejsApi={this.api}
         render={renderChart(AreaRenderer)}
+      />
+      <QueryRenderer
+        query={{
+          measures: ["Stories.averageScore"],
+          dimensions: ['Stories.category']
+        }}
+        cubejsApi={this.api}
+        render={renderChart(BarRenderer)}
       />
     </div>);
   }
