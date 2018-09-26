@@ -14,6 +14,7 @@
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
     "core-js": "^2.5.3",
+    "ramda": "^0.25.0",
     "whatwg-fetch": "^3.0.0"
   },
   "files": [

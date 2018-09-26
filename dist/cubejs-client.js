@@ -1,3 +1,4 @@
+import { groupBy, pipe, toPairs, uniq, flatten, map } from 'ramda';
 import { fetch } from 'whatwg-fetch';
 
 class ResultSet {
@@ -41,9 +42,13 @@ class ResultSet {
 
   normalizePivotConfig(pivotConfig) {
     const query = this.loadResponse.query;
-    pivotConfig = pivotConfig || {
-      x: (query.timeDimensions || []).filter(td => !!td.granularity).map(td => td.dimension),
+    let timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+    pivotConfig = pivotConfig || timeDimensions.length ? {
+      x: timeDimensions.map(td => td.dimension),
       y: query.dimensions || []
+    } : {
+      x: query.dimensions || [],
+      y: []
     };
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
@@ -59,21 +64,20 @@ class ResultSet {
   pivotedRows(pivotConfig) {
     // TODO missing date filling
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    return this.loadResponse.data.map(row =>
-      this.axisValues(pivotConfig.x)(row).map(category => ({
-        row,
-        category,
-        ...(this.axisValues(pivotConfig.y)(row).map(series =>{
+    return pipe(groupBy(this.axisValues(pivotConfig.x)), toPairs)(this.loadResponse.data).map(([category, rows]) => ({
+      rows,
+      category,
+      ...(rows.map(row => this.axisValues(pivotConfig.y)(row).map(series => {
             let measure = pivotConfig.x.find(d => d === 'measures') ?
               ResultSet.measureFromAxis(category) :
               ResultSet.measureFromAxis(series);
             return {
-            [pivotConfig.y.filter(d => d !== 'measures').concat(measure).join(', ')]: row[measure]
-          }
+              [series]: row[measure]
+            }
           }).reduce((a, b) => Object.assign(a, b), {})
-        )
-      }))
-    ).reduce((a, b) => a.concat(b), []);
+        )).reduce((a, b) => Object.assign(a, b), {})
+      })
+    );
   }
 
   categories(pivotConfig) { //TODO
@@ -82,7 +86,7 @@ class ResultSet {
 
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    return this.axisKeys(pivotConfig.y).map(axis => ({
+    return pipe(map(this.axisValues(pivotConfig.y)), uniq, flatten)(this.loadResponse.data).map(axis => ({
       title: pivotConfig.y.find(d => d === 'measures') ? axis.replace(
         ResultSet.measureFromAxis(axis),
         this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axis)].title
