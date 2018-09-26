@@ -14,12 +14,12 @@ export default class QueryRenderer extends React.Component {
   componentDidUpdate(prevProps) {
     let query = this.props.query;
     if (!equals(prevProps.query, query)) {
-      this.setState({ isLoading: true });
       this.load(query);
     }
   }
 
   load(query) {
+    this.setState({ isLoading: true, resultSet: null, error: null });
     this.props.cubejsApi.load(query)
       .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
       .catch(error => this.setState({ resultSet: null, error, isLoading: false }))

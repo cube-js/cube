@@ -8,7 +8,9 @@
     "ramda": "^0.25.0",
     "react": "^16.5.2"
   },
+  "main": "src/index.js",
   "files": [
+    "src",
     "dist"
   ]
 }
