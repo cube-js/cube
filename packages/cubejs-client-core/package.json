@@ -1,0 +1,15 @@
+{
+  "name": "@cubejs-client/core",
+  "version": "0.1.0",
+  "description": "cube.js client",
+  "main": "dist/cubejs-client-core.js",
+  "author": "Statsbot, Inc.",
+  "dependencies": {
+    "ramda": "^0.25.0",
+    "whatwg-fetch": "^3.0.0"
+  },
+  "files": [
+    "src",
+    "dist"
+  ]
+}

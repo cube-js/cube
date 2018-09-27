@@ -22,6 +22,8 @@ class CubejsApi {
       options = undefined;
     }
 
+    options = options || {};
+
     const loadImpl = async () => {
       const response = await this.request(`/load?query=${JSON.stringify(query)}`);
       if (response.status === 502) {

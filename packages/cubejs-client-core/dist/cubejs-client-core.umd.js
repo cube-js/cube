@@ -821,6 +821,42 @@
 	  return target;
 	}
 
+	function _objectWithoutPropertiesLoose(source, excluded) {
+	  if (source == null) return {};
+	  var target = {};
+	  var sourceKeys = Object.keys(source);
+	  var key, i;
+
+	  for (i = 0; i < sourceKeys.length; i++) {
+	    key = sourceKeys[i];
+	    if (excluded.indexOf(key) >= 0) continue;
+	    target[key] = source[key];
+	  }
+
+	  return target;
+	}
+
+	function _objectWithoutProperties(source, excluded) {
+	  if (source == null) return {};
+
+	  var target = _objectWithoutPropertiesLoose(source, excluded);
+
+	  var key, i;
+
+	  if (Object.getOwnPropertySymbols) {
+	    var sourceSymbolKeys = Object.getOwnPropertySymbols(source);
+
+	    for (i = 0; i < sourceSymbolKeys.length; i++) {
+	      key = sourceSymbolKeys[i];
+	      if (excluded.indexOf(key) >= 0) continue;
+	      if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
+	      target[key] = source[key];
+	    }
+	  }
+
+	  return target;
+	}
+
 	function _slicedToArray(arr, i) {
 	  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
 	}
@@ -5285,14 +5321,17 @@
 	      var _this = this;
 
 	      var query = this.loadResponse.query;
-	      return query.measures.map(function (measure) {
+	      return this.seriesNames(pivotConfig).map(function (_ref) {
+	        var title = _ref.title,
+	            key = _ref.key;
 	        return {
-	          title: _this.loadResponse.annotation.measures[measure].title,
-	          series: _this.categories().map(function (_ref) {
-	            var row = _ref.row,
-	                category = _ref.category;
+	          title: title,
+	          series: _this.pivotedRows(pivotConfig).map(function (_ref2) {
+	            var category = _ref2.category,
+	                obj = _objectWithoutProperties(_ref2, ["category"]);
+
 	            return {
-	              value: row[measure],
+	              value: obj[key],
 	              category: category
 	            };
 	          })
@@ -5373,10 +5412,10 @@
 
 	      // TODO missing date filling
 	      pivotConfig = this.normalizePivotConfig(pivotConfig);
-	      return pipe(groupBy(this.axisValues(pivotConfig.x)), toPairs)(this.loadResponse.data).map(function (_ref2) {
-	        var _ref3 = _slicedToArray(_ref2, 2),
-	            category = _ref3[0],
-	            rows = _ref3[1];
+	      return pipe(groupBy(this.axisValues(pivotConfig.x)), toPairs)(this.loadResponse.data).map(function (_ref3) {
+	        var _ref4 = _slicedToArray(_ref3, 2),
+	            category = _ref4[0],
+	            rows = _ref4[1];
 
 	        return _objectSpread({
 	          rows: rows,
@@ -5491,6 +5530,8 @@
 	        callback = options;
 	        options = undefined;
 	      }
+
+	      options = options || {};
 
 	      var loadImpl =
 	      /*#__PURE__*/

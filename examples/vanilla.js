@@ -30,7 +30,7 @@ class LikeButton extends React.Component {
     })
       .then(r => {
         const context = document.getElementById("myChart");
-        const config = cubejs.chartjsConfig(r);
+        const config = chartjsConfig(r);
         this.setState({ result: JSON.stringify(config) });
         new Chart(context, config);
       })

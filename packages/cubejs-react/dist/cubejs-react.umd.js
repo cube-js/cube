@@ -5686,9 +5686,6 @@
         var query = this.props.query;
 
         if (!equals(prevProps.query, query)) {
-          this.setState({
-            isLoading: true
-          });
           this.load(query);
         }
       }
@@ -5697,6 +5694,11 @@
       value: function load(query) {
         var _this2 = this;
 
+        this.setState({
+          isLoading: true,
+          resultSet: null,
+          error: null
+        });
         this.props.cubejsApi.load(query).then(function (resultSet) {
           return _this2.setState({
             resultSet: resultSet,

@@ -6,13 +6,10 @@ export default class ResultSet {
   }
 
   series(pivotConfig) {
-    const query = this.loadResponse.query;
-    return query.measures.map(measure => ({
-      title: this.loadResponse.annotation.measures[measure].title,
-      series: this.categories().map(
-        ({ row, category }) => ({ value: row[measure], category })
-      )
-    }))
+    return this.seriesNames(pivotConfig).map(({ title, key}) => ({
+      title,
+      series: this.pivotedRows(pivotConfig).map(({ category, ...obj }) => ({ value: obj[key], category }))
+    }));
   }
 
   axisValues(axis) {

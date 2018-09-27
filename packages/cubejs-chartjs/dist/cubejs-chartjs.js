@@ -1,5 +1,3 @@
-import cubejs from 'cubejs-client';
-
 class ChartjsResultSet {
   constructor(resultSet, userConfig) {
     this.resultSet = resultSet;
@@ -48,8 +46,8 @@ class ChartjsResultSet {
   }
 }
 
-cubejs.chartjsConfig = (resultSet, userConfig) => {
+var index = (resultSet, userConfig) => {
   return new ChartjsResultSet(resultSet, userConfig).prepareConfig();
 };
 
-export default cubejs;
+export default index;

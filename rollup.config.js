@@ -39,7 +39,7 @@ const bundle = (name, globalName, baseConfig) => {
         module: true
       }),
       alias({
-        'cubejs-client': 'src/index.js'
+        '@cubejs-client/core': '../cubejs-client-core/src/index.js'
       }),
       commonjs()
     ]
@@ -51,7 +51,7 @@ const bundle = (name, globalName, baseConfig) => {
       ...baseUmdConfig,
       output: [
         {
-          file: `dist/${name}.umd.js`,
+          file: `packages/${name}/dist/${name}.umd.js`,
           format: "umd",
           name: globalName
         }
@@ -68,14 +68,14 @@ const bundle = (name, globalName, baseConfig) => {
     // // ES module (for bundlers) build.
     {
       ...baseConfig,
-      output: [{ file: `dist/${name}.js`, format: "es" }]
+      output: [{ file: `packages/${name}/dist/${name}.js`, format: "es" }]
     }
   ]
 };
 
-export default bundle('cubejs-client', 'cubejs', {
-  input: "src/index.js",
-}).concat(bundle('cubejs-chartjs-client', 'cubejs', {
+export default bundle('cubejs-client-core', 'cubejs', {
+  input: "packages/cubejs-client-core/src/index.js",
+}).concat(bundle('cubejs-chartjs', 'chartjsConfig', {
   input: "packages/cubejs-chartjs/src/index.js",
 })).concat(bundle('cubejs-react', 'cubejsReact', {
   input: "packages/cubejs-react/src/index.js",
