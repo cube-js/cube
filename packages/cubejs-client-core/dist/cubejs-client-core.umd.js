@@ -5320,7 +5320,6 @@
 	    value: function series(pivotConfig) {
 	      var _this = this;
 
-	      var query = this.loadResponse.query;
 	      return this.seriesNames(pivotConfig).map(function (_ref) {
 	        var title = _ref.title,
 	            key = _ref.key;
