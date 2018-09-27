@@ -1,11 +1,13 @@
 const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
 
 const toChartjsOptions = (chartType, resultSet) => {
-  if (chartType === 'line' || chartType === 'bar') {
-    return { scales: { xAxes: [{ type: `time`, time: { unit: 'month' }}] }};
+  // TODO: Check for supported charts
+  let options = {};
+  if ((resultSet.query().timeDimensions || []).find(td => !!td.granularity)) {
+    options.scales = { xAxes: [{ type: `time`, time: { unit: 'month' }}] };
   }
 
-  return {}
+  return options;
 }
 
 const toChartjsData = (chartType, resultSet) => {

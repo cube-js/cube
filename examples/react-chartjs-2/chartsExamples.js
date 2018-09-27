@@ -72,10 +72,36 @@ const chartsExamples = {
       ]
     })
   },
+  lineMulti: {
+    title: 'Line',
+    render: renderExample('line', {
+      measures: ['Stories.count', 'Stories.totalScore'],
+      timeDimensions: [
+        {
+          dimension: 'Stories.time',
+          granularity: 'month',
+          dateRange: ["2015-01-01", "2015-08-01"]
+        }
+      ]
+    })
+  },
   bar: {
     title: 'Bar',
     render: renderExample('bar', {
-      measures: ['Stories.count', 'Stories.totalScore'],
+      measures: ['Stories.count'],
+      timeDimensions: [
+        {
+          dimension: 'Stories.time',
+          granularity: 'month',
+          dateRange: ["2015-01-01", "2015-08-01"] }
+      ]
+    })
+  },
+  barStacked: {
+    title: 'Bar',
+    render: renderExample('bar', {
+      measures: ['Stories.count'],
+      dimensions: ['Stories.category'],
       timeDimensions: [
         {
           dimension: 'Stories.time',
