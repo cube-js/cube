@@ -47,6 +47,52 @@ cubejsApi.load({
 
 ### cubejs(apiKey)
 
-Create instance of CubejsApi.
+Create instance of `CubejsApi`.
 
 - `apiKey` - API key used to authorize requests and determine SQL database you're accessing. Please email info@statsbot.co to obtain API key.
+
+### CubejsApi.load(query, options, callback)
+
+Fetch data for passed `query`.
+
+- `query` - analytic query. Learn more about it's format below.
+- `options` - optional.
+-- `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
+- `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
+
+### ResultSet.rawData()
+
+Returns query result raw data returned from server in format
+
+```
+[
+    { "Stories.time":"2015-01-01T00:00:00", "Stories.count": 27120 },
+    { "Stories.time":"2015-02-01T00:00:00", "Stories.count": 25861 },
+    { "Stories.time":"2015-03-01T00:00:00", "Stories.count": 29661 },
+    ...
+]
+```
+
+
+Format of this data may change over time.
+
+### Query Format
+
+Query is plain JavaScript object with following format
+
+```
+{
+  measures: ['Stories.count'],
+  dimensions: ['Stories.category'],
+  filters: [{
+    dimension: 'Stories.dead',
+    operator: 'equals',
+    params: ['No']
+  }],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+
+```
