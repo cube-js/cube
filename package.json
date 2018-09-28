@@ -6,7 +6,8 @@
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
-    "example": "http-server"
+    "example": "http-server",
+    "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w"
   },
   "author": "Statsbot, Inc.",
   "dependencies": {

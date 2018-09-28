@@ -15,10 +15,11 @@ class ReactExample extends React.Component {
     return (<div>
       <QueryRenderer query={{
         measures: ["Stories.count"],
-        timeDimensions: [{
+        dimensions: ['Stories.time.month'],
+        filters: [{
           dimension: "Stories.time",
-          dateRange: ["2015-01-01", "2016-01-01"],
-          granularity: 'month'
+          operator: 'inDateRange',
+          values: ["2015-01-01", "2016-01-01"]
         }]
       }} cubejsApi={this.api} render={
         ({ resultSet, error }) => {
