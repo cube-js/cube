@@ -1,8 +1,8 @@
 import React from 'react';
 import { Row, Col, Tabs, Spin, Card } from 'antd';
+import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 import JSONPretty from 'react-json-pretty';
-import cubejs from 'cubejs-client';
 import Prism from "prismjs";
 import "./prism.css";
 

@@ -11,8 +11,9 @@ const chartTypesToComponents = {
 
 const exampleTemplate = (query, type) => (
 `
-import { default as cubejs, chartjsConfig } from 'cubejs-client';
+import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
+import chartjsConfig from '@cubejs-client/chartjs';
 import { Line } from 'react-chartjs-2';
 
 const query =

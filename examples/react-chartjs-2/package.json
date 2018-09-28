@@ -16,7 +16,7 @@
     "babel-loader": "^8.0.2",
     "chart.js": "^2.7.2",
     "css-loader": "^1.0.0",
-    "cubejs-client": "../../",
+    "@cubejs-client/core": "../../packages/cubejs-client-core",
     "react": "^16.5.2",
     "react-chartjs-2": "^2.7.4",
     "react-dom": "^16.5.2",
