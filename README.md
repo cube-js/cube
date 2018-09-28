@@ -1,5 +1,5 @@
 
-<p align="center"><a href="https://www.statsbot.co"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="340px"></a></p>
+<p align="center"><a href="https://www.statsbot.co"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
 ## Installation
 
@@ -118,7 +118,7 @@ Properties:
 
 ### Query Format
 
-Query is plain JavaScript object with following format
+Query is plain JavaScript object with the following format -
 
 ```
 {
@@ -134,5 +134,5 @@ Query is plain JavaScript object with following format
     dateRange: ['2015-01-01', '2015-12-31'],
     granularity: 'month'
   }]
-
+}
 ```
