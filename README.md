@@ -37,9 +37,9 @@ cubejsApi.load({
     granularity: 'month'
   }]
 })
-  .then(r => {
+  .then(resultSet => {
     const context = document.getElementById("myChart");
-    new Chart(context, chartjsConfig(r));
+    new Chart(context, chartjsConfig(resultSet));
   });
 ```
 
@@ -53,7 +53,7 @@ Create instance of `CubejsApi`.
 
 ### CubejsApi.load(query, options, callback)
 
-Fetch data for passed `query`.
+Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn't passed.
 
 - `query` - analytic query. Learn more about it's format below.
 - `options` - optional.
