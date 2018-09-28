@@ -55,10 +55,10 @@ Create instance of `CubejsApi`.
 
 Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn't passed.
 
-- `query` - analytic query. Learn more about it's format below.
-- `options` - optional.
--- `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
-- `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
+* `query` - analytic query. Learn more about it's format below.
+* `options` - optional.
+    * `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
+* `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
 
 ### ResultSet.rawData()
 
