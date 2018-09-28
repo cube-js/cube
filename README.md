@@ -43,6 +43,37 @@ cubejsApi.load({
   });
 ```
 
+Using React `QueryRenderer` component:
+
+```
+  <QueryRenderer query={{
+    measures: ['Stories.count'],
+    timeDimensions: [{
+      dimension: 'Stories.time',
+      dateRange: ['2015-01-01', '2016-01-01'],
+      granularity: 'month'
+    }]
+  }} cubejsApi={this.api} render={
+    ({ resultSet }) => {
+      return resultSet && (
+        <LineChart width={600} height={300} data={resultSet.rawData()}
+                         margin={{top: 5, right: 30, left: 20, bottom: 5}}>
+          <XAxis dataKey="Stories.time"
+                 tickFormatter={(v) => moment(v).format('MMM YY')}
+          />
+          <YAxis/>
+          <CartesianGrid strokeDasharray="3 3"/>
+          <Tooltip/>
+          <Legend />
+          <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
+        </LineChart>
+      ) || 'Loading...'
+    }
+  }
+  />
+```
+
+
 ## API
 
 ### cubejs(apiKey)
@@ -73,8 +104,17 @@ Returns query result raw data returned from server in format
 ]
 ```
 
-
 Format of this data may change over time.
+
+### <QueryRenderer />
+
+React component for rendering query results.
+
+Properties:
+
+- `query` - analytic query. Learn more about it's format below.
+- `cubejsApi` - `CubejsApi` instance to use.
+- `render({ resultSet, error, loadingState })` - output of this function will be rendered by `QueryRenderer`.
 
 ### Query Format
 
