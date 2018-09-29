@@ -1,7 +1,7 @@
 {
-  "name": "react-chartjs-2",
+  "name": "cubejs-examples-gallery",
   "version": "1.0.0",
-  "description": "Cube.js example with React and Chart.js 2",
+  "description": "Cube.js examples gallery",
   "main": "index.js",
   "license": "MIT",
   "scripts": {
