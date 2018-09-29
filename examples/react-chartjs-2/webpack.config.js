@@ -19,16 +19,10 @@ module.exports = {
       "process.env.CUBEJS_API_URL": `"${process.env.CUBEJS_API_URL || "https://statsbot.co/cubejs-api/v1"}"`
     }),
   ],
-  resolve: {
-    alias: {
-      'cubejs-client': path.join(__dirname, '../..', 'src/index.js'),
-      '@cubejs-client/react': path.join(__dirname, '../..', 'packages/cubejs-react/src/index.js'),
-    },
-  },
   module: {
     rules: [
       {
-        test: /\.js$/,
+        test: /\.jsx?$/,
         loaders: ['babel-loader'],
         exclude: /node_modules/,
         include: [
@@ -40,6 +34,13 @@ module.exports = {
         test: /\.css$/,
         loaders: ['style-loader', 'css-loader'],
       },
+      {
+        test: /\.svg$/,
+        loader: 'file-loader'
+      }
     ],
   },
+  resolve: {
+    extensions: ['.js', '.jsx']
+  }
 };

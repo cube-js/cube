@@ -1,7 +1,7 @@
 import React from 'react';
 import chartjsConfig from './toChartjsData';
 import { Line, Bar, Pie }  from 'react-chartjs-2';
-import Example from './Chart';
+import Example from './Example';
 
 const chartTypesToComponents = {
   line: Line,
@@ -64,26 +64,14 @@ const chartsExamples = {
     title: 'Line',
     render: renderExample('line', {
       measures: ['Stories.count'],
-      timeDimensions: [
-        {
-          dimension: 'Stories.time',
-          granularity: 'month',
-          dateRange: ["2015-01-01", "2015-08-01"]
-        }
-      ]
+      dimensions: ['Stories.time.month']
     })
   },
   lineMulti: {
     title: 'Line',
     render: renderExample('line', {
       measures: ['Stories.count', 'Stories.totalScore'],
-      timeDimensions: [
-        {
-          dimension: 'Stories.time',
-          granularity: 'month',
-          dateRange: ["2015-01-01", "2015-08-01"]
-        }
-      ]
+      dimensions: ['Stories.time.month']
     })
   },
   bar: {

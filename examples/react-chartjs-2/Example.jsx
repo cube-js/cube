@@ -1,10 +1,10 @@
 import React from 'react';
-import { Row, Col, Tabs, Spin, Card } from 'antd';
+import { Row, Col, Tabs, Spin, Card, Alert } from 'antd';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 import JSONPretty from 'react-json-pretty';
 import Prism from "prismjs";
-import "./prism.css";
+import "./css/prism.css";
 
 const HACKER_NEWS_DATASET_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw'
 
@@ -66,33 +66,44 @@ class CodeExample extends React.Component {
   }
 }
 
+const Loader = () => (
+  <div style={{textAlign: 'center', marginTop: "50px" }}>
+    <Spin size="large" />
+  </div>
+)
+
 const TabPane = Tabs.TabPane;
-const Chart = ({ query, codeExample, render }) => (
-  <Row gutter={24}>
+const Example = ({ query, codeExample, render }) => (
     <QueryRenderer
       query={query}
       cubejsApi={cubejs(HACKER_NEWS_DATASET_API_KEY)}
       render={ ({ resultSet, error, loadingState }) => {
-        if (loadingState.isLoading) {
-          return <Spin style={{ textAlign: 'center' }} />;
+        if (error) {
+          return <Alert
+            message="Error occured while loading your query"
+            description={error.message}
+            type="error"
+          />
         }
 
-        if (resultSet) {
+        if (resultSet && !loadingState.isLoading) {
           return [
-            <Col span={12} style={{ "padding": 10 }}>
-              <Card
-                title="Line Chart"
-              >
-                {render({ resultSet, error })}
-              </Card>
-            </Col>,
-            <CodeExample resultSet={resultSet} codeExample={codeExample} />
+            <Row gutter={24}>
+              <Col span={12} style={{ "padding": 10 }}>
+                <Card
+                  title="Line Chart"
+                >
+                  {render({ resultSet, error })}
+                </Card>
+              </Col>
+              <CodeExample resultSet={resultSet} codeExample={codeExample} />
+            </Row>
           ];
         }
-        return <Spin style={{ textAlign: 'center' }} />;
+
+        return <Loader />
       }}
     />
-  </Row>
 )
 
-export default Chart;
+export default Example;
