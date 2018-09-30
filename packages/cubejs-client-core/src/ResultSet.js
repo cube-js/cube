@@ -6,7 +6,7 @@ export default class ResultSet {
   }
 
   series(pivotConfig) {
-    return this.seriesNames(pivotConfig).map(({ title, key}) => ({
+    return this.seriesNames(pivotConfig).map(({ title, key }) => ({
       title,
       series: this.pivotedRows(pivotConfig).map(({ category, ...obj }) => ({ value: obj[key], category }))
     }));
@@ -24,16 +24,6 @@ export default class ResultSet {
       }
       return [value()];
     };
-  }
-
-  axisKeys(axis) {
-    const query = this.loadResponse.query;
-    if (axis.find(d => d === 'measures') && (query.measures || []).length) {
-      let withoutMeasures = axis.filter(d => d !== 'measures');
-      return query.measures.map(measure => withoutMeasures.concat(measure).join(', '));
-    } else {
-      return [axis.join(', ')];
-    }
   }
 
   normalizePivotConfig(pivotConfig) {
@@ -61,19 +51,22 @@ export default class ResultSet {
     // TODO missing date filling
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     return pipe(groupBy(this.axisValues(pivotConfig.x)), toPairs)(this.loadResponse.data).map(([category, rows]) => ({
-      rows,
       category,
       ...(rows.map(row => this.axisValues(pivotConfig.y)(row).map(series => {
             let measure = pivotConfig.x.find(d => d === 'measures') ?
               ResultSet.measureFromAxis(category) :
               ResultSet.measureFromAxis(series);
             return {
-              [series]: row[measure]
+              [series]: row[measure] && Number.parseFloat(row[measure])
             }
           }).reduce((a, b) => Object.assign(a, b), {})
         )).reduce((a, b) => Object.assign(a, b), {})
       })
     );
+  }
+
+  totalRow() {
+    return this.pivotedRows()[0];
   }
 
   categories(pivotConfig) { //TODO

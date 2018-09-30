@@ -1,6 +1,6 @@
 'use strict';
 
-const QueryRenderer = cubejsReact.QueryRenderer;
+const { QueryRenderer, QueryRendererWithTotals } = cubejsReact;
 const {Area, AreaChart, BarChart, Bar, PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend} = Recharts;
 
 const TimeSeriesRenderer = ({ resultSet }) => {
@@ -87,7 +87,7 @@ class HackerNewsExample extends React.Component {
     };
 
     return (<div>
-      <QueryRenderer
+      <QueryRendererWithTotals
         query={{
           measures: ["Stories.count", "Stories.averageScore"],
           dimensions: ['Stories.time.week'],
@@ -97,7 +97,9 @@ class HackerNewsExample extends React.Component {
           }]
         }}
         cubejsApi={this.api}
-        render={renderChart(TimeSeriesRenderer)}
+        render={({ resultSet: { totals, main } }) =>
+          <div><span>{totals && totals.totalRow()['Stories.count']}</span>{renderChart(TimeSeriesRenderer)({ resultSet: main })}</div>
+        }
       />
       <QueryRenderer
         query={{

@@ -68,6 +68,23 @@ const bundle = (name, globalName, baseConfig) => {
     // // ES module (for bundlers) build.
     {
       ...baseConfig,
+      plugins: [
+        ...baseConfig.plugins,
+        babel({
+          exclude: 'node_modules/**',
+          runtimeHelpers: true,
+          "presets": [
+            '@babel/preset-react',
+            [
+              "@babel/preset-env",
+              {
+                shippedProposals: true,
+                "useBuiltIns": "usage"
+              }
+            ]
+          ]
+        })
+      ],
       output: [{ file: `packages/${name}/dist/${name}.js`, format: "es" }]
     }
   ]
