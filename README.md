@@ -3,7 +3,7 @@
 
 ## Examples
 
-- [Examples Gallery](./examples/examples-gallery)
+- [Examples Gallery](https://statsbotco.github.io/cubejs-client/index.html)
 
 ## Installation
 
