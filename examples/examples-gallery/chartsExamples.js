@@ -49,12 +49,12 @@ const renderChart = (resultSet, type) => {
   return <Chart data={data} type={type} options={options}  />
 }
 
-const renderExample = (type, query) => {
+const renderExample = (type, query, render = null) => {
   return () => {
      return (<Example
        query={query}
        codeExample={exampleTemplate(query, type)}
-       render={ ({ resultSet }) => renderChart(resultSet, type) }
+       render={ ({ resultSet }) => render ? render(resultSet, type) : renderChart(resultSet, type) }
      />);
   }
 }
@@ -64,14 +64,28 @@ const chartsExamples = {
     title: 'Line',
     render: renderExample('line', {
       measures: ['Stories.count'],
-      dimensions: ['Stories.time.month']
+      dimensions: ['Stories.time.month'],
+      filters: [
+        {
+          dimension: `Stories.time`,
+          operator: `beforeDate`,
+          values: [`2010-01-01`]
+        }
+      ]
     })
   },
   lineMulti: {
     title: 'Line',
     render: renderExample('line', {
       measures: ['Stories.count', 'Stories.totalScore'],
-      dimensions: ['Stories.time.month']
+      dimensions: ['Stories.time.month'],
+      filters: [
+        {
+          dimension: 'Stories.time',
+          operator: 'inDateRange',
+          values: ['2014-01-01', '2015-01-01']
+        }
+      ]
     })
   },
   bar: {
