@@ -5,7 +5,8 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "start": "webpack-dev-server --progress --mode development"
+    "start": "webpack-dev-server --progress --mode development",
+    "build": "webpack && cp build/* ../../docs/ && cp index.html ../../docs/"
   },
   "devDependencies": {
     "@babel/core": "^7.1.0",
