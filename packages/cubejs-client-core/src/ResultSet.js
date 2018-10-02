@@ -1,4 +1,4 @@
-import { groupBy, pipe, toPairs, uniq, flatten, map } from 'ramda';
+import { groupBy, pipe, toPairs, uniq, flatten, map, unnest, dropLast } from 'ramda';
 
 export default class ResultSet {
   constructor(loadResponse) {
@@ -17,13 +17,16 @@ export default class ResultSet {
     return row => {
       const value = (measure) =>
         axis.filter(d => d !== 'measures')
-        .map(d => row[d]).concat(measure ? [measure] : [])
-        .map(v => v != null ? v : '∅').join(', ');
+        .map(d => row[d]).concat(measure ? [measure] : []);
       if (axis.find(d => d === 'measures') && (query.measures || []).length) {
         return query.measures.map(value);
       }
       return [value()];
     };
+  }
+
+  axisValuesString(axisValues, delimiter) {
+    return axisValues.map(v => v != null ? v : '∅').join(delimiter || ':');
   }
 
   normalizePivotConfig(pivotConfig) {
@@ -42,27 +45,44 @@ export default class ResultSet {
     return pivotConfig;
   }
 
-  static measureFromAxis(axis) {
-    const axisValues = axis.split(', ');
+  static measureFromAxis(axisValues) {
     return axisValues[axisValues.length - 1];
   };
 
-  pivotedRows(pivotConfig) {
+  pivot(pivotConfig) {
     // TODO missing date filling
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    return pipe(groupBy(this.axisValues(pivotConfig.x)), toPairs)(this.loadResponse.data).map(([category, rows]) => ({
-      category,
-      ...(rows.map(row => this.axisValues(pivotConfig.y)(row).map(series => {
+    return pipe(
+      map(row => this.axisValues(pivotConfig.x)(row).map(xValues => ({ xValues, row }))),
+      unnest,
+      groupBy(({ xValues }) => this.axisValuesString(xValues)),
+      toPairs
+    )(this.loadResponse.data).map(([xValuesString, rows]) => {
+      const xValues = rows[0].xValues;
+      return {
+        xValues,
+        ...(rows.map(r => r.row).map(row => this.axisValues(pivotConfig.y)(row).map(yValues => {
             let measure = pivotConfig.x.find(d => d === 'measures') ?
-              ResultSet.measureFromAxis(category) :
-              ResultSet.measureFromAxis(series);
+              ResultSet.measureFromAxis(xValues) :
+              ResultSet.measureFromAxis(yValues);
             return {
-              [series]: row[measure] && Number.parseFloat(row[measure])
+              [this.axisValuesString(yValues)]: row[measure]
             }
           }).reduce((a, b) => Object.assign(a, b), {})
         )).reduce((a, b) => Object.assign(a, b), {})
-      })
-    );
+      };
+    });
+  }
+
+  pivotedRows(pivotConfig) { // TODO
+    return this.chartPivot(pivotConfig);
+  }
+
+  chartPivot(pivotConfig) {
+    return this.pivot(pivotConfig).map(({ xValues, ...measures }) => ({
+      category: this.axisValuesString(xValues, ', '),
+      ...(map(m => m && Number.parseFloat(m), measures))
+    }));
   }
 
   totalRow() {
@@ -75,12 +95,12 @@ export default class ResultSet {
 
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    return pipe(map(this.axisValues(pivotConfig.y)), uniq, flatten)(this.loadResponse.data).map(axis => ({
-      title: pivotConfig.y.find(d => d === 'measures') ? axis.replace(
-        ResultSet.measureFromAxis(axis),
-        this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axis)].title
-      ) : axis,
-      key: axis
+    return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(axisValues => ({
+      title: this.axisValuesString(pivotConfig.y.find(d => d === 'measures') ?
+        dropLast(1, axisValues)
+          .concat(this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) :
+        axisValues, ', '),
+      key: this.axisValuesString(axisValues)
     }))
   }
 

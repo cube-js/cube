@@ -1,13 +1,11 @@
-import 'core-js/modules/es6.regexp.split';
-import 'core-js/modules/es6.regexp.replace';
-import 'core-js/modules/es6.object.assign';
 import 'core-js/modules/es6.number.constructor';
 import 'core-js/modules/es6.number.parse-float';
+import 'core-js/modules/es6.object.assign';
 import 'core-js/modules/es6.array.reduce';
 import 'core-js/modules/es6.array.find';
 import 'core-js/modules/es6.array.filter';
 import 'core-js/modules/es6.array.map';
-import { groupBy, pipe, toPairs, uniq, flatten, map } from 'ramda';
+import { groupBy, pipe, toPairs, uniq, map, unnest, dropLast } from 'ramda';
 import 'regenerator-runtime/runtime';
 import { fetch } from 'whatwg-fetch';
 
@@ -218,9 +216,7 @@ function () {
             return d !== 'measures';
           }).map(function (d) {
             return row[d];
-          }).concat(measure ? [measure] : []).map(function (v) {
-            return v != null ? v : '∅';
-          }).join(', ');
+          }).concat(measure ? [measure] : []);
         };
 
         if (axis.find(function (d) {
@@ -231,6 +227,13 @@ function () {
 
         return [value()];
       };
+    }
+  }, {
+    key: "axisValuesString",
+    value: function axisValuesString(axisValues, delimiter) {
+      return axisValues.map(function (v) {
+        return v != null ? v : '∅';
+      }).join(delimiter || ':');
     }
   }, {
     key: "normalizePivotConfig",
@@ -258,31 +261,66 @@ function () {
       return pivotConfig;
     }
   }, {
-    key: "pivotedRows",
-    value: function pivotedRows(pivotConfig) {
+    key: "pivot",
+    value: function pivot(pivotConfig) {
       var _this2 = this;
 
       // TODO missing date filling
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      return pipe(groupBy(this.axisValues(pivotConfig.x)), toPairs)(this.loadResponse.data).map(function (_ref3) {
-        var _ref4 = _slicedToArray(_ref3, 2),
-            category = _ref4[0],
-            rows = _ref4[1];
+      return pipe(map(function (row) {
+        return _this2.axisValues(pivotConfig.x)(row).map(function (xValues) {
+          return {
+            xValues: xValues,
+            row: row
+          };
+        });
+      }), unnest, groupBy(function (_ref3) {
+        var xValues = _ref3.xValues;
+        return _this2.axisValuesString(xValues);
+      }), toPairs)(this.loadResponse.data).map(function (_ref4) {
+        var _ref5 = _slicedToArray(_ref4, 2),
+            xValuesString = _ref5[0],
+            rows = _ref5[1];
 
+        var xValues = rows[0].xValues;
         return _objectSpread({
-          category: category
-        }, rows.map(function (row) {
-          return _this2.axisValues(pivotConfig.y)(row).map(function (series) {
+          xValues: xValues
+        }, rows.map(function (r) {
+          return r.row;
+        }).map(function (row) {
+          return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
             var measure = pivotConfig.x.find(function (d) {
               return d === 'measures';
-            }) ? ResultSet.measureFromAxis(category) : ResultSet.measureFromAxis(series);
-            return _defineProperty({}, series, row[measure] && Number.parseFloat(row[measure]));
+            }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
+            return _defineProperty({}, _this2.axisValuesString(yValues), row[measure]);
           }).reduce(function (a, b) {
             return Object.assign(a, b);
           }, {});
         }).reduce(function (a, b) {
           return Object.assign(a, b);
         }, {}));
+      });
+    }
+  }, {
+    key: "pivotedRows",
+    value: function pivotedRows(pivotConfig) {
+      // TODO
+      return this.chartPivot(pivotConfig);
+    }
+  }, {
+    key: "chartPivot",
+    value: function chartPivot(pivotConfig) {
+      var _this3 = this;
+
+      return this.pivot(pivotConfig).map(function (_ref7) {
+        var xValues = _ref7.xValues,
+            measures = _objectWithoutProperties(_ref7, ["xValues"]);
+
+        return _objectSpread({
+          category: _this3.axisValuesString(xValues, ', ')
+        }, map(function (m) {
+          return m && Number.parseFloat(m);
+        }, measures));
       });
     }
   }, {
@@ -299,15 +337,15 @@ function () {
   }, {
     key: "seriesNames",
     value: function seriesNames(pivotConfig) {
-      var _this3 = this;
+      var _this4 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      return pipe(map(this.axisValues(pivotConfig.y)), uniq, flatten)(this.loadResponse.data).map(function (axis) {
+      return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(function (axisValues) {
         return {
-          title: pivotConfig.y.find(function (d) {
+          title: _this4.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
-          }) ? axis.replace(ResultSet.measureFromAxis(axis), _this3.loadResponse.annotation.measures[ResultSet.measureFromAxis(axis)].title) : axis,
-          key: axis
+          }) ? dropLast(1, axisValues).concat(_this4.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+          key: _this4.axisValuesString(axisValues)
         };
       });
     }
@@ -323,8 +361,7 @@ function () {
     }
   }], [{
     key: "measureFromAxis",
-    value: function measureFromAxis(axis) {
-      var axisValues = axis.split(', ');
+    value: function measureFromAxis(axisValues) {
       return axisValues[axisValues.length - 1];
     }
   }]);

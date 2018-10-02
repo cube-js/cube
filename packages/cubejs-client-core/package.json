@@ -5,7 +5,9 @@
   "main": "dist/cubejs-client-core.js",
   "author": "Statsbot, Inc.",
   "dependencies": {
+    "core-js": "^2.5.3",
     "ramda": "^0.25.0",
+    "regenerator-runtime": "^0.12.1",
     "whatwg-fetch": "^3.0.0"
   },
   "files": [
