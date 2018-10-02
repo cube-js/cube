@@ -1,6 +1,10 @@
 
 <p align="center"><a href="https://www.statsbot.co"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
+## Examples
+
+- [Examples Gallery](./examples/examples-gallery)
+
 ## Installation
 
 Vanilla JS:
