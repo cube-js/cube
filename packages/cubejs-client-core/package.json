@@ -1,13 +1,13 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
   "author": "Statsbot, Inc.",
   "dependencies": {
+    "@babel/runtime": "^7.1.2",
     "core-js": "^2.5.3",
     "ramda": "^0.25.0",
-    "regenerator-runtime": "^0.12.1",
     "whatwg-fetch": "^3.0.0"
   },
   "files": [

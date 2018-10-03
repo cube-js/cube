@@ -7,7 +7,7 @@
 	var require$$0 = /*#__PURE__*/Object.freeze({
 
 	});
-	var require$$1 = /*#__PURE__*/Object.freeze({
+	var require$$0$1 = /*#__PURE__*/Object.freeze({
 
 	});
 	var require$$0$2 = /*#__PURE__*/Object.freeze({
@@ -346,15 +346,15 @@
 	  }).a != 7;
 	});
 
-	var require$$0$1 = /*#__PURE__*/Object.freeze({
+	var DESCRIPTORS = /*#__PURE__*/Object.freeze({
 
 	});
 
 	// 19.1.2.4 / 15.2.3.6 Object.defineProperty(O, P, Attributes)
 
 
-	$export$1($export$1.S + $export$1.F * !require$$0$1, 'Object', {
-	  defineProperty: require$$1.f
+	$export$1($export$1.S + $export$1.F * !DESCRIPTORS, 'Object', {
+	  defineProperty: require$$0$1.f
 	});
 
 	var anObject$1 = require('./_an-object');
@@ -639,7 +639,7 @@
 
 	var $flags = require('./_flags');
 
-	var DESCRIPTORS = require('./_descriptors');
+	var DESCRIPTORS$1 = require('./_descriptors');
 
 	var TO_STRING$1 = 'toString';
 	var $toString$1 = /./[TO_STRING$1];
@@ -657,7 +657,7 @@
 	})) {
 	  define(function toString() {
 	    var R = anObject$2(this);
-	    return '/'.concat(R.source, '/', 'flags' in R ? R.flags : !DESCRIPTORS && R instanceof RegExp ? $flags.call(R) : undefined);
+	    return '/'.concat(R.source, '/', 'flags' in R ? R.flags : !DESCRIPTORS$1 && R instanceof RegExp ? $flags.call(R) : undefined);
 	  }); // FF44- RegExp#toString has a wrong name
 	} else if ($toString$1.name != TO_STRING$1) {
 	  define(function toString() {
@@ -819,7 +819,7 @@
 
 	var _setSpecies = function (KEY) {
 	  var C = _global[KEY];
-	  if (require$$0$1 && C && !C[SPECIES]) require$$1.f(C, SPECIES, {
+	  if (DESCRIPTORS && C && !C[SPECIES]) require$$0$1.f(C, SPECIES, {
 	    configurable: true,
 	    get: function get() {
 	      return this;
@@ -827,7 +827,7 @@
 	  });
 	};
 
-	var dP$1 = require$$1.f;
+	var dP$1 = require$$0$1.f;
 
 	var gOPN = _objectGopn.f;
 
@@ -843,7 +843,7 @@
 
 	var CORRECT_NEW = new $RegExp(re1) !== re1;
 
-	if (require$$0$1 && (!CORRECT_NEW || _fails(function () {
+	if (DESCRIPTORS && (!CORRECT_NEW || _fails(function () {
 	  re2[require$$0$2('match')] = false; // RegExp constructor can alter flags and IsRegExp works correct with @@match
 
 	  return $RegExp(re1) != re1 || $RegExp(re2) == re2 || $RegExp(re1, 'i') != '/a/i';
@@ -930,8 +930,8 @@
 	  };
 	};
 
-	var _hide = require$$0$1 ? function (object, key, value) {
-	  return require$$1.f(object, key, _propertyDesc(1, value));
+	var _hide = DESCRIPTORS ? function (object, key, value) {
+	  return require$$0$1.f(object, key, _propertyDesc(1, value));
 	} : function (object, key, value) {
 	  object[key] = value;
 	  return object;
@@ -1658,7 +1658,7 @@
 		f: f$1
 	};
 
-	var defineProperty = require$$1.f;
+	var defineProperty = require$$0$1.f;
 
 	var _wksDefine = function (name) {
 	  var $Symbol = _core.Symbol || (_core.Symbol = _library ? {} : _global.Symbol || {});
@@ -1673,7 +1673,7 @@
 
 	var has$1 = require('./_has');
 
-	var DESCRIPTORS$1 = require('./_descriptors');
+	var DESCRIPTORS$2 = require('./_descriptors');
 
 	var $export$6 = require('./_export');
 
@@ -1740,7 +1740,7 @@
 
 	var setter = !QObject || !QObject[PROTOTYPE$2] || !QObject[PROTOTYPE$2].findChild; // fallback for old Android, https://code.google.com/p/v8/issues/detail?id=687
 
-	var setSymbolDesc = DESCRIPTORS$1 && $fails(function () {
+	var setSymbolDesc = DESCRIPTORS$2 && $fails(function () {
 	  return _create(dP$3({}, 'a', {
 	    get: function get() {
 	      return dP$3(this, 'a', {
@@ -1863,7 +1863,7 @@
 	      setSymbolDesc(this, tag, createDesc(1, value));
 	    };
 
-	    if (DESCRIPTORS$1 && setter) setSymbolDesc(ObjectProto, tag, {
+	    if (DESCRIPTORS$2 && setter) setSymbolDesc(ObjectProto, tag, {
 	      configurable: true,
 	      set: $set
 	    });
@@ -1879,7 +1879,7 @@
 	  require('./_object-pie').f = $propertyIsEnumerable;
 	  require('./_object-gops').f = $getOwnPropertySymbols;
 
-	  if (DESCRIPTORS$1 && !require('./_library')) {
+	  if (DESCRIPTORS$2 && !require('./_library')) {
 	    redefine$4(ObjectProto, 'propertyIsEnumerable', $propertyIsEnumerable, true);
 	  }
 
@@ -3521,7 +3521,7 @@
 
 	var global$7 = require('./_global');
 
-	var DESCRIPTORS$2 = require('./_descriptors');
+	var DESCRIPTORS$3 = require('./_descriptors');
 
 	var LIBRARY$3 = require('./_library');
 
@@ -3569,9 +3569,9 @@
 	var BUFFER = 'buffer';
 	var BYTE_LENGTH = 'byteLength';
 	var BYTE_OFFSET = 'byteOffset';
-	var $BUFFER = DESCRIPTORS$2 ? '_b' : BUFFER;
-	var $LENGTH = DESCRIPTORS$2 ? '_l' : BYTE_LENGTH;
-	var $OFFSET = DESCRIPTORS$2 ? '_o' : BYTE_OFFSET; // IEEE754 conversions based on https://github.com/feross/ieee754
+	var $BUFFER = DESCRIPTORS$3 ? '_b' : BUFFER;
+	var $LENGTH = DESCRIPTORS$3 ? '_l' : BYTE_LENGTH;
+	var $OFFSET = DESCRIPTORS$3 ? '_o' : BYTE_OFFSET; // IEEE754 conversions based on https://github.com/feross/ieee754
 
 	function packIEEE754(value, mLen, nBytes) {
 	  var buffer = new Array(nBytes);
@@ -3741,7 +3741,7 @@
 	    this[$LENGTH] = byteLength;
 	  };
 
-	  if (DESCRIPTORS$2) {
+	  if (DESCRIPTORS$3) {
 	    addGetter$1($ArrayBuffer$1, BYTE_LENGTH, '_l');
 	    addGetter$1($DataView$1, BUFFER, '_b');
 	    addGetter$1($DataView$1, BYTE_LENGTH, '_l');
@@ -7773,7 +7773,7 @@
 	  return it;
 	};
 
-	var dP$7 = require$$1.f;
+	var dP$7 = require$$0$1.f;
 
 
 
@@ -7797,7 +7797,7 @@
 
 
 
-	var SIZE = require$$0$1 ? '_s' : 'size';
+	var SIZE = DESCRIPTORS ? '_s' : 'size';
 
 	var getEntry = function getEntry(that, key) {
 	  // fast case
@@ -7882,7 +7882,7 @@
 	        return !!getEntry(_validateCollection(this, NAME), key);
 	      }
 	    });
-	    if (require$$0$1) dP$7(C.prototype, 'size', {
+	    if (DESCRIPTORS) dP$7(C.prototype, 'size', {
 	      get: function get() {
 	        return _validateCollection(this, NAME)[SIZE];
 	      }
