@@ -9,6 +9,12 @@ const chartTypesToComponents = {
   pie: Pie
 };
 
+const chartTypesToComponentsName = {
+  line: 'Line',
+  bar: 'Bar',
+  pie: 'Pie'
+};
+
 const exampleTemplate = (query, type) => (
 `
 import cubejs from '@cubejs-client/core';
@@ -25,7 +31,7 @@ ReactDOM.render(
     cubejsApi={cubejs('API_KEY')}
     render={ ({ resultSet }) => {
       const { data, options } = chartjsConfig('${type}', resultSet)
-      return <${chartTypesToComponents[type].name} data={data} options={options} />
+      return <${chartTypesToComponentsName[type]} data={data} options={options} />
     }
   />
 )

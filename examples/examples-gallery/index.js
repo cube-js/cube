@@ -20,7 +20,7 @@ class App extends React.Component {
   constructor(props) {
     super(props);
 
-    this.state = { activeChart: 'line' }
+    this.state = { activeChart: 'bizcharts-line' }
   }
 
   handleMenuChange(e) {
@@ -45,7 +45,7 @@ class App extends React.Component {
             theme="dark"
             onClick={this.handleMenuChange.bind(this)}
             defaultSelectedKeys={[this.state.activeChart]}
-            defaultOpenKeys={["chartjs"]}
+            defaultOpenKeys={["bizcharts"]}
           >
             <Menu.SubMenu key="bizcharts" title="Bizcharts">
               <Menu.ItemGroup key="g1" title="Line">

@@ -91,7 +91,7 @@ const Example = ({ query, codeExample, render }) => (
             <Row gutter={24}>
               <Col span={12} style={{ "padding": 10 }}>
                 <Card
-                  title="Line Chart"
+                  title="Chart"
                 >
                   {render({ resultSet, error })}
                 </Card>

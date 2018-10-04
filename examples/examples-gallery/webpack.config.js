@@ -1,5 +1,6 @@
-var path = require('path');
-var webpack = require('webpack');
+const path = require('path');
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+const webpack = require('webpack');
 
 module.exports = {
   context: __dirname,
@@ -42,5 +43,13 @@ module.exports = {
   },
   resolve: {
     extensions: ['.js', '.jsx']
+  },
+  node: {
+    fs: 'empty'
+  },
+  optimization: {
+    minimizer: [new UglifyJsPlugin({
+      exclude: /@babel/
+    })]
   }
 };

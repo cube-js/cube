@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "start": "webpack-dev-server --progress --mode development",
-    "build": "webpack && cp build/* ../../docs/ && cp index.html ../../docs/"
+    "build": "webpack --mode production --progress && cp build/* ../../docs/ && cp index.html ../../docs/"
   },
   "devDependencies": {
     "@babel/core": "^7.1.0",
