@@ -131,7 +131,7 @@ Query is plain JavaScript object with the following format -
   filters: [{
     dimension: 'Stories.dead',
     operator: 'equals',
-    params: ['No']
+    values: ['No']
   }],
   timeDimensions: [{
     dimension: 'Stories.time',
