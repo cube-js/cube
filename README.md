@@ -96,7 +96,7 @@ For example if you want to pass user id in security context you can create token
 In this case `{ id: 42 }` object will be accessible as `USER_CONTEXT` in cube.js Data Schema.
 Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-user-context).
 
-> We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
+> *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
 > Learn more: [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
 
 Please email info@statsbot.co to obtain your secret key.
