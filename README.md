@@ -140,3 +140,24 @@ Query is plain JavaScript object with the following format -
   }]
 }
 ```
+
+## Securing customer facing applications
+
+Cube.js tokens are in fact [JWT tokens](https://jwt.io/).
+Besides public API key you can obtain secret key to generate public API keys yourself.
+Secret key looks like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`.
+To generate public key with this secret you should provide minimal payload `{ i: 38594 }` which is your key identifier required for token verification.
+Such key is called global and provides no security context so it has all possible rights for querying.
+Security context can be provided by passing `u` param for payload.
+For example if you want to pass user id in security context you can create token with payload:
+```
+{
+  i: 38594,
+  u: { id: 42 }
+}
+```
+
+In this case `{ id: 42 }` object will be accessible as `USER_CONTEXT` in Cube.js Data Schema.
+Learn more about it in [Data Schema docs](https://statsbot.co/docs/cube#context-variables-user-context).
+
+Please email info@statsbot.co to obtain your secret key.
