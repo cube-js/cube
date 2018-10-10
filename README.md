@@ -144,7 +144,7 @@ Query is plain JavaScript object with the following format -
 ## Securing customer facing applications
 
 Cube.js tokens are in fact [JWT tokens](https://jwt.io/).
-Besides public API key you can obtain secret key to generate public API keys yourself.
+Besides public API key you can obtain secret key to generate public customer API keys on your server side and embed it in web page that renders query results.
 Secret key looks like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`.
 To generate public key with this secret you should provide minimal payload `{ i: 38594 }` which is your key identifier required for token verification.
 Such key is called global and provides no security context so it has all possible rights for querying.
@@ -157,7 +157,10 @@ For example if you want to pass user id in security context you can create token
 }
 ```
 
-In this case `{ id: 42 }` object will be accessible as `USER_CONTEXT` in Cube.js Data Schema.
+In this case `{ id: 42 }` object will be accessible as `USER_CONTEXT` in cube.js Data Schema.
 Learn more about it in [Data Schema docs](https://statsbot.co/docs/cube#context-variables-user-context).
+
+We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
+Learn more about it in [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
 
 Please email info@statsbot.co to obtain your secret key.
