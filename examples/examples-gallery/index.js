@@ -64,6 +64,11 @@ class App extends React.Component {
                 <Menu.Item key="pie">Pie</Menu.Item>
               </Menu.ItemGroup>
             </Menu.SubMenu>
+            <Menu.SubMenu key="interaction" title="Interaction">
+              <Menu.ItemGroup key="g1" title="Filters">
+                <Menu.Item key="categoryFilter">Category Filter</Menu.Item>
+              </Menu.ItemGroup>
+            </Menu.SubMenu>
           </Menu>
         </Sider>
         <Layout>

@@ -13,6 +13,13 @@ const chartTypeToTemplate = {
   <Tooltip crosshairs={{type : 'y'}} />
   <Geom type="line" position="category*Stories.count" size={2} />
 </Chart>`,
+  categoryFilter: `
+<Chart scale={{ category: { tickCount: 8 } }} height={400} data={resultSet.chartPivot()} forceFit>
+  <Axis name="category" label={{ formatter: val => moment(val).format("MMM 'YY") }} />
+  <Axis name="Stories.count" />
+  <Tooltip crosshairs={{type : 'y'}} />
+  <Geom type="line" position="category*Stories.count" size={2} />
+</Chart>`,
   lineMulti: `
 <Chart scale={{ category: { tickCount: 8 } }} height={400} data={resultSet.chartPivot()} forceFit>
   <Axis name="category" label={{ formatter: val => moment(val).format("MMM 'YY") }} />
@@ -52,38 +59,14 @@ const chartTypeToTemplate = {
 
 
 export const sourceCodeTemplate = (chartType, query) => (
-  `import React from 'react';
-import cubejs from '@cubejs-client/core';
-import { QueryRenderer } from '@cubejs-client/react';
-import { Spin } from 'antd';
-import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
+  `import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
 import moment from 'moment';
 
-const HACKER_NEWS_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw';
-
-const query =
-${JSON.stringify(query, null, 2)}
-
 const renderChart = (resultSet) => (${chartTypeToTemplate[chartType]}
-);
-
-const Example = <QueryRenderer
-  query={query}
-  cubejsApi={cubejs(HACKER_NEWS_API_KEY)}
-  render={ ({ resultSet }) => (
-    resultSet && renderChart(resultSet) || (<Spin />)
-  )}
-/>;
-
-export default Example;
-`
+);`
 );
 
 export const imports = {
-  '@cubejs-client/core': cubejs,
-  '@cubejs-client/react': cubejsReact,
-  antd,
-  react: React,
   bizcharts,
   moment
 };

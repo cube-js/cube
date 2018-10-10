@@ -3,6 +3,9 @@ import Example from './Example';
 import SourceRender from 'react-source-render';
 import presetEnv from '@babel/preset-env';
 import presetReact from '@babel/preset-react';
+import cubejs from '@cubejs-client/core';
+import * as cubejsReact from '@cubejs-client/react';
+import * as antd from 'antd';
 
 import * as bizChartLibrary from './libraries/bizChart';
 import * as chartjsLibrary from './libraries/chartjs';
@@ -31,17 +34,107 @@ const babelConfig = {
   ]
 };
 
-const renderExample = (chartType, query) => {
+const sourceCodeTemplate = (chartLibrary, chartType, query) => (
+`import React from 'react';
+import cubejs from '@cubejs-client/core';
+import { QueryRenderer } from '@cubejs-client/react';
+import { Spin } from 'antd';
+${libraryToTemplate[chartLibrary].sourceCodeTemplate(chartType, query)}
+
+const query =
+${typeof query === 'object' ? JSON.stringify(query, null, 2) : query};
+
+const HACKER_NEWS_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw';
+
+const Example = <QueryRenderer
+  query={query}
+  cubejsApi={cubejs(HACKER_NEWS_API_KEY)}
+  render={ ({ resultSet }) => (
+    resultSet && renderChart(resultSet) || (<Spin />)
+  )}
+/>;
+
+export default Example;
+`);
+
+const basicFilterCodeTemplate = (chartLibrary, chartType, query) => (
+  `import React from 'react';
+import cubejs from '@cubejs-client/core';
+import { QueryRenderer } from '@cubejs-client/react';
+import { Spin, Row, Col, Select } from 'antd';
+const Option = Select.Option;
+${libraryToTemplate[chartLibrary].sourceCodeTemplate(chartType, query)}
+
+const query =
+${typeof query === 'object' ? JSON.stringify(query, null, 2) : query};
+
+const HACKER_NEWS_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw';
+
+export default class Example extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { category: 'Other' };
+  }
+  
+  handleChange(value) {
+    this.setState({ category: value })
+  }
+  
+  render() {
+    return <div>
+      <Row style={{ marginBottom: 12 }}>
+        <Col>
+          <Select value={this.state.category} style={{ width: 120 }} onChange={this.handleChange.bind(this)}>
+            <Option value="Ask">Ask</Option>
+            <Option value="Show">Show</Option>
+            <Option value="Other">Other</Option>
+          </Select>
+        </Col>
+      </Row>
+      <Row>
+        <Col>
+          <QueryRenderer
+            query={{ 
+              ...query, 
+              filters: [ 
+                ...query.filters, 
+                { 
+                  dimension: 'Stories.category', 
+                  operator: 'equals', 
+                  values: [this.state.category] 
+                }
+              ] 
+            }}
+            cubejsApi={cubejs(HACKER_NEWS_API_KEY)}
+            render={ ({ resultSet }) => (
+              resultSet && renderChart(resultSet) || (<Spin />)
+            )}
+          />
+        </Col>
+      </Row>
+    </div>
+  }
+};
+`);
+
+const renderExample = (chartType, query, sourceCodeFn) => {
+  sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
   return ({ chartLibrary }) => {
      return (<Example
        query={query}
-       codeExample={libraryToTemplate[chartLibrary].sourceCodeTemplate(chartType, query)}
+       codeExample={sourceCodeFn(chartLibrary, chartType, query)}
        render={() => (<SourceRender
          babelConfig={babelConfig}
          onError={error => console.log(error)}
          onSuccess={(error, { markup }) => console.log('HTML', markup)}
-         resolver={importName => libraryToTemplate[chartLibrary].imports[importName]}
-         source={libraryToTemplate[chartLibrary].sourceCodeTemplate(chartType, query)}
+         resolver={importName => ({
+           '@cubejs-client/core': cubejs,
+           '@cubejs-client/react': cubejsReact,
+           antd,
+           react: React,
+           ...libraryToTemplate[chartLibrary].imports
+         })[importName]}
+         source={sourceCodeFn(chartLibrary, chartType, query)}
        />)
        }
      />);
@@ -108,6 +201,20 @@ const chartsExamples = {
       measures: ['Stories.count'],
       dimensions: ['Stories.category']
     })
+  },
+  categoryFilter: {
+    title: 'Line',
+    render: renderExample('categoryFilter', {
+      measures: ['Stories.count'],
+      dimensions: ['Stories.time.month'],
+      filters: [
+        {
+          dimension: `Stories.time`,
+          operator: `beforeDate`,
+          values: [`2010-01-01`]
+        }
+      ]
+    }, basicFilterCodeTemplate)
   }
 };
 
