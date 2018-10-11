@@ -88,8 +88,8 @@ Security context can be provided by passing `u` param for payload.
 For example if you want to pass user id in security context you can create token with payload:
 ```json
 {
-  i: 38594,
-  u: { id: 42 }
+  "i": 38594,
+  "u": { "id": 42 }
 }
 ```
 
