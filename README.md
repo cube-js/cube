@@ -86,7 +86,7 @@ To generate public key with this secret you should provide minimal payload `{ i:
 Such key is called global and provides no security context so it has all possible rights for querying.
 Security context can be provided by passing `u` param for payload.
 For example if you want to pass user id in security context you can create token with payload:
-```
+```json
 {
   i: 38594,
   u: { id: 42 }
@@ -122,12 +122,12 @@ Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn
 
 Returns query result raw data returned from server in format
 
-```json
+```js
 [
     { "Stories.time":"2015-01-01T00:00:00", "Stories.count": 27120 },
     { "Stories.time":"2015-02-01T00:00:00", "Stories.count": 25861 },
     { "Stories.time":"2015-03-01T00:00:00", "Stories.count": 29661 },
-    ...
+    //...
 ]
 ```
 
