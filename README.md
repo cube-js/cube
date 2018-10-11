@@ -1,6 +1,8 @@
 
 <p align="center"><a href="https://www.statsbot.co"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
+[![npm version](https://badge.fury.io/js/%40cubejs-client%2Fcore.svg)](https://badge.fury.io/js/%40cubejs-client%2Fcore)
+
 ## Examples
 
 - [Examples Gallery](https://statsbotco.github.io/cubejs-client/)
