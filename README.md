@@ -9,13 +9,13 @@
 
 Vanilla JS:
 
-```
+```bash
 npm i --save @cubejs-client/core
 ```
 
 React:
 
-```
+```bash
 npm i --save @cubejs-client/core
 npm i --save @cubejs-client/react
 ```
@@ -24,7 +24,7 @@ npm i --save @cubejs-client/react
 
 Instantiate Cube.js API:
 
-```
+```js
 const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
 ```
 
@@ -32,7 +32,7 @@ Please email info@statsbot.co to obtain API key.
 
 Use load API to fetch data:
 
-```
+```js
 cubejsApi.load({
   measures: ['Stories.count'],
   timeDimensions: [{
@@ -49,7 +49,7 @@ cubejsApi.load({
 
 Using React `QueryRenderer` component:
 
-```
+```jsx
   <QueryRenderer query={{
     measures: ['Stories.count'],
     timeDimensions: [{
@@ -122,7 +122,7 @@ Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn
 
 Returns query result raw data returned from server in format
 
-```
+```json
 [
     { "Stories.time":"2015-01-01T00:00:00", "Stories.count": 27120 },
     { "Stories.time":"2015-02-01T00:00:00", "Stories.count": 25861 },
@@ -147,7 +147,7 @@ Properties:
 
 Query is plain JavaScript object with the following format -
 
-```
+```js
 {
   measures: ['Stories.count'],
   dimensions: ['Stories.category'],
