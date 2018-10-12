@@ -22,14 +22,14 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 Vanilla JS:
 
 ```bash
-npm i --save @cubejs-client/core
+$ npm i --save @cubejs-client/core
 ```
 
 React:
 
 ```bash
-npm i --save @cubejs-client/core
-npm i --save @cubejs-client/react
+$ npm i --save @cubejs-client/core
+$ npm i --save @cubejs-client/react
 ```
 
 ## Getting Started
