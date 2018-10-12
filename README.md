@@ -6,7 +6,7 @@
 __Cube.js is an analytics framework for modern applications.__ It supplies building blocks that let developers build custom and large-scale analytics frontends without spending the time on a complex analytics backend infrastructure. 
 
 * __Cube.js is visualization agnostic.__ It means you can use your favorite chart library, like Chart.js, Recharts, C3.js or any other.
-* __Cube.js Data Schema works as an ORM for your analytics.__ Being extremely flexible, it allows you to model everything from simple counts to cohort retention and funnel analysis.
+* __Cube.js Data Schema works as an ORM for your analytics.__ It allows to model everything from simple counts to cohort retention and funnel analysis.
 * __It is designed to work on top of your database, so all your data stays with you.__ All major SQL databases are supported.
 
 This repository contains Cube.js Javascript and React clients. The Cube.js Server itself is not yet open-sourced. We are working hard to make it happen. Before that, you can request early access to our cloud version.
