@@ -35,7 +35,7 @@ const babelConfig = {
 };
 
 const sourceCodeTemplate = (chartLibrary, chartType, query) => (
-`import React from 'react';
+  `import React from 'react';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 import { Spin } from 'antd';
@@ -117,104 +117,132 @@ export default class Example extends React.Component {
 };
 `);
 
-const renderExample = (chartType, query, sourceCodeFn) => {
+const renderExample = ({ chartType, query, sourceCodeFn, title }) => {
   sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
   return ({ chartLibrary }) => {
-     return (<Example
-       query={query}
-       codeExample={sourceCodeFn(chartLibrary, chartType, query)}
-       render={() => (<SourceRender
-         babelConfig={babelConfig}
-         onError={error => console.log(error)}
-         onSuccess={(error, { markup }) => console.log('HTML', markup)}
-         resolver={importName => ({
-           '@cubejs-client/core': cubejs,
-           '@cubejs-client/react': cubejsReact,
-           antd,
-           react: React,
-           ...libraryToTemplate[chartLibrary].imports
-         })[importName]}
-         source={sourceCodeFn(chartLibrary, chartType, query)}
-       />)
-       }
-     />);
+    const chart = (<SourceRender
+      babelConfig={babelConfig}
+      onError={error => console.log(error)}
+      onSuccess={(error, { markup }) => console.log('HTML', markup)}
+      resolver={importName => ({
+        '@cubejs-client/core': cubejs,
+        '@cubejs-client/react': cubejsReact,
+        antd,
+        react: React,
+        ...libraryToTemplate[chartLibrary].imports
+      })[importName]}
+      source={sourceCodeFn(chartLibrary, chartType, query)}
+    />);
+    return (<Example
+      title={title}
+      query={query}
+      codeExample={sourceCodeFn(chartLibrary, chartType, query)}
+      render={() => chart}
+    />);
   }
 };
 
 const chartsExamples = {
   line: {
-    title: 'Line',
-    render: renderExample('line', {
-  measures: ['Stories.count'],
-  dimensions: ['Stories.time.month'],
-  filters: [
-    {
-      dimension: `Stories.time`,
-      operator: `beforeDate`,
-      values: [`2010-01-01`]
-    }
-  ]
-})
+    group: 'basic',
+    render: renderExample({
+      title: 'Line Chart',
+      chartType: 'line',
+      query: {
+        measures: ['Stories.count'],
+        dimensions: ['Stories.time.month'],
+        filters: [
+          {
+            dimension: `Stories.time`,
+            operator: `beforeDate`,
+            values: [`2010-01-01`]
+          }
+        ]
+      }
+    })
   },
   lineMulti: {
-    title: 'Line',
-    render: renderExample('lineMulti', {
-      measures: ['Stories.count', 'Stories.totalScore'],
-      dimensions: ['Stories.time.month'],
-      filters: [
-        {
-          dimension: 'Stories.time',
-          operator: 'inDateRange',
-          values: ['2014-01-01', '2015-01-01']
-        }
-      ]
+    group: 'basic',
+    render: renderExample({
+      title: 'Multi Axis',
+      chartType: 'lineMulti',
+      query: {
+        measures: ['Stories.count', 'Stories.totalScore'],
+        dimensions: ['Stories.time.month'],
+        filters: [
+          {
+            dimension: 'Stories.time',
+            operator: 'inDateRange',
+            values: ['2014-01-01', '2015-01-01']
+          }
+        ]
+      }
     })
   },
   bar: {
-    title: 'Bar',
-    render: renderExample('bar', {
-      measures: ['Stories.count'],
-      timeDimensions: [
-        {
-          dimension: 'Stories.time',
-          granularity: 'month',
-          dateRange: ["2015-01-01", "2015-08-01"] }
-      ]
+    group: 'basic',
+    render: renderExample({
+      title: 'Bar Chart',
+      chartType: 'bar',
+      query: {
+        measures: ['Stories.count'],
+        timeDimensions: [
+          {
+            dimension: 'Stories.time',
+            granularity: 'month',
+            dateRange: ["2015-01-01", "2015-08-01"]
+          }
+        ]
+      }
     })
   },
   barStacked: {
-    title: 'Bar',
-    render: renderExample('barStacked', {
-      measures: ['Stories.count'],
-      dimensions: ['Stories.category'],
-      timeDimensions: [
-        {
-          dimension: 'Stories.time',
-          granularity: 'month',
-          dateRange: ["2015-01-01", "2015-07-31"] }
-      ]
+    group: 'basic',
+    render: renderExample({
+      title: 'Stacked Bar Chart',
+      chartType: 'barStacked',
+      query: {
+        measures: ['Stories.count'],
+        dimensions: ['Stories.category'],
+        timeDimensions: [
+          {
+            dimension: 'Stories.time',
+            granularity: 'month',
+            dateRange: ["2015-01-01", "2015-07-31"]
+          }
+        ]
+      }
     })
   },
   pie: {
-    title: 'Pie',
-    render: renderExample('pie', {
-      measures: ['Stories.count'],
-      dimensions: ['Stories.category']
+    group: 'basic',
+    render: renderExample({
+      title: 'Pie Chart',
+      chartType: 'pie',
+      query: {
+        measures: ['Stories.count'],
+        dimensions: ['Stories.category']
+      }
     })
   },
   categoryFilter: {
-    title: 'Line',
-    render: renderExample('categoryFilter', {
-      measures: ['Stories.count'],
-      dimensions: ['Stories.time.month'],
-      filters: [
-        {
-          dimension: `Stories.time`,
-          operator: `beforeDate`,
-          values: [`2010-01-01`]
-        }
-      ]
-    }, basicFilterCodeTemplate)
+    group: 'interaction',
+    render: renderExample({
+      title: 'Category Filter',
+      chartType: 'categoryFilter',
+      query: {
+        measures: ['Stories.count'],
+        dimensions: ['Stories.time.month'],
+        filters: [
+          {
+            dimension: `Stories.time`,
+            operator: `beforeDate`,
+            values: [`2010-01-01`]
+          }
+        ]
+      },
+      sourceCodeFn: basicFilterCodeTemplate
+    })
   }
 };
 

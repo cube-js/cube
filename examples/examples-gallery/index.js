@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Layout, Row, Col, Menu, Icon, Radio } from 'antd';
 import chartsExamples from './bizChartExamples';
+import { toPairs } from 'ramda';
 import 'antd/dist/antd.css';
 import './css/style.css';
 
@@ -18,7 +19,7 @@ class App extends React.Component {
   constructor(props) {
     super(props);
 
-    this.state = { activeChart: 'line', chartLibrary: 'bizcharts' }
+    this.state = { activeChart: 'basic', chartLibrary: 'bizcharts' }
   }
 
   handleMenuChange(e) {
@@ -31,6 +32,12 @@ class App extends React.Component {
     this.setState({
       chartLibrary: e.target.value
     })
+  }
+
+  renderGroup(group) {
+    return toPairs(chartsExamples).filter(([n, c]) => c.group === group).map(([name, c]) =>
+      (<div key={name} style={{ marginBottom: 24 }}>{c.render({ chartLibrary: this.state.chartLibrary })}</div>)
+    );
   }
 
   render() {
@@ -49,26 +56,9 @@ class App extends React.Component {
             theme="dark"
             onClick={this.handleMenuChange.bind(this)}
             defaultSelectedKeys={[this.state.activeChart]}
-            defaultOpenKeys={["basic"]}
           >
-            <Menu.SubMenu key="basic" title="Basic Charts">
-              <Menu.ItemGroup key="g1" title="Line">
-                <Menu.Item key="line">Time series</Menu.Item>
-                <Menu.Item key="lineMulti">Multi axis</Menu.Item>
-              </Menu.ItemGroup>
-              <Menu.ItemGroup key="g2" title="Bar">
-                <Menu.Item key="bar">Basic</Menu.Item>
-                <Menu.Item key="barStacked">Stacked</Menu.Item>
-              </Menu.ItemGroup>
-              <Menu.ItemGroup key="g3" title="Other">
-                <Menu.Item key="pie">Pie</Menu.Item>
-              </Menu.ItemGroup>
-            </Menu.SubMenu>
-            <Menu.SubMenu key="interaction" title="Interaction">
-              <Menu.ItemGroup key="g1" title="Filters">
-                <Menu.Item key="categoryFilter">Category Filter</Menu.Item>
-              </Menu.ItemGroup>
-            </Menu.SubMenu>
+            <Menu.Item key="basic">Basic Charts</Menu.Item>
+            <Menu.Item key="interaction">Interaction</Menu.Item>
           </Menu>
         </Sider>
         <Layout>
@@ -87,7 +77,7 @@ class App extends React.Component {
             </Row>
           </Header>
           <Content style={{ padding: '30px', margin: '30px', background: '#fff' }}>
-            { allChartsExamples[this.state.activeChart].render({ chartLibrary: this.state.chartLibrary }) }
+            { this.renderGroup(this.state.activeChart) }
           </Content>
         </Layout>
       </Layout>

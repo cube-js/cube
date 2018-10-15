@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row, Col, Tabs, Spin, Card, Alert } from 'antd';
+import { Row, Col, Tabs, Spin, Card, Alert, Tooltip, Icon, Button } from 'antd';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 import JSONPretty from 'react-json-pretty';
@@ -54,15 +54,14 @@ class CodeExample extends React.Component {
       response: <PrismCode code={JSON.stringify(resultSet, null, 2)} />
     };
 
-    return (<Col span={12} style={{ "padding": 10 }}>
-      <Card
-        tabList={tabList}
-        activeTabKey={this.state.activeTabKey}
-        onTabChange={(key) => { this.onTabChange(key, 'key'); }}
-      >
-        { contentList[this.state.activeTabKey] }
-      </Card>
-    </Col>);
+    return (<Card
+      type="inner"
+      tabList={tabList}
+      activeTabKey={this.state.activeTabKey}
+      onTabChange={(key) => { this.onTabChange(key, 'key'); }}
+    >
+      { contentList[this.state.activeTabKey] }
+    </Card>);
   }
 }
 
@@ -73,37 +72,50 @@ const Loader = () => (
 )
 
 const TabPane = Tabs.TabPane;
-const Example = ({ query, codeExample, render }) => (
-    <QueryRenderer
-      query={query}
-      cubejsApi={cubejs(HACKER_NEWS_DATASET_API_KEY)}
-      render={ ({ resultSet, error, loadingState }) => {
-        if (error) {
-          return <Alert
-            message="Error occured while loading your query"
-            description={error.message}
-            type="error"
-          />
-        }
+class Example extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { showCode: false };
+  }
 
-        if (resultSet && !loadingState.isLoading) {
-          return [
-            <Row gutter={24}>
-              <Col span={12} style={{ "padding": 10 }}>
-                <Card
-                  title="Chart"
-                >
-                  {render({ resultSet, error })}
-                </Card>
-              </Col>
-              <CodeExample resultSet={resultSet} codeExample={codeExample} />
-            </Row>
-          ];
-        }
+  render() {
+    const { query, codeExample, render, title } = this.props;
+    return (
+      <QueryRenderer
+        query={query}
+        cubejsApi={cubejs(HACKER_NEWS_DATASET_API_KEY)}
+        render={ ({ resultSet, error, loadingState }) => {
+          if (error) {
+            return <Alert
+              message="Error occured while loading your query"
+              description={error.message}
+              type="error"
+            />
+          }
 
-        return <Loader />
-      }}
-    />
-)
+          if (resultSet && !loadingState.isLoading) {
+            return (<Card
+              title={title || "Example"}
+              extra={<Tooltip placement="top" title={this.state.showCode ? 'Hide Code' : 'Show Code'}>
+                <Button
+                  onClick={() => this.setState({ showCode: !this.state.showCode })}
+                  icon="code"
+                  shape="circle"
+                  size="small"
+                  type={this.state.showCode ? 'primary' : 'default'}
+                />
+              </Tooltip>}
+            >
+              {render({ resultSet, error })}
+              {this.state.showCode && <CodeExample resultSet={resultSet} codeExample={codeExample} />}
+            </Card>);
+          }
+
+          return <Loader />
+        }}
+      />
+    );
+  }
+};
 
 export default Example;
