@@ -13,8 +13,6 @@ const RadioGroup = Radio.Group;
 
 const { Header, Footer, Sider, Content } = Layout;
 
-const allChartsExamples = chartsExamples;
-
 class App extends React.Component {
   constructor(props) {
     super(props);

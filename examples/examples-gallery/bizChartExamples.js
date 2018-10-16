@@ -49,7 +49,7 @@ const HACKER_NEWS_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH
 const Example = <QueryRenderer
   query={query}
   cubejsApi={cubejs(HACKER_NEWS_API_KEY)}
-  render={ ({ resultSet }) => (
+  render={({ resultSet }) => (
     resultSet && renderChart(resultSet) || (<Spin />)
   )}
 />;
