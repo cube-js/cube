@@ -1,21 +1,25 @@
-import 'core-js/modules/es6.number.constructor';
-import 'core-js/modules/es6.number.parse-float';
-import 'core-js/modules/es6.object.assign';
-import _defineProperty from '@babel/runtime/helpers/defineProperty';
-import 'core-js/modules/es6.array.reduce';
-import _objectSpread from '@babel/runtime/helpers/objectSpread';
-import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
-import 'core-js/modules/es6.array.find';
-import 'core-js/modules/es6.array.filter';
-import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
-import 'core-js/modules/es6.array.map';
-import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
-import _createClass from '@babel/runtime/helpers/createClass';
-import { groupBy, pipe, toPairs, uniq, map, unnest, dropLast } from 'ramda';
-import _regeneratorRuntime from '@babel/runtime/regenerator';
-import 'regenerator-runtime/runtime';
-import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
-import { fetch } from 'whatwg-fetch';
+'use strict';
+
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+require('core-js/modules/es6.number.constructor');
+require('core-js/modules/es6.number.parse-float');
+require('core-js/modules/es6.object.assign');
+var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
+require('core-js/modules/es6.array.reduce');
+var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
+var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
+require('core-js/modules/es6.array.find');
+require('core-js/modules/es6.array.filter');
+var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
+require('core-js/modules/es6.array.map');
+var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
+var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
+var ramda = require('ramda');
+var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
+require('regenerator-runtime/runtime');
+var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
+var whatwgFetch = require('whatwg-fetch');
 
 var ResultSet =
 /*#__PURE__*/
@@ -109,17 +113,17 @@ function () {
 
       // TODO missing date filling
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      return pipe(map(function (row) {
+      return ramda.pipe(ramda.map(function (row) {
         return _this2.axisValues(pivotConfig.x)(row).map(function (xValues) {
           return {
             xValues: xValues,
             row: row
           };
         });
-      }), unnest, groupBy(function (_ref3) {
+      }), ramda.unnest, ramda.groupBy(function (_ref3) {
         var xValues = _ref3.xValues;
         return _this2.axisValuesString(xValues);
-      }), toPairs)(this.loadResponse.data).map(function (_ref4) {
+      }), ramda.toPairs)(this.loadResponse.data).map(function (_ref4) {
         var _ref5 = _slicedToArray(_ref4, 2),
             xValuesString = _ref5[0],
             rows = _ref5[1];
@@ -160,7 +164,7 @@ function () {
 
         return _objectSpread({
           category: _this3.axisValuesString(xValues, ', ')
-        }, map(function (m) {
+        }, ramda.map(function (m) {
           return m && Number.parseFloat(m);
         }, measures));
       });
@@ -182,11 +186,11 @@ function () {
       var _this4 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(function (axisValues) {
+      return ramda.pipe(ramda.map(this.axisValues(pivotConfig.y)), ramda.unnest, ramda.uniq)(this.loadResponse.data).map(function (axisValues) {
         return {
           title: _this4.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
-          }) ? dropLast(1, axisValues).concat(_this4.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+          }) ? ramda.dropLast(1, axisValues).concat(_this4.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
           key: _this4.axisValuesString(axisValues)
         };
       });
@@ -249,7 +253,7 @@ function () {
   _createClass(CubejsApi, [{
     key: "request",
     value: function request(url, config) {
-      return fetch("".concat(API_URL).concat(url), Object.assign({
+      return whatwgFetch.fetch("".concat(API_URL).concat(url), Object.assign({
         headers: {
           Authorization: this.apiToken,
           'Content-Type': 'application/json'
@@ -353,4 +357,4 @@ var index = (function (apiToken) {
   return new CubejsApi(apiToken);
 });
 
-export default index;
+module.exports = index;

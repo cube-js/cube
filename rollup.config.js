@@ -96,7 +96,7 @@ const bundle = (name, globalName, baseConfig) => {
           ]
         })
       ],
-      output: [{ file: `packages/${name}/dist/${name}.js`, format: "es" }]
+      output: [{ file: `packages/${name}/dist/${name}.js`, format: "cjs" }]
     }
   ]
 };

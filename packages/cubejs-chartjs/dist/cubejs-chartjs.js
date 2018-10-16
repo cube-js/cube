@@ -1,8 +1,12 @@
-import 'core-js/modules/es6.array.find';
-import 'core-js/modules/es6.array.map';
-import _objectSpread from '@babel/runtime/helpers/objectSpread';
-import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
-import _createClass from '@babel/runtime/helpers/createClass';
+'use strict';
+
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+require('core-js/modules/es6.array.find');
+require('core-js/modules/es6.array.map');
+var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
+var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
+var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
 
 var ChartjsResultSet =
 /*#__PURE__*/
@@ -84,4 +88,4 @@ var index = (function (resultSet, userConfig) {
   return new ChartjsResultSet(resultSet, userConfig).prepareConfig();
 });
 
-export default index;
+module.exports = index;
