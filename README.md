@@ -17,10 +17,22 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 
 - [Examples Gallery](https://statsbotco.github.io/cubejs-client/)
 
-## Installation
+## Getting Started
+
+### 1. Create Free Statsbot Account
+Cube.js Cloud is provided by Statsbot, you can sign up for a free account [here](https://statsbot.co/sign-up?cubejs=true).
+
+### 2. Connect Your Database
+All major SQL databases are supported. Here the guide on [how to connect your database to Statsbot](http://help.statsbot.co/how-to-connect-database-to-statsbot/how-to-connect-your-database-to-statsbot).
+
+### 3.Define Your Data Schema
+Cube.js uses Data Schema to generate and execute SQL. It acts as an ORM for yor analytics and it is flixible enough to model everything from simple counts to cohort retention and funnel analysis. [Read Cube.js Schema docs](https://statsbot.co/docs/getting-started-cubejs).
+
+### 4. Visualize Results
+Generate a Cube.js token within Statsbot UI and you are ready to use this library to add analytics features to your app.
+#### Installation
 
 Vanilla JS:
-
 ```bash
 $ npm i --save @cubejs-client/core
 ```
@@ -32,7 +44,7 @@ $ npm i --save @cubejs-client/core
 $ npm i --save @cubejs-client/react
 ```
 
-## Getting Started
+#### Example Usage
 
 Instantiate Cube.js API:
 
