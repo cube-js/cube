@@ -92,8 +92,8 @@ Using React `QueryRenderer` component:
 ## Cube.js API tokens
 
 You're provided with two types of security credentials:
-- *Cube.js Global Token*. Looks like `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw`. Can be passed to `cubejs()`.
-- *Cube.js Secret*. Looks like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`. Should be used to sign JWT tokens passed to `cubejs()`.
+- *Cube.js Global Token*. Has format like `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw`. Can be passed to `cubejs()`.
+- *Cube.js Secret*. Has format like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`. Should be used to sign JWT tokens passed to `cubejs()`.
 
 Cube.js tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
 *Cube.js Global Token* is not an exception and generated for your convenience.
