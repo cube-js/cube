@@ -89,13 +89,18 @@ Using React `QueryRenderer` component:
   />
 ```
 
-## Securing customer facing applications
+## Cube.js API tokens
 
-Cube.js tokens are in fact [JWT tokens](https://jwt.io/).
-Besides public API key you can obtain secret key to generate public customer API keys on your server side and embed it in web page that renders query results.
-Secret key looks like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`.
-To generate public key with this secret you should provide minimal payload `{ i: 38594 }` which is your key identifier required for token verification.
-Such key is called global and provides no security context so it has all possible rights for querying.
+You're provided with two types of security credentials:
+- Cube.js Global Token. Looks like `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw`. Can be passed to `cubejs()`.
+- Cube.js Secret. Looks like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`. Should be used to sign JWT tokens passed to `cubejs()`.
+
+Cube.js tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
+*Cube.js Global Token* is not an exception and generated for your convenience.
+*Cube.js Global Token* is JWT token signed with *Cube.js Secret* that has minimal payload like `{ i: 38594 }`.
+*Cube.js Global Token* provides no security context so it has all possible rights for querying.
+Besides *Cube.js Global Token* you can use *Cube.js Secret* to generate customer API tokens to restrict data available for querying on your server side and embed it in web page that renders query results.
+For example to generate customer API tokens with `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc` secret you should provide minimal payload `{ i: 38594 }` which is your key identifier required for token verification.
 Security context can be provided by passing `u` param for payload.
 For example if you want to pass user id in security context you can create token with payload:
 ```json
