@@ -25,11 +25,18 @@ Cube.js Cloud is provided by Statsbot, you can sign up for a free account [here]
 ### 2. Connect Your Database
 All major SQL databases are supported. Here the guide on [how to connect your database to Statsbot](http://help.statsbot.co/how-to-connect-database-to-statsbot/how-to-connect-your-database-to-statsbot).
 
-### 3.Define Your Data Schema
+### 3. Define Your Data Schema
 Cube.js uses Data Schema to generate and execute SQL. It acts as an ORM for your analytics and it is flixible enough to model everything from simple counts to cohort retention and funnel analysis. [Read Cube.js Schema docs](https://statsbot.co/docs/getting-started-cubejs).
 
 ### 4. Visualize Results
-Generate a Cube.js token within Statsbot UI and you are ready to use this library to add analytics features to your app.
+<Details>
+<Summary>Generate a Cube.js token within Statsbot UI.</Summary>
+1. Go to Data Sources  <br />
+2. Click Edit next to your database <br />
+3. Select Cube.js API <br />
+</Details>
+
+Now you are ready to use this library to add analytics features to your app.
 #### Installation
 
 Vanilla JS:
