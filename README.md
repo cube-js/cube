@@ -9,7 +9,7 @@ __Cube.js is an analytics framework for modern applications.__ It supplies build
 * __Cube.js Data Schema works as an ORM for your analytics.__ It allows to model everything from simple counts to cohort retention and funnel analysis.
 * __It is designed to work on top of your database, so all your data stays with you.__ All major SQL databases are supported.
 
-This repository contains Cube.js Javascript and React clients. The Cube.js Server itself is not yet open-sourced. We are working hard to make it happen. Before that, you can request early access to our cloud version.
+This repository contains Cube.js Javascript and React clients. The Cube.js Server itself is not yet open-sourced. We are working hard to make it happen. Before that, you can [request early access to our cloud version](https://statsbot.co/cubejs/).
 
 
 
@@ -17,10 +17,29 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 
 - [Examples Gallery](https://statsbotco.github.io/cubejs-client/)
 
-## Installation
+## Getting Started
+
+### 1. Create Free Statsbot Account
+Cube.js Cloud is provided by Statsbot, you can sign up for a free account [here](https://statsbot.co/sign-up?cubejs=true).
+
+### 2. Connect Your Database
+All major SQL databases are supported. Here the guide on [how to connect your database to Statsbot](http://help.statsbot.co/how-to-connect-database-to-statsbot/how-to-connect-your-database-to-statsbot).
+
+### 3. Define Your Data Schema
+Cube.js uses Data Schema to generate and execute SQL. It acts as an ORM for your analytics and it is flixible enough to model everything from simple counts to cohort retention and funnel analysis. [Read Cube.js Schema docs](https://statsbot.co/docs/getting-started-cubejs).
+
+### 4. Visualize Results
+<Details>
+<Summary>Generate a Cube.js token within Statsbot UI.</Summary>
+1. Go to Data Sources  <br />
+2. Click Edit next to your database <br />
+3. Select Cube.js API <br />
+</Details>
+
+Now you are ready to use this library to add analytics features to your app.
+#### Installation
 
 Vanilla JS:
-
 ```bash
 $ npm i --save @cubejs-client/core
 ```
@@ -32,7 +51,7 @@ $ npm i --save @cubejs-client/core
 $ npm i --save @cubejs-client/react
 ```
 
-## Getting Started
+#### Example Usage
 
 Instantiate Cube.js API:
 
@@ -40,7 +59,7 @@ Instantiate Cube.js API:
 const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
 ```
 
-Please email info@statsbot.co to obtain API key.
+Please [request an early access](https://statsbot.co/cubejs/) to get an API key.
 
 Use load API to fetch data:
 
@@ -89,13 +108,18 @@ Using React `QueryRenderer` component:
   />
 ```
 
-## Securing customer facing applications
+## Cube.js API tokens
 
-Cube.js tokens are in fact [JWT tokens](https://jwt.io/).
-Besides public API key you can obtain secret key to generate public customer API keys on your server side and embed it in web page that renders query results.
-Secret key looks like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`.
-To generate public key with this secret you should provide minimal payload `{ i: 38594 }` which is your key identifier required for token verification.
-Such key is called global and provides no security context so it has all possible rights for querying.
+You're provided with two types of security credentials:
+- *Cube.js Global Token*. Has format like `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw`. Can be passed to `cubejs()`.
+- *Cube.js Secret*. Has format like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`. Should be used to sign JWT tokens passed to `cubejs()`.
+
+Cube.js tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
+*Cube.js Global Token* is not an exception and generated for your convenience.
+*Cube.js Global Token* is JWT token signed with *Cube.js Secret* that has minimal payload like `{ i: 38594 }`.
+*Cube.js Global Token* provides no security context so it has all possible rights for querying.
+Besides *Cube.js Global Token* you can use *Cube.js Secret* to generate customer API tokens to restrict data available for querying on your server side and embed it in web page that renders query results.
+For example to generate customer API tokens with `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc` secret you should provide minimal payload `{ i: 38594 }` which is your key identifier required for token verification.
 Security context can be provided by passing `u` param for payload.
 For example if you want to pass user id in security context you can create token with payload:
 ```json
@@ -111,7 +135,7 @@ Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-u
 > *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
 > Learn more: [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
 
-Please email info@statsbot.co to obtain your secret key.
+Please [request an early access](https://statsbot.co/cubejs/) to get an API key.
 
 ## API
 
