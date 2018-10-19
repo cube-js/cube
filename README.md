@@ -89,13 +89,9 @@ Using React `QueryRenderer` component:
     }
 
     return (
-      <LineChart width={600} height={300} data={resultSet.rawData()}
-                       margin={{top: 5, right: 30, left: 20, bottom: 5}}>
-        <XAxis dataKey="Stories.time"
-               tickFormatter={(v) => moment(v).format('MMM YY')}
-        />
+      <LineChart data={resultSet.rawData()}>
+        <XAxis dataKey="Stories.time"/>
         <YAxis/>
-        <CartesianGrid strokeDasharray="3 3"/>
         <Tooltip/>
         <Legend />
         <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
