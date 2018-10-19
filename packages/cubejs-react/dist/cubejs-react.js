@@ -4,8 +4,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 require('core-js/modules/es6.array.map');
+var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 require('core-js/modules/es6.promise');
 require('core-js/modules/web.dom.iterable');
 require('core-js/modules/es6.array.iterator');
@@ -71,21 +71,58 @@ function (_React$Component) {
       this.setState({
         isLoading: true,
         resultSet: null,
-        error: null
+        error: null,
+        sqlQuery: null
       });
-      this.props.cubejsApi.load(query).then(function (resultSet) {
-        return _this2.setState({
-          resultSet: resultSet,
-          error: null,
-          isLoading: false
+
+      if (this.props.loadSql === 'only') {
+        this.props.cubejsApi.sql(query).then(function (sqlQuery) {
+          return _this2.setState({
+            sqlQuery: sqlQuery,
+            error: null,
+            isLoading: false
+          });
+        }).catch(function (error) {
+          return _this2.setState({
+            resultSet: null,
+            error: error,
+            isLoading: false
+          });
         });
-      }).catch(function (error) {
-        return _this2.setState({
-          resultSet: null,
-          error: error,
-          isLoading: false
+      } else if (this.props.loadSql) {
+        Promise.all([this.props.cubejsApi.sql(query), this.props.cubejsApi.load(query)]).then(function (_ref) {
+          var _ref2 = _slicedToArray(_ref, 2),
+              sqlQuery = _ref2[0],
+              resultSet = _ref2[1];
+
+          return _this2.setState({
+            sqlQuery: sqlQuery,
+            resultSet: resultSet,
+            error: null,
+            isLoading: false
+          });
+        }).catch(function (error) {
+          return _this2.setState({
+            resultSet: null,
+            error: error,
+            isLoading: false
+          });
         });
-      });
+      } else {
+        this.props.cubejsApi.load(query).then(function (resultSet) {
+          return _this2.setState({
+            resultSet: resultSet,
+            error: null,
+            isLoading: false
+          });
+        }).catch(function (error) {
+          return _this2.setState({
+            resultSet: null,
+            error: error,
+            isLoading: false
+          });
+        });
+      }
     }
   }, {
     key: "loadQueries",
@@ -97,10 +134,10 @@ function (_React$Component) {
         resultSet: null,
         error: null
       });
-      var resultPromises = Promise.all(ramda.toPairs(queries).map(function (_ref) {
-        var _ref2 = _slicedToArray(_ref, 2),
-            name = _ref2[0],
-            query = _ref2[1];
+      var resultPromises = Promise.all(ramda.toPairs(queries).map(function (_ref3) {
+        var _ref4 = _slicedToArray(_ref3, 2),
+            name = _ref4[0],
+            query = _ref4[1];
 
         return _this3.props.cubejsApi.load(query).then(function (r) {
           return [name, r];
@@ -128,7 +165,8 @@ function (_React$Component) {
         resultSet: this.props.queries ? this.state.resultSet || {} : this.state.resultSet,
         loadingState: {
           isLoading: this.state.isLoading
-        }
+        },
+        sqlQuery: this.state.sqlQuery
       };
 
       if (this.props.render) {
@@ -146,7 +184,8 @@ QueryRenderer.propTypes = {
   afterRender: PropTypes.func,
   cubejsApi: PropTypes.object.required,
   query: PropTypes.object,
-  queries: PropTypes.object
+  queries: PropTypes.object,
+  loadSql: PropTypes.any
 };
 
 var QueryRendererWithTotals = (function (_ref) {

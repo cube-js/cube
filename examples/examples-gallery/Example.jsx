@@ -2,6 +2,7 @@ import React from 'react';
 import { Row, Col, Tabs, Spin, Card, Alert, Tooltip, Icon, Button } from 'antd';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
+import sqlFormatter from "sql-formatter";
 import JSONPretty from 'react-json-pretty';
 import Prism from "prismjs";
 import "./css/prism.css";
@@ -32,9 +33,12 @@ const tabList = [{
   key: 'code',
   tab: 'Code'
 }, {
+  key: 'sqlQuery',
+  tab: 'Generated SQL'
+}, {
   key: 'response',
   tab: 'Response'
-}]
+}];
 
 class CodeExample extends React.Component {
   constructor(props) {
@@ -48,10 +52,11 @@ class CodeExample extends React.Component {
   }
 
   render() {
-    const { codeExample, resultSet } = this.props;
+    const { codeExample, resultSet, sqlQuery } = this.props;
     const contentList = {
       code: <PrismCode code={codeExample} />,
-      response: <PrismCode code={JSON.stringify(resultSet, null, 2)} />
+      response: <PrismCode code={JSON.stringify(resultSet, null, 2)} />,
+      sqlQuery: <PrismCode code={sqlQuery && sqlFormatter.format(sqlQuery.sql())} />
     };
 
     return (<Card
@@ -84,7 +89,8 @@ class Example extends React.Component {
       <QueryRenderer
         query={query}
         cubejsApi={cubejs(HACKER_NEWS_DATASET_API_KEY)}
-        render={ ({ resultSet, error, loadingState }) => {
+        loadSql
+        render={ ({ resultSet, sqlQuery, error, loadingState }) => {
           if (error) {
             return <Alert
               message="Error occured while loading your query"
@@ -107,7 +113,7 @@ class Example extends React.Component {
               </Tooltip>}
             >
               {render({ resultSet, error })}
-              {this.state.showCode && <CodeExample resultSet={resultSet} codeExample={codeExample} />}
+              {this.state.showCode && <CodeExample resultSet={resultSet} codeExample={codeExample} sqlQuery={sqlQuery}/>}
             </Card>);
           }
 

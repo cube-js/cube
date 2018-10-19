@@ -9178,6 +9178,30 @@
 	  return ResultSet;
 	}();
 
+	var SqlQuery =
+	/*#__PURE__*/
+	function () {
+	  function SqlQuery(sqlQuery) {
+	    _classCallCheck(this, SqlQuery);
+
+	    this.sqlQuery = sqlQuery;
+	  }
+
+	  _createClass(SqlQuery, [{
+	    key: "rawQuery",
+	    value: function rawQuery() {
+	      return this.sqlQuery.sql;
+	    }
+	  }, {
+	    key: "sql",
+	    value: function sql() {
+	      return this.rawQuery().sql[0];
+	    }
+	  }]);
+
+	  return SqlQuery;
+	}();
+
 	var ProgressResult =
 	/*#__PURE__*/
 	function () {
@@ -9224,10 +9248,8 @@
 	      }, config || {}));
 	    }
 	  }, {
-	    key: "load",
-	    value: function load(query, options, callback) {
-	      var _this = this;
-
+	    key: "loadMethod",
+	    value: function loadMethod(request, toResult, options, callback) {
 	      if (typeof options === 'function' && !callback) {
 	        callback = options;
 	        options = undefined;
@@ -9247,7 +9269,7 @@
 	              switch (_context.prev = _context.next) {
 	                case 0:
 	                  _context.next = 2;
-	                  return _this.request("/load?query=".concat(JSON.stringify(query)));
+	                  return request();
 
 	                case 2:
 	                  response = _context.sent;
@@ -9286,7 +9308,7 @@
 	                  throw new Error(body.error);
 
 	                case 13:
-	                  return _context.abrupt("return", new ResultSet(body));
+	                  return _context.abrupt("return", toResult(body));
 
 	                case 14:
 	                case "end":
@@ -9310,6 +9332,28 @@
 	      } else {
 	        return loadImpl();
 	      }
+	    }
+	  }, {
+	    key: "load",
+	    value: function load(query, options, callback) {
+	      var _this = this;
+
+	      return this.loadMethod(function () {
+	        return _this.request("/load?query=".concat(JSON.stringify(query)));
+	      }, function (body) {
+	        return new ResultSet(body);
+	      }, options, callback);
+	    }
+	  }, {
+	    key: "sql",
+	    value: function sql(query, options, callback) {
+	      var _this2 = this;
+
+	      return this.loadMethod(function () {
+	        return _this2.request("/sql?query=".concat(JSON.stringify(query)));
+	      }, function (body) {
+	        return new SqlQuery(body);
+	      }, options, callback);
 	    }
 	  }]);
 

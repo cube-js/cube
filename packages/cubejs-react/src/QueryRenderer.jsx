@@ -30,10 +30,20 @@ export default class QueryRenderer extends React.Component {
   }
 
   load(query) {
-    this.setState({ isLoading: true, resultSet: null, error: null });
-    this.props.cubejsApi.load(query)
-      .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
-      .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+    this.setState({ isLoading: true, resultSet: null, error: null, sqlQuery: null });
+    if (this.props.loadSql === 'only') {
+      this.props.cubejsApi.sql(query)
+        .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))
+        .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+    } else if (this.props.loadSql) {
+      Promise.all([this.props.cubejsApi.sql(query), this.props.cubejsApi.load(query)])
+        .then(([sqlQuery, resultSet]) => this.setState({ sqlQuery, resultSet, error: null, isLoading: false }))
+        .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+    } else {
+      this.props.cubejsApi.load(query)
+        .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
+        .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+    }
   }
 
   loadQueries(queries) {
@@ -56,7 +66,8 @@ export default class QueryRenderer extends React.Component {
     const loadState = {
       error: this.state.error,
       resultSet: this.props.queries ? (this.state.resultSet || {}) : this.state.resultSet,
-      loadingState: { isLoading: this.state.isLoading }
+      loadingState: { isLoading: this.state.isLoading },
+      sqlQuery: this.state.sqlQuery
     };
     if (this.props.render) {
       return this.props.render(loadState);
@@ -70,5 +81,6 @@ QueryRenderer.propTypes = {
   afterRender: PropTypes.func,
   cubejsApi: PropTypes.object.required,
   query: PropTypes.object,
-  queries: PropTypes.object
+  queries: PropTypes.object,
+  loadSql: PropTypes.any
 };
