@@ -62,7 +62,7 @@ const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5
 Use load API to fetch data:
 
 ```js
-cubejsApi.load({
+const resultSet = await cubejsApi.load({
   measures: ['Stories.count'],
   timeDimensions: [{
     dimension: 'Stories.time',
@@ -70,40 +70,43 @@ cubejsApi.load({
     granularity: 'month'
   }]
 })
-  .then(resultSet => {
-    const context = document.getElementById("myChart");
-    new Chart(context, chartjsConfig(resultSet));
-  });
+const context = document.getElementById("myChart");
+new Chart(context, chartjsConfig(resultSet));;
 ```
 
 Using React `QueryRenderer` component:
 
 ```jsx
-  <QueryRenderer query={{
+<QueryRenderer 
+  query={{
     measures: ['Stories.count'],
     timeDimensions: [{
       dimension: 'Stories.time',
       dateRange: ['2015-01-01', '2016-01-01'],
       granularity: 'month'
     }]
-  }} cubejsApi={this.api} render={
-    ({ resultSet }) => {
-      return resultSet && (
-        <LineChart width={600} height={300} data={resultSet.rawData()}
-                         margin={{top: 5, right: 30, left: 20, bottom: 5}}>
-          <XAxis dataKey="Stories.time"
-                 tickFormatter={(v) => moment(v).format('MMM YY')}
-          />
-          <YAxis/>
-          <CartesianGrid strokeDasharray="3 3"/>
-          <Tooltip/>
-          <Legend />
-          <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
-        </LineChart>
-      ) || 'Loading...'
+  }} 
+  cubejsApi={cubejsApi} 
+  render={({ resultSet }) => {
+    if (!resultSet) {
+      return 'Loading...';
     }
-  }
-  />
+
+    return (
+      <LineChart width={600} height={300} data={resultSet.rawData()}
+                       margin={{top: 5, right: 30, left: 20, bottom: 5}}>
+        <XAxis dataKey="Stories.time"
+               tickFormatter={(v) => moment(v).format('MMM YY')}
+        />
+        <YAxis/>
+        <CartesianGrid strokeDasharray="3 3"/>
+        <Tooltip/>
+        <Legend />
+        <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
+      </LineChart>
+    );
+  }}
+/>
 ```
 
 ## Cube.js API tokens
