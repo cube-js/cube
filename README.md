@@ -80,11 +80,7 @@ Using React `QueryRenderer` component:
 <QueryRenderer 
   query={{
     measures: ['Stories.count'],
-    timeDimensions: [{
-      dimension: 'Stories.time',
-      dateRange: ['2015-01-01', '2016-01-01'],
-      granularity: 'month'
-    }]
+    dimensions: ['Stories.time.month']
   }} 
   cubejsApi={cubejsApi} 
   render={({ resultSet }) => {
