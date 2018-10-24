@@ -9,7 +9,7 @@ __Cube.js is an analytics framework for modern applications.__ It supplies build
 * __Cube.js Data Schema works as an ORM for your analytics.__ It allows to model everything from simple counts to cohort retention and funnel analysis.
 * __It is designed to work on top of your database, so all your data stays with you.__ All major SQL databases are supported.
 
-This repository contains Cube.js Javascript and React clients. The Cube.js Server itself is not yet open-sourced. We are working hard to make it happen. Before that, you can [request early access to our cloud version](https://statsbot.co/cubejs/).
+This repository contains Cube.js Javascript and React clients. The Cube.js Server itself is not yet open-sourced. We are working hard to make it happen.
 
 
 
@@ -59,12 +59,10 @@ Instantiate Cube.js API:
 const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
 ```
 
-Please [request an early access](https://statsbot.co/cubejs/) to get an API key.
-
 Use load API to fetch data:
 
 ```js
-cubejsApi.load({
+const resultSet = await cubejsApi.load({
   measures: ['Stories.count'],
   timeDimensions: [{
     dimension: 'Stories.time',
@@ -72,40 +70,35 @@ cubejsApi.load({
     granularity: 'month'
   }]
 })
-  .then(resultSet => {
-    const context = document.getElementById("myChart");
-    new Chart(context, chartjsConfig(resultSet));
-  });
+const context = document.getElementById("myChart");
+new Chart(context, chartjsConfig(resultSet));
 ```
 
 Using React `QueryRenderer` component:
 
 ```jsx
-  <QueryRenderer query={{
+<QueryRenderer 
+  query={{
     measures: ['Stories.count'],
-    timeDimensions: [{
-      dimension: 'Stories.time',
-      dateRange: ['2015-01-01', '2016-01-01'],
-      granularity: 'month'
-    }]
-  }} cubejsApi={this.api} render={
-    ({ resultSet }) => {
-      return resultSet && (
-        <LineChart width={600} height={300} data={resultSet.rawData()}
-                         margin={{top: 5, right: 30, left: 20, bottom: 5}}>
-          <XAxis dataKey="Stories.time"
-                 tickFormatter={(v) => moment(v).format('MMM YY')}
-          />
-          <YAxis/>
-          <CartesianGrid strokeDasharray="3 3"/>
-          <Tooltip/>
-          <Legend />
-          <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
-        </LineChart>
-      ) || 'Loading...'
+    dimensions: ['Stories.time.month']
+  }} 
+  cubejsApi={cubejsApi} 
+  render={({ resultSet }) => {
+    if (!resultSet) {
+      return 'Loading...';
     }
-  }
-  />
+
+    return (
+      <LineChart data={resultSet.rawData()}>
+        <XAxis dataKey="Stories.time"/>
+        <YAxis/>
+        <Tooltip/>
+        <Legend />
+        <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
+      </LineChart>
+    );
+  }}
+/>
 ```
 
 ## Cube.js API tokens
@@ -134,8 +127,6 @@ Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-u
 
 > *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
 > Learn more: [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
-
-Please [request an early access](https://statsbot.co/cubejs/) to get an API key.
 
 ## API
 
