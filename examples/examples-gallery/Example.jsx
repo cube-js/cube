@@ -102,15 +102,12 @@ class Example extends React.Component {
           if (resultSet && !loadingState.isLoading) {
             return (<Card
               title={title || "Example"}
-              extra={<Tooltip placement="top" title={this.state.showCode ? 'Hide Code' : 'Show Code'}>
-                <Button
-                  onClick={() => this.setState({ showCode: !this.state.showCode })}
-                  icon="code"
-                  shape="circle"
-                  size="small"
-                  type={this.state.showCode ? 'primary' : 'default'}
-                />
-              </Tooltip>}
+              extra={<Button
+                onClick={() => this.setState({ showCode: !this.state.showCode })}
+                icon="code"
+                size="small"
+                type={this.state.showCode ? 'primary' : 'default'}
+              >{this.state.showCode ? 'Hide Code' : 'Show Code'}</Button>}
             >
               {render({ resultSet, error })}
               {this.state.showCode && <CodeExample resultSet={resultSet} codeExample={codeExample} sqlQuery={sqlQuery}/>}

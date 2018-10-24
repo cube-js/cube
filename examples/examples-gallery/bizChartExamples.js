@@ -117,6 +117,59 @@ export default class Example extends React.Component {
 };
 `);
 
+const datePickerCodeTemplate = (chartLibrary, chartType, query) => (
+  `import React from 'react';
+import cubejs from '@cubejs-client/core';
+import { QueryRenderer } from '@cubejs-client/react';
+import { Spin, Row, Col, DatePicker } from 'antd';
+${libraryToTemplate[chartLibrary].sourceCodeTemplate(chartType, query)}
+
+const HACKER_NEWS_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw';
+
+export default class Example extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { range: [
+      moment('2014-01-01'), moment('2014-12-31')
+    ]};
+  }
+  
+  render() {
+    const range = this.state.range;
+    return <div>
+      <Row style={{ marginBottom: 12 }}>
+        <Col>
+          <DatePicker.RangePicker 
+            onChange={(range) => this.setState({ range })} 
+            value={this.state.range} 
+            style={{ marginBottom: 12 }}
+          />
+        </Col>
+      </Row>
+      <Row>
+        <Col>
+          <QueryRenderer
+            cubejsApi={cubejs(HACKER_NEWS_API_KEY)}
+            query={{ 
+              measures: ['Stories.count'], 
+              dimensions: ['Stories.time.month'],
+              filters: range && range.length && [{ 
+                dimension: 'Stories.time', 
+                operator: 'inDateRange', 
+                values: range.map(d => d.format('YYYY-MM-DD')) 
+              }]
+            }}
+            render={ ({ resultSet }) => (
+              resultSet && renderChart(resultSet) || (<Spin />)
+            )}
+          />
+        </Col>
+      </Row>
+    </div>;
+  }
+}
+`);
+
 const renderExample = ({ chartType, query, sourceCodeFn, title }) => {
   sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
   return ({ chartLibrary }) => {
@@ -242,6 +295,18 @@ const chartsExamples = {
         ]
       },
       sourceCodeFn: basicFilterCodeTemplate
+    })
+  },
+  datePicker: {
+    group: 'interaction',
+    render: renderExample({
+      title: 'Date Picker',
+      chartType: 'line',
+      query: {
+        measures: ['Stories.count'],
+        dimensions: ['Stories.time.month']
+      },
+      sourceCodeFn: datePickerCodeTemplate
     })
   }
 };
