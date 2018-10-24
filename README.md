@@ -14,8 +14,8 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 ## Contents
 
 - [Examples](#examples)
-- [Getting Started](#getting-started)
 - [Architecture](#architecture)
+- [Getting Started](#getting-started)
 - [Cube.js API tokens](#cubejs-api-tokens)
 - [API](#api)
 
@@ -23,6 +23,13 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 ## Examples
 
 - [Examples Gallery](https://statsbotco.github.io/cubejs-client/)
+
+## Architecture
+__Cube.js acts as an analytics backend__, taking care of translating business  logic into SQL and handling database connection. 
+
+The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The Server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is visualization agnostic and works well with any chart library.
+
+<p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
 
 ## Getting Started
 
@@ -107,13 +114,6 @@ Using React `QueryRenderer` component:
   }}
 />
 ```
-
-## Architecture
-__Cube.js acts as an analytics backend__, taking care of translating business  logic into SQL and handling database connection. 
-
-The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The Server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is visualization agnostic and works well with any chart library.
-
-<p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
 
 ## Cube.js API tokens
 
