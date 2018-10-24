@@ -1,5 +1,5 @@
 
-<p align="center"><a href="https://www.statsbot.co"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://www.statsbot.co/cubejs"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
 [![npm version](https://badge.fury.io/js/%40cubejs-client%2Fcore.svg)](https://badge.fury.io/js/%40cubejs-client%2Fcore)
 
@@ -16,7 +16,7 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 - [Examples](#examples)
 - [Getting Started](#getting-started)
 - [Architecture](#architecture)
-- [Cube.js API tokens](#cube.js-api-tokens)
+- [Cube.js API tokens](#cubejs-api-tokens)
 - [API](#api)
 
 
@@ -109,7 +109,7 @@ Using React `QueryRenderer` component:
 ```
 
 ## Architecture
-<p align="center"><a href="https://www.statsbot.co"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></a></p>
+<p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
 
 ## Cube.js API tokens
 
