@@ -109,6 +109,10 @@ Using React `QueryRenderer` component:
 ```
 
 ## Architecture
+Cube.js acts as an analytics backend, taking care of translating business domain logic into SQL and handling database connection. It provides pre-aggregations and caching. 
+
+The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is agnostic to visualization library and works well with any chart library.
+
 <p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
 
 ## Cube.js API tokens
