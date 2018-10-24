@@ -71,7 +71,7 @@ const resultSet = await cubejsApi.load({
   }]
 })
 const context = document.getElementById("myChart");
-new Chart(context, chartjsConfig(resultSet));;
+new Chart(context, chartjsConfig(resultSet));
 ```
 
 Using React `QueryRenderer` component:
