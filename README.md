@@ -11,6 +11,13 @@ __Cube.js is an analytics framework for modern applications.__ It supplies build
 
 This repository contains Cube.js Javascript and React clients. The Cube.js Server itself is not yet open-sourced. We are working hard to make it happen.
 
+## Contents
+
+- [Examples](#examples)
+- [Getting Started](#getting-started)
+- [Architecture](#architecture)
+- [Cube.js API tokens](#cube.js-api-tokens)
+- [API](#api)
 
 
 ## Examples
@@ -100,6 +107,9 @@ Using React `QueryRenderer` component:
   }}
 />
 ```
+
+## Architecture
+<p align="center"><a href="https://www.statsbot.co"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></a></p>
 
 ## Cube.js API tokens
 
