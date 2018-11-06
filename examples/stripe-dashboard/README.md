@@ -1,4 +1,4 @@
-# Examples Gallery
+# Stripe Dashboard Example
 This example project contains a demo Stripe dashboard built with Cube.js.
 It uses Recharts for visiualizations.
 
