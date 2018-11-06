@@ -99,7 +99,7 @@ import { QueryRenderer } from '@cubejs-client/react';
 
 const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
 
-export default (props) => {
+export default () => {
   return (
     <QueryRenderer 
       query={{
@@ -158,7 +158,7 @@ Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-u
 
 Create instance of `CubejsApi`.
 
-- `apiKey` - API key used to authorize requests and determine SQL database you're accessing. Please email info@statsbot.co to obtain API key.
+- `apiKey` - API key used to authorize requests and determine SQL database you're accessing. To get a key signup for here [here](https://statsbot.co/sign-up?cubejs=true).
 
 ### CubejsApi.load(query, options, callback)
 
@@ -184,7 +184,7 @@ Returns query result raw data returned from server in format
 
 Format of this data may change over time.
 
-### <QueryRenderer />
+### QueryRenderer
 
 React component for rendering query results.
 
