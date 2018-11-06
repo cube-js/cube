@@ -69,15 +69,12 @@ $ npm i --save @cubejs-client/react
 
 #### Example Usage
 
-Instantiate Cube.js API:
+Vanilla Javascript. 
+Instantiate Cube.js API and then use it to fetch data:
 
 ```js
 const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
-```
 
-Use load API to fetch data:
-
-```js
 const resultSet = await cubejsApi.load({
   measures: ['Stories.count'],
   timeDimensions: [{
@@ -90,31 +87,42 @@ const context = document.getElementById("myChart");
 new Chart(context, chartjsConfig(resultSet));
 ```
 
-Using React `QueryRenderer` component:
+Using React
+Import `cubejs` and `QueryRenderer` component, and use it to fetch the data.
+In the example below we use Recharts to visualize data.
 
 ```jsx
-<QueryRenderer 
-  query={{
-    measures: ['Stories.count'],
-    dimensions: ['Stories.time.month']
-  }} 
-  cubejsApi={cubejsApi} 
-  render={({ resultSet }) => {
-    if (!resultSet) {
-      return 'Loading...';
-    }
+import React from 'react';
+import { LineChart, Line, XAxis, YAxis } 
+import cubejs from '@cubejs-client/core';
+import { QueryRenderer } from '@cubejs-client/react';
 
-    return (
-      <LineChart data={resultSet.rawData()}>
-        <XAxis dataKey="Stories.time"/>
-        <YAxis/>
-        <Tooltip/>
-        <Legend />
-        <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
-      </LineChart>
-    );
-  }}
-/>
+const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
+
+export default (props) => {
+  return (
+    <QueryRenderer 
+      query={{
+        measures: ['Stories.count'],
+        dimensions: ['Stories.time.month']
+      }} 
+      cubejsApi={cubejsApi} 
+      render={({ resultSet }) => {
+        if (!resultSet) {
+          return 'Loading...';
+        }
+
+        return (
+          <LineChart data={resultSet.rawData()}>
+            <XAxis dataKey="Stories.time"/>
+            <YAxis/>
+            <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
+          </LineChart>
+        );
+      }}
+    />
+  )
+}
 ```
 
 ## Cube.js API tokens
