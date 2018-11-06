@@ -1,0 +1,62 @@
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  padding-top: 30px;
+  background: #f5f6f7;
+}
+
+.chart {
+  background: #fff;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(141,149,166,0.1);
+}
+
+.chart-title {
+  color: #50556C;
+  font-size: 17px;
+  font-weight: 400;
+  padding: 7px 10px 4px;
+  border-bottom: 1px solid #e7e7e7;
+}
+
+.chart-body {
+  overflow: hidden;
+  padding: 5px 10px;
+  position: relative;
+  height: 300px;
+  text-align: center;
+}
+
+.chart-body h1 {
+  margin-top: 100px;
+}
+
+.loader {
+  position: relative;
+  text-align: center;
+  margin: 55px auto 35px auto;
+  z-index: 9999;
+  display: block;
+  width: 50px;
+  height: 50px;
+  border: 5px solid #B1B7C5;
+  border-radius: 50%;
+  border-top-color: #50556C;
+  animation: spin 1s ease-in-out infinite;
+  -webkit-animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes spin {
+  to {
+    -webkit-transform: rotate(360deg);
+  }
+}
