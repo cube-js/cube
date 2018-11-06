@@ -169,6 +169,21 @@ Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn
     * `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
 * `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
 
+
+### QueryRenderer
+
+`<QueryRenderer />` React component takes a query, fetches the given query, and uses the render prop to render the resulting data.
+
+Properties:
+
+- `query`: analytic query. Learn more about it's format below.
+- `cubejsApi`: `CubejsApi` instance to use.
+- `render({ resultSet, error, loadingState })`: output of this function will be rendered by `QueryRenderer`.
+  - `resultSet`: A `resultSet` is an object containing data obtained from the query.  If this object is not defined, it means that the data is still being fetched. `ResultSet` object provides a convient interface for data munipulation.
+  - `error`: Error will be defined if an error has occurred while fetching the query.
+  - `loadingState`: Provides information about the state of the query loading.
+  
+
 ### ResultSet.rawData()
 
 Returns query result raw data returned from server in format
@@ -183,16 +198,6 @@ Returns query result raw data returned from server in format
 ```
 
 Format of this data may change over time.
-
-### QueryRenderer
-
-React component for rendering query results.
-
-Properties:
-
-- `query` - analytic query. Learn more about it's format below.
-- `cubejsApi` - `CubejsApi` instance to use.
-- `render({ resultSet, error, loadingState })` - output of this function will be rendered by `QueryRenderer`.
 
 ### Query Format
 
