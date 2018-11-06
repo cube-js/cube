@@ -201,7 +201,19 @@ Format of this data may change over time.
 
 ### Query Format
 
-Query is plain JavaScript object with the following format -
+Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`. The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension email in the Cube Users would have the following name `Users.email`.
+
+Query has following properties:
+
+- `measures`: An array of measures.
+- `dimensions`: An array of dimensions.
+- `filters`: An array of filters.
+- `timeDimensions`: A convient way to specify a time dimension with a filter. It is an array of objects with following keys
+  - `dimension`: Time dimension name.
+  - `dateRange`: An array of dates with following format '2015-01-01', if only one date specified the filter would be set exactly to this date. It supports rolling dates, in this case pass single array element with formar `last N days|weeks|months|years`. For example `['last 7 days']`.
+  - `granularity`: A granularity for a time dimension, supports following values `day|week|month|year`.
+- `segments`: A segment is a named filter, created in the Data Schema.
+- `limit`: A row limit for your query. The hard limit is set to 5000 rows by default.
 
 ```js
 {
@@ -216,6 +228,7 @@ Query is plain JavaScript object with the following format -
     dimension: 'Stories.time',
     dateRange: ['2015-01-01', '2015-12-31'],
     granularity: 'month'
-  }]
+  }],
+  limit: 100
 }
 ```
