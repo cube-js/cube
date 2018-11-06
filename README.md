@@ -201,7 +201,8 @@ Format of this data may change over time.
 
 ### Query Format
 
-Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`. The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension email in the Cube Users would have the following name `Users.email`.
+Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`. You can [learn more about Cube.js Data Schema here.](https://statsbot.co/docs/getting-started-cubejs)
+The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension email in the Cube Users would have the following name `Users.email`.
 
 Query has following properties:
 
@@ -212,7 +213,7 @@ Query has following properties:
   - `dimension`: Time dimension name.
   - `dateRange`: An array of dates with following format '2015-01-01', if only one date specified the filter would be set exactly to this date. It supports rolling dates, in this case pass single array element with formar `last N days|weeks|months|years`. For example `['last 7 days']`.
   - `granularity`: A granularity for a time dimension, supports following values `day|week|month|year`.
-- `segments`: A segment is a named filter, created in the Data Schema.
+- `segments`: An array of segments. Segment is a named filter, created in the Data Schema.
 - `limit`: A row limit for your query. The hard limit is set to 5000 rows by default.
 
 ```js
