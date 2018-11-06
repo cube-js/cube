@@ -69,7 +69,7 @@ $ npm i --save @cubejs-client/react
 
 #### Example Usage
 
-Vanilla Javascript. 
+##### Vanilla Javascript. 
 Instantiate Cube.js API and then use it to fetch data:
 
 ```js
@@ -87,13 +87,13 @@ const context = document.getElementById("myChart");
 new Chart(context, chartjsConfig(resultSet));
 ```
 
-Using React
-Import `cubejs` and `QueryRenderer` component, and use it to fetch the data.
+##### Using React
+Import `cubejs` and `QueryRenderer` components, and use them to fetch the data.
 In the example below we use Recharts to visualize data.
 
 ```jsx
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis } 
+import { LineChart, Line, XAxis, YAxis } from 'recharts';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 
