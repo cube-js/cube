@@ -236,3 +236,8 @@ Query has following properties:
   limit: 100
 }
 ```
+
+
+### License
+
+Cube.js Client is [MIT licensed](./LICENSE).
