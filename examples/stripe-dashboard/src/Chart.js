@@ -1,12 +1,13 @@
 import React from 'react';
 import { QueryRenderer } from '@cubejs-client/react';
+import './Chart.css'
 
 const Chart = ({ cubejsApi, title, query, render }) => (
-  <div className="chart">
-    <div className="chart-title">
+  <div className="Chart">
+    <div className="ChartTitle">
       { title }
     </div>
-    <div className="chart-body">
+    <div className="ChartBody">
       <QueryRenderer
         query={query}
         cubejsApi={cubejsApi}

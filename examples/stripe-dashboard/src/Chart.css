@@ -1,0 +1,26 @@
+.Chart {
+  background: #fff;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(141,149,166,0.1);
+}
+
+.ChartTitle {
+  color: #50556C;
+  font-size: 17px;
+  font-weight: 400;
+  padding: 7px 10px 4px;
+  border-bottom: 1px solid #e7e7e7;
+}
+
+.ChartBody {
+  overflow: hidden;
+  padding: 5px 10px;
+  position: relative;
+  height: 300px;
+  text-align: center;
+}
+
+.ChartBody h1 {
+  margin-top: 100px;
+}
