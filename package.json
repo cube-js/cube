@@ -12,6 +12,7 @@
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
+    "@cubejs-client/core": "^0.1.4",
     "core-js": "^2.5.3",
     "ramda": "^0.25.0",
     "whatwg-fetch": "^3.0.0"

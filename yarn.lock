@@ -560,6 +560,12 @@
   dependencies:
     regenerator-runtime "^0.12.0"
 
+"@babel/runtime@^7.1.2":
+  version "7.1.5"
+  resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.1.5.tgz#4170907641cf1f61508f563ece3725150cc6fe39"
+  dependencies:
+    regenerator-runtime "^0.12.0"
+
 "@babel/template@^7.0.0":
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/@babel/template/-/template-7.0.0.tgz#c2bc9870405959c89a9c814376a2ecb247838c80"
@@ -589,6 +595,15 @@
     esutils "^2.0.2"
     lodash "^4.17.10"
     to-fast-properties "^2.0.0"
+
+"@cubejs-client/core@^0.1.4":
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.1.4.tgz#1405e85b506526b673ea722f172728cd33abdada"
+  dependencies:
+    "@babel/runtime" "^7.1.2"
+    core-js "^2.5.3"
+    ramda "^0.25.0"
+    whatwg-fetch "^3.0.0"
 
 "@types/estree@0.0.39":
   version "0.0.39"
