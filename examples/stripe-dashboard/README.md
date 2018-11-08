@@ -1,5 +1,5 @@
 # Stripe Dashboard Example
-This example project contains a demo Stripe dashboard built with Cube.js.
+This example project contains a demo Stripe dashboard built with Cube.js from the [Building a Serverless Stripe Analytics Dashboard](https://statsbot.co/blog/building-serverless-stripe-analytics-dashboard/) tutorial.
 It uses Recharts for visiualizations.
 
 [Live Demo](http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/)
