@@ -19,7 +19,7 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 - [Tutorials](#tutorials)
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
-- [Cube.js API tokens](#cubejs-api-tokens)
+- [Security](#security)
 - [API](#api)
 
 
@@ -132,11 +132,17 @@ export default () => {
 }
 ```
 
-## Cube.js API tokens
+## Security
+
+Cube.js can be used in two modes:
+- Without security context. It implies same data access permissions for all users
+- With security context. User or role-based security models can be implemented using this approach.
 
 You're provided with two types of security credentials:
-- *Cube.js Global Token*. Has format like `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw`. Can be passed to `cubejs()`.
+- *Cube.js Global Token*. Has format like `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw`. Can be passed to `cubejs()`. 
 - *Cube.js Secret*. Has format like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`. Should be used to sign JWT tokens passed to `cubejs()`.
+
+> *NOTE:* *Cube.js Global Token* should be used only for publicly available data or for testing purposes. For production use please generate expirable tokens using *Cube.js Secret*.
 
 Cube.js tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
 *Cube.js Global Token* is not an exception and generated for your convenience.
