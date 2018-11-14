@@ -135,7 +135,7 @@ export default () => {
 ## Security
 
 Cube.js can be used in two modes:
-- Without security context. It implies same data access permissions for all users
+- Without security context. It implies same data access permissions for all users.
 - With security context. User or role-based security models can be implemented using this approach.
 
 You're provided with two types of security credentials:
