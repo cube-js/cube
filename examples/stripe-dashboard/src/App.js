@@ -48,7 +48,7 @@ class App extends Component {
                 measures: ['StripeSaaSMetrics.mrr'],
                 timeDimensions: [{
                   dimension: 'StripeSaaSMetrics.time',
-                  dateRange: ['today'],
+                  dateRange: [new Date().toISOString().substring(0,10)],
                   granularity: null
                 }]
               }}
