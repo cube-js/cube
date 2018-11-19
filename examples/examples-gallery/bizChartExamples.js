@@ -157,7 +157,7 @@ export default class Example extends React.Component {
                 dimension: 'Stories.time', 
                 operator: 'inDateRange', 
                 values: range.map(d => d.format('YYYY-MM-DD')) 
-              }]
+              }] || []
             }}
             render={ ({ resultSet }) => (
               resultSet && renderChart(resultSet) || (<Spin />)
