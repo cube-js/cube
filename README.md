@@ -224,7 +224,7 @@ Query has following properties:
 - `filters`: An array of filters.
 - `timeDimensions`: A convient way to specify a time dimension with a filter. It is an array of objects with following keys
   - `dimension`: Time dimension name.
-  - `dateRange`: An array of dates with following format '2015-01-01', if only one date specified the filter would be set exactly to this date. It supports rolling dates, in this case pass single array element with formar `last N days|weeks|months|years`. For example `['last 7 days']`.
+  - `dateRange`: An array of dates with following format '2015-01-01', if only one date specified the filter would be set exactly to this date. 
   - `granularity`: A granularity for a time dimension, supports following values `day|week|month|year`.
 - `segments`: An array of segments. Segment is a named filter, created in the Data Schema.
 - `limit`: A row limit for your query. The hard limit is set to 5000 rows by default.
