@@ -4,22 +4,50 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 
 require('core-js/modules/es6.number.constructor');
 require('core-js/modules/es6.number.parse-float');
+var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
+var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 require('core-js/modules/es6.object.assign');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 require('core-js/modules/es6.array.reduce');
-var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
-var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 require('core-js/modules/es6.array.find');
 require('core-js/modules/es6.array.filter');
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
-require('core-js/modules/es6.array.map');
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
+require('core-js/modules/es6.string.iterator');
+require('core-js/modules/es6.array.from');
+require('core-js/modules/es6.array.map');
 var ramda = require('ramda');
+var Moment = require('moment');
+var momentRange = require('moment-range');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
 var whatwgFetch = require('whatwg-fetch');
+
+var moment = momentRange.extendMoment(Moment);
+var TIME_SERIES = {
+  day: function day(range) {
+    return Array.from(range.by('day')).map(function (d) {
+      return d.format('YYYY-MM-DDT00:00:00.000');
+    });
+  },
+  month: function month(range) {
+    return Array.from(range.snapTo('month').by('month')).map(function (d) {
+      return d.format('YYYY-MM-01T00:00:00.000');
+    });
+  },
+  hour: function hour(range) {
+    return Array.from(range.by('hour')).map(function (d) {
+      return d.format('YYYY-MM-DDTHH:00:00.000');
+    });
+  },
+  week: function week(range) {
+    return Array.from(range.snapTo('isoweek').by('week')).map(function (d) {
+      return d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000');
+    });
+  }
+};
 
 var ResultSet =
 /*#__PURE__*/
@@ -40,13 +68,15 @@ function () {
             key = _ref.key;
         return {
           title: title,
-          series: _this.pivotedRows(pivotConfig).map(function (_ref2) {
+          series: _this.chartPivot(pivotConfig).map(function (_ref2) {
             var category = _ref2.category,
-                obj = _objectWithoutProperties(_ref2, ["category"]);
+                x = _ref2.x,
+                obj = _objectWithoutProperties(_ref2, ["category", "x"]);
 
             return {
               value: obj[key],
-              category: category
+              category: category,
+              x: x
             };
           })
         };
@@ -104,29 +134,112 @@ function () {
         pivotConfig.y = pivotConfig.y.concat(['measures']);
       }
 
+      if (pivotConfig.fillMissingDates == null) {
+        pivotConfig.fillMissingDates = true;
+      }
+
       return pivotConfig;
+    }
+  }, {
+    key: "timeSeries",
+    value: function timeSeries(timeDimension) {
+      if (!timeDimension.granularity) {
+        return null;
+      }
+
+      var dateRange = timeDimension.dateRange;
+
+      if (!dateRange) {
+        var dates = ramda.pipe(ramda.map(function (row) {
+          return row[timeDimension.dimension] && moment(row[timeDimension.dimension]);
+        }), ramda.filter(function (r) {
+          return !!r;
+        }))(this.loadResponse.data);
+        dateRange = dates.length && [ramda.reduce(ramda.minBy(function (d) {
+          return d.toDate();
+        }), dates[0], dates), ramda.reduce(ramda.maxBy(function (d) {
+          return d.toDate();
+        }), dates[0], dates)] || null;
+      }
+
+      if (!dateRange) {
+        return null;
+      }
+
+      var range = moment.range(dateRange[0], dateRange[1]);
+
+      if (!TIME_SERIES[timeDimension.granularity]) {
+        throw new Error("Unsupported time granularity: ".concat(timeDimension.granularity));
+      }
+
+      return TIME_SERIES[timeDimension.granularity](range);
     }
   }, {
     key: "pivot",
     value: function pivot(pivotConfig) {
       var _this2 = this;
 
-      // TODO missing date filling
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      return ramda.pipe(ramda.map(function (row) {
+      var groupByXAxis = ramda.groupBy(function (_ref3) {
+        var xValues = _ref3.xValues;
+        return _this2.axisValuesString(xValues);
+      });
+
+      var measureValue = function measureValue(row, measure, xValues) {
+        return row[measure];
+      };
+
+      if (pivotConfig.fillMissingDates && pivotConfig.x.length === 1 && ramda.equals(pivotConfig.x, (this.loadResponse.query.timeDimensions || []).filter(function (td) {
+        return !!td.granularity;
+      }).map(function (td) {
+        return td.dimension;
+      }))) {
+        var series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
+
+        if (series) {
+          groupByXAxis = function groupByXAxis(rows) {
+            var byXValues = ramda.groupBy(function (_ref4) {
+              var xValues = _ref4.xValues;
+              return moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+            }, rows);
+            return series.map(function (d) {
+              return _defineProperty({}, d, byXValues[d] || [{
+                xValues: [d],
+                row: {}
+              }]);
+            }).reduce(function (a, b) {
+              return Object.assign(a, b);
+            }, {});
+          };
+
+          measureValue = function measureValue(row, measure, xValues) {
+            return row[measure] || 0;
+          };
+        }
+      }
+
+      var xGrouped = ramda.pipe(ramda.map(function (row) {
         return _this2.axisValues(pivotConfig.x)(row).map(function (xValues) {
           return {
             xValues: xValues,
             row: row
           };
         });
-      }), ramda.unnest, ramda.groupBy(function (_ref3) {
-        var xValues = _ref3.xValues;
-        return _this2.axisValuesString(xValues);
-      }), ramda.toPairs)(this.loadResponse.data).map(function (_ref4) {
-        var _ref5 = _slicedToArray(_ref4, 2),
-            xValuesString = _ref5[0],
-            rows = _ref5[1];
+      }), ramda.unnest, groupByXAxis, ramda.toPairs)(this.loadResponse.data);
+      var allYValues = ramda.pipe(ramda.map(function (_ref6) {
+        var _ref7 = _slicedToArray(_ref6, 2),
+            xValuesString = _ref7[0],
+            rows = _ref7[1];
+
+        return ramda.unnest(rows.map(function (_ref8) {
+          var row = _ref8.row;
+          return _this2.axisValues(pivotConfig.y)(row);
+        }));
+      }), ramda.unnest, ramda.uniq)(xGrouped);
+      return xGrouped.map(function (_ref9) {
+        var _ref10 = _slicedToArray(_ref9, 2),
+            xValuesString = _ref10[0],
+            rows = _ref10[1];
 
         var xValues = rows[0].xValues;
         return _objectSpread({
@@ -134,11 +247,11 @@ function () {
         }, rows.map(function (r) {
           return r.row;
         }).map(function (row) {
-          return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
+          return allYValues.map(function (yValues) {
             var measure = pivotConfig.x.find(function (d) {
               return d === 'measures';
             }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
-            return _defineProperty({}, _this2.axisValuesString(yValues), row[measure]);
+            return _defineProperty({}, _this2.axisValuesString(yValues), measureValue(row, measure, xValues));
           }).reduce(function (a, b) {
             return Object.assign(a, b);
           }, {});
@@ -158,12 +271,14 @@ function () {
     value: function chartPivot(pivotConfig) {
       var _this3 = this;
 
-      return this.pivot(pivotConfig).map(function (_ref7) {
-        var xValues = _ref7.xValues,
-            measures = _objectWithoutProperties(_ref7, ["xValues"]);
+      return this.pivot(pivotConfig).map(function (_ref12) {
+        var xValues = _ref12.xValues,
+            measures = _objectWithoutProperties(_ref12, ["xValues"]);
 
         return _objectSpread({
-          category: _this3.axisValuesString(xValues, ', ')
+          category: _this3.axisValuesString(xValues, ', '),
+          //TODO deprecated
+          x: _this3.axisValuesString(xValues, ', ')
         }, ramda.map(function (m) {
           return m && Number.parseFloat(m);
         }, measures));
@@ -172,13 +287,13 @@ function () {
   }, {
     key: "totalRow",
     value: function totalRow() {
-      return this.pivotedRows()[0];
+      return this.chartPivot()[0];
     }
   }, {
     key: "categories",
     value: function categories(pivotConfig) {
       //TODO
-      return this.pivotedRows(pivotConfig);
+      return this.chartPivot(pivotConfig);
     }
   }, {
     key: "seriesNames",

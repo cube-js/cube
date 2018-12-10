@@ -1,4 +1,23 @@
-import { groupBy, pipe, toPairs, uniq, flatten, map, unnest, dropLast } from 'ramda';
+import { groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy } from 'ramda';
+import * as Moment from 'moment';
+import * as momentRange from 'moment-range';
+
+const moment = momentRange.extendMoment(Moment);
+
+const TIME_SERIES = {
+  day: (range) =>
+    Array.from(range.by('day'))
+      .map(d => d.format('YYYY-MM-DDT00:00:00.000')),
+  month: (range) =>
+    Array.from(range.snapTo('month').by('month'))
+      .map(d => d.format('YYYY-MM-01T00:00:00.000')),
+  hour: (range) =>
+    Array.from(range.by('hour'))
+      .map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
+  week: (range) =>
+    Array.from(range.snapTo('isoweek').by('week'))
+      .map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
+};
 
 export default class ResultSet {
   constructor(loadResponse) {
@@ -8,7 +27,7 @@ export default class ResultSet {
   series(pivotConfig) {
     return this.seriesNames(pivotConfig).map(({ title, key }) => ({
       title,
-      series: this.pivotedRows(pivotConfig).map(({ category, ...obj }) => ({ value: obj[key], category }))
+      series: this.chartPivot(pivotConfig).map(({ category, x, ...obj }) => ({ value: obj[key], category, x }))
     }));
   }
 
@@ -42,6 +61,9 @@ export default class ResultSet {
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
     }
+    if (pivotConfig.fillMissingDates == null) {
+      pivotConfig.fillMissingDates = true;
+    }
     return pivotConfig;
   }
 
@@ -49,24 +71,83 @@ export default class ResultSet {
     return axisValues[axisValues.length - 1];
   };
 
+  timeSeries(timeDimension) {
+    if (!timeDimension.granularity) {
+      return null;
+    }
+    let dateRange = timeDimension.dateRange;
+    if (!dateRange) {
+      const dates = pipe(
+        map(row => row[timeDimension.dimension] && moment(row[timeDimension.dimension])),
+        filter(r => !!r)
+      )(this.loadResponse.data);
+
+      dateRange = dates.length && [
+        reduce(minBy(d => d.toDate()), dates[0], dates),
+        reduce(maxBy(d => d.toDate()), dates[0], dates)
+      ] || null;
+    }
+    if (!dateRange) {
+      return null;
+    }
+    const range = moment.range(dateRange[0], dateRange[1]);
+    if (!TIME_SERIES[timeDimension.granularity]) {
+      throw new Error(`Unsupported time granularity: ${timeDimension.granularity}`);
+    }
+    return TIME_SERIES[timeDimension.granularity](range);
+  }
+
   pivot(pivotConfig) {
-    // TODO missing date filling
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    return pipe(
+    let groupByXAxis = groupBy(({ xValues }) => this.axisValuesString(xValues));
+
+    let measureValue = (row, measure, xValues) => row[measure];
+
+    if (
+      pivotConfig.fillMissingDates &&
+      pivotConfig.x.length === 1 &&
+      equals(
+        pivotConfig.x,
+        (this.loadResponse.query.timeDimensions || []).filter(td => !!td.granularity).map(td => td.dimension)
+      )
+    ) {
+      const series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
+      if (series) {
+        groupByXAxis = (rows) => {
+          const byXValues = groupBy(({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS), rows);
+          return series.map(d => ({ [d]: byXValues[d] || [{ xValues: [d], row: {} }] }))
+            .reduce((a, b) => Object.assign(a, b), {});
+        };
+
+        measureValue = (row, measure, xValues) => row[measure] || 0;
+      }
+    }
+
+    const xGrouped = pipe(
       map(row => this.axisValues(pivotConfig.x)(row).map(xValues => ({ xValues, row }))),
       unnest,
-      groupBy(({ xValues }) => this.axisValuesString(xValues)),
+      groupByXAxis,
       toPairs
-    )(this.loadResponse.data).map(([xValuesString, rows]) => {
+    )(this.loadResponse.data);
+
+    const allYValues = pipe(
+      map(
+        ([xValuesString, rows]) => unnest(rows.map(({ row }) => this.axisValues(pivotConfig.y)(row)))
+      ),
+      unnest,
+      uniq
+    )(xGrouped);
+
+    return xGrouped.map(([xValuesString, rows]) => {
       const xValues = rows[0].xValues;
       return {
         xValues,
-        ...(rows.map(r => r.row).map(row => this.axisValues(pivotConfig.y)(row).map(yValues => {
+        ...(rows.map(r => r.row).map(row => allYValues.map(yValues => {
             let measure = pivotConfig.x.find(d => d === 'measures') ?
               ResultSet.measureFromAxis(xValues) :
               ResultSet.measureFromAxis(yValues);
             return {
-              [this.axisValuesString(yValues)]: row[measure]
+              [this.axisValuesString(yValues)]: measureValue(row, measure, xValues)
             }
           }).reduce((a, b) => Object.assign(a, b), {})
         )).reduce((a, b) => Object.assign(a, b), {})
@@ -80,17 +161,18 @@ export default class ResultSet {
 
   chartPivot(pivotConfig) {
     return this.pivot(pivotConfig).map(({ xValues, ...measures }) => ({
-      category: this.axisValuesString(xValues, ', '),
+      category: this.axisValuesString(xValues, ', '), //TODO deprecated
+      x: this.axisValuesString(xValues, ', '),
       ...(map(m => m && Number.parseFloat(m), measures))
     }));
   }
 
   totalRow() {
-    return this.pivotedRows()[0];
+    return this.chartPivot()[0];
   }
 
   categories(pivotConfig) { //TODO
-    return this.pivotedRows(pivotConfig);
+    return this.chartPivot(pivotConfig);
   }
 
   seriesNames(pivotConfig) {
