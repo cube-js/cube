@@ -36,7 +36,7 @@ export default class ResultSet {
     return row => {
       const value = (measure) =>
         axis.filter(d => d !== 'measures')
-        .map(d => row[d]).concat(measure ? [measure] : []);
+        .map(d => row[d] != null ? row[d] : null).concat(measure ? [measure] : []);
       if (axis.find(d => d === 'measures') && (query.measures || []).length) {
         return query.measures.map(value);
       }
@@ -140,17 +140,19 @@ export default class ResultSet {
 
     return xGrouped.map(([xValuesString, rows]) => {
       const xValues = rows[0].xValues;
+      const yGrouped = pipe(
+        map(({ row }) => this.axisValues(pivotConfig.y)(row).map(yValues => ({ yValues, row }))),
+        unnest,
+        groupBy(({ yValues }) => this.axisValuesString(yValues))
+      )(rows);
       return {
         xValues,
-        ...(rows.map(r => r.row).map(row => allYValues.map(yValues => {
-            let measure = pivotConfig.x.find(d => d === 'measures') ?
-              ResultSet.measureFromAxis(xValues) :
-              ResultSet.measureFromAxis(yValues);
-            return {
-              [this.axisValuesString(yValues)]: measureValue(row, measure, xValues)
-            }
-          }).reduce((a, b) => Object.assign(a, b), {})
-        )).reduce((a, b) => Object.assign(a, b), {})
+        yValuesArray: unnest(allYValues.map(yValues => {
+          let measure = pivotConfig.x.find(d => d === 'measures') ?
+            ResultSet.measureFromAxis(xValues) :
+            ResultSet.measureFromAxis(yValues);
+          return (yGrouped[this.axisValuesString(yValues)] || [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure, xValues)])
+        }))
       };
     });
   }
@@ -160,10 +162,14 @@ export default class ResultSet {
   }
 
   chartPivot(pivotConfig) {
-    return this.pivot(pivotConfig).map(({ xValues, ...measures }) => ({
+    return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ', '), //TODO deprecated
       x: this.axisValuesString(xValues, ', '),
-      ...(map(m => m && Number.parseFloat(m), measures))
+      ...(
+        yValuesArray
+          .map(([yValues, m]) => ({ [this.axisValuesString(yValues, ', ')]: m && Number.parseFloat(m) }))
+          .reduce((a, b) => Object.assign(a, b), {})
+      )
     }));
   }
 

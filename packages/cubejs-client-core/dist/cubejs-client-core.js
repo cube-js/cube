@@ -91,7 +91,7 @@ function () {
           return axis.filter(function (d) {
             return d !== 'measures';
           }).map(function (d) {
-            return row[d];
+            return row[d] != null ? row[d] : null;
           }).concat(measure ? [measure] : []);
         };
 
@@ -242,22 +242,32 @@ function () {
             rows = _ref10[1];
 
         var xValues = rows[0].xValues;
-        return _objectSpread({
-          xValues: xValues
-        }, rows.map(function (r) {
-          return r.row;
-        }).map(function (row) {
-          return allYValues.map(function (yValues) {
+        var yGrouped = ramda.pipe(ramda.map(function (_ref11) {
+          var row = _ref11.row;
+          return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
+            return {
+              yValues: yValues,
+              row: row
+            };
+          });
+        }), ramda.unnest, ramda.groupBy(function (_ref12) {
+          var yValues = _ref12.yValues;
+          return _this2.axisValuesString(yValues);
+        }))(rows);
+        return {
+          xValues: xValues,
+          yValuesArray: ramda.unnest(allYValues.map(function (yValues) {
             var measure = pivotConfig.x.find(function (d) {
               return d === 'measures';
             }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
-            return _defineProperty({}, _this2.axisValuesString(yValues), measureValue(row, measure, xValues));
-          }).reduce(function (a, b) {
-            return Object.assign(a, b);
-          }, {});
-        }).reduce(function (a, b) {
-          return Object.assign(a, b);
-        }, {}));
+            return (yGrouped[_this2.axisValuesString(yValues)] || [{
+              row: {}
+            }]).map(function (_ref13) {
+              var row = _ref13.row;
+              return [yValues, measureValue(row, measure, xValues)];
+            });
+          }))
+        };
       });
     }
   }, {
@@ -271,17 +281,22 @@ function () {
     value: function chartPivot(pivotConfig) {
       var _this3 = this;
 
-      return this.pivot(pivotConfig).map(function (_ref12) {
-        var xValues = _ref12.xValues,
-            measures = _objectWithoutProperties(_ref12, ["xValues"]);
-
+      return this.pivot(pivotConfig).map(function (_ref14) {
+        var xValues = _ref14.xValues,
+            yValuesArray = _ref14.yValuesArray;
         return _objectSpread({
           category: _this3.axisValuesString(xValues, ', '),
           //TODO deprecated
           x: _this3.axisValuesString(xValues, ', ')
-        }, ramda.map(function (m) {
-          return m && Number.parseFloat(m);
-        }, measures));
+        }, yValuesArray.map(function (_ref15) {
+          var _ref16 = _slicedToArray(_ref15, 2),
+              yValues = _ref16[0],
+              m = _ref16[1];
+
+          return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && Number.parseFloat(m));
+        }).reduce(function (a, b) {
+          return Object.assign(a, b);
+        }, {}));
       });
     }
   }, {
