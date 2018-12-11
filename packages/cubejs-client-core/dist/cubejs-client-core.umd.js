@@ -14389,9 +14389,17 @@
 	  }, {
 	    key: "axisValuesString",
 	    value: function axisValuesString(axisValues, delimiter) {
-	      return axisValues.map(function (v) {
-	        return v != null ? v : '∅';
-	      }).join(delimiter || ':');
+	      var formatValue = function formatValue(v) {
+	        if (v == null) {
+	          return '∅';
+	        } else if (v === '') {
+	          return '[Empty string]';
+	        } else {
+	          return v;
+	        }
+	      };
+
+	      return axisValues.map(formatValue).join(delimiter || ':');
 	    }
 	  }, {
 	    key: "normalizePivotConfig",

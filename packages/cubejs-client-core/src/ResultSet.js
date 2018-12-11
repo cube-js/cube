@@ -45,7 +45,16 @@ export default class ResultSet {
   }
 
   axisValuesString(axisValues, delimiter) {
-    return axisValues.map(v => v != null ? v : '∅').join(delimiter || ':');
+    const formatValue = (v) => {
+      if (v == null) {
+        return '∅';
+      } else if (v === '') {
+        return '[Empty string]';
+      } else {
+        return v;
+      }
+    };
+    return axisValues.map(formatValue).join(delimiter || ':');
   }
 
   normalizePivotConfig(pivotConfig) {
