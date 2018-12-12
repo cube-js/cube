@@ -303,6 +303,11 @@ class App extends Component {
                   <PrismCode code={schemaCode}/>
                 </Card>
               </Col>
+              <Col span={24} style={{ textAlign: 'center' }}>
+                <a href="https://statsbot.co/cubejs/">
+                  <img src='/powered-by-cubejs-color.svg' style={{ width: 200 }}/>
+                </a>
+              </Col>
             </Row>
           </Content>
         </Layout>,
