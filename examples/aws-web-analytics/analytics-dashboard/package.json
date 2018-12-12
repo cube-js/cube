@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cubejs-client/core": "^0.1.4",
+    "@cubejs-client/core": "^0.2.0",
     "@cubejs-client/react": "^0.1.4",
     "antd": "^3.11.2",
     "bizcharts": "^3.4.1",
     "component-cookie": "^1.1.4",
     "moment": "^2.22.2",
+    "prismjs": "^1.15.0",
     "react": "^16.6.3",
     "react-dom": "^16.6.3",
+    "react-github-corner": "^2.3.0",
     "react-scripts": "2.1.1",
     "uuid": "^3.3.2",
     "whatwg-fetch": "^3.0.0"
