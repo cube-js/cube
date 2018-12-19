@@ -29,6 +29,13 @@ pre[class*="language-"] {
 	hyphens: none;
 }
 
+@media (max-width: 767px) and (min-width: 1px) {
+	code[class*="language-"],
+	pre[class*="language-"] {
+		font-size: 10px;
+	}
+}
+
 pre[class*="language-"]::-moz-selection, pre[class*="language-"] ::-moz-selection,
 code[class*="language-"]::-moz-selection, code[class*="language-"] ::-moz-selection {
 	text-shadow: none;

@@ -190,7 +190,7 @@ class App extends Component {
           </Header>
           <Content style={{ padding: '25px', margin: '25px' }}>
             <Row type="flex" justify="space-around" align="top" gutter={24}>
-              <Col lg={12} md={24}>
+              <Col span={24} lg={12}>
                 <Card title="Page Views" style={{ marginBottom: '24px' }}>
                   <QueryRenderer
                     query={{
@@ -212,7 +212,7 @@ class App extends Component {
                   />
                 </Card>
               </Col>
-              <Col lg={12} md={24}>
+              <Col span={24} lg={12}>
                 <Card title="Unique Visitors" style={{ marginBottom: '24px' }}>
                   <QueryRenderer
                     query={{
@@ -234,7 +234,7 @@ class App extends Component {
                   />
                 </Card>
               </Col>
-              <Col lg={12} md={24}>
+              <Col lg={12} span={24}>
                 <Card title="Visitor by Referrer" style={{ marginBottom: '24px' }}>
                   <QueryRenderer
                     query={{
@@ -259,7 +259,7 @@ class App extends Component {
                   />
                 </Card>
               </Col>
-              <Col lg={12} md={24}>
+              <Col lg={12} span={24}>
                 <Card title="Visitor by Referrer" style={{ marginBottom: '24px' }}>
                   <QueryRenderer
                     query={{
@@ -283,22 +283,22 @@ class App extends Component {
                   />
                 </Card>
               </Col>
-              <Col lg={12} md={24}>
+              <Col lg={12} span={24}>
                 <Card title="Architecture" style={{ marginBottom: '24px', textAlign: 'center' }}>
                   <img src="/architecture.png" style={{ width: '100%', maxWidth: '500px' }}/>
                 </Card>
               </Col>
-              <Col lg={12} md={24}>
+              <Col lg={12} span={24}>
                 <Card title="Page contains this tracking code" style={{ marginBottom: '24px' }}>
                   <PrismCode code={trackingCode}/>
                 </Card>
               </Col>
-              <Col lg={12} md={24}>
+              <Col lg={12} span={24}>
                 <Card title="Events collected using this Lambda function" style={{ marginBottom: '24px' }}>
                   <PrismCode code={lambdaCode}/>
                 </Card>
               </Col>
-              <Col lg={12} md={24}>
+              <Col lg={12} span={24}>
                 <Card title="Cube.js schema used for analytic querying" style={{ marginBottom: '24px' }}>
                   <PrismCode code={schemaCode}/>
                 </Card>
