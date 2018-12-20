@@ -1,5 +1,7 @@
 # AWS Web Analytics Dashboard
 
+This example project contains a web analytics POC built with Cube.js from the [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/).
+
 [Live Demo](http://aws-web-analytics-dashboard.s3-website-us-east-1.amazonaws.com/)
 
 # Packages
