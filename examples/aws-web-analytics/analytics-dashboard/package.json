@@ -2,6 +2,7 @@
   "name": "analytics-dashboard",
   "version": "0.1.0",
   "private": true,
+  "homepage": ".",
   "dependencies": {
     "@cubejs-client/core": "^0.2.0",
     "@cubejs-client/react": "^0.1.4",
