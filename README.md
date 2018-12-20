@@ -34,6 +34,7 @@ This repository contains Cube.js Javascript and React clients. The Cube.js Serve
 ## Tutorials
 - [Building a Serverless Stripe Analytics Dashboard](https://statsbot.co/blog/building-serverless-stripe-analytics-dashboard/)
 - [Building E-commerce Analytics React Dashboard with Cube.js and Flatlogic](https://statsbot.co/blog/building-analytics-react-dashboard-with-cube.js)
+- [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
 
 ## Architecture
 __Cube.js acts as an analytics backend__, taking care of translating business  logic into SQL and handling database connection. 
