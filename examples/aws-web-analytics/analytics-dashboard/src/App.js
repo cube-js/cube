@@ -285,7 +285,7 @@ class App extends Component {
               </Col>
               <Col lg={12} span={24}>
                 <Card title="Architecture" style={{ marginBottom: '24px', textAlign: 'center' }}>
-                  <img src="/architecture.png" style={{ width: '100%', maxWidth: '500px' }}/>
+                  <img src="./architecture.png" style={{ width: '100%', maxWidth: '500px' }}/>
                 </Card>
               </Col>
               <Col lg={12} span={24}>
@@ -305,7 +305,7 @@ class App extends Component {
               </Col>
               <Col span={24} style={{ textAlign: 'center' }}>
                 <a href="https://statsbot.co/cubejs/">
-                  <img src='/powered-by-cubejs-color.svg' style={{ width: 200 }}/>
+                  <img src='./powered-by-cubejs-color.svg' style={{ width: 200 }}/>
                 </a>
               </Col>
             </Row>

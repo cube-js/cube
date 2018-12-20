@@ -23,7 +23,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "upload": "react-scripts build && aws s3 sync build/ s3://aws-web-analytics-dashboard && cp -R build/ ../../../docs/aws-web-analytics/"
+    "upload": "react-scripts build && aws s3 sync build/ s3://aws-web-analytics-dashboard",
+    "update-github": "rm -Rf ../../../docs/aws-web-analytics/ && cp -R build/ ../../../docs/aws-web-analytics/"
   },
   "eslintConfig": {
     "extends": "react-app"
