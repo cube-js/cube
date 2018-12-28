@@ -269,7 +269,7 @@ class BaseQuery {
               () => this.overTimeSeriesQuery(
                 multiplied ?
                   (measures, filters) =>
-                    this.aggregateSubQuery(measures.cube().name, measures, filters)
+                    this.aggregateSubQuery(measures[0].cube().name, measures, filters)
                   : this.regularMeasuresSubQuery.bind(this),
                 measure
               )

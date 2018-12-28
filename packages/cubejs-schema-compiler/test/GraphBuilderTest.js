@@ -457,6 +457,41 @@ describe('JoinGraph', () => {
       ])
   );
 
+  it('rolling multiplied', () =>
+    runQueryTest({
+      measures: [
+        'visitors.revenueRolling',
+        'visitor_checkins.visitor_checkins_count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'date',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      {
+        "visitors.created_at_date": "2017-01-02T00:00:00.000Z", "visitors.revenue_rolling": null,
+        "visitor_checkins.visitor_checkins_count": "3"
+      },
+      {
+        "visitors.created_at_date": "2017-01-04T00:00:00.000Z", "visitors.revenue_rolling": "100",
+        'visitor_checkins.visitor_checkins_count': '2'
+      },
+      {
+        "visitors.created_at_date": "2017-01-05T00:00:00.000Z", "visitors.revenue_rolling": "200",
+        'visitor_checkins.visitor_checkins_count': '1'
+      },
+      {
+        "visitors.created_at_date": "2017-01-06T00:00:00.000Z", "visitors.revenue_rolling": "500",
+        'visitor_checkins.visitor_checkins_count': '0'
+      }
+    ])
+  );
+
   it('rolling month', () =>
     runQueryTest({
       measures: [
