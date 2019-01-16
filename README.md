@@ -11,13 +11,14 @@ Unlike others, it is not a monolith application, but a set of modules, which doe
 
 ### Cube.js Backend
 
-Cube.js generates a SQL and executes it in your database to retrieve a result. It generates SQL code based on the Cube.js schema. The schema is a javascript code, which acts as an ORM for analytics. It describes how the data should be retrieved and transformed in order to get an analytical result out of raw data in the warehouse. The transformations could run during the query time or in the background, creating pre-aggregations. 
+- __Cube.js Schema.__ It acts as an ORM for analytics and allows to model everything from simple counts to cohort retention and funnel analysis.
+- __Cube.js Query Orchestration and Cache.__ It optimizes query execution by breaking queries into small, fast, reusable and materialzed pieces.
+- __Cube.js API Gateway.__ It provides idempotent long polling API which guarantees analytic query results delivery without request time frame limitations and tolerant to connectivity issues.
 
-Pre-aggregations are used to make querying big data sets cost and time efficient. Often they require dependency management or so-called muti-staged queries. Cube.js manages these dependencies and builds pre-aggregations on top of each other, taking care of freshness checking, invalidation, query precedence and priority sorting, orphaned queries cancellation.
+### Cube.js Frontend
 
-### Cube.js Frontend 
-
-The javascript client is a convenient way to fetch data from Cube.js Backend and prepare it for visualization. It handles the transport layer and data manipulation, such as pivoting. It is visualization agnostic, so you can use your favorite chart library, like Chart.js, Recharts, C3.js or any other.
+- __Cube.js Javascript Client.__ It provides idempotent long polling API which guarantees analytic query results delivery without request time frame limitations and tolerant to connectivity issues.
+- __Cube.js React.__ React wrapper for Cube.js API.
 
 
 ## Contents
