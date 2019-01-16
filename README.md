@@ -9,6 +9,17 @@ Cube.js is an open source modular framework to build analytical web applications
 
 Unlike others, it is not a monolith application, but a set of modules, which does one thing well. Cube.js provides modules to run transformations and modeling in data warehouse, querying and caching, managing API gateway and building UI on top of that.
 
+### Cube.js Backend
+
+Cube.js generates a SQL and executes it in your database to retrieve a result. It generates SQL code based on the Cube.js schema. The schema is a javascript code, which acts as an ORM for analytics. It describes how the data should be retrieved and transformed in order to get an analytical result out of raw data in the warehouse. The transformations could run during the query time or in the background, creating pre-aggregations. 
+
+Pre-aggregations are used to make querying big data sets cost and time efficient. Often they require dependency management or so-called muti-staged queries. Cube.js manages these dependencies and builds pre-aggregations on top of each other, taking care of freshness checking, invalidation, query precedence and priority sorting, orphaned queries cancellation.
+
+### Cube.js Frontend 
+
+The javascript client is a convenient way to fetch data from Cube.js Backend and prepare it for visualization. It handles the transport layer and data manipulation, such as pivoting. It is visualization agnostic, so you can use your favorite chart library, like Chart.js, Recharts, C3.js or any other.
+
+
 ## Contents
 
 - [Examples](#examples)
