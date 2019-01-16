@@ -5,13 +5,9 @@
 
 [![npm version](https://badge.fury.io/js/%40cubejs-client%2Fcore.svg)](https://badge.fury.io/js/%40cubejs-client%2Fcore)
 
-__Cube.js is an analytics framework for modern applications.__ It supplies building blocks that let developers build custom and large-scale analytics frontends without spending the time on a complex analytics backend infrastructure. 
+Cube.js is an open source modular framework to build analytical web applications. It is primarily used to build internal business intelligence tools or to add customer-facing analytics to an existing application.
 
-* __Cube.js is visualization agnostic.__ It means you can use your favorite chart library, like Chart.js, Recharts, C3.js or any other.
-* __Cube.js Data Schema works as an ORM for your analytics.__ It allows to model everything from simple counts to cohort retention and funnel analysis.
-* __It is designed to work on top of your database, so all your data stays with you.__ All major SQL databases are supported.
-
-This repository contains Cube.js Javascript and React clients. The Cube.js Server itself is not yet open-sourced. We are working hard to make it happen.
+Unlike others, it is not a monolith application, but a set of modules, which does one thing well. Cube.js provides modules to run transformations and modeling in data warehouse, querying and caching, managing API gateway and building UI on top of that.
 
 ## Contents
 
