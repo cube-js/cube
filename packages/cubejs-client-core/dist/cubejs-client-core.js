@@ -406,16 +406,18 @@ var API_URL = "https://statsbot.co/cubejs-api/v1";
 var CubejsApi =
 /*#__PURE__*/
 function () {
-  function CubejsApi(apiToken) {
+  function CubejsApi(apiToken, options) {
     _classCallCheck(this, CubejsApi);
 
+    options = options || {};
     this.apiToken = apiToken;
+    this.apiUrl = options.apiUrl || API_URL;
   }
 
   _createClass(CubejsApi, [{
     key: "request",
     value: function request(url, config) {
-      return whatwgFetch.fetch("".concat(API_URL).concat(url), Object.assign({
+      return whatwgFetch.fetch("".concat(this.apiUrl).concat(url), Object.assign({
         headers: {
           Authorization: this.apiToken,
           'Content-Type': 'application/json'
