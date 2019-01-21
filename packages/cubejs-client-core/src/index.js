@@ -6,13 +6,15 @@ import ProgressResult from './ProgressResult';
 const API_URL = process.env.CUBEJS_API_URL;
 
 class CubejsApi {
-  constructor(apiToken) {
+  constructor(apiToken, options) {
+    options = options || {};
     this.apiToken = apiToken;
+    this.apiUrl = options.apiUrl || API_URL;
   }
 
   request(url, config) {
     return fetch(
-      `${API_URL}${url}`,
+      `${this.apiUrl}${url}`,
       Object.assign({ headers: { Authorization: this.apiToken, 'Content-Type': 'application/json' }}, config || {})
     )
   }

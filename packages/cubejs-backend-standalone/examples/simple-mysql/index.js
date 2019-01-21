@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
+app.use(require('cors')());
 app.use(bodyParser.json({ limit: '50mb' }));
 
 const CubejsStandalone = require('@cubejs-backend/standalone');
