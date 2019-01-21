@@ -134,9 +134,11 @@ class PreAggregationLoader {
 
     const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation.preAggregationsSchema);
 
-    const versionEntryByContentVersion = versionEntries.find(
+    const getVersionEntryByContentVersion = (versionEntries) => versionEntries.find(
       v => v.table_name === this.preAggregation.tableName && v.content_version === contentVersion
     );
+
+    const versionEntryByContentVersion = getVersionEntryByContentVersion(versionEntries);
     if (versionEntryByContentVersion) {
       return this.targetTableName(versionEntryByContentVersion);
     }
@@ -166,7 +168,7 @@ class PreAggregationLoader {
         this.logger('Invalidating pre-aggregation structure', { preAggregation: this.preAggregation });
         await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
         await this.loadCache.reset();
-        return this.targetTableName(newVersionEntry);
+        return this.targetTableName(getVersionEntryByContentVersion(await this.loadCache.getVersionEntries(this.preAggregation.preAggregationsSchema)));
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (
           this.preAggregations.refreshErrors[newVersionEntry.table_name] &&
@@ -181,7 +183,7 @@ class PreAggregationLoader {
       this.logger('Creating pre-aggregation from scratch', { preAggregation: this.preAggregation });
       await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
       await this.loadCache.reset();
-      return this.targetTableName(newVersionEntry);
+      return this.targetTableName(getVersionEntryByContentVersion(await this.loadCache.getVersionEntries(this.preAggregation.preAggregationsSchema)));
     }
     return this.targetTableName(versionEntry);
   }
