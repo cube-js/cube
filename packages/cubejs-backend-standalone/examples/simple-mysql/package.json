@@ -11,6 +11,10 @@
     "install": "./node_modules/.bin/node-java-maven"
   },
   "dependencies": {
+    "@cubejs-backend/standalone": "^0.0.2",
+    "body-parser": "^1.15.2",
+    "cors": "^2.8.4",
+    "express": "^4.14.0",
     "node-java-maven": "^0.1.1"
   },
   "devDependencies": {
