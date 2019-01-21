@@ -6,6 +6,7 @@
   "engines": {
     "node": "^8.11.1"
   },
+  "main": "driver/JDBCDriver.js",
   "scripts": {
     "test": "mocha"
   },

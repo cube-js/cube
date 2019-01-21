@@ -1,0 +1,25 @@
+{
+  "name": "@cubejs-backend/api-gateway",
+  "description": "Cube.js API Gateway",
+  "author": "Statsbot, Inc.",
+  "version": "0.0.1",
+  "engines": {
+    "node": "^8.11.1"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "dependencies": {
+    "joi": "^14.0.6",
+    "jsonwebtoken": "^8.3.0",
+    "ramda": "^0.25.0"
+  },
+  "devDependencies": {
+    "eslint": "^4.14.0",
+    "eslint-plugin-node": "^5.2.1",
+    "mocha": "^5.2.0",
+    "should": "^13.2.3"
+  },
+  "license": "Apache-2.0"
+}
