@@ -1,0 +1,48 @@
+const QueryCache = require('./QueryCache');
+const PreAggregations = require('./PreAggregations');
+
+class QueryOrchestrator {
+  constructor(redisPrefix, clientFactory, logger) {
+    this.redisPrefix = redisPrefix;
+    this.clientFactory = clientFactory;
+    this.logger = logger;
+    this.queryCache = new QueryCache(this.redisPrefix, this.clientFactory, this.logger);
+    this.preAggregations = new PreAggregations(this.redisPrefix, this.clientFactory, this.logger, this.queryCache);
+  }
+
+  async fetchQuery(queryBody) {
+    return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
+      .then(preAggregationsTablesToTempTables =>
+        this.queryCache.cachedQueryResult(queryBody, preAggregationsTablesToTempTables)
+      );
+  }
+
+  async queryStage(queryBody) {
+    const queue = this.preAggregations.getQueue();
+    const preAggregationsQueryStageState = await queue.fetchQueryStageState();
+    const pendingPreAggregationIndex =
+      (await Promise.all(
+        (queryBody.preAggregations || [])
+          .map(p => queue.getQueryStage(PreAggregations.preAggregationQueryCacheKey(p), 10, preAggregationsQueryStageState))
+      )).findIndex(p => !!p);
+    if (pendingPreAggregationIndex === -1) {
+      return this.queryCache.getQueue().getQueryStage(QueryCache.queryCacheKey(queryBody));
+    }
+    const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
+    const preAggregationStage = await queue.getQueryStage(
+      PreAggregations.preAggregationQueryCacheKey(preAggregation), undefined, preAggregationsQueryStageState
+    );
+    if (!preAggregationStage) {
+      return undefined;
+    }
+    const stageMessage =
+      `Building pre-aggregation ${pendingPreAggregationIndex + 1}/${queryBody.preAggregations.length}`;
+    if (preAggregationStage.stage.indexOf('queue') !== -1) {
+      return { ...preAggregationStage, stage: `${stageMessage}: ${preAggregationStage.stage}` };
+    } else {
+      return { ...preAggregationStage, stage: stageMessage };
+    }
+  }
+}
+
+module.exports = QueryOrchestrator;
