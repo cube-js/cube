@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Statsbot, Inc.",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -14,7 +14,7 @@
     "standalone"
   ],
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.0.3",
+    "@cubejs-backend/server-core": "^0.0.4",
     "body-parser": "^1.15.2",
     "cors": "^2.8.4",
     "dotenv": "^6.2.0",
