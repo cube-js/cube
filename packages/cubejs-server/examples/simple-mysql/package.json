@@ -11,8 +11,8 @@
     "install": "./node_modules/.bin/node-java-maven"
   },
   "dependencies": {
-    "@cubejs-backend/server": "^0.0.2",
-    "@cubejs-backend/jdbc-driver": "^0.0.3",
+    "@cubejs-backend/server": "^0.0.4",
+    "@cubejs-backend/jdbc-driver": "^0.0.4",
     "node-java-maven": "^0.1.1"
   },
   "devDependencies": {

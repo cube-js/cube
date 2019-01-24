@@ -11,10 +11,10 @@
     jsonwebtoken "^8.3.0"
     ramda "^0.25.0"
 
-"@cubejs-backend/jdbc-driver@^0.0.3":
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/jdbc-driver/-/jdbc-driver-0.0.3.tgz#eb8c450aa422710e8632df9848511f85670f4420"
-  integrity sha512-L2Fo7g5FKk+RuXe8yrRrQfNKqom1e+NzWwCcTtJbsNAWpo9I/0hpZO4ydHWT7WAPHWPOLwbe85POFbUURXaewg==
+"@cubejs-backend/jdbc-driver@^0.0.4":
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/jdbc-driver/-/jdbc-driver-0.0.4.tgz#1d746ddbe3c781df0c8d9fd6ca589728a29c2ced"
+  integrity sha512-0a+AQVGPoDRkXfdTHghp2EHhBRosaIotD8WLKsjtlOCGnEjWb2n22H940eL0THzWsU9FtFqKhEf2rwmG4VUTyA==
   dependencies:
     "@cubejs-backend/query-orchestrator" "^0.0.3"
     generic-pool "^3.1.7"
@@ -49,10 +49,10 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.0.3":
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.3.tgz#054fa9b186d5e690d95b6bd6d8763d9ad4032958"
-  integrity sha512-m1f9wrSUOzXhtGnNpjoKFZe8PmbuUrzS+cbAN7e/zJ4hvkD3i23zwbN7QgLFfLEgO1a8bC/CjWDhddnlwKDSyw==
+"@cubejs-backend/server-core@^0.0.4":
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.4.tgz#6a351694bd9eae4bdf8d1c9d8457d138d38e411c"
+  integrity sha512-Xr9amllXf6StPoYbIP19RGwYI/dXMb1jDky9VeHmmtub8MK/ix1c6WcUM7qo6Biwhk5eW0BdYovrIYZtjsOFwA==
   dependencies:
     "@cubejs-backend/api-gateway" "^0.0.2"
     "@cubejs-backend/query-orchestrator" "^0.0.3"
@@ -61,13 +61,12 @@
     promise-timeout "^1.3.0"
     ramda "^0.25.0"
 
-"@cubejs-backend/server@^0.0.2":
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.0.2.tgz#f489dc6cdead8046b477bd6167b5525918a7b59b"
-  integrity sha512-AYu7azXm7o1OPFR+VH6PpGYQVh7D+AkQeohH+6pn6yURJdXXKDNd1juA1j6gNwiXEUGc8X2VkmL9z/Bodwmq1A==
+"@cubejs-backend/server@^0.0.4":
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.0.4.tgz#87fdd079db999a7c87a31fce8ef1cb4eadb62a6f"
+  integrity sha512-9VnCh8Nf0bCQlopTWNUuMdoyAZ5RwCwaCLf9nJQB0we1LOt8y9M13uC3KeNXe7CEwRYuXaUyZwdVK1gDRe3zbg==
   dependencies:
-    "@cubejs-backend/jdbc-driver" "^0.0.3"
-    "@cubejs-backend/server-core" "^0.0.3"
+    "@cubejs-backend/server-core" "^0.0.4"
     body-parser "^1.15.2"
     cors "^2.8.4"
     dotenv "^6.2.0"
