@@ -4,7 +4,7 @@ const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
 
-class CubejsStandalone {
+class CubejsServerCore {
   constructor(options) {
     if (
       !options.driverFactory ||
@@ -22,7 +22,7 @@ class CubejsStandalone {
   }
 
   static create(options) {
-    return new CubejsStandalone(options);
+    return new CubejsServerCore(options);
   }
 
   async initApp(app) {
@@ -44,4 +44,4 @@ class CubejsStandalone {
   }
 }
 
-module.exports = CubejsStandalone;
+module.exports = CubejsServerCore;

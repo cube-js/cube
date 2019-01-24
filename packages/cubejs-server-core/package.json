@@ -1,23 +1,22 @@
 {
-  "name": "@cubejs-backend/standalone",
-  "description": "Cube.js all-in-one backend",
+  "name": "@cubejs-backend/server-core",
+  "description": "Cube.js base component to wire all backend components together",
   "author": "Statsbot, Inc.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "engines": {
-    "node": "^8.11.1"
+    "node": ">=8.11.1"
   },
   "scripts": {
     "test": "mocha"
   },
-  "main": "standalone/index.js",
+  "main": "core/index.js",
   "files": [
-    "standalone"
+    "core"
   ],
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.0.1",
-    "@cubejs-backend/jdbc-driver": "^0.0.1",
-    "@cubejs-backend/query-orchestrator": "^0.0.1",
-    "@cubejs-backend/schema-compiler": "^0.0.2",
+    "@cubejs-backend/api-gateway": "^0.0.2",
+    "@cubejs-backend/query-orchestrator": "^0.0.3",
+    "@cubejs-backend/schema-compiler": "^0.0.3",
     "es6-promisify-all": "^0.1.0",
     "promise-timeout": "^1.3.0",
     "ramda": "^0.25.0"

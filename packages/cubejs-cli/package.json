@@ -1,19 +1,20 @@
 {
-  "name": "@cubejs-backend/api-gateway",
-  "description": "Cube.js API Gateway",
+  "name": "cubejs-cli",
+  "description": "Cube.js Command Line Interface",
   "author": "Statsbot, Inc.",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "engines": {
     "node": ">=8.11.1"
   },
-  "main": "index.js",
+  "bin": {
+    "cubejs": "./index.js"
+  },
   "scripts": {
     "test": "mocha"
   },
   "dependencies": {
-    "joi": "^14.0.6",
-    "jsonwebtoken": "^8.3.0",
-    "ramda": "^0.25.0"
+    "chalk": "^2.4.2",
+    "commander": "^2.19.0"
   },
   "devDependencies": {
     "eslint": "^4.14.0",

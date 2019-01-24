@@ -27,10 +27,35 @@ const initMvn = (customClassPath) => {
   return mvnPromise;
 };
 
+const DbTypes = {
+  mysql: {
+    driverClass: "com.mysql.jdbc.Driver",
+    prepareConnectionQueries: [`SET time_zone = '+00:00'`],
+    mavenDependency: {
+      "groupId": "mysql",
+      "artifactId": "mysql-connector-java",
+      "version": "8.0.13"
+    },
+    jdbcUrl: () => `jdbc:mysql://${process.env.CUBEJS_DB_HOST}:3306/${process.env.CUBEJS_DB_NAME}`
+  }
+};
+
 class JDBCDriver extends BaseDriver {
   constructor(config) {
     super();
-    this.config = config;
+    config = config || {};
+
+    const dbTypeDescription = JDBCDriver.dbTypeDescription(config.dbType || process.env.CUBEJS_DB_TYPE);
+    this.config = {
+      dbType: process.env.CUBEJS_DB_TYPE,
+      url: process.env.CUBEJS_JDBC_URL || dbTypeDescription && dbTypeDescription.jdbcUrl(),
+      drivername: process.env.CUBEJS_JDBC_DRIVER || dbTypeDescription && dbTypeDescription.driverClass,
+      properties: {
+        user: process.env.CUBEJS_DB_USER,
+        password: process.env.CUBEJS_DB_PASS
+      },
+      ...config
+    };
 
     this.pool = genericPool.createPool({
       create: async () => {
@@ -80,7 +105,10 @@ class JDBCDriver extends BaseDriver {
   }
 
   prepareConnectionQueries() {
-    return this.config.prepareConnectionQueries || [];
+    let dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
+    return this.config.prepareConnectionQueries ||
+      dbTypeDescription && dbTypeDescription.prepareConnectionQueries ||
+      [];
   }
 
   query(query, values) {
@@ -133,6 +161,10 @@ class JDBCDriver extends BaseDriver {
   async release() {
     await this.pool.drain();
     await this.pool.clear();
+  }
+
+  static dbTypeDescription(dbType) {
+    return DbTypes[dbType];
   }
 }
 

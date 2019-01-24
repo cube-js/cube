@@ -2,16 +2,16 @@
   "name": "@cubejs-backend/jdbc-driver",
   "description": "Cube.js JDBC database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "engines": {
-    "node": "^8.11.1"
+    "node": ">=8.11.1"
   },
   "main": "driver/JDBCDriver.js",
   "scripts": {
     "test": "mocha"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.0.1",
+    "@cubejs-backend/query-orchestrator": "^0.0.3",
     "generic-pool": "^3.1.7",
     "jdbc": "^0.6.2",
     "node-java-maven": "^0.1.1",

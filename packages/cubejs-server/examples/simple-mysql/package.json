@@ -1,0 +1,34 @@
+{
+  "name": "@cubejs-backend/simple-mysql-example",
+  "description": "Mysql example",
+  "author": "Statsbot, Inc.",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "scripts": {
+    "test": "mocha",
+    "install": "./node_modules/.bin/node-java-maven"
+  },
+  "dependencies": {
+    "@cubejs-backend/server": "^0.0.2",
+    "@cubejs-backend/jdbc-driver": "^0.0.3",
+    "node-java-maven": "^0.1.1"
+  },
+  "devDependencies": {
+    "eslint": "^4.14.0",
+    "eslint-plugin-node": "^5.2.1",
+    "mocha": "^5.2.0",
+    "should": "^13.2.3"
+  },
+  "license": "Apache-2.0",
+  "java": {
+    "dependencies": [
+      {
+        "groupId": "mysql",
+        "artifactId": "mysql-connector-java",
+        "version": "8.0.13"
+      }
+    ]
+  }
+}
