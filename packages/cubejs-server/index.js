@@ -21,7 +21,7 @@ class CubejsServer {
     await this.core.initApp(app);
 
     return new Promise((resolve, reject) => {
-      const port = process.env.PORT || 6020;
+      const port = process.env.PORT || 4000;
       app.listen(port, (err) => {
         if (err) {
           reject(err);
