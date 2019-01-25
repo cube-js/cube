@@ -85,7 +85,11 @@ const displayError = (text) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
-  console.error(text);
+  if (Array.isArray(text)) {
+    text.forEach((str) => console.error(str));
+  } else {
+    console.error(text)
+  }
   console.error('');
 };
 
@@ -101,7 +105,12 @@ const logStage = (stage) => {
 
 const createApp = async (projectName, options) => {
   if (!options.dbType) {
-    displayError("You must pass an application name and a database type (-d).");
+    displayError([
+      "You must pass an application name and a database type (-d).",
+      "",
+      "Example: ",
+      " $ cubejs create hello-world -d postgres"
+    ]);
     process.exit(1);
   }
   if (await fs.pathExists(projectName)) {
@@ -172,14 +181,26 @@ const createApp = async (projectName, options) => {
 };
 
 program
+  .usage('<command> [options]')
+  .on('--help', function(){
+    console.log('')
+    console.log('Use cubejs <command> --help for more information about a command.');
+    console.log('')
+  })
   .command('create <name>')
-  .description('create new Cube.js app')
   .option('-d, --db-type <db-type>', 'Preconfigure for selected database (options: postgres, mysql)')
-  .action(createApp);
+  .description('Create new Cube.js app')
+  .action(createApp)
+  .on('--help', function() {
+      console.log('');
+      console.log('Examples:');
+      console.log('');
+      console.log('  $ cubejs create hello-world -d postgres');
+    });
 
 
 if (!process.argv.slice(2).length) {
   program.help();
-}
+  }
 
-program.parse(process.argv);
+  program.parse(process.argv);
