@@ -53,7 +53,7 @@ const createApp = async (projectName, options) => {
     console.error(
       chalk.red(`${chalk.green('--db-type')} option is required`)
     );
-    return;
+    process.exit(1);
   }
   if (await fs.pathExists(projectName)) {
     console.error(
@@ -63,7 +63,7 @@ const createApp = async (projectName, options) => {
         )}: directory already exist.\n`
       )
     );
-    return;
+    process.exit(1);
   }
   await fs.ensureDir(projectName);
   process.chdir(projectName);
@@ -81,8 +81,15 @@ const createApp = async (projectName, options) => {
   console.log('- Installing dependencies');
   await executeCommand('npm', ['install', '--save'].concat(dependencies));
   const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
-  let dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
-  console.log(dbTypeDescription);
+  const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
+  if (!dbTypeDescription) {
+    console.error(
+      chalk.red(
+        `Unsupported db type: ${chalk.green(options.dbType)}`
+      )
+    );
+    process.exit(1);
+  }
 
   const packageJson = await fs.readJson('package.json');
   if (dbTypeDescription.mavenDependency) {
