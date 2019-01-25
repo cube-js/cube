@@ -54,7 +54,17 @@ const displayError = (text) => {
   console.error('');
   console.error(text)
   console.error('');
-}
+};
+
+const requireFromPackage = (module) => require(path.join(process.cwd(), 'node_modules', module));
+
+const npmInstall = (dependencies) => {
+  return executeCommand('npm', ['install', '--save'].concat(dependencies));
+};
+
+const logStage = (stage) => {
+  console.log(`- ${stage}`);
+};
 
 const createApp = async (projectName, options) => {
   if (!options.dbType) {
@@ -74,7 +84,7 @@ const createApp = async (projectName, options) => {
   await fs.ensureDir(projectName);
   process.chdir(projectName);
 
-  console.log('- Creating project structure');
+  logStage('Creating project structure');
   await writePackageJson({
     name: projectName,
     version: '0.0.1',
@@ -83,41 +93,52 @@ const createApp = async (projectName, options) => {
   await fs.writeFile('index.js', indexJs);
   await fs.ensureDir('schema');
 
-  const dependencies = ['@cubejs-backend/server', '@cubejs-backend/jdbc-driver', 'node-java-maven'];
-  console.log('- Installing dependencies');
-  await executeCommand('npm', ['install', '--save'].concat(dependencies));
-  const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
-  const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
-  if (!dbTypeDescription) {
-    console.error(
-      chalk.red(
-        `Unsupported db type: ${chalk.green(options.dbType)}`
-      )
-    );
-    process.exit(1);
-  }
+  logStage('Installing server dependencies');
+  await npmInstall(['@cubejs-backend/server']);
 
-  const packageJson = await fs.readJson('package.json');
-  if (dbTypeDescription.mavenDependency) {
-    packageJson.java = {
-      dependencies: [dbTypeDescription.mavenDependency]
+  logStage('Installing DB driver dependencies');
+  const CubejsServer = requireFromPackage('@cubejs-backend/server');
+  let driverDependencies = CubejsServer.driverDependencies(options.dbType);
+  driverDependencies = Array.isArray(driverDependencies) ? driverDependencies : [driverDependencies];
+  if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
+    driverDependencies.push('node-java-maven')
+  }
+  await npmInstall(driverDependencies);
+
+  if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
+    logStage('Installing JDBC dependencies');
+    const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
+    const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
+    if (!dbTypeDescription) {
+      console.error(
+        chalk.red(
+          `Unsupported db type: ${chalk.green(options.dbType)}`
+        )
+      );
+      process.exit(1);
     }
+
+    const packageJson = await fs.readJson('package.json');
+    if (dbTypeDescription.mavenDependency) {
+      packageJson.java = {
+        dependencies: [dbTypeDescription.mavenDependency]
+      }
+    }
+    packageJson.scripts = packageJson.scripts || {};
+    packageJson.scripts.install = './node_modules/.bin/node-java-maven';
+    await writePackageJson(packageJson);
+
+    await executeCommand('npm', ['install']);
   }
-  packageJson.scripts = packageJson.scripts || {};
-  packageJson.scripts.install = './node_modules/.bin/node-java-maven';
-  await writePackageJson(packageJson);
 
-  console.log('- Installing JDBC dependencies');
-  await executeCommand('npm', ['install']);
-
-  console.log('- Creating default configuration');
+  logStage('Creating default configuration');
   await fs.writeFile('.env', dotEnv + `CUBEJS_DB_TYPE=${options.dbType}\nCUBEJS_API_SECRET=${crypto.randomBytes(64).toString('hex')}\n`);
 
-  console.log(`- ${chalk.green(projectName)} app has been created 🎉`);
+  logStage(`${chalk.green(projectName)} app has been created 🎉`);
 };
 
 program
-  .command('create [name]')
+  .command('create <name>')
   .description('create new Cube.js app')
   .option('-d, --db-type <db-type>', 'Preconfigure for selected database (options: postgres, mysql)')
   .action(createApp);

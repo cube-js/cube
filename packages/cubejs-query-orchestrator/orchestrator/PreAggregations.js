@@ -5,8 +5,6 @@ const redis = require('redis');
 const QueryCache = require('./QueryCache');
 const ContinueWaitError = require('./ContinueWaitError');
 
-const redisClient = redis.createClient(process.env.REDIS_URL);
-
 function version(cacheKey) {
   let result = '';
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
@@ -52,14 +50,15 @@ class PreAggregationLoadCache {
     this.queryCache = queryCache;
     this.preAggregations = preAggregations;
     this.queryResults = {};
+    this.redisClient = preAggregations.redisClient;
   }
 
   async tablesFromCache(schema) {
-    let tables = JSON.parse(await redisClient.getAsync(this.tablesRedisKey()));
+    let tables = JSON.parse(await this.redisClient.getAsync(this.tablesRedisKey()));
     if (!tables) {
       const client = await this.clientFactory();
       tables = await client.getTablesQuery(schema);
-      await redisClient.setAsync(this.tablesRedisKey(), JSON.stringify(tables), 'EX', 120);
+      await this.redisClient.setAsync(this.tablesRedisKey(), JSON.stringify(tables), 'EX', 120);
     }
     return tables;
   }
@@ -107,7 +106,7 @@ class PreAggregationLoadCache {
     this.tables = undefined;
     this.queryStageState = undefined;
     this.versionEnries = undefined;
-    await redisClient.delAsync(this.tablesRedisKey());
+    await this.redisClient.delAsync(this.tablesRedisKey());
   }
 }
 
@@ -283,6 +282,7 @@ class PreAggregations {
     this.queryCache = queryCache;
     this.refreshErrors = {}; // TODO should be in redis
     this.tablesUsedInQuery = {}; // TODO should be in redis
+    this.redisClient = redis.createClient(process.env.REDIS_URL);
   }
 
   loadAllPreAggregationsIfNeeded (queryBody) {

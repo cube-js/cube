@@ -3,13 +3,12 @@ const crypto = require('crypto');
 const QueryQueue = require('./QueryQueue');
 const ContinueWaitError = require('./ContinueWaitError');
 
-const redisClient = redis.createClient(process.env.REDIS_URL);
-
 class QueryCache {
   constructor(redisPrefix, clientFactory, logger) {
     this.redisPrefix = redisPrefix;
     this.clientFactory = clientFactory;
     this.logger = logger;
+    this.redisClient = redis.createClient(process.env.REDIS_URL);
   }
 
   cachedQueryResult (queryBody, preAggregationsTablesToTempTables) {
@@ -193,7 +192,7 @@ class QueryCache {
           result: res,
           renewalKey
         };
-        return redisClient.setAsync(redisKey, JSON.stringify(result), 'EX', expiration)
+        return this.redisClient.setAsync(redisKey, JSON.stringify(result), 'EX', expiration)
           .then(() => {
             this.logger('Renewed', { cacheKey });
             return res
@@ -201,7 +200,7 @@ class QueryCache {
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
           this.logger('Dropping Cache', { cacheKey, error: e.stack || e });
-          redisClient.delAsync(redisKey)
+          this.redisClient.delAsync(redisKey)
             .catch(e => this.logger('Error removing key', { cacheKey, error: e.stack || e }));
         }
         throw e;
@@ -213,7 +212,7 @@ class QueryCache {
       return fetchNew();
     }
 
-    return redisClient.getAsync(redisKey).then(res => {
+    return this.redisClient.getAsync(redisKey).then(res => {
       if (res) {
         const parsedResult = JSON.parse(res);
         const renewedAgo = (new Date()).getTime() - parsedResult.time;
