@@ -100,7 +100,7 @@ cube('Users', {
 ```
 
 ### 4. Visualize Results
-Now you are ready to use this library to add analytics features to your app.
+The Cube.js client connects to Cube.js Backend and lets you visualize your data. This section shows how to use Cube.js Javascript client. 
 #### Installation
 
 Vanilla JS:
