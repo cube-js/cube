@@ -31,7 +31,7 @@ const indexJs = `const CubejsServer = require('@cubejs-backend/server');
 const server = new CubejsServer();
 
 server.listen().then(({ port }) => {
-  console.log(\`Cube.js server listening on \${port}\`);
+  console.log(\`Cube.js server is listening on \${port}\`);
 });
 `;
 
@@ -52,7 +52,11 @@ const displayError = (text) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
-  console.error(text)
+  if (Array.isArray(text)) {
+    text.forEach((str) => console.error(str));
+  } else {
+    console.error(text)
+  }
   console.error('');
 };
 
@@ -68,7 +72,12 @@ const logStage = (stage) => {
 
 const createApp = async (projectName, options) => {
   if (!options.dbType) {
-    displayError("You must pass an application name and a database type (-d).");
+    displayError([
+      "You must pass an application name and a database type (-d).",
+      "",
+      "Example: ",
+      " $ cubejs create hello-world -d postgres"
+    ]);
     process.exit(1);
   }
   if (await fs.pathExists(projectName)) {
