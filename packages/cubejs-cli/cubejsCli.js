@@ -48,11 +48,17 @@ const writePackageJson = async (packageJson) => {
   });
 };
 
+const displayError = (text) => {
+  console.error('');
+  console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
+  console.error('');
+  console.error(text)
+  console.error('');
+}
+
 const createApp = async (projectName, options) => {
   if (!options.dbType) {
-    console.error(
-      chalk.red(`${chalk.green('--db-type')} option is required`)
-    );
+    displayError("You must pass an application name and a database type (-d).");
     process.exit(1);
   }
   if (await fs.pathExists(projectName)) {
@@ -111,9 +117,14 @@ const createApp = async (projectName, options) => {
 };
 
 program
-  .command('create <project-name>')
-  .description('create cube.js app')
-  .option('-d, --db-type <db-type>', 'Database type. Can be: postgres, mysql.')
+  .command('create [name]')
+  .description('create new Cube.js app')
+  .option('-d, --db-type <db-type>', 'Preconfigure for selected database (options: postgres, mysql)')
   .action(createApp);
+
+
+if (!process.argv.slice(2).length) {
+  program.help();
+}
 
 program.parse(process.argv);
