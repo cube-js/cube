@@ -71,6 +71,6 @@ class CubejsApi {
   }
 }
 
-export default (apiToken) => {
-  return new CubejsApi(apiToken);
+export default (apiToken, options) => {
+  return new CubejsApi(apiToken, options);
 };

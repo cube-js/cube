@@ -31,7 +31,7 @@ const indexJs = `const CubejsServer = require('@cubejs-backend/server');
 const server = new CubejsServer();
 
 server.listen().then(({ port }) => {
-  console.log(\`Cube.js server listening on \${port}\`);
+  console.log(\`🚀 Cube.js server is listening on \${port}\`);
 });
 `;
 
@@ -39,6 +39,39 @@ const dotEnv = `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
 CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
 CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
+`;
+
+const ordersJs = `cube(\`Orders\`, {
+  sql: \`
+  select 1 as id, 100 as amount, 'new' status
+  UNION ALL
+  select 2 as id, 200 as amount, 'new' status
+  UNION ALL
+  select 3 as id, 300 as amount, 'processed' status
+  UNION ALL
+  select 4 as id, 500 as amount, 'processed' status
+  UNION ALL
+  select 5 as id, 600 as amount, 'shipped' status
+  \`,
+
+  measures: {
+    count: {
+      type: \`count\`
+    },
+
+    totalAmount: {
+      sql: \`amount\`,
+      type: \`sum\`
+    }
+  },
+
+  dimensions: {
+    status: {
+      sql: \`status\`,
+      type: \`string\`
+    }
+  }
+});
 `;
 
 const writePackageJson = async (packageJson) => {
@@ -52,7 +85,7 @@ const displayError = (text) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
-  console.error(text)
+  console.error(text);
   console.error('');
 };
 
@@ -92,6 +125,7 @@ const createApp = async (projectName, options) => {
   });
   await fs.writeFile('index.js', indexJs);
   await fs.ensureDir('schema');
+  await fs.writeFile(path.join('schema', 'Orders.js'), ordersJs);
 
   logStage('Installing server dependencies');
   await npmInstall(['@cubejs-backend/server']);

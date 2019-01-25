@@ -14819,8 +14819,8 @@
 	  return CubejsApi;
 	}();
 
-	var index = (function (apiToken) {
-	  return new CubejsApi(apiToken);
+	var index = (function (apiToken, options) {
+	  return new CubejsApi(apiToken, options);
 	});
 
 	return index;
