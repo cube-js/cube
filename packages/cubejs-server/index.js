@@ -54,12 +54,21 @@ ReactDOM.render(<App />, rootElement);
 class CubejsServer {
   constructor(config) {
     config = config || {};
-    this.core = CubejsServerCore.create({
+    config = {
       driverFactory: () => new (require(CubejsServer.driverDependencies(config.dbType || process.env.CUBEJS_DB_TYPE)))(),
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
       ...config
-    });
+    };
+    if (
+      process.env.CUBEJS_DB_HOST.indexOf('<YOUR_DB_') === 0 ||
+      process.env.CUBEJS_DB_NAME.indexOf('<YOUR_DB_') === 0 ||
+      process.env.CUBEJS_DB_USER.indexOf('<YOUR_DB_') === 0 ||
+      process.env.CUBEJS_DB_PASS.indexOf('<YOUR_DB_') === 0
+    ) {
+      throw new Error('Your .env file contains placeholders in DB credentials. Please replace them with your DB credentials.');
+    }
+    this.core = CubejsServerCore.create(config);
   }
 
   async listen() {
