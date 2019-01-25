@@ -57,6 +57,13 @@ class JDBCDriver extends BaseDriver {
       ...config
     };
 
+    if (!this.config.drivername) {
+      throw new Error('drivername is required property');
+    }
+    if (!this.config.url) {
+      throw new Error('url is required property');
+    }
+
     this.pool = genericPool.createPool({
       create: async () => {
         await initMvn(config.customClassPath);

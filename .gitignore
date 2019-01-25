@@ -6,3 +6,4 @@ newrelic_agent.log
 .DS_Store
 package-lock.json
 examples/examples-gallery/build
+yarn-error.log

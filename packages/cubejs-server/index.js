@@ -1,10 +1,16 @@
 require('dotenv').config();
 const CubejsServerCore = require('@cubejs-backend/server-core');
 
+const DriverDependencies = {
+  postgres: '@cubejs-backend/postgres-driver',
+  jdbc: '@cubejs-backend/jdbc-driver',
+};
+
 class CubejsServer {
   constructor(config) {
+    config = config || {};
     this.core = CubejsServerCore.create({
-      driverFactory: () => new (require('@cubejs-backend/jdbc-driver'))(),
+      driverFactory: () => new (require(CubejsServer.driverDependencies(config.dbType || process.env.CUBEJS_DB_TYPE)))(),
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
       ...config
@@ -30,6 +36,10 @@ class CubejsServer {
         resolve({ app, port });
       });
     })
+  }
+
+  static driverDependencies(dbType) {
+    return DriverDependencies[dbType] || DriverDependencies.jdbc
   }
 }
 
