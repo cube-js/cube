@@ -51,6 +51,23 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(<App />, rootElement);
 `;
 
+const checkEnvForPlaceholders = () => {
+  const placeholderSubstr = '<YOUR_DB_';
+  const credentials = [
+    'CUBEJS_DB_HOST',
+    'CUBEJS_DB_NAME',
+    'CUBEJS_DB_USER',
+    'CUBEJS_DB_PASS'
+  ];
+  if (
+    credentials.find((credential) => (
+      process.env[credential] && process.env[credential].indexOf(placeholderSubstr) === 0
+    ))
+  ) {
+    throw new Error('Your .env file contains placeholders in DB credentials. Please replace them with your DB credentials.');
+  }
+}
+
 class CubejsServer {
   constructor(config) {
     config = config || {};
@@ -60,14 +77,7 @@ class CubejsServer {
       dbType: process.env.CUBEJS_DB_TYPE,
       ...config
     };
-    if (
-      process.env.CUBEJS_DB_HOST.indexOf('<YOUR_DB_') === 0 ||
-      process.env.CUBEJS_DB_NAME.indexOf('<YOUR_DB_') === 0 ||
-      process.env.CUBEJS_DB_USER.indexOf('<YOUR_DB_') === 0 ||
-      process.env.CUBEJS_DB_PASS.indexOf('<YOUR_DB_') === 0
-    ) {
-      throw new Error('Your .env file contains placeholders in DB credentials. Please replace them with your DB credentials.');
-    }
+    checkEnvForPlaceholders();
     this.core = CubejsServerCore.create(config);
   }
 
