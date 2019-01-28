@@ -176,27 +176,18 @@ export default () => {
 
 ## Security
 
-Cube.js can be used in two modes:
+Cube.js auth tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
+You should use API Secret to generate your own client side auth tokens.
+API Secret is generated on app creation and saved in `.env` file as `CUBEJS_API_SECRET` variable.
+
+You can generate two types of tokens:
 - Without security context. It implies same data access permissions for all users.
 - With security context. User or role-based security models can be implemented using this approach.
 
-You're provided with two types of security credentials:
-- *Cube.js Global Token*. Has format like `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw`. Can be passed to `cubejs()`. 
-- *Cube.js Secret*. Has format like `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc`. Should be used to sign JWT tokens passed to `cubejs()`.
-
-> *NOTE:* *Cube.js Global Token* should be used only for publicly available data or for testing purposes. For production use please generate expirable tokens using *Cube.js Secret*.
-
-Cube.js tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
-*Cube.js Global Token* is not an exception and generated for your convenience.
-*Cube.js Global Token* is JWT token signed with *Cube.js Secret* that has minimal payload like `{ i: 38594 }`.
-*Cube.js Global Token* provides no security context so it has all possible rights for querying.
-Besides *Cube.js Global Token* you can use *Cube.js Secret* to generate customer API tokens to restrict data available for querying on your server side and embed it in web page that renders query results.
-For example to generate customer API tokens with `cjs_38594_sPEWwPkVtTEEjTs9AkpicdUcw26R58ueo2G4rRZ-Wyc` secret you should provide minimal payload `{ i: 38594 }` which is your key identifier required for token verification.
 Security context can be provided by passing `u` param for payload.
 For example if you want to pass user id in security context you can create token with payload:
 ```json
 {
-  "i": 38594,
   "u": { "id": 42 }
 }
 ```
