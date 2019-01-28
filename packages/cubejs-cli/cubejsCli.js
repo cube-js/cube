@@ -131,6 +131,9 @@ const createApp = async (projectName, options) => {
     name: projectName,
     version: '0.0.1',
     private: true,
+    scripts: {
+      dev: "node index.js"
+    }
   });
   await fs.writeFile('index.js', indexJs);
   await fs.ensureDir('schema');
