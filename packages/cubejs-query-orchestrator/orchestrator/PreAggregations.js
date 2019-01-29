@@ -111,7 +111,18 @@ class PreAggregationLoadCache {
 }
 
 class PreAggregationLoader {
-  constructor(redisPrefix, clientFactory, logger, queryCache, preAggregations, preAggregation, preAggregationsTablesToTempTables, loadCache) {
+  constructor(
+    redisPrefix,
+    clientFactory,
+    logger,
+    queryCache,
+    preAggregations,
+    preAggregation,
+    preAggregationsTablesToTempTables,
+    loadCache,
+    options
+  ) {
+    options = options || {};
     this.redisPrefix = redisPrefix;
     this.clientFactory = clientFactory;
     this.logger = logger;
@@ -120,6 +131,7 @@ class PreAggregationLoader {
     this.preAggregation = preAggregation;
     this.preAggregationsTablesToTempTables = preAggregationsTablesToTempTables;
     this.loadCache = loadCache;
+    this.waitForRenew = options.waitForRenew;
   }
 
   async loadPreAggregation() {
@@ -142,7 +154,10 @@ class PreAggregationLoader {
       return this.targetTableName(versionEntryByContentVersion);
     }
 
-    if (await this.loadCache.getQueryStage(PreAggregations.preAggregationQueryCacheKey(this.preAggregation))) {
+    if (
+      !this.waitForRenew &&
+      await this.loadCache.getQueryStage(PreAggregations.preAggregationQueryCacheKey(this.preAggregation))
+    ) {
       const versionEntryByStructureVersion = versionEntries.find(
         v => v.table_name === this.preAggregation.tableName && v.structure_version === structureVersion
       );
@@ -162,27 +177,41 @@ class PreAggregationLoader {
       content_version: contentVersion,
       last_updated_at: new Date().getTime()
     };
+
+    const mostRecentTargetTableName = async () => {
+      await this.loadCache.reset();
+      return this.targetTableName(
+        getVersionEntryByContentVersion(
+          await this.loadCache.getVersionEntries(this.preAggregation.preAggregationsSchema)
+        )
+      );
+    };
+
     if (versionEntry) {
       if (versionEntry.structure_version !== newVersionEntry.structure_version) {
         this.logger('Invalidating pre-aggregation structure', { preAggregation: this.preAggregation });
         await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
-        await this.loadCache.reset();
-        return this.targetTableName(getVersionEntryByContentVersion(await this.loadCache.getVersionEntries(this.preAggregation.preAggregationsSchema)));
+        return mostRecentTargetTableName();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
-        if (
-          this.preAggregations.refreshErrors[newVersionEntry.table_name] &&
-          this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version] &&
-          this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].counter > 10) {
-          throw this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].error;
+        if (this.waitForRenew) {
+          this.logger('Waiting for pre-aggregation renew', { preAggregation: this.preAggregation });
+          await this.executeInQueue(invalidationKeys, 0, newVersionEntry);
+          return mostRecentTargetTableName();
         } else {
-          this.scheduleRefresh(invalidationKeys, newVersionEntry);
+          if (
+            this.preAggregations.refreshErrors[newVersionEntry.table_name] &&
+            this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version] &&
+            this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].counter > 10) {
+            throw this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].error;
+          } else {
+            this.scheduleRefresh(invalidationKeys, newVersionEntry);
+          }
         }
       }
     } else {
       this.logger('Creating pre-aggregation from scratch', { preAggregation: this.preAggregation });
       await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
-      await this.loadCache.reset();
-      return this.targetTableName(getVersionEntryByContentVersion(await this.loadCache.getVersionEntries(this.preAggregation.preAggregationsSchema)));
+      return mostRecentTargetTableName();
     }
     return this.targetTableName(versionEntry);
   }
@@ -298,7 +327,8 @@ class PreAggregations {
           this,
           p,
           preAggregationsTablesToTempTables,
-          loadCache
+          loadCache,
+          { waitForRenew: queryBody.renewQuery }
         );
         const preAggregationPromise = () => {
           return loader.loadPreAggregation().then(tempTableName => {
