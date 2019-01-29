@@ -5,6 +5,10 @@ const os = require('os');
 const chalk = require('chalk');
 const spawn = require('cross-spawn');
 const crypto = require('crypto');
+const Analytics = require('analytics-node');
+const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
+const { machineIdSync } = require('node-machine-id');
+const { promisify } = require('util');
 
 const packageJson = require('./package.json');
 
@@ -74,6 +78,19 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
+const anonymousId = machineIdSync();
+
+const event = async (name, props) => {
+  try {
+    client.track({
+      event: name,
+      anonymousId: anonymousId,
+      properties: props
+    });
+    await promisify(client.flush.bind(client))()
+  } catch (e) {}
+};
+
 const writePackageJson = async (packageJson) => {
   return fs.writeJson('package.json', packageJson, {
     spaces: 2,
@@ -81,7 +98,7 @@ const writePackageJson = async (packageJson) => {
   });
 };
 
-const displayError = (text) => {
+const displayError = async (text) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
@@ -91,6 +108,8 @@ const displayError = (text) => {
     console.error(text)
   }
   console.error('');
+  await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString() });
+  process.exit(1);
 };
 
 const requireFromPackage = (module) => require(path.join(process.cwd(), 'node_modules', module));
@@ -104,24 +123,21 @@ const logStage = (stage) => {
 };
 
 const createApp = async (projectName, options) => {
+  event('Create App', { projectName, dbType: options.dbType });
   if (!options.dbType) {
-    displayError([
+    await displayError([
       "You must pass an application name and a database type (-d).",
       "",
       "Example: ",
       " $ cubejs create hello-world -d postgres"
     ]);
-    process.exit(1);
   }
   if (await fs.pathExists(projectName)) {
-    console.error(
-      chalk.red(
-        `We cannot create a project called ${chalk.green(
-          projectName
-        )}: directory already exist.\n`
-      )
+    await displayError(
+      `We cannot create a project called ${chalk.green(
+        projectName
+      )}: directory already exist.\n`
     );
-    process.exit(1);
   }
   await fs.ensureDir(projectName);
   process.chdir(projectName);
@@ -180,6 +196,7 @@ const createApp = async (projectName, options) => {
   logStage('Creating default configuration');
   await fs.writeFile('.env', dotEnv + `CUBEJS_DB_TYPE=${options.dbType}\nCUBEJS_API_SECRET=${crypto.randomBytes(64).toString('hex')}\n`);
 
+  await event('Create App Success', { projectName, dbType: options.dbType });
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
 };
 
@@ -193,7 +210,7 @@ program
   .command('create <name>')
   .option('-d, --db-type <db-type>', 'Preconfigure for selected database (options: postgres, mysql)')
   .description('Create new Cube.js app')
-  .action(createApp)
+  .action((projectName, options) => createApp(projectName, options).catch(e => displayError(e.stack || e)))
   .on('--help', function() {
       console.log('');
       console.log('Examples:');

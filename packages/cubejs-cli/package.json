@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Statsbot, Inc.",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -13,10 +13,12 @@
     "test": "mocha"
   },
   "dependencies": {
+    "analytics-node": "^3.3.0",
     "chalk": "^2.4.2",
     "commander": "^2.19.0",
     "cross-spawn": "^6.0.5",
-    "fs-extra": "^7.0.1"
+    "fs-extra": "^7.0.1",
+    "node-machine-id": "^1.1.10"
   },
   "devDependencies": {
     "eslint": "^4.14.0",
