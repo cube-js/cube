@@ -172,12 +172,7 @@ const createApp = async (projectName, options) => {
     const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
     const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
     if (!dbTypeDescription) {
-      console.error(
-        chalk.red(
-          `Unsupported db type: ${chalk.green(options.dbType)}`
-        )
-      );
-      process.exit(1);
+      await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`);
     }
 
     const packageJson = await fs.readJson('package.json');
