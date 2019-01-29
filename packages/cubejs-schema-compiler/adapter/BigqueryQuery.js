@@ -118,6 +118,10 @@ class BigqueryQuery extends BaseQuery {
   countDistinctApprox(sql) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
+
+  concatStringsSql(strings) {
+    return `CONCAT(${strings.join(", ")})`;
+  }
 }
 
 module.exports = BigqueryQuery;
