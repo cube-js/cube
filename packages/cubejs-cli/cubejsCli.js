@@ -98,7 +98,7 @@ const writePackageJson = async (packageJson) => {
   });
 };
 
-const displayError = async (text) => {
+const displayError = async (text, options) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
@@ -108,7 +108,7 @@ const displayError = async (text) => {
     console.error(text)
   }
   console.error('');
-  await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString() });
+  await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString(), ...options });
   process.exit(1);
 };
 
@@ -123,20 +123,22 @@ const logStage = (stage) => {
 };
 
 const createApp = async (projectName, options) => {
-  event('Create App', { projectName, dbType: options.dbType });
+  const createAppOptions = { projectName, dbType: options.dbType };
+  event('Create App', createAppOptions);
   if (!options.dbType) {
     await displayError([
       "You must pass an application name and a database type (-d).",
       "",
       "Example: ",
       " $ cubejs create hello-world -d postgres"
-    ]);
+    ], createAppOptions);
   }
   if (await fs.pathExists(projectName)) {
     await displayError(
       `We cannot create a project called ${chalk.green(
         projectName
-      )}: directory already exist.\n`
+      )}: directory already exist.\n`,
+      createAppOptions
     );
   }
   await fs.ensureDir(projectName);
@@ -172,7 +174,7 @@ const createApp = async (projectName, options) => {
     const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
     const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
     if (!dbTypeDescription) {
-      await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`);
+      await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
     }
 
     const packageJson = await fs.readJson('package.json');
@@ -205,7 +207,9 @@ program
   .command('create <name>')
   .option('-d, --db-type <db-type>', 'Preconfigure for selected database (options: postgres, mysql)')
   .description('Create new Cube.js app')
-  .action((projectName, options) => createApp(projectName, options).catch(e => displayError(e.stack || e)))
+  .action((projectName, options) => createApp(projectName, options)
+    .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }))
+  )
   .on('--help', function() {
       console.log('');
       console.log('Examples:');
