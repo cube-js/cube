@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/postgres-driver",
   "description": "Cube.js Postgres database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.0.9",
+  "version": "0.0.13",
   "engines": {
     "node": ">=8.11.1"
   },

@@ -197,13 +197,51 @@ const createApp = async (projectName, options) => {
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
 };
 
+const generateSchema = async (options) => {
+  const generateSchemaOptions = { tables: options.tables };
+  event('Generate Schema', generateSchemaOptions);
+  if (!options.tables) {
+    await displayError([
+      "You must pass table names to generate schema from (-t).",
+      "",
+      "Example: ",
+      " $ cubejs generate -t orders,customers"
+    ], generateSchemaOptions);
+  }
+  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server')))) {
+    await displayError(
+      "@cubejs-backend/server dependency not found. Please run generate command from project directory.",
+      generateSchemaOptions
+    );
+  }
+
+  logStage('Fetching DB schema');
+  const CubejsServer = requireFromPackage('@cubejs-backend/server');
+  const driver = await CubejsServer.createDriver();
+  const dbSchema = await driver.tablesSchema();
+  if (driver.release) {
+    await driver.release();
+  }
+
+  logStage('Generating schema files');
+  const ScaffoldingTemplate = requireFromPackage('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
+  const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema);
+  const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
+  await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
+
+  await event('Generate Schema Success', generateSchemaOptions);
+  logStage(`Schema for ${options.tables.join(', ')} was successfully generated 🎉`);
+};
+
 program
   .usage('<command> [options]')
   .on('--help', function(){
     console.log('')
     console.log('Use cubejs <command> --help for more information about a command.');
     console.log('')
-  })
+  });
+
+program
   .command('create <name>')
   .option('-d, --db-type <db-type>', 'Preconfigure for selected database (options: postgres, mysql)')
   .description('Create new Cube.js app')
@@ -217,9 +255,24 @@ program
       console.log('  $ cubejs create hello-world -d postgres');
     });
 
+const list = (val) => val.split(',');
+
+program
+  .command('generate')
+  .option('-t, --tables <tables>', 'Comma delimited list of tables to generate schema from', list)
+  .description('Generate Cube.js schema from DB tables schema')
+  .action((options) => generateSchema(options)
+    .catch(e => displayError(e.stack || e, { dbType: options.dbType }))
+  )
+  .on('--help', function() {
+    console.log('');
+    console.log('Examples:');
+    console.log('');
+    console.log('  $ cubejs generate -t orders,customers');
+  });
 
 if (!process.argv.slice(2).length) {
   program.help();
-  }
+}
 
-  program.parse(process.argv);
+program.parse(process.argv);

@@ -40,6 +40,10 @@ class PostgresDriver extends BaseDriver {
     }
   }
 
+  release() {
+    return this.pool.end();
+  }
+
   param(paramIndex) {
     return '$' + (paramIndex + 1);
   }

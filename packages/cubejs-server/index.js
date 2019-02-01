@@ -72,7 +72,7 @@ class CubejsServer {
   constructor(config) {
     config = config || {};
     config = {
-      driverFactory: () => new (require(CubejsServer.driverDependencies(config.dbType || process.env.CUBEJS_DB_TYPE)))(),
+      driverFactory: () => CubejsServer.createDriver(config.dbType),
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
       ...config
@@ -133,6 +133,10 @@ class CubejsServer {
         resolve({ app, port });
       });
     })
+  }
+
+  static createDriver(dbType) {
+    return new (require(CubejsServer.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE)))();
   }
 
   static driverDependencies(dbType) {
