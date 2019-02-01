@@ -110,7 +110,16 @@ cube('Users', {
 ```
 
 ### 4. Visualize Results
-The Cube.js client connects to Cube.js Backend and lets you visualize your data. This section shows how to use Cube.js Javascript client. 
+The Cube.js client connects to Cube.js Backend and lets you visualize your data. This section shows how to use Cube.js Javascript client.
+
+As a shortcut you can run your dev server first:
+
+```
+$ npm run dev
+```
+
+Then open `http://localhost:4000` to see visualization examples.
+
 #### Installation
 
 Vanilla JS:
