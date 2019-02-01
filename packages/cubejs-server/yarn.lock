@@ -20,10 +20,10 @@
     redis "^2.8.0"
     util-promisifyall "^1.0.4"
 
-"@cubejs-backend/schema-compiler@^0.0.3":
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.0.3.tgz#51e54bc200205f710157259fbc1e590f8e760d9f"
-  integrity sha512-TllDwui1nk6sabWvyOXfzHP9YpS+4GpReXD4hsiUALfWn8zAxJEP9X7Q9Y88O0O6v+5Tudwh/lMBVr9Pqauv7w==
+"@cubejs-backend/schema-compiler@0.0.13":
+  version "0.0.13"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.0.13.tgz#a8bc846e55d76ebce5cfc90105b6515a2c7558c0"
+  integrity sha512-wcQrroNl7pH5ae0mHw7Nn7ZvtHJZpl19GqHX8SaB6EGOVhUSpIAfQ4Igb9w6DfJiC8Na/AdR03lkShz5j5DYKw==
   dependencies:
     babel-generator "^6.25.0"
     babel-traverse "^6.25.0"
@@ -38,14 +38,14 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.0.9":
-  version "0.0.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.9.tgz#6eee70ca0d4a254b58c0768490262e4438ab48d0"
-  integrity sha512-8YBFmblLuMlO/P5VWbx2qnapzAHAxBVoc3oR9B3vpQssWbK4YyiiwwAldby2D/1cZGONWozQpe5ICzepfR50yw==
+"@cubejs-backend/server-core@0.0.13":
+  version "0.0.13"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.13.tgz#381bd9808796c81069f25c58b537eb3cdd9183f3"
+  integrity sha512-4lNyId1KEPo5pCBUaH8ponWHATSHbFBIEosDTHugRHFg4rrltHJu2lyYLwv7XasL0eqvtEtHDhv1Qz1cFoq7Nw==
   dependencies:
     "@cubejs-backend/api-gateway" "^0.0.2"
     "@cubejs-backend/query-orchestrator" "^0.0.7"
-    "@cubejs-backend/schema-compiler" "^0.0.3"
+    "@cubejs-backend/schema-compiler" "0.0.13"
     fs-extra "^7.0.1"
     promise-timeout "^1.3.0"
     ramda "^0.25.0"
