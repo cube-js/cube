@@ -195,6 +195,18 @@ const createApp = async (projectName, options) => {
 
   await event('Create App Success', { projectName, dbType: options.dbType });
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
+
+  console.log();
+  console.log(`📊 Next steps:`);
+  console.log(`1. Generate schema:`);
+  console.log();
+  console.log(`     $ cd ${projectName}`);
+  console.log(`     $ cubejs generate -t orders,customers`);
+  console.log();
+  console.log(`2. Run dev server:`);
+  console.log();
+  console.log(`     $ npm run dev`);
+  console.log();
 };
 
 const generateSchema = async (options) => {
