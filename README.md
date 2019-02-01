@@ -73,6 +73,7 @@ Specify your database using `-d` flag. Available options: `postgres`, `mysql`. E
 ### 3. Define Your Data Schema
 Cube.js uses Data Schema to generate and execute SQL.
 It acts as an ORM for your analytics and it is flixible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://statsbot.co/docs/getting-started-cubejs).
+
 Generate schema files from your database tables:
 ```
 $ cubejs generate -t orders,customers
