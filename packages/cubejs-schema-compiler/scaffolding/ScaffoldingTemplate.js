@@ -40,6 +40,7 @@ class ScaffoldingTemplate {
   schemaDescriptorForTable(tableSchema) {
     return {
       cube: tableSchema.cube,
+      sql: `SELECT * FROM ${tableSchema.schema}.${tableSchema.table}`, // TODO escape
       joins: tableSchema.joins.map(j => ({
         [j.cubeToJoin]: {
           sql: `\${CUBE}.${j.thisTableColumn} = \${${j.cubeToJoin}}.${j.columnToJoin}`,

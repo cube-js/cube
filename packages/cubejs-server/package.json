@@ -2,7 +2,8 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Statsbot, Inc.",
-  "version": "0.0.14",
+  "version": "0.0.15",
+  "version": "0.0.15",
   "engines": {
     "node": ">=8.11.1"
   },

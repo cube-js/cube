@@ -34,6 +34,9 @@ describe('ScaffoldingSchema', () => {
     schemaForTables.should.be.deepEqual([
       {
         "cube": "Orders",
+        "schema": "public",
+        "table": "orders",
+        "tableName": "public.orders",
         "measures": [
           {
             "name": "amount",
@@ -78,6 +81,9 @@ describe('ScaffoldingSchema', () => {
       },
       {
         "cube": "Customers",
+        "schema": "public",
+        "table": "customers",
+        "tableName": "public.customers",
         "measures": [],
         "dimensions": [
           {
@@ -155,6 +161,8 @@ describe('ScaffoldingSchema', () => {
       {
         fileName: 'Orders.js',
         content: `cube(\`Orders\`, {
+  sql: \`SELECT * FROM public.orders\`,
+  
   joins: {
     Customers: {
       sql: \`\${CUBE}.customer_id = \${Customers}.id\`,
@@ -187,6 +195,8 @@ describe('ScaffoldingSchema', () => {
       {
         fileName: 'Customers.js',
         content: `cube(\`Customers\`, {
+  sql: \`SELECT * FROM public.customers\`,
+  
   joins: {
     
   },

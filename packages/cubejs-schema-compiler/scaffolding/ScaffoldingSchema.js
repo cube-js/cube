@@ -80,6 +80,9 @@ class ScaffoldingSchema {
 
     return {
       cube: inflection.camelize(table),
+      tableName,
+      schema,
+      table,
       measures: this.numberMeasures(tableDefinition),
       dimensions,
       drillMembers: this.drillMembers(dimensions),
