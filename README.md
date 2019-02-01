@@ -71,8 +71,14 @@ $ cubejs create hello-world -d postgres
 Specify your database using `-d` flag. Available options: `postgres`, `mysql`. Edit `.env` file in the generated project with your database credentials.
 
 ### 3. Define Your Data Schema
-Cube.js uses Data Schema to generate and execute SQL. It acts as an ORM for your analytics and it is flixible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://statsbot.co/docs/getting-started-cubejs).
-Put schema files into `schema` folder:
+Cube.js uses Data Schema to generate and execute SQL.
+It acts as an ORM for your analytics and it is flixible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://statsbot.co/docs/getting-started-cubejs).
+Generate schema files from your database tables:
+```
+$ cubejs generate -t orders,customers
+```
+
+Or put schema files into `schema` folder manually:
 
 
 ```javascript
