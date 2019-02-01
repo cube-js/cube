@@ -20,10 +20,10 @@
     redis "^2.8.0"
     util-promisifyall "^1.0.4"
 
-"@cubejs-backend/schema-compiler@0.0.16":
-  version "0.0.16"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.0.16.tgz#d8d4dce6ab7a1520f25809741afc040ff557f927"
-  integrity sha512-d6XH0+0gGvX5VAnXykAheNuDUzBZVTCI+pfhH0rNhCpqhEWOE4fLHz/X3QJdKstII1cDfRin/fnbtWKtAKGqIw==
+"@cubejs-backend/schema-compiler@0.0.17":
+  version "0.0.17"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.0.17.tgz#639e80c70e868bbb4bd3784f2a8aca1c294982d8"
+  integrity sha512-/OxLPQT3RUfbmejSv4SE6Bq8tRN9JFJ6cmbdc/n6sAvmlAPxek/8Y/CB8HOgHmgH6JXpTzyGE8LImtSdynH12A==
   dependencies:
     babel-generator "^6.25.0"
     babel-traverse "^6.25.0"

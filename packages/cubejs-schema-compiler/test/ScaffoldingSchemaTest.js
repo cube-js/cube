@@ -186,7 +186,7 @@ describe('ScaffoldingSchema', () => {
     id: {
       sql: \`id\`,
       type: \`number\`,
-      isPrimaryKey: true
+      primaryKey: true
     }
   }
 });
@@ -217,7 +217,7 @@ describe('ScaffoldingSchema', () => {
     id: {
       sql: \`id\`,
       type: \`number\`,
-      isPrimaryKey: true
+      primaryKey: true
     },
     
     name: {

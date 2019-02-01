@@ -64,7 +64,7 @@ class ScaffoldingTemplate {
           sql: m.name,
           type: m.types[0],
           title: this.memberTitle(m),
-          isPrimaryKey: m.isPrimaryKey ? true : undefined
+          primaryKey: m.isPrimaryKey ? true : undefined
         }
       })).reduce((a, b) => ({ ...a, ...b }), {})
     }
