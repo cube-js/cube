@@ -1,0 +1,19 @@
+{
+  "name": "@cubejs-backend/mysql-driver",
+  "description": "Cube.js Mysql database driver",
+  "author": "Statsbot, Inc.",
+  "version": "0.0.13",
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/MySqlDriver.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.0.7",
+    "generic-pool": "^3.6.0",
+    "mysql": "^2.16.0"
+  },
+  "license": "Apache-2.0"
+}

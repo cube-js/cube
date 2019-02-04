@@ -3,6 +3,7 @@ const CubejsServerCore = require('@cubejs-backend/server-core');
 
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
+  mysql: '@cubejs-backend/mysql-driver',
   jdbc: '@cubejs-backend/jdbc-driver',
 };
 
