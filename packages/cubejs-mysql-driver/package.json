@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mysql-driver",
   "description": "Cube.js Mysql database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.0.13",
+  "version": "0.0.19",
   "engines": {
     "node": ">=8.11.1"
   },
