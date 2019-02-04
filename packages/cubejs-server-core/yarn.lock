@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/api-gateway@^0.0.2":
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.2.tgz#4f710cc1231019629061ec727cb880868a58fffa"
-  integrity sha512-S4buZqOmGvN+rtaF0GJIyvkEA2SQmsMCsaI9dJbc06nedHjg5GRsXQgm3PNkU5s8p1cSl6tNQ2J0pXrhUUFm1Q==
+"@cubejs-backend/api-gateway@0.0.18":
+  version "0.0.18"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.18.tgz#89ae3ce0909cc841119ccfb97d9e333ab8255fe4"
+  integrity sha512-0Nrguir3CAx/PJKMdC/hFaWKhJVvW0rxFiXK/AXBgkGqNybnajEK00KE8CG6tprOFilzLRLM+zsMpzIyQFTU2w==
   dependencies:
     joi "^14.0.6"
     jsonwebtoken "^8.3.0"

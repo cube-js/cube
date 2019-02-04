@@ -184,7 +184,7 @@ class ApiGateway {
       try {
         let query = JSON.parse(req.query.query);
         this.log(req, {
-          type: 'load',
+          type: 'Load Request',
           query: req.query.query
         });
         const normalizedQuery = normalizeQuery(query);
@@ -199,7 +199,7 @@ class ApiGateway {
         const toExecute = { ...sqlQuery, query: sqlQuery.sql[0], values: sqlQuery.sql[1], continueWait: true };
         const response = await this.adapterApi.executeQuery(toExecute);
         this.log(req, {
-          type: 'load:success',
+          type: 'Load Request Success',
           query: req.query.query,
         });
         res.json({
