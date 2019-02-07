@@ -146,12 +146,14 @@ const cubeSchema = Joi.object().keys({
     Joi.object().keys(Object.assign(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
-      dimensionReferences: Joi.func()
+      dimensionReferences: Joi.func(),
+      segmentReferences: Joi.func()
     })),
     Joi.object().keys(Object.assign(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
+      segmentReferences: Joi.func(),
       timeDimensionReference: Joi.func().required(),
       granularity: Joi.any().valid('hour', 'day', 'week', 'month').required()
     }))

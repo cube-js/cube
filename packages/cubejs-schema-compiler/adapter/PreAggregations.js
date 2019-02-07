@@ -255,7 +255,7 @@ class PreAggregations {
 
   static squashDimensions(query) {
     return R.pipe(R.uniq, R.sortBy(R.identity))(
-      query.dimensions.concat(query.filters).map(d => d.dimension)
+      query.dimensions.concat(query.filters).map(d => d.dimension).concat(query.segments.map(s => s.segment))
     );
   }
 
@@ -265,11 +265,8 @@ class PreAggregations {
 
   findPreAggregationForQuery() {
     if (!this.preAggregationForQuery) {
-      // TODO decide how to handle segments
       const query = this.query;
-      if (query.segments.length) {
-        return null;
-      }
+
       if (PreAggregations.hasCumulativeMeasures(query)) {
         return null;
       }
@@ -395,7 +392,9 @@ class PreAggregations {
     }] : [];
     return {
       dimensions:
-        aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [],
+        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || []).concat(
+          aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences) || []
+        ),
       measures:
         aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
       timeDimensions
@@ -413,7 +412,12 @@ class PreAggregations {
         preAggregationForQuery.cube,
         preAggregationForQuery.preAggregationName
       );
-    const filters = this.query.segments.concat(this.query.filters).concat(this.query.timeDimensions.map(dimension =>
+    let segmentFilters = this.query.segments.map(s =>
+      this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })
+    );
+    const filters =
+      segmentFilters
+      .concat(this.query.filters).concat(this.query.timeDimensions.map(dimension =>
       dimension.dateRange && ({
         filterToWhere: () => this.query.timeRangeFilter(
           this.query.dimensionSql(dimension),

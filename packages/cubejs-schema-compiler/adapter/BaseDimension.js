@@ -25,6 +25,9 @@ class BaseDimension {
   }
 
   dimensionDefinition() {
+    if (this.query.cubeEvaluator.isSegment(this.dimension)) {
+      return this.query.cubeEvaluator.segmentByPath(this.dimension);
+    }
     return this.query.cubeEvaluator.dimensionByPath(this.dimension);
   }
 
@@ -46,6 +49,9 @@ class BaseDimension {
   }
 
   path() {
+    if (this.query.cubeEvaluator.isSegment(this.dimension)) {
+      return this.query.cubeEvaluator.parsePath('segments', this.dimension);
+    }
     return this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
   }
 }

@@ -69,12 +69,25 @@ describe('PreAggregations', () => {
         }
       },
       
+      segments: {
+        google: {
+          sql: \`source = 'google'\`
+        }
+      },
+      
       preAggregations: {
         default: {
           type: 'originalSql',
           refreshKey: {
             sql: 'select NOW()'
           }
+        },
+        googleRollup: {
+          type: 'rollup',
+          measureReferences: [checkinsTotal],
+          segmentReferences: [google],
+          timeDimensionReference: createdAt,
+          granularity: 'day',
         },
         approx: {
           type: 'rollup',
@@ -477,6 +490,51 @@ describe('PreAggregations', () => {
             },
             {
               "visitors.source": "google",
+              "visitors.created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors.checkins_total": "1"
+            }
+          ]
+        );
+      });
+    });
+  });
+
+  it('segment', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.checkinsTotal'
+        ],
+        dimensions: [],
+        segments: ['visitors.google'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'date',
+          dateRange: ['2016-12-30', '2017-01-05']
+        }],
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+
+      const queries = tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.testQueries(
+        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 142))
+      ).then(res => {
+        console.log(JSON.stringify(res));
+        res.should.be.deepEqual(
+          [
+            {
               "visitors.created_at_date": "2017-01-05T00:00:00.000Z",
               "visitors.checkins_total": "1"
             }
