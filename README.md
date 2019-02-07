@@ -99,7 +99,7 @@ $ npm run dev
 
 Then open `http://localhost:4000` to see visualization examples.
 
-#### Installation
+#### Cube.js Client Installation
 
 Vanilla JS:
 ```bash
