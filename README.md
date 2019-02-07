@@ -85,25 +85,25 @@ Or put schema files into `schema` folder manually:
 ```javascript
 // schema/users.js
 
-cube('Users', {
+cube(`Users`, {
    measures: {
-     type: 'count'
+     type: `count`
    },
    
    dimensions: {
      age: {
-       type: 'number',
-       sql: 'age'
+       type: `number`,
+       sql: `age`
      },
      
      createdAt: {
-       type: 'date',
-       sql: 'createdAt'
+       type: `time`,
+       sql: `createdAt`
      },
      
      country: {
-       type: 'string',
-       sql: 'country'
+       type: `string`,
+       sql: `country`
      }
    }
 });
