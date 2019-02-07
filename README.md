@@ -301,4 +301,5 @@ Query has following properties:
 
 ### License
 
-Cube.js Client is [MIT licensed](./LICENSE).
+Cube.js Client is [MIT licensed](./packages/cubejs-client-core/LICENSE).
+Cube.js Backend is [Apache 2.0 licensed](./packages/cubejs-server/LICENSE).
