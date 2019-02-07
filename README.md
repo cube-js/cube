@@ -25,40 +25,19 @@ Unlike others, it is not a monolith application, but a set of modules, which doe
 
 ## Contents
 
+- [Getting Started](#getting-started)
 - [Examples](#examples)
 - [Tutorials](#tutorials)
 - [Architecture](#architecture)
-- [Getting Started](#getting-started)
 - [Security](#security)
 - [API](#api)
-
-
-## Examples
-
-| Demo | Code | Description |
-|:------|:----------:|:-------------|
-|[Examples Gallery](https://statsbotco.github.io/cubejs-client/)|[examples-gallery](https://github.com/statsbotco/cubejs-client/tree/master/examples/examples-gallery)|Examples Gallery with different visualizations libraries|
-|[Stripe Dashboard](http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/)|[stripe-dashboard](https://github.com/statsbotco/cubejs-client/tree/master/examples/stripe-dashboard)|Stripe Demo Dashboard built with Cube.js and Recharts|
-|[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](https://github.com/statsbotco/cubejs-client/tree/master/examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js|
-
-## Tutorials
-- [Building a Serverless Stripe Analytics Dashboard](https://statsbot.co/blog/building-serverless-stripe-analytics-dashboard/)
-- [Building E-commerce Analytics React Dashboard with Cube.js and Flatlogic](https://statsbot.co/blog/building-analytics-react-dashboard-with-cube.js)
-- [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
-
-## Architecture
-__Cube.js acts as an analytics backend__, taking care of translating business  logic into SQL and handling database connection. 
-
-The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The Server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is visualization agnostic and works well with any chart library.
-
-<p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
 
 ## Getting Started
 
 ### 1. Install with NPM or Yarn
 ```bash
 $ npm install -g cubejs-cli
-# or 
+# or
 $ yarn global add cubejs-cli
 ```
 
@@ -89,18 +68,18 @@ cube(`Users`, {
    measures: {
      type: `count`
    },
-   
+
    dimensions: {
      age: {
        type: `number`,
        sql: `age`
      },
-     
+
      createdAt: {
        type: `time`,
        sql: `createdAt`
      },
-     
+
      country: {
        type: `string`,
        sql: `country`
@@ -136,7 +115,7 @@ $ npm i --save @cubejs-client/react
 
 #### Example Usage
 
-##### Vanilla Javascript. 
+##### Vanilla Javascript.
 Instantiate Cube.js API and then use it to fetch data:
 
 ```js
@@ -168,12 +147,12 @@ const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5
 
 export default () => {
   return (
-    <QueryRenderer 
+    <QueryRenderer
       query={{
         measures: ['Stories.count'],
         dimensions: ['Stories.time.month']
-      }} 
-      cubejsApi={cubejsApi} 
+      }}
+      cubejsApi={cubejsApi}
       render={({ resultSet }) => {
         if (!resultSet) {
           return 'Loading...';
@@ -191,6 +170,27 @@ export default () => {
   )
 }
 ```
+
+
+## Examples
+
+| Demo | Code | Description |
+|:------|:----------:|:-------------|
+|[Examples Gallery](https://statsbotco.github.io/cubejs-client/)|[examples-gallery](https://github.com/statsbotco/cubejs-client/tree/master/examples/examples-gallery)|Examples Gallery with different visualizations libraries|
+|[Stripe Dashboard](http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/)|[stripe-dashboard](https://github.com/statsbotco/cubejs-client/tree/master/examples/stripe-dashboard)|Stripe Demo Dashboard built with Cube.js and Recharts|
+|[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](https://github.com/statsbotco/cubejs-client/tree/master/examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js|
+
+## Tutorials
+- [Building a Serverless Stripe Analytics Dashboard](https://statsbot.co/blog/building-serverless-stripe-analytics-dashboard/)
+- [Building E-commerce Analytics React Dashboard with Cube.js and Flatlogic](https://statsbot.co/blog/building-analytics-react-dashboard-with-cube.js)
+- [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
+
+## Architecture
+__Cube.js acts as an analytics backend__, taking care of translating business  logic into SQL and handling database connection. 
+
+The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The Server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is visualization agnostic and works well with any chart library.
+
+<p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
 
 ## Security
 
