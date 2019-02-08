@@ -67,7 +67,7 @@ const checkEnvForPlaceholders = () => {
   ) {
     throw new Error('Your .env file contains placeholders in DB credentials. Please replace them with your DB credentials.');
   }
-}
+};
 
 class CubejsServer {
   constructor(config) {
@@ -193,6 +193,7 @@ class CubejsServer {
   }
 
   static createDriver(dbType) {
+    checkEnvForPlaceholders();
     return new (require(CubejsServer.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE)))();
   }
 

@@ -245,7 +245,7 @@ class ApiGateway {
       this.log(req, {
         type: 'Orchestrator error',
         query: req.query && req.query.query,
-        error: e.message
+        error: e.error
       });
       res.status(400).json(e);
     } else {
