@@ -227,11 +227,22 @@ Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-u
 
 ## API
 
-### cubejs(apiKey)
+### cubejs(apiKey, options)
 
 Create instance of `CubejsApi`.
 
-- `apiKey` - API key used to authorize requests and determine SQL database you're accessing.
+* `apiKey` - API key used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API key to the console on on startup.
+* `options` - options object.
+   * `apiUrl` - URL of your Cube.js Backend. By default, in the development environment it is http://localhost:4000/cubejs-api/v1.
+
+```javascript
+import cubejs from "@cubejs-client/core";
+
+const cubejsApi = cubejs(
+  "CUBEJS-API-TOKEN",
+  { apiUrl: "http://localhost:4000/cubejs-api/v1" }
+);
+```
 
 ### CubejsApi.load(query, options, callback)
 
