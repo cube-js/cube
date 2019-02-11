@@ -268,20 +268,29 @@ Properties:
   - `loadingState`: Provides information about the state of the query loading.
   
 
-### ResultSet.rawData()
+### ResultSet.chartPivot()
 
-Returns query result raw data returned from server in format
+Returns normalized query result data in the following format.
 
 ```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.chartPivot() will return
 [
-    { "Stories.time":"2015-01-01T00:00:00", "Stories.count": 27120 },
-    { "Stories.time":"2015-02-01T00:00:00", "Stories.count": 25861 },
-    { "Stories.time":"2015-03-01T00:00:00", "Stories.count": 29661 },
+    { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
+    { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
+    { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
     //...
 ]
 ```
-
-Format of this data may change over time.
 
 ### Query Format
 
