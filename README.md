@@ -268,7 +268,8 @@ Properties:
   - `loadingState`: Provides information about the state of the query loading.
   
 
-### ResultSet.chartPivot()
+### ResultSet
+#### ResultSet.chartPivot()
 
 Returns normalized query result data in the following format.
 
@@ -289,6 +290,26 @@ Returns normalized query result data in the following format.
     { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
     { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
     //...
+]
+```
+#### ResultSet.seriesNames()
+
+Returns the array of series objects, containing `key` and `title` parameters.
+
+```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.seriesNames() will return
+[
+   { "key":"Stories.count", "title": "Stories Count" }
 ]
 ```
 
