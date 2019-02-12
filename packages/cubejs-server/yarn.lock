@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/api-gateway@0.0.18":
-  version "0.0.18"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.18.tgz#89ae3ce0909cc841119ccfb97d9e333ab8255fe4"
-  integrity sha512-0Nrguir3CAx/PJKMdC/hFaWKhJVvW0rxFiXK/AXBgkGqNybnajEK00KE8CG6tprOFilzLRLM+zsMpzIyQFTU2w==
+"@cubejs-backend/api-gateway@0.0.20":
+  version "0.0.20"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.20.tgz#bb0f18fbcbd2d8341c971297f2980b82f262fcea"
+  integrity sha512-oSCNA+G3Rd05zw1xQDYHJoxOQiW7jHJ/BtYivkia+HHW1oAun490uauqHV0b7+XfqV2QJA/A0eZQRxrbqo7ogA==
   dependencies:
     joi "^14.0.6"
     jsonwebtoken "^8.3.0"
@@ -20,10 +20,10 @@
     redis "^2.8.0"
     util-promisifyall "^1.0.4"
 
-"@cubejs-backend/schema-compiler@0.0.17":
-  version "0.0.17"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.0.17.tgz#639e80c70e868bbb4bd3784f2a8aca1c294982d8"
-  integrity sha512-/OxLPQT3RUfbmejSv4SE6Bq8tRN9JFJ6cmbdc/n6sAvmlAPxek/8Y/CB8HOgHmgH6JXpTzyGE8LImtSdynH12A==
+"@cubejs-backend/schema-compiler@0.0.20":
+  version "0.0.20"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.0.20.tgz#8dbc06f3d7c38de0f2349c22fad809b726cb99bd"
+  integrity sha512-I5CO/fHvjyTQKmZNw/f8lsDoR9NFkafLK9MMKKxsSil7XqkJIj7AP6MtwTJgKVaz/PlJ9kmE/xa8zMwZcodTaQ==
   dependencies:
     babel-generator "^6.25.0"
     babel-traverse "^6.25.0"
@@ -38,14 +38,14 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@0.0.18":
-  version "0.0.18"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.18.tgz#55e02aa284d54763e67910bf476a9026586a42fb"
-  integrity sha512-r6cYqLVacyZALAdow68VzOokTeNj3paQBCo08zo9o+Xw1z0wMBE2ohA0qKK7z2UxCu+gO8sWymmyGezZB8NLVA==
+"@cubejs-backend/server-core@0.0.20":
+  version "0.0.20"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.20.tgz#42c50a9f1fd6ca4cda231d42213f4af5c9fa725d"
+  integrity sha512-+/P0F/ZGB22ErVU4W29K5GoaGyd/HNo6PbyBfeiAEfxviGcwg8v2rBOJjv6+bf+FISF7I/alj9GHaCFjSfEJ5w==
   dependencies:
-    "@cubejs-backend/api-gateway" "0.0.18"
+    "@cubejs-backend/api-gateway" "0.0.20"
     "@cubejs-backend/query-orchestrator" "^0.0.7"
-    "@cubejs-backend/schema-compiler" "0.0.17"
+    "@cubejs-backend/schema-compiler" "0.0.20"
     fs-extra "^7.0.1"
     promise-timeout "^1.3.0"
     ramda "^0.25.0"

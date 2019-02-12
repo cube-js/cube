@@ -22,6 +22,15 @@ Unlike others, it is not a monolith application, but a set of modules, which doe
 - __Cube.js Javascript Client.__ It provides idempotent long polling API which guarantees analytic query results delivery without request time frame limitations and tolerant to connectivity issues.
 - __Cube.js React.__ React wrapper for Cube.js API.
 
+## Why Cube.js?
+
+If you are building your own business intelligence tool or customer-facing analytics most probably you'll face following problems:
+
+1. __Performance.__ Most of effort time in modern analytics software development is spent to provide adequate time to insight. In the world where every company data is a big data writing just SQL query to get insight isn't enough anymore.
+2. __SQL code organization.__ Modelling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
+3. __Infrastructure.__ Key components every production-ready analytics solution requires: analytic SQL generation, query results caching and execution orchestration, data pre-aggregation, security, API for query results fetch, and visualization.
+
+Cube.js has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
 
 ## Contents
 
@@ -218,11 +227,22 @@ Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-u
 
 ## API
 
-### cubejs(apiKey)
+### cubejs(apiKey, options)
 
 Create instance of `CubejsApi`.
 
-- `apiKey` - API key used to authorize requests and determine SQL database you're accessing.
+* `apiKey` - API key used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API key to the console on on startup.
+* `options` - options object.
+   * `apiUrl` - URL of your Cube.js Backend. By default, in the development environment it is http://localhost:4000/cubejs-api/v1.
+
+```javascript
+import cubejs from "@cubejs-client/core";
+
+const cubejsApi = cubejs(
+  "CUBEJS-API-TOKEN",
+  { apiUrl: "http://localhost:4000/cubejs-api/v1" }
+);
+```
 
 ### CubejsApi.load(query, options, callback)
 
@@ -248,20 +268,50 @@ Properties:
   - `loadingState`: Provides information about the state of the query loading.
   
 
-### ResultSet.rawData()
+### ResultSet
+#### ResultSet.chartPivot()
 
-Returns query result raw data returned from server in format
+Returns normalized query result data in the following format.
 
 ```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.chartPivot() will return
 [
-    { "Stories.time":"2015-01-01T00:00:00", "Stories.count": 27120 },
-    { "Stories.time":"2015-02-01T00:00:00", "Stories.count": 25861 },
-    { "Stories.time":"2015-03-01T00:00:00", "Stories.count": 29661 },
+    { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
+    { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
+    { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
     //...
 ]
 ```
+#### ResultSet.seriesNames()
 
-Format of this data may change over time.
+Returns the array of series objects, containing `key` and `title` parameters.
+
+```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.seriesNames() will return
+[
+   { "key":"Stories.count", "title": "Stories Count" }
+]
+```
 
 ### Query Format
 
