@@ -5,6 +5,7 @@ import moment from 'moment';
 import { withStyles } from '@material-ui/core/styles';
 
 import Chart from '../components/Charts';
+import WindowTitle from '../components/WindowTitle';
 
 const styles = theme => ({
   cardContainerStyles: {
@@ -90,11 +91,14 @@ const queries = [
 
 
 const DashboardPage = ({ classes }) => (
-  <div className={classes.cardContainerStyles}>
-    {
-      queries.map((query, index) => <Chart {...query} key={index} />)
-    }
-  </div>
+  <>
+    <WindowTitle title="Dashboard" />
+    <div className={classes.cardContainerStyles}>
+      {
+        queries.map((query, index) => <Chart {...query} key={index} />)
+      }
+    </div>
+  </>
 );
 
 DashboardPage.propTypes = {

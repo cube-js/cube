@@ -1,0 +1,28 @@
+{
+  "name": "backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/jdbc-driver": "0.0.9",
+    "@cubejs-backend/server": "0.0.20",
+    "node-java-maven": "^0.1.1"
+  },
+  "java": {
+    "repositories": [
+      {
+        "id": "s3-maven-qubole-releases",
+        "url": "http://maven-qubole.s3-website-us-east-1.amazonaws.com/maven/release/"
+      }
+    ],
+    "dependencies": [
+      {
+        "groupId": "com.qubole",
+        "artifactId": "jdbc",
+        "version": "1.1.7"
+      }
+    ]
+  }
+}

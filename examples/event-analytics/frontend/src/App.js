@@ -93,10 +93,12 @@ class App extends React.Component {
   };
 
   handleDrawerOpen = () => {
+    window.snowplow('trackStructEvent', 'Navigation', 'Menu Opened');
     this.setState({ open: true });
   };
 
   handleDrawerClose = () => {
+    window.snowplow('trackStructEvent', 'Navigation', 'Menu Closed');
     this.setState({ open: false });
   };
 

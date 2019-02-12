@@ -32,7 +32,6 @@ const supportedTypes = {
 }
 
 const rendetChart = (type, props) => {
-  debugger
   const Component = supportedTypes[type];
   return <Component {...props} />;
 }
