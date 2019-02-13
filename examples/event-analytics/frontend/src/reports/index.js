@@ -3,7 +3,7 @@ import React from 'react';
 import { withStyles } from '@material-ui/core/styles';
 
 import WindowTitle from '../components/WindowTitle';
-import EventsSelect from '../components/EventsSelect';
+import QueryBuilder from '../components/QueryBuilder';
 
 const styles = ({
   root: {
@@ -19,7 +19,8 @@ const ReportsPage = ({ classes }) => (
   <>
     <WindowTitle title="Reports" />
     <div>
-      <EventsSelect />
+      <QueryBuilder>
+      </QueryBuilder>
       <form className={classes.root} autoComplete="off">
       </form>
     </div>

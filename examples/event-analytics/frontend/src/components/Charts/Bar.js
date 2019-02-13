@@ -14,7 +14,6 @@ import { format, COLORS } from './helpers.js';
 import ResponsiveContainer from './ResponsiveContainer.js';
 
 export default ({ resultSet }) => {
-  debugger
   return (
   <ResponsiveContainer>
     <BarChart data={format("x", resultSet.chartPivot(), 'date')}>

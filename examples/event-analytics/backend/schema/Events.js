@@ -27,12 +27,12 @@ cube(`Events`, {
   WHERE length(querystring) > 1
   `,
 
-  measures: Object.assign(customEvents.reduce((accum, event) => {
-    accum[event.systemName] = {
-      title: event.humanName,
+  measures: Object.assign(customEvents.reduce((accum, e) => {
+    accum[e.systemName] = {
+      title: e.humanName,
       type: `count`,
       filters: [
-        { sql: `${CUBE.event} = '${event.humanName}'` }
+        { sql: `${CUBE.event} = '${e.humanName}'` }
       ]
     }
     return accum
@@ -86,7 +86,7 @@ cube(`Events`, {
     },
 
     pageTitle: {
-      sql: `page_title`,
+      sql: `replace(page_title, '')`,
       type: `string`
     },
 
