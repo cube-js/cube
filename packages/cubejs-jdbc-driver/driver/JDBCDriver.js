@@ -36,7 +36,26 @@ const DbTypes = {
       "artifactId": "mysql-connector-java",
       "version": "8.0.13"
     },
+    properties: {
+      user: process.env.CUBEJS_DB_USER,
+      password: process.env.CUBEJS_DB_PASS,
+    },
     jdbcUrl: () => `jdbc:mysql://${process.env.CUBEJS_DB_HOST}:3306/${process.env.CUBEJS_DB_NAME}`
+  },
+  athena: {
+    driverClass: "com.qubole.jdbc.jdbc41.core.QDriver",
+    prepareConnectionQueries: [],
+    mavenDependency: {
+      "groupId": "com.syncron.amazonaws",
+      "artifactId": "simba-athena-jdbc-driver",
+      "version": "2.0.2"
+    },
+    jdbcUrl: () => `jdbc:awsathena://AwsRegion=${process.env.CUBEJS_AWS_REGION}`,
+    properties: {
+      UID: process.env.CUBEJS_AWS_KEY,
+      PWD: process.env.CUBEJS_AWS_SECRET,
+      S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION
+    }
   }
 };
 
@@ -50,10 +69,7 @@ class JDBCDriver extends BaseDriver {
       dbType: process.env.CUBEJS_DB_TYPE,
       url: process.env.CUBEJS_JDBC_URL || dbTypeDescription && dbTypeDescription.jdbcUrl(),
       drivername: process.env.CUBEJS_JDBC_DRIVER || dbTypeDescription && dbTypeDescription.driverClass,
-      properties: {
-        user: process.env.CUBEJS_DB_USER,
-        password: process.env.CUBEJS_DB_PASS
-      },
+      properties: dbTypeDescription && dbTypeDescription.properties,
       ...config
     };
 
