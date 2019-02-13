@@ -1,12 +1,29 @@
 import React from 'react';
 
-import WindowTitle from '../components/WindowTitle';
+import { withStyles } from '@material-ui/core/styles';
 
-export default () => (
+import WindowTitle from '../components/WindowTitle';
+import EventsSelect from '../components/EventsSelect';
+
+const styles = ({
+  root: {
+    display: 'flex',
+    flexWrap: 'wrap',
+  },
+  formControl: {
+    minWidth: 120,
+  }
+});
+
+const ReportsPage = ({ classes }) => (
   <>
     <WindowTitle title="Reports" />
     <div>
-      Reports
+      <EventsSelect />
+      <form className={classes.root} autoComplete="off">
+      </form>
     </div>
   </>
 );
+
+export default withStyles(styles)(ReportsPage);

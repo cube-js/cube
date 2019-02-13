@@ -10,19 +10,23 @@ import {
   Legend
 } from 'recharts';
 
-import { formatters, COLORS } from './helpers.js';
+import { format, COLORS } from './helpers.js';
 import ResponsiveContainer from './ResponsiveContainer.js';
 
-export default ({ resultSet }) => (
+export default ({ resultSet }) => {
+  debugger
+  return (
   <ResponsiveContainer>
-    <BarChart data={resultSet.chartPivot()}>
+    <BarChart data={format("x", resultSet.chartPivot(), 'date')}>
       <CartesianGrid strokeDasharray="3 3"/>
       <XAxis dataKey="x"/>
       <YAxis/>
       <Tooltip/>
-      {resultSet.seriesNames().map((s, i) =>
-        <Bar key={i} dataKey={s.key} name={s.title} stackId="a" fill={COLORS[i % COLORS.length]} />
+      {Object.keys(resultSet.chartPivot()[0]).filter((s) => !["category", "x"].includes(s)).map((s, i) =>
+        <Bar key={i} dataKey={s} name={s} stackId="a" fill={COLORS[i % COLORS.length]} />
       )}
+      <Legend />
     </BarChart>
   </ResponsiveContainer>
-);
+  )
+}

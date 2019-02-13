@@ -16,7 +16,10 @@ import PieChart from './Pie';
 import BarChart from './Bar';
 import { DASHBOARD_CHART_MIN_HEIGHT } from './helpers.js';
 
-const cubejsClient = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjo0MDY3OH0.Vd-Qu4dZ95rVy9pKkyzy6Uxc5D-VOdTidCWYUVhKpYU');
+const cubejsClient = cubejs(
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NDk5ODg3NjgsImV4cCI6MTU1MDA3NTE2OH0.fGNQw9t_jFwdcRLyA-ITJaqdMG2TsNrN8HxHqmRcwEA',
+  { apiUrl: "http://localhost:4000/cubejs-api/v1" }
+);
 
 const styles = ({
   chartContainer: {

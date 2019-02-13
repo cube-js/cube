@@ -1,44 +1,90 @@
-const regexp = (key) => `&${key}=(.*?)&`;
+import StructuredEvent from './StructuredEvent';
+
+const regexp = (key) => `&${key}=([^&]+)&`;
 const parameters = {
   event: regexp('e'),
   true_tstamp: regexp('ttm'),
   user_fingerprint: regexp('fp'),
   se_category: regexp('se_ca'),
-  se_action: regexp('se_ac')
+  se_action: regexp('se_ac'),
+  page_referrer: regexp('refr'),
+  page_title: regexp('page')
 }
+
+const customEvents = [
+  ['Navigation', 'Menu Opened'],
+  ['Navigation', 'Menu Closed']
+].map(event =>
+  new StructuredEvent(...event)
+);
 
 cube(`Events`, {
   sql:
   `SELECT
     from_iso8601_timestamp(to_iso8601(date) || 'T' || "time") as time,
     ${Object.keys(parameters).map((key) => ( `regexp_extract(querystring, '${parameters[key]}', 1) as ${key}` )).join(", ")}
-  FROM
-  cloudfront_logs`,
+  FROM cloudfront_logs
+  WHERE length(querystring) > 1
+  `,
 
-  measures: {
-    count: {
+  measures: Object.assign(customEvents.reduce((accum, event) => {
+    accum[event.systemName] = {
+      title: event.humanName,
+      type: `count`,
+      filters: [
+        { sql: `${CUBE.event} = '${event.humanName}'` }
+      ]
+    }
+    return accum
+  }, {}), {
+    anyEvent: {
       type: `count`,
     },
 
-    uniqCount: {
+    anyEventUniq: {
       sql: `user_fingerprint`,
       type: `countDistinct`
+    },
+
+    pageView: {
+      type: `count`,
+      filters: [
+        { sql: `${CUBE.event} = 'Page View'` }
+      ]
     }
-  },
+  }),
 
   dimensions: {
     event: {
       type: `string`,
       case: {
-        when: [
+        when: customEvents.map(e => (
+          { sql: `${CUBE}.event = 'se'
+                  AND ${CUBE}.se_category = '${e.categoryEscaped}'
+                  AND ${CUBE}.se_action = '${e.actionEscaped}'`,
+            label: e.humanName }
+        )).concat([
           { sql: `${CUBE}.event = 'pv'`, label: `Page View` },
-          { sql: `${CUBE}.event = 'se' AND ${CUBE}.se_category = 'Navigation' AND ${CUBE}.se_action = 'Menu%2520Opened'`, label: `Navigation: Menu Opened` },
-          { sql: `${CUBE}.event = 'se' AND ${CUBE}.se_category = 'Navigation' AND ${CUBE}.se_action = 'Menu%2520Closed'`, label: `Navigation: Menu Closed` }
-        ],
+        ]),
         else: {
           label: `Unknown event`
         }
       }
+    },
+
+    referrer: {
+      sql: `page_referrer`,
+      type: `string`
+    },
+
+    pageTitle: {
+      sql: `page_title`,
+      type: `string`
+    },
+
+    time: {
+      sql: `time`,
+      type: `time`
     }
   }
 });

@@ -12,51 +12,31 @@ const styles = {
   root: {
     width: '100%',
     overflowX: 'auto',
-  },
-  table: {
-    minWidth: 700,
-  },
+  }
 };
 
-let id = 0;
-function createData(name, calories, fat, carbs, protein) {
-  id += 1;
-  return { id, name, calories, fat, carbs, protein };
-}
-
-const data = [
-  createData('Frozen yoghurt', 159, 6.0, 24, 4.0),
-  createData('Ice cream sandwich', 237, 9.0, 37, 4.3),
-  createData('Eclair', 262, 16.0, 24, 6.0),
-  createData('Cupcake', 305, 3.7, 67, 4.3),
-  createData('Gingerbread', 356, 16.0, 49, 3.9),
-];
-
 function TableChart(props) {
-  const { classes } = props;
+  const { classes, resultSet } = props;
 
   return (
     <Paper className={classes.root}>
       <Table className={classes.table}>
         <TableHead>
           <TableRow>
-            <TableCell>Dessert (100g serving)</TableCell>
-            <TableCell align="right">Calories</TableCell>
-            <TableCell align="right">Fat (g)</TableCell>
-            <TableCell align="right">Carbs (g)</TableCell>
-            <TableCell align="right">Protein (g)</TableCell>
+            <TableCell>Event</TableCell>
+            <TableCell align="right">Count</TableCell>
+            <TableCell align="right">Uniq Count</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.map(n => (
-            <TableRow key={n.id}>
-              <TableCell component="th" scope="row">
-                {n.name}
-              </TableCell>
-              <TableCell align="right">{n.calories}</TableCell>
-              <TableCell align="right">{n.fat}</TableCell>
-              <TableCell align="right">{n.carbs}</TableCell>
-              <TableCell align="right">{n.protein}</TableCell>
+          {resultSet.pivot().map((rows, i) => (
+            <TableRow key={i}>
+              { rows.xValues.map((r, i) => (
+                <TableCell key={i}  component="th"> {r} </TableCell>
+              ))}
+              { rows.yValuesArray.map((r, i) => (
+                <TableCell key={i} align="right">{r[1]}</TableCell>
+              ))}
             </TableRow>
           ))}
         </TableBody>
