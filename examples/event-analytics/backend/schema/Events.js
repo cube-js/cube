@@ -51,6 +51,14 @@ cube(`Events`, {
       filters: [
         { sql: `${CUBE.event} = 'Page View'` }
       ]
+    },
+
+    pageViewUniq: {
+      type: `countDistinct`,
+      sql: `user_fingerprint`,
+      filters: [
+        { sql: `${CUBE.event} = 'Page View'` }
+      ]
     }
   }),
 
