@@ -3,8 +3,9 @@ const QueryOrchestrator = require('@cubejs-backend/query-orchestrator/orchestrat
 const ContinueWaitError = require('@cubejs-backend/query-orchestrator/orchestrator/ContinueWaitError');
 
 class OrchestratorApi {
-  constructor(driverFactory, logger) {
-    this.orchestrator = new QueryOrchestrator('STANDALONE', driverFactory, logger);
+  constructor(driverFactory, logger, options) {
+    options = options || {};
+    this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
     this.logger = logger;
   }
 

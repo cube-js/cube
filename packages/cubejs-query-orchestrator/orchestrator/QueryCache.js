@@ -4,9 +4,10 @@ const QueryQueue = require('./QueryQueue');
 const ContinueWaitError = require('./ContinueWaitError');
 
 class QueryCache {
-  constructor(redisPrefix, clientFactory, logger) {
+  constructor(redisPrefix, clientFactory, logger, options) {
+    this.options = options || {};
     this.redisPrefix = redisPrefix;
-    this.clientFactory = clientFactory;
+    this.driverFactory = clientFactory;
     this.logger = logger;
     this.redisClient = redis.createClient(process.env.REDIS_URL);
   }
@@ -90,9 +91,9 @@ class QueryCache {
     if (!this.queue) {
       this.queue = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}`,
-        this.clientFactory,
+        this.driverFactory,
         (client, q) => client.query(q.query, q.values),
-        { logger: this.logger }
+        { logger: this.logger, ...this.options.queueOptions }
       );
     }
     return this.queue;

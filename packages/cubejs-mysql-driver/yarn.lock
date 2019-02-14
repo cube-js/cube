@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/query-orchestrator@^0.0.7":
-  version "0.0.7"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.7.tgz#5c6a5d95e7e17d26a1dfd8a6bb1068607df681a7"
-  integrity sha512-bC5ohIyALcgYzyuO3Z0olN9hr5RFbRPv8eEtQAYnbXouS1Se+hiculMj3olbx6eeCEj98ZXLrMdLAQMPrZtCOg==
+"@cubejs-backend/query-orchestrator@^0.0.21":
+  version "0.0.21"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.21.tgz#b5a0422a34931a834f4429280679460d08dc6112"
+  integrity sha512-jQS5F2D9PzKEJ4guzba6S2PymruA5pTIFu4DnOnM7Y3sFQkjVDcl7KYEr5VmpX6+Hu1u+naApuCQo2l6PtOXKg==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"

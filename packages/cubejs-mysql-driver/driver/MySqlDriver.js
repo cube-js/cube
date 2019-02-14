@@ -87,8 +87,13 @@ class MySqlDriver extends BaseDriver {
     return promise;
   }
 
-  testConnection() {
-    return this.withConnection((conn) => conn.execute('SELECT 1'));
+  async testConnection() {
+    const conn = await this.pool._factory.create();
+    try {
+      return await conn.execute('SELECT 1');
+    } finally {
+      await this.pool._factory.destroy(conn);
+    }
   }
 
   query(query, values) {
