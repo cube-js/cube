@@ -14798,7 +14798,7 @@
 	      var _this = this;
 
 	      return this.loadMethod(function () {
-	        return _this.request("/load?query=".concat(JSON.stringify(query)));
+	        return _this.request("/load?query=".concat(encodeURIComponent(JSON.stringify(query))));
 	      }, function (body) {
 	        return new ResultSet(body);
 	      }, options, callback);

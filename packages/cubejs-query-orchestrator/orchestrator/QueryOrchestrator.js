@@ -2,12 +2,17 @@ const QueryCache = require('./QueryCache');
 const PreAggregations = require('./PreAggregations');
 
 class QueryOrchestrator {
-  constructor(redisPrefix, clientFactory, logger) {
+  constructor(redisPrefix, driverFactory, logger, options) {
+    options = options || {};
     this.redisPrefix = redisPrefix;
-    this.clientFactory = clientFactory;
+    this.driverFactory = driverFactory;
     this.logger = logger;
-    this.queryCache = new QueryCache(this.redisPrefix, this.clientFactory, this.logger);
-    this.preAggregations = new PreAggregations(this.redisPrefix, this.clientFactory, this.logger, this.queryCache);
+    this.queryCache = new QueryCache(
+      this.redisPrefix, this.driverFactory, this.logger, options.queryCacheOptions
+    );
+    this.preAggregations = new PreAggregations(
+      this.redisPrefix, this.driverFactory, this.logger, this.queryCache, options.preAggregationsOptions
+    );
   }
 
   async fetchQuery(queryBody) {

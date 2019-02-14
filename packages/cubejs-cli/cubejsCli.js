@@ -9,6 +9,7 @@ const Analytics = require('analytics-node');
 const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
 const { machineIdSync } = require('node-machine-id');
 const { promisify } = require('util');
+const templates = require('./templates');
 
 const packageJson = require('./package.json');
 
@@ -29,54 +30,6 @@ const executeCommand = (command, args) => {
     });
   })
 };
-
-const indexJs = `const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer();
-
-server.listen().then(({ port }) => {
-  console.log(\`🚀 Cube.js server is listening on \${port}\`);
-});
-`;
-
-const dotEnv = `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
-`;
-
-const ordersJs = `cube(\`Orders\`, {
-  sql: \`
-  select 1 as id, 100 as amount, 'new' status
-  UNION ALL
-  select 2 as id, 200 as amount, 'new' status
-  UNION ALL
-  select 3 as id, 300 as amount, 'processed' status
-  UNION ALL
-  select 4 as id, 500 as amount, 'processed' status
-  UNION ALL
-  select 5 as id, 600 as amount, 'shipped' status
-  \`,
-
-  measures: {
-    count: {
-      type: \`count\`
-    },
-
-    totalAmount: {
-      sql: \`amount\`,
-      type: \`sum\`
-    }
-  },
-
-  dimensions: {
-    status: {
-      sql: \`status\`,
-      type: \`string\`
-    }
-  }
-});
-`;
 
 const anonymousId = machineIdSync();
 
@@ -141,6 +94,13 @@ const createApp = async (projectName, options) => {
       createAppOptions
     );
   }
+  const template = options.template || 'express';
+  if (!templates[template]) {
+    await displayError(
+      `Unknown template ${chalk.red(template)}`,
+      createAppOptions
+    );
+  }
   await fs.ensureDir(projectName);
   process.chdir(projectName);
 
@@ -150,12 +110,9 @@ const createApp = async (projectName, options) => {
     version: '0.0.1',
     private: true,
     scripts: {
-      dev: "node index.js"
+      dev: "./node_modules/.bin/cubejs-dev-server"
     }
   });
-  await fs.writeFile('index.js', indexJs);
-  await fs.ensureDir('schema');
-  await fs.writeFile(path.join('schema', 'Orders.js'), ordersJs);
 
   logStage('Installing server dependencies');
   await npmInstall(['@cubejs-backend/server']);
@@ -190,8 +147,23 @@ const createApp = async (projectName, options) => {
     await executeCommand('npm', ['install']);
   }
 
-  logStage('Creating default configuration');
-  await fs.writeFile('.env', dotEnv + `CUBEJS_DB_TYPE=${options.dbType}\nCUBEJS_API_SECRET=${crypto.randomBytes(64).toString('hex')}\n`);
+  logStage('Writing files from template');
+
+  const templateConfig = templates[template];
+  const env = {
+    dbType: options.dbType,
+    apiSecret: crypto.randomBytes(64).toString('hex'),
+    projectName
+  };
+  await Promise.all(Object.keys(templateConfig.files).map(async fileName => {
+    await fs.ensureDir(path.dirname(fileName));
+    await fs.writeFile(fileName, templateConfig.files[fileName](env));
+  }));
+
+  if (templateConfig.dependencies) {
+    logStage('Installing template dependencies');
+    await npmInstall(templateConfig.dependencies);
+  }
 
   await event('Create App Success', { projectName, dbType: options.dbType });
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
@@ -255,7 +227,8 @@ program
 
 program
   .command('create <name>')
-  .option('-d, --db-type <db-type>', 'Preconfigure for selected database (options: postgres, mysql)')
+  .option('-d, --db-type <db-type>', 'Preconfigure for selected database. Options: postgres, mysql')
+  .option('-t, --template <template>', 'App template. Options: express (default), serverless.')
   .description('Create new Cube.js app')
   .action((projectName, options) => createApp(projectName, options)
     .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }))

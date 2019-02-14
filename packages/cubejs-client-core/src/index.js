@@ -54,7 +54,7 @@ class CubejsApi {
 
   load(query, options, callback) {
     return this.loadMethod(
-      () => this.request(`/load?query=${JSON.stringify(query)}`),
+      () => this.request(`/load?query=${encodeURIComponent(JSON.stringify(query))}`),
       (body) => new ResultSet(body),
       options,
       callback

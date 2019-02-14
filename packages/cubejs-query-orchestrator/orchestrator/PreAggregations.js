@@ -46,7 +46,7 @@ const tablesToVersionEntries = (schema, tables) => {
 class PreAggregationLoadCache {
   constructor(redisPrefix, clientFactory, queryCache, preAggregations) {
     this.redisPrefix = redisPrefix;
-    this.clientFactory = clientFactory;
+    this.driverFactory = clientFactory;
     this.queryCache = queryCache;
     this.preAggregations = preAggregations;
     this.queryResults = {};
@@ -56,7 +56,7 @@ class PreAggregationLoadCache {
   async tablesFromCache(schema) {
     let tables = JSON.parse(await this.redisClient.getAsync(this.tablesRedisKey()));
     if (!tables) {
-      const client = await this.clientFactory();
+      const client = await this.driverFactory();
       tables = await client.getTablesQuery(schema);
       await this.redisClient.setAsync(this.tablesRedisKey(), JSON.stringify(tables), 'EX', 120);
     }
@@ -124,7 +124,7 @@ class PreAggregationLoader {
   ) {
     options = options || {};
     this.redisPrefix = redisPrefix;
-    this.clientFactory = clientFactory;
+    this.driverFactory = clientFactory;
     this.logger = logger;
     this.queryCache = queryCache;
     this.preAggregations = preAggregations;
@@ -167,7 +167,7 @@ class PreAggregationLoader {
     }
 
     if (!versionEntries.length) {
-      const client = await this.clientFactory();
+      const client = await this.driverFactory();
       await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     }
     const versionEntry = versionEntries.find(e => e.table_name === this.preAggregation.tableName); // TODO can be array instead of last
@@ -304,9 +304,10 @@ class PreAggregationLoader {
 }
 
 class PreAggregations {
-  constructor(redisPrefix, clientFactory, logger, queryCache) {
+  constructor(redisPrefix, clientFactory, logger, queryCache, options) {
+    this.options = options || {};
     this.redisPrefix = redisPrefix;
-    this.clientFactory = clientFactory;
+    this.driverFactory = clientFactory;
     this.logger = logger;
     this.queryCache = queryCache;
     this.refreshErrors = {}; // TODO should be in redis
@@ -316,12 +317,12 @@ class PreAggregations {
 
   loadAllPreAggregationsIfNeeded (queryBody) {
     const preAggregations = queryBody.preAggregations || [];
-    const loadCache = new PreAggregationLoadCache(this.redisPrefix, this.clientFactory, this.queryCache, this);
+    const loadCache = new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this);
     return preAggregations.map(p =>
       (preAggregationsTablesToTempTables) => {
         const loader = new PreAggregationLoader(
           this.redisPrefix,
-          this.clientFactory,
+          this.driverFactory,
           this.logger,
           this.queryCache,
           this,
@@ -343,20 +344,20 @@ class PreAggregations {
 
   getQueue() {
     if (!this.queue) {
-      this.queue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}`, this.clientFactory, (client, q) => {
+      this.queue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}`, this.driverFactory, (client, q) => {
         const { preAggregation, preAggregationsTablesToTempTables, newVersionEntry } = q;
         const loader = new PreAggregationLoader(
           this.redisPrefix,
-          this.clientFactory,
+          this.driverFactory,
           this.logger,
           this.queryCache,
           this,
           preAggregation,
           preAggregationsTablesToTempTables,
-          new PreAggregationLoadCache(this.redisPrefix, this.clientFactory, this.queryCache, this)
+          new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this)
         );
         return loader.refresh(newVersionEntry)(client);
-      }, { concurrency: 1, logger: this.logger });
+      }, { concurrency: 1, logger: this.logger, ...this.options.queueOptions });
     }
     return this.queue;
   }
