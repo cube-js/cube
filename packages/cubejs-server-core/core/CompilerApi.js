@@ -1,18 +1,26 @@
 const QueryBuilder = require('@cubejs-backend/schema-compiler/adapter/QueryBuilder');
+const PrepareCompiler = require('@cubejs-backend/schema-compiler/compiler/PrepareCompiler');
 
 class CompilerApi {
-  constructor(compilers, dbType) {
-    this.compilers = compilers;
+  constructor(repository, dbType) {
+    this.repository = repository;
     this.dbType = dbType;
+  }
+
+  async getCompilers() {
+    if (!this.compilers) {
+      this.compilers = await PrepareCompiler.compile(this.repository, { adapter: this.dbType }); // TODO mutex and rebuild
+    }
+    return this.compilers;
   }
 
   async getSql(query) {
     const sqlGenerator = QueryBuilder.query(
-      this.compilers,
+      await this.getCompilers(),
       this.dbType,
       query
     );
-    return this.compilers.compiler.withQuery(sqlGenerator, () => ({
+    return (await this.getCompilers()).compiler.withQuery(sqlGenerator, () => ({
       sql: sqlGenerator.buildSqlAndParams(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
@@ -23,7 +31,7 @@ class CompilerApi {
   }
 
   async metaConfig() {
-    return this.compilers.metaTransformer.cubes;
+    return (await this.getCompilers()).metaTransformer.cubes;
   }
 }
 

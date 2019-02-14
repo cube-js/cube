@@ -1,5 +1,4 @@
 const ApiGateway = require('@cubejs-backend/api-gateway');
-const PrepareCompiler = require('@cubejs-backend/schema-compiler/compiler/PrepareCompiler');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
@@ -16,6 +15,8 @@ import ReactDOM from "react-dom";
 import cubejs from "@cubejs-client/core";
 import { QueryRenderer } from "@cubejs-client/react";
 import { Chart, Axis, Tooltip, Geom, Coord, Legend } from "bizcharts";
+
+const API_URL = "${localUrl}"; // change to your actual endpoint
 
 const renderChart = resultSet => (
   <Chart height={400} data={resultSet.chartPivot()} forceFit>
@@ -34,7 +35,7 @@ const query = {
 
 const cubejsApi = cubejs(
   "${cubejsToken}",
-  { apiUrl: "${localUrl}/cubejs-api/v1" }
+  { apiUrl: API_URL + "/cubejs-api/v1" }
 );
 
 const App = () => (
@@ -151,8 +152,7 @@ class CubejsServerCore {
 
   async initApp(app) {
     checkEnvForPlaceholders();
-    const compilers = await PrepareCompiler.compile(this.repository, { adapter: this.dbType });
-    this.compilerApi = this.createCompilerApi(compilers);
+    this.compilerApi = this.createCompilerApi(this.repository);
     this.orchestratorApi = this.createOrchestratorApi();
     const apiGateway = new ApiGateway(
       this.apiSecret,
@@ -167,7 +167,7 @@ class CubejsServerCore {
   initDevEnv(app) {
     if (process.env.NODE_ENV !== 'production') {
       const port = process.env.PORT || 4000; // TODO
-      const localUrl = `http://localhost:${port}`;
+      const localUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
       const jwt = require('jsonwebtoken');
       let cubejsToken = jwt.sign({}, this.apiSecret, { expiresIn: '1d' });
       console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
@@ -202,8 +202,8 @@ class CubejsServerCore {
     }
   }
 
-  createCompilerApi(compilers) {
-    return new CompilerApi(compilers, this.dbType);
+  createCompilerApi(repository) {
+    return new CompilerApi(repository, this.dbType);
   }
 
   createOrchestratorApi() {
