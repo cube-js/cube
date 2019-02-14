@@ -60,13 +60,13 @@ export default class ResultSet {
   normalizePivotConfig(pivotConfig) {
     const query = this.loadResponse.query;
     let timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
-    pivotConfig = pivotConfig || timeDimensions.length ? {
+    pivotConfig = pivotConfig || (timeDimensions.length ? {
       x: timeDimensions.map(td => td.dimension),
       y: query.dimensions || []
     } : {
       x: query.dimensions || [],
       y: []
-    };
+    });
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
     }
