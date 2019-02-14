@@ -112,7 +112,7 @@ class QueryBuilder extends Component {
         <Grid item xs={6}>
           <EventsSelect onChange={onChange} />
         </Grid>
-        <Grid item justify="flex-end" xs={6}>
+        <Grid item xs={6}>
           <Grid container justify="flex-end">
             <SaveButton disabled={!this.ready} />
           </Grid>

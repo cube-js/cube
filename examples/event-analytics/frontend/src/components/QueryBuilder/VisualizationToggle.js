@@ -21,9 +21,11 @@ const VisualizationToggle = ({ value, onChange, classes }) => (
      <ToggleButtonGroup
         exclusive
         value={value}
-        onChange={((e, value) => (
-          onChange({ type: 'CHANGE_VISUALIZATION_TYPE', value: value})
-        ))}
+        onChange={((e, value) => {
+          if (value) {
+            onChange({ type: 'CHANGE_VISUALIZATION_TYPE', value: value})
+          }
+        })}
       >
        <ToggleButton value="line">
          <ShowChartIcon />

@@ -13,19 +13,21 @@ import {
   format,
   DASHBOARD_CHART_MIN_HEIGHT,
   COLORS,
+  extractSeries,
+  humanName,
   RECHARTS_RESPONSIVE_WIDTH
 } from './helpers.js';
 
 export default ({ resultSet }) => (
   <ResponsiveContainer width={RECHARTS_RESPONSIVE_WIDTH} height={DASHBOARD_CHART_MIN_HEIGHT}>
     <LineChart data={format("x", resultSet.chartPivot(), 'date')}>
-      <XAxis dataKey="x" />
+      <XAxis dataKey="x" minTickGap={20}/>
       <YAxis />
-      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+      <CartesianGrid strokeDasharray="3 3" />
       <Tooltip />
       <Legend />
-      {resultSet.seriesNames().map((s, i) =>
-        <Line key={i} dataKey={s.key} name={s.title} stroke={COLORS[i % COLORS.length]} />
+      {extractSeries(resultSet).map((s, i) =>
+        <Line key={i} dataKey={s} name={humanName(resultSet, s)} stroke={COLORS[i % COLORS.length]} />
       )}
     </LineChart>
   </ResponsiveContainer>

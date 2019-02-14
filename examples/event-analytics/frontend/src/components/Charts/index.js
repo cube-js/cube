@@ -5,6 +5,9 @@ import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
 import CardContent from '@material-ui/core/CardContent';
 import CircularProgress from '@material-ui/core/CircularProgress';
+import Grid from '@material-ui/core/Grid';
+import Typography from '@material-ui/core/Typography';
+import ErrorIcon from '@material-ui/icons/Error';
 import { withStyles } from '@material-ui/core/styles';
 
 import cubejs from '@cubejs-client/core';
@@ -39,6 +42,25 @@ const rendetChart = (type, props) => {
   return <Component {...props} />;
 }
 
+const Loading = () => (
+  <Grid container justify="center">
+    <CircularProgress />
+  </Grid>
+)
+
+const Error = ({ error }) => (
+  <>
+    <Grid container justify="center">
+      <ErrorIcon color="error" fontSize="large" />
+    </Grid>
+    <Grid container justify="center">
+      <Typography align='center' color='error' variant='body1'>
+        {error.message}
+      </Typography>
+    </Grid>
+  </>
+)
+
 const Chart = ({ title, query, type, classes }) => (
   <Card>
     <CardHeader title={title} />
@@ -47,12 +69,16 @@ const Chart = ({ title, query, type, classes }) => (
         <QueryRenderer
           cubejsApi={cubejsClient}
           query={query}
-          render={({ resultSet }) => {
+          render={({ resultSet, loadingState, error }) => {
             if (resultSet) {
               return rendetChart(type, { resultSet });
             }
 
-            return <CircularProgress />
+            if (error) {
+              return <Error error={error} />
+            }
+
+            return <Loading loadingState={loadingState} />
           }}
         />
       </div>
