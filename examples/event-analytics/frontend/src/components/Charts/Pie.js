@@ -5,15 +5,18 @@ import { PieChart, Pie, Tooltip, Legend, Cell } from 'recharts';
 import { formatters, format, COLORS } from './helpers.js';
 import ResponsiveContainer from './ResponsiveContainer.js';
 
+// Сделать query getter
+//
+// get query => Query
+// Query
+//
+
 const dimensionOnX = (resultSet) => (
-  resultSet.loadResponse.query.dimensions[0] ||
-  (resultSet.loadResponse.query.timeDimensions[0] &&
-    resultSet.loadResponse.query.timeDimensions[0].dimension)
+  resultSet.query().dimensions[0]
 )
 
 const anyDimensions = (resultSet) => (
-  resultSet.loadResponse.query.dimensions.length > 0 ||
-    resultSet.loadResponse.query.timeDimensions.length > 0
+  resultSet.query().dimensions.length > 0
 )
 
 const piePivot = (resultSet) => {
@@ -24,14 +27,16 @@ const piePivot = (resultSet) => {
       fillMissingDates: false
     })
   } else {
+    debugger
     return resultSet.chartPivot()
   }
 }
 
 const findFormat = (resultSet, dimension) => {
-  const dim = resultSet.loadResponse.annotation.dimensions[dimension] ||
-    resultSet.loadResponse.annotation.timeDimensions[dimension]
-  return dim.type
+  if (anyDimensions(resultSet)) {
+    return resultSet.loadResponse.annotation.dimensions[dimension].type
+  }
+  return undefined
 }
 
 export default ({ resultSet }) => {

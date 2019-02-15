@@ -21,7 +21,7 @@ import ResponsiveContainer from './ResponsiveContainer.js';
 export default ({ resultSet }) => {
   return (
   <ResponsiveContainer>
-    <BarChart data={format("x", resultSet.chartPivot(), 'date')}>
+    <BarChart data={format("x", resultSet.chartPivot(), 'time')}>
       <CartesianGrid strokeDasharray="3 3"/>
       <XAxis dataKey="x" minTickGap={20}/>
       <YAxis/>

@@ -45,6 +45,21 @@ const buildQuery = ({ dateRange, granularity, measures, dimensions, visualizatio
   }
 })
 
+const resolveGranularity = (visualizationType, state) => {
+  // Reset granularity if pie chart selected,
+  // but memorized previousily selected
+  if (visualizationType === 'pie') {
+    return { granularity: null, memorizedGranularity: state.granularity }
+  // For the rest of the charts use currently selected granularity,
+  // or in case it is null the memorized one
+  } else {
+    return {
+      granularity: (state.granularity || state.memorizedGranularity),
+      memorizedGranularity: null
+    }
+  }
+}
+
 const reducer = (state, action) => {
   switch (action.type) {
     case 'CHANGE_GRANULARITY':
@@ -53,8 +68,14 @@ const reducer = (state, action) => {
         granularity: action.value
       }
     case 'CHANGE_VISUALIZATION_TYPE':
+      const {
+        granularity,
+        memorizedGranularity
+      } = resolveGranularity(action.value, state)
       return {
         ...state,
+        granularity,
+        memorizedGranularity,
         visualizationType: action.value
       }
     case 'ADD_DIMENSION':
@@ -130,11 +151,13 @@ class QueryBuilder extends Component {
             <Grid item xs={12}>
               <Grid container justify='flex-end'>
                 <Grid item>
-                  <div className={classes.granularitySelectContainer}>
-                    <GranularitySelect
-                      value={this.state.granularity}
-                      onChange={onChange} />
-                  </div>
+                  { this.state.granularity &&
+                    <div className={classes.granularitySelectContainer}>
+                      <GranularitySelect
+                        value={this.state.granularity}
+                        onChange={onChange} />
+                    </div>
+                  }
                 </Grid>
                 <Grid item>
                   <div>

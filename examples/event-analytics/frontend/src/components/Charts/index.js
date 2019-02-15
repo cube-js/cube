@@ -20,7 +20,7 @@ import BarChart from './Bar';
 import { DASHBOARD_CHART_MIN_HEIGHT } from './helpers.js';
 
 const cubejsClient = cubejs(
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NTAwNzY0MjEsImV4cCI6MTU1MDE2MjgyMX0.AFZtJAIF7sbiQboI53xPnocIFIUhsmttMG9jVAj59tM',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NTAyMTUwMTcsImV4cCI6MTU1MDMwMTQxN30.khK73b3GtELqpYN1Dm88VGuKIc1Z5fLF79bTOeVHOm0',
   { apiUrl: "http://localhost:4000/cubejs-api/v1" }
 );
 
