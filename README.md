@@ -128,6 +128,10 @@ $ npm i --save @cubejs-client/react
 Instantiate Cube.js API and then use it to fetch data:
 
 ```js
+import cubejs from '@cubejs-client/core';
+import Chart from 'chart.js';
+import chartjsConfig from './toChartjsData';
+
 const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
 
 const resultSet = await cubejsApi.load({
