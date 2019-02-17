@@ -40,6 +40,7 @@ Cube.js has necessary infrastructure for every analytic application that heavily
 - [Architecture](#architecture)
 - [Security](#security)
 - [API](#api)
+- [License](#license)
 
 ## Getting Started
 
@@ -386,8 +387,7 @@ Query has following properties:
 }
 ```
 
-
-### License
+## License
 
 Cube.js Client is [MIT licensed](./packages/cubejs-client-core/LICENSE).
 
