@@ -4,6 +4,8 @@ import numeral from 'numeral';
 export const formatters = {
   date: (val) => moment(val).format("MMM DD"),
   time: (val) => moment(val).format("MMM DD"),
+  "time:day": (val) => moment(val).format("MMM DD"),
+  "time:hour": (val) => moment(val).format("MMM DD, HH:mm"),
   number: (val) => numeral(val).format('0,0'),
   undefined: (val) => val,
   string: (val) => val
@@ -15,6 +17,11 @@ export const format = (key, data, formatter) => (
     return i;
   })
 );
+
+export const resolveFormat = (resultSet) => {
+  debugger
+  return `time:${resultSet.query().timeDimensions[0].granularity}`
+}
 
 export const extractSeries= (resultSet) => {
   return Object.keys(resultSet.chartPivot()[0])

@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
-import moment from 'moment';
 
 import Grid from '@material-ui/core/Grid';
+import Fab from '@material-ui/core/Fab';
+import AddIcon from '@material-ui/icons/Add';
 
 import Button from '@material-ui/core/Button';
 import { withStyles } from '@material-ui/core/styles';
@@ -9,12 +10,14 @@ import { withStyles } from '@material-ui/core/styles';
 import EventsSelect from './EventsSelect';
 import DimensionSelect from './DimensionSelect';
 import VisualizationToggle from './VisualizationToggle';
-import GranularitySelect from './GranularitySelect';
+import GranularitySelect, { defaultGranularity } from './GranularitySelect';
+import DateRangeSelect, { defaultDateRange } from './TimeSelect';
 import SaveButton from './SaveButton';
+import withQueryBuilder from './withQueryBuilder';
 
 import Chart from '../Charts';
 
-const styles = theme => ({
+const styles = {
   dimensionSelectContainer: {
     display: "inline-flex",
     marginLeft: "20px"
@@ -23,19 +26,14 @@ const styles = theme => ({
     paddingTop: 10,
     marginRight: 20
   }
-});
+};
 
-const defaultDateRange = [
-  moment().subtract(14,'d').format('YYYY-MM-DD'),
-  moment().format('YYYY-MM-DD'),
-];
-const defaultGranularity = 'day';
 const defaultVisualizationType = 'line';
 
 const buildQuery = ({ dateRange, granularity, measures, dimensions, visualizationType }) => ({
   type: visualizationType,
   query: {
-    measures,
+    measures: Object.values(measures),
     dimensions,
     timeDimensions: [{
       dimension: 'Events.time',
@@ -45,95 +43,54 @@ const buildQuery = ({ dateRange, granularity, measures, dimensions, visualizatio
   }
 })
 
-const resolveGranularity = (visualizationType, state) => {
-  // Reset granularity if pie chart selected,
-  // but memorized previousily selected
-  if (visualizationType === 'pie') {
-    return { granularity: null, memorizedGranularity: state.granularity }
-  // For the rest of the charts use currently selected granularity,
-  // or in case it is null the memorized one
-  } else {
-    return {
-      granularity: (state.granularity || state.memorizedGranularity),
-      memorizedGranularity: null
-    }
-  }
-}
-
-const reducer = (state, action) => {
-  switch (action.type) {
-    case 'CHANGE_GRANULARITY':
-      return {
-        ...state,
-        granularity: action.value
-      }
-    case 'CHANGE_VISUALIZATION_TYPE':
-      const {
-        granularity,
-        memorizedGranularity
-      } = resolveGranularity(action.value, state)
-      return {
-        ...state,
-        granularity,
-        memorizedGranularity,
-        visualizationType: action.value
-      }
-    case 'ADD_DIMENSION':
-      return {
-        ...state,
-        dimensions: [action.dimension]
-      }
-    case 'REMOVE_DIMENSION':
-      return {
-        ...state,
-        dimensions: []
-      }
-    case 'ADD_MEASURE':
-      return {
-        ...state,
-        measures: [action.measure]
-      }
-    case 'REMOVE_MEASURE':
-      return {
-        ...state,
-        measures: []
-      }
-    default:
-      return state
-  }
-}
-
 class QueryBuilder extends Component {
-  state = {
-    measures: [],
-    dimensions: [],
-    dateRange: defaultDateRange,
-    granularity: defaultGranularity,
-    visualizationType: defaultVisualizationType
-  };
-
-  onChange(action) {
-    this.setState(reducer(this.state, action));
-  }
-
   get ready() {
-    return this.state.measures.length > 0;
+    return Object.keys(this.props.measures).length > 0;
   }
 
   get query() {
-    return buildQuery(this.state);
+    return buildQuery(this.props);
+  }
+
+  get canAddEventsSelects() {
+    return this.ready && this.props.eventSelects.length < 3;
+  }
+
+  get canRemoveEventsSelects() {
+    return this.props.eventSelects.length > 1;
   }
 
   render() {
-    const { classes } = this.props;
-    const onChange = this.onChange.bind(this);
+    const {
+      classes,
+      onChange,
+      eventSelects,
+      granularity,
+      visualizationType
+    } = this.props;
 
     return (
       <Grid container spacing={24}>
-        <Grid item xs={6}>
-          <EventsSelect onChange={onChange} />
+        <Grid item xs={10}>
+          <Grid container alignItems='flex-end' spacing={16}>
+            {eventSelects.map(i => (
+              <Grid key={i} item>
+                <EventsSelect id={i}
+                  onChange={onChange}
+                  clearable={this.canRemoveEventsSelects}
+                />
+              </Grid>
+            ))}
+            { this.canAddEventsSelects &&
+              <Grid item>
+                <Fab onClick={() => onChange({ type: "ADD_EVENT_SELECT" }) } size="small" aria-label="Add" className={classes.fab}>
+                  <AddIcon />
+                </Fab>
+              </Grid>
+            }
+          </Grid>
         </Grid>
-        <Grid item xs={6}>
+        <Grid item xs={2}>
           <Grid container justify="flex-end">
             <SaveButton disabled={!this.ready} />
           </Grid>
@@ -151,10 +108,15 @@ class QueryBuilder extends Component {
             <Grid item xs={12}>
               <Grid container justify='flex-end'>
                 <Grid item>
-                  { this.state.granularity &&
+                  <div className={classes.granularitySelectContainer}>
+                    <DateRangeSelect onChange={onChange} defaultValue={defaultDateRange} />
+                  </div>
+                </Grid>
+                <Grid item>
+                  {granularity &&
                     <div className={classes.granularitySelectContainer}>
                       <GranularitySelect
-                        value={this.state.granularity}
+                        defaultValue={defaultGranularity}
                         onChange={onChange} />
                     </div>
                   }
@@ -162,7 +124,7 @@ class QueryBuilder extends Component {
                 <Grid item>
                   <div>
                     <VisualizationToggle
-                      value={this.state.visualizationType}
+                      value={visualizationType}
                       onChange={onChange}
                     />
                   </div>
@@ -180,4 +142,13 @@ class QueryBuilder extends Component {
   }
 }
 
-export default withStyles(styles)(QueryBuilder);
+const initialData = {
+  eventSelects: [1],
+  measures: {},
+  dimensions: [],
+  dateRange: defaultDateRange.value,
+  granularity: defaultGranularity.value,
+  visualizationType: defaultVisualizationType
+}
+
+export default withQueryBuilder(initialData, withStyles(styles)(QueryBuilder));

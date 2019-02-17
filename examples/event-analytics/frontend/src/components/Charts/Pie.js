@@ -5,12 +5,6 @@ import { PieChart, Pie, Tooltip, Legend, Cell } from 'recharts';
 import { formatters, format, COLORS } from './helpers.js';
 import ResponsiveContainer from './ResponsiveContainer.js';
 
-// Сделать query getter
-//
-// get query => Query
-// Query
-//
-
 const dimensionOnX = (resultSet) => (
   resultSet.query().dimensions[0]
 )

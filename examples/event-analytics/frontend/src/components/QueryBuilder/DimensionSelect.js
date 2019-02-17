@@ -30,7 +30,7 @@ const handleChange = (value, action, onChangeProp) => {
   if (value) {
     onChangeProp({
       type: 'ADD_DIMENSION',
-      dimension: value.value
+      value: value.value
     })
   }
 }

@@ -29,7 +29,7 @@ cube(`Events`, {
 
   measures: Object.assign(customEvents.reduce((accum, e) => {
     accum[e.systemName] = {
-      title: e.humanName,
+      title: `${e.humanName} - Total`,
       type: `count`,
       filters: [
         { sql: `${CUBE.event} = '${e.humanName}'` }
@@ -39,11 +39,13 @@ cube(`Events`, {
   }, {}), {
     anyEvent: {
       type: `count`,
+      title: `Any Event - Total`
     },
 
     anyEventUniq: {
       sql: `user_fingerprint`,
-      type: `countDistinct`
+      type: `countDistinct`,
+      title: `Any Event - Unique`
     },
 
     pageView: {

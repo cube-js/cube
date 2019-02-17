@@ -4,10 +4,11 @@ import Select from 'react-select';
 
 const options = [
   { value: 'hour', label: 'Hourly' },
-  { value: 'day', label: 'Daily' },
+  { value: 'day', label: 'Daily', default: true },
   { value: 'week', label: 'Weekly' },
   { value: 'month', label: 'Montly' },
 ]
+export const defaultGranularity = options.find(i => i.default)
 
 const customStyles = {
   container: (provided) => ({
@@ -16,14 +17,10 @@ const customStyles = {
   })
 }
 
-const setDefaultValue = (value) => (
-  options.find(i => i.value === value)
-)
-
-const GranularitySelect = ({ value, onChange }) => (
+const GranularitySelect = ({ defaultValue, onChange }) => (
   <>
     <Select
-      defaultValue={setDefaultValue(value)}
+      defaultValue={defaultValue}
       styles={customStyles}
       options={options}
       onChange={(value, action) => (

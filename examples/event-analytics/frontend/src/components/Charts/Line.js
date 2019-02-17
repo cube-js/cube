@@ -15,12 +15,13 @@ import {
   COLORS,
   extractSeries,
   humanName,
+  resolveFormat,
   RECHARTS_RESPONSIVE_WIDTH
 } from './helpers.js';
 
 export default ({ resultSet }) => (
   <ResponsiveContainer width={RECHARTS_RESPONSIVE_WIDTH} height={DASHBOARD_CHART_MIN_HEIGHT}>
-    <LineChart data={format("x", resultSet.chartPivot(), 'date')}>
+    <LineChart data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
       <XAxis dataKey="x" minTickGap={20}/>
       <YAxis />
       <CartesianGrid strokeDasharray="3 3" />

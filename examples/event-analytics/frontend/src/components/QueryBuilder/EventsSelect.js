@@ -1,6 +1,12 @@
 import React from 'react';
 import Select from 'react-select';
 
+import { withStyles } from '@material-ui/core/styles';
+import { default as MaterialSelect } from '@material-ui/core/Select';
+import MenuItem from '@material-ui/core/MenuItem';
+import IconButton from '@material-ui/core/IconButton';
+import ClearIcon from '@material-ui/icons/Clear';
+
 const options = [
   { value: 'Events.anyEvent', label: 'Any Event' },
   { value: 'Events.pageView', label: 'Page View' },
@@ -8,11 +14,12 @@ const options = [
   { value: 'Events.Navigation__Menu_Opened', label: 'Navigation: Menu Opened' }
 ]
 
-const handleChange = (value, action, onChangeProp) => {
-  onChangeProp({ type: "REMOVE_MEASURE" })
+const handleChange = (value, action, id, onChangeProp) => {
+  onChangeProp({ type: "REMOVE_MEASURE", id })
   onChangeProp({
     type: 'ADD_MEASURE',
-    measure: value.value
+    value: value.value,
+    id
   })
 }
 
@@ -23,14 +30,44 @@ const customStyles = {
   })
 }
 
-const EventsSelect = ({ onChange }) => (
-  <>
+const styles = {
+  container: {
+    position: "relative",
+  },
+  clearButton: {
+    position: "absolute",
+    right: -10,
+    top: -10
+  }
+};
+
+const EventsSelect = ({ onChange, id, clearable, classes }) => (
+  <div className={classes.container}>
+    <MaterialSelect
+      disableUnderline
+      value="total"
+    >
+      <MenuItem value="total">Total</MenuItem>
+      <MenuItem value="unique">Unique</MenuItem>
+    </MaterialSelect>
+    { clearable &&
+      <IconButton
+        className={classes.clearButton}
+        onClick={() => {
+          onChange({ type: 'REMOVE_MEASURE', id })
+          onChange({ type: 'REMOVE_EVENT_SELECT', id })
+        }}
+        aria-label="Delete"
+      >
+        <ClearIcon />
+      </IconButton>
+    }
     <Select
       styles={customStyles}
       options={options}
-      onChange={(value, action) => handleChange(value, action, onChange)}
+      onChange={(value, action) => handleChange(value, action, id, onChange)}
     />
-  </>
+  </div>
 )
 
-export default EventsSelect;
+export default withStyles(styles)(EventsSelect);
