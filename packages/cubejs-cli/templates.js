@@ -125,7 +125,7 @@ exports.express = {
   files: {
     'index.js': () => indexJs,
     '.env': dotEnv,
-    'schema/Orders.js': () => ordersJs,
+    'schema/Orders.js': () => ordersJs
   },
 };
 
@@ -135,7 +135,7 @@ exports.serverless = {
     'app.js': () => appJs,
     'serverless.yml': serverlessYml,
     '.env': dotEnv,
-    'schema/Orders.js': () => ordersJs,
+    'schema/Orders.js': () => ordersJs
   },
-  dependencies: ['serverless-express'],
+  dependencies: ['serverless-express']
 };
