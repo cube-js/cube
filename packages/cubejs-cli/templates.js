@@ -126,7 +126,7 @@ exports.express = {
     'index.js': () => indexJs,
     '.env': dotEnv,
     'schema/Orders.js': () => ordersJs
-  },
+  }
 };
 
 exports.serverless = {
