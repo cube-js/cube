@@ -227,7 +227,7 @@ program
 
 program
   .command('create <name>')
-  .option('-d, --db-type <db-type>', 'Preconfigure for selected database. Options: postgres, mysql')
+  .option('-d, --db-type <db-type>', 'Preconfigure for selected database. Options: postgres, mysql, athena')
   .option('-t, --template <template>', 'App template. Options: express (default), serverless.')
   .description('Create new Cube.js app')
   .action((projectName, options) => createApp(projectName, options)
