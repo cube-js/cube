@@ -20,7 +20,6 @@ export const format = (key, data, formatter) => (
 );
 
 export const resolveFormat = (resultSet) => {
-  debugger
   return `time:${resultSet.query().timeDimensions[0].granularity}`
 }
 

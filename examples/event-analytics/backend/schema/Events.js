@@ -35,6 +35,14 @@ cube(`Events`, {
         { sql: `${CUBE.event} = '${e.humanName}'` }
       ]
     }
+    accum[`${e.systemName}Uniq`] = {
+      title: `${e.humanName} - Unique`,
+      type: `countDistinct`,
+      sql: `user_fingerprint`,
+      filters: [
+        { sql: `${CUBE.event} = '${e.humanName}'` }
+      ]
+    }
     return accum
   }, {}), {
     anyEvent: {
@@ -50,6 +58,7 @@ cube(`Events`, {
 
     pageView: {
       type: `count`,
+      title: `Page View`,
       filters: [
         { sql: `${CUBE.event} = 'Page View'` }
       ]
@@ -57,6 +66,7 @@ cube(`Events`, {
 
     pageViewUniq: {
       type: `countDistinct`,
+      title: `Page View - Unique`,
       sql: `user_fingerprint`,
       filters: [
         { sql: `${CUBE.event} = 'Page View'` }
