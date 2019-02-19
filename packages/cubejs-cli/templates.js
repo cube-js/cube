@@ -23,15 +23,28 @@ const app = require('./app');
 exports.api = handler(app);
 `;
 
-const dotEnv = (env) => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_DB_TYPE=${env.dbType}
+// Shared environment variables, across all DB types
+const sharedDotEnvVars = env => `CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}
 `;
 
-const serverlessYml = (env) => `service: ${env.projectName}
+const athenaDotEnvVars = env => `CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
+CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
+CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
+# You can find the Athena S3 Output location here: https://docs.aws.amazon.com/athena/latest/ug/querying.html
+CUBEJS_AWS_S3_OUTPUT_LOCATION=<S3 OUTPUT LOCATION>
+CUBEJS_JDBC_DRIVER=athena
+${sharedDotEnvVars(env)}`;
+
+const defaultDotEnvVars = env => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
+CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
+CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
+CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
+${sharedDotEnvVars(env)}`;
+
+const dotEnv = env => env.dbType === 'athena' ? athenaDotEnvVars(env) : defaultDotEnvVars(env);
+
+const serverlessYml = env => `service: ${env.projectName}
 
 provider:
   name: aws

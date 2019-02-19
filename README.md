@@ -7,7 +7,7 @@
 
 __Cube.js is an open source modular framework to build analytical web applications__. It is primarily used to build internal business intelligence tools or to add customer-facing analytics to an existing application.
 
-Cube.js was designed to work with Serverless Query Engines like AWS Athena and Google BigQuery at the first place. Multi-stage querying approach makes it suitable for handling trillions of data points. Most of modern RDBMS work with Cube.js as well and can be tuned for adequate performance.
+Cube.js was designed to work with Serverless Query Engines like AWS Athena and Google BigQuery. Multi-stage querying approach makes it suitable for handling trillions of data points. Most modern RDBMS work with Cube.js as well and can be tuned for adequate performance.
 
 Unlike others, it is not a monolith application, but a set of modules, which does one thing well. Cube.js provides modules to run transformations and modeling in data warehouse, querying and caching, managing API gateway and building UI on top of that.
 
@@ -40,6 +40,7 @@ Cube.js has necessary infrastructure for every analytic application that heavily
 - [Architecture](#architecture)
 - [Security](#security)
 - [API](#api)
+- [License](#license)
 
 ## Getting Started
 
@@ -54,21 +55,52 @@ $ yarn global add cubejs-cli
 Run the following command to get started with Cube.js
 
 ```bash
+$ cubejs create <project name> -d <database type>
+```
+
+specifying the project name and your database using `-d` flag. Available options: 
+
+* `postgres`
+* `mysql` 
+* `athena`
+
+For example,
+
+```bash
 $ cubejs create hello-world -d postgres
 ```
-Specify your database using `-d` flag. Available options: `postgres`, `mysql`. Edit `.env` file in the generated project with your database credentials.
+
+Once run, the `create` command will create a new project directory that contains the scaffolding for your new Cube.js project. This includes all the files necessary to spin up the Cube.js backend, example frontend code for displaying the results of Cube.js queries in a React app, and some example schema files to highlight the format of the Cube.js Data Schema layer.
+
+The `.env` file in this project directory contains placeholders for the relevant database credentials. For MySQL and PostgreSQL, you'll need to fill in the target host, database name, user and password. For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
 
 ### 3. Define Your Data Schema
-Cube.js uses Data Schema to generate and execute SQL.
-It acts as an ORM for your analytics and it is flixible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://statsbot.co/docs/getting-started-cubejs).
 
-Generate schema files from your database tables:
-```
+Cube.js uses Data Schema to generate and execute SQL.
+
+It acts as an ORM for your database and it is flexible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://statsbot.co/docs/getting-started-cubejs).
+
+You can generate schema files from your database tables using the `cubejs` CLI, or write them manually:
+
+#### Generating Data Schema files for MySQL, Postgres
+
+Since you've defined the target database in the `CUBEJS_DB_NAME` environment variable, in the `.env` file above, you can simply specify a comma-separated list of tables for which you want to generate Data Schema files as the argument for the `-t` option:
+
+```bash
 $ cubejs generate -t orders,customers
 ```
 
-Or put schema files into `schema` folder manually:
+#### Generating Data Schema files for Athena
 
+Generating Data Schema files for Athena requires you to pass the target database and table in the format `db.table`. For example:
+
+```bash
+$ cubejs generate -t my_db.orders
+```
+
+#### Manually creating Data Schema files
+
+You can also add schema files to the `schema` folder manually:
 
 ```javascript
 // schema/users.js
@@ -98,7 +130,14 @@ cube(`Users`, {
 ```
 
 ### 4. Visualize Results
-The Cube.js client connects to Cube.js Backend and lets you visualize your data. This section shows how to use Cube.js Javascript client.
+The Cube.js client connects to the Cube.js Backend and lets you visualize your data. This section shows how to use Cube.js Javascript client.
+
+The Cube.js backend requires a Redis server running on your local machine on the default port of `6379`. This default location can be changed by setting the `REDIS_URL` environment variable to your Redis server. Please make sure your Redis server is up before proceeding:
+
+```bash
+$ redis-cli ping
+PONG
+```
 
 As a shortcut you can run your dev server first:
 
@@ -106,7 +145,7 @@ As a shortcut you can run your dev server first:
 $ npm run dev
 ```
 
-Then open `http://localhost:4000` to see visualization examples.
+Then open `http://localhost:4000` to see visualization examples. This will open a [codesandbox.io](https://codesandbox.io) sample React app you can edit. You can change the metrics and dimensions of the example to use the schema you defined above, change the chart types, and more!
 
 #### Cube.js Client Installation
 
@@ -199,7 +238,7 @@ export default () => {
 - [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
 
 ## Architecture
-__Cube.js acts as an analytics backend__, taking care of translating business  logic into SQL and handling database connection. 
+__Cube.js acts as an analytics backend__, translating business logic (metrics and dimensions) into SQL and handling database connection. 
 
 The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The Server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is visualization agnostic and works well with any chart library.
 
@@ -352,8 +391,7 @@ Query has following properties:
 }
 ```
 
-
-### License
+## License
 
 Cube.js Client is [MIT licensed](./packages/cubejs-client-core/LICENSE).
 
