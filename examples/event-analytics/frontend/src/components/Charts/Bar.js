@@ -15,13 +15,14 @@ import {
   COLORS,
   extractSeries,
   humanName,
+  resolveFormat
 } from './helpers.js';
 import ResponsiveContainer from './ResponsiveContainer.js';
 
 export default ({ resultSet }) => {
   return (
   <ResponsiveContainer>
-    <BarChart data={format("x", resultSet.chartPivot(), 'time')}>
+    <BarChart data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
       <CartesianGrid strokeDasharray="3 3"/>
       <XAxis dataKey="x" minTickGap={20}/>
       <YAxis/>

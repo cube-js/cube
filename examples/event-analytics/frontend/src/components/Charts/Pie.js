@@ -21,16 +21,24 @@ const piePivot = (resultSet) => {
       fillMissingDates: false
     })
   } else {
-    debugger
-    return resultSet.chartPivot()
+    return resultSet.chartPivot({ x: ['measures'], y: [] })
   }
 }
 
 const findFormat = (resultSet, dimension) => {
+  debugger
   if (anyDimensions(resultSet)) {
     return resultSet.loadResponse.annotation.dimensions[dimension].type
   }
   return undefined
+}
+
+const dataKey = (resultSet) => {
+  if (anyDimensions(resultSet)) {
+    return Object.keys(resultSet.loadResponse.annotation.measures)[0]
+  }
+
+  return ""
 }
 
 export default ({ resultSet }) => {
@@ -41,7 +49,7 @@ export default ({ resultSet }) => {
         isAnimationActive={false}
         data={format("x", piePivot(resultSet), findFormat(resultSet, dimensionOnX(resultSet)))}
         nameKey="x"
-        dataKey={Object.keys(resultSet.loadResponse.annotation.measures)[0]}
+        dataKey={dataKey(resultSet)}
         fill="#8884d8"
       >
       {
