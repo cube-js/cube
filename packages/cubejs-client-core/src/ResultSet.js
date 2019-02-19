@@ -99,7 +99,9 @@ export default class ResultSet {
     if (!dateRange) {
       return null;
     }
-    const range = moment.range(dateRange[0], dateRange[1]);
+    const start = moment(dateRange[0]).format('YYYY-MM-DD 00:00:00');
+    const end = moment(dateRange[1]).format('YYYY-MM-DD 23:59:59');
+    const range = moment.range(start, end);
     if (!TIME_SERIES[timeDimension.granularity]) {
       throw new Error(`Unsupported time granularity: ${timeDimension.granularity}`);
     }
