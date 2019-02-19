@@ -870,10 +870,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.2.2":
-  version "0.2.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.2.2.tgz#e0c9eee55112d8c93b8670b40121064286ddff84"
-  integrity sha512-WjwTYpxKiGSuUwDBfwOQxyzXAGF+Rg7Q9mdULGrUf+VRBtVHeu13mDCM5+grDfKYZVPsuN77D38a7ALos/IO9g==
+"@cubejs-client/core@^0.2.5":
+  version "0.2.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.2.5.tgz#0d8d78ff18afeec3d7c15190b458f3f97cfa9966"
+  integrity sha512-A6VyPKzpspguBl0k6IITv2f2D3l0oTeMon85idqL2Pstfv765ah3il+3A63+ZqKo9EQHsXjzWfqcZzn7SuwyJQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -882,10 +882,10 @@
     ramda "^0.25.0"
     whatwg-fetch "^3.0.0"
 
-"@cubejs-client/react@^0.1.4":
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.1.4.tgz#250d5b3fc4dcacab79815e5668be4412c8901316"
-  integrity sha512-NinKWUVlw2h1KlEZT+skEJJ5LEYgYqUmlpjjTs1q7i6Fcx8Te/TWHLUv9iNPq/vDvEPVY3k6QRvkfN4vFYUrSA==
+"@cubejs-client/react@^0.1.5":
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.1.5.tgz#d7bce92c7d9ffeb5f378959dde7f72031af83b24"
+  integrity sha512-AmdcM6ea4dQTfXEQVLoXLy7BXipI12q4m0tBhCSLvUU02LpTIASo2gcPoy6RgUDloGZB9lrbE1atoo1j/IdC1g==
   dependencies:
     "@babel/runtime" "^7.1.2"
     prop-types "^15.6.2"
