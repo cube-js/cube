@@ -384,55 +384,102 @@
 	  return hasOwnProperty.call(it, key);
 	};
 
-	var isRegExp = require('./_is-regexp');
+	var hide$1 = require('./_hide');
 
-	var anObject$2 = require('./_an-object');
-
-	var speciesConstructor = require('./_species-constructor');
-
-	var advanceStringIndex = require('./_advance-string-index');
-
-	var toLength = require('./_to-length');
-
-	var callRegExpExec = require('./_regexp-exec-abstract');
-
-	var regexpExec = require('./_regexp-exec');
+	var redefine$1 = require('./_redefine');
 
 	var fails = require('./_fails');
 
-	var $min = Math.min;
-	var $push = [].push;
-	var $SPLIT = 'split';
-	var LENGTH = 'length';
-	var LAST_INDEX = 'lastIndex';
-	var MAX_UINT32 = 0xffffffff; // babel-minify transpiles RegExp('x', 'y') -> /x/y and it causes SyntaxError
+	var defined = require('./_defined');
 
-	var SUPPORTS_Y = !fails(function () {
-	}); // @@split logic
+	var wks = require('./_wks');
 
-	require('./_fix-re-wks')('split', 2, function (defined, SPLIT, $split, maybeCallNative) {
-	  var internalSplit;
+	module.exports = function (KEY, length, exec) {
+	  var SYMBOL = wks(KEY);
+	  var fns = exec(defined, SYMBOL, ''[KEY]);
+	  var strfn = fns[0];
+	  var rxfn = fns[1];
+
+	  if (fails(function () {
+	    var O = {};
+
+	    O[SYMBOL] = function () {
+	      return 7;
+	    };
+
+	    return ''[KEY](O) != 7;
+	  })) {
+	    redefine$1(String.prototype, KEY, strfn);
+	    hide$1(RegExp.prototype, SYMBOL, length == 2 // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
+	    // 21.2.5.11 RegExp.prototype[@@split](string, limit)
+	    ? function (string, arg) {
+	      return rxfn.call(string, this, arg);
+	    } // 21.2.5.6 RegExp.prototype[@@match](string)
+	    // 21.2.5.9 RegExp.prototype[@@search](string)
+	    : function (string) {
+	      return rxfn.call(string, this);
+	    });
+	  }
+	};
+
+	var _fixReWks = /*#__PURE__*/Object.freeze({
+
+	});
+
+	// @@replace logic
+	_fixReWks('replace', 2, function (defined, REPLACE, $replace) {
+	  // 21.1.3.14 String.prototype.replace(searchValue, replaceValue)
+	  return [function replace(searchValue, replaceValue) {
+
+	    var O = defined(this);
+	    var fn = searchValue == undefined ? undefined : searchValue[REPLACE];
+	    return fn !== undefined ? fn.call(searchValue, O, replaceValue) : $replace.call(String(O), searchValue, replaceValue);
+	  }, $replace];
+	});
+
+	// @@split logic
+	require('./_fix-re-wks')('split', 2, function (defined, SPLIT, $split) {
+
+	  var isRegExp = require('./_is-regexp');
+
+	  var _split = $split;
+	  var $push = [].push;
+	  var $SPLIT = 'split';
+	  var LENGTH = 'length';
+	  var LAST_INDEX = 'lastIndex';
 
 	  if ('abbc'[$SPLIT](/(b)*/)[1] == 'c' || 'test'[$SPLIT](/(?:)/, -1)[LENGTH] != 4 || 'ab'[$SPLIT](/(?:ab)*/)[LENGTH] != 2 || '.'[$SPLIT](/(.?)(.?)/)[LENGTH] != 4 || '.'[$SPLIT](/()()/)[LENGTH] > 1 || ''[$SPLIT](/.?/)[LENGTH]) {
+	    var NPCG = /()??/.exec('')[1] === undefined; // nonparticipating capturing group
 	    // based on es5-shim implementation, need to rework it
-	    internalSplit = function internalSplit(separator, limit) {
+
+	    $split = function $split(separator, limit) {
 	      var string = String(this);
 	      if (separator === undefined && limit === 0) return []; // If `separator` is not a regex, use native split
 
-	      if (!isRegExp(separator)) return $split.call(string, separator, limit);
+	      if (!isRegExp(separator)) return _split.call(string, separator, limit);
 	      var output = [];
 	      var flags = (separator.ignoreCase ? 'i' : '') + (separator.multiline ? 'm' : '') + (separator.unicode ? 'u' : '') + (separator.sticky ? 'y' : '');
 	      var lastLastIndex = 0;
-	      var splitLimit = limit === undefined ? MAX_UINT32 : limit >>> 0; // Make `global` and avoid `lastIndex` issues by working with a copy
+	      var splitLimit = limit === undefined ? 4294967295 : limit >>> 0; // Make `global` and avoid `lastIndex` issues by working with a copy
 
 	      var separatorCopy = new RegExp(separator.source, flags + 'g');
-	      var match, lastIndex, lastLength;
+	      var separator2, match, lastIndex, lastLength, i; // Doesn't need flags gy, but they don't hurt
 
-	      while (match = regexpExec.call(separatorCopy, string)) {
-	        lastIndex = separatorCopy[LAST_INDEX];
+	      if (!NPCG) separator2 = new RegExp('^' + separatorCopy.source + '$(?!\\s)', flags);
+
+	      while (match = separatorCopy.exec(string)) {
+	        // `separatorCopy.lastIndex` is not reliable cross-browser
+	        lastIndex = match.index + match[0][LENGTH];
 
 	        if (lastIndex > lastLastIndex) {
-	          output.push(string.slice(lastLastIndex, match.index));
+	          output.push(string.slice(lastLastIndex, match.index)); // Fix browsers whose `exec` methods don't consistently return `undefined` for NPCG
+	          // eslint-disable-next-line no-loop-func
+
+	          if (!NPCG && match[LENGTH] > 1) match[0].replace(separator2, function () {
+	            for (i = 1; i < arguments[LENGTH] - 2; i++) {
+	              if (arguments[i] === undefined) match[i] = undefined;
+	            }
+	          });
 	          if (match[LENGTH] > 1 && match.index < string[LENGTH]) $push.apply(output, match.slice(1));
 	          lastLength = match[0][LENGTH];
 	          lastLastIndex = lastIndex;
@@ -450,65 +497,17 @@
 	    }; // Chakra, V8
 
 	  } else if ('0'[$SPLIT](undefined, 0)[LENGTH]) {
-	    internalSplit = function internalSplit(separator, limit) {
-	      return separator === undefined && limit === 0 ? [] : $split.call(this, separator, limit);
+	    $split = function $split(separator, limit) {
+	      return separator === undefined && limit === 0 ? [] : _split.call(this, separator, limit);
 	    };
-	  } else {
-	    internalSplit = $split;
-	  }
+	  } // 21.1.3.17 String.prototype.split(separator, limit)
 
-	  return [// `String.prototype.split` method
-	  // https://tc39.github.io/ecma262/#sec-string.prototype.split
-	  function split(separator, limit) {
+
+	  return [function split(separator, limit) {
 	    var O = defined(this);
-	    var splitter = separator == undefined ? undefined : separator[SPLIT];
-	    return splitter !== undefined ? splitter.call(separator, O, limit) : internalSplit.call(String(O), separator, limit);
-	  }, // `RegExp.prototype[@@split]` method
-	  // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@split
-	  //
-	  // NOTE: This cannot be properly polyfilled in engines that don't support
-	  // the 'y' flag.
-	  function (regexp, limit) {
-	    var res = maybeCallNative(internalSplit, regexp, this, limit, internalSplit !== $split);
-	    if (res.done) return res.value;
-	    var rx = anObject$2(regexp);
-	    var S = String(this);
-	    var C = speciesConstructor(rx, RegExp);
-	    var unicodeMatching = rx.unicode;
-	    var flags = (rx.ignoreCase ? 'i' : '') + (rx.multiline ? 'm' : '') + (rx.unicode ? 'u' : '') + (SUPPORTS_Y ? 'y' : 'g'); // ^(? + rx + ) is needed, in combination with some S slicing, to
-	    // simulate the 'y' flag.
-
-	    var splitter = new C(SUPPORTS_Y ? rx : '^(?:' + rx.source + ')', flags);
-	    var lim = limit === undefined ? MAX_UINT32 : limit >>> 0;
-	    if (lim === 0) return [];
-	    if (S.length === 0) return callRegExpExec(splitter, S) === null ? [S] : [];
-	    var p = 0;
-	    var q = 0;
-	    var A = [];
-
-	    while (q < S.length) {
-	      splitter.lastIndex = SUPPORTS_Y ? q : 0;
-	      var z = callRegExpExec(splitter, SUPPORTS_Y ? S : S.slice(q));
-	      var e;
-
-	      if (z === null || (e = $min(toLength(splitter.lastIndex + (SUPPORTS_Y ? 0 : q)), S.length)) === p) {
-	        q = advanceStringIndex(S, q, unicodeMatching);
-	      } else {
-	        A.push(S.slice(p, q));
-	        if (A.length === lim) return A;
-
-	        for (var i = 1; i <= z.length - 1; i++) {
-	          A.push(z[i]);
-	          if (A.length === lim) return A;
-	        }
-
-	        q = p = e;
-	      }
-	    }
-
-	    A.push(S.slice(p));
-	    return A;
-	  }];
+	    var fn = separator == undefined ? undefined : separator[SPLIT];
+	    return fn !== undefined ? fn.call(separator, O, limit) : $split.call(String(O), separator, limit);
+	  }, $split];
 	});
 
 	// fallback for non-array-like ES3 and non-enumerable old V8 strings
@@ -594,7 +593,7 @@
 
 	var _core = createCommonjsModule(function (module) {
 	var core = module.exports = {
-	  version: '2.6.4'
+	  version: '2.5.7'
 	};
 	if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
 	});
@@ -610,7 +609,7 @@
 	})('versions', []).push({
 	  version: _core.version,
 	  mode: 'global',
-	  copyright: '© 2019 Denis Pushkarev (zloirock.ru)'
+	  copyright: '© 2018 Denis Pushkarev (zloirock.ru)'
 	});
 	});
 
@@ -636,7 +635,7 @@
 
 	require('./es6.regexp.flags');
 
-	var anObject$3 = require('./_an-object');
+	var anObject$2 = require('./_an-object');
 
 	var $flags = require('./_flags');
 
@@ -657,7 +656,7 @@
 	  }) != '/a/b';
 	})) {
 	  define$1(function toString() {
-	    var R = anObject$3(this);
+	    var R = anObject$2(this);
 	    return '/'.concat(R.source, '/', 'flags' in R ? R.flags : !DESCRIPTORS$1 && R instanceof RegExp ? $flags.call(R) : undefined);
 	  }); // FF44- RegExp#toString has a wrong name
 	} else if ($toString$1.name != TO_STRING$1) {
@@ -777,15 +776,14 @@
 
 	var global$2 = require('./_global');
 
-	var hide$1 = require('./_hide');
+	var hide$2 = require('./_hide');
 
 	var has = require('./_has');
 
 	var SRC = require('./_uid')('src');
 
-	var $toString$2 = require('./_function-to-string');
-
 	var TO_STRING$2 = 'toString';
+	var $toString$2 = Function[TO_STRING$2];
 	var TPL = ('' + $toString$2).split(TO_STRING$2);
 
 	require('./_core').inspectSource = function (it) {
@@ -794,26 +792,26 @@
 
 	(module.exports = function (O, key, val, safe) {
 	  var isFunction = typeof val == 'function';
-	  if (isFunction) has(val, 'name') || hide$1(val, 'name', key);
+	  if (isFunction) has(val, 'name') || hide$2(val, 'name', key);
 	  if (O[key] === val) return;
-	  if (isFunction) has(val, SRC) || hide$1(val, SRC, O[key] ? '' + O[key] : TPL.join(String(key)));
+	  if (isFunction) has(val, SRC) || hide$2(val, SRC, O[key] ? '' + O[key] : TPL.join(String(key)));
 
 	  if (O === global$2) {
 	    O[key] = val;
 	  } else if (!safe) {
 	    delete O[key];
-	    hide$1(O, key, val);
+	    hide$2(O, key, val);
 	  } else if (O[key]) {
 	    O[key] = val;
 	  } else {
-	    hide$1(O, key, val);
+	    hide$2(O, key, val);
 	  } // add fake Function#toString for correct work wrapped methods / constructors with methods like LoDash isNative
 
 	})(Function.prototype, TO_STRING$2, function toString() {
 	  return typeof this == 'function' && this[SRC] || $toString$2.call(this);
 	});
 
-	var redefine$1 = /*#__PURE__*/Object.freeze({
+	var redefine$2 = /*#__PURE__*/Object.freeze({
 
 	});
 
@@ -876,50 +874,20 @@
 	  proto.constructor = $RegExp;
 	  $RegExp.prototype = proto;
 
-	  redefine$1(_global, 'RegExp', $RegExp);
+	  redefine$2(_global, 'RegExp', $RegExp);
 	}
 
 	_setSpecies('RegExp');
 
-	var anObject$4 = require('./_an-object');
+	// @@match logic
+	require('./_fix-re-wks')('match', 1, function (defined, MATCH, $match) {
+	  // 21.1.3.11 String.prototype.match(regexp)
+	  return [function match(regexp) {
 
-	var toLength$1 = require('./_to-length');
-
-	var advanceStringIndex$1 = require('./_advance-string-index');
-
-	var regExpExec = require('./_regexp-exec-abstract'); // @@match logic
-
-
-	require('./_fix-re-wks')('match', 1, function (defined, MATCH, $match, maybeCallNative) {
-	  return [// `String.prototype.match` method
-	  // https://tc39.github.io/ecma262/#sec-string.prototype.match
-	  function match(regexp) {
 	    var O = defined(this);
 	    var fn = regexp == undefined ? undefined : regexp[MATCH];
 	    return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[MATCH](String(O));
-	  }, // `RegExp.prototype[@@match]` method
-	  // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@match
-	  function (regexp) {
-	    var res = maybeCallNative($match, regexp, this);
-	    if (res.done) return res.value;
-	    var rx = anObject$4(regexp);
-	    var S = String(this);
-	    if (!rx.global) return regExpExec(rx, S);
-	    var fullUnicode = rx.unicode;
-	    rx.lastIndex = 0;
-	    var A = [];
-	    var n = 0;
-	    var result;
-
-	    while ((result = regExpExec(rx, S)) !== null) {
-	      var matchStr = String(result[0]);
-	      A[n] = matchStr;
-	      if (matchStr === '') rx.lastIndex = advanceStringIndex$1(S, toLength$1(rx.lastIndex), fullUnicode);
-	      n++;
-	    }
-
-	    return n === 0 ? null : A;
-	  }];
+	  }, $match];
 	});
 
 	var dP$2 = require('./_object-dp').f;
@@ -992,9 +960,9 @@
 
 	var $export$2 = require('./_export');
 
-	var redefine$2 = require('./_redefine');
+	var redefine$3 = require('./_redefine');
 
-	var hide$2 = require('./_hide');
+	var hide$3 = require('./_hide');
 
 	var Iterators = require('./_iterators');
 
@@ -1056,7 +1024,7 @@
 	      // Set @@toStringTag to native iterators
 	      setToStringTag(IteratorPrototype, TAG, true); // fix for some old engines
 
-	      if (!LIBRARY && typeof IteratorPrototype[ITERATOR] != 'function') hide$2(IteratorPrototype, ITERATOR, returnThis);
+	      if (!LIBRARY && typeof IteratorPrototype[ITERATOR] != 'function') hide$3(IteratorPrototype, ITERATOR, returnThis);
 	    }
 	  } // fix Array#{values, @@iterator}.name in V8 / FF
 
@@ -1071,7 +1039,7 @@
 
 
 	  if ((!LIBRARY || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR])) {
-	    hide$2(proto, ITERATOR, $default);
+	    hide$3(proto, ITERATOR, $default);
 	  } // Plug for library
 
 
@@ -1085,7 +1053,7 @@
 	      entries: $entries
 	    };
 	    if (FORCED) for (key in methods) {
-	      if (!(key in proto)) redefine$2(proto, key, methods[key]);
+	      if (!(key in proto)) redefine$3(proto, key, methods[key]);
 	    } else $export$2($export$2.P + $export$2.F * (BUGGY || VALUES_BUG), NAME, methods);
 	  }
 
@@ -1224,7 +1192,7 @@
 	    if (!proto$1[TO_STRING_TAG]) _hide(proto$1, TO_STRING_TAG, NAME$1);
 	    _iterators[NAME$1] = ArrayValues;
 	    if (explicit) for (key in es6_array_iterator) {
-	      if (!proto$1[key]) redefine$1(proto$1, key, es6_array_iterator[key], true);
+	      if (!proto$1[key]) redefine$2(proto$1, key, es6_array_iterator[key], true);
 	    }
 	  }
 	}
@@ -1263,7 +1231,7 @@
 
 	var forOf = require('./_for-of');
 
-	var speciesConstructor$1 = require('./_species-constructor');
+	var speciesConstructor = require('./_species-constructor');
 
 	var task = require('./_task').set;
 
@@ -1501,7 +1469,7 @@
 	  Internal.prototype = require('./_redefine-all')($Promise.prototype, {
 	    // 25.4.5.3 Promise.prototype.then(onFulfilled, onRejected)
 	    then: function then(onFulfilled, onRejected) {
-	      var reaction = newPromiseCapability(speciesConstructor$1(this, $Promise));
+	      var reaction = newPromiseCapability(speciesConstructor(this, $Promise));
 	      reaction.ok = typeof onFulfilled == 'function' ? onFulfilled : true;
 	      reaction.fail = typeof onRejected == 'function' && onRejected;
 	      reaction.domain = isNode ? process.domain : undefined;
@@ -1616,7 +1584,7 @@
 	});
 
 	// 19.1.2.2 / 15.2.3.5 Object.create(O [, Properties])
-	var anObject$5 = require('./_an-object');
+	var anObject$3 = require('./_an-object');
 
 	var dPs = require('./_object-dps');
 
@@ -1663,7 +1631,7 @@
 	  var result;
 
 	  if (O !== null) {
-	    Empty[PROTOTYPE$1] = anObject$5(O);
+	    Empty[PROTOTYPE$1] = anObject$3(O);
 	    result = new Empty();
 	    Empty[PROTOTYPE$1] = null; // add "__proto__" for Object.getPrototypeOf polyfill
 
@@ -1709,7 +1677,7 @@
 
 	var $export$6 = require('./_export');
 
-	var redefine$3 = require('./_redefine');
+	var redefine$4 = require('./_redefine');
 
 	var META = require('./_meta').KEY;
 
@@ -1721,7 +1689,7 @@
 
 	var uid$1 = require('./_uid');
 
-	var wks = require('./_wks');
+	var wks$1 = require('./_wks');
 
 	var wksExt = require('./_wks-ext');
 
@@ -1731,7 +1699,7 @@
 
 	var isArray = require('./_is-array');
 
-	var anObject$6 = require('./_an-object');
+	var anObject$4 = require('./_an-object');
 
 	var isObject$3 = require('./_is-object');
 
@@ -1760,8 +1728,8 @@
 	var _stringify = $JSON && $JSON.stringify;
 
 	var PROTOTYPE$2 = 'prototype';
-	var HIDDEN = wks('_hidden');
-	var TO_PRIMITIVE = wks('toPrimitive');
+	var HIDDEN = wks$1('_hidden');
+	var TO_PRIMITIVE = wks$1('toPrimitive');
 	var isEnum = {}.propertyIsEnumerable;
 	var SymbolRegistry = shared$1('symbol-registry');
 	var AllSymbols = shared$1('symbols');
@@ -1802,9 +1770,9 @@
 
 	var $defineProperty = function defineProperty(it, key, D) {
 	  if (it === ObjectProto) $defineProperty(OPSymbols, key, D);
-	  anObject$6(it);
+	  anObject$4(it);
 	  key = toPrimitive$1(key, true);
-	  anObject$6(D);
+	  anObject$4(D);
 
 	  if (has$1(AllSymbols, key)) {
 	    if (!D.enumerable) {
@@ -1824,7 +1792,7 @@
 	};
 
 	var $defineProperties = function defineProperties(it, P) {
-	  anObject$6(it);
+	  anObject$4(it);
 	  var keys = enumKeys(P = toIObject(P));
 	  var i = 0;
 	  var l = keys.length;
@@ -1902,7 +1870,7 @@
 	    return wrap(tag);
 	  };
 
-	  redefine$3($Symbol[PROTOTYPE$2], 'toString', function toString() {
+	  redefine$4($Symbol[PROTOTYPE$2], 'toString', function toString() {
 	    return this._k;
 	  });
 	  $GOPD.f = $getOwnPropertyDescriptor;
@@ -1912,11 +1880,11 @@
 	  require('./_object-gops').f = $getOwnPropertySymbols;
 
 	  if (DESCRIPTORS$2 && !require('./_library')) {
-	    redefine$3(ObjectProto, 'propertyIsEnumerable', $propertyIsEnumerable, true);
+	    redefine$4(ObjectProto, 'propertyIsEnumerable', $propertyIsEnumerable, true);
 	  }
 
 	  wksExt.f = function (name) {
-	    return wrap(wks(name));
+	    return wrap(wks$1(name));
 	  };
 	}
 
@@ -1926,10 +1894,10 @@
 
 	for (var es6Symbols = // 19.4.2.2, 19.4.2.3, 19.4.2.4, 19.4.2.6, 19.4.2.8, 19.4.2.9, 19.4.2.10, 19.4.2.11, 19.4.2.12, 19.4.2.13, 19.4.2.14
 	'hasInstance,isConcatSpreadable,iterator,match,replace,search,species,split,toPrimitive,toStringTag,unscopables'.split(','), j = 0; es6Symbols.length > j;) {
-	  wks(es6Symbols[j++]);
+	  wks$1(es6Symbols[j++]);
 	}
 
-	for (var wellKnownSymbols = $keys$2(wks.store), k = 0; wellKnownSymbols.length > k;) {
+	for (var wellKnownSymbols = $keys$2(wks$1.store), k = 0; wellKnownSymbols.length > k;) {
 	  wksDefine(wellKnownSymbols[k++]);
 	}
 
@@ -2766,319 +2734,11 @@
 	  assign: _objectAssign
 	});
 
-	// true  -> String#at
-	// false -> String#codePointAt
-
-
-	var _stringAt = function (TO_STRING) {
-	  return function (that, pos) {
-	    var s = String(_defined(that));
-	    var i = _toInteger(pos);
-	    var l = s.length;
-	    var a, b;
-	    if (i < 0 || i >= l) return TO_STRING ? '' : undefined;
-	    a = s.charCodeAt(i);
-	    return a < 0xd800 || a > 0xdbff || i + 1 === l || (b = s.charCodeAt(i + 1)) < 0xdc00 || b > 0xdfff ? TO_STRING ? s.charAt(i) : a : TO_STRING ? s.slice(i, i + 2) : (a - 0xd800 << 10) + (b - 0xdc00) + 0x10000;
-	  };
-	};
-
-	var at = _stringAt(true); // `AdvanceStringIndex` abstract operation
-	// https://tc39.github.io/ecma262/#sec-advancestringindex
-
-
-	var _advanceStringIndex = function (S, index, unicode) {
-	  return index + (unicode ? at(S, index).length : 1);
-	};
-
-	var classof$1 = require('./_classof');
-
-	var builtinExec = RegExp.prototype.exec; // `RegExpExec` abstract operation
-	// https://tc39.github.io/ecma262/#sec-regexpexec
-
-	module.exports = function (R, S) {
-	  var exec = R.exec;
-
-	  if (typeof exec === 'function') {
-	    var result = exec.call(R, S);
-
-	    if (_typeof(result) !== 'object') {
-	      throw new TypeError('RegExp exec method returned something other than an Object or null');
-	    }
-
-	    return result;
-	  }
-
-	  if (classof$1(R) !== 'RegExp') {
-	    throw new TypeError('RegExp#exec called on incompatible receiver');
-	  }
-
-	  return builtinExec.call(R, S);
-	};
-
-	var _regexpExecAbstract = /*#__PURE__*/Object.freeze({
-
-	});
-
-	require('./es6.regexp.exec');
-
-	var redefine$4 = require('./_redefine');
-
-	var hide$3 = require('./_hide');
-
-	var fails$1 = require('./_fails');
-
-	var defined = require('./_defined');
-
-	var wks$1 = require('./_wks');
-
-	var regexpExec$1 = require('./_regexp-exec');
-
-	var SPECIES$1 = wks$1('species');
-	var REPLACE_SUPPORTS_NAMED_GROUPS = !fails$1(function () {
-	  // #replace needs built-in support for named groups.
-	  // #match works fine because it just return the exec results, even if it has
-	  // a "grops" property.
-	  var re = /./;
-
-	  re.exec = function () {
-	    var result = [];
-	    result.groups = {
-	      a: '7'
-	    };
-	    return result;
-	  };
-
-	  return ''.replace(re, '$<a>') !== '7';
-	});
-
-	var SPLIT_WORKS_WITH_OVERWRITTEN_EXEC = function () {
-	  // Chrome 51 has a buggy "split" implementation when RegExp#exec !== nativeExec
-	  var re = /(?:)/;
-	  var originalExec = re.exec;
-
-	  re.exec = function () {
-	    return originalExec.apply(this, arguments);
-	  };
-
-	  var result = 'ab'.split(re);
-	  return result.length === 2 && result[0] === 'a' && result[1] === 'b';
-	}();
-
-	module.exports = function (KEY, length, exec) {
-	  var SYMBOL = wks$1(KEY);
-	  var DELEGATES_TO_SYMBOL = !fails$1(function () {
-	    // String methods call symbol-named RegEp methods
-	    var O = {};
-
-	    O[SYMBOL] = function () {
-	      return 7;
-	    };
-
-	    return ''[KEY](O) != 7;
-	  });
-	  var DELEGATES_TO_EXEC = DELEGATES_TO_SYMBOL ? !fails$1(function () {
-	    // Symbol-named RegExp methods call .exec
-	    var execCalled = false;
-	    var re = /a/;
-
-	    re.exec = function () {
-	      execCalled = true;
-	      return null;
-	    };
-
-	    if (KEY === 'split') {
-	      // RegExp[@@split] doesn't call the regex's exec method, but first creates
-	      // a new one. We need to return the patched regex when creating the new one.
-	      re.constructor = {};
-
-	      re.constructor[SPECIES$1] = function () {
-	        return re;
-	      };
-	    }
-
-	    re[SYMBOL]('');
-	    return !execCalled;
-	  }) : undefined;
-
-	  if (!DELEGATES_TO_SYMBOL || !DELEGATES_TO_EXEC || KEY === 'replace' && !REPLACE_SUPPORTS_NAMED_GROUPS || KEY === 'split' && !SPLIT_WORKS_WITH_OVERWRITTEN_EXEC) {
-	    var nativeRegExpMethod = /./[SYMBOL];
-	    var fns = exec(defined, SYMBOL, ''[KEY], function maybeCallNative(nativeMethod, regexp, str, arg2, forceStringMethod) {
-	      if (regexp.exec === regexpExec$1) {
-	        if (DELEGATES_TO_SYMBOL && !forceStringMethod) {
-	          // The native String method already delegates to @@method (this
-	          // polyfilled function), leasing to infinite recursion.
-	          // We avoid it by directly calling the native @@method method.
-	          return {
-	            done: true,
-	            value: nativeRegExpMethod.call(regexp, str, arg2)
-	          };
-	        }
-
-	        return {
-	          done: true,
-	          value: nativeMethod.call(str, regexp, arg2)
-	        };
-	      }
-
-	      return {
-	        done: false
-	      };
-	    });
-	    var strfn = fns[0];
-	    var rxfn = fns[1];
-	    redefine$4(String.prototype, KEY, strfn);
-	    hide$3(RegExp.prototype, SYMBOL, length == 2 // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
-	    // 21.2.5.11 RegExp.prototype[@@split](string, limit)
-	    ? function (string, arg) {
-	      return rxfn.call(string, this, arg);
-	    } // 21.2.5.6 RegExp.prototype[@@match](string)
-	    // 21.2.5.9 RegExp.prototype[@@search](string)
-	    : function (string) {
-	      return rxfn.call(string, this);
-	    });
-	  }
-	};
-
-	var _fixReWks = /*#__PURE__*/Object.freeze({
-
-	});
-
-	var max$1 = Math.max;
-	var min$2 = Math.min;
-	var floor$1 = Math.floor;
-	var SUBSTITUTION_SYMBOLS = /\$([$&`']|\d\d?|<[^>]*>)/g;
-	var SUBSTITUTION_SYMBOLS_NO_NAMED = /\$([$&`']|\d\d?)/g;
-
-	var maybeToString = function maybeToString(it) {
-	  return it === undefined ? it : String(it);
-	}; // @@replace logic
-
-
-	_fixReWks('replace', 2, function (defined, REPLACE, $replace, maybeCallNative) {
-	  return [// `String.prototype.replace` method
-	  // https://tc39.github.io/ecma262/#sec-string.prototype.replace
-	  function replace(searchValue, replaceValue) {
-	    var O = defined(this);
-	    var fn = searchValue == undefined ? undefined : searchValue[REPLACE];
-	    return fn !== undefined ? fn.call(searchValue, O, replaceValue) : $replace.call(String(O), searchValue, replaceValue);
-	  }, // `RegExp.prototype[@@replace]` method
-	  // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@replace
-	  function (regexp, replaceValue) {
-	    var res = maybeCallNative($replace, regexp, this, replaceValue);
-	    if (res.done) return res.value;
-	    var rx = _anObject(regexp);
-	    var S = String(this);
-	    var functionalReplace = typeof replaceValue === 'function';
-	    if (!functionalReplace) replaceValue = String(replaceValue);
-	    var global = rx.global;
-
-	    if (global) {
-	      var fullUnicode = rx.unicode;
-	      rx.lastIndex = 0;
-	    }
-
-	    var results = [];
-
-	    while (true) {
-	      var result = _regexpExecAbstract(rx, S);
-	      if (result === null) break;
-	      results.push(result);
-	      if (!global) break;
-	      var matchStr = String(result[0]);
-	      if (matchStr === '') rx.lastIndex = _advanceStringIndex(S, _toLength(rx.lastIndex), fullUnicode);
-	    }
-
-	    var accumulatedResult = '';
-	    var nextSourcePosition = 0;
-
-	    for (var i = 0; i < results.length; i++) {
-	      result = results[i];
-	      var matched = String(result[0]);
-	      var position = max$1(min$2(_toInteger(result.index), S.length), 0);
-	      var captures = []; // NOTE: This is equivalent to
-	      //   captures = result.slice(1).map(maybeToString)
-	      // but for some reason `nativeSlice.call(result, 1, result.length)` (called in
-	      // the slice polyfill when slicing native arrays) "doesn't work" in safari 9 and
-	      // causes a crash (https://pastebin.com/N21QzeQA) when trying to debug it.
-
-	      for (var j = 1; j < result.length; j++) {
-	        captures.push(maybeToString(result[j]));
-	      }
-
-	      var namedCaptures = result.groups;
-
-	      if (functionalReplace) {
-	        var replacerArgs = [matched].concat(captures, position, S);
-	        if (namedCaptures !== undefined) replacerArgs.push(namedCaptures);
-	        var replacement = String(replaceValue.apply(undefined, replacerArgs));
-	      } else {
-	        replacement = getSubstitution(matched, S, position, captures, namedCaptures, replaceValue);
-	      }
-
-	      if (position >= nextSourcePosition) {
-	        accumulatedResult += S.slice(nextSourcePosition, position) + replacement;
-	        nextSourcePosition = position + matched.length;
-	      }
-	    }
-
-	    return accumulatedResult + S.slice(nextSourcePosition);
-	  }]; // https://tc39.github.io/ecma262/#sec-getsubstitution
-
-	  function getSubstitution(matched, str, position, captures, namedCaptures, replacement) {
-	    var tailPos = position + matched.length;
-	    var m = captures.length;
-	    var symbols = SUBSTITUTION_SYMBOLS_NO_NAMED;
-
-	    if (namedCaptures !== undefined) {
-	      namedCaptures = _toObject(namedCaptures);
-	      symbols = SUBSTITUTION_SYMBOLS;
-	    }
-
-	    return $replace.call(replacement, symbols, function (match, ch) {
-	      var capture;
-
-	      switch (ch.charAt(0)) {
-	        case '$':
-	          return '$';
-
-	        case '&':
-	          return matched;
-
-	        case '`':
-	          return str.slice(0, position);
-
-	        case "'":
-	          return str.slice(tailPos);
-
-	        case '<':
-	          capture = namedCaptures[ch.slice(1, -1)];
-	          break;
-
-	        default:
-	          // \d\d?
-	          var n = +ch;
-	          if (n === 0) return match;
-
-	          if (n > m) {
-	            var f = floor$1(n / 10);
-	            if (f === 0) return match;
-	            if (f <= m) return captures[f - 1] === undefined ? ch.charAt(1) : captures[f - 1] + ch.charAt(1);
-	            return match;
-	          }
-
-	          capture = captures[n - 1];
-	      }
-
-	      return capture === undefined ? '' : capture;
-	    });
-	  }
-	});
-
 	var $export$7 = require('./_export');
 
 	var defined$1 = require('./_defined');
 
-	var fails$2 = require('./_fails');
+	var fails$1 = require('./_fails');
 
 	var spaces = require('./_string-ws');
 
@@ -3089,7 +2749,7 @@
 
 	var exporter = function exporter(KEY, exec, ALIAS) {
 	  var exp = {};
-	  var FORCE = fails$2(function () {
+	  var FORCE = fails$1(function () {
 	    return !!spaces[KEY]() || non[KEY]() != non;
 	  });
 	  var fn = exp[KEY] = FORCE ? exec(trim) : spaces[KEY];
@@ -3131,14 +2791,14 @@
 
 	var toObject$1 = require('./_to-object');
 
-	var fails$3 = require('./_fails');
+	var fails$2 = require('./_fails');
 
 	var $sort = [].sort;
 	var test = [1, 2, 3];
-	$export$8($export$8.P + $export$8.F * (fails$3(function () {
+	$export$8($export$8.P + $export$8.F * (fails$2(function () {
 	  // IE8-
 	  test.sort(undefined);
-	}) || !fails$3(function () {
+	}) || !fails$2(function () {
 	  // V8 bug
 	  test.sort(null); // Old WebKit
 	}) || !require('./_strict-method')($sort)), 'Array', {
@@ -3180,7 +2840,7 @@
 
 	var toInteger = require('./_to-integer');
 
-	var toLength$2 = require('./_to-length');
+	var toLength = require('./_to-length');
 
 	var $native$1 = [].lastIndexOf;
 	var NEGATIVE_ZERO$1 = !!$native$1 && 1 / [1].lastIndexOf(1, -0) < 0;
@@ -3192,7 +2852,7 @@
 	    // convert -0 to +0
 	    if (NEGATIVE_ZERO$1) return $native$1.apply(this, arguments) || 0;
 	    var O = toIObject$1(this);
-	    var length = toLength$2(O.length);
+	    var length = toLength(O.length);
 	    var index = length - 1;
 	    if (arguments.length > 1) index = Math.min(index, toInteger(arguments[1]));
 	    if (index < 0) index = length + index;
@@ -3210,7 +2870,7 @@
 
 	  var global$5 = require('./_global');
 
-	  var fails$4 = require('./_fails');
+	  var fails$3 = require('./_fails');
 
 	  var $export$c = require('./_export');
 
@@ -3230,7 +2890,7 @@
 
 	  var toInteger$1 = require('./_to-integer');
 
-	  var toLength$3 = require('./_to-length');
+	  var toLength$1 = require('./_to-length');
 
 	  var toIndex = require('./_to-index');
 
@@ -3240,7 +2900,7 @@
 
 	  var has$2 = require('./_has');
 
-	  var classof$2 = require('./_classof');
+	  var classof$1 = require('./_classof');
 
 	  var isObject$4 = require('./_is-object');
 
@@ -3264,7 +2924,7 @@
 
 	  var createArrayIncludes = require('./_array-includes');
 
-	  var speciesConstructor$2 = require('./_species-constructor');
+	  var speciesConstructor$1 = require('./_species-constructor');
 
 	  var ArrayIterators = require('./es6.array.iterator');
 
@@ -3322,13 +2982,13 @@
 	  var VIEW = $typed.VIEW;
 	  var WRONG_LENGTH = 'Wrong length!';
 	  var $map = createArrayMethod(1, function (O, length) {
-	    return allocate(speciesConstructor$2(O, O[DEF_CONSTRUCTOR]), length);
+	    return allocate(speciesConstructor$1(O, O[DEF_CONSTRUCTOR]), length);
 	  });
-	  var LITTLE_ENDIAN = fails$4(function () {
+	  var LITTLE_ENDIAN = fails$3(function () {
 	    // eslint-disable-next-line no-undef
 	    return new Uint8Array$1(new Uint16Array([1]).buffer)[0] === 1;
 	  });
-	  var FORCED_SET = !!Uint8Array$1 && !!Uint8Array$1[PROTOTYPE$3].set && fails$4(function () {
+	  var FORCED_SET = !!Uint8Array$1 && !!Uint8Array$1[PROTOTYPE$3].set && fails$3(function () {
 	    new Uint8Array$1(1).set({});
 	  });
 
@@ -3352,7 +3012,7 @@
 	  };
 
 	  var speciesFromList = function speciesFromList(O, list) {
-	    return fromList(speciesConstructor$2(O, O[DEF_CONSTRUCTOR]), list);
+	    return fromList(speciesConstructor$1(O, O[DEF_CONSTRUCTOR]), list);
 	  };
 
 	  var fromList = function fromList(C, list) {
@@ -3395,7 +3055,7 @@
 
 	    if (mapping && aLen > 2) mapfn = ctx$2(mapfn, arguments[2], 2);
 
-	    for (i = 0, length = toLength$3(O.length), result = allocate(this, length); length > i; i++) {
+	    for (i = 0, length = toLength$1(O.length), result = allocate(this, length); length > i; i++) {
 	      result[i] = mapping ? mapfn(O[i], i) : O[i];
 	    }
 
@@ -3417,7 +3077,7 @@
 	  }; // iOS Safari 6.x fails here
 
 
-	  var TO_LOCALE_BUG = !!Uint8Array$1 && fails$4(function () {
+	  var TO_LOCALE_BUG = !!Uint8Array$1 && fails$3(function () {
 	    arrayToLocaleString.call(new Uint8Array$1(1));
 	  });
 
@@ -3526,7 +3186,7 @@
 	      var O = validate(this);
 	      var length = O.length;
 	      var $begin = toAbsoluteIndex(begin, length);
-	      return new (speciesConstructor$2(O, O[DEF_CONSTRUCTOR]))(O.buffer, O.byteOffset + $begin * O.BYTES_PER_ELEMENT, toLength$3((end === undefined ? length : toAbsoluteIndex(end, length)) - $begin));
+	      return new (speciesConstructor$1(O, O[DEF_CONSTRUCTOR]))(O.buffer, O.byteOffset + $begin * O.BYTES_PER_ELEMENT, toLength$1((end === undefined ? length : toAbsoluteIndex(end, length)) - $begin));
 	    }
 	  };
 
@@ -3541,7 +3201,7 @@
 	    var offset = toOffset(arguments[1], 1);
 	    var length = this.length;
 	    var src = toObject$2(arrayLike);
-	    var len = toLength$3(src.length);
+	    var len = toLength$1(src.length);
 	    var index = 0;
 	    if (len + offset > length) throw RangeError$1(WRONG_LENGTH);
 
@@ -3590,7 +3250,7 @@
 	    defineProperty: $setDesc
 	  });
 
-	  if (fails$4(function () {
+	  if (fails$3(function () {
 	    arrayToString.call({});
 	  })) {
 	    arrayToString = arrayToLocaleString = function toString() {
@@ -3666,7 +3326,7 @@
 	          length = toIndex(data);
 	          byteLength = length * BYTES;
 	          buffer = new $ArrayBuffer(byteLength);
-	        } else if (data instanceof $ArrayBuffer || (klass = classof$2(data)) == ARRAY_BUFFER || klass == SHARED_BUFFER) {
+	        } else if (data instanceof $ArrayBuffer || (klass = classof$1(data)) == ARRAY_BUFFER || klass == SHARED_BUFFER) {
 	          buffer = data;
 	          offset = toOffset($offset, BYTES);
 	          var $len = data.byteLength;
@@ -3676,7 +3336,7 @@
 	            byteLength = $len - offset;
 	            if (byteLength < 0) throw RangeError$1(WRONG_LENGTH);
 	          } else {
-	            byteLength = toLength$3($length) * BYTES;
+	            byteLength = toLength$1($length) * BYTES;
 	            if (byteLength + offset > $len) throw RangeError$1(WRONG_LENGTH);
 	          }
 
@@ -3701,9 +3361,9 @@
 	      });
 	      TypedArrayPrototype = TypedArray[PROTOTYPE$3] = create$1($TypedArrayPrototype$);
 	      hide$4(TypedArrayPrototype, 'constructor', TypedArray);
-	    } else if (!fails$4(function () {
+	    } else if (!fails$3(function () {
 	      TypedArray(1);
-	    }) || !fails$4(function () {
+	    }) || !fails$3(function () {
 	      new TypedArray(-1); // eslint-disable-line no-new
 	    }) || !$iterDetect(function (iter) {
 	      new TypedArray(); // eslint-disable-line no-new
@@ -3721,7 +3381,7 @@
 
 	        if (!isObject$4(data)) return new Base(toIndex(data));
 
-	        if (data instanceof $ArrayBuffer || (klass = classof$2(data)) == ARRAY_BUFFER || klass == SHARED_BUFFER) {
+	        if (data instanceof $ArrayBuffer || (klass = classof$1(data)) == ARRAY_BUFFER || klass == SHARED_BUFFER) {
 	          return $length !== undefined ? new Base(data, toOffset($offset, BYTES), $length) : $offset !== undefined ? new Base(data, toOffset($offset, BYTES)) : new Base(data);
 	        }
 
@@ -3756,7 +3416,7 @@
 	    $export$c($export$c.S, NAME, {
 	      BYTES_PER_ELEMENT: BYTES
 	    });
-	    $export$c($export$c.S + $export$c.F * fails$4(function () {
+	    $export$c($export$c.S + $export$c.F * fails$3(function () {
 	      Base.of.call(TypedArray, 1);
 	    }), NAME, {
 	      from: $from,
@@ -3770,14 +3430,14 @@
 	    });
 	    $export$c($export$c.P + $export$c.F * !CORRECT_ITER_NAME, NAME, $iterators);
 	    if (!LIBRARY$2 && TypedArrayPrototype.toString != arrayToString) TypedArrayPrototype.toString = arrayToString;
-	    $export$c($export$c.P + $export$c.F * fails$4(function () {
+	    $export$c($export$c.P + $export$c.F * fails$3(function () {
 	      new TypedArray(1).slice();
 	    }), NAME, {
 	      slice: $slice
 	    });
-	    $export$c($export$c.P + $export$c.F * (fails$4(function () {
+	    $export$c($export$c.P + $export$c.F * (fails$3(function () {
 	      return [1, 2].toLocaleString() != new TypedArray([1, 2]).toLocaleString();
-	    }) || !fails$4(function () {
+	    }) || !fails$3(function () {
 	      TypedArrayPrototype.toLocaleString.call([1, 2]);
 	    })), NAME, {
 	      toLocaleString: $toLocaleString
@@ -3871,13 +3531,13 @@
 
 	var redefineAll$1 = require('./_redefine-all');
 
-	var fails$5 = require('./_fails');
+	var fails$4 = require('./_fails');
 
 	var anInstance$2 = require('./_an-instance');
 
 	var toInteger$2 = require('./_to-integer');
 
-	var toLength$4 = require('./_to-length');
+	var toLength$2 = require('./_to-length');
 
 	var toIndex$1 = require('./_to-index');
 
@@ -3903,7 +3563,7 @@
 	var BaseBuffer = $ArrayBuffer$1;
 	var abs = Math$1.abs;
 	var pow = Math$1.pow;
-	var floor$2 = Math$1.floor;
+	var floor$1 = Math$1.floor;
 	var log = Math$1.log;
 	var LN2 = Math$1.LN2;
 	var BUFFER = 'buffer';
@@ -3929,7 +3589,7 @@
 	    m = value != value ? 1 : 0;
 	    e = eMax;
 	  } else {
-	    e = floor$2(log(value) / LN2);
+	    e = floor$1(log(value) / LN2);
 
 	    if (value * (c = pow(2, -e)) < 1) {
 	      e--;
@@ -4074,7 +3734,7 @@
 	    var bufferLength = buffer[$LENGTH];
 	    var offset = toInteger$2(byteOffset);
 	    if (offset < 0 || offset > bufferLength) throw RangeError$2('Wrong offset!');
-	    byteLength = byteLength === undefined ? bufferLength - offset : toLength$4(byteLength);
+	    byteLength = byteLength === undefined ? bufferLength - offset : toLength$2(byteLength);
 	    if (offset + byteLength > bufferLength) throw RangeError$2(WRONG_LENGTH$1);
 	    this[$BUFFER] = buffer;
 	    this[$OFFSET] = offset;
@@ -4165,11 +3825,11 @@
 	    }
 	  });
 	} else {
-	  if (!fails$5(function () {
+	  if (!fails$4(function () {
 	    $ArrayBuffer$1(1);
-	  }) || !fails$5(function () {
+	  }) || !fails$4(function () {
 	    new $ArrayBuffer$1(-1); // eslint-disable-line no-new
-	  }) || fails$5(function () {
+	  }) || fails$4(function () {
 	    new $ArrayBuffer$1(); // eslint-disable-line no-new
 
 	    new $ArrayBuffer$1(1.5); // eslint-disable-line no-new
@@ -4760,7 +4420,7 @@
 
 	var toPrimitive$3 = require('./_to-primitive');
 
-	var fails$6 = require('./_fails');
+	var fails$5 = require('./_fails');
 
 	var gOPN$4 = require('./_object-gopn').f;
 
@@ -4828,7 +4488,7 @@
 	    var it = arguments.length < 1 ? 0 : value;
 	    var that = this;
 	    return that instanceof $Number // check on 1..constructor(foo) case
-	    && (BROKEN_COF ? fails$6(function () {
+	    && (BROKEN_COF ? fails$5(function () {
 	      proto$3.valueOf.call(that);
 	    }) : cof$3(that) != NUMBER) ? inheritIfRequired(new Base$1(toNumber(it)), that, $Number) : toNumber(it);
 	  };
@@ -4889,6 +4549,22 @@
 	  }
 	});
 
+	// true  -> String#at
+	// false -> String#codePointAt
+
+
+	var _stringAt = function (TO_STRING) {
+	  return function (that, pos) {
+	    var s = String(_defined(that));
+	    var i = _toInteger(pos);
+	    var l = s.length;
+	    var a, b;
+	    if (i < 0 || i >= l) return TO_STRING ? '' : undefined;
+	    a = s.charCodeAt(i);
+	    return a < 0xd800 || a > 0xdbff || i + 1 === l || (b = s.charCodeAt(i + 1)) < 0xdc00 || b > 0xdfff ? TO_STRING ? s.charAt(i) : a : TO_STRING ? s.slice(i, i + 2) : (a - 0xd800 << 10) + (b - 0xdc00) + 0x10000;
+	  };
+	};
+
 	var $at = _stringAt(true); // 21.1.3.27 String.prototype[@@iterator]()
 
 
@@ -4923,7 +4599,7 @@
 
 	var isArrayIter$1 = require('./_is-array-iter');
 
-	var toLength$5 = require('./_to-length');
+	var toLength$3 = require('./_to-length');
 
 	var createProperty = require('./_create-property');
 
@@ -4950,7 +4626,7 @@
 	        createProperty(result, index, mapping ? call(iterator, mapfn, [step.value, index], true) : step.value);
 	      }
 	    } else {
-	      length = toLength$5(O.length);
+	      length = toLength$3(O.length);
 
 	      for (result = new C(length); length > index; index++) {
 	        createProperty(result, index, mapping ? mapfn(O[index], index) : O[index]);
@@ -5472,7 +5148,7 @@
 	 *      R.max('a', 'b'); //=> 'b'
 	 */
 
-	var max$2 =
+	var max$1 =
 	/*#__PURE__*/
 	_curry2(function max(a, b) {
 	  return b > a ? b : a;
@@ -6040,10 +5716,10 @@
 	// 20.1.2.3 Number.isInteger(number)
 
 
-	var floor$3 = Math.floor;
+	var floor$2 = Math.floor;
 
 	var _isInteger = function isInteger(it) {
-	  return !isObject(it) && isFinite(it) && floor$3(it) === it;
+	  return !isObject(it) && isFinite(it) && floor$2(it) === it;
 	};
 
 	// 20.1.2.3 Number.isInteger(number)
@@ -7204,7 +6880,7 @@
 	var converge =
 	/*#__PURE__*/
 	_curry2(function converge(after, fns) {
-	  return curryN(reduce(max$2, 0, pluck('length', fns)), function () {
+	  return curryN(reduce(max$1, 0, pluck('length', fns)), function () {
 	    var args = arguments;
 	    var context = this;
 	    return after.apply(context, _map(function (fn) {
@@ -7915,7 +7591,7 @@
 
 	var _redefineAll = function (target, src, safe) {
 	  for (var key in src) {
-	    redefine$1(target, key, src[key], safe);
+	    redefine$2(target, key, src[key], safe);
 	  }
 
 	  return target;
@@ -8344,7 +8020,7 @@
 
 	var isObject$6 = require('./_is-object');
 
-	var fails$7 = require('./_fails');
+	var fails$6 = require('./_fails');
 
 	var $iterDetect$1 = require('./_iter-detect');
 
@@ -8376,7 +8052,7 @@
 	    });
 	  };
 
-	  if (typeof C != 'function' || !(IS_WEAK || proto.forEach && !fails$7(function () {
+	  if (typeof C != 'function' || !(IS_WEAK || proto.forEach && !fails$6(function () {
 	    new C().entries().next();
 	  }))) {
 	    // create collection constructor
@@ -8388,7 +8064,7 @@
 
 	    var HASNT_CHAINING = instance[ADDER](IS_WEAK ? {} : -0, 1) != instance; // V8 ~  Chromium 40- weak-collections throws on primitives, but should return false
 
-	    var THROWS_ON_PRIMITIVES = fails$7(function () {
+	    var THROWS_ON_PRIMITIVES = fails$6(function () {
 	      instance.has(1);
 	    }); // most early implementations doesn't supports iterables, most modern - not close it correctly
 
@@ -8397,7 +8073,7 @@
 	    }); // eslint-disable-line no-new
 	    // for early implementations -0 and +0 not the same
 
-	    var BUGGY_ZERO = !IS_WEAK && fails$7(function () {
+	    var BUGGY_ZERO = !IS_WEAK && fails$6(function () {
 	      // V8 ~ Chromium 42- fails only with 5+ elements
 	      var $instance = new C();
 	      var index = 5;
@@ -10634,20 +10310,36 @@
 	  function createDate(y, m, d, h, M, s, ms) {
 	    // can't just apply() to create a date:
 	    // https://stackoverflow.com/q/181348
-	    var date = new Date(y, m, d, h, M, s, ms); // the date constructor remaps years 0-99 to 1900-1999
+	    var date; // the date constructor remaps years 0-99 to 1900-1999
 
-	    if (y < 100 && y >= 0 && isFinite(date.getFullYear())) {
-	      date.setFullYear(y);
+	    if (y < 100 && y >= 0) {
+	      // preserve leap years using a full 400 year cycle, then reset
+	      date = new Date(y + 400, m, d, h, M, s, ms);
+
+	      if (isFinite(date.getFullYear())) {
+	        date.setFullYear(y);
+	      }
+	    } else {
+	      date = new Date(y, m, d, h, M, s, ms);
 	    }
 
 	    return date;
 	  }
 
 	  function createUTCDate(y) {
-	    var date = new Date(Date.UTC.apply(null, arguments)); // the Date.UTC function remaps years 0-99 to 1900-1999
+	    var date; // the Date.UTC function remaps years 0-99 to 1900-1999
 
-	    if (y < 100 && y >= 0 && isFinite(date.getUTCFullYear())) {
-	      date.setUTCFullYear(y);
+	    if (y < 100 && y >= 0) {
+	      var args = Array.prototype.slice.call(arguments); // preserve leap years using a full 400 year cycle, then reset
+
+	      args[0] = y + 400;
+	      date = new Date(Date.UTC.apply(null, args));
+
+	      if (isFinite(date.getUTCFullYear())) {
+	        date.setUTCFullYear(y);
+	      }
+	    } else {
+	      date = new Date(Date.UTC.apply(null, arguments));
 	    }
 
 	    return date;
@@ -10742,7 +10434,7 @@
 	  var defaultLocaleWeek = {
 	    dow: 0,
 	    // Sunday is the first day of the week.
-	    doy: 6 // The week that contains Jan 1st is the first week of the year.
+	    doy: 6 // The week that contains Jan 6th is the first week of the year.
 
 	  };
 
@@ -10840,26 +10532,27 @@
 	  } // LOCALES
 
 
+	  function shiftWeekdays(ws, n) {
+	    return ws.slice(n, 7).concat(ws.slice(0, n));
+	  }
+
 	  var defaultLocaleWeekdays = 'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split('_');
 
 	  function localeWeekdays(m, format) {
-	    if (!m) {
-	      return isArray(this._weekdays) ? this._weekdays : this._weekdays['standalone'];
-	    }
-
-	    return isArray(this._weekdays) ? this._weekdays[m.day()] : this._weekdays[this._weekdays.isFormat.test(format) ? 'format' : 'standalone'][m.day()];
+	    var weekdays = isArray(this._weekdays) ? this._weekdays : this._weekdays[m && m !== true && this._weekdays.isFormat.test(format) ? 'format' : 'standalone'];
+	    return m === true ? shiftWeekdays(weekdays, this._week.dow) : m ? weekdays[m.day()] : weekdays;
 	  }
 
 	  var defaultLocaleWeekdaysShort = 'Sun_Mon_Tue_Wed_Thu_Fri_Sat'.split('_');
 
 	  function localeWeekdaysShort(m) {
-	    return m ? this._weekdaysShort[m.day()] : this._weekdaysShort;
+	    return m === true ? shiftWeekdays(this._weekdaysShort, this._week.dow) : m ? this._weekdaysShort[m.day()] : this._weekdaysShort;
 	  }
 
 	  var defaultLocaleWeekdaysMin = 'Su_Mo_Tu_We_Th_Fr_Sa'.split('_');
 
 	  function localeWeekdaysMin(m) {
-	    return m ? this._weekdaysMin[m.day()] : this._weekdaysMin;
+	    return m === true ? shiftWeekdays(this._weekdaysMin, this._week.dow) : m ? this._weekdaysMin[m.day()] : this._weekdaysMin;
 	  }
 
 	  function handleStrictParse$1(weekdayName, format, strict) {
@@ -11629,14 +11322,14 @@
 	          weekdayOverflow = true;
 	        }
 	      } else if (w.e != null) {
-	        // local weekday -- counting starts from begining of week
+	        // local weekday -- counting starts from beginning of week
 	        weekday = w.e + dow;
 
 	        if (w.e < 0 || w.e > 6) {
 	          weekdayOverflow = true;
 	        }
 	      } else {
-	        // default to begining of week
+	        // default to beginning of week
 	        weekday = dow;
 	      }
 	    }
@@ -12212,7 +11905,7 @@
 	        years = normalizedInput.year || 0,
 	        quarters = normalizedInput.quarter || 0,
 	        months = normalizedInput.month || 0,
-	        weeks = normalizedInput.week || 0,
+	        weeks = normalizedInput.week || normalizedInput.isoWeek || 0,
 	        days = normalizedInput.day || 0,
 	        hours = normalizedInput.hour || 0,
 	        minutes = normalizedInput.minute || 0,
@@ -12508,7 +12201,7 @@
 
 	      };
 	    } else if (!!(match = isoRegex.exec(input))) {
-	      sign = match[1] === '-' ? -1 : match[1] === '+' ? 1 : 1;
+	      sign = match[1] === '-' ? -1 : 1;
 	      duration = {
 	        y: parseIso(match[2], sign),
 	        M: parseIso(match[3], sign),
@@ -12550,10 +12243,7 @@
 	  }
 
 	  function positiveMomentsDifference(base, other) {
-	    var res = {
-	      milliseconds: 0,
-	      months: 0
-	    };
+	    var res = {};
 	    res.months = other.month() - base.month() + (other.year() - base.year()) * 12;
 
 	    if (base.clone().add(res.months, 'M').isAfter(other)) {
@@ -12664,7 +12354,7 @@
 	      return false;
 	    }
 
-	    units = normalizeUnits(!isUndefined(units) ? units : 'millisecond');
+	    units = normalizeUnits(units) || 'millisecond';
 
 	    if (units === 'millisecond') {
 	      return this.valueOf() > localInput.valueOf();
@@ -12680,7 +12370,7 @@
 	      return false;
 	    }
 
-	    units = normalizeUnits(!isUndefined(units) ? units : 'millisecond');
+	    units = normalizeUnits(units) || 'millisecond';
 
 	    if (units === 'millisecond') {
 	      return this.valueOf() < localInput.valueOf();
@@ -12690,8 +12380,15 @@
 	  }
 
 	  function isBetween(from, to, units, inclusivity) {
+	    var localFrom = isMoment(from) ? from : createLocal(from),
+	        localTo = isMoment(to) ? to : createLocal(to);
+
+	    if (!(this.isValid() && localFrom.isValid() && localTo.isValid())) {
+	      return false;
+	    }
+
 	    inclusivity = inclusivity || '()';
-	    return (inclusivity[0] === '(' ? this.isAfter(from, units) : !this.isBefore(from, units)) && (inclusivity[1] === ')' ? this.isBefore(to, units) : !this.isAfter(to, units));
+	    return (inclusivity[0] === '(' ? this.isAfter(localFrom, units) : !this.isBefore(localFrom, units)) && (inclusivity[1] === ')' ? this.isBefore(localTo, units) : !this.isAfter(localTo, units));
 	  }
 
 	  function isSame(input, units) {
@@ -12702,7 +12399,7 @@
 	      return false;
 	    }
 
-	    units = normalizeUnits(units || 'millisecond');
+	    units = normalizeUnits(units) || 'millisecond';
 
 	    if (units === 'millisecond') {
 	      return this.valueOf() === localInput.valueOf();
@@ -12931,74 +12628,149 @@
 	    return this._locale;
 	  }
 
+	  var MS_PER_SECOND = 1000;
+	  var MS_PER_MINUTE = 60 * MS_PER_SECOND;
+	  var MS_PER_HOUR = 60 * MS_PER_MINUTE;
+	  var MS_PER_400_YEARS = (365 * 400 + 97) * 24 * MS_PER_HOUR; // actual modulo - handles negative numbers (for dates before 1970):
+
+	  function mod$1(dividend, divisor) {
+	    return (dividend % divisor + divisor) % divisor;
+	  }
+
+	  function localStartOfDate(y, m, d) {
+	    // the date constructor remaps years 0-99 to 1900-1999
+	    if (y < 100 && y >= 0) {
+	      // preserve leap years using a full 400 year cycle, then reset
+	      return new Date(y + 400, m, d) - MS_PER_400_YEARS;
+	    } else {
+	      return new Date(y, m, d).valueOf();
+	    }
+	  }
+
+	  function utcStartOfDate(y, m, d) {
+	    // Date.UTC remaps years 0-99 to 1900-1999
+	    if (y < 100 && y >= 0) {
+	      // preserve leap years using a full 400 year cycle, then reset
+	      return Date.UTC(y + 400, m, d) - MS_PER_400_YEARS;
+	    } else {
+	      return Date.UTC(y, m, d);
+	    }
+	  }
+
 	  function startOf(units) {
-	    units = normalizeUnits(units); // the following switch intentionally omits break keywords
-	    // to utilize falling through the cases.
+	    var time;
+	    units = normalizeUnits(units);
+
+	    if (units === undefined || units === 'millisecond' || !this.isValid()) {
+	      return this;
+	    }
+
+	    var startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
 
 	    switch (units) {
 	      case 'year':
-	        this.month(0);
-
-	      /* falls through */
+	        time = startOfDate(this.year(), 0, 1);
+	        break;
 
 	      case 'quarter':
-	      case 'month':
-	        this.date(1);
+	        time = startOfDate(this.year(), this.month() - this.month() % 3, 1);
+	        break;
 
-	      /* falls through */
+	      case 'month':
+	        time = startOfDate(this.year(), this.month(), 1);
+	        break;
 
 	      case 'week':
+	        time = startOfDate(this.year(), this.month(), this.date() - this.weekday());
+	        break;
+
 	      case 'isoWeek':
+	        time = startOfDate(this.year(), this.month(), this.date() - (this.isoWeekday() - 1));
+	        break;
+
 	      case 'day':
 	      case 'date':
-	        this.hours(0);
-
-	      /* falls through */
+	        time = startOfDate(this.year(), this.month(), this.date());
+	        break;
 
 	      case 'hour':
-	        this.minutes(0);
-
-	      /* falls through */
+	        time = this._d.valueOf();
+	        time -= mod$1(time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE), MS_PER_HOUR);
+	        break;
 
 	      case 'minute':
-	        this.seconds(0);
-
-	      /* falls through */
+	        time = this._d.valueOf();
+	        time -= mod$1(time, MS_PER_MINUTE);
+	        break;
 
 	      case 'second':
-	        this.milliseconds(0);
-	    } // weeks are a special case
-
-
-	    if (units === 'week') {
-	      this.weekday(0);
+	        time = this._d.valueOf();
+	        time -= mod$1(time, MS_PER_SECOND);
+	        break;
 	    }
 
-	    if (units === 'isoWeek') {
-	      this.isoWeekday(1);
-	    } // quarters are also special
+	    this._d.setTime(time);
 
-
-	    if (units === 'quarter') {
-	      this.month(Math.floor(this.month() / 3) * 3);
-	    }
-
+	    hooks.updateOffset(this, true);
 	    return this;
 	  }
 
 	  function endOf(units) {
+	    var time;
 	    units = normalizeUnits(units);
 
-	    if (units === undefined || units === 'millisecond') {
+	    if (units === undefined || units === 'millisecond' || !this.isValid()) {
 	      return this;
-	    } // 'date' is an alias for 'day', so it should be considered as such.
-
-
-	    if (units === 'date') {
-	      units = 'day';
 	    }
 
-	    return this.startOf(units).add(1, units === 'isoWeek' ? 'week' : units).subtract(1, 'ms');
+	    var startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
+
+	    switch (units) {
+	      case 'year':
+	        time = startOfDate(this.year() + 1, 0, 1) - 1;
+	        break;
+
+	      case 'quarter':
+	        time = startOfDate(this.year(), this.month() - this.month() % 3 + 3, 1) - 1;
+	        break;
+
+	      case 'month':
+	        time = startOfDate(this.year(), this.month() + 1, 1) - 1;
+	        break;
+
+	      case 'week':
+	        time = startOfDate(this.year(), this.month(), this.date() - this.weekday() + 7) - 1;
+	        break;
+
+	      case 'isoWeek':
+	        time = startOfDate(this.year(), this.month(), this.date() - (this.isoWeekday() - 1) + 7) - 1;
+	        break;
+
+	      case 'day':
+	      case 'date':
+	        time = startOfDate(this.year(), this.month(), this.date() + 1) - 1;
+	        break;
+
+	      case 'hour':
+	        time = this._d.valueOf();
+	        time += MS_PER_HOUR - mod$1(time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE), MS_PER_HOUR) - 1;
+	        break;
+
+	      case 'minute':
+	        time = this._d.valueOf();
+	        time += MS_PER_MINUTE - mod$1(time, MS_PER_MINUTE) - 1;
+	        break;
+
+	      case 'second':
+	        time = this._d.valueOf();
+	        time += MS_PER_SECOND - mod$1(time, MS_PER_SECOND) - 1;
+	        break;
+	    }
+
+	    this._d.setTime(time);
+
+	    hooks.updateOffset(this, true);
+	    return this;
 	  }
 
 	  function valueOf() {
@@ -13601,10 +13373,20 @@
 	    var milliseconds = this._milliseconds;
 	    units = normalizeUnits(units);
 
-	    if (units === 'month' || units === 'year') {
+	    if (units === 'month' || units === 'quarter' || units === 'year') {
 	      days = this._days + milliseconds / 864e5;
 	      months = this._months + daysToMonths(days);
-	      return units === 'month' ? months : months / 12;
+
+	      switch (units) {
+	        case 'month':
+	          return months;
+
+	        case 'quarter':
+	          return months / 3;
+
+	        case 'year':
+	          return months / 12;
+	      }
 	    } else {
 	      // handle milliseconds separately because of floating point math errors (issue #1867)
 	      days = this._days + Math.round(monthsToDays(this._months));
@@ -13657,6 +13439,7 @@
 	  var asDays = makeAs('d');
 	  var asWeeks = makeAs('w');
 	  var asMonths = makeAs('M');
+	  var asQuarters = makeAs('Q');
 	  var asYears = makeAs('y');
 
 	  function clone$1() {
@@ -13834,6 +13617,7 @@
 	  proto$2.asDays = asDays;
 	  proto$2.asWeeks = asWeeks;
 	  proto$2.asMonths = asMonths;
+	  proto$2.asQuarters = asQuarters;
 	  proto$2.asYears = asYears;
 	  proto$2.valueOf = valueOf$1;
 	  proto$2._bubble = bubble;
@@ -13869,7 +13653,7 @@
 	    config._d = new Date(toInt(input));
 	  }); // Side effect imports
 
-	  hooks.version = '2.22.2';
+	  hooks.version = '2.24.0';
 	  setHookCallback(createLocal);
 	  hooks.fn = proto;
 	  hooks.min = min;
@@ -13914,7 +13698,7 @@
 	    // <input type="time" step="1" />
 	    TIME_MS: 'HH:mm:ss.SSS',
 	    // <input type="time" step="0.001" />
-	    WEEK: 'YYYY-[W]WW',
+	    WEEK: 'GGGG-[W]WW',
 	    // <input type="week" />
 	    MONTH: 'YYYY-MM' // <input type="month" />
 
@@ -13926,43 +13710,25 @@
 
 	});
 
-	var anObject$7 = require('./_an-object');
+	// @@search logic
+	require('./_fix-re-wks')('search', 1, function (defined, SEARCH, $search) {
+	  // 21.1.3.15 String.prototype.search(regexp)
+	  return [function search(regexp) {
 
-	var sameValue = require('./_same-value');
-
-	var regExpExec$1 = require('./_regexp-exec-abstract'); // @@search logic
-
-
-	require('./_fix-re-wks')('search', 1, function (defined, SEARCH, $search, maybeCallNative) {
-	  return [// `String.prototype.search` method
-	  // https://tc39.github.io/ecma262/#sec-string.prototype.search
-	  function search(regexp) {
 	    var O = defined(this);
 	    var fn = regexp == undefined ? undefined : regexp[SEARCH];
 	    return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[SEARCH](String(O));
-	  }, // `RegExp.prototype[@@search]` method
-	  // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@search
-	  function (regexp) {
-	    var res = maybeCallNative($search, regexp, this);
-	    if (res.done) return res.value;
-	    var rx = anObject$7(regexp);
-	    var S = String(this);
-	    var previousLastIndex = rx.lastIndex;
-	    if (!sameValue(previousLastIndex, 0)) rx.lastIndex = 0;
-	    var result = regExpExec$1(rx, S);
-	    if (!sameValue(rx.lastIndex, previousLastIndex)) rx.lastIndex = previousLastIndex;
-	    return result === null ? -1 : result.index;
-	  }];
+	  }, $search];
 	});
 
 	var dP$8 = require('./_object-dp');
 
-	var anObject$8 = require('./_an-object');
+	var anObject$5 = require('./_an-object');
 
 	var getKeys$1 = require('./_object-keys');
 
 	module.exports = require('./_descriptors') ? Object.defineProperties : function defineProperties(O, Properties) {
-	  anObject$8(O);
+	  anObject$5(O);
 	  var keys = getKeys$1(Properties);
 	  var length = keys.length;
 	  var i = 0;
@@ -14798,7 +14564,9 @@
 	        return null;
 	      }
 
-	      var range$$1 = moment.range(dateRange[0], dateRange[1]);
+	      var start = moment(dateRange[0]).format('YYYY-MM-DD 00:00:00');
+	      var end = moment(dateRange[1]).format('YYYY-MM-DD 23:59:59');
+	      var range$$1 = moment.range(start, end);
 
 	      if (!TIME_SERIES[timeDimension.granularity]) {
 	        throw new Error("Unsupported time granularity: ".concat(timeDimension.granularity));
