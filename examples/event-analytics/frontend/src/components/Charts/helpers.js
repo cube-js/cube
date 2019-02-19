@@ -19,7 +19,6 @@ export const format = (key, data, formatter) => (
 );
 
 export const resolveFormat = (resultSet) => {
-  debugger
   return `time:${resultSet.query().timeDimensions[0].granularity}`
 }
 
@@ -35,7 +34,8 @@ export const humanName = (resultSet, key) => {
     return annotation.shortTitle
   }
 
-  if (key.split(",").length > 1) {
+
+  if (resultSet.query().measures.length === 1 && key.split(",").length > 1) {
     return key.split(",")[0]
   }
 

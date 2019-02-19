@@ -3,8 +3,8 @@ import Select from 'react-select';
 import moment from 'moment';
 
 const generateDateRange = (start, end) => ([
-  moment().subtract(...start).format('YYYY-MM-DD'),
-  moment().subtract(...end).format('YYYY-MM-DD')
+  moment().subtract(...start).format('YYYY-MM-DD').concat(" 00:00"),
+  moment().subtract(...end).format('YYYY-MM-DD').concat(" 23:59")
 ])
 
 const options = [
