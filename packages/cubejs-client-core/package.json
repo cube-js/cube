@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
   "author": "Statsbot, Inc.",
@@ -12,9 +12,18 @@
     "ramda": "^0.25.0",
     "whatwg-fetch": "^3.0.0"
   },
+  "scripts": {
+    "test": "jest"
+  },
   "files": [
     "src",
     "dist"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.3.3",
+    "@babel/preset-env": "^7.3.1",
+    "babel-jest": "^24.1.0",
+    "jest": "^24.1.0"
+  }
 }
