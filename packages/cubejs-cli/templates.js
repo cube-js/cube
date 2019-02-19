@@ -45,6 +45,14 @@ provider:
     CUBEJS_DB_TYPE: ${env.dbType}
     CUBEJS_API_SECRET: ${env.apiSecret}
     REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_API_URL:
+      Fn::Join:
+      - ""
+      - - "https://"
+        - Ref: "ApiGatewayRestApi"
+        - ".execute-api."
+        - Ref: "AWS::Region"
+        - ".amazonaws.com/\${self:provider.stage}"
 
 functions:
   cubejs:

@@ -126,7 +126,7 @@ function () {
       var timeDimensions = (query.timeDimensions || []).filter(function (td) {
         return !!td.granularity;
       });
-      pivotConfig = pivotConfig || timeDimensions.length ? {
+      pivotConfig = pivotConfig || (timeDimensions.length ? {
         x: timeDimensions.map(function (td) {
           return td.dimension;
         }),
@@ -134,7 +134,7 @@ function () {
       } : {
         x: query.dimensions || [],
         y: []
-      };
+      });
 
       if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
         return d === 'measures';

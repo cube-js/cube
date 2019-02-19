@@ -6,6 +6,7 @@ const FileRepository = require('./FileRepository');
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
   mysql: '@cubejs-backend/mysql-driver',
+  athena: '@cubejs-backend/athena-driver',
   jdbc: '@cubejs-backend/jdbc-driver',
 };
 
