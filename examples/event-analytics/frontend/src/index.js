@@ -19,8 +19,17 @@ history.listen((location, action) => {
 ReactDOM.render(
   <Router history={history}>
     <Switch>
-      <SectionRoute exact path="/" component={DashboardPage} />
-      <SectionRoute path="/reports" component={ReportsPage} />
+      <SectionRoute
+        exact
+        path="/"
+        title="Dashboard"
+        component={DashboardPage}
+      />
+      <SectionRoute
+        path="/reports"
+        title="Reports"
+        component={ReportsPage}
+      />
     </Switch>
   </Router>
   ,

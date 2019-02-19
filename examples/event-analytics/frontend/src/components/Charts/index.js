@@ -19,9 +19,8 @@ import PieChart from './Pie';
 import BarChart from './Bar';
 import { DASHBOARD_CHART_MIN_HEIGHT } from './helpers.js';
 
-const cubejsClient = cubejs(
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NTA1MTI1MzYsImV4cCI6MTU1MDU5ODkzNn0.4BByjPe9v4B1lbRBf0ZUf8pFL8RJLMtAql9Vw4o8kd4',
-  { apiUrl: "http://localhost:4000/cubejs-api/v1" }
+const cubejsClient = cubejs(process.env.REACT_APP_CUBEJS_API_KEY,
+  { apiUrl: process.env.REACT_APP_CUBEJS_API_URL }
 );
 
 const styles = ({
