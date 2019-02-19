@@ -2,8 +2,9 @@ import moment from 'moment';
 import numeral from 'numeral';
 
 export const formatters = {
-  date: (val) => moment(val).format("MMM DD"),
-  time: (val) => moment(val).format("MMM DD"),
+  "time:null": (val) => moment(val).format("MMM DD"),
+  "time:month": (val) => moment(val).format("MMM DD"),
+  "time:week": (val) => moment(val).format("MMM DD"),
   "time:day": (val) => moment(val).format("MMM DD"),
   "time:hour": (val) => moment(val).format("MMM DD, HH:mm"),
   number: (val) => numeral(val).format('0,0'),
@@ -19,6 +20,7 @@ export const format = (key, data, formatter) => (
 );
 
 export const resolveFormat = (resultSet) => {
+  debugger
   return `time:${resultSet.query().timeDimensions[0].granularity}`
 }
 

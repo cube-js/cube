@@ -7,7 +7,7 @@ import AddIcon from '@material-ui/icons/Add';
 import Button from '@material-ui/core/Button';
 import { withStyles } from '@material-ui/core/styles';
 
-import EventsSelect from './EventsSelect';
+import EventsSelect, { defaultEvent } from './EventsSelect';
 import DimensionSelect from './DimensionSelect';
 import VisualizationToggle from './VisualizationToggle';
 import GranularitySelect, { defaultGranularity } from './GranularitySelect';
@@ -29,6 +29,7 @@ const styles = {
 };
 
 const defaultVisualizationType = 'line';
+const DEFAULT_EVENT_SELECT_ID = 1;
 
 const buildQuery = ({ dateRange, granularity, measures, dimensions, visualizationType }) => ({
   type: visualizationType,
@@ -44,16 +45,12 @@ const buildQuery = ({ dateRange, granularity, measures, dimensions, visualizatio
 })
 
 class QueryBuilder extends Component {
-  get ready() {
-    return Object.keys(this.props.measures).length > 0;
-  }
-
   get query() {
     return buildQuery(this.props);
   }
 
   get canAddEventsSelects() {
-    return this.ready && this.props.eventSelects.length < 3;
+    return this.props.eventSelects.length < 3;
   }
 
   get canRemoveEventsSelects() {
@@ -76,6 +73,7 @@ class QueryBuilder extends Component {
             {eventSelects.map(i => (
               <Grid key={i} item>
                 <EventsSelect id={i}
+                  defaultValue={(i === DEFAULT_EVENT_SELECT_ID && defaultEvent)}
                   onChange={onChange}
                   clearable={this.canRemoveEventsSelects}
                 />
@@ -92,59 +90,54 @@ class QueryBuilder extends Component {
         </Grid>
         <Grid item xs={2}>
           <Grid container justify="flex-end">
-            <SaveButton disabled={!this.ready} />
+            <SaveButton  />
           </Grid>
         </Grid>
-        { this.ready && (
-          <>
-            <Grid item xs={12}>
-              <Button variant="contained" color="secondary" disabled>
-                By
-              </Button>
-              <div className={classes.dimensionSelectContainer}>
-                <DimensionSelect onChange={onChange} />
-              </div>
-            </Grid>
-            <Grid item xs={12}>
-              <Grid container justify='flex-end'>
-                <Grid item>
+          <Grid item xs={12}>
+            <Button variant="contained" color="secondary" disabled>
+              By
+            </Button>
+            <div className={classes.dimensionSelectContainer}>
+              <DimensionSelect onChange={onChange} />
+            </div>
+          </Grid>
+          <Grid item xs={12}>
+            <Grid container justify='flex-end'>
+              <Grid item>
+                <div className={classes.granularitySelectContainer}>
+                  <DateRangeSelect onChange={onChange} defaultValue={defaultDateRange} />
+                </div>
+              </Grid>
+              <Grid item>
+                {granularity &&
                   <div className={classes.granularitySelectContainer}>
-                    <DateRangeSelect onChange={onChange} defaultValue={defaultDateRange} />
+                    <GranularitySelect
+                      defaultValue={defaultGranularity}
+                      onChange={onChange} />
                   </div>
-                </Grid>
-                <Grid item>
-                  {granularity &&
-                    <div className={classes.granularitySelectContainer}>
-                      <GranularitySelect
-                        defaultValue={defaultGranularity}
-                        onChange={onChange} />
-                    </div>
-                  }
-                </Grid>
-                <Grid item>
-                  <div>
-                    <VisualizationToggle
-                      value={visualizationType}
-                      onChange={onChange}
-                    />
-                  </div>
-                </Grid>
+                }
+              </Grid>
+              <Grid item>
+                <div>
+                  <VisualizationToggle
+                    value={visualizationType}
+                    onChange={onChange}
+                  />
+                </div>
               </Grid>
             </Grid>
-            <Grid item xs={12}>
-              <Chart {...this.query} />
-            </Grid>
-          </>
-          )
-        }
+          </Grid>
+          <Grid item xs={12}>
+            <Chart {...this.query} />
+          </Grid>
       </Grid>
     )
   }
 }
 
 const initialData = {
-  eventSelects: [1],
-  measures: {},
+  eventSelects: [DEFAULT_EVENT_SELECT_ID],
+  measures: { [DEFAULT_EVENT_SELECT_ID]: defaultEvent.value },
   dimensions: [],
   dateRange: defaultDateRange.value,
   granularity: defaultGranularity.value,

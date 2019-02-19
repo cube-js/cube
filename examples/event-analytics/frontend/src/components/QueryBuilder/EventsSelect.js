@@ -8,11 +8,12 @@ import IconButton from '@material-ui/core/IconButton';
 import ClearIcon from '@material-ui/icons/Clear';
 
 const options = [
-  { value: 'Events.anyEvent', label: 'Any Event' },
+  { value: 'Events.anyEvent', label: 'Any Event', default: true },
   { value: 'Events.pageView', label: 'Page View' },
   { value: 'Events.Navigation__Menu_Closed', label: 'Navigation: Menu Closed' },
   { value: 'Events.Navigation__Menu_Opened', label: 'Navigation: Menu Opened' }
 ]
+export const defaultEvent = options.find(i => i.default)
 
 const handleChange = (value, action, id, onChangeProp) => {
   onChangeProp({ type: "REMOVE_MEASURE", id })
@@ -41,7 +42,7 @@ const styles = {
   }
 };
 
-const EventsSelect = ({ onChange, id, clearable, classes }) => (
+const EventsSelect = ({ onChange, defaultValue, id, clearable, classes }) => (
   <div className={classes.container}>
     <MaterialSelect
       disableUnderline
@@ -63,6 +64,7 @@ const EventsSelect = ({ onChange, id, clearable, classes }) => (
       </IconButton>
     }
     <Select
+      defaultValue={defaultValue}
       styles={customStyles}
       options={options}
       onChange={(value, action) => handleChange(value, action, id, onChange)}
