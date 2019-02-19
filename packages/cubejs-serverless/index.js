@@ -2,10 +2,10 @@ const aws = require('aws-sdk');
 const sns = new aws.SNS();
 
 const topicArn = (topic) => `arn:aws:sns:${process.env.AWS_REGION}:${process.env.AWS_ACCOUNT_ID}:${topic}`;
-const sendSnsMessage = async (message, topic) => {
+const sendSnsMessage = async (message, type) => {
   const params = {
-    Message: JSON.stringify(message),
-    TopicArn: topicArn(topic)
+    Message: JSON.stringify({ message, type }),
+    TopicArn: topicArn(`${process.env.CUBEJS_APP || 'cubejs'}-process`)
   };
   await sns.publish(params).promise();
 };
@@ -14,14 +14,14 @@ exports.serverCore = require('@cubejs-backend/server-core').create({
   orchestratorOptions: {
     queryCacheOptions: {
       queueOptions: {
-        sendProcessMessageFn: async (queryKey) => sendSnsMessage(queryKey, 'cubejs-query-process'),
-        sendCancelMessageFn: async (query) => sendSnsMessage(query, 'cubejs-query-cancel')
+        sendProcessMessageFn: async (queryKey) => sendSnsMessage(queryKey, 'queryProcess'),
+        sendCancelMessageFn: async (query) => sendSnsMessage(query, 'queryCancel')
       }
     },
     preAggregationsOptions: {
       queueOptions: {
-        sendProcessMessageFn: async (queryKey) => sendSnsMessage(queryKey, 'cubejs-pre-aggregation-process'),
-        sendCancelMessageFn: async (query) => sendSnsMessage(query, 'cubejs-pre-aggregation-cancel')
+        sendProcessMessageFn: async (queryKey) => sendSnsMessage(queryKey, 'preAggregationProcess'),
+        sendCancelMessageFn: async (query) => sendSnsMessage(query, 'preAggregationCancel')
       }
     }
   }
@@ -51,11 +51,34 @@ const getOrchestratorApi = async () => {
   return orchestratorApi;
 };
 
-const processMessage = async (event, processFn) => {
+const handlers = {
+  queryProcess: async (queryKey, orchestrator) => {
+    const queue = orchestrator.queryCache.getQueue();
+    await queue.processQuery(queryKey);
+  },
+  queryCancel: async (query, orchestrator) => {
+    const queue = orchestrator.queryCache.getQueue();
+    await queue.processCancel(query);
+  },
+  preAggregationProcess: async (queryKey, orchestrator) => {
+    const queue = orchestrator.preAggregations.getQueue();
+    await queue.processQuery(queryKey);
+  },
+  preAggregationCancel: async (query, orchestrator) => {
+    const queue = orchestrator.preAggregations.getQueue();
+    await queue.processCancel(query);
+  }
+};
+
+const processMessage = async (event) => {
   await Promise.all(event.Records.map(async record => {
     const message = JSON.parse(record.Sns.Message);
+    let processFn = handlers[message.type];
+    if (!processFn) {
+      throw new Error(`Unrecognized message type: ${message.type}`);
+    }
     const orchestratorApi = await getOrchestratorApi();
-    await processFn(message, orchestratorApi.orchestrator);
+    await processFn(message.message, orchestratorApi.orchestrator);
   }));
 
   return {
@@ -63,30 +86,6 @@ const processMessage = async (event, processFn) => {
   }
 };
 
-exports.queryProcess = async (event) => {
-  return processMessage(event, async (queryKey, orchestrator) => {
-    const queue = orchestrator.queryCache.getQueue();
-    await queue.processQuery(queryKey);
-  });
-};
-
-exports.queryCancel = async (event) => {
-  return processMessage(event, async (query, orchestrator) => {
-    const queue = orchestrator.queryCache.getQueue();
-    await queue.processCancel(query);
-  });
-};
-
-exports.preAggregationProcess = async (event) => {
-  return processMessage(event, async (queryKey, orchestrator) => {
-    const queue = orchestrator.preAggregations.getQueue();
-    await queue.processQuery(queryKey);
-  });
-};
-
-exports.preAggregationCancel = async (event) => {
-  return processMessage(event, async (query, orchestrator) => {
-    const queue = orchestrator.preAggregations.getQueue();
-    await queue.processCancel(query);
-  });
+exports.process = async (event) => {
+  return processMessage(event);
 };

@@ -58,19 +58,22 @@ provider:
     CUBEJS_DB_USER: <YOUR_DB_USER_HERE>
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
+    REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_DB_TYPE: ${env.dbType}
     CUBEJS_API_SECRET: ${env.apiSecret}
-    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_APP: ${env.projectName}
     CUBEJS_API_URL:
       Fn::Join:
-      - ""
-      - - "https://"
-        - Ref: "ApiGatewayRestApi"
-        - ".execute-api."
-        - Ref: "AWS::Region"
-        - ".amazonaws.com/\${self:provider.stage}"
+        - ""
+        - - "https://"
+          - Ref: "ApiGatewayRestApi"
+          - ".execute-api."
+          - Ref: "AWS::Region"
+          - ".amazonaws.com/\${self:provider.stage}"
     AWS_ACCOUNT_ID:
-      - Ref: "AWS::AccountId" 
+      Fn::Join:
+        - ""
+        - - Ref: "AWS::AccountId"
 
 functions:
   cubejs:
@@ -83,26 +86,11 @@ functions:
       - http:
           path: /{proxy+}
           method: ANY
-  cubejsQueryProcess:
-    handler: cube.queryProcess
+  cubejsProcess:
+    handler: cube.process
     timeout: 630
     events:
-      - sns: cubejs-query-process
-  cubejsQueryCancel:
-    handler: cube.queryCancel
-    timeout: 630
-    events:
-      - sns: cubejs-query-cancel
-  cubejsPreAggregationProcess:
-      handler: cube.preAggregationProcess
-      timeout: 630
-      events:
-        - sns: cubejs-pre-aggregation-process
-  cubejsPreAggregationCancel:
-    handler: cube.preAggregationCancel
-    timeout: 630
-    events:
-      - sns: cubejs-pre-aggregation-cancel
+      - sns: ${env.projectName}-process
 
 plugins:
   - serverless-express
