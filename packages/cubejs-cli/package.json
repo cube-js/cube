@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Statsbot, Inc.",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -12,6 +12,14 @@
   "scripts": {
     "test": "mocha"
   },
+  "files": [
+    "index.js",
+    "cubejsCli.js",
+    "templates.js",
+    "yarn.lock",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "analytics-node": "^3.3.0",
     "chalk": "^2.4.2",
