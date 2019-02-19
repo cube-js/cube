@@ -15,11 +15,6 @@
   "scripts": {
     "test": "jest"
   },
-  "jest": {
-    "transformIgnorePatterns": [
-      "node_modules/(?!(moment)/)"
-    ]
-  },
   "files": [
     "src",
     "dist"
