@@ -113,7 +113,7 @@ class CubejsServerCore {
           });
           await promisify(client.flush.bind(client))()
         } catch (e) {
-          console.error(e);
+          // console.error(e);
         }
       };
       if (!options.logger) {

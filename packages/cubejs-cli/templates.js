@@ -7,20 +7,7 @@ server.listen().then(({ port }) => {
 });
 `;
 
-const appJs = `const express = require('serverless-express/express');
-const app = express();
-app.use(require('cors')());
-const serverCore = require('@cubejs-backend/server-core').create();
-
-serverCore.initApp(app);
-
-module.exports = app;
-`;
-
-const handlerJs = `const handler = require('serverless-express/handler');
-const app = require('./app');
-
-exports.api = handler(app);
+const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 `;
 
 // Shared environment variables, across all DB types
@@ -49,6 +36,22 @@ const serverlessYml = env => `service: ${env.projectName}
 provider:
   name: aws
   runtime: nodejs8.10
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "sns:*"
+# Athena permissions        
+#        - "athena:*"
+#        - "s3:*"
+#        - "glue:*"
+      Resource:
+        - "*"
+# When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12  
+#  vpc:
+#    securityGroupIds:
+#     - sg-12345678901234567 # Your DB and Redis security groups here
+#    subnetIds:
+#     - subnet-12345678901234567 # Your DB and Redis subnets here
   environment:
     CUBEJS_DB_HOST: <YOUR_DB_HOST_HERE>
     CUBEJS_DB_NAME: <YOUR_DB_NAME_HERE>
@@ -66,16 +69,13 @@ provider:
         - ".execute-api."
         - Ref: "AWS::Region"
         - ".amazonaws.com/\${self:provider.stage}"
+    AWS_ACCOUNT_ID:
+      - Ref: "AWS::AccountId" 
 
 functions:
   cubejs:
-    handler: handler.api
+    handler: cube.api
     timeout: 30
-#   vpc:
-#     securityGroupIds:
-#       - sg-12345678901234567 # Your DB and Redis security groups here
-#     subnetIds:
-#       - subnet-12345678901234567 # Your DB and Redis subnets here
     events:
       - http:
           path: /
@@ -83,6 +83,26 @@ functions:
       - http:
           path: /{proxy+}
           method: ANY
+  cubejsQueryProcess:
+    handler: cube.queryProcess
+    timeout: 630
+    events:
+      - sns: cubejs-query-process
+  cubejsQueryCancel:
+    handler: cube.queryCancel
+    timeout: 630
+    events:
+      - sns: cubejs-query-cancel
+  cubejsPreAggregationProcess:
+      handler: cube.preAggregationProcess
+      timeout: 630
+      events:
+        - sns: cubejs-pre-aggregation-process
+  cubejsPreAggregationCancel:
+    handler: cube.preAggregationCancel
+    timeout: 630
+    events:
+      - sns: cubejs-pre-aggregation-cancel
 
 plugins:
   - serverless-express
@@ -131,11 +151,10 @@ exports.express = {
 
 exports.serverless = {
   files: {
-    'handler.js': () => handlerJs,
-    'app.js': () => appJs,
+    'cube.js': () => handlerJs,
     'serverless.yml': serverlessYml,
     '.env': dotEnv,
     'schema/Orders.js': () => ordersJs
   },
-  dependencies: ['serverless-express']
+  dependencies: ['@cubejs-backend/serverless']
 };

@@ -29,10 +29,6 @@ class AthenaDriver extends BaseDriver {
     return this.query('SELECT 1', []);
   }
 
-  queryToken(queryString) {
-    return crypto.createHash('md5').update(queryString).digest('hex');
-  }
-
   sleep(ms) {
     return new Promise((resolve) => {
       setTimeout(() => resolve(), ms);
@@ -45,16 +41,21 @@ class AthenaDriver extends BaseDriver {
       QueryString: queryString,
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
-      },
-      ClientRequestToken: this.queryToken(queryString)
+      }
     });
     while (true) {
       const queryExecution = await this.athena.getQueryExecutionAsync({
         QueryExecutionId
       });
       const status = queryExecution.QueryExecution.Status.State;
+      if (status === 'FAILED') {
+        throw new Error(queryExecution.QueryExecution.Status.StateChangeReason);
+      }
+      if (status === 'CANCELLED') {
+        throw new Error('Query has been cancelled');
+      }
       if (
-        status === 'SUCCEEDED' || status === 'FAILED' || status === 'CANCELLED'
+        status === 'SUCCEEDED'
       ) {
         const allRows = [];
         let columnInfo;
