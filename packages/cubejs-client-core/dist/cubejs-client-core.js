@@ -174,7 +174,9 @@ function () {
         return null;
       }
 
-      var range = moment.range(dateRange[0], dateRange[1]);
+      var start = moment(dateRange[0]).format('YYYY-MM-DD 00:00:00');
+      var end = moment(dateRange[1]).format('YYYY-MM-DD 23:59:59');
+      var range = moment.range(start, end);
 
       if (!TIME_SERIES[timeDimension.granularity]) {
         throw new Error("Unsupported time granularity: ".concat(timeDimension.granularity));

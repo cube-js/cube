@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
   "author": "Statsbot, Inc.",
@@ -14,11 +14,6 @@
   },
   "scripts": {
     "test": "jest"
-  },
-  "jest": {
-    "transformIgnorePatterns": [
-      "node_modules/(?!(moment)/)"
-    ]
   },
   "files": [
     "src",
