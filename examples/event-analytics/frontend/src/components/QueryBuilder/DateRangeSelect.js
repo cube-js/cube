@@ -36,6 +36,7 @@ const DateRangeSelect = ({ defaultValue, onChange }) => (
           type: 'CHANGE_DATERANGE',
           value: value.value
         })
+        window.snowplow('trackStructEvent', 'Reports', 'Date Range Changed');
       }}
     />
   </>

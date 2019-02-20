@@ -3,17 +3,17 @@ import Select from 'react-select';
 
 const options = [
   {
-    label: "User properties",
-    options: [
-      { value: 'Users.id', label: 'User ID' },
-      { value: 'Users.lastSeen', label: 'Last Seen' },
-    ]
-  },
-  {
     label: "Event properties",
     options: [
       { value: 'Events.pageTitle', label: 'Page Title' },
       { value: 'Events.referrer', label: 'Referrer' }
+    ]
+  },
+  {
+    label: "User properties",
+    options: [
+      { value: 'Users.id', label: 'User ID' },
+      { value: 'Users.lastSeen', label: 'Last Seen' }
     ]
   }
 ]
@@ -32,6 +32,7 @@ const handleChange = (value, action, onChangeProp) => {
       type: 'ADD_DIMENSION',
       value: value.value
     })
+    window.snowplow('trackStructEvent', 'Reports', 'Property Selected');
   }
 }
 

@@ -26,7 +26,6 @@ const piePivot = (resultSet) => {
 }
 
 const findFormat = (resultSet, dimension) => {
-  debugger
   if (anyDimensions(resultSet)) {
     return resultSet.loadResponse.annotation.dimensions[dimension].type
   }

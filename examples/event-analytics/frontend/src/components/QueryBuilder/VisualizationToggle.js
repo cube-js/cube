@@ -24,6 +24,7 @@ const VisualizationToggle = ({ value, onChange, classes }) => (
         onChange={((e, value) => {
           if (value) {
             onChange({ type: 'CHANGE_VISUALIZATION_TYPE', value: value})
+            window.snowplow('trackStructEvent', 'Reports', 'Visualization Changed');
           }
         })}
       >

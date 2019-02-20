@@ -13,7 +13,11 @@ const options = [
   { value: 'Events.anyEvent', label: 'Any Event', default: true },
   { value: 'Events.pageView', label: 'Page View' },
   { value: 'Events.Navigation__Menu_Closed', label: 'Navigation: Menu Closed' },
-  { value: 'Events.Navigation__Menu_Opened', label: 'Navigation: Menu Opened' }
+  { value: 'Events.Navigation__Menu_Opened', label: 'Navigation: Menu Opened' },
+  { value: 'Events.Reports__Event_Selected', label: 'Reports: Event Selected' },
+  { value: 'Events.Reports__Property_Selected', label: 'Reports: Property Selected' },
+  { value: 'Events.Reports__Date_Range_Changed', label: 'Reports: Date Range Changed' },
+  { value: 'Events.Reports__Visualization_Changed', label: 'Reports: Visualization Changed' }
 ]
 export const defaultEvent = options.find(i => i.default)
 
@@ -31,6 +35,7 @@ const handleChange = (value, eventType, id, onChangeProp) => {
     value: withEventType(value, eventType),
     id
   })
+  window.snowplow('trackStructEvent', 'Reports', 'Event Selected');
 }
 
 const customStyles = {

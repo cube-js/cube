@@ -1,8 +1,9 @@
 import StructuredEvent from './StructuredEvent';
 
-const regexp = (key) => `&${key}=([^&]+)&`;
+const regexp = (key) => `&${key}=([^&]+)`;
 const parameters = {
   event: regexp('e'),
+  event_id: regexp('eid'),
   true_tstamp: regexp('ttm'),
   user_fingerprint: regexp('fp'),
   se_category: regexp('se_ca'),
@@ -13,7 +14,11 @@ const parameters = {
 
 const customEvents = [
   ['Navigation', 'Menu Opened'],
-  ['Navigation', 'Menu Closed']
+  ['Navigation', 'Menu Closed'],
+  ['Reports', 'Event Selected'],
+  ['Reports', 'Property Selected'],
+  ['Reports', 'Date Range Changed'],
+  ['Reports', 'Visualization Changed']
 ].map(event =>
   new StructuredEvent(...event)
 );
@@ -26,6 +31,13 @@ cube(`Events`, {
   FROM cloudfront_logs
   WHERE length(querystring) > 1
   `,
+
+  joins: {
+    Users: {
+      relationship: `belongsTo`,
+      sql: `${CUBE}.user_fingerprint = ${Users.id}`
+    }
+  },
 
   measures: Object.assign(customEvents.reduce((accum, e) => {
     accum[e.systemName] = {
@@ -71,6 +83,12 @@ cube(`Events`, {
       filters: [
         { sql: `${CUBE.event} = 'Page View'` }
       ]
+    },
+
+    // Used for subquery in Users cube
+    maxTime: {
+      type: `max`,
+      sql: `time`
     }
   }),
 
@@ -105,6 +123,12 @@ cube(`Events`, {
     time: {
       sql: `time`,
       type: `time`
+    },
+
+    id: {
+      sql: `event_id`,
+      type: `string`,
+      primaryKey: true
     }
   }
 });
