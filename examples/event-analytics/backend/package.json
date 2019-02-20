@@ -1,0 +1,13 @@
+{
+  "name": "event-analytics-example-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-dev-server"
+  },
+  "dependencies": {
+    "@cubejs-backend/athena-driver": "0.0.25",
+    "@cubejs-backend/server": "0.0.24",
+    "@cubejs-backend/serverless": "0.0.25"
+  }
+}

@@ -1,0 +1,70 @@
+service: event-analytics-example-backend
+
+package:
+  exclude:
+    - secrets.yml
+
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  secrets: ${file(secrets.yml):${self:custom.stage}}
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "sns:*"
+# Athena permissions
+#        - "athena:*"
+#        - "s3:*"
+#        - "glue:*"
+      Resource:
+        - "*"
+# When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12  
+#  vpc:
+#    securityGroupIds:
+#     - sg-12345678901234567 # Your DB and Redis security groups here
+#    subnetIds:
+#     - subnet-12345678901234567 # Your DB and Redis subnets here
+  environment:
+    CUBEJS_AWS_KEY: "${self:custom.secrets.CUBEJS_AWS_KEY}"
+    CUBEJS_AWS_SECRET: "${self:custom.secrets.CUBEJS_AWS_SECRET}"
+    CUBEJS_AWS_REGION: "${self:custom.secrets.CUBEJS_AWS_REGION}"
+    CUBEJS_AWS_S3_OUTPUT_LOCATION: "${self:custom.secrets.CUBEJS_AWS_S3_OUTPUT_LOCATION}"
+    CUBEJS_DB_TYPE: "${self:custom.secrets.CUBEJS_DB_TYPE}"
+    CUBEJS_API_SECRET: "${self:custom.secrets.CUBEJS_API_SECRET}"
+    REDIS_URL: "${self:custom.secrets.CUBEJS_API_SECRET}"
+    CUBEJS_APP: hello-world
+    CUBEJS_API_URL:
+      Fn::Join:
+        - ""
+        - - "https://"
+          - Ref: "ApiGatewayRestApi"
+          - ".execute-api."
+          - Ref: "AWS::Region"
+          - ".amazonaws.com/${self:provider.stage}"
+    AWS_ACCOUNT_ID:
+      Fn::Join:
+        - ""
+        - - Ref: "AWS::AccountId"
+
+functions:
+  cubejs:
+    handler: cube.api
+    timeout: 30
+    events:
+      - http:
+          path: /
+          method: GET
+      - http:
+          path: /{proxy+}
+          method: ANY
+  cubejsProcess:
+    handler: cube.process
+    timeout: 630
+    events:
+      - sns: hello-world-process
+
+plugins:
+  - serverless-express
