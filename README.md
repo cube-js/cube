@@ -37,6 +37,7 @@ Cube.js has necessary infrastructure for every analytic application that heavily
 - [Getting Started](#getting-started)
 - [Examples](#examples)
 - [Tutorials](#tutorials)
+- [Community](#community)
 - [Architecture](#architecture)
 - [Security](#security)
 - [API](#api)
@@ -237,6 +238,10 @@ export default () => {
 - [Building E-commerce Analytics React Dashboard with Cube.js and Flatlogic](https://statsbot.co/blog/building-analytics-react-dashboard-with-cube.js)
 - [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
 - [Building MongoDB Dashboard using Node.js](https://statsbot.co/blog/building-mongodb-dashboard-using-node.js)
+
+## Community
+
+If you have any questions or need help - [please join our Slack community](https://publicslack.com/slacks/cubejs/invites/new) of amazing developers and contributors.
 
 ## Architecture
 __Cube.js acts as an analytics backend__, translating business logic (metrics and dimensions) into SQL and handling database connection. 
