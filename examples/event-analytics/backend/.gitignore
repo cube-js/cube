@@ -1,1 +1,4 @@
 .env
+secrets.yml
+
+.serverless
