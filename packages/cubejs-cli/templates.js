@@ -12,8 +12,7 @@ const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 
 // Shared environment variables, across all DB types
 const sharedDotEnvVars = env => `CUBEJS_DB_TYPE=${env.dbType}
-CUBEJS_API_SECRET=${env.apiSecret}
-`;
+CUBEJS_API_SECRET=${env.apiSecret}`;
 
 const athenaDotEnvVars = env => `CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
@@ -146,3 +145,7 @@ exports.serverless = {
   },
   dependencies: ['@cubejs-backend/serverless']
 };
+
+module.exports = {
+  dotEnv,
+}
