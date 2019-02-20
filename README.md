@@ -271,33 +271,9 @@ Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-u
 
 ## API
 
-### cubejs(apiKey, options)
+### Cube.js Backend
 
-Create instance of `CubejsApi`.
-
-* `apiKey` - API key used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API key to the console on on startup.
-* `options` - options object.
-   * `apiUrl` - URL of your Cube.js Backend. By default, in the development environment it is http://localhost:4000/cubejs-api/v1.
-
-```javascript
-import cubejs from "@cubejs-client/core";
-
-const cubejsApi = cubejs(
-  "CUBEJS-API-TOKEN",
-  { apiUrl: "http://localhost:4000/cubejs-api/v1" }
-);
-```
-
-### CubejsApi.load(query, options, callback)
-
-Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn't passed.
-
-* `query` - analytic query. Learn more about it's format below.
-* `options` - options object. Can be omitted.
-    * `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
-* `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
-
-### CubejsServerCore.create(options)
+#### CubejsServerCore.create(options)
 
 Create an instance of `CubejsServerCore` to embed it in an `Express` application.
 
@@ -328,7 +304,35 @@ const core = CubejsServerCore.create(config);
 await core.initApp(express);
 ```
 
-### QueryRenderer
+### Cube.js Frontend
+
+#### cubejs(apiKey, options)
+
+Create instance of `CubejsApi`.
+
+* `apiKey` - API key used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API key to the console on on startup.
+* `options` - options object.
+   * `apiUrl` - URL of your Cube.js Backend. By default, in the development environment it is http://localhost:4000/cubejs-api/v1.
+
+```javascript
+import cubejs from "@cubejs-client/core";
+
+const cubejsApi = cubejs(
+  "CUBEJS-API-TOKEN",
+  { apiUrl: "http://localhost:4000/cubejs-api/v1" }
+);
+```
+
+#### CubejsApi.load(query, options, callback)
+
+Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn't passed.
+
+* `query` - analytic query. Learn more about it's format below.
+* `options` - options object. Can be omitted.
+    * `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
+* `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
+
+#### QueryRenderer
 
 `<QueryRenderer />` React component takes a query, fetches the given query, and uses the render prop to render the resulting data.
 
@@ -342,8 +346,8 @@ Properties:
   - `loadingState`: Provides information about the state of the query loading.
   
 
-### ResultSet
-#### ResultSet.chartPivot()
+#### ResultSet
+##### ResultSet.chartPivot()
 
 Returns normalized query result data in the following format.
 
@@ -366,7 +370,7 @@ Returns normalized query result data in the following format.
     //...
 ]
 ```
-#### ResultSet.seriesNames()
+##### ResultSet.seriesNames()
 
 Returns the array of series objects, containing `key` and `title` parameters.
 
@@ -387,7 +391,7 @@ Returns the array of series objects, containing `key` and `title` parameters.
 ]
 ```
 
-### Query Format
+#### Query Format
 
 Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`. You can [learn more about Cube.js Data Schema here.](https://statsbot.co/docs/getting-started-cubejs)
 The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension email in the Cube Users would have the following name `Users.email`.
