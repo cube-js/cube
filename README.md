@@ -271,7 +271,42 @@ Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-u
 
 ## API
 
-### cubejs(apiKey, options)
+### Cube.js Backend
+
+#### CubejsServerCore.create(options)
+
+Create an instance of `CubejsServerCore` to embed it in an `Express` application.
+
+* `options` - options object.
+    * `dbType` - Type of your database.
+    * `driverFactory()` - pass function of the driver factory with your database type.
+    * `logger(msg, params)` - pass function for your custom logger.
+    * `schemaPath` - Path to the `schema` location. By default, it is `/schema`.
+    
+```javascript
+import * as CubejsServerCore from "@cubejs-backend/server-core";
+import * as express from 'express';
+import * as path from 'path';
+
+const express = express();
+
+const dbType = 'mysql';
+const config = {
+  dbType,
+  driverFactory: () => CubejsServerCore.createDriver(dbType),
+  logger: (msg, params) => {
+    console.log(`${msg}: ${JSON.stringify(params)}`);
+  },
+  schemaPath: path.join('assets', 'schema')
+};
+
+const core = CubejsServerCore.create(config);
+await core.initApp(express);
+```
+
+### Cube.js Frontend
+
+#### cubejs(apiKey, options)
 
 Create instance of `CubejsApi`.
 
@@ -288,7 +323,7 @@ const cubejsApi = cubejs(
 );
 ```
 
-### CubejsApi.load(query, options, callback)
+#### CubejsApi.load(query, options, callback)
 
 Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn't passed.
 
@@ -297,8 +332,7 @@ Fetch data for passed `query`. Returns promise for `ResultSet` if `callback` isn
     * `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
 * `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
 
-
-### QueryRenderer
+#### QueryRenderer
 
 `<QueryRenderer />` React component takes a query, fetches the given query, and uses the render prop to render the resulting data.
 
@@ -312,8 +346,8 @@ Properties:
   - `loadingState`: Provides information about the state of the query loading.
   
 
-### ResultSet
-#### ResultSet.chartPivot()
+#### ResultSet
+##### ResultSet.chartPivot()
 
 Returns normalized query result data in the following format.
 
@@ -336,7 +370,7 @@ Returns normalized query result data in the following format.
     //...
 ]
 ```
-#### ResultSet.seriesNames()
+##### ResultSet.seriesNames()
 
 Returns the array of series objects, containing `key` and `title` parameters.
 
@@ -357,7 +391,7 @@ Returns the array of series objects, containing `key` and `title` parameters.
 ]
 ```
 
-### Query Format
+#### Query Format
 
 Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`. You can [learn more about Cube.js Data Schema here.](https://statsbot.co/docs/getting-started-cubejs)
 The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension email in the Cube Users would have the following name `Users.email`.
