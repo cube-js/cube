@@ -27,7 +27,7 @@ cube(`Events`, {
   sql:
   `SELECT
     from_iso8601_timestamp(to_iso8601(date) || 'T' || "time") as time,
-    ${Object.keys(parameters).map((key) => ( `regexp_extract(querystring, '${parameters[key]}', 1) as ${key}` )).join(", ")}
+    ${Object.keys(parameters).map((key) => ( `url_decode(url_decode(regexp_extract(querystring, '${parameters[key]}', 1))) as ${key}` )).join(", ")}
   FROM cloudfront_logs
   WHERE length(querystring) > 1
   `,
@@ -98,8 +98,8 @@ cube(`Events`, {
       case: {
         when: customEvents.map(e => (
           { sql: `${CUBE}.event = 'se'
-                  AND ${CUBE}.se_category = '${e.categoryEscaped}'
-                  AND ${CUBE}.se_action = '${e.actionEscaped}'`,
+                  AND ${CUBE}.se_category = '${e.category}'
+                  AND ${CUBE}.se_action = '${e.action}'`,
             label: e.humanName }
         )).concat([
           { sql: `${CUBE}.event = 'pv'`, label: `Page View` },
@@ -116,7 +116,7 @@ cube(`Events`, {
     },
 
     pageTitle: {
-      sql: `replace(page_title, '')`,
+      sql: `page_title`,
       type: `string`
     },
 
