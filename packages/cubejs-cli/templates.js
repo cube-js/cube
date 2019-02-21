@@ -50,7 +50,7 @@ provider:
 #    securityGroupIds:
 #     - sg-12345678901234567 # Your DB and Redis security groups here
 #    subnetIds:
-#     - subnet-12345678901234567 # Your DB and Redis subnets here
+#     - subnet-12345678901234567 # Put here subnet with access to your DB, Redis and internet. For internet access 0.0.0.0/0 should be routed through NAT only for this subnet!
   environment:
     CUBEJS_DB_HOST: <YOUR_DB_HOST_HERE>
     CUBEJS_DB_NAME: <YOUR_DB_NAME_HERE>
