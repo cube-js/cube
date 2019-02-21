@@ -1,5 +1,5 @@
 cube(`Users`, {
-  sql: `select distinct user_fingerprint from ${Events.sql()}`,
+  sql: `select distinct user_id from ${Events.sql()}`,
 
   measures: {
     count: {
@@ -31,7 +31,7 @@ cube(`Users`, {
     },
 
     id: {
-      sql: `user_fingerprint`,
+      sql: `user_id`,
       type: `string`,
       primaryKey: true,
       shown: true

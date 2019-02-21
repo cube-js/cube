@@ -5,7 +5,7 @@ const parameters = {
   event: regexp('e'),
   event_id: regexp('eid'),
   true_tstamp: regexp('ttm'),
-  user_fingerprint: regexp('fp'),
+  user_id: regexp('duid'),
   se_category: regexp('se_ca'),
   se_action: regexp('se_ac'),
   page_referrer: regexp('refr'),
@@ -35,7 +35,7 @@ cube(`Events`, {
   joins: {
     Users: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.user_fingerprint = ${Users.id}`
+      sql: `${CUBE}.user_id = ${Users.id}`
     }
   },
 
@@ -50,7 +50,7 @@ cube(`Events`, {
     accum[`${e.systemName}Uniq`] = {
       title: `${e.humanName} - Unique`,
       type: `countDistinct`,
-      sql: `user_fingerprint`,
+      sql: `user_id`,
       filters: [
         { sql: `${CUBE.event} = '${e.humanName}'` }
       ]
@@ -63,7 +63,7 @@ cube(`Events`, {
     },
 
     anyEventUniq: {
-      sql: `user_fingerprint`,
+      sql: `user_id`,
       type: `countDistinct`,
       title: `Any Event - Unique`
     },
@@ -79,7 +79,7 @@ cube(`Events`, {
     pageViewUniq: {
       type: `countDistinct`,
       title: `Page View - Unique`,
-      sql: `user_fingerprint`,
+      sql: `user_id`,
       filters: [
         { sql: `${CUBE.event} = 'Page View'` }
       ]
