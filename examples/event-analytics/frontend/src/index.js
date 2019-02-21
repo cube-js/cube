@@ -5,6 +5,7 @@ import createHistory from 'history/createBrowserHistory'
 import SectionRoute from './auth/components/SectionRoute';
 import DashboardPage from './dashboard';
 import ReportsPage from './reports';
+import AboutPage from './about';
 import * as serviceWorker from './serviceWorker';
 
 const history = createHistory()
@@ -29,6 +30,11 @@ ReactDOM.render(
         path="/reports"
         title="Reports"
         component={ReportsPage}
+      />
+      <SectionRoute
+        path="/about"
+        title="About"
+        component={AboutPage}
       />
     </Switch>
   </Router>
