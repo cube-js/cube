@@ -7,6 +7,10 @@ cube(`Users`, {
     }
   },
 
+  refreshKey: {
+    sql: `select count(*) from ${Users.sql()}`
+  },
+
   dimensions: {
     maxTimestamp: {
       sql: `${Events.maxTime}`,
