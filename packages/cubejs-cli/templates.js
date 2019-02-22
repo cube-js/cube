@@ -61,6 +61,7 @@ provider:
     CUBEJS_DB_TYPE: ${env.dbType}
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
+    NODE_ENV: "\${self:provider.stage}"
     CUBEJS_API_URL:
       Fn::Join:
         - ""
