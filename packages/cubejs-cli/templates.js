@@ -28,7 +28,7 @@ CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
 ${sharedDotEnvVars(env)}`;
 
-const dotEnv = env => env.dbType === 'athena' ? athenaDotEnvVars(env) : defaultDotEnvVars(env);
+const dotEnv = env => (env.dbType === 'athena' ? athenaDotEnvVars(env) : defaultDotEnvVars(env));
 
 const serverlessYml = env => `service: ${env.projectName}
 
@@ -60,7 +60,7 @@ provider:
     REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_DB_TYPE: ${env.dbType}
     CUBEJS_API_SECRET: ${env.apiSecret}
-    CUBEJS_APP: ${env.projectName}
+    CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
     CUBEJS_API_URL:
       Fn::Join:
         - ""
@@ -89,7 +89,7 @@ functions:
     handler: cube.process
     timeout: 630
     events:
-      - sns: ${env.projectName}-process
+      - sns: "\${self:service.name}-\${self:provider.stage}-process"
 
 plugins:
   - serverless-express
@@ -145,7 +145,3 @@ exports.serverless = {
   },
   dependencies: ['@cubejs-backend/serverless']
 };
-
-module.exports = {
-  dotEnv,
-}

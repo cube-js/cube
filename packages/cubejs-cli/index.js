@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-
+/*
+eslint no-var: 0
+*/
+/*
+eslint prefer-template: 0
+ */
 var chalk = require('chalk');
 
 var currentNodeVersion = process.versions.node;

@@ -1,3 +1,9 @@
+/*
+eslint import/no-dynamic-require: 0
+ */
+/*
+eslint global-require: 0
+ */
 const program = require('commander');
 const fs = require('fs-extra');
 const path = require('path');
@@ -6,6 +12,7 @@ const chalk = require('chalk');
 const spawn = require('cross-spawn');
 const crypto = require('crypto');
 const Analytics = require('analytics-node');
+
 const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
 const { machineIdSync } = require('node-machine-id');
 const { promisify } = require('util');
@@ -28,7 +35,7 @@ const executeCommand = (command, args) => {
       }
       resolve();
     });
-  })
+  });
 };
 
 const anonymousId = machineIdSync();
@@ -37,19 +44,19 @@ const event = async (name, props) => {
   try {
     client.track({
       event: name,
-      anonymousId: anonymousId,
+      anonymousId,
       properties: props
     });
-    await promisify(client.flush.bind(client))()
-  } catch (e) {}
+    await promisify(client.flush.bind(client))();
+  } catch (e) {
+    // ignore
+  }
 };
 
-const writePackageJson = async (packageJson) => {
-  return fs.writeJson('package.json', packageJson, {
-    spaces: 2,
-    EOL: os.EOL
-  });
-};
+const writePackageJson = async (json) => fs.writeJson('package.json', json, {
+  spaces: 2,
+  EOL: os.EOL
+});
 
 const displayError = async (text, options) => {
   console.error('');
@@ -58,23 +65,21 @@ const displayError = async (text, options) => {
   if (Array.isArray(text)) {
     text.forEach((str) => console.error(str));
   } else {
-    console.error(text)
+    console.error(text);
   }
   console.error('');
   console.error(chalk.yellow('Need some help? -------------------------------------'));
   await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString(), ...options });
   console.error('');
-  console.error(chalk.yellow(`  Ask this question in Cube.js Slack: `) + 'https://publicslack.com/slacks/cubejs/invites/new');
-  console.error(chalk.yellow(`  Post an issue: `) + 'https://github.com/statsbotco/cube.js/issues');
+  console.error(`${chalk.yellow(`  Ask this question in Cube.js Slack:`)} https://publicslack.com/slacks/cubejs/invites/new`);
+  console.error(`${chalk.yellow(`  Post an issue:`)} https://github.com/statsbotco/cube.js/issues`);
   console.error('');
   process.exit(1);
 };
 
 const requireFromPackage = (module) => require(path.join(process.cwd(), 'node_modules', module));
 
-const npmInstall = (dependencies) => {
-  return executeCommand('npm', ['install', '--save'].concat(dependencies));
-};
+const npmInstall = (dependencies) => executeCommand('npm', ['install', '--save'].concat(dependencies));
 
 const logStage = (stage) => {
   console.log(`- ${stage}`);
@@ -127,7 +132,7 @@ const createApp = async (projectName, options) => {
   let driverDependencies = CubejsServer.driverDependencies(options.dbType);
   driverDependencies = Array.isArray(driverDependencies) ? driverDependencies : [driverDependencies];
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
-    driverDependencies.push('node-java-maven')
+    driverDependencies.push('node-java-maven');
   }
   await npmInstall(driverDependencies);
 
@@ -139,15 +144,15 @@ const createApp = async (projectName, options) => {
       await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
     }
 
-    const packageJson = await fs.readJson('package.json');
+    const newPackageJson = await fs.readJson('package.json');
     if (dbTypeDescription.mavenDependency) {
-      packageJson.java = {
+      newPackageJson.java = {
         dependencies: [dbTypeDescription.mavenDependency]
-      }
+      };
     }
-    packageJson.scripts = packageJson.scripts || {};
-    packageJson.scripts.install = './node_modules/.bin/node-java-maven';
-    await writePackageJson(packageJson);
+    newPackageJson.scripts = newPackageJson.scripts || {};
+    newPackageJson.scripts.install = './node_modules/.bin/node-java-maven';
+    await writePackageJson(newPackageJson);
 
     await executeCommand('npm', ['install']);
   }
@@ -225,10 +230,10 @@ const generateSchema = async (options) => {
 
 program
   .usage('<command> [options]')
-  .on('--help', function(){
-    console.log('')
+  .on('--help', () => {
+    console.log('');
     console.log('Use cubejs <command> --help for more information about a command.');
-    console.log('')
+    console.log('');
   });
 
 program
@@ -236,15 +241,16 @@ program
   .option('-d, --db-type <db-type>', 'Preconfigure for selected database. Options: postgres, mysql, athena')
   .option('-t, --template <template>', 'App template. Options: express (default), serverless.')
   .description('Create new Cube.js app')
-  .action((projectName, options) => createApp(projectName, options)
-    .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }))
+  .action(
+    (projectName, options) => createApp(projectName, options)
+      .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }))
   )
-  .on('--help', function() {
-      console.log('');
-      console.log('Examples:');
-      console.log('');
-      console.log('  $ cubejs create hello-world -d postgres');
-    });
+  .on('--help', () => {
+    console.log('');
+    console.log('Examples:');
+    console.log('');
+    console.log('  $ cubejs create hello-world -d postgres');
+  });
 
 const list = (val) => val.split(',');
 
@@ -252,10 +258,10 @@ program
   .command('generate')
   .option('-t, --tables <tables>', 'Comma delimited list of tables to generate schema from', list)
   .description('Generate Cube.js schema from DB tables schema')
-  .action((options) => generateSchema(options)
-    .catch(e => displayError(e.stack || e, { dbType: options.dbType }))
+  .action(
+    (options) => generateSchema(options).catch(e => displayError(e.stack || e, { dbType: options.dbType }))
   )
-  .on('--help', function() {
+  .on('--help', () => {
     console.log('');
     console.log('Examples:');
     console.log('');

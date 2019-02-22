@@ -208,7 +208,10 @@ class CubejsServerCore {
   }
 
   createOrchestratorApi() {
-    return new OrchestratorApi(() => this.getDriver(), this.logger, this.options.orchestratorOptions);
+    return new OrchestratorApi(() => this.getDriver(), this.logger, {
+      redisPrefix: process.env.CUBEJS_APP,
+      ...this.options.orchestratorOptions
+    });
   }
 
   async getDriver() {
