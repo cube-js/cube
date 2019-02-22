@@ -241,6 +241,14 @@ class QueryQueue {
             .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
             .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
             .execAsync();
+        } else {
+          this.logger('Query cancelled in-flight', { queueSize, queryKey });
+          await redisClient.multi()
+            .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
+            .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
+            .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
+            .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
+            .execAsync();
         }
 
         await this.reconcileQueue(redisClient);
