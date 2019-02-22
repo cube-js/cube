@@ -10310,36 +10310,20 @@
 	  function createDate(y, m, d, h, M, s, ms) {
 	    // can't just apply() to create a date:
 	    // https://stackoverflow.com/q/181348
-	    var date; // the date constructor remaps years 0-99 to 1900-1999
+	    var date = new Date(y, m, d, h, M, s, ms); // the date constructor remaps years 0-99 to 1900-1999
 
-	    if (y < 100 && y >= 0) {
-	      // preserve leap years using a full 400 year cycle, then reset
-	      date = new Date(y + 400, m, d, h, M, s, ms);
-
-	      if (isFinite(date.getFullYear())) {
-	        date.setFullYear(y);
-	      }
-	    } else {
-	      date = new Date(y, m, d, h, M, s, ms);
+	    if (y < 100 && y >= 0 && isFinite(date.getFullYear())) {
+	      date.setFullYear(y);
 	    }
 
 	    return date;
 	  }
 
 	  function createUTCDate(y) {
-	    var date; // the Date.UTC function remaps years 0-99 to 1900-1999
+	    var date = new Date(Date.UTC.apply(null, arguments)); // the Date.UTC function remaps years 0-99 to 1900-1999
 
-	    if (y < 100 && y >= 0) {
-	      var args = Array.prototype.slice.call(arguments); // preserve leap years using a full 400 year cycle, then reset
-
-	      args[0] = y + 400;
-	      date = new Date(Date.UTC.apply(null, args));
-
-	      if (isFinite(date.getUTCFullYear())) {
-	        date.setUTCFullYear(y);
-	      }
-	    } else {
-	      date = new Date(Date.UTC.apply(null, arguments));
+	    if (y < 100 && y >= 0 && isFinite(date.getUTCFullYear())) {
+	      date.setUTCFullYear(y);
 	    }
 
 	    return date;
@@ -10434,7 +10418,7 @@
 	  var defaultLocaleWeek = {
 	    dow: 0,
 	    // Sunday is the first day of the week.
-	    doy: 6 // The week that contains Jan 6th is the first week of the year.
+	    doy: 6 // The week that contains Jan 1st is the first week of the year.
 
 	  };
 
@@ -10532,27 +10516,26 @@
 	  } // LOCALES
 
 
-	  function shiftWeekdays(ws, n) {
-	    return ws.slice(n, 7).concat(ws.slice(0, n));
-	  }
-
 	  var defaultLocaleWeekdays = 'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split('_');
 
 	  function localeWeekdays(m, format) {
-	    var weekdays = isArray(this._weekdays) ? this._weekdays : this._weekdays[m && m !== true && this._weekdays.isFormat.test(format) ? 'format' : 'standalone'];
-	    return m === true ? shiftWeekdays(weekdays, this._week.dow) : m ? weekdays[m.day()] : weekdays;
+	    if (!m) {
+	      return isArray(this._weekdays) ? this._weekdays : this._weekdays['standalone'];
+	    }
+
+	    return isArray(this._weekdays) ? this._weekdays[m.day()] : this._weekdays[this._weekdays.isFormat.test(format) ? 'format' : 'standalone'][m.day()];
 	  }
 
 	  var defaultLocaleWeekdaysShort = 'Sun_Mon_Tue_Wed_Thu_Fri_Sat'.split('_');
 
 	  function localeWeekdaysShort(m) {
-	    return m === true ? shiftWeekdays(this._weekdaysShort, this._week.dow) : m ? this._weekdaysShort[m.day()] : this._weekdaysShort;
+	    return m ? this._weekdaysShort[m.day()] : this._weekdaysShort;
 	  }
 
 	  var defaultLocaleWeekdaysMin = 'Su_Mo_Tu_We_Th_Fr_Sa'.split('_');
 
 	  function localeWeekdaysMin(m) {
-	    return m === true ? shiftWeekdays(this._weekdaysMin, this._week.dow) : m ? this._weekdaysMin[m.day()] : this._weekdaysMin;
+	    return m ? this._weekdaysMin[m.day()] : this._weekdaysMin;
 	  }
 
 	  function handleStrictParse$1(weekdayName, format, strict) {
@@ -11322,14 +11305,14 @@
 	          weekdayOverflow = true;
 	        }
 	      } else if (w.e != null) {
-	        // local weekday -- counting starts from beginning of week
+	        // local weekday -- counting starts from begining of week
 	        weekday = w.e + dow;
 
 	        if (w.e < 0 || w.e > 6) {
 	          weekdayOverflow = true;
 	        }
 	      } else {
-	        // default to beginning of week
+	        // default to begining of week
 	        weekday = dow;
 	      }
 	    }
@@ -11905,7 +11888,7 @@
 	        years = normalizedInput.year || 0,
 	        quarters = normalizedInput.quarter || 0,
 	        months = normalizedInput.month || 0,
-	        weeks = normalizedInput.week || normalizedInput.isoWeek || 0,
+	        weeks = normalizedInput.week || 0,
 	        days = normalizedInput.day || 0,
 	        hours = normalizedInput.hour || 0,
 	        minutes = normalizedInput.minute || 0,
@@ -12201,7 +12184,7 @@
 
 	      };
 	    } else if (!!(match = isoRegex.exec(input))) {
-	      sign = match[1] === '-' ? -1 : 1;
+	      sign = match[1] === '-' ? -1 : match[1] === '+' ? 1 : 1;
 	      duration = {
 	        y: parseIso(match[2], sign),
 	        M: parseIso(match[3], sign),
@@ -12243,7 +12226,10 @@
 	  }
 
 	  function positiveMomentsDifference(base, other) {
-	    var res = {};
+	    var res = {
+	      milliseconds: 0,
+	      months: 0
+	    };
 	    res.months = other.month() - base.month() + (other.year() - base.year()) * 12;
 
 	    if (base.clone().add(res.months, 'M').isAfter(other)) {
@@ -12354,7 +12340,7 @@
 	      return false;
 	    }
 
-	    units = normalizeUnits(units) || 'millisecond';
+	    units = normalizeUnits(!isUndefined(units) ? units : 'millisecond');
 
 	    if (units === 'millisecond') {
 	      return this.valueOf() > localInput.valueOf();
@@ -12370,7 +12356,7 @@
 	      return false;
 	    }
 
-	    units = normalizeUnits(units) || 'millisecond';
+	    units = normalizeUnits(!isUndefined(units) ? units : 'millisecond');
 
 	    if (units === 'millisecond') {
 	      return this.valueOf() < localInput.valueOf();
@@ -12380,15 +12366,8 @@
 	  }
 
 	  function isBetween(from, to, units, inclusivity) {
-	    var localFrom = isMoment(from) ? from : createLocal(from),
-	        localTo = isMoment(to) ? to : createLocal(to);
-
-	    if (!(this.isValid() && localFrom.isValid() && localTo.isValid())) {
-	      return false;
-	    }
-
 	    inclusivity = inclusivity || '()';
-	    return (inclusivity[0] === '(' ? this.isAfter(localFrom, units) : !this.isBefore(localFrom, units)) && (inclusivity[1] === ')' ? this.isBefore(localTo, units) : !this.isAfter(localTo, units));
+	    return (inclusivity[0] === '(' ? this.isAfter(from, units) : !this.isBefore(from, units)) && (inclusivity[1] === ')' ? this.isBefore(to, units) : !this.isAfter(to, units));
 	  }
 
 	  function isSame(input, units) {
@@ -12399,7 +12378,7 @@
 	      return false;
 	    }
 
-	    units = normalizeUnits(units) || 'millisecond';
+	    units = normalizeUnits(units || 'millisecond');
 
 	    if (units === 'millisecond') {
 	      return this.valueOf() === localInput.valueOf();
@@ -12628,149 +12607,74 @@
 	    return this._locale;
 	  }
 
-	  var MS_PER_SECOND = 1000;
-	  var MS_PER_MINUTE = 60 * MS_PER_SECOND;
-	  var MS_PER_HOUR = 60 * MS_PER_MINUTE;
-	  var MS_PER_400_YEARS = (365 * 400 + 97) * 24 * MS_PER_HOUR; // actual modulo - handles negative numbers (for dates before 1970):
-
-	  function mod$1(dividend, divisor) {
-	    return (dividend % divisor + divisor) % divisor;
-	  }
-
-	  function localStartOfDate(y, m, d) {
-	    // the date constructor remaps years 0-99 to 1900-1999
-	    if (y < 100 && y >= 0) {
-	      // preserve leap years using a full 400 year cycle, then reset
-	      return new Date(y + 400, m, d) - MS_PER_400_YEARS;
-	    } else {
-	      return new Date(y, m, d).valueOf();
-	    }
-	  }
-
-	  function utcStartOfDate(y, m, d) {
-	    // Date.UTC remaps years 0-99 to 1900-1999
-	    if (y < 100 && y >= 0) {
-	      // preserve leap years using a full 400 year cycle, then reset
-	      return Date.UTC(y + 400, m, d) - MS_PER_400_YEARS;
-	    } else {
-	      return Date.UTC(y, m, d);
-	    }
-	  }
-
 	  function startOf(units) {
-	    var time;
-	    units = normalizeUnits(units);
-
-	    if (units === undefined || units === 'millisecond' || !this.isValid()) {
-	      return this;
-	    }
-
-	    var startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
+	    units = normalizeUnits(units); // the following switch intentionally omits break keywords
+	    // to utilize falling through the cases.
 
 	    switch (units) {
 	      case 'year':
-	        time = startOfDate(this.year(), 0, 1);
-	        break;
+	        this.month(0);
+
+	      /* falls through */
 
 	      case 'quarter':
-	        time = startOfDate(this.year(), this.month() - this.month() % 3, 1);
-	        break;
-
 	      case 'month':
-	        time = startOfDate(this.year(), this.month(), 1);
-	        break;
+	        this.date(1);
+
+	      /* falls through */
 
 	      case 'week':
-	        time = startOfDate(this.year(), this.month(), this.date() - this.weekday());
-	        break;
-
 	      case 'isoWeek':
-	        time = startOfDate(this.year(), this.month(), this.date() - (this.isoWeekday() - 1));
-	        break;
-
 	      case 'day':
 	      case 'date':
-	        time = startOfDate(this.year(), this.month(), this.date());
-	        break;
+	        this.hours(0);
+
+	      /* falls through */
 
 	      case 'hour':
-	        time = this._d.valueOf();
-	        time -= mod$1(time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE), MS_PER_HOUR);
-	        break;
+	        this.minutes(0);
+
+	      /* falls through */
 
 	      case 'minute':
-	        time = this._d.valueOf();
-	        time -= mod$1(time, MS_PER_MINUTE);
-	        break;
+	        this.seconds(0);
+
+	      /* falls through */
 
 	      case 'second':
-	        time = this._d.valueOf();
-	        time -= mod$1(time, MS_PER_SECOND);
-	        break;
+	        this.milliseconds(0);
+	    } // weeks are a special case
+
+
+	    if (units === 'week') {
+	      this.weekday(0);
 	    }
 
-	    this._d.setTime(time);
+	    if (units === 'isoWeek') {
+	      this.isoWeekday(1);
+	    } // quarters are also special
 
-	    hooks.updateOffset(this, true);
+
+	    if (units === 'quarter') {
+	      this.month(Math.floor(this.month() / 3) * 3);
+	    }
+
 	    return this;
 	  }
 
 	  function endOf(units) {
-	    var time;
 	    units = normalizeUnits(units);
 
-	    if (units === undefined || units === 'millisecond' || !this.isValid()) {
+	    if (units === undefined || units === 'millisecond') {
 	      return this;
+	    } // 'date' is an alias for 'day', so it should be considered as such.
+
+
+	    if (units === 'date') {
+	      units = 'day';
 	    }
 
-	    var startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
-
-	    switch (units) {
-	      case 'year':
-	        time = startOfDate(this.year() + 1, 0, 1) - 1;
-	        break;
-
-	      case 'quarter':
-	        time = startOfDate(this.year(), this.month() - this.month() % 3 + 3, 1) - 1;
-	        break;
-
-	      case 'month':
-	        time = startOfDate(this.year(), this.month() + 1, 1) - 1;
-	        break;
-
-	      case 'week':
-	        time = startOfDate(this.year(), this.month(), this.date() - this.weekday() + 7) - 1;
-	        break;
-
-	      case 'isoWeek':
-	        time = startOfDate(this.year(), this.month(), this.date() - (this.isoWeekday() - 1) + 7) - 1;
-	        break;
-
-	      case 'day':
-	      case 'date':
-	        time = startOfDate(this.year(), this.month(), this.date() + 1) - 1;
-	        break;
-
-	      case 'hour':
-	        time = this._d.valueOf();
-	        time += MS_PER_HOUR - mod$1(time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE), MS_PER_HOUR) - 1;
-	        break;
-
-	      case 'minute':
-	        time = this._d.valueOf();
-	        time += MS_PER_MINUTE - mod$1(time, MS_PER_MINUTE) - 1;
-	        break;
-
-	      case 'second':
-	        time = this._d.valueOf();
-	        time += MS_PER_SECOND - mod$1(time, MS_PER_SECOND) - 1;
-	        break;
-	    }
-
-	    this._d.setTime(time);
-
-	    hooks.updateOffset(this, true);
-	    return this;
+	    return this.startOf(units).add(1, units === 'isoWeek' ? 'week' : units).subtract(1, 'ms');
 	  }
 
 	  function valueOf() {
@@ -13373,20 +13277,10 @@
 	    var milliseconds = this._milliseconds;
 	    units = normalizeUnits(units);
 
-	    if (units === 'month' || units === 'quarter' || units === 'year') {
+	    if (units === 'month' || units === 'year') {
 	      days = this._days + milliseconds / 864e5;
 	      months = this._months + daysToMonths(days);
-
-	      switch (units) {
-	        case 'month':
-	          return months;
-
-	        case 'quarter':
-	          return months / 3;
-
-	        case 'year':
-	          return months / 12;
-	      }
+	      return units === 'month' ? months : months / 12;
 	    } else {
 	      // handle milliseconds separately because of floating point math errors (issue #1867)
 	      days = this._days + Math.round(monthsToDays(this._months));
@@ -13439,7 +13333,6 @@
 	  var asDays = makeAs('d');
 	  var asWeeks = makeAs('w');
 	  var asMonths = makeAs('M');
-	  var asQuarters = makeAs('Q');
 	  var asYears = makeAs('y');
 
 	  function clone$1() {
@@ -13617,7 +13510,6 @@
 	  proto$2.asDays = asDays;
 	  proto$2.asWeeks = asWeeks;
 	  proto$2.asMonths = asMonths;
-	  proto$2.asQuarters = asQuarters;
 	  proto$2.asYears = asYears;
 	  proto$2.valueOf = valueOf$1;
 	  proto$2._bubble = bubble;
@@ -13653,7 +13545,7 @@
 	    config._d = new Date(toInt(input));
 	  }); // Side effect imports
 
-	  hooks.version = '2.24.0';
+	  hooks.version = '2.22.2';
 	  setHookCallback(createLocal);
 	  hooks.fn = proto;
 	  hooks.min = min;
@@ -13698,7 +13590,7 @@
 	    // <input type="time" step="1" />
 	    TIME_MS: 'HH:mm:ss.SSS',
 	    // <input type="time" step="0.001" />
-	    WEEK: 'GGGG-[W]WW',
+	    WEEK: 'YYYY-[W]WW',
 	    // <input type="week" />
 	    MONTH: 'YYYY-MM' // <input type="month" />
 
@@ -14794,6 +14686,18 @@
 	}();
 
 	var API_URL = "https://statsbot.co/cubejs-api/v1";
+	var mutexCounter = 0;
+	var MUTEX_ERROR = 'Mutex has been changed';
+
+	var mutexPromise = function mutexPromise(promise) {
+	  return new Promise(function (resolve, reject) {
+	    promise.then(function (r) {
+	      return resolve(r);
+	    }, function (e) {
+	      return e !== MUTEX_ERROR && reject(e);
+	    });
+	  });
+	};
 
 	var CubejsApi =
 	/*#__PURE__*/
@@ -14819,12 +14723,25 @@
 	  }, {
 	    key: "loadMethod",
 	    value: function loadMethod(request, toResult, options, callback) {
+	      var mutexValue = ++mutexCounter;
+
 	      if (typeof options === 'function' && !callback) {
 	        callback = options;
 	        options = undefined;
 	      }
 
 	      options = options || {};
+	      var mutexKey = options.mutexKey || 'default';
+
+	      if (options.mutexObj) {
+	        options.mutexObj[mutexKey] = mutexValue;
+	      }
+
+	      var checkMutex = function checkMutex() {
+	        if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
+	          throw MUTEX_ERROR;
+	        }
+	      };
 
 	      var loadImpl =
 	      /*#__PURE__*/
@@ -14844,23 +14761,26 @@
 	                  response = _context.sent;
 
 	                  if (!(response.status === 502)) {
-	                    _context.next = 5;
+	                    _context.next = 6;
 	                    break;
 	                  }
 
+	                  checkMutex();
 	                  return _context.abrupt("return", loadImpl());
 
-	                case 5:
-	                  _context.next = 7;
+	                case 6:
+	                  _context.next = 8;
 	                  return response.json();
 
-	                case 7:
+	                case 8:
 	                  body = _context.sent;
 
 	                  if (!(body.error === 'Continue wait')) {
-	                    _context.next = 11;
+	                    _context.next = 13;
 	                    break;
 	                  }
+
+	                  checkMutex();
 
 	                  if (options.progressCallback) {
 	                    options.progressCallback(new ProgressResult(body));
@@ -14868,18 +14788,20 @@
 
 	                  return _context.abrupt("return", loadImpl());
 
-	                case 11:
+	                case 13:
 	                  if (!(response.status !== 200)) {
-	                    _context.next = 13;
+	                    _context.next = 16;
 	                    break;
 	                  }
 
+	                  checkMutex();
 	                  throw new Error(body.error);
 
-	                case 13:
+	                case 16:
+	                  checkMutex();
 	                  return _context.abrupt("return", toResult(body));
 
-	                case 14:
+	                case 18:
 	                case "end":
 	                  return _context.stop();
 	              }
@@ -14893,13 +14815,13 @@
 	      }();
 
 	      if (callback) {
-	        loadImpl().then(function (r) {
+	        mutexPromise(loadImpl()).then(function (r) {
 	          return callback(null, r);
 	        }, function (e) {
 	          return callback(e);
 	        });
 	      } else {
-	        return loadImpl();
+	        return mutexPromise(loadImpl());
 	      }
 	    }
 	  }, {

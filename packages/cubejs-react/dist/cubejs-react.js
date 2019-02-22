@@ -34,6 +34,7 @@ function (_React$Component) {
 
     _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryRenderer).call(this, props));
     _this.state = {};
+    _this.mutexObj = {};
     return _this;
   }
 
@@ -76,7 +77,10 @@ function (_React$Component) {
       });
 
       if (this.props.loadSql === 'only') {
-        this.props.cubejsApi.sql(query).then(function (sqlQuery) {
+        this.props.cubejsApi.sql(query, {
+          mutexObj: this.mutexObj,
+          mutexKey: 'sql'
+        }).then(function (sqlQuery) {
           return _this2.setState({
             sqlQuery: sqlQuery,
             error: null,
@@ -90,7 +94,13 @@ function (_React$Component) {
           });
         });
       } else if (this.props.loadSql) {
-        Promise.all([this.props.cubejsApi.sql(query), this.props.cubejsApi.load(query)]).then(function (_ref) {
+        Promise.all([this.props.cubejsApi.sql(query, {
+          mutexObj: this.mutexObj,
+          mutexKey: 'sql'
+        }), this.props.cubejsApi.load(query, {
+          mutexObj: this.mutexObj,
+          mutexKey: 'query'
+        })]).then(function (_ref) {
           var _ref2 = _slicedToArray(_ref, 2),
               sqlQuery = _ref2[0],
               resultSet = _ref2[1];
@@ -109,7 +119,10 @@ function (_React$Component) {
           });
         });
       } else {
-        this.props.cubejsApi.load(query).then(function (resultSet) {
+        this.props.cubejsApi.load(query, {
+          mutexObj: this.mutexObj,
+          mutexKey: 'query'
+        }).then(function (resultSet) {
           return _this2.setState({
             resultSet: resultSet,
             error: null,
@@ -139,7 +152,10 @@ function (_React$Component) {
             name = _ref4[0],
             query = _ref4[1];
 
-        return _this3.props.cubejsApi.load(query).then(function (r) {
+        return _this3.props.cubejsApi.load(query, {
+          mutexObj: _this3.mutexObj,
+          mutexKey: name
+        }).then(function (r) {
           return [name, r];
         });
       }));

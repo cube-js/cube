@@ -23,6 +23,7 @@ var momentRange = require('moment-range');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
+require('core-js/modules/es6.promise');
 var whatwgFetch = require('whatwg-fetch');
 
 var moment = momentRange.extendMoment(Moment);
@@ -404,6 +405,18 @@ function () {
 }();
 
 var API_URL = "https://statsbot.co/cubejs-api/v1";
+var mutexCounter = 0;
+var MUTEX_ERROR = 'Mutex has been changed';
+
+var mutexPromise = function mutexPromise(promise) {
+  return new Promise(function (resolve, reject) {
+    promise.then(function (r) {
+      return resolve(r);
+    }, function (e) {
+      return e !== MUTEX_ERROR && reject(e);
+    });
+  });
+};
 
 var CubejsApi =
 /*#__PURE__*/
@@ -429,12 +442,25 @@ function () {
   }, {
     key: "loadMethod",
     value: function loadMethod(request, toResult, options, callback) {
+      var mutexValue = ++mutexCounter;
+
       if (typeof options === 'function' && !callback) {
         callback = options;
         options = undefined;
       }
 
       options = options || {};
+      var mutexKey = options.mutexKey || 'default';
+
+      if (options.mutexObj) {
+        options.mutexObj[mutexKey] = mutexValue;
+      }
+
+      var checkMutex = function checkMutex() {
+        if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
+          throw MUTEX_ERROR;
+        }
+      };
 
       var loadImpl =
       /*#__PURE__*/
@@ -454,23 +480,26 @@ function () {
                   response = _context.sent;
 
                   if (!(response.status === 502)) {
-                    _context.next = 5;
+                    _context.next = 6;
                     break;
                   }
 
+                  checkMutex();
                   return _context.abrupt("return", loadImpl());
 
-                case 5:
-                  _context.next = 7;
+                case 6:
+                  _context.next = 8;
                   return response.json();
 
-                case 7:
+                case 8:
                   body = _context.sent;
 
                   if (!(body.error === 'Continue wait')) {
-                    _context.next = 11;
+                    _context.next = 13;
                     break;
                   }
+
+                  checkMutex();
 
                   if (options.progressCallback) {
                     options.progressCallback(new ProgressResult(body));
@@ -478,18 +507,20 @@ function () {
 
                   return _context.abrupt("return", loadImpl());
 
-                case 11:
+                case 13:
                   if (!(response.status !== 200)) {
-                    _context.next = 13;
+                    _context.next = 16;
                     break;
                   }
 
+                  checkMutex();
                   throw new Error(body.error);
 
-                case 13:
+                case 16:
+                  checkMutex();
                   return _context.abrupt("return", toResult(body));
 
-                case 14:
+                case 18:
                 case "end":
                   return _context.stop();
               }
@@ -503,13 +534,13 @@ function () {
       }();
 
       if (callback) {
-        loadImpl().then(function (r) {
+        mutexPromise(loadImpl()).then(function (r) {
           return callback(null, r);
         }, function (e) {
           return callback(e);
         });
       } else {
-        return loadImpl();
+        return mutexPromise(loadImpl());
       }
     }
   }, {

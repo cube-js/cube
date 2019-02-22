@@ -5,6 +5,16 @@ import ProgressResult from './ProgressResult';
 
 const API_URL = process.env.CUBEJS_API_URL;
 
+let mutexCounter = 0;
+
+const MUTEX_ERROR = 'Mutex has been changed';
+
+const mutexPromise = (promise) => {
+  return new Promise((resolve, reject) => {
+    promise.then(r => resolve(r), e => e !== MUTEX_ERROR && reject(e));
+  })
+};
+
 class CubejsApi {
   constructor(apiToken, options) {
     options = options || {};
@@ -20,6 +30,7 @@ class CubejsApi {
   }
 
   loadMethod(request, toResult, options, callback) {
+    const mutexValue = ++mutexCounter;
     if (typeof options === 'function' && !callback) {
       callback = options;
       options = undefined;
@@ -27,28 +38,42 @@ class CubejsApi {
 
     options = options || {};
 
+    const mutexKey = options.mutexKey || 'default';
+    if (options.mutexObj) {
+      options.mutexObj[mutexKey] = mutexValue;
+    }
+
+    const checkMutex = () => {
+      if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
+        throw MUTEX_ERROR;
+      }
+    };
 
     const loadImpl = async () => {
       const response = await request();
       if (response.status === 502) {
+        checkMutex();
         return loadImpl(); // TODO backoff wait
       }
       const body = await response.json();
       if (body.error === 'Continue wait') {
+        checkMutex();
         if (options.progressCallback) {
           options.progressCallback(new ProgressResult(body));
         }
         return loadImpl();
       }
       if (response.status !== 200) {
+        checkMutex();
         throw new Error(body.error); // TODO error class
       }
+      checkMutex();
       return toResult(body);
     };
     if (callback) {
-      loadImpl().then(r => callback(null, r), e => callback(e));
+      mutexPromise(loadImpl()).then(r => callback(null, r), e => callback(e));
     } else {
-      return loadImpl();
+      return mutexPromise(loadImpl());
     }
   }
 
