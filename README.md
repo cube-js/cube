@@ -287,6 +287,7 @@ Create an instance of `CubejsServerCore` to embed it in an `Express` application
     * `driverFactory()` - pass function of the driver factory with your database type.
     * `logger(msg, params)` - pass function for your custom logger.
     * `schemaPath` - Path to the `schema` location. By default, it is `/schema`.
+    * `devServer` - Enable development server. By default, it is `true`.
     
 ```javascript
 import * as CubejsServerCore from "@cubejs-backend/server-core";
@@ -298,6 +299,7 @@ const express = express();
 const dbType = 'mysql';
 const config = {
   dbType,
+  devServer: false,
   driverFactory: () => CubejsServerCore.createDriver(dbType),
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
