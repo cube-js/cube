@@ -81,6 +81,7 @@ class CubejsServerCore {
       driverFactory: () => CubejsServerCore.createDriver(options.dbType),
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
+      devServer: true,
       ...options
     };
     if (
@@ -162,7 +163,9 @@ class CubejsServerCore {
       this.logger
     );
     apiGateway.initApp(app);
-    this.initDevEnv(app);
+    if (this.options.devServer) {
+      this.initDevEnv(app);
+    }
   }
 
   initDevEnv(app) {
