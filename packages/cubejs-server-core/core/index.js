@@ -81,6 +81,7 @@ class CubejsServerCore {
       driverFactory: () => CubejsServerCore.createDriver(options.dbType),
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
+      devServer: process.env.NODE_ENV !== 'production',
       ...options
     };
     if (
@@ -98,7 +99,7 @@ class CubejsServerCore {
     this.logger = options.logger || ((msg, params) => { console.log(`${msg}: ${JSON.stringify(params)}`)});
     this.repository = new FileRepository(this.schemaPath);
 
-    if (process.env.NODE_ENV !== 'production') {
+    if (this.options.devServer) {
       const Analytics = require('analytics-node');
       const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
       const { machineIdSync } = require('node-machine-id');
@@ -162,45 +163,45 @@ class CubejsServerCore {
       this.logger
     );
     apiGateway.initApp(app);
-    this.initDevEnv(app);
+    if (this.options.devServer) {
+      this.initDevEnv(app);
+    }
   }
 
   initDevEnv(app) {
-    if (process.env.NODE_ENV !== 'production') {
-      const port = process.env.PORT || 4000; // TODO
-      const localUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
-      const jwt = require('jsonwebtoken');
-      let cubejsToken = jwt.sign({}, this.apiSecret, { expiresIn: '1d' });
-      console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
-      console.log(`🦅 Dev environment available at ${localUrl}`);
-      this.event('Dev Server Start');
-      app.get('/', (req, res) => {
-        this.event('Dev Server Env Open');
-        const { getParameters } = require('codesandbox-import-utils/lib/api/define');
+    const port = process.env.PORT || 4000; // TODO
+    const localUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
+    const jwt = require('jsonwebtoken');
+    let cubejsToken = jwt.sign({}, this.apiSecret, { expiresIn: '1d' });
+    console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
+    console.log(`🦅 Dev environment available at ${localUrl}`);
+    this.event('Dev Server Start');
+    app.get('/', (req, res) => {
+      this.event('Dev Server Env Open');
+      const { getParameters } = require('codesandbox-import-utils/lib/api/define');
 
-        const parameters = getParameters({
-          files: {
-            'index.js': {
-              content: devServerIndexJs(localUrl, cubejsToken),
-            },
-            'package.json': {
-              content: {
-                dependencies: {
-                  '@cubejs-client/core': 'latest',
-                  '@cubejs-client/react': 'latest',
-                  'bizcharts': 'latest',
-                  'react': 'latest',
-                  'react-dom': 'latest'
-                }
-              },
+      const parameters = getParameters({
+        files: {
+          'index.js': {
+            content: devServerIndexJs(localUrl, cubejsToken),
+          },
+          'package.json': {
+            content: {
+              dependencies: {
+                '@cubejs-client/core': 'latest',
+                '@cubejs-client/react': 'latest',
+                'bizcharts': 'latest',
+                'react': 'latest',
+                'react-dom': 'latest'
+              }
             },
           },
-          template: 'create-react-app'
-        });
+        },
+        template: 'create-react-app'
+      });
 
-        res.redirect(`https://codesandbox.io/api/v1/sandboxes/define?parameters=${parameters}`);
-      })
-    }
+      res.redirect(`https://codesandbox.io/api/v1/sandboxes/define?parameters=${parameters}`);
+    })
   }
 
   createCompilerApi(repository) {
