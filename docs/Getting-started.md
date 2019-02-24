@@ -46,7 +46,7 @@ The `.env` file in this project directory contains placeholders for the relevant
 
 Cube.js uses Data Schema to generate and execute SQL.
 
-It acts as an ORM for your database and it is flexible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://statsbot.co/docs/getting-started-cubejs).
+It acts as an ORM for your database and it is flexible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](getting-started-cubejs-schema).
 
 You can generate schema files from your database tables using the `cubejs` CLI, or write them manually:
 
