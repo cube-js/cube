@@ -132,7 +132,9 @@ $ npm i --save @cubejs-client/react
 ### Example Usage
 
 #### Vanilla Javascript
-Instantiate Cube.js API and then use it to fetch data:
+Instantiate Cube.js API and then use it to fetch data. `CubejsApi.load` accepts
+query, which is a plain Javascript object. [Learn more about query format
+here.](query-format)
 
 ```js
 import cubejs from '@cubejs-client/core';
