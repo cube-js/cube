@@ -8,10 +8,10 @@ Cube.js currently provides connectors to the following databases:
 
 | Database             | Cube.js DB Type |
 | -------------------- |---------------- |
-| PostgreSQL           | `postgres`      |
-| MySQL                | `mysql`         |
-| AWS Athena           | `athena`        |
-| MongoDB (via MongoDB Connector for BI)           | `mysql`        |
+| PostgreSQL           | postgres      |
+| MySQL                | mysql         |
+| AWS Athena           | athena        |
+| MongoDB (via MongoDB Connector for BI)           | mysql        |
 
 MongoDB Connector for BI acts as a MySQL server on top of your MongoDB data, so
 you need to set `CUBEJS_DB_TYPE` to `mysql`. [Learn more about setup for MongoDB

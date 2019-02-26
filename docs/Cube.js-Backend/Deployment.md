@@ -14,7 +14,7 @@ deployment to AWS Lambda.
 
 Create Cube.js Serverless app:
 
-```
+```bash
 $ npm install -g serverless
 $ cubejs create -d athena -t serverless
 ```
@@ -25,7 +25,7 @@ Create AWS ElasticCache Redis instance within the same region where lambda hosts
 
 Add Redis security group and subnet to `serverless.yml` vpc settings:
 
-```
+```yaml
 provider:
   vpc:
     securityGroupIds:
@@ -44,7 +44,7 @@ Please follow [this guide](https://medium.com/@philippholly/aws-lambda-enable-ou
 
 Please add following permissions to `serverless.yml` if you need Athena within your Lambda functions:
 
-```
+```yaml
 provider:
   iamRoleStatements:
     - Effect: "Allow"
@@ -60,13 +60,13 @@ provider:
 
 ### Deploy
 
-```
+```bash
 $ serverless deploy -v
 ```
 
 ### Logs
 
-```
+```bash
 $ serverless logs -t -f cubejs
 $ serverless logs -t -f cubejsProcess
 ```
