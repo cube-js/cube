@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const R = require('ramda');
 const Joi = require('joi');
+const moment = require('moment');
 
 class UserError extends Error {}
 
@@ -57,12 +58,21 @@ const prepareAliasToMemberNameMap = (metaConfig, sqlQuery, query) => {
   )
 };
 
-const transformValue = (value) => value && value.value ? value.value : value; // TODO move to sql adapter
+const transformValue = (value, type) => {
+  if (value && type === 'time') {
+    return moment(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  }
+  return value && value.value ? value.value : value  // TODO move to sql adapter
+};
 
-const transformData = (aliasToMemberNameMap, data) => {
+
+const transformData = (aliasToMemberNameMap, annotation, data) => {
   return data.map(r => R.pipe(
     R.toPairs,
-    R.map(p => [aliasToMemberNameMap[p[0]], transformValue(p[1])]),
+    R.map(p => [
+      aliasToMemberNameMap[p[0]],
+      transformValue(p[1], annotation[aliasToMemberNameMap[p[0]]].type)
+    ]),
     R.fromPairs
   )(r));
 };
@@ -202,9 +212,14 @@ class ApiGateway {
           type: 'Load Request Success',
           query: req.query.query,
         });
+        const flattenAnnotation = {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        };
         res.json({
           query: normalizedQuery,
-          data: transformData(aliasToMemberNameMap, response.data),
+          data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data),
           annotation
         });
       } catch (e) {

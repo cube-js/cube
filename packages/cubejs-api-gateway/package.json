@@ -13,6 +13,7 @@
   "dependencies": {
     "joi": "^14.0.6",
     "jsonwebtoken": "^8.3.0",
+    "moment": "^2.24.0",
     "ramda": "^0.25.0"
   },
   "devDependencies": {
