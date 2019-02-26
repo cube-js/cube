@@ -106,25 +106,25 @@ You can also add schema files to the `schema` folder manually:
 ```javascript
 // schema/users.js
 
-cube(`Users`, {
+cube('Users', {
    measures: {
-     type: `count`
+     type: 'count'
    },
 
    dimensions: {
      age: {
-       type: `number`,
-       sql: `age`
+       type: 'number',
+       sql: 'age'
      },
 
      createdAt: {
-       type: `time`,
-       sql: `createdAt`
+       type: 'time',
+       sql: 'createdAt'
      },
 
      country: {
-       type: `string`,
-       sql: `country`
+       type: 'string',
+       sql: 'country'
      }
    }
 });
@@ -182,7 +182,7 @@ const resultSet = await cubejsApi.load({
     granularity: 'month'
   }]
 })
-const context = document.getElementById("myChart");
+const context = document.getElementById('myChart');
 new Chart(context, chartjsConfig(resultSet));
 ```
 
@@ -268,7 +268,7 @@ For example if you want to pass user id in security context you can create token
 }
 ```
 
-In this case `{ id: 42 }` object will be accessible as `USER_CONTEXT` in cube.js Data Schema.
+In this case `{ "id": 42 }` object will be accessible as `USER_CONTEXT` in cube.js Data Schema.
 Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-user-context).
 
 > *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
@@ -290,7 +290,7 @@ Create an instance of `CubejsServerCore` to embed it in an `Express` application
     * `devServer` - Enable development server. By default, it is `true`.
     
 ```javascript
-import * as CubejsServerCore from "@cubejs-backend/server-core";
+import * as CubejsServerCore from '@cubejs-backend/server-core';
 import * as express from 'express';
 import * as path from 'path';
 
@@ -322,11 +322,11 @@ Create instance of `CubejsApi`.
    * `apiUrl` - URL of your Cube.js Backend. By default, in the development environment it is http://localhost:4000/cubejs-api/v1.
 
 ```javascript
-import cubejs from "@cubejs-client/core";
+import cubejs from '@cubejs-client/core';
 
 const cubejsApi = cubejs(
-  "CUBEJS-API-TOKEN",
-  { apiUrl: "http://localhost:4000/cubejs-api/v1" }
+  'CUBEJS-API-TOKEN',
+  { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
 );
 ```
 
