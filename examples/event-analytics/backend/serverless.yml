@@ -5,10 +5,10 @@ package:
     - secrets.yml
 
 custom:
-  stage: ${opt:stage, self:provider.stage}
-  secrets: ${file(secrets.yml):${self:custom.stage}}
+  secrets: ${file(secrets.yml):${self:provider.stage}}
 
 provider:
+  stage: ${opt:stage, 'dev'}
   name: aws
   runtime: nodejs8.10
   iamRoleStatements:
@@ -32,7 +32,8 @@ provider:
     CUBEJS_DB_TYPE: "${self:custom.secrets.CUBEJS_DB_TYPE}"
     CUBEJS_API_SECRET: "${self:custom.secrets.CUBEJS_API_SECRET}"
     REDIS_URL: "${self:custom.secrets.REDIS_URL}"
-    CUBEJS_APP: event-analytics-example-dev
+    CUBEJS_APP: "${self:service.name}-${self:provider.stage}"
+    NODE_ENV: "${self:provider.stage}"
     CUBEJS_API_URL:
       Fn::Join:
         - ""
@@ -61,7 +62,7 @@ functions:
     handler: cube.process
     timeout: 630
     events:
-      - sns: event-analytics-example-dev-process
+      - sns: "${self:service.name}-${self:provider.stage}-process"
 
 plugins:
   - serverless-express
