@@ -239,6 +239,7 @@ export default () => {
 - [Building E-commerce Analytics React Dashboard with Cube.js and Flatlogic](https://statsbot.co/blog/building-analytics-react-dashboard-with-cube.js)
 - [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
 - [Building MongoDB Dashboard using Node.js](https://statsbot.co/blog/building-mongodb-dashboard-using-node.js)
+- [Building an Open Source Mixpanel Alternative](https://statsbot.co/blog/building-an-open-source-mixpanel-alternative-1/)
 
 ## Community
 
