@@ -2,19 +2,20 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/api-gateway@0.0.20":
-  version "0.0.20"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.20.tgz#bb0f18fbcbd2d8341c971297f2980b82f262fcea"
-  integrity sha512-oSCNA+G3Rd05zw1xQDYHJoxOQiW7jHJ/BtYivkia+HHW1oAun490uauqHV0b7+XfqV2QJA/A0eZQRxrbqo7ogA==
+"@cubejs-backend/api-gateway@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.26.tgz#9ba5b35b613d524b934072c1d14bb7b717af2103"
+  integrity sha512-3hJgzweTedq9NlLECZCLhLUjigbVO7IXTmb+9jaZsGdypbmT4jrQT91d+uvQCkQdsO9QS7erPyTumJs0kZ/iPA==
   dependencies:
     joi "^14.0.6"
     jsonwebtoken "^8.3.0"
+    moment "^2.24.0"
     ramda "^0.25.0"
 
-"@cubejs-backend/query-orchestrator@0.0.25":
-  version "0.0.25"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.25.tgz#d84f1cf55c89317a2220407686c9cd5cfe61eddc"
-  integrity sha512-VP52TUtGhQG68wFrpPehhdEd3spWjYkvV0swPXa0isrRB9ieevTFr4tr8DpStvojcTOP/a4bXwBkQJlYTsWycQ==
+"@cubejs-backend/query-orchestrator@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.26.tgz#3cb5f1d8b32f70355ee357a22d3a31f630fc44b2"
+  integrity sha512-hDxSbwmAaVMtsXfmNgB6DMa/E9zUkBuebdrfb8sM8/vJnXhYqg3KnHyQvVpotnEdm8kWOaKYuOPXvik52nJriA==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
@@ -1129,6 +1130,11 @@ moment-timezone@^0.5.13:
   version "2.23.0"
   resolved "https://registry.yarnpkg.com/moment/-/moment-2.23.0.tgz#759ea491ac97d54bac5ad776996e2a58cc1bc225"
   integrity sha512-3IE39bHVqFbWWaPOMHZF98Q9c3LDKGTmypMiTM2QygGXXElkFWIH7GxfmlwmY2vwa+wmNsoYZmG2iusf1ZjJoA==
+
+moment@^2.24.0:
+  version "2.24.0"
+  resolved "https://registry.yarnpkg.com/moment/-/moment-2.24.0.tgz#0d055d53f5052aa653c9f6eb68bb5d12bf5c2b5b"
+  integrity sha512-bV7f+6l2QigeBBZSM/6yTNq4P2fNpSWj/0e7jQcy87A8e7o2nAfP/34/2ky5Vw4B9S446EtIhodAzkFCcR4dQg==
 
 ms@2.0.0:
   version "2.0.0"
