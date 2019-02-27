@@ -2,19 +2,20 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/api-gateway@0.0.20":
-  version "0.0.20"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.20.tgz#bb0f18fbcbd2d8341c971297f2980b82f262fcea"
-  integrity sha512-oSCNA+G3Rd05zw1xQDYHJoxOQiW7jHJ/BtYivkia+HHW1oAun490uauqHV0b7+XfqV2QJA/A0eZQRxrbqo7ogA==
+"@cubejs-backend/api-gateway@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.26.tgz#9ba5b35b613d524b934072c1d14bb7b717af2103"
+  integrity sha512-3hJgzweTedq9NlLECZCLhLUjigbVO7IXTmb+9jaZsGdypbmT4jrQT91d+uvQCkQdsO9QS7erPyTumJs0kZ/iPA==
   dependencies:
     joi "^14.0.6"
     jsonwebtoken "^8.3.0"
+    moment "^2.24.0"
     ramda "^0.25.0"
 
-"@cubejs-backend/query-orchestrator@^0.0.21":
-  version "0.0.21"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.21.tgz#b5a0422a34931a834f4429280679460d08dc6112"
-  integrity sha512-jQS5F2D9PzKEJ4guzba6S2PymruA5pTIFu4DnOnM7Y3sFQkjVDcl7KYEr5VmpX6+Hu1u+naApuCQo2l6PtOXKg==
+"@cubejs-backend/query-orchestrator@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.26.tgz#3cb5f1d8b32f70355ee357a22d3a31f630fc44b2"
+  integrity sha512-hDxSbwmAaVMtsXfmNgB6DMa/E9zUkBuebdrfb8sM8/vJnXhYqg3KnHyQvVpotnEdm8kWOaKYuOPXvik52nJriA==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
@@ -38,13 +39,13 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@0.0.24":
-  version "0.0.24"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.24.tgz#ccf9abca77be5eabc7d6a4715caa80c9e049b4e0"
-  integrity sha512-03DvPUsmSJWrNfUQLMBr5Jm69pKjyNBNNiCntBulAe42bt25HdK/P1+7E4P2AdJo8qDih8JcbseU1fa5NqWkAg==
+"@cubejs-backend/server-core@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.26.tgz#cc3473db0f59596101a7a90012a693e577687747"
+  integrity sha512-iKCCrsM7eNVAbSKKdWwTGFBhKJSBp2z+G7pFZh2j8jJgO9KttJmzCYBncm0mtV+XDuLVa+bl1PKayD9jjyIzew==
   dependencies:
-    "@cubejs-backend/api-gateway" "0.0.20"
-    "@cubejs-backend/query-orchestrator" "^0.0.21"
+    "@cubejs-backend/api-gateway" "0.0.26"
+    "@cubejs-backend/query-orchestrator" "0.0.26"
     "@cubejs-backend/schema-compiler" "0.0.20"
     analytics-node "^3.3.0"
     codesandbox-import-utils "^1.3.8"
@@ -1415,7 +1416,7 @@ moment-timezone@^0.5.13:
   dependencies:
     moment ">= 2.9.0"
 
-"moment@>= 2.9.0":
+"moment@>= 2.9.0", moment@^2.24.0:
   version "2.24.0"
   resolved "https://registry.yarnpkg.com/moment/-/moment-2.24.0.tgz#0d055d53f5052aa653c9f6eb68bb5d12bf5c2b5b"
   integrity sha512-bV7f+6l2QigeBBZSM/6yTNq4P2fNpSWj/0e7jQcy87A8e7o2nAfP/34/2ky5Vw4B9S446EtIhodAzkFCcR4dQg==
