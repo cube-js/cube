@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@cubejs-backend/athena-driver": "0.0.25",
-    "@cubejs-backend/server": "0.0.24",
+    "@cubejs-backend/server": "0.0.26",
     "@cubejs-backend/serverless": "0.0.25"
   }
 }

@@ -11,6 +11,16 @@
     jsonwebtoken "^8.3.0"
     ramda "^0.25.0"
 
+"@cubejs-backend/api-gateway@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.0.26.tgz#9ba5b35b613d524b934072c1d14bb7b717af2103"
+  integrity sha512-3hJgzweTedq9NlLECZCLhLUjigbVO7IXTmb+9jaZsGdypbmT4jrQT91d+uvQCkQdsO9QS7erPyTumJs0kZ/iPA==
+  dependencies:
+    joi "^14.0.6"
+    jsonwebtoken "^8.3.0"
+    moment "^2.24.0"
+    ramda "^0.25.0"
+
 "@cubejs-backend/athena-driver@0.0.25":
   version "0.0.25"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/athena-driver/-/athena-driver-0.0.25.tgz#0031f970fd57f86d58387486b29e32f07e53627c"
@@ -19,6 +29,15 @@
     "@cubejs-backend/query-orchestrator" "^0.0.21"
     aws-sdk "^2.403.0"
     sqlstring "^2.3.1"
+
+"@cubejs-backend/query-orchestrator@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.26.tgz#3cb5f1d8b32f70355ee357a22d3a31f630fc44b2"
+  integrity sha512-hDxSbwmAaVMtsXfmNgB6DMa/E9zUkBuebdrfb8sM8/vJnXhYqg3KnHyQvVpotnEdm8kWOaKYuOPXvik52nJriA==
+  dependencies:
+    ramda "^0.24.1"
+    redis "^2.8.0"
+    util-promisifyall "^1.0.4"
 
 "@cubejs-backend/query-orchestrator@^0.0.21":
   version "0.0.21"
@@ -63,12 +82,28 @@
     promise-timeout "^1.3.0"
     ramda "^0.25.0"
 
-"@cubejs-backend/server@0.0.24":
-  version "0.0.24"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.0.24.tgz#6f96f521681f5daad682f0d64a5e3e29e2698f51"
-  integrity sha512-2L0ZKUgTQfIAQkSq9Og8DTnPlVf4Phh0v6Wxz8m1b+3haFr1ril8pFjK7OPJAz0IFGVeVUiGK8uNUK8egHid0w==
+"@cubejs-backend/server-core@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.0.26.tgz#cc3473db0f59596101a7a90012a693e577687747"
+  integrity sha512-iKCCrsM7eNVAbSKKdWwTGFBhKJSBp2z+G7pFZh2j8jJgO9KttJmzCYBncm0mtV+XDuLVa+bl1PKayD9jjyIzew==
   dependencies:
-    "@cubejs-backend/server-core" "0.0.24"
+    "@cubejs-backend/api-gateway" "0.0.26"
+    "@cubejs-backend/query-orchestrator" "0.0.26"
+    "@cubejs-backend/schema-compiler" "0.0.20"
+    analytics-node "^3.3.0"
+    codesandbox-import-utils "^1.3.8"
+    fs-extra "^7.0.1"
+    jsonwebtoken "^8.4.0"
+    node-machine-id "^1.1.10"
+    promise-timeout "^1.3.0"
+    ramda "^0.25.0"
+
+"@cubejs-backend/server@0.0.26":
+  version "0.0.26"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.0.26.tgz#2971f89023d8e8b05990cd80aa96bcd65740f669"
+  integrity sha512-MdslOqivob9Fm61c8y0rWPaHTrU8L4ob3EsMqGM+HsR097zl162gcluftw7xEK4f1clvgVKZUH63eMvBEHlJeQ==
+  dependencies:
+    "@cubejs-backend/server-core" "0.0.26"
     analytics-node "^3.3.0"
     body-parser "^1.15.2"
     codesandbox-import-utils "^1.3.8"
@@ -915,7 +950,7 @@ moment-timezone@^0.5.13:
   dependencies:
     moment ">= 2.9.0"
 
-"moment@>= 2.9.0":
+"moment@>= 2.9.0", moment@^2.24.0:
   version "2.24.0"
   resolved "https://registry.yarnpkg.com/moment/-/moment-2.24.0.tgz#0d055d53f5052aa653c9f6eb68bb5d12bf5c2b5b"
   integrity sha512-bV7f+6l2QigeBBZSM/6yTNq4P2fNpSWj/0e7jQcy87A8e7o2nAfP/34/2ky5Vw4B9S446EtIhodAzkFCcR4dQg==
