@@ -30,6 +30,7 @@
     "babel-runtime": "^6.26.0",
     "babelrc-rollup": "^3.0.0",
     "http-server": "^0.11.1",
+    "lerna": "^3.13.1",
     "rollup": "^0.65.2",
     "rollup-plugin-alias": "^1.4.0",
     "rollup-plugin-babel": "^4.0.3",
