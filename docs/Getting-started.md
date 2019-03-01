@@ -5,7 +5,7 @@ category: Getting Started
 ---
 
 ## 1. Install with NPM or Yarn
-Cube.js CLI can be installed via NPM or Yarn.
+Cube.js CLI is used for various Cube.js workflows. It can be installed via NPM or Yarn.
 
 ### NPM
 ```bash
