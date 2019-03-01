@@ -117,6 +117,8 @@ class BaseMeasure {
       return 'date';
     } else if (interval.match(/month/)) {
       return 'month';
+    } else if (interval.match(/year/)) {
+      return 'year';
     } else if (interval.match(/week/)) {
       return 'week';
     } else if (interval.match(/hour/)) {

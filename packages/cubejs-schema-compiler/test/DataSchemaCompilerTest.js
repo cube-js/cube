@@ -218,7 +218,7 @@ describe('DataSchemaCompiler', () => {
         res.should.be.deepEqual(
           [
             { "visitors.status": "Approved", "visitors.visitor_count": "2" },
-            { "visitors.status": "Canceled", "visitors.visitor_count": "3" }
+            { "visitors.status": "Canceled", "visitors.visitor_count": "4" }
           ]
         );
       });

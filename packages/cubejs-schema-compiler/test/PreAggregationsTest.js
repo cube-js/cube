@@ -386,7 +386,7 @@ describe('PreAggregations', () => {
         console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [
-            { "visitors.checkins_count": "0", "visitors.count": "2" },
+            { "visitors.checkins_count": "0", "visitors.count": "3" },
             { "visitors.checkins_count": "1", "visitors.count": "1" },
             { "visitors.checkins_count": "2", "visitors.count": "1" },
             { "visitors.checkins_count": "3", "visitors.count": "1" }

@@ -11,6 +11,9 @@ const TIME_SERIES = {
   month: (range) =>
     Array.from(range.snapTo('month').by('month'))
       .map(d => d.format('YYYY-MM-01T00:00:00.000')),
+  year: (range) =>
+    Array.from(range.snapTo('year').by('year'))
+      .map(d => d.format('YYYY-01-01T00:00:00.000')),
   hour: (range) =>
     Array.from(range.by('hour'))
       .map(d => d.format('YYYY-MM-DDTHH:00:00.000')),

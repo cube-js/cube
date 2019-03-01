@@ -32,7 +32,8 @@ const GRANULARITY_TO_INTERVAL = {
   date: (date) => `FORMAT(${date}, 'yyyy-MM-ddT00:00:00.000Z')`,
   week: (date) => `FORMAT(dateadd(week, DATEDIFF(week, '1900-01-01', ${date}), '1900-01-01'), 'yyyy-MM-ddT00:00:00.000Z')`,
   hour: (date) => `FORMAT(${date}, 'yyyy-MM-ddTHH:00:00.000Z')`,
-  month: (date) => `FORMAT(${date}, 'yyyy-MM-01T00:00:00.000Z')`
+  month: (date) => `FORMAT(${date}, 'yyyy-MM-01T00:00:00.000Z')`,
+  year: (date) => `FORMAT(${date}, 'yyyy-01-01T00:00:00.000Z')`
 };
 
 class MssqlFilter extends BaseFilter {

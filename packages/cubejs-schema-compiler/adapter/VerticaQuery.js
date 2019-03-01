@@ -4,7 +4,8 @@ const GRANULARITY_TO_INTERVAL = {
   date: 'DD',
   week: 'W',
   hour: 'HH24',
-  month: 'MM'
+  month: 'MM',
+  year: 'YY'
 };
 
 class VerticaQuery extends BaseQuery {

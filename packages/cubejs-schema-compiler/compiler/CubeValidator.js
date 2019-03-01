@@ -64,7 +64,7 @@ const BasePreAggregation = {
     sql: Joi.func().required()
   }),
   useOriginalSqlPreAggregations: Joi.boolean(),
-  partitionGranularity: Joi.any().valid('day', 'week', 'month')
+  partitionGranularity: Joi.any().valid('day', 'week', 'month', 'year')
 };
 
 const cubeSchema = Joi.object().keys({
@@ -155,7 +155,7 @@ const cubeSchema = Joi.object().keys({
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
       timeDimensionReference: Joi.func().required(),
-      granularity: Joi.any().valid('hour', 'day', 'week', 'month').required()
+      granularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year').required()
     }))
   ))
 });

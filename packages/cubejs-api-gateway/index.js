@@ -80,7 +80,7 @@ const transformData = (aliasToMemberNameMap, annotation, data) => {
 };
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(hour|day|week|month))?$/);
+const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(hour|day|week|month|year))?$/);
 
 const operators = [
   'equals',
@@ -112,7 +112,7 @@ const querySchema = Joi.object().keys({
   })),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
-    granularity: Joi.valid('day', 'month', 'week', 'hour', null),
+    granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', null),
     dateRange: Joi.array().items(Joi.string()).min(1).max(2)
   })),
   segments: Joi.array().items(id),

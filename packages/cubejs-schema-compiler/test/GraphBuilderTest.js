@@ -738,7 +738,7 @@ describe('JoinGraph', () => {
             "visitors.visitor_count": "2"
           }, {
             "visitors.source": null,
-            "visitors.visitor_count": "2"
+            "visitors.visitor_count": "3"
           }]
         );
       });
@@ -1233,6 +1233,32 @@ describe('JoinGraph', () => {
     }, [
       { 'visitors.id': 1 },
       { 'visitors.id': 2 }
+    ])
+  );
+
+  it('year granularity', () =>
+    runQueryTest({
+      measures: [
+        'visitors.visitor_count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'year',
+        dateRange: ['2016-01-09', '2017-01-10']
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      {
+        "visitors.created_at_year": "2016-01-01T00:00:00.000Z",
+        "visitors.visitor_count": "1"
+      },
+      {
+        "visitors.created_at_year": "2017-01-01T00:00:00.000Z",
+        "visitors.visitor_count": "5"
+      }
     ])
   );
 });

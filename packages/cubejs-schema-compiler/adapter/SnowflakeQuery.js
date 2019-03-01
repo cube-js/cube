@@ -4,7 +4,8 @@ const GRANULARITY_TO_INTERVAL = {
   date: 'DAY',
   week: 'WEEK',
   hour: 'HOUR',
-  month: 'MONTH'
+  month: 'MONTH',
+  year: 'YEAR'
 };
 
 class SnowflakeQuery extends BaseQuery {

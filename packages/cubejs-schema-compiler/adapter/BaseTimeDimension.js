@@ -11,6 +11,9 @@ const TIME_SERIES = {
   month: (range) =>
     Array.from(range.snapTo('month').by('month'))
       .map(d => [d.format('YYYY-MM-01T00:00:00.000'), d.endOf('month').format('YYYY-MM-DDT23:59:59.999')]),
+  year: (range) =>
+    Array.from(range.snapTo('year').by('year'))
+      .map(d => [d.format('YYYY-01-01T00:00:00.000'), d.endOf('year').format('YYYY-MM-DDT23:59:59.999')]),
   hour: (range) =>
     Array.from(range.by('hour'))
       .map(d => [d.format('YYYY-MM-DDTHH:00:00.000'), d.format('YYYY-MM-DDTHH:59:59.999')]),
@@ -126,7 +129,6 @@ class BaseTimeDimension extends BaseFilter {
       ];
     }
     const range = moment.range(this.dateFromFormatted(), this.dateToFormatted());
-    console.log(JSON.stringify(Array.from(range.by('month'))));
     if (!TIME_SERIES[this.granularity]) {
       throw new UserError(`Unsupported time granularity: ${this.granularity}`);
     }

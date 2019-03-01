@@ -38,6 +38,11 @@ var TIME_SERIES = {
       return d.format('YYYY-MM-01T00:00:00.000');
     });
   },
+  year: function year(range) {
+    return Array.from(range.snapTo('year').by('year')).map(function (d) {
+      return d.format('YYYY-01-01T00:00:00.000');
+    });
+  },
   hour: function hour(range) {
     return Array.from(range.by('hour')).map(function (d) {
       return d.format('YYYY-MM-DDTHH:00:00.000');
@@ -525,7 +530,7 @@ function () {
                   return _context.stop();
               }
             }
-          }, _callee, this);
+          }, _callee);
         }));
 
         return function loadImpl() {

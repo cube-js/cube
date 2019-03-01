@@ -333,6 +333,8 @@ class BaseQuery {
       return 'date';
     } else if (granularityA === 'month' && granularityB === 'month') {
       return 'month';
+    } else if (granularityA === 'year' && granularityB === 'year') {
+      return 'year';
     } else if (granularityA === 'week' && granularityB === 'week') {
       return 'week';
     }

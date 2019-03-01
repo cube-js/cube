@@ -5,7 +5,8 @@ const GRANULARITY_TO_INTERVAL = {
   date: 'DAY',
   week: 'WEEK(MONDAY)',
   hour: 'HOUR',
-  month: 'MONTH'
+  month: 'MONTH',
+  year: 'YEAR'
 };
 
 class BigqueryFilter extends BaseFilter {

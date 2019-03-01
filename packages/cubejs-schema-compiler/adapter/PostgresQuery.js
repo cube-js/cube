@@ -5,7 +5,8 @@ const GRANULARITY_TO_INTERVAL = {
   date: 'day',
   week: 'week',
   hour: 'hour',
-  month: 'month'
+  month: 'month',
+  year: 'year'
 };
 
 class PostgresParamAllocator extends ParamAllocator {

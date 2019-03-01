@@ -103,9 +103,7 @@ const bundle = (name, globalName, baseConfig) => {
 
 export default bundle('cubejs-client-core', 'cubejs', {
   input: "packages/cubejs-client-core/src/index.js",
-}).concat(bundle('cubejs-chartjs', 'chartjsConfig', {
-  input: "packages/cubejs-chartjs/src/index.js",
-})).concat(bundle('cubejs-react', 'cubejsReact', {
+}).concat(bundle('cubejs-react', 'cubejsReact', {
   input: "packages/cubejs-react/src/index.js",
   external: [
     'react',
