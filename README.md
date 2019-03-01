@@ -19,7 +19,7 @@ Unlike others, it is not a monolith application, but a set of modules, which doe
 
 ### Cube.js Frontend
 
-- __Cube.js Javascript Client.__ It provides idempotent long polling API which guarantees analytic query results delivery without request time frame limitations and tolerant to connectivity issues.
+- __Cube.js Javascript Client.__ Сore set of methods to access Cube.js API Gateway and to work with query result sets.
 - __Cube.js React.__ React wrapper for Cube.js API.
 
 ## Why Cube.js?
