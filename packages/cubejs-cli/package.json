@@ -13,11 +13,6 @@
     "test": "jest",
     "lint": "eslint -c .eslintrc.js *.js"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm test"
-    }
-  },
   "files": [
     "index.js",
     "cubejsCli.js",
