@@ -33,6 +33,7 @@ const prepareAnnotation = (metaConfig, query) => {
   return {
     measures: R.fromPairs((query.measures || []).map(annotation('measures')).filter(a => !!a)),
     dimensions: R.fromPairs((query.dimensions || []).map(annotation('dimensions')).filter(a => !!a)),
+    segments: R.fromPairs((query.segments || []).map(annotation('segments')).filter(a => !!a)),
     timeDimensions: R.fromPairs((query.timeDimensions || []).map(td => annotation('dimensions')(td.dimension)).filter(a => !!a)), // TODO
   }
 };
@@ -52,6 +53,7 @@ const prepareAliasToMemberNameMap = (metaConfig, sqlQuery, query) => {
   return R.fromPairs(
     (query.measures || []).map(lookupAlias('measures'))
       .concat((query.dimensions || []).map(lookupAlias('dimensions')))
+      .concat((query.segments || []).map(lookupAlias('segments')))
       .concat((query.timeDimensions || []).map(td => lookupAlias('dimensions')(td.dimension)))
       .concat(sqlQuery.timeDimensionAlias ? [[sqlQuery.timeDimensionAlias, sqlQuery.timeDimensionField]] : [])
       .filter(a => !!a)
@@ -62,7 +64,7 @@ const transformValue = (value, type) => {
   if (value && type === 'time') {
     return moment(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
-  return value && value.value ? value.value : value  // TODO move to sql adapter
+  return value && value.value ? value.value : value; // TODO move to sql adapter
 };
 
 
@@ -77,8 +79,8 @@ const transformData = (aliasToMemberNameMap, annotation, data) => {
   )(r));
 };
 
-const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/)
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(hour|day|week|month))?$/)
+const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
+const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(hour|day|week|month))?$/);
 
 const operators = [
   'equals',
@@ -113,6 +115,7 @@ const querySchema = Joi.object().keys({
     granularity: Joi.valid('day', 'month', 'week', 'hour', null),
     dateRange: Joi.array().items(Joi.string()).min(1).max(2)
   })),
+  segments: Joi.array().items(id),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(1).max(50000)
 });
