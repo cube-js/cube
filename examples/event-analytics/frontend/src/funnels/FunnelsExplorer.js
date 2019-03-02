@@ -6,7 +6,8 @@ import Select from 'react-select';
 import Funnel from './Funnel';
 
 const options = [
-  { value: 'Reports', label: 'Reports' }
+  { value: 'ReportsFunnel', label: 'Reports' },
+  { value: 'FunnelsUsageFunnel', label: 'Funnels Usage' }
 ]
 
 class FunnelsExplorer extends Component {
@@ -24,7 +25,10 @@ class FunnelsExplorer extends Component {
           <Select
             options={options}
             placeholder="Select a funnel"
-            onChange={(value) => this.setState({funnelId: value.value}) }
+            onChange={(value) => {
+              window.snowplow('trackStructEvent', 'Funnels', 'Funnel Selected');
+              this.setState({funnelId: value.value})
+            }}
           />
         </Grid>
         { this.state.funnelId &&

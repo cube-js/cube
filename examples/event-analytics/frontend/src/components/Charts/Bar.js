@@ -30,7 +30,7 @@ const resolveFormat = (resultSet) => {
   }
 }
 
-export default ({ resultSet }) => {
+export default ({ resultSet, label }) => {
   return (
   <ResponsiveContainer>
     <BarChart margin={{ top: 20 }} data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
@@ -39,7 +39,7 @@ export default ({ resultSet }) => {
       <YAxis/>
       <Tooltip/>
       {extractSeries(resultSet).map((s, i) =>
-        <Bar label={{ position: 'top' }} key={i} dataKey={s} name={humanName(resultSet, s)} stackId="a" fill={COLORS[i % COLORS.length]} />
+        <Bar label={label} key={i} dataKey={s} name={humanName(resultSet, s)} stackId="a" fill={COLORS[i % COLORS.length]} />
       )}
       <Legend />
     </BarChart>

@@ -4,9 +4,10 @@ import Chart from '../components/Charts';
 const Funnel = ({ id }) => (
   <Chart
     type="bar"
+    options={{label: { position: 'top' }}}
     query={{
-      measures: [`${id}Funnel.conversions`],
-      dimensions: [`${id}Funnel.step`]
+      measures: [`${id}.conversions`],
+      dimensions: [`${id}.step`]
     }}
   />
 )

@@ -60,7 +60,7 @@ const Error = ({ error }) => (
   </>
 )
 
-const Chart = ({ title, query, type, classes }) => (
+const Chart = ({ title, query, type, classes, options }) => (
   <Card>
     <CardHeader title={title} />
     <CardContent>
@@ -70,7 +70,7 @@ const Chart = ({ title, query, type, classes }) => (
           query={query}
           render={({ resultSet, loadingState, error }) => {
             if (resultSet) {
-              return rendetChart(type, { resultSet });
+              return rendetChart(type, { resultSet, ...options });
             }
 
             if (error) {
@@ -88,7 +88,8 @@ const Chart = ({ title, query, type, classes }) => (
 Chart.propTypes = {
   title: PropTypes.string,
   type: PropTypes.oneOf(Object.keys(supportedTypes)).isRequired,
-  query: PropTypes.object
+  query: PropTypes.object,
+  options: PropTypes.object
 }
 
 Chart.defaultprops = {

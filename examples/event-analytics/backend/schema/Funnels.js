@@ -2,46 +2,70 @@ import Funnels from 'Funnels';
 
 import { eventsSQl, PAGE_VIEW_EVENT } from './Events.js';
 
-let funnelConfig = {
-  userId: {
-    sql: () => `user_id`
-  },
-  time: {
-    sql: () => `time`
-  },
-  steps: []
-}
-
 const funnels = [
   {
     title: 'ReportsFunnel',
     steps: {
       view_reports_page: [PAGE_VIEW_EVENT, 'Reports'],
       selected_event: ['Reports', 'Event Selected'],
-      saved_report: ['Reports', 'Save Button Clicked']
+      report_saved: ['Reports', 'Save Button Clicked']
+    }
+  },
+  {
+    title: 'FunnelsUsageFunnel',
+    steps: {
+      view_any_page: [PAGE_VIEW_EVENT],
+      view_funnels_page: [PAGE_VIEW_EVENT, 'Funnels'],
+      funnel_selected: ['Funnels', 'Funnel Selected']
     }
   }
 ]
 
-funnels.forEach(({ title, steps }) => {
-  Object.keys(steps).forEach((key) => {
-    const value = steps[key];
-    let where = null
-    if (value[0] === PAGE_VIEW_EVENT) {
-      where = `event = '${value[0]}' AND page_title = '${value[1]}'`
-    } else {
-      where = `event = 'se' AND se_category = '${value[0]}' AND se_action = '${value[1]}'`
-    }
+class Funnel {
+  constructor({ title, steps }) {
+    this.title = title;
+    this.steps = steps;
+  }
 
-    funnelConfig.steps.push({
-      name: key,
-      eventsView: {
-        sql: () => `select * from (${eventsSQl}) WHERE ${where}`
+  get transformedSteps() {
+    return Object.keys(this.steps).map((key) => {
+      const value = this.steps[key];
+      let where = null
+      if (value[0] === PAGE_VIEW_EVENT) {
+        if (value.length === 1) {
+          where = `event = '${value[0]}'`
+        } else {
+          where = `event = '${value[0]}' AND page_title = '${value[1]}'`
+        }
+      } else {
+        where = `event = 'se' AND se_category = '${value[0]}' AND se_action = '${value[1]}'`
       }
-    })
-  });
 
-  cube(title, {
-    extends: Funnels.eventFunnel(funnelConfig)
+      return {
+        name: key,
+        eventsView: {
+          sql: () => `select * from (${eventsSQl}) WHERE ${where}`
+        }
+      }
+    });
+  }
+
+  get config() {
+    return {
+      userId: {
+        sql: () => `user_id`
+      },
+      time: {
+        sql: () => `time`
+      },
+      steps: this.transformedSteps
+    }
+  }
+}
+
+funnels.forEach((funnel) => {
+  const funnelObject = new Funnel(funnel);
+  cube(funnelObject.title, {
+    extends: Funnels.eventFunnel(funnelObject.config)
   });
 });
