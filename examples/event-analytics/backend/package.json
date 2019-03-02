@@ -6,8 +6,8 @@
     "dev": "./node_modules/.bin/cubejs-dev-server"
   },
   "dependencies": {
-    "@cubejs-backend/athena-driver": "0.0.25",
-    "@cubejs-backend/server": "0.0.26",
-    "@cubejs-backend/serverless": "0.0.25"
+    "@cubejs-backend/athena-driver": "0.0.27",
+    "@cubejs-backend/server": "0.0.28",
+    "@cubejs-backend/serverless": "0.0.28"
   }
 }

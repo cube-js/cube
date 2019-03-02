@@ -18,12 +18,7 @@ const styles = ({
 const ReportsPage = ({ classes }) => (
   <>
     <WindowTitle title="Reports" />
-    <div>
-      <QueryBuilder>
-      </QueryBuilder>
-      <form className={classes.root} autoComplete="off">
-      </form>
-    </div>
+    <QueryBuilder />
   </>
 );
 

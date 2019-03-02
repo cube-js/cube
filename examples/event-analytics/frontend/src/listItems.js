@@ -7,6 +7,7 @@ import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import DashboardIcon from '@material-ui/icons/Dashboard';
 import BarChartIcon from '@material-ui/icons/BarChart';
+import FilterListIcon from '@material-ui/icons/FilterList';
 import HelpIcon from '@material-ui/icons/Help';
 
 const styles = theme => ({
@@ -31,6 +32,14 @@ const mainListItems = ({ classes }) => (
           <BarChartIcon />
         </ListItemIcon>
         <ListItemText primary="Reports" />
+      </ListItem>
+    </Link>
+    <Link to="/funnels" className={classes.link}>
+      <ListItem button>
+        <ListItemIcon>
+          <FilterListIcon />
+        </ListItemIcon>
+        <ListItemText primary="Funnels" />
       </ListItem>
     </Link>
     <Link to="/about" className={classes.link}>

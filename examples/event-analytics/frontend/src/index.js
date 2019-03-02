@@ -5,6 +5,7 @@ import createHistory from 'history/createBrowserHistory'
 import SectionRoute from './auth/components/SectionRoute';
 import DashboardPage from './dashboard';
 import ReportsPage from './reports';
+import FunnelsPage from './funnels';
 import AboutPage from './about';
 import * as serviceWorker from './serviceWorker';
 
@@ -30,6 +31,11 @@ ReactDOM.render(
         path="/reports"
         title="Reports"
         component={ReportsPage}
+      />
+      <SectionRoute
+        path="/funnels"
+        title="Funnels"
+        component={FunnelsPage}
       />
       <SectionRoute
         path="/about"

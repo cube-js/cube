@@ -15,20 +15,31 @@ import {
   COLORS,
   extractSeries,
   humanName,
-  resolveFormat
 } from './helpers.js';
 import ResponsiveContainer from './ResponsiveContainer.js';
+
+// for default chart pivot config
+const resolveFormat = (resultSet) => {
+  const query = resultSet.loadResponse.query;
+  const annotation = resultSet.loadResponse.annotation;
+  const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+  if (timeDimensions.length) {
+    return `time:${timeDimensions[0].granularity}`
+  } else {
+    return annotation.dimensions[query.dimensions[0]].type
+  }
+}
 
 export default ({ resultSet }) => {
   return (
   <ResponsiveContainer>
-    <BarChart data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
+    <BarChart margin={{ top: 20 }} data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
       <CartesianGrid strokeDasharray="3 3"/>
       <XAxis dataKey="x" minTickGap={20}/>
       <YAxis/>
       <Tooltip/>
       {extractSeries(resultSet).map((s, i) =>
-        <Bar key={i} dataKey={s} name={humanName(resultSet, s)} stackId="a" fill={COLORS[i % COLORS.length]} />
+        <Bar label={{ position: 'top' }} key={i} dataKey={s} name={humanName(resultSet, s)} stackId="a" fill={COLORS[i % COLORS.length]} />
       )}
       <Legend />
     </BarChart>

@@ -23,14 +23,18 @@ const customEvents = [
   new StructuredEvent(...event)
 );
 
-cube(`Events`, {
-  sql:
-  `SELECT
+export const PAGE_VIEW_EVENT = 'pv';
+export const eventsSQl =
+  `
+  SELECT
     from_iso8601_timestamp(to_iso8601(date) || 'T' || "time") as time,
     ${Object.keys(parameters).map((key) => ( `url_decode(url_decode(regexp_extract(querystring, '${parameters[key]}', 1))) as ${key}` )).join(", ")}
   FROM cloudfront_logs
   WHERE length(querystring) > 1
-  `,
+  `
+
+cube(`Events`, {
+  sql: eventsSQl,
 
   joins: {
     Users: {

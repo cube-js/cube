@@ -87,7 +87,8 @@ const Chart = ({ title, query, type, classes }) => (
 
 Chart.propTypes = {
   title: PropTypes.string,
-  type: PropTypes.oneOf(Object.keys(supportedTypes)).isRequired
+  type: PropTypes.oneOf(Object.keys(supportedTypes)).isRequired,
+  query: PropTypes.object
 }
 
 Chart.defaultprops = {
