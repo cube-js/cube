@@ -77,9 +77,7 @@ funnels.forEach((funnel) => {
     extends: Funnels.eventFunnel(funnelObject.config),
     preAggregations: {
       main: {
-        type: `rollup`,
-        measureReferences: [CUBE.conversions],
-        dimensionReferences: [CUBE.step]
+        type: `originalSql`,
       }
     }
   });
