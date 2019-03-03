@@ -18,6 +18,14 @@ const funnels = [
       view_funnels_page: [PAGE_VIEW_EVENT, 'Funnels'],
       funnel_selected: ['Funnels', 'Funnel Selected']
     }
+  },
+  {
+    title: 'FunnelsEditFunnel',
+    steps: {
+      view_funnels_page: [PAGE_VIEW_EVENT, 'Funnels'],
+      funnel_selected: ['Funnels', 'Funnel Selected'],
+      edit_button_clicked: ['Funnels', 'Edit Button Clicked']
+    }
   }
 ]
 
@@ -28,7 +36,7 @@ class Funnel {
   }
 
   get transformedSteps() {
-    return Object.keys(this.steps).map((key) => {
+    return Object.keys(this.steps).map((key, index) => {
       const value = this.steps[key];
       let where = null
       if (value[0] === PAGE_VIEW_EVENT) {
@@ -66,6 +74,13 @@ class Funnel {
 funnels.forEach((funnel) => {
   const funnelObject = new Funnel(funnel);
   cube(funnelObject.title, {
-    extends: Funnels.eventFunnel(funnelObject.config)
+    extends: Funnels.eventFunnel(funnelObject.config),
+    preAggregations: {
+      main: {
+        type: `rollup`,
+        measureReferences: [CUBE.conversions],
+        dimensionReferences: [CUBE.step]
+      }
+    }
   });
 });

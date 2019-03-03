@@ -11,7 +11,7 @@ import EventsSelect, { defaultEvent } from './EventsSelect';
 import DimensionSelect from './DimensionSelect';
 import VisualizationToggle from './VisualizationToggle';
 import GranularitySelect, { defaultGranularity } from './GranularitySelect';
-import DateRangeSelect, { defaultDateRange } from './DateRangeSelect';
+import DateRangeSelect, { defaultDateRange } from '../DateRangeSelect';
 import SaveButton from './SaveButton';
 import withQueryBuilder from './withQueryBuilder';
 
