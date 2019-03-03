@@ -56,6 +56,12 @@ class PrestodbQuery extends BaseQuery {
   timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
+
+  addInterval(date, interval) {
+    const [intervalValue, intervalUnit] = interval.split(" ");
+    return `${date} + interval '${intervalValue}' ${intervalUnit}`;
+  }
+
 }
 
 module.exports = PrestodbQuery;
