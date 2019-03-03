@@ -53,7 +53,8 @@ class Funnel {
         name: key,
         eventsView: {
           sql: () => `select * from (${eventsSQl}) WHERE ${where}`
-        }
+        },
+        timeToConvert: index > 0 ? '30 day' : null
       }
     });
   }

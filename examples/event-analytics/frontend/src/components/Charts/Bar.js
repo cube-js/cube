@@ -25,8 +25,10 @@ const resolveFormat = (resultSet) => {
   const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
   if (timeDimensions.length) {
     return `time:${timeDimensions[0].granularity}`
-  } else {
+  } else if (query.dimensions.length) {
     return annotation.dimensions[query.dimensions[0]].type
+  } else {
+    return undefined
   }
 }
 

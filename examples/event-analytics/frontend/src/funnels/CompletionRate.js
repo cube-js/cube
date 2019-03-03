@@ -11,7 +11,7 @@ const calculateCompletionRate = (resultSet, id) => {
 
   const first = Number(data[0][`${id}.conversions`])
 
-  return Math.round(last/first);
+  return Math.round(100 * last/first);
 }
 
 const CompletionRate = ({ query, id }) => (

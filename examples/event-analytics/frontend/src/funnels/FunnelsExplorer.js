@@ -53,11 +53,10 @@ class FunnelsExplorer extends Component {
     return {
       measures: [`${this.state.funnelId}.conversions`],
       dimensions: [`${this.state.funnelId}.step`],
-      filters: [
+      timeDimensions: [
         {
           dimension: `${this.state.funnelId}.time`,
-          operator: `inDateRange`,
-          values: this.state.dateRange
+          dateRange: this.state.dateRange
         }
       ]
     }
