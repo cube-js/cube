@@ -126,6 +126,7 @@ If `refreshKey` is not set Cube.js will try to use time dimension which have `'u
 then will check if any other time dimension exists.
 If time dimension is found then `max` value of this time dimension will be used as `refreshKey`.
 Otherwise count of rows for this cube will be used as a `refreshKey` by default.
+Result of `refreshKey` query itself is cached for 2 minutes by default.
 
 You can use existing timestamp from your tables. Make sure to select max
 timestamp in that case.
