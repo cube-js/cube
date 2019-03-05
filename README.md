@@ -1,7 +1,7 @@
 
 <p align="center"><a href="https://www.statsbot.co/cubejs"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
-[Website](https://statsbot.co/cubejs) • [Docs](https://statsbot.co/cubejs/docs) • [Blog](https://statsbot.co/blog) • [Slack](https://publicslack.com/slacks/cubejs/invites/new) • [Twitter](https://twitter.com/thecubejs)
+[Website](https://cube.dev) • [Docs](https://cube.dev) • [Blog](https://statsbot.co/blog) • [Slack](https://publicslack.com/slacks/cubejs/invites/new) • [Twitter](https://twitter.com/thecubejs)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-client%2Fcore.svg)](https://badge.fury.io/js/%40cubejs-client%2Fcore)
 
@@ -79,7 +79,7 @@ The `.env` file in this project directory contains placeholders for the relevant
 
 Cube.js uses Data Schema to generate and execute SQL.
 
-It acts as an ORM for your database and it is flexible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://statsbot.co/docs/getting-started-cubejs).
+It acts as an ORM for your database and it is flexible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://cube.dev/docs/getting-started-cubejs-schema).
 
 You can generate schema files from your database tables using the `cubejs` CLI, or write them manually:
 
@@ -271,7 +271,7 @@ For example if you want to pass user id in security context you can create token
 ```
 
 In this case `{ "id": 42 }` object will be accessible as `USER_CONTEXT` in cube.js Data Schema.
-Learn more: [Data Schema docs](https://statsbot.co/docs/cube#context-variables-user-context).
+Learn more: [Data Schema docs](https://cube.dev/docs/cube#context-variables-user-context).
 
 > *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
 > Learn more: [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
@@ -402,7 +402,7 @@ Returns the array of series objects, containing `key` and `title` parameters.
 
 #### Query Format
 
-Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`. You can [learn more about Cube.js Data Schema here.](https://statsbot.co/docs/getting-started-cubejs)
+Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`. You can [learn more about Cube.js Data Schema here.](https://cube.dev/docs/getting-started-cubejs-schema)
 The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension email in the Cube Users would have the following name `Users.email`.
 
 Query has following properties:
