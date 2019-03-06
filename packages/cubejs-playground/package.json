@@ -1,7 +1,6 @@
 {
   "name": "@cubejs-client/playground",
   "version": "0.2.9",
-  "private": true,
   "dependencies": {
     "@babel/preset-env": "^7.3.4",
     "@babel/preset-react": "^7.0.0",
@@ -37,6 +36,11 @@
     "not dead",
     "not ie <= 11",
     "not op_mini all"
+  ],
+  "files": [
+    "src",
+    "public",
+    "build"
   ],
   "proxy": "http://localhost:4000",
   "license": "MIT",
