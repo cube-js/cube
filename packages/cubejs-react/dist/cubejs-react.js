@@ -7,9 +7,10 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 require('core-js/modules/es6.array.map');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 require('core-js/modules/es6.promise');
+require('core-js/modules/es6.string.iterator');
 require('core-js/modules/web.dom.iterable');
 require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.string.iterator');
+require('core-js/modules/es6.object.keys');
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
 var _possibleConstructorReturn = _interopDefault(require('@babel/runtime/helpers/possibleConstructorReturn'));
@@ -21,6 +22,12 @@ var ramda = require('ramda');
 var _extends = _interopDefault(require('@babel/runtime/helpers/extends'));
 var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
+require('core-js/modules/es6.array.filter');
+var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
+require('core-js/modules/es6.function.name');
+var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
+require('regenerator-runtime/runtime');
+var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
 
 var QueryRenderer =
 /*#__PURE__*/
@@ -76,65 +83,67 @@ function (_React$Component) {
         sqlQuery: null
       });
 
-      if (this.props.loadSql === 'only') {
-        this.props.cubejsApi.sql(query, {
-          mutexObj: this.mutexObj,
-          mutexKey: 'sql'
-        }).then(function (sqlQuery) {
-          return _this2.setState({
-            sqlQuery: sqlQuery,
-            error: null,
-            isLoading: false
+      if (query && Object.keys(query).length) {
+        if (this.props.loadSql === 'only') {
+          this.props.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql'
+          }).then(function (sqlQuery) {
+            return _this2.setState({
+              sqlQuery: sqlQuery,
+              error: null,
+              isLoading: false
+            });
+          }).catch(function (error) {
+            return _this2.setState({
+              resultSet: null,
+              error: error,
+              isLoading: false
+            });
           });
-        }).catch(function (error) {
-          return _this2.setState({
-            resultSet: null,
-            error: error,
-            isLoading: false
-          });
-        });
-      } else if (this.props.loadSql) {
-        Promise.all([this.props.cubejsApi.sql(query, {
-          mutexObj: this.mutexObj,
-          mutexKey: 'sql'
-        }), this.props.cubejsApi.load(query, {
-          mutexObj: this.mutexObj,
-          mutexKey: 'query'
-        })]).then(function (_ref) {
-          var _ref2 = _slicedToArray(_ref, 2),
-              sqlQuery = _ref2[0],
-              resultSet = _ref2[1];
+        } else if (this.props.loadSql) {
+          Promise.all([this.props.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql'
+          }), this.props.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query'
+          })]).then(function (_ref) {
+            var _ref2 = _slicedToArray(_ref, 2),
+                sqlQuery = _ref2[0],
+                resultSet = _ref2[1];
 
-          return _this2.setState({
-            sqlQuery: sqlQuery,
-            resultSet: resultSet,
-            error: null,
-            isLoading: false
+            return _this2.setState({
+              sqlQuery: sqlQuery,
+              resultSet: resultSet,
+              error: null,
+              isLoading: false
+            });
+          }).catch(function (error) {
+            return _this2.setState({
+              resultSet: null,
+              error: error,
+              isLoading: false
+            });
           });
-        }).catch(function (error) {
-          return _this2.setState({
-            resultSet: null,
-            error: error,
-            isLoading: false
+        } else {
+          this.props.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query'
+          }).then(function (resultSet) {
+            return _this2.setState({
+              resultSet: resultSet,
+              error: null,
+              isLoading: false
+            });
+          }).catch(function (error) {
+            return _this2.setState({
+              resultSet: null,
+              error: error,
+              isLoading: false
+            });
           });
-        });
-      } else {
-        this.props.cubejsApi.load(query, {
-          mutexObj: this.mutexObj,
-          mutexKey: 'query'
-        }).then(function (resultSet) {
-          return _this2.setState({
-            resultSet: resultSet,
-            error: null,
-            isLoading: false
-          });
-        }).catch(function (error) {
-          return _this2.setState({
-            resultSet: null,
-            error: error,
-            isLoading: false
-          });
-        });
+        }
       }
     }
   }, {
@@ -196,9 +205,9 @@ function (_React$Component) {
   return QueryRenderer;
 }(React.Component);
 QueryRenderer.propTypes = {
-  render: PropTypes.func.required,
+  render: PropTypes.func,
   afterRender: PropTypes.func,
-  cubejsApi: PropTypes.object.required,
+  cubejsApi: PropTypes.object,
   query: PropTypes.object,
   queries: PropTypes.object,
   loadSql: PropTypes.any
@@ -223,5 +232,186 @@ var QueryRendererWithTotals = (function (_ref) {
   }, restProps));
 });
 
+var QueryBuilder =
+/*#__PURE__*/
+function (_React$Component) {
+  _inherits(QueryBuilder, _React$Component);
+
+  function QueryBuilder(props) {
+    var _this;
+
+    _classCallCheck(this, QueryBuilder);
+
+    _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props));
+    _this.state = {
+      query: props.query,
+      chartType: 'line'
+    };
+    return _this;
+  }
+
+  _createClass(QueryBuilder, [{
+    key: "componentDidMount",
+    value: function () {
+      var _componentDidMount = _asyncToGenerator(
+      /*#__PURE__*/
+      _regeneratorRuntime.mark(function _callee() {
+        var meta;
+        return _regeneratorRuntime.wrap(function _callee$(_context) {
+          while (1) {
+            switch (_context.prev = _context.next) {
+              case 0:
+                _context.next = 2;
+                return this.props.cubejsApi.meta();
+
+              case 2:
+                meta = _context.sent;
+                this.setState({
+                  meta: meta
+                });
+
+              case 4:
+              case "end":
+                return _context.stop();
+            }
+          }
+        }, _callee, this);
+      }));
+
+      function componentDidMount() {
+        return _componentDidMount.apply(this, arguments);
+      }
+
+      return componentDidMount;
+    }()
+  }, {
+    key: "render",
+    value: function render() {
+      var _this2 = this;
+
+      return React.createElement(QueryRenderer, {
+        query: this.state.query,
+        cubejsApi: this.props.cubejsApi,
+        render: function render(queryRendererProps) {
+          if (_this2.props.render) {
+            return _this2.props.render(_this2.prepareRenderProps(queryRendererProps));
+          }
+        }
+      });
+    }
+  }, {
+    key: "prepareRenderProps",
+    value: function prepareRenderProps(queryRendererProps) {
+      var _this3 = this;
+
+      var getName = function getName(member) {
+        return member.name;
+      };
+
+      var toTimeDimension = function toTimeDimension(member) {
+        return {
+          dimension: member.dimension.name,
+          granularity: member.granularity,
+          dateRange: member.dateRange
+        };
+      };
+
+      var updateMethods = function updateMethods(memberType) {
+        var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
+        return {
+          add: function add(member) {
+            return _this3.setState({
+              query: _objectSpread({}, _this3.state.query, _defineProperty({}, memberType, (_this3.state.query[memberType] || []).concat(toQuery(member))))
+            });
+          },
+          remove: function remove(member) {
+            var members = (_this3.state.query[memberType] || []).concat([]);
+            members.splice(member.index, 1);
+            return _this3.setState({
+              query: _objectSpread({}, _this3.state.query, _defineProperty({}, memberType, members))
+            });
+          },
+          update: function update(member, updateWith) {
+            var members = (_this3.state.query[memberType] || []).concat([]);
+            members.splice(member.index, 1, toQuery(updateWith));
+            return _this3.setState({
+              query: _objectSpread({}, _this3.state.query, _defineProperty({}, memberType, members))
+            });
+          }
+        };
+      };
+
+      var granularities = [{
+        name: 'hour',
+        title: 'Hour'
+      }, {
+        name: 'day',
+        title: 'Day'
+      }, {
+        name: 'week',
+        title: 'Week'
+      }, {
+        name: 'month',
+        title: 'Month'
+      }, {
+        name: 'year',
+        title: 'Year'
+      }];
+      return _objectSpread({
+        meta: this.state.meta,
+        query: this.state.query,
+        chartType: this.state.chartType,
+        measures: (this.state.meta && this.state.query.measures || []).map(function (m, i) {
+          return _objectSpread({
+            index: i
+          }, _this3.state.meta.resolveMember(m, 'measures'));
+        }),
+        dimensions: (this.state.meta && this.state.query.dimensions || []).map(function (m, i) {
+          return _objectSpread({
+            index: i
+          }, _this3.state.meta.resolveMember(m, 'dimensions'));
+        }),
+        segments: (this.state.meta && this.state.query.segments || []).map(function (m, i) {
+          return _objectSpread({
+            index: i
+          }, _this3.state.meta.resolveMember(m, 'segments'));
+        }),
+        timeDimensions: (this.state.meta && this.state.query.timeDimensions || []).map(function (m, i) {
+          return _objectSpread({}, m, {
+            dimension: _objectSpread({}, _this3.state.meta.resolveMember(m.dimension, 'dimensions'), {
+              granularities: granularities
+            }),
+            index: i
+          });
+        }),
+        filters: (this.state.meta && this.state.query.filters || []).map(function (m, i) {
+          return _objectSpread({}, m, {
+            dimension: _this3.state.meta.resolveMember(m.dimension, 'dimensions'),
+            index: i
+          });
+        }),
+        availableMeasures: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'measures') || [],
+        availableDimensions: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'dimensions') || [],
+        availableTimeDimensions: (this.state.meta && this.state.meta.membersForQuery(this.state.query, 'dimensions') || []).filter(function (m) {
+          return m.type === 'time';
+        }),
+        availableSegments: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'segments') || [],
+        updateMeasures: updateMethods('measures'),
+        updateDimensions: updateMethods('dimensions'),
+        updateSegments: updateMethods('segments'),
+        updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
+        updateChartType: function updateChartType(chartType) {
+          return _this3.setState({
+            chartType: chartType
+          });
+        }
+      }, queryRendererProps);
+    }
+  }]);
+
+  return QueryBuilder;
+}(React.Component);
+
 exports.QueryRenderer = QueryRenderer;
 exports.QueryRendererWithTotals = QueryRendererWithTotals;
+exports.QueryBuilder = QueryBuilder;

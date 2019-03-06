@@ -1,6 +1,7 @@
 import { fetch } from 'whatwg-fetch';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
+import Meta from './Meta';
 import ProgressResult from './ProgressResult';
 
 const API_URL = process.env.CUBEJS_API_URL;
@@ -90,6 +91,15 @@ class CubejsApi {
     return this.loadMethod(
       () => this.request(`/sql?query=${JSON.stringify(query)}`),
       (body) => new SqlQuery(body),
+      options,
+      callback
+    );
+  }
+
+  meta(options, callback) {
+    return this.loadMethod(
+      () => this.request(`/meta`),
+      (body) => new Meta(body),
       options,
       callback
     );

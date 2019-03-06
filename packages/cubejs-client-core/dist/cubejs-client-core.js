@@ -20,6 +20,8 @@ require('core-js/modules/es6.array.map');
 var ramda = require('ramda');
 var Moment = require('moment');
 var momentRange = require('moment-range');
+require('core-js/modules/es6.regexp.split');
+require('core-js/modules/es6.function.name');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
@@ -385,6 +387,61 @@ function () {
   return SqlQuery;
 }();
 
+var memberMap = function memberMap(memberArray) {
+  return ramda.fromPairs(memberArray.map(function (m) {
+    return [m.name, m];
+  }));
+};
+
+var Meta =
+/*#__PURE__*/
+function () {
+  function Meta(metaResponse) {
+    _classCallCheck(this, Meta);
+
+    this.meta = metaResponse;
+    var cubes = this.meta.cubes;
+    this.cubes = cubes;
+    this.cubesMap = ramda.fromPairs(cubes.map(function (c) {
+      return [c.name, {
+        measures: memberMap(c.measures),
+        dimensions: memberMap(c.dimensions),
+        segments: memberMap(c.segments)
+      }];
+    }));
+  }
+
+  _createClass(Meta, [{
+    key: "membersForQuery",
+    value: function membersForQuery(query, memberType) {
+      return ramda.unnest(this.cubes.map(function (c) {
+        return c[memberType];
+      }));
+    }
+  }, {
+    key: "resolveMember",
+    value: function resolveMember(memberName, memberType) {
+      var _memberName$split = memberName.split('.'),
+          _memberName$split2 = _slicedToArray(_memberName$split, 1),
+          cube = _memberName$split2[0];
+
+      if (!this.cubesMap[cube]) {
+        throw new Error("Cube not found ".concat(cube, " for path '").concat(memberName, "'"));
+      }
+
+      var member = this.cubesMap[cube][memberType][memberName];
+
+      if (!member) {
+        throw new Error("Path not found '".concat(memberName, "'"));
+      }
+
+      return member;
+    }
+  }]);
+
+  return Meta;
+}();
+
 var ProgressResult =
 /*#__PURE__*/
 function () {
@@ -568,6 +625,17 @@ function () {
         return _this2.request("/sql?query=".concat(JSON.stringify(query)));
       }, function (body) {
         return new SqlQuery(body);
+      }, options, callback);
+    }
+  }, {
+    key: "meta",
+    value: function meta(options, callback) {
+      var _this3 = this;
+
+      return this.loadMethod(function () {
+        return _this3.request("/meta");
+      }, function (body) {
+        return new Meta(body);
       }, options, callback);
     }
   }]);

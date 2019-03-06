@@ -1,4 +1,5 @@
 const ApiGateway = require('@cubejs-backend/api-gateway');
+const path = require('path');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
@@ -9,53 +10,6 @@ const DriverDependencies = {
   athena: '@cubejs-backend/athena-driver',
   jdbc: '@cubejs-backend/jdbc-driver',
 };
-
-const devServerIndexJs = (localUrl, cubejsToken) => `import React from "react";
-import ReactDOM from "react-dom";
-
-import cubejs from "@cubejs-client/core";
-import { QueryRenderer } from "@cubejs-client/react";
-import { Chart, Axis, Tooltip, Geom, Coord, Legend } from "bizcharts";
-
-const API_URL = "${localUrl}"; // change to your actual endpoint
-
-const renderChart = resultSet => (
-  <Chart height={400} data={resultSet.chartPivot()} forceFit>
-    <Coord type="theta" radius={0.75} />
-    <Axis name="Orders.count" />
-    <Legend position="right" name="category" />
-    <Tooltip showTitle={false} />
-    <Geom type="intervalStack" position="Orders.count" color="x" />
-  </Chart>
-);
-
-const query = {
-  measures: ["Orders.count"],
-  dimensions: ["Orders.status"]
-};
-
-const cubejsApi = cubejs(
-  "${cubejsToken}",
-  { apiUrl: API_URL + "/cubejs-api/v1" }
-);
-
-const App = () => (
-  <div style={{ textAlign: 'center', fontFamily: 'sans-serif' }}>
-    <h1>Order by status example</h1>
-    <QueryRenderer
-      query={query}
-      cubejsApi={cubejsApi}
-      render={({ resultSet, error }) =>
-        (resultSet && renderChart(resultSet)) ||
-        (error && error.toString()) || <span>Loading...</span>
-      }
-    />
-  </div>
-);
-
-const rootElement = document.getElementById("root");
-ReactDOM.render(<App />, rootElement);
-`;
 
 const checkEnvForPlaceholders = () => {
   const placeholderSubstr = '<YOUR_DB_';
@@ -105,6 +59,7 @@ class CubejsServerCore {
       const { machineIdSync } = require('node-machine-id');
       const { promisify } = require('util');
       const anonymousId = machineIdSync();
+      this.anonymousId = anonymousId;
       this.event = async (name, props) => {
         try {
           await promisify(client.track.bind(client))({
@@ -170,38 +125,18 @@ class CubejsServerCore {
 
   initDevEnv(app) {
     const port = process.env.PORT || 4000; // TODO
-    const localUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
+    const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
     const jwt = require('jsonwebtoken');
     let cubejsToken = jwt.sign({}, this.apiSecret, { expiresIn: '1d' });
     console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
-    console.log(`🦅 Dev environment available at ${localUrl}`);
+    console.log(`🦅 Dev environment available at ${apiUrl}`);
     this.event('Dev Server Start');
-    app.get('/', (req, res) => {
+    const serveStatic = require('serve-static');
+    app.get('/playground/context', (req, res) => {
       this.event('Dev Server Env Open');
-      const { getParameters } = require('codesandbox-import-utils/lib/api/define');
-
-      const parameters = getParameters({
-        files: {
-          'index.js': {
-            content: devServerIndexJs(localUrl, cubejsToken),
-          },
-          'package.json': {
-            content: {
-              dependencies: {
-                '@cubejs-client/core': 'latest',
-                '@cubejs-client/react': 'latest',
-                'bizcharts': 'latest',
-                'react': 'latest',
-                'react-dom': 'latest'
-              }
-            },
-          },
-        },
-        template: 'create-react-app'
-      });
-
-      res.redirect(`https://codesandbox.io/api/v1/sandboxes/define?parameters=${parameters}`);
-    })
+      res.json({ cubejsToken, apiUrl, anonymousId: this.anonymousId });
+    });
+    app.use(serveStatic(path.join(__dirname, '../node_modules/@cubejs-client/playground/build')));
   }
 
   createCompilerApi(repository) {

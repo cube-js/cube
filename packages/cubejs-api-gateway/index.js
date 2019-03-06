@@ -5,12 +5,12 @@ const moment = require('moment');
 
 class UserError extends Error {}
 
-const toConfigMap = (metaConfig) => {
-  return R.pipe(
+const toConfigMap = (metaConfig) => (
+  R.pipe(
     R.map(c => [c.config.name, c.config]),
     R.fromPairs
-  )(metaConfig);
-};
+  )(metaConfig)
+);
 
 const prepareAnnotation = (metaConfig, query) => {
   const configMap = toConfigMap(metaConfig);
@@ -27,7 +27,7 @@ const prepareAnnotation = (metaConfig, query) => {
       description: config.description,
       type: config.type,
       format: config.format
-    }]
+    }];
   };
 
   return {
@@ -35,7 +35,7 @@ const prepareAnnotation = (metaConfig, query) => {
     dimensions: R.fromPairs((query.dimensions || []).map(annotation('dimensions')).filter(a => !!a)),
     segments: R.fromPairs((query.segments || []).map(annotation('segments')).filter(a => !!a)),
     timeDimensions: R.fromPairs((query.timeDimensions || []).map(td => annotation('dimensions')(td.dimension)).filter(a => !!a)), // TODO
-  }
+  };
 };
 
 const prepareAliasToMemberNameMap = (metaConfig, sqlQuery, query) => {
@@ -57,7 +57,7 @@ const prepareAliasToMemberNameMap = (metaConfig, sqlQuery, query) => {
       .concat((query.timeDimensions || []).map(td => lookupAlias('dimensions')(td.dimension)))
       .concat(sqlQuery.timeDimensionAlias ? [[sqlQuery.timeDimensionAlias, sqlQuery.timeDimensionField]] : [])
       .filter(a => !!a)
-  )
+  );
 };
 
 const transformValue = (value, type) => {
@@ -68,16 +68,14 @@ const transformValue = (value, type) => {
 };
 
 
-const transformData = (aliasToMemberNameMap, annotation, data) => {
-  return data.map(r => R.pipe(
-    R.toPairs,
-    R.map(p => [
-      aliasToMemberNameMap[p[0]],
-      transformValue(p[1], annotation[aliasToMemberNameMap[p[0]]].type)
-    ]),
-    R.fromPairs
-  )(r));
-};
+const transformData = (aliasToMemberNameMap, annotation, data) => (data.map(r => R.pipe(
+  R.toPairs,
+  R.map(p => [
+    aliasToMemberNameMap[p[0]],
+    transformValue(p[1], annotation[aliasToMemberNameMap[p[0]]].type)
+  ]),
+  R.fromPairs
+)(r)));
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(hour|day|week|month|year))?$/);
@@ -121,6 +119,7 @@ const querySchema = Joi.object().keys({
 });
 
 const normalizeQuery = (query) => {
+  // eslint-disable-next-line no-unused-vars
   const { error, value } = Joi.validate(query, querySchema);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
@@ -130,27 +129,25 @@ const normalizeQuery = (query) => {
     throw new UserError(`Operator required for filter: ${JSON.stringify(filterWithoutOperator)}`);
   }
   const filterWithIncorrectOperator = (query.filters || [])
-    .find(f =>
-      [
-        'equals',
-        'notEquals',
-        'contains',
-        'notContains',
-        'in',
-        'notIn',
-        'gt',
-        'gte',
-        'lt',
-        'lte',
-        'set',
-        'notSet',
-        'inDateRange',
-        'notInDateRange',
-        'onTheDate',
-        'beforeDate',
-        'afterDate'
-      ].indexOf(f.operator) === -1
-    );
+    .find(f => [
+      'equals',
+      'notEquals',
+      'contains',
+      'notContains',
+      'in',
+      'notIn',
+      'gt',
+      'gte',
+      'lt',
+      'lte',
+      'set',
+      'notSet',
+      'inDateRange',
+      'notInDateRange',
+      'onTheDate',
+      'beforeDate',
+      'afterDate'
+    ].indexOf(f.operator) === -1);
   if (filterWithIncorrectOperator) {
     throw new UserError(`Operator ${filterWithIncorrectOperator.operator} not supported for filter: ${JSON.stringify(filterWithIncorrectOperator)}`);
   }
@@ -172,17 +169,14 @@ const normalizeQuery = (query) => {
       ...td,
       dateRange: td.dateRange && td.dateRange.length === 1 ? [td.dateRange[0], td.dateRange[0]] : td.dateRange
     })).concat(regularToTimeDimension)
-  }
+  };
 };
 
-const coerceForSqlQuery = (query) => {
-  return {
-    ...query,
-    timeDimensions: (query.timeDimensions || []).map(td => {
-      return td.granularity === 'day' ? { ...td, granularity: 'date' } : td;
-    })
-  }
-};
+const coerceForSqlQuery = (query) => ({
+  ...query,
+  timeDimensions: (query.timeDimensions || [])
+    .map(td => (td.granularity === 'day' ? { ...td, granularity: 'date' } : td))
+});
 
 class ApiGateway {
   constructor(apiSecret, compilerApi, adapterApi, logger) {
@@ -195,7 +189,7 @@ class ApiGateway {
   initApp(app) {
     app.get('/cubejs-api/v1/load', this.checkAuth.bind(this), (async (req, res) => {
       try {
-        let query = JSON.parse(req.query.query);
+        const query = JSON.parse(req.query.query);
         this.log(req, {
           type: 'Load Request',
           query: req.query.query
@@ -206,10 +200,12 @@ class ApiGateway {
           this.compilerApi.metaConfig()
         ]);
         const sqlQuery = compilerSqlResult;
-        let metaConfig = metaConfigResult;
+        const metaConfig = metaConfigResult;
         const annotation = prepareAnnotation(metaConfig, normalizedQuery);
-        let aliasToMemberNameMap = prepareAliasToMemberNameMap(metaConfig, sqlQuery, normalizedQuery);
-        const toExecute = { ...sqlQuery, query: sqlQuery.sql[0], values: sqlQuery.sql[1], continueWait: true };
+        const aliasToMemberNameMap = prepareAliasToMemberNameMap(metaConfig, sqlQuery, normalizedQuery);
+        const toExecute = {
+          ...sqlQuery, query: sqlQuery.sql[0], values: sqlQuery.sql[1], continueWait: true
+        };
         const response = await this.adapterApi.executeQuery(toExecute);
         this.log(req, {
           type: 'Load Request Success',
@@ -232,7 +228,7 @@ class ApiGateway {
 
     app.get('/cubejs-api/v1/sql', this.checkAuth.bind(this), (async (req, res) => {
       try {
-        let query = JSON.parse(req.query.query);
+        const query = JSON.parse(req.query.query);
         const normalizedQuery = normalizeQuery(query);
         const sqlQuery = await this.compilerApi.getSql(coerceForSqlQuery(normalizedQuery));
         res.json({
@@ -242,9 +238,19 @@ class ApiGateway {
         this.handleError(e, req, res);
       }
     }));
+
+    app.get('/cubejs-api/v1/meta', this.checkAuth.bind(this), (async (req, res) => {
+      try {
+        const metaConfig = await this.compilerApi.metaConfig();
+        const cubes = metaConfig.map(c => c.config);
+        res.json({ cubes });
+      } catch (e) {
+        this.handleError(e, req, res);
+      }
+    }));
   }
 
-  handleError (e, req, res) {
+  handleError(e, req, res) {
     if (e instanceof UserError) {
       this.log(req, {
         type: 'User Error',
@@ -277,7 +283,7 @@ class ApiGateway {
   }
 
   async checkAuth(req, res, next) {
-    const auth = req.headers['authorization'];
+    const auth = req.headers.authorization;
 
     if (auth) {
       const secret = this.apiSecret;
@@ -290,13 +296,13 @@ class ApiGateway {
     } else {
       res.status(403).send({ error: "Authorization header isn't set" });
     }
+    return null;
   }
 
   log(req, event) {
     const { type, ...restParams } = event;
     this.logger(type, { ...restParams, authInfo: req.authInfo });
   }
-
 }
 
 module.exports = ApiGateway;

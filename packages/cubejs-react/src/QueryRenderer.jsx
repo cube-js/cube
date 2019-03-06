@@ -32,20 +32,22 @@ export default class QueryRenderer extends React.Component {
 
   load(query) {
     this.setState({ isLoading: true, resultSet: null, error: null, sqlQuery: null });
-    if (this.props.loadSql === 'only') {
-      this.props.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
-        .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))
-        .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
-    } else if (this.props.loadSql) {
-      Promise.all([
-        this.props.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
+    if (query && Object.keys(query).length) {
+      if (this.props.loadSql === 'only') {
+        this.props.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
+          .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))
+          .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+      } else if (this.props.loadSql) {
+        Promise.all([
+          this.props.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
+          this.props.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
+        ]).then(([sqlQuery, resultSet]) => this.setState({ sqlQuery, resultSet, error: null, isLoading: false }))
+          .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+      } else {
         this.props.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
-      ]).then(([sqlQuery, resultSet]) => this.setState({ sqlQuery, resultSet, error: null, isLoading: false }))
-        .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
-    } else {
-      this.props.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
-        .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
-        .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+          .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
+          .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+      }
     }
   }
 
@@ -81,9 +83,9 @@ export default class QueryRenderer extends React.Component {
 }
 
 QueryRenderer.propTypes = {
-  render: PropTypes.func.required,
+  render: PropTypes.func,
   afterRender: PropTypes.func,
-  cubejsApi: PropTypes.object.required,
+  cubejsApi: PropTypes.object,
   query: PropTypes.object,
   queries: PropTypes.object,
   loadSql: PropTypes.any
