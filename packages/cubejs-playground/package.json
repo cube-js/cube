@@ -24,7 +24,7 @@
   },
   "scripts": {
     "start": "react-app-rewired start",
-    "build": "react-app-rewired build",
+    "build": "react-app-rewired build && cp -R build/ ../cubejs-server-core/playground/",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject"
   },

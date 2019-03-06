@@ -136,7 +136,7 @@ class CubejsServerCore {
       this.event('Dev Server Env Open');
       res.json({ cubejsToken, apiUrl, anonymousId: this.anonymousId });
     });
-    app.use(serveStatic(path.join(__dirname, '../node_modules/@cubejs-client/playground/build')));
+    app.use(serveStatic(path.join(__dirname, '../playground')));
   }
 
   createCompilerApi(repository) {
