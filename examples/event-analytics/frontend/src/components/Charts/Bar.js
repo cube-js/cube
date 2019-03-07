@@ -32,16 +32,24 @@ const resolveFormat = (resultSet) => {
   }
 }
 
-export default ({ resultSet, label }) => {
+const customShape = (shape, resultSet) => {
+  if (shape) {
+    return React.cloneElement(shape, { resultSet: resultSet })
+  }
+
+  return null
+}
+
+export default ({ resultSet, label, margin, shape }) => {
   return (
   <ResponsiveContainer>
-    <BarChart margin={{ top: 20 }} data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
+    <BarChart margin={margin} data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
       <CartesianGrid strokeDasharray="3 3"/>
       <XAxis dataKey="x" minTickGap={20}/>
       <YAxis/>
       <Tooltip/>
       {extractSeries(resultSet).map((s, i) =>
-        <Bar label={label} key={i} dataKey={s} name={humanName(resultSet, s)} stackId="a" fill={COLORS[i % COLORS.length]} />
+        <Bar label={label} key={i} dataKey={s} shape={customShape(shape, resultSet)} name={humanName(resultSet, s)} stackId="a" fill={COLORS[i % COLORS.length]} />
       )}
       <Legend />
     </BarChart>
