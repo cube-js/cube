@@ -69,13 +69,19 @@ class BaseQuery {
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
     this.join = this.joinGraph.buildJoin(this.collectCubeNames());
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
-    this.subQueryDimensions = this.collectFromMembers(false, this.collectSubQueryDimensionsFor.bind(this));
     this.preAggregationsSchemaOption =
       this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
 
     if (this.order.length === 0) {
       this.order = this.defaultOrder();
     }
+  }
+
+  get subQueryDimensions() {
+    if (!this._subQueryDimensions) {
+      this._subQueryDimensions = this.collectFromMembers(false, this.collectSubQueryDimensionsFor.bind(this));
+    }
+    return this._subQueryDimensions;
   }
 
   defaultOrder() {
@@ -145,9 +151,11 @@ class BaseQuery {
   }
 
   buildParamAnnotatedSql() {
-    const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
-    if (preAggregationForQuery && !this.options.preAggregationQuery) {
-      return this.preAggregations.rollupPreAggregation(preAggregationForQuery);
+    if (!this.options.preAggregationQuery) {
+      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
+      if (preAggregationForQuery) {
+        return this.preAggregations.rollupPreAggregation(preAggregationForQuery);
+      }
     }
     return this.fullKeyQueryAggregate();
   }
@@ -661,16 +669,6 @@ class BaseQuery {
     return s.path() ?
       [s.cube().name].concat(this.evaluateSymbolSql(s.path()[0], s.path()[1], s.definition())) :
       this.evaluateSql(s.cube().name, s.definition().sql);
-  }
-
-  /**
-   * Use collectCubeNames instead
-   * @param excludeTimeDimensions
-   * @returns {*}
-   * @deprecated
-   */
-  collectCubeNames(excludeTimeDimensions) {
-    return this.collectCubeNames(excludeTimeDimensions);
   }
 
   collectCubeNames(excludeTimeDimensions) {
