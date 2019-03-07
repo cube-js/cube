@@ -36,19 +36,6 @@ class FunnelsExplorer extends Component {
     }
   }
 
-  get completionRateQuery() {
-    return {
-      measures: [`${this.state.funnelId}.conversionsPercent`],
-      filters: [
-        {
-          dimension: `${this.state.funnelId}.time`,
-          operator: `inDateRange`,
-          values: this.state.dateRange
-        }
-      ]
-    }
-  }
-
   get query() {
     return {
       measures: [`${this.state.funnelId}.conversions`],
