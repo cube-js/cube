@@ -24,7 +24,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "build-gh": "PUBLIC_URL=/cubejs/event-analytics react-scripts build && mkdir -p build/reports && mkdir -p build/funnels && mkdir -p build/about && cp build/index.html build/reports/ && cp build/index.html build/funnels/ && cp build/index.html build/about/ && cp -R build/ ../../../../statsbotco.github.io/cubejs/event-analytics/"
   },
   "eslintConfig": {
     "extends": "react-app"

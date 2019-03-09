@@ -9,7 +9,7 @@ import FunnelsPage from './funnels';
 import AboutPage from './about';
 import * as serviceWorker from './serviceWorker';
 
-const history = createHistory()
+const history = createHistory({ basename: process.env.PUBLIC_URL });
 history.listen((location, action) => {
   // Use setTimeout due to react-helmet issue
   // https://github.com/nfl/react-helmet/issues/189

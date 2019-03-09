@@ -22,7 +22,7 @@ const AboutPage = ({ classes }) => (
     <div className={classes.cardContainerStyles}>
       <Card>
         <CardHeader title="Architecture" />
-        <CardMedia component="img" image="./schema.png" />
+        <CardMedia component="img" image="../schema.png" />
       </Card>
     </div>
   </>
