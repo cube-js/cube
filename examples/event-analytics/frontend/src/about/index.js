@@ -4,6 +4,7 @@ import { withStyles } from '@material-ui/core/styles';
 import WindowTitle from '../components/WindowTitle';
 import PrismCode from '../components/PrismCode';
 
+import Grid from '@material-ui/core/Grid';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
 import CardMedia from '@material-ui/core/CardMedia';
@@ -13,12 +14,11 @@ import Typography from '@material-ui/core/Typography';
 import schemaImg from './schema.png';
 
 const styles = theme => ({
-  cardContainerStyles: {
-    fontSize: 14,
-    display: "grid",
-    gridColumnGap: "24px",
-    gridTemplateColumns: "[start] 50% [end] 50%",
-    rowGap: "24px"
+  withMinHeight: {
+    minHeight: 600,
+    [theme.breakpoints.down('sm')]: {
+     minHeight: 0
+    }
   },
   twoColumn: {
     gridColumnEnd: "span 2"
@@ -82,6 +82,10 @@ const cubejsSchema = `cube(\`Events\`, {
     \`,
 
   measures: {
+    count: {
+      type: \`count\`
+    },
+
     pageView: {
       type: \`count\`,
       filters: [
@@ -101,65 +105,77 @@ const cubejsSchema = `cube(\`Events\`, {
 const AboutPage = ({ classes }) => (
   <>
     <WindowTitle title="About" />
-    <div className={classes.cardContainerStyles}>
-      <Card>
-        <CardHeader title="Architecture" />
-        <CardMedia component="img" image={schemaImg} />
-      </Card>
-      <Card>
-        <CardHeader title="Installation" />
-        <CardContent>
-          <Typography variant="h6">
-            Setup Snowplow Cloudfront Collector
-          </Typography>
-          <Typography variant="body1" className={classes.withBottomMargin}>
-  You need to upload a tracking pixel to Amazon CloudFront CDN. The Snowplow Tracker sends data to the collector by making a GET request for the pixel and passing data as a query string parameter. The CloudFront Collector uses CloudFront logging to record the request (including the query string) to an S3 bucket.
-          </Typography>
-          <Typography variant="h6">
-            Install Javascript Tracker
-          </Typography>
-          <Typography variant="body1" className={classes.withBottomMargin}>
-            Snowplow Javascripot Tracker is similar to Google Analytics’s tracking code or Mixpanel’s, so you need to just embed it into your HTML page. See snippet example below.
-          </Typography>
-          <Typography variant="h6">
-            Create Athena Table
-          </Typography>
-          <Typography variant="body1" className={classes.withBottomMargin}>
-            Once you have the data, which is CloudFront logs, in the S3 bucket, you can query it with Athena. All you need to do is create a table for CloudFront logs. See SQL code below.
-          </Typography>
-          <Typography variant="h6">
-            Setup Cube.js Schema
-          </Typography>
-          <Typography variant="body1" className={classes.withBottomMargin}>
-            Cube.js uses Data Schema to generate and execute SQL. You can express all required transformation in the schema, it also could be generated dynamically. See code below for an example or <a href="https://cube.dev/docs/getting-started-cubejs-schema">learn more about it here</a>
-          </Typography>
-        </CardContent>
-      </Card>
-      <Card className={classes.twoColumn}>
-        <CardHeader title="Tracking Code" />
-        <CardContent>
-          <PrismCode code={trackingCode} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader title="Create Athena table" />
-        <CardContent>
-          <PrismCode code={createAthenaTable} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader title="Setup Cube.js Schema" />
-        <CardContent>
-          <PrismCode code={cubejsSchema} />
-        </CardContent>
-      </Card>
-      <Card className={classes.twoColumn}>
-        <CardHeader title="Visualize Results" />
-        <CardContent>
-            <iframe src="https://codesandbox.io/embed/pkj4pk0x1j?fontsize=12&hidenavigation=1" style={{width: "100%", height: 1000, border: 0, borderRadius: "4px", overflow: "hidden"}} sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
-        </CardContent>
-      </Card>
-    </div>
+    <Grid container spacing={24}>
+      <Grid item xs={12} md={6}>
+        <Card className={classes.withMinHeight}>
+          <CardHeader title="Architecture" />
+          <CardMedia component="img" image={schemaImg} />
+        </Card>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <Card className={classes.withMinHeight}>
+          <CardHeader title="Installation" />
+          <CardContent>
+            <Typography variant="h6">
+              Setup Snowplow Cloudfront Collector
+            </Typography>
+            <Typography variant="body1" className={classes.withBottomMargin}>
+    You need to upload a tracking pixel to Amazon CloudFront CDN. The Snowplow Tracker sends data to the collector by making a GET request for the pixel and passing data as a query string parameter. The CloudFront Collector uses CloudFront logging to record the request (including the query string) to an S3 bucket.
+            </Typography>
+            <Typography variant="h6">
+              Install Javascript Tracker
+            </Typography>
+            <Typography variant="body1" className={classes.withBottomMargin}>
+              Snowplow Javascript Tracker is similar to Google Analytics’s tracking code or Mixpanel’s, so you need to just embed it into your HTML page. See snippet example below.
+            </Typography>
+            <Typography variant="h6">
+              Create Athena Table
+            </Typography>
+            <Typography variant="body1" className={classes.withBottomMargin}>
+              Once you have the data, which is CloudFront logs, in the S3 bucket, you can query it with Athena. All you need to do is create a table for CloudFront logs. See SQL code below.
+            </Typography>
+            <Typography variant="h6">
+              Setup Cube.js Schema
+            </Typography>
+            <Typography variant="body1" className={classes.withBottomMargin}>
+              Cube.js uses Data Schema to generate and execute SQL. You can express all required transformation in the schema, it also could be generated dynamically. See code below for an example or <a href="https://cube.dev/docs/getting-started-cubejs-schema">learn more about it here</a>
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12}>
+        <Card >
+          <CardHeader title="Tracking Code" />
+          <CardContent>
+            <PrismCode code={trackingCode} />
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <Card>
+          <CardHeader title="Create Athena table" />
+          <CardContent>
+            <PrismCode code={createAthenaTable} />
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <Card>
+          <CardHeader title="Setup Cube.js Schema" />
+          <CardContent>
+            <PrismCode code={cubejsSchema} />
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12}>
+        <Card>
+          <CardHeader title="Visualize Results" />
+          <CardContent>
+              <iframe src="https://codesandbox.io/embed/pkj4pk0x1j?fontsize=12&hidenavigation=1" style={{width: "100%", height: 1000, border: 0, borderRadius: "4px", overflow: "hidden"}} sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
   </>
 );
 
