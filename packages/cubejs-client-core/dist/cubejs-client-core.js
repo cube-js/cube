@@ -18,8 +18,8 @@ require('core-js/modules/es6.string.iterator');
 require('core-js/modules/es6.array.from');
 require('core-js/modules/es6.array.map');
 var ramda = require('ramda');
-var Moment = require('moment');
-var momentRange = require('moment-range');
+var Moment = _interopDefault(require('moment'));
+var momentRange = _interopDefault(require('moment-range'));
 require('core-js/modules/es6.regexp.split');
 require('core-js/modules/es6.function.name');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
@@ -587,7 +587,7 @@ function () {
                   return _context.stop();
               }
             }
-          }, _callee);
+          }, _callee, this);
         }));
 
         return function loadImpl() {

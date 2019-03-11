@@ -278,11 +278,9 @@ function (_React$Component) {
         }, _callee, this);
       }));
 
-      function componentDidMount() {
+      return function componentDidMount() {
         return _componentDidMount.apply(this, arguments);
-      }
-
-      return componentDidMount;
+      };
     }()
   }, {
     key: "render",

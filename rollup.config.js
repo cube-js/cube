@@ -21,8 +21,12 @@ const bundle = (name, globalName, baseConfig) => {
     ...baseConfig,
     plugins: [
       ...baseConfig.plugins,
+      commonjs(),
+      resolve({
+        module: true
+      }),
       babel({
-        exclude: 'node_modules/**',
+        exclude: ['node_modules/**', /\/core-js\//],
         runtimeHelpers: true,
         "presets": [
           '@babel/preset-react',
@@ -35,13 +39,9 @@ const bundle = (name, globalName, baseConfig) => {
           ]
         ]
       }),
-      resolve({
-        module: true
-      }),
       alias({
         '@cubejs-client/core': '../cubejs-client-core/src/index.js'
-      }),
-      commonjs()
+      })
     ]
   };
 
