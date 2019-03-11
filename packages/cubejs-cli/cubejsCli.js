@@ -213,7 +213,7 @@ const generateSchema = async (options) => {
 
   const CubejsServerCore = requireFromPackage('@cubejs-backend/server-core');
   // Load env credentials to build driver
-  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
+  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', 'dotenv')))) {
     await displayError(
       "Cube.js CLI couldn't find .env file with credentials to connect to your database. \nPlease learn more about configuring connection to the database with .env file here - \nhttps://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps",
       generateSchemaOptions
