@@ -1,6 +1,6 @@
 import { groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy } from 'ramda';
-import * as Moment from 'moment';
-import * as momentRange from 'moment-range';
+import Moment from 'moment';
+import momentRange from 'moment-range';
 
 const moment = momentRange.extendMoment(Moment);
 

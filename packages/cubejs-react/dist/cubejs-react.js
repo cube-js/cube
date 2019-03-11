@@ -1,33 +1,27 @@
-'use strict';
-
-Object.defineProperty(exports, '__esModule', { value: true });
-
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
-
-require('core-js/modules/es6.array.map');
-var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
-require('core-js/modules/es6.promise');
-require('core-js/modules/es6.string.iterator');
-require('core-js/modules/web.dom.iterable');
-require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.keys');
-var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
-var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
-var _possibleConstructorReturn = _interopDefault(require('@babel/runtime/helpers/possibleConstructorReturn'));
-var _getPrototypeOf = _interopDefault(require('@babel/runtime/helpers/getPrototypeOf'));
-var _inherits = _interopDefault(require('@babel/runtime/helpers/inherits'));
-var React = _interopDefault(require('react'));
-var PropTypes = require('prop-types');
-var ramda = require('ramda');
-var _extends = _interopDefault(require('@babel/runtime/helpers/extends'));
-var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
-var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
-require('core-js/modules/es6.array.filter');
-var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
-require('core-js/modules/es6.function.name');
-var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
-require('regenerator-runtime/runtime');
-var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
+import 'core-js/modules/es6.array.map';
+import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
+import 'core-js/modules/es6.promise';
+import 'core-js/modules/es6.string.iterator';
+import 'core-js/modules/web.dom.iterable';
+import 'core-js/modules/es6.array.iterator';
+import 'core-js/modules/es6.object.keys';
+import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
+import _createClass from '@babel/runtime/helpers/createClass';
+import _possibleConstructorReturn from '@babel/runtime/helpers/possibleConstructorReturn';
+import _getPrototypeOf from '@babel/runtime/helpers/getPrototypeOf';
+import _inherits from '@babel/runtime/helpers/inherits';
+import React from 'react';
+import { func, object, any } from 'prop-types';
+import { equals, toPairs, fromPairs } from 'ramda';
+import _extends from '@babel/runtime/helpers/extends';
+import _objectSpread from '@babel/runtime/helpers/objectSpread';
+import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+import 'core-js/modules/es6.array.filter';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
+import 'core-js/modules/es6.function.name';
+import _regeneratorRuntime from '@babel/runtime/regenerator';
+import 'regenerator-runtime/runtime';
+import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
 
 var QueryRenderer =
 /*#__PURE__*/
@@ -61,13 +55,13 @@ function (_React$Component) {
     value: function componentDidUpdate(prevProps) {
       var query = this.props.query;
 
-      if (!ramda.equals(prevProps.query, query)) {
+      if (!equals(prevProps.query, query)) {
         this.load(query);
       }
 
       var queries = this.props.queries;
 
-      if (!ramda.equals(prevProps.queries, queries)) {
+      if (!equals(prevProps.queries, queries)) {
         this.loadQueries(queries);
       }
     }
@@ -156,7 +150,7 @@ function (_React$Component) {
         resultSet: null,
         error: null
       });
-      var resultPromises = Promise.all(ramda.toPairs(queries).map(function (_ref3) {
+      var resultPromises = Promise.all(toPairs(queries).map(function (_ref3) {
         var _ref4 = _slicedToArray(_ref3, 2),
             name = _ref4[0],
             query = _ref4[1];
@@ -170,7 +164,7 @@ function (_React$Component) {
       }));
       resultPromises.then(function (resultSet) {
         return _this3.setState({
-          resultSet: ramda.fromPairs(resultSet),
+          resultSet: fromPairs(resultSet),
           error: null,
           isLoading: false
         });
@@ -205,12 +199,12 @@ function (_React$Component) {
   return QueryRenderer;
 }(React.Component);
 QueryRenderer.propTypes = {
-  render: PropTypes.func,
-  afterRender: PropTypes.func,
-  cubejsApi: PropTypes.object,
-  query: PropTypes.object,
-  queries: PropTypes.object,
-  loadSql: PropTypes.any
+  render: func,
+  afterRender: func,
+  cubejsApi: object,
+  query: object,
+  queries: object,
+  loadSql: any
 };
 
 var QueryRendererWithTotals = (function (_ref) {
@@ -278,11 +272,9 @@ function (_React$Component) {
         }, _callee, this);
       }));
 
-      function componentDidMount() {
+      return function componentDidMount() {
         return _componentDidMount.apply(this, arguments);
-      }
-
-      return componentDidMount;
+      };
     }()
   }, {
     key: "render",
@@ -412,6 +404,4 @@ function (_React$Component) {
   return QueryBuilder;
 }(React.Component);
 
-exports.QueryRenderer = QueryRenderer;
-exports.QueryRendererWithTotals = QueryRendererWithTotals;
-exports.QueryBuilder = QueryBuilder;
+export { QueryRenderer, QueryRendererWithTotals, QueryBuilder };

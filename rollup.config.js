@@ -21,8 +21,12 @@ const bundle = (name, globalName, baseConfig) => {
     ...baseConfig,
     plugins: [
       ...baseConfig.plugins,
+      commonjs(),
+      resolve({
+        module: true
+      }),
       babel({
-        exclude: 'node_modules/**',
+        exclude: ['node_modules/**', /\/core-js\//],
         runtimeHelpers: true,
         "presets": [
           '@babel/preset-react',
@@ -35,13 +39,9 @@ const bundle = (name, globalName, baseConfig) => {
           ]
         ]
       }),
-      resolve({
-        module: true
-      }),
       alias({
         '@cubejs-client/core': '../cubejs-client-core/src/index.js'
-      }),
-      commonjs()
+      })
     ]
   };
 
@@ -96,13 +96,13 @@ const bundle = (name, globalName, baseConfig) => {
           ]
         })
       ],
-      output: [{ file: `packages/${name}/dist/${name}.js`, format: "cjs" }]
+      output: [{ file: `packages/${name}/dist/${name}.js`, format: "es" }]
     }
   ]
 };
 
 export default bundle('cubejs-client-core', 'cubejs', {
-  input: "packages/cubejs-client-core/src/index.js",
+  input: "packages/cubejs-client-core/src/index.js"
 }).concat(bundle('cubejs-react', 'cubejsReact', {
   input: "packages/cubejs-react/src/index.js",
   external: [
