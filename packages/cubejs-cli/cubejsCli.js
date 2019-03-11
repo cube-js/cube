@@ -202,16 +202,25 @@ const generateSchema = async (options) => {
       " $ cubejs generate -t orders,customers"
     ], generateSchemaOptions);
   }
-  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server')))) {
+  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
     await displayError(
-      "@cubejs-backend/server dependency not found. Please run generate command from project directory.",
+      "@cubejs-backend/server-core dependency not found. Please run generate command from project directory.",
       generateSchemaOptions
     );
   }
 
   logStage('Fetching DB schema');
-  const CubejsServer = requireFromPackage('@cubejs-backend/server');
-  const driver = await CubejsServer.createDriver();
+
+  const CubejsServerCore = requireFromPackage('@cubejs-backend/server-core');
+  // Load env credentials to build driver
+  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
+    await displayError(
+      "Cube.js CLI couldn't find .env file with credentials to connect to your database. \nPlease learn more about configuring connection to the database with .env file here - \nhttps://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps",
+      generateSchemaOptions
+    );
+  }
+  requireFromPackage('dotenv').config();
+  const driver = await CubejsServerCore.createDriver();
   await driver.testConnection();
   const dbSchema = await driver.tablesSchema();
   if (driver.release) {
