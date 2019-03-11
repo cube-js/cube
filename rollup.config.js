@@ -96,13 +96,13 @@ const bundle = (name, globalName, baseConfig) => {
           ]
         })
       ],
-      output: [{ file: `packages/${name}/dist/${name}.js`, format: "es" }]
+      output: [{ file: `packages/${name}/dist/${name}.js`, format: "cjs" }]
     }
   ]
 };
 
 export default bundle('cubejs-client-core', 'cubejs', {
-  input: "packages/cubejs-client-core/src/index.js"
+  input: "packages/cubejs-client-core/src/index.js",
 }).concat(bundle('cubejs-react', 'cubejsReact', {
   input: "packages/cubejs-react/src/index.js",
   external: [
