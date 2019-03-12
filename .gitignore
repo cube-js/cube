@@ -7,3 +7,4 @@ newrelic_agent.log
 package-lock.json
 examples/examples-gallery/build
 yarn-error.log
+.gh-token
