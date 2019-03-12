@@ -1,8 +1,7 @@
 {
-  "name": "cubejs-client",
+  "name": "cubejs",
   "version": "0.1.0",
   "description": "",
-  "main": "dist/cubejs-client.js",
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
@@ -38,6 +37,10 @@
     "rollup-plugin-node-resolve": "^3.4.0",
     "rollup-plugin-replace": "^2.0.0",
     "rollup-plugin-uglify": "^5.0.2"
+  },
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/statsbotco/cube.js.git"
   },
   "license": "MIT"
 }
