@@ -140,7 +140,11 @@ class CubejsServerCore {
   }
 
   createCompilerApi(repository) {
-    return new CompilerApi(repository, this.dbType);
+    return new CompilerApi(repository, this.dbType, {
+      schemaVersion: this.options.schemaVersion,
+      devServer: this.options.devServer,
+      logger: this.logger
+    });
   }
 
   createOrchestratorApi() {

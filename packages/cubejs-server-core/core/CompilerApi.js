@@ -1,15 +1,28 @@
 const QueryBuilder = require('@cubejs-backend/schema-compiler/adapter/QueryBuilder');
 const PrepareCompiler = require('@cubejs-backend/schema-compiler/compiler/PrepareCompiler');
+const crypto = require('crypto');
 
 class CompilerApi {
-  constructor(repository, dbType) {
+  constructor(repository, dbType, options) {
     this.repository = repository;
     this.dbType = dbType;
+    this.options = options || {};
+    this.logger = this.options.logger;
   }
 
   async getCompilers() {
-    if (!this.compilers) {
-      this.compilers = await PrepareCompiler.compile(this.repository, { adapter: this.dbType }); // TODO mutex and rebuild
+    let compilerVersion = (
+      this.options.schemaVersion && this.options.schemaVersion() ||
+      'default_schema_version'
+    ).toString();
+    if (this.options.devServer) {
+      const files = await this.repository.dataSchemaFiles();
+      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest("hex")}`
+    }
+    if (!this.compilers || this.compilerVersion !== compilerVersion) {
+      this.logger('Recompiling schema', { version: compilerVersion });
+      this.compilers = PrepareCompiler.compile(this.repository, { adapter: this.dbType }); // TODO check if saving this promise can produce memory leak?
+      this.compilerVersion = compilerVersion;
     }
     return this.compilers;
   }
