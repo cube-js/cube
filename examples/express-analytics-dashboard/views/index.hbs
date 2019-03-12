@@ -1,0 +1,134 @@
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.bundle.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
+<script
+src="/javascripts/cubejs-client-core.umd.js"></script>
+
+<script>
+  var cubejsApi = cubejs(
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NTIzMDkzODYsImV4cCI6MTU1MjM5NTc4Nn0.ycxL4hrBdbced6yObFPpEf4dsZApzBIZ7_oug-fzV3Q',
+    { apiUrl: 'http://localhost:3000/cubejs-api/v1' }
+  );
+
+  var backgroundColors = [
+    'rgb(255, 99, 132)',
+    'rgb(255, 159, 64)',
+    'rgb(255, 205, 86)',
+    'rgb(75, 192, 192)',
+    'rgb(54, 162, 235)'
+  ];
+
+  var chartJsData = function(resultSet) {
+    return {
+      datasets: [{
+        data: resultSet.series()[0].series.map(function(r) { return r.value }),
+        backgroundColor: backgroundColors
+      }],
+      labels: resultSet.categories().map(function(c) { return c.category })
+    }
+  }
+
+  var kpis = [
+    ["Tweets.count", "total-tweets"],
+    ["Tweets.retweetCount", "total-retweets"],
+    ["Tweets.favoriteCount", "total-favorited"]
+  ];
+
+  kpis.forEach(kpi => {
+    cubejsApi.load({
+      measures: [kpi[0]]
+    }).then(resultSet => {
+      document.getElementById(kpi[1]).textContent =
+        numeral(resultSet.totalRow()[kpi[0]]).format('0,0');
+    })
+  });
+
+  cubejsApi.load({
+    measures: ["Tweets.count"],
+    dimensions: ["Tweets.location"],
+    filters: [
+      {
+        dimension: "Tweets.location",
+        operator: "notEquals",
+        values: ["''"]
+      }
+    ],
+    limit: 5
+  }).then(resultSet => {
+    new Chart(document.getElementById("pie-chart"), {
+      type: 'pie',
+      data: chartJsData(resultSet)
+    })
+  });
+
+  cubejsApi.load({
+    measures: ["Tweets.count"],
+    dimensions: ["Tweets.lang"],
+    limit: 5
+  }).then(resultSet => {
+    new Chart(document.getElementById("bar-chart"), {
+      type: 'bar',
+      data: chartJsData(resultSet),
+      options: { legend: { display: false } }
+    })
+  });
+</script>
+
+<div class="container" id="app">
+  <div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total tweets</h5>
+                <div class="card-text">
+                    <h3 id="total-tweets"></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total retweets</h5>
+                <div class="card-text">
+                  <h3 id="total-retweets"></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total favorited</h5>
+                <div class="card-text">
+                  <h3 id="total-favorited"></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
+  <br />
+  <br />
+  <div class="row">
+      <div class="col-md-6">
+          <div class="card">
+              <div class="card-body">
+                  <h5 class="card-title">Top Tweets Locations</h5>
+                  <div class="card-text">
+                    <canvas id="pie-chart"></canvas>
+                  </div>
+              </div>
+          </div>
+      </div>
+      <div class="col-md-6">
+          <div class="card">
+              <div class="card-body">
+                  <h5 class="card-title">Most Popular Languges</h5>
+                  <div class="card-text">
+                    <canvas id="bar-chart"></canvas>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+</div>
