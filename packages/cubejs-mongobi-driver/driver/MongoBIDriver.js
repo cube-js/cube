@@ -13,10 +13,10 @@ class MongoBIDriver extends BaseDriver {
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
       ssl: {
-	      ssl: process.env.USE_SSL
+	      ssl: process.env.CUBEJS_DB_SSL
       },
       authSwitchHandler: (data, cb) => {
-        var buffer = Buffer.fromprocess.env.CUBEJS_DB_PASS.concat('\0')();
+        var buffer = Buffer.from(process.env.CUBEJS_DB_PASS.concat('\0'));
         cb(null, buffer);
       },
       ...config
@@ -123,4 +123,4 @@ class MongoBIDriver extends BaseDriver {
   }
 }
 
-module.exports = MySqlDriver;
+module.exports = MongoBIDriver;
