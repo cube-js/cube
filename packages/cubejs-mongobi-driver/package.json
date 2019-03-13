@@ -15,5 +15,8 @@
     "generic-pool": "^3.6.0",
     "mysql2": "^1.6.5"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
 }
