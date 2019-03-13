@@ -31,6 +31,8 @@ If you are building your own business intelligence tool or customer-facing analy
 
 Cube.js has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
 
+<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/old-was-vs-cubejs-way.png" style="border: none" />
+
 ## Architecture
 __Cube.js acts as an analytics backend__, translating business logic (metrics and dimensions) into SQL and handling database connection. 
 
