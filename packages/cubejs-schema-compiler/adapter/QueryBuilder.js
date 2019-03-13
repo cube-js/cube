@@ -11,6 +11,7 @@ const ADAPTERS = {
   postgres,
   redshift,
   mysql,
+  mongobi: mysql,
   mssql,
   bigquery,
   prestodb,
