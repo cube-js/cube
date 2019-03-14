@@ -9,7 +9,7 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Total Tweets</h5>
+              <h5 class="card-title">Total Tweets</h5>
                 <div class="card-text">
                     <h3 id="total-tweets"></h3>
                 </div>
@@ -65,8 +65,8 @@
 
 <script>
   var cubejsApi = cubejs(
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NTIzOTk5MjcsImV4cCI6MTU1MjQ4NjMyN30.SOO-A6GfGH7ar3EoeBb0cjj10BVxO3ffjvmqQziXIZA',
-    { apiUrl: 'http://localhost:3000/cubejs-api/v1' }
+    '{{{ cubejsApiToken }}}',
+    { apiUrl: '{{{ cubejsApiUrl }}}/cubejs-api/v1' }
   );
 
   var kpis = [

@@ -3,11 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www"
+    "start": "node ./bin/www",
   },
   "dependencies": {
-    "@cubejs-backend/mysql-driver": "^0.3.1",
-    "@cubejs-backend/server-core": "^0.3.4",
+    "@cubejs-backend/mongobi-driver": "^0.4.0",
+    "@cubejs-backend/server-core": "^0.4.0",
     "cookie-parser": "~1.4.3",
     "debug": "~2.6.9",
     "dotenv": "^6.2.0",

@@ -14,6 +14,8 @@ var app = express();
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'hbs');
+app.locals.cubejsApiToken = process.env.CUBEJS_API_TOKEN;
+app.locals.cubejsApiUrl = process.env.CUBEJS_API_URL;
 
 app.use(logger('dev'));
 app.use(express.json());
