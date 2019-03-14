@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www",
+    "start": "node ./bin/www"
   },
   "dependencies": {
     "@cubejs-backend/mongobi-driver": "^0.4.0",
