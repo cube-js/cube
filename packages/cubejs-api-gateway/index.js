@@ -172,22 +172,27 @@ const normalizeQuery = (query) => {
   };
 };
 
-const coerceForSqlQuery = (query) => ({
+const coerceForSqlQuery = (query, req) => ({
   ...query,
   timeDimensions: (query.timeDimensions || [])
-    .map(td => (td.granularity === 'day' ? { ...td, granularity: 'date' } : td))
+    .map(td => (td.granularity === 'day' ? { ...td, granularity: 'date' } : td)),
+  contextSymbols: {
+    userContext: req.authInfo && req.authInfo.u || {}
+  }
 });
 
 class ApiGateway {
-  constructor(apiSecret, compilerApi, adapterApi, logger) {
+  constructor(apiSecret, compilerApi, adapterApi, logger, options) {
+    options = options || {};
     this.apiSecret = apiSecret;
     this.compilerApi = compilerApi;
     this.adapterApi = adapterApi;
     this.logger = logger;
+    this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
   }
 
   initApp(app) {
-    app.get('/cubejs-api/v1/load', this.checkAuth.bind(this), (async (req, res) => {
+    app.get('/cubejs-api/v1/load', this.checkAuthMiddleware, (async (req, res) => {
       try {
         const query = JSON.parse(req.query.query);
         this.log(req, {
@@ -196,7 +201,7 @@ class ApiGateway {
         });
         const normalizedQuery = normalizeQuery(query);
         const [compilerSqlResult, metaConfigResult] = await Promise.all([
-          this.compilerApi.getSql(coerceForSqlQuery(normalizedQuery)),
+          this.compilerApi.getSql(coerceForSqlQuery(normalizedQuery, req)),
           this.compilerApi.metaConfig()
         ]);
         const sqlQuery = compilerSqlResult;
@@ -226,11 +231,11 @@ class ApiGateway {
       }
     }));
 
-    app.get('/cubejs-api/v1/sql', this.checkAuth.bind(this), (async (req, res) => {
+    app.get('/cubejs-api/v1/sql', this.checkAuthMiddleware, (async (req, res) => {
       try {
         const query = JSON.parse(req.query.query);
         const normalizedQuery = normalizeQuery(query);
-        const sqlQuery = await this.compilerApi.getSql(coerceForSqlQuery(normalizedQuery));
+        const sqlQuery = await this.compilerApi.getSql(coerceForSqlQuery(normalizedQuery, req));
         res.json({
           sql: sqlQuery
         });
@@ -239,7 +244,7 @@ class ApiGateway {
       }
     }));
 
-    app.get('/cubejs-api/v1/meta', this.checkAuth.bind(this), (async (req, res) => {
+    app.get('/cubejs-api/v1/meta', this.checkAuthMiddleware, (async (req, res) => {
       try {
         const metaConfig = await this.compilerApi.metaConfig();
         const cubes = metaConfig.map(c => c.config);

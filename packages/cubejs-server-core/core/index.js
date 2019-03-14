@@ -116,7 +116,9 @@ class CubejsServerCore {
       this.apiSecret,
       this.compilerApi,
       this.orchestratorApi,
-      this.logger
+      this.logger, {
+        checkAuthMiddleware: this.options.checkAuthMiddleware
+      }
     );
     apiGateway.initApp(app);
     if (this.options.devServer) {
