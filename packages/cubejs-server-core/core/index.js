@@ -65,10 +65,10 @@ class CubejsServerCore {
         try {
           await promisify(client.track.bind(client))({
             event: name,
-            anonymousId: anonymousId,
+            anonymousId,
             properties: props
           });
-          await promisify(client.flush.bind(client))()
+          await promisify(client.flush.bind(client))();
         } catch (e) {
           // console.error(e);
         }
@@ -84,7 +84,7 @@ class CubejsServerCore {
           ) {
             this.event(msg, { error: params.error });
           }
-          console.log(`${msg}: ${JSON.stringify(params)}`)
+          console.log(`${msg}: ${JSON.stringify(params)}`);
         });
       }
       let causeErrorPromise;
@@ -92,6 +92,13 @@ class CubejsServerCore {
         console.error(e.stack || e);
         if (e.message && e.message.indexOf('Redis connection to') !== -1) {
           console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
+          if (process.platform.indexOf('win') === 0) {
+            console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
+          } else if (process.platform.indexOf('darwin') === 0) {
+            console.log('💾 To install Redis on Mac please use https://redis.io/topics/quickstart or `$ brew install redis`');
+          } else {
+            console.log('💾 To install Redis please use https://redis.io/topics/quickstart');
+          }
         }
         if (!causeErrorPromise) {
           causeErrorPromise = this.event('Dev Server Fatal Error', {
@@ -100,7 +107,7 @@ class CubejsServerCore {
         }
         await causeErrorPromise;
         process.exit(1);
-      })
+      });
     }
   }
 
@@ -130,7 +137,7 @@ class CubejsServerCore {
     const port = process.env.PORT || 4000; // TODO
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
     const jwt = require('jsonwebtoken');
-    let cubejsToken = jwt.sign({}, this.apiSecret, { expiresIn: '1d' });
+    const cubejsToken = jwt.sign({}, this.apiSecret, { expiresIn: '1d' });
     console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
     console.log(`🦅 Dev environment available at ${apiUrl}`);
     this.event('Dev Server Start');
@@ -160,7 +167,7 @@ class CubejsServerCore {
   async getDriver() {
     if (!this.driver) {
       const driver = this.driverFactory();
-      await driver.testConnection(); //TODO mutex
+      await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }
     return this.driver;
@@ -168,11 +175,12 @@ class CubejsServerCore {
 
   static createDriver(dbType) {
     checkEnvForPlaceholders();
+    // eslint-disable-next-line global-require,import/no-dynamic-require
     return new (require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE)))();
   }
 
   static driverDependencies(dbType) {
-    return DriverDependencies[dbType] || DriverDependencies.jdbc
+    return DriverDependencies[dbType] || DriverDependencies.jdbc;
   }
 }
 
