@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.2](https://github.com/statsbotco/cubejs-client/compare/v0.4.1...v0.4.2) (2019-03-14)
+
+
+### Bug Fixes
+
+* **mongobi-driver:** Fix Server does not support secure connnection on connection to localhost ([3202508](https://github.com/statsbotco/cubejs-client/commit/3202508))
+
+
+
+
+
 ## [0.4.1](https://github.com/statsbotco/cubejs-client/compare/v0.4.0...v0.4.1) (2019-03-14)
 
 

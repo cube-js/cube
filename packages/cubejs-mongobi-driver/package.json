@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mongobi-driver",
   "description": "Cube.js MongoBI driver",
   "author": "krunalsabnis@gmail.com",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "engines": {
     "node": ">=8.11.1"
   },
