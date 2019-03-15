@@ -11,11 +11,12 @@ Cube.js currently provides connectors to the following databases:
 | PostgreSQL           | postgres      |
 | MySQL                | mysql         |
 | AWS Athena           | athena        |
-| MongoDB (via MongoDB Connector for BI)           | mysql        |
+| MongoDB (via MongoDB Connector for BI)           | mongobi        |
 
-MongoDB Connector for BI acts as a MySQL server on top of your MongoDB data, so
-you need to set `CUBEJS_DB_TYPE` to `mysql`. [Learn more about setup for MongoDB
-here.](https://statsbot.co/blog/building-mongodb-dashboard-using-node.js)
+
+_To use Cube.js with MongoDB you need to install MongoDB Connector for BI. You
+can download it [here](https://www.mongodb.com/download-center/bi-connector). [Learn more about setup for MongoDB
+here.](https://statsbot.co/blog/building-mongodb-dashboard-using-node.js)_
 
 ### Configuring Connection for Cube.js CLI Created Apps
 

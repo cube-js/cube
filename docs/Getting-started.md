@@ -27,7 +27,8 @@ $ cubejs create <project name> -d <database type>
 specifying the project name and your database using `-d` flag. Available options: 
 
 * `postgres`
-* `mysql` 
+* `mysql`
+* `mongobi`
 * `athena`
 
 For example,
@@ -38,7 +39,7 @@ $ cubejs create hello-world -d postgres
 
 Once run, the `create` command will create a new project directory that contains the scaffolding for your new Cube.js project. This includes all the files necessary to spin up the Cube.js backend, example frontend code for displaying the results of Cube.js queries in a React app, and some example schema files to highlight the format of the Cube.js Data Schema layer.
 
-The `.env` file in this project directory contains placeholders for the relevant database credentials. For MySQL and PostgreSQL, you'll need to fill in the target host, database name, user and password. For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
+The `.env` file in this project directory contains placeholders for the relevant database credentials. For MySQL, MongoBI and PostgreSQL, you'll need to fill in the target host, database name, user and password. For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
 
 [Learn more about connecting to different databases with Cube.js](connecting-to-the-database)
 

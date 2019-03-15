@@ -65,7 +65,8 @@ $ cubejs create <project name> -d <database type>
 specifying the project name and your database using `-d` flag. Available options: 
 
 * `postgres`
-* `mysql` 
+* `mysql`
+* `mongobi`
 * `athena`
 
 For example,
