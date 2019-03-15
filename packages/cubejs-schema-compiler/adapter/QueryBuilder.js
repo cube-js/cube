@@ -1,5 +1,6 @@
 const postgres = require('./PostgresQuery');
 const mysql = require('./MysqlQuery');
+const mongobi = require('./MongoBiQuery');
 const mssql = require('./MssqlQuery');
 const bigquery = require('./BigqueryQuery');
 const redshift = require('./RedshiftQuery');
@@ -11,7 +12,7 @@ const ADAPTERS = {
   postgres,
   redshift,
   mysql,
-  mongobi: mysql,
+  mongobi,
   mssql,
   bigquery,
   prestodb,

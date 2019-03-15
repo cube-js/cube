@@ -62,7 +62,8 @@ const prepareAliasToMemberNameMap = (metaConfig, sqlQuery, query) => {
 
 const transformValue = (value, type) => {
   if (value && type === 'time') {
-    return moment(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+    // TODO value of type time should be always local. Consider fixing adapter time formats.
+    return moment(value.replace('Z', '')).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
   return value && value.value ? value.value : value; // TODO move to sql adapter
 };
