@@ -29,7 +29,7 @@ import * as path from 'path';
 const express = express();
 
 const dbType = 'mysql';
-const config = {
+const options = {
   dbType,
   devServer: false,
   driverFactory: () => CubejsServerCore.createDriver(dbType),
@@ -39,6 +39,17 @@ const config = {
   schemaPath: path.join('assets', 'schema')
 };
 
-const core = CubejsServerCore.create(config);
+const core = CubejsServerCore.create(options);
 await core.initApp(express);
+```
+
+#### Disable Security
+Security can be disabled by passing an empty middleware in options:
+
+```javascript
+options = {
+  checkAuthMiddleware: (req, res, next) => {
+    return next && next();
+  }
+};
 ```
