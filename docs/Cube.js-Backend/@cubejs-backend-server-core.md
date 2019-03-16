@@ -42,3 +42,14 @@ const config = {
 const core = CubejsServerCore.create(config);
 await core.initApp(express);
 ```
+
+#### Disable Security
+Security can be disabled by passing an empty middleware in the configuration:
+
+```javascript
+config = {
+  checkAuthMiddleware: (req, res, next) => {
+    return next && next();
+  }
+};
+```
