@@ -4,11 +4,11 @@ const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_TO_INTERVAL = {
-  date: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000Z')`,
-  week: (date) => `DATE_FORMAT(date_add('1900-01-01', interval TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000Z')`,
-  hour: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000Z')`,
-  month: (date) => `DATE_FORMAT(${date}, '%Y-%m-01T00:00:00.000Z')`,
-  year: (date) => `DATE_FORMAT(${date}, '%Y-01-01T00:00:00.000Z')`
+  date: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
+  week: (date) => `DATE_FORMAT(date_add('1900-01-01', interval TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
+  hour: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000')`,
+  month: (date) => `DATE_FORMAT(${date}, '%Y-%m-01T00:00:00.000')`,
+  year: (date) => `DATE_FORMAT(${date}, '%Y-01-01T00:00:00.000')`
 };
 
 class MysqlFilter extends BaseFilter {
