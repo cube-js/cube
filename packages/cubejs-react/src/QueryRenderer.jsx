@@ -85,8 +85,12 @@ export default class QueryRenderer extends React.Component {
 QueryRenderer.propTypes = {
   render: PropTypes.func,
   afterRender: PropTypes.func,
-  cubejsApi: PropTypes.object,
+  cubejsApi: PropTypes.object.isRequired,
   query: PropTypes.object,
   queries: PropTypes.object,
   loadSql: PropTypes.any
 };
+
+QueryRender.defaultProps = {
+  query: {}
+}
