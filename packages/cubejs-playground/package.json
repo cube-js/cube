@@ -11,12 +11,15 @@
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
+    "history": "^4.9.0",
     "moment": "^2.24.0",
     "prismjs": "^1.15.0",
     "react": "^16.8.3",
     "react-chartjs-2": "^2.7.4",
     "react-dom": "^16.8.3",
     "react-is": "^16.8.4",
+    "react-router": "^4.4.0",
+    "react-router-dom": "^4.4.0",
     "react-scripts": "2.1.5",
     "react-source-render": "^2.0.0-beta.6",
     "sql-formatter": "^2.3.2",
@@ -45,6 +48,10 @@
   "proxy": "http://localhost:4000",
   "license": "MIT",
   "devDependencies": {
+    "eslint-config-airbnb": "^17.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-jsx-a11y": "^6.2.1",
+    "eslint-plugin-react": "^7.12.4",
     "react-app-rewired": "^2.1.0"
   }
 }

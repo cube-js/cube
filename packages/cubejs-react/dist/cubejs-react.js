@@ -278,9 +278,11 @@ function (_React$Component) {
         }, _callee, this);
       }));
 
-      return function componentDidMount() {
+      function componentDidMount() {
         return _componentDidMount.apply(this, arguments);
-      };
+      }
+
+      return componentDidMount;
     }()
   }, {
     key: "render",
@@ -296,6 +298,11 @@ function (_React$Component) {
           }
         }
       });
+    }
+  }, {
+    key: "isQueryPresent",
+    value: function isQueryPresent() {
+      return this.state.query.measures && this.state.query.measures.length || this.state.query.dimensions && this.state.query.dimensions.length || this.state.query.timeDimensions && this.state.query.timeDimensions.length;
     }
   }, {
     key: "prepareRenderProps",
@@ -358,6 +365,7 @@ function (_React$Component) {
       return _objectSpread({
         meta: this.state.meta,
         query: this.state.query,
+        isQueryPresent: this.isQueryPresent(),
         chartType: this.state.chartType,
         measures: (this.state.meta && this.state.query.measures || []).map(function (m, i) {
           return _objectSpread({

@@ -20,11 +20,11 @@ export default class Meta {
   resolveMember(memberName, memberType) {
     const [cube] = memberName.split('.');
     if (!this.cubesMap[cube]) {
-      throw new Error(`Cube not found ${cube} for path '${memberName}'`);
+      return { title: memberName, error: `Cube not found ${cube} for path '${memberName}'` };
     }
     const member = this.cubesMap[cube][memberType][memberName];
     if (!member) {
-      throw new Error(`Path not found '${memberName}'`);
+      return { title: memberName, error: `Path not found '${memberName}'` };
     }
     return member;
   }

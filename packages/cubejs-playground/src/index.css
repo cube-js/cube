@@ -13,3 +13,17 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+#root {
+  height: 100%;
+}
+
+.schema-sidebar, .schema-sidebar .ant-tabs, .schema-sidebar .ant-tabs-content {
+  height: 100%;
+}
+
+.schema-sidebar .ant-tabs-tabpane {
+  /* TODO: replace with flexbox */
+  height: 85%;
+  overflow: auto;
+}

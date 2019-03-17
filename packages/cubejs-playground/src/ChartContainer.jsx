@@ -1,29 +1,9 @@
 import React from 'react';
 import { Card, Button } from 'antd';
-import Prism from "prismjs";
-import "./prism.css";
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { map } from 'ramda';
-
-class PrismCode extends React.Component {
-  componentDidMount() {
-    Prism.highlightAll();
-  }
-
-  componentDidUpdate() {
-    Prism.highlightAll();
-  }
-
-  render() {
-    return (
-      <pre>
-        <code className='language-javascript'>
-          { this.props.code }
-        </code>
-      </pre>
-    )
-  }
-}
+import PrismCode from './PrismCode';
+import { playgroundAction } from './events';
 
 class ChartContainer extends React.Component {
   constructor(props) {
@@ -58,7 +38,10 @@ class ChartContainer extends React.Component {
     const extra =
       (<Button.Group>
         <Button
-          onClick={() => this.setState({ showCode: !this.state.showCode })}
+          onClick={() => {
+            playgroundAction('Show Code');
+            this.setState({ showCode: !this.state.showCode });
+          }}
           icon="code"
           size="small"
           type={this.state.showCode ? 'primary' : 'default'}
@@ -70,6 +53,7 @@ class ChartContainer extends React.Component {
           target="_blank"
           icon="code-sandbox"
           size="small"
+          onClick={() => playgroundAction('Open Code Sandbox')}
         >
           Edit
         </Button>

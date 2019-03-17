@@ -27,6 +27,12 @@ export default class QueryBuilder extends React.Component {
     />);
   };
 
+  isQueryPresent() {
+    return this.state.query.measures && this.state.query.measures.length ||
+      this.state.query.dimensions && this.state.query.dimensions.length ||
+      this.state.query.timeDimensions && this.state.query.timeDimensions.length
+  }
+
   prepareRenderProps(queryRendererProps) {
     const getName = member => member.name;
     const toTimeDimension = member =>
@@ -71,6 +77,7 @@ export default class QueryBuilder extends React.Component {
     return {
       meta: this.state.meta,
       query: this.state.query,
+      isQueryPresent: this.isQueryPresent(),
       chartType: this.state.chartType,
       measures: (this.state.meta && this.state.query.measures || [])
         .map((m, i) => ({ index: i, ...this.state.meta.resolveMember(m, 'measures') })),

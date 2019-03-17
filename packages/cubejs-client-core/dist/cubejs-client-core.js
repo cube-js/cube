@@ -426,13 +426,19 @@ function () {
           cube = _memberName$split2[0];
 
       if (!this.cubesMap[cube]) {
-        throw new Error("Cube not found ".concat(cube, " for path '").concat(memberName, "'"));
+        return {
+          title: memberName,
+          error: "Cube not found ".concat(cube, " for path '").concat(memberName, "'")
+        };
       }
 
       var member = this.cubesMap[cube][memberType][memberName];
 
       if (!member) {
-        throw new Error("Path not found '".concat(memberName, "'"));
+        return {
+          title: memberName,
+          error: "Path not found '".concat(memberName, "'")
+        };
       }
 
       return member;
@@ -587,7 +593,7 @@ function () {
                   return _context.stop();
               }
             }
-          }, _callee, this);
+          }, _callee);
         }));
 
         return function loadImpl() {

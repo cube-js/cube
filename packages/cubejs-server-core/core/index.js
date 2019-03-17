@@ -1,4 +1,6 @@
+/* eslint-disable global-require */
 const ApiGateway = require('@cubejs-backend/api-gateway');
+const fs = require('fs-extra');
 const path = require('path');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
@@ -144,8 +146,38 @@ class CubejsServerCore {
     const serveStatic = require('serve-static');
     app.get('/playground/context', (req, res) => {
       this.event('Dev Server Env Open');
-      res.json({ cubejsToken, apiUrl, anonymousId: this.anonymousId });
+      res.json({
+        cubejsToken: jwt.sign({}, this.apiSecret, { expiresIn: '1d' }),
+        apiUrl,
+        anonymousId: this.anonymousId
+      });
     });
+
+    app.get('/playground/db-schema', async (req, res) => {
+      this.event('Dev Server DB Schema Load');
+      const driver = await this.getDriver();
+      const tablesSchema = await driver.tablesSchema();
+      res.json({ tablesSchema });
+    });
+
+    app.get('/playground/files', async (req, res) => {
+      this.event('Dev Server Files Load');
+      const files = await this.repository.dataSchemaFiles();
+      res.json({ files });
+    });
+
+    app.post('/playground/generate-schema', async (req, res) => {
+      this.event('Dev Server Generate Schema');
+      const driver = await this.getDriver();
+      const tablesSchema = await driver.tablesSchema();
+
+      const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema);
+      const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables);
+      await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
+      res.json({ files });
+    });
+
     app.use(serveStatic(path.join(__dirname, '../playground')));
   }
 
