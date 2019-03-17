@@ -17,11 +17,12 @@ class CompilerApi {
     ).toString();
     if (this.options.devServer) {
       const files = await this.repository.dataSchemaFiles();
-      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest("hex")}`
+      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest("hex")}`;
     }
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      this.logger('Recompiling schema', { version: compilerVersion });
-      this.compilers = PrepareCompiler.compile(this.repository, { adapter: this.dbType }); // TODO check if saving this promise can produce memory leak?
+      this.logger('Compiling schema', { version: compilerVersion });
+      // TODO check if saving this promise can produce memory leak?
+      this.compilers = PrepareCompiler.compile(this.repository, { adapter: this.dbType });
       this.compilerVersion = compilerVersion;
     }
     return this.compilers;
