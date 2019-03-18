@@ -13,12 +13,13 @@ Express application.
 
 Create an instance of `CubejsServerCore` to embed it in an `Express` application.
 
-* `options` - options object.
+* `options` - Options object.
     * `dbType` - Type of your database.
-    * `driverFactory()` - pass function of the driver factory with your database type.
-    * `logger(msg, params)` - pass function for your custom logger.
+    * `driverFactory()` - Pass function of the driver factory with your database type.
+    * `logger(msg, params)` - Pass function for your custom logger.
     * `schemaPath` - Path to the `schema` location. By default, it is `/schema`.
     * `devServer` - Enable development server. By default, it is `true`.
+    * `basePath` - Path where _Cube.js_ is mounted to. By default, it is `/cubejs-api`.
     * `checkAuthMiddleware` - Pass express-style middleware to check authentication. Set `req.authInfo = { u: { ...userContextObj } }` inside middleware if you want to provide `USER_CONTEXT`. [Learn more](/cube#context-variables-user-context).
 
 ```javascript
