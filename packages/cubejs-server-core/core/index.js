@@ -124,7 +124,7 @@ class CubejsServerCore {
       this.compilerApi,
       this.orchestratorApi,
       this.logger, {
-        baseRoute: this.options.baseRoute,
+        basePath: this.options.basePath,
         checkAuthMiddleware: this.options.checkAuthMiddleware
       }
     );

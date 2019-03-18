@@ -190,11 +190,11 @@ class ApiGateway {
     this.adapterApi = adapterApi;
     this.logger = logger;
     this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
-    this.baseRoute = options.baseRoute || '/cubejs-api';
+    this.basePath = options.basePath || '/cubejs-api';
   }
 
   initApp(app) {
-    app.get(`${this.baseRoute}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       try {
         const query = JSON.parse(req.query.query);
         this.log(req, {
@@ -233,7 +233,7 @@ class ApiGateway {
       }
     }));
 
-    app.get(`${this.baseRoute}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
       try {
         const query = JSON.parse(req.query.query);
         const normalizedQuery = normalizeQuery(query);
@@ -246,7 +246,7 @@ class ApiGateway {
       }
     }));
 
-    app.get(`${this.baseRoute}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
       try {
         const metaConfig = await this.compilerApi.metaConfig();
         const cubes = metaConfig.map(c => c.config);
