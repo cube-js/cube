@@ -1,4 +1,5 @@
 import React from 'react';
+import * as PropTypes from 'prop-types';
 import QueryRenderer from './QueryRenderer.jsx'
 
 export default class QueryBuilder extends React.Component {
@@ -6,7 +7,7 @@ export default class QueryBuilder extends React.Component {
     super(props);
     this.state = {
       query: props.query,
-      chartType: 'line'
+      chartType: props.defaultChartType
     };
   }
 
@@ -108,4 +109,17 @@ export default class QueryBuilder extends React.Component {
       ...queryRendererProps
     };
   }
+}
+
+
+QueryBuilder.propTypes = {
+  render: PropTypes.func.isRequired,
+  cubejsApi: PropTypes.object.isRequired,
+  defaultChartType: PropTypes.string
+  query: PropTypes.object
+}
+
+QueryBuilder.defaultProps = {
+  query: {},
+  defaultChartType: 'line'
 }
