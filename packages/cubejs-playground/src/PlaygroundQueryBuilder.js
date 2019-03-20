@@ -1,4 +1,5 @@
 import React from 'react';
+import * as PropTypes from 'prop-types';
 import {
   Row, Col, Button, Menu, Dropdown, Divider, Icon, Card, Select, Input
 } from 'antd';
@@ -6,43 +7,65 @@ import { QueryBuilder } from '@cubejs-client/react';
 import ChartRenderer from './ChartRenderer';
 import { playgroundAction } from './events';
 
-const renderMemberGroup = (members, availableMembers, addMemberName, updateMethods) => {
-  const menu = (onClick) => (
-    <Menu>
-      {availableMembers.length ? availableMembers.map(m => (<Menu.Item key={m.name} onClick={() => onClick(m)}>
+// Can't be a Pure Component due to Dropdown lookups overlay component type to set appropriate styles
+const memberMenu = (onClick, availableMembers) => (
+  <Menu>
+    {availableMembers.length ? availableMembers.map(m => (
+      <Menu.Item key={m.name} onClick={() => onClick(m)}>
         {m.title}
-      </Menu.Item>)) : <Menu.Item disabled>No members found</Menu.Item>}
-    </Menu>
-  );
+      </Menu.Item>
+    )) : <Menu.Item disabled>No members found</Menu.Item>}
+  </Menu>
+);
 
-  return (<span>
-      {members.map(m => (
-        <Button.Group style={{ marginRight: 8 }}>
-          <Dropdown overlay={menu(updateWith => {
-            playgroundAction('Update Member', { memberName: addMemberName });
-            updateMethods.update(m, updateWith)
-          })} placement="bottomLeft" trigger={['click']}>
-            <Button>{m.title}</Button>
-          </Dropdown>
-          <Button type="danger" icon='close' onClick={() => {
+const MemberGroup = ({
+  members, availableMembers, addMemberName, updateMethods
+}) => (
+  <span>
+    {members.map(m => (
+      <Button.Group style={{ marginRight: 8 }}>
+        <Dropdown
+          overlay={
+            memberMenu(updateWith => {
+              playgroundAction('Update Member', { memberName: addMemberName });
+              updateMethods.update(m, updateWith);
+            }, availableMembers)
+          }
+          placement="bottomLeft"
+          trigger={['click']}
+        >
+          <Button>{m.title}</Button>
+        </Dropdown>
+        <Button
+          type="danger"
+          icon="close"
+          onClick={() => {
             playgroundAction('Remove Member', { memberName: addMemberName });
             updateMethods.remove(m);
-          }} />
-        </Button.Group>
-      ))}
+          }}
+        />
+      </Button.Group>
+    ))}
     <Dropdown
-      overlay={menu(
-        (m) => {
+      overlay={
+        memberMenu(m => {
           playgroundAction('Add Member', { memberName: addMemberName });
           updateMethods.add(m);
-        }
-      )}
+        }, availableMembers)
+      }
       placement="bottomLeft"
       trigger={['click']}
     >
-        <Button type="dashed" icon='plus'>{addMemberName}</Button>
-      </Dropdown>
-    </span>);
+      <Button type="dashed" icon="plus">{addMemberName}</Button>
+    </Dropdown>
+  </span>
+);
+
+MemberGroup.propTypes = {
+  members: PropTypes.array.isRequired,
+  availableMembers: PropTypes.array.isRequired,
+  addMemberName: PropTypes.string.isRequired,
+  updateMethods: PropTypes.object.isRequired
 };
 
 const filterInputs = {
@@ -65,6 +88,24 @@ const filterInputs = {
   )
 };
 
+filterInputs.string.propTypes = {
+  values: PropTypes.array,
+  onChange: PropTypes.func.isRequired
+};
+
+filterInputs.string.defaultProps = {
+  values: []
+};
+
+filterInputs.number.propTypes = {
+  values: PropTypes.array,
+  onChange: PropTypes.func.isRequired
+};
+
+filterInputs.number.defaultProps = {
+  values: []
+};
+
 const FilterInput = ({ member, updateMethods, addMemberName }) => {
   const Filter = filterInputs[member.dimension.type] || filterInputs.string;
   return (
@@ -79,99 +120,98 @@ const FilterInput = ({ member, updateMethods, addMemberName }) => {
   );
 };
 
-const FilterGroup = ({ members, availableMembers, addMemberName, updateMethods }) => {
-  const menu = (onClick) => (
+FilterInput.propTypes = {
+  member: PropTypes.object.isRequired,
+  addMemberName: PropTypes.string.isRequired,
+  updateMethods: PropTypes.object.isRequired
+};
+
+const FilterGroup = ({
+  members, availableMembers, addMemberName, updateMethods
+}) => (
+  <span>
+    {members.map(m => (
+      <div style={{ marginBottom: 12 }} key={m.index}>
+        <Button.Group style={{ marginRight: 8 }}>
+          <Dropdown
+            overlay={
+              memberMenu(updateWith => {
+                playgroundAction('Update Member', { memberName: addMemberName });
+                updateMethods.update(m, { ...m, dimension: updateWith });
+              }, availableMembers)
+            }
+            placement="bottomLeft"
+            trigger={['click']}
+          >
+            <Button
+              style={{
+                width: 150,
+                textOverflow: 'ellipsis',
+                overflow: 'hidden'
+              }}
+            >
+              {m.dimension.title}
+            </Button>
+          </Dropdown>
+          <Button
+            type="danger"
+            icon="close"
+            onClick={() => {
+              playgroundAction('Remove Member', { memberName: addMemberName });
+              updateMethods.remove(m);
+            }}
+          />
+        </Button.Group>
+        <Select
+          value={m.operator}
+          onChange={(operator) => updateMethods.update(m, { ...m, operator })}
+          style={{ width: 200, marginRight: 8 }}
+        >
+          {m.operators.map(operator => (
+            <Select.Option
+              key={operator.name}
+              value={operator.name}
+            >
+              {operator.title}
+            </Select.Option>
+          ))}
+        </Select>
+        <FilterInput member={m} key="filterInput" updateMethods={updateMethods} addMemberName={addMemberName}/>
+      </div>
+    ))}
+    <Dropdown
+      overlay={memberMenu(
+        (m) => {
+          playgroundAction('Add Member', { memberName: addMemberName });
+          updateMethods.add({ dimension: m });
+        },
+        availableMembers
+      )}
+      placement="bottomLeft"
+      trigger={['click']}
+    >
+      <Button type="dashed" icon="plus">{addMemberName}</Button>
+    </Dropdown>
+  </span>
+);
+
+FilterGroup.propTypes = {
+  members: PropTypes.array.isRequired,
+  availableMembers: PropTypes.array.isRequired,
+  addMemberName: PropTypes.string.isRequired,
+  updateMethods: PropTypes.object.isRequired
+};
+
+const TimeGroup = ({
+  members, availableMembers, addMemberName, updateMethods
+}) => {
+  const granularityMenu = (member, onClick) => (
     <Menu>
-      {availableMembers.length ? availableMembers.map(m => (
+      {member.granularities.length ? member.granularities.map(m => (
         <Menu.Item key={m.name} onClick={() => onClick(m)}>
           {m.title}
         </Menu.Item>
       )) : <Menu.Item disabled>No members found</Menu.Item>}
-    </Menu>
-  );
-
-  return (
-    <span>
-      {members.map(m => (
-        <div style={{ marginBottom: 12 }} key={m.index}>
-          <Button.Group style={{ marginRight: 8 }}>
-            <Dropdown
-              overlay={menu(updateWith => {
-                playgroundAction('Update Member', { memberName: addMemberName });
-                updateMethods.update(m, { ...m, dimension: updateWith });
-              })}
-              placement="bottomLeft"
-              trigger={['click']}
-            >
-              <Button
-                style={{
-                  width: 150,
-                  textOverflow: 'ellipsis',
-                  overflow: 'hidden'
-                }}
-              >
-                {m.dimension.title}
-              </Button>
-            </Dropdown>
-            <Button
-              type="danger"
-              icon="close"
-              onClick={() => {
-                playgroundAction('Remove Member', { memberName: addMemberName });
-                updateMethods.remove(m);
-              }}
-            />
-          </Button.Group>
-          <Select
-            value={m.operator}
-            onChange={(operator) => updateMethods.update(m, { ...m, operator })}
-            style={{ width: 200, marginRight: 8 }}
-          >
-            {m.operators.map(operator => (
-              <Select.Option
-                key={operator.name}
-                value={operator.name}
-              >
-                {operator.title}
-              </Select.Option>
-            ))}
-          </Select>
-          <FilterInput member={m} key="filterInput" updateMethods={updateMethods} addMemberName={addMemberName}/>
-        </div>
-      ))}
-      <Dropdown
-        overlay={menu(
-          (m) => {
-            playgroundAction('Add Member', { memberName: addMemberName });
-            updateMethods.add({ dimension: m });
-          }
-        )}
-        placement="bottomLeft"
-        trigger={['click']}
-      >
-        <Button type="dashed" icon="plus">{addMemberName}</Button>
-      </Dropdown>
-    </span>
-  );
-};
-
-const renderTimeGroup = (members, availableMembers, addMemberName, updateMethods) => {
-  const menu = (onClick) => (
-    <Menu>
-      {availableMembers.length ? availableMembers.map(m => (<Menu.Item key={m.name} onClick={() => onClick(m)}>
-        {m.title}
-      </Menu.Item>)) : <Menu.Item disabled>No members found</Menu.Item>}
-    </Menu>
-  );
-
-  const granularityMenu = (member, onClick) => (
-    <Menu>
-      {member.granularities.length ? member.granularities.map(m => (
-          <Menu.Item key={m.name} onClick={() => onClick(m)}>
-            {m.title}
-          </Menu.Item>
-        )
-      ) : <Menu.Item disabled>No members found</Menu.Item>}
     </Menu>
   );
 
@@ -183,30 +223,33 @@ const renderTimeGroup = (members, availableMembers, addMemberName, updateMethods
 
   const dateRanges = [
     { title: 'All time', value: undefined },
-    { title: 'Last 30 days', value: [
+    {
+      title: 'Last 30 days',
+      value: [
         last30DaysFrom.toISOString().substring(0, 10), yesterday.toISOString().substring(0, 10)
-      ] }
+      ]
+    }
   ];
 
   const dateRangeMenu = (onClick) => (
     <Menu>
       {dateRanges.map(m => (
-          <Menu.Item key={m.title} onClick={() => onClick(m)}>
-            {m.title}
-          </Menu.Item>
-        )
-      )}
+        <Menu.Item key={m.title} onClick={() => onClick(m)}>
+          {m.title}
+        </Menu.Item>
+      ))}
     </Menu>
   );
 
-  return (<span>
+  return (
+    <span>
       {members.map(m => [
         <Button.Group style={{ marginRight: 8 }}>
           <Dropdown
-            overlay={menu(updateWith => {
+            overlay={memberMenu(updateWith => {
               playgroundAction('Update Member', { memberName: addMemberName });
               updateMethods.update(m, { ...m, dimension: updateWith });
-            })}
+            }, availableMembers)}
             placement="bottomLeft"
             trigger={['click']}
           >
@@ -256,22 +299,30 @@ const renderTimeGroup = (members, availableMembers, addMemberName, updateMethods
           </Button>
         </Dropdown>
       ])}
-    {!members.length && (
-      <Dropdown
-        overlay={menu(member => {
-          playgroundAction('Add Member', { memberName: addMemberName });
-          updateMethods.add({ dimension: member, granularity: 'day' });
-        })}
-        placement="bottomLeft"
-        trigger={['click']}
-      >
-        <Button type="dashed" icon='plus'>{addMemberName}</Button>
-      </Dropdown>
-    )}
-    </span>);
+      {!members.length && (
+        <Dropdown
+          overlay={memberMenu(member => {
+            playgroundAction('Add Member', { memberName: addMemberName });
+            updateMethods.add({ dimension: member, granularity: 'day' });
+          }, availableMembers)}
+          placement="bottomLeft"
+          trigger={['click']}
+        >
+          <Button type="dashed" icon="plus">{addMemberName}</Button>
+        </Dropdown>
+      )}
+    </span>
+  );
 };
 
-const renderChartType = (chartType, updateChartType) => {
+TimeGroup.propTypes = {
+  members: PropTypes.array.isRequired,
+  availableMembers: PropTypes.array.isRequired,
+  addMemberName: PropTypes.string.isRequired,
+  updateMethods: PropTypes.object.isRequired
+};
+
+const ChartType = ({ chartType, updateChartType }) => {
   const chartTypes = [
     { name: 'line', title: 'Line', icon: 'line-chart' },
     { name: 'bar', title: 'Bar', icon: 'bar-chart' },
@@ -307,12 +358,19 @@ const renderChartType = (chartType, updateChartType) => {
   );
 };
 
-export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
-  return (<QueryBuilder
+ChartType.propTypes = {
+  chartType: PropTypes.string.isRequired,
+  updateChartType: PropTypes.func.isRequired
+};
+
+const PlaygroundQueryBuilder = ({
+  query, cubejsApi, apiUrl, cubejsToken
+}) => (
+  <QueryBuilder
     query={query}
     cubejsApi={cubejsApi}
     render={({
-      resultSet, error, query, validatedQuery, isQueryPresent, chartType, updateChartType,
+      resultSet, error, validatedQuery, isQueryPresent, chartType, updateChartType,
       measures, availableMeasures, updateMeasures,
       dimensions, availableDimensions, updateDimensions,
       segments, availableSegments, updateSegments,
@@ -324,13 +382,33 @@ export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
           <Card>
             <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
               <Col span={24}>
-                {renderMemberGroup(measures, availableMeasures, 'Measure', updateMeasures)}
+                <MemberGroup
+                  members={measures}
+                  availableMembers={availableMeasures}
+                  addMemberName="Measure"
+                  updateMethods={updateMeasures}
+                />
                 <Divider type="vertical" />
-                {renderMemberGroup(dimensions, availableDimensions, 'Dimension', updateDimensions)}
+                <MemberGroup
+                  members={dimensions}
+                  availableMembers={availableDimensions}
+                  addMemberName="Dimension"
+                  updateMethods={updateDimensions}
+                />
                 <Divider type="vertical" />
-                {renderMemberGroup(segments, availableSegments, 'Segment', updateSegments)}
+                <MemberGroup
+                  members={segments}
+                  availableMembers={availableSegments}
+                  addMemberName="Segment"
+                  updateMethods={updateSegments}
+                />
                 <Divider type="vertical" />
-                {renderTimeGroup(timeDimensions, availableTimeDimensions, 'Time', updateTimeDimensions)}
+                <TimeGroup
+                  members={timeDimensions}
+                  availableMembers={availableTimeDimensions}
+                  addMemberName="Time"
+                  updateMethods={updateTimeDimensions}
+                />
               </Col>
             </Row>
             <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
@@ -345,7 +423,7 @@ export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
             </Row>
             <Row type="flex" justify="space-around" align="top" gutter={24}>
               <Col span={24}>
-                {renderChartType(chartType, updateChartType)}
+                <ChartType chartType={chartType} updateChartType={updateChartType} />
               </Col>
             </Row>
           </Card>
@@ -368,5 +446,21 @@ export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
         </Col>
       </Row>
     ]}
-  />);
+  />
+);
+
+PlaygroundQueryBuilder.propTypes = {
+  query: PropTypes.object,
+  cubejsApi: PropTypes.object,
+  apiUrl: PropTypes.string,
+  cubejsToken: PropTypes.string
 };
+
+PlaygroundQueryBuilder.defaultProps = {
+  query: {},
+  cubejsApi: null,
+  apiUrl: '/cubejs-api/v1',
+  cubejsToken: null
+};
+
+export default PlaygroundQueryBuilder;

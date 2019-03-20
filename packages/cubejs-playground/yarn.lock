@@ -1016,10 +1016,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.4.1":
-  version "0.4.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.4.1.tgz#be0cba08218ea082ec2eeb960229a0fad5901716"
-  integrity sha512-BN7NSZTObRrTg8W4HFy4Z3BNo4kJihLldx66q57V24ENujTUonDlvt3wrjAzvNbVLIcnDQhd2CiLS9XhBx7KkA==
+"@cubejs-client/core@^0.4.4":
+  version "0.4.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.4.4.tgz#0dd2d82f531caf03fab1fa3f540f871d0cc2bd36"
+  integrity sha512-PE9OzlNgxr9CtngepRnZhKYxkanGSGkt+BbzYihGZf3ukKjQ1y2fWAp5o9Mm/Yow7seCRfOFJiTBG1Chxi2JoA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -1028,10 +1028,10 @@
     ramda "^0.25.0"
     whatwg-fetch "^3.0.0"
 
-"@cubejs-client/react@^0.4.1":
-  version "0.4.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.4.1.tgz#4335d281a9ddbdfd7cedf4f791f0cc42d3a7365b"
-  integrity sha512-otISLhgIBdJcPmI7cB4x6s9TGM7YyOAKceL4Kw7Q6yxl9qNR+kxq+aTDTpHnZ+gkv6/vToccH/nmPtdHE+w2oA==
+"@cubejs-client/react@^0.4.4":
+  version "0.4.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.4.4.tgz#f97601a28a2a1d9f077a037c71f2bd478ca66506"
+  integrity sha512-pdvhOOtMcTEAqc8b8RDgZi5Ibw6qdv5JkU3gEFnf4/Mhw67WFSZWFmg3zL8ZsZ8Z7RlnWh0hHo32L+s8b0XvLQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     prop-types "^15.6.2"
@@ -8685,7 +8685,7 @@ prompts@^0.1.9:
     kleur "^2.0.1"
     sisteransi "^0.1.1"
 
-prop-types@15.x, prop-types@^15.5.0, prop-types@^15.5.10, prop-types@^15.5.4, prop-types@^15.5.6, prop-types@^15.5.7, prop-types@^15.5.8, prop-types@^15.5.9, prop-types@^15.6.0:
+prop-types@15.x, prop-types@^15.5.0, prop-types@^15.5.10, prop-types@^15.5.4, prop-types@^15.5.6, prop-types@^15.5.7, prop-types@^15.5.8, prop-types@^15.5.9, prop-types@^15.6.0, prop-types@^15.7.2:
   version "15.7.2"
   resolved "https://registry.yarnpkg.com/prop-types/-/prop-types-15.7.2.tgz#52c41e75b8c87e72b9d9360e0206b99dcbffa6c5"
   integrity sha512-8QQikdH7//R2vurIJSutZ1smHYTcLpRWEOlHnzcWHmBYrOGUysKwSsrC89BCiFj3CbrfJ/nXFdJepOVrY1GCHQ==
