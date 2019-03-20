@@ -1,5 +1,5 @@
 import React from 'react';
-import QueryRenderer from './QueryRenderer.jsx'
+import QueryRenderer from './QueryRenderer.jsx';
 
 export default class QueryBuilder extends React.Component {
   constructor(props) {
@@ -15,28 +15,25 @@ export default class QueryBuilder extends React.Component {
     this.setState({ meta });
   }
 
-  render() {
-    return (<QueryRenderer
-      query={this.state.query}
-      cubejsApi={this.props.cubejsApi}
-      render={(queryRendererProps) => {
-        if (this.props.render) {
-          return this.props.render(this.prepareRenderProps(queryRendererProps));
-        }
-      }}
-    />);
-  };
-
   isQueryPresent() {
-    return this.state.query.measures && this.state.query.measures.length ||
-      this.state.query.dimensions && this.state.query.dimensions.length ||
-      this.state.query.timeDimensions && this.state.query.timeDimensions.length
+    const { query } = this.state;
+    return query.measures && query.measures.length ||
+      query.dimensions && query.dimensions.length ||
+      query.timeDimensions && query.timeDimensions.length;
   }
 
   prepareRenderProps(queryRendererProps) {
     const getName = member => member.name;
-    const toTimeDimension = member =>
-      ({ dimension: member.dimension.name, granularity: member.granularity, dateRange: member.dateRange });
+    const toTimeDimension = member => ({
+      dimension: member.dimension.name,
+      granularity: member.granularity,
+      dateRange: member.dateRange
+    });
+    const toFilter = member => ({
+      dimension: member.dimension.name,
+      operator: member.operator,
+      values: member.values
+    });
     const updateMethods = (memberType, toQuery = getName) => ({
       add: (member) => this.setState({
         query: {
@@ -52,7 +49,7 @@ export default class QueryBuilder extends React.Component {
             ...this.state.query,
             [memberType]: members
           }
-        })
+        });
       },
       update: (member, updateWith) => {
         const members = (this.state.query[memberType] || []).concat([]);
@@ -62,7 +59,7 @@ export default class QueryBuilder extends React.Component {
             ...this.state.query,
             [memberType]: members
           }
-        })
+        });
       }
     });
 
@@ -77,6 +74,7 @@ export default class QueryBuilder extends React.Component {
     return {
       meta: this.state.meta,
       query: this.state.query,
+      validatedQuery: this.validatedQuery(),
       isQueryPresent: this.isQueryPresent(),
       chartType: this.state.chartType,
       measures: (this.state.meta && this.state.query.measures || [])
@@ -92,7 +90,12 @@ export default class QueryBuilder extends React.Component {
           index: i
         })),
       filters: (this.state.meta && this.state.query.filters || [])
-        .map((m, i) => ({ ...m, dimension: this.state.meta.resolveMember(m.dimension, 'dimensions'), index: i })),
+        .map((m, i) => ({
+          ...m,
+          dimension: this.state.meta.resolveMember(m.dimension, ['dimensions', 'measures']),
+          operators: this.state.meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
+          index: i
+        })),
       availableMeasures: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'measures') || [],
       availableDimensions: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'dimensions') || [],
       availableTimeDimensions: (
@@ -104,8 +107,33 @@ export default class QueryBuilder extends React.Component {
       updateDimensions: updateMethods('dimensions'),
       updateSegments: updateMethods('segments'),
       updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
+      updateFilters: updateMethods('filters', toFilter),
       updateChartType: (chartType) => this.setState({ chartType }),
       ...queryRendererProps
     };
+  }
+
+  validatedQuery() {
+    const { query } = this.state;
+    return {
+      ...query,
+      filters: (query.filters || []).filter(f => f.operator)
+    };
+  }
+
+  render() {
+    const { cubejsApi, render } = this.props;
+    return (
+      <QueryRenderer
+        query={this.validatedQuery()}
+        cubejsApi={cubejsApi}
+        render={(queryRendererProps) => {
+          if (render) {
+            return render(this.prepareRenderProps(queryRendererProps));
+          }
+          return null;
+        }}
+      />
+    );
   }
 }

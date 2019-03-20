@@ -91,6 +91,6 @@ QueryRenderer.propTypes = {
   loadSql: PropTypes.any
 };
 
-QueryRender.defaultProps = {
+QueryRenderer.defaultProps = {
   query: {}
-}
+};

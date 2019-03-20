@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Row, Col, Button, Menu, Dropdown, Divider, Icon, Card
+  Row, Col, Button, Menu, Dropdown, Divider, Icon, Card, Select, Input
 } from 'antd';
 import { QueryBuilder } from '@cubejs-client/react';
 import ChartRenderer from './ChartRenderer';
@@ -26,7 +26,7 @@ const renderMemberGroup = (members, availableMembers, addMemberName, updateMetho
           </Dropdown>
           <Button type="danger" icon='close' onClick={() => {
             playgroundAction('Remove Member', { memberName: addMemberName });
-            updateMethods.remove(m)
+            updateMethods.remove(m);
           }} />
         </Button.Group>
       ))}
@@ -43,6 +43,116 @@ const renderMemberGroup = (members, availableMembers, addMemberName, updateMetho
         <Button type="dashed" icon='plus'>{addMemberName}</Button>
       </Dropdown>
     </span>);
+};
+
+const filterInputs = {
+  string: ({ values, onChange }) => (
+    <Select
+      key="input"
+      style={{ width: 300 }}
+      mode="tags"
+      onChange={onChange}
+      value={values}
+    />
+  ),
+  number: ({ values, onChange }) => (
+    <Input
+      key="input"
+      style={{ width: 300 }}
+      onChange={e => onChange([e.target.value])}
+      value={values && values[0] || ''}
+    />
+  )
+};
+
+const FilterInput = ({ member, updateMethods, addMemberName }) => {
+  const Filter = filterInputs[member.dimension.type] || filterInputs.string;
+  return (
+    <Filter
+      key="filter"
+      values={member.values}
+      onChange={(values) => {
+        playgroundAction('Update Filter Values', { memberName: addMemberName });
+        updateMethods.update(member, { ...member, values });
+      }}
+    />
+  );
+};
+
+const FilterGroup = ({ members, availableMembers, addMemberName, updateMethods }) => {
+  const menu = (onClick) => (
+    <Menu>
+      {availableMembers.length ? availableMembers.map(m => (
+        <Menu.Item key={m.name} onClick={() => onClick(m)}>
+          {m.title}
+        </Menu.Item>
+      )) : <Menu.Item disabled>No members found</Menu.Item>}
+    </Menu>
+  );
+
+  return (
+    <span>
+      {members.map(m => (
+        <div style={{ marginBottom: 12 }} key={m.index}>
+          <Button.Group style={{ marginRight: 8 }}>
+            <Dropdown
+              overlay={menu(updateWith => {
+                playgroundAction('Update Member', { memberName: addMemberName });
+                updateMethods.update(m, { ...m, dimension: updateWith });
+              })}
+              placement="bottomLeft"
+              trigger={['click']}
+            >
+              <Button
+                style={{
+                  width: 150,
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden'
+                }}
+              >
+                {m.dimension.title}
+              </Button>
+            </Dropdown>
+            <Button
+              type="danger"
+              icon="close"
+              onClick={() => {
+                playgroundAction('Remove Member', { memberName: addMemberName });
+                updateMethods.remove(m);
+              }}
+            />
+          </Button.Group>
+          <Select
+            value={m.operator}
+            onChange={(operator) => updateMethods.update(m, { ...m, operator })}
+            style={{ width: 200, marginRight: 8 }}
+          >
+            {m.operators.map(operator => (
+              <Select.Option
+                key={operator.name}
+                value={operator.name}
+              >
+                {operator.title}
+              </Select.Option>
+            ))}
+          </Select>
+          <FilterInput member={m} key="filterInput" updateMethods={updateMethods} addMemberName={addMemberName}/>
+        </div>
+      ))}
+      <Dropdown
+        overlay={menu(
+          (m) => {
+            playgroundAction('Add Member', { memberName: addMemberName });
+            updateMethods.add({ dimension: m });
+          }
+        )}
+        placement="bottomLeft"
+        trigger={['click']}
+      >
+        <Button type="dashed" icon="plus">{addMemberName}</Button>
+      </Dropdown>
+    </span>
+  );
 };
 
 const renderTimeGroup = (members, availableMembers, addMemberName, updateMethods) => {
@@ -202,13 +312,14 @@ export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
     query={query}
     cubejsApi={cubejsApi}
     render={({
-      resultSet, error, query, isQueryPresent, chartType, updateChartType,
+      resultSet, error, query, validatedQuery, isQueryPresent, chartType, updateChartType,
       measures, availableMeasures, updateMeasures,
       dimensions, availableDimensions, updateDimensions,
       segments, availableSegments, updateSegments,
+      filters, updateFilters,
       timeDimensions, availableTimeDimensions, updateTimeDimensions
     }) => [
-      <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+      <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }} key="1">
         <Col span={24}>
           <Card>
             <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
@@ -222,6 +333,16 @@ export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
                 {renderTimeGroup(timeDimensions, availableTimeDimensions, 'Time', updateTimeDimensions)}
               </Col>
             </Row>
+            <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+              <Col span={24}>
+                <FilterGroup
+                  members={filters}
+                  availableMembers={availableDimensions.concat(availableMeasures)}
+                  addMemberName="Filter"
+                  updateMethods={updateFilters}
+                />
+              </Col>
+            </Row>
             <Row type="flex" justify="space-around" align="top" gutter={24}>
               <Col span={24}>
                 {renderChartType(chartType, updateChartType)}
@@ -230,11 +351,11 @@ export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
           </Card>
         </Col>
       </Row>,
-      <Row type="flex" justify="space-around" align="top" gutter={24}>
+      <Row type="flex" justify="space-around" align="top" gutter={24} key="2">
         <Col span={24}>
           {isQueryPresent ? (
             <ChartRenderer
-              query={query}
+              query={validatedQuery}
               resultSet={resultSet}
               error={error}
               title="Chart"
@@ -248,4 +369,4 @@ export default ({ query, cubejsApi, apiUrl, cubejsToken }) => {
       </Row>
     ]}
   />);
-}
+};

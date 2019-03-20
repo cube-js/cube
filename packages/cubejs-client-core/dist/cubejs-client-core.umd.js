@@ -43,7 +43,7 @@
 	  return store[key] || (store[key] = value !== undefined ? value : {});
 	})('versions', []).push({
 	  version: _core.version,
-	  mode: 'global',
+	  mode: _library ? 'pure' : 'global',
 	  copyright: '© 2019 Denis Pushkarev (zloirock.ru)'
 	});
 	});
@@ -1168,10 +1168,10 @@
 	    return capability.promise;
 	  }
 	});
-	_export(_export.S + _export.F * (_library || !USE_NATIVE), PROMISE, {
+	_export(_export.S + _export.F * (!USE_NATIVE), PROMISE, {
 	  // 25.4.4.6 Promise.resolve(x)
 	  resolve: function resolve(x) {
-	    return _promiseResolve(_library && this === Wrapper ? $Promise : this, x);
+	    return _promiseResolve(this, x);
 	  }
 	});
 	_export(_export.S + _export.F * !(USE_NATIVE && _iterDetect(function (iter) {
@@ -14683,6 +14683,53 @@
 	  }));
 	};
 
+	var operators = {
+	  string: [{
+	    name: 'contains',
+	    title: 'contains'
+	  }, {
+	    name: 'notContains',
+	    title: 'does not contain'
+	  }, {
+	    name: 'equals',
+	    title: 'equals'
+	  }, {
+	    name: 'notEquals',
+	    title: 'does not equal'
+	  }, {
+	    name: 'set',
+	    title: 'is set'
+	  }, {
+	    name: 'notSet',
+	    title: 'is not set'
+	  }],
+	  number: [{
+	    name: 'equals',
+	    title: 'equals'
+	  }, {
+	    name: 'notEquals',
+	    title: 'does not equal'
+	  }, {
+	    name: 'set',
+	    title: 'is set'
+	  }, {
+	    name: 'notSet',
+	    title: 'is not set'
+	  }, {
+	    name: 'gt',
+	    title: '>'
+	  }, {
+	    name: 'gte',
+	    title: '>='
+	  }, {
+	    name: 'lt',
+	    title: '<'
+	  }, {
+	    name: 'lte',
+	    title: '<='
+	  }]
+	};
+
 	var Meta =
 	/*#__PURE__*/
 	function () {
@@ -14711,6 +14758,8 @@
 	  }, {
 	    key: "resolveMember",
 	    value: function resolveMember(memberName, memberType) {
+	      var _this = this;
+
 	      var _memberName$split = memberName.split('.'),
 	          _memberName$split2 = _slicedToArray(_memberName$split, 1),
 	          cube = _memberName$split2[0];
@@ -14722,7 +14771,12 @@
 	        };
 	      }
 
-	      var member = this.cubesMap[cube][memberType][memberName];
+	      var memberTypes = Array.isArray(memberType) ? memberType : [memberType];
+	      var member = memberTypes.map(function (type$$1) {
+	        return _this.cubesMap[cube][type$$1] && _this.cubesMap[cube][type$$1][memberName];
+	      }).find(function (m) {
+	        return m;
+	      });
 
 	      if (!member) {
 	        return {
@@ -14732,6 +14786,12 @@
 	      }
 
 	      return member;
+	    }
+	  }, {
+	    key: "filterOperatorsForMember",
+	    value: function filterOperatorsForMember(memberName, memberType) {
+	      var member = this.resolveMember(memberName, memberType);
+	      return operators[member.type] || operators.string;
 	    }
 	  }]);
 

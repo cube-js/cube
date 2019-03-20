@@ -20,6 +20,7 @@ require('core-js/modules/es6.array.map');
 var ramda = require('ramda');
 var Moment = _interopDefault(require('moment'));
 var momentRange = _interopDefault(require('moment-range'));
+require('core-js/modules/es6.array.is-array');
 require('core-js/modules/es6.regexp.split');
 require('core-js/modules/es6.function.name');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
@@ -393,6 +394,53 @@ var memberMap = function memberMap(memberArray) {
   }));
 };
 
+var operators = {
+  string: [{
+    name: 'contains',
+    title: 'contains'
+  }, {
+    name: 'notContains',
+    title: 'does not contain'
+  }, {
+    name: 'equals',
+    title: 'equals'
+  }, {
+    name: 'notEquals',
+    title: 'does not equal'
+  }, {
+    name: 'set',
+    title: 'is set'
+  }, {
+    name: 'notSet',
+    title: 'is not set'
+  }],
+  number: [{
+    name: 'equals',
+    title: 'equals'
+  }, {
+    name: 'notEquals',
+    title: 'does not equal'
+  }, {
+    name: 'set',
+    title: 'is set'
+  }, {
+    name: 'notSet',
+    title: 'is not set'
+  }, {
+    name: 'gt',
+    title: '>'
+  }, {
+    name: 'gte',
+    title: '>='
+  }, {
+    name: 'lt',
+    title: '<'
+  }, {
+    name: 'lte',
+    title: '<='
+  }]
+};
+
 var Meta =
 /*#__PURE__*/
 function () {
@@ -421,6 +469,8 @@ function () {
   }, {
     key: "resolveMember",
     value: function resolveMember(memberName, memberType) {
+      var _this = this;
+
       var _memberName$split = memberName.split('.'),
           _memberName$split2 = _slicedToArray(_memberName$split, 1),
           cube = _memberName$split2[0];
@@ -432,7 +482,12 @@ function () {
         };
       }
 
-      var member = this.cubesMap[cube][memberType][memberName];
+      var memberTypes = Array.isArray(memberType) ? memberType : [memberType];
+      var member = memberTypes.map(function (type) {
+        return _this.cubesMap[cube][type] && _this.cubesMap[cube][type][memberName];
+      }).find(function (m) {
+        return m;
+      });
 
       if (!member) {
         return {
@@ -442,6 +497,12 @@ function () {
       }
 
       return member;
+    }
+  }, {
+    key: "filterOperatorsForMember",
+    value: function filterOperatorsForMember(memberName, memberType) {
+      var member = this.resolveMember(memberName, memberType);
+      return operators[member.type] || operators.string;
     }
   }]);
 

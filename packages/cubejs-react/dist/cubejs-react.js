@@ -207,10 +207,13 @@ function (_React$Component) {
 QueryRenderer.propTypes = {
   render: PropTypes.func,
   afterRender: PropTypes.func,
-  cubejsApi: PropTypes.object,
+  cubejsApi: PropTypes.object.isRequired,
   query: PropTypes.object,
   queries: PropTypes.object,
   loadSql: PropTypes.any
+};
+QueryRenderer.defaultProps = {
+  query: {}
 };
 
 var QueryRendererWithTotals = (function (_ref) {
@@ -285,29 +288,15 @@ function (_React$Component) {
       return componentDidMount;
     }()
   }, {
-    key: "render",
-    value: function render() {
-      var _this2 = this;
-
-      return React.createElement(QueryRenderer, {
-        query: this.state.query,
-        cubejsApi: this.props.cubejsApi,
-        render: function render(queryRendererProps) {
-          if (_this2.props.render) {
-            return _this2.props.render(_this2.prepareRenderProps(queryRendererProps));
-          }
-        }
-      });
-    }
-  }, {
     key: "isQueryPresent",
     value: function isQueryPresent() {
-      return this.state.query.measures && this.state.query.measures.length || this.state.query.dimensions && this.state.query.dimensions.length || this.state.query.timeDimensions && this.state.query.timeDimensions.length;
+      var query = this.state.query;
+      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
     }
   }, {
     key: "prepareRenderProps",
     value: function prepareRenderProps(queryRendererProps) {
-      var _this3 = this;
+      var _this2 = this;
 
       var getName = function getName(member) {
         return member.name;
@@ -321,26 +310,34 @@ function (_React$Component) {
         };
       };
 
+      var toFilter = function toFilter(member) {
+        return {
+          dimension: member.dimension.name,
+          operator: member.operator,
+          values: member.values
+        };
+      };
+
       var updateMethods = function updateMethods(memberType) {
         var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
         return {
           add: function add(member) {
-            return _this3.setState({
-              query: _objectSpread({}, _this3.state.query, _defineProperty({}, memberType, (_this3.state.query[memberType] || []).concat(toQuery(member))))
+            return _this2.setState({
+              query: _objectSpread({}, _this2.state.query, _defineProperty({}, memberType, (_this2.state.query[memberType] || []).concat(toQuery(member))))
             });
           },
           remove: function remove(member) {
-            var members = (_this3.state.query[memberType] || []).concat([]);
+            var members = (_this2.state.query[memberType] || []).concat([]);
             members.splice(member.index, 1);
-            return _this3.setState({
-              query: _objectSpread({}, _this3.state.query, _defineProperty({}, memberType, members))
+            return _this2.setState({
+              query: _objectSpread({}, _this2.state.query, _defineProperty({}, memberType, members))
             });
           },
           update: function update(member, updateWith) {
-            var members = (_this3.state.query[memberType] || []).concat([]);
+            var members = (_this2.state.query[memberType] || []).concat([]);
             members.splice(member.index, 1, toQuery(updateWith));
-            return _this3.setState({
-              query: _objectSpread({}, _this3.state.query, _defineProperty({}, memberType, members))
+            return _this2.setState({
+              query: _objectSpread({}, _this2.state.query, _defineProperty({}, memberType, members))
             });
           }
         };
@@ -365,26 +362,27 @@ function (_React$Component) {
       return _objectSpread({
         meta: this.state.meta,
         query: this.state.query,
+        validatedQuery: this.validatedQuery(),
         isQueryPresent: this.isQueryPresent(),
         chartType: this.state.chartType,
         measures: (this.state.meta && this.state.query.measures || []).map(function (m, i) {
           return _objectSpread({
             index: i
-          }, _this3.state.meta.resolveMember(m, 'measures'));
+          }, _this2.state.meta.resolveMember(m, 'measures'));
         }),
         dimensions: (this.state.meta && this.state.query.dimensions || []).map(function (m, i) {
           return _objectSpread({
             index: i
-          }, _this3.state.meta.resolveMember(m, 'dimensions'));
+          }, _this2.state.meta.resolveMember(m, 'dimensions'));
         }),
         segments: (this.state.meta && this.state.query.segments || []).map(function (m, i) {
           return _objectSpread({
             index: i
-          }, _this3.state.meta.resolveMember(m, 'segments'));
+          }, _this2.state.meta.resolveMember(m, 'segments'));
         }),
         timeDimensions: (this.state.meta && this.state.query.timeDimensions || []).map(function (m, i) {
           return _objectSpread({}, m, {
-            dimension: _objectSpread({}, _this3.state.meta.resolveMember(m.dimension, 'dimensions'), {
+            dimension: _objectSpread({}, _this2.state.meta.resolveMember(m.dimension, 'dimensions'), {
               granularities: granularities
             }),
             index: i
@@ -392,7 +390,8 @@ function (_React$Component) {
         }),
         filters: (this.state.meta && this.state.query.filters || []).map(function (m, i) {
           return _objectSpread({}, m, {
-            dimension: _this3.state.meta.resolveMember(m.dimension, 'dimensions'),
+            dimension: _this2.state.meta.resolveMember(m.dimension, ['dimensions', 'measures']),
+            operators: _this2.state.meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
             index: i
           });
         }),
@@ -406,12 +405,43 @@ function (_React$Component) {
         updateDimensions: updateMethods('dimensions'),
         updateSegments: updateMethods('segments'),
         updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
+        updateFilters: updateMethods('filters', toFilter),
         updateChartType: function updateChartType(chartType) {
-          return _this3.setState({
+          return _this2.setState({
             chartType: chartType
           });
         }
       }, queryRendererProps);
+    }
+  }, {
+    key: "validatedQuery",
+    value: function validatedQuery() {
+      var query = this.state.query;
+      return _objectSpread({}, query, {
+        filters: (query.filters || []).filter(function (f) {
+          return f.operator;
+        })
+      });
+    }
+  }, {
+    key: "render",
+    value: function render() {
+      var _this3 = this;
+
+      var _this$props = this.props,
+          cubejsApi = _this$props.cubejsApi,
+          _render = _this$props.render;
+      return React.createElement(QueryRenderer, {
+        query: this.validatedQuery(),
+        cubejsApi: cubejsApi,
+        render: function render(queryRendererProps) {
+          if (_render) {
+            return _render(_this3.prepareRenderProps(queryRendererProps));
+          }
+
+          return null;
+        }
+      });
     }
   }]);
 

@@ -16,7 +16,7 @@ class App extends Component {
   }
 
   render() {
-    return [
+    return (
       <Layout style={{ height: '100%' }}>
         <Header style={{ padding: '0 32px'}}>
           <div style={{ float: 'left' }}>
@@ -36,7 +36,7 @@ class App extends Component {
           {this.props.children}
         </Content>
       </Layout>
-    ];
+    );
   }
 }
 
