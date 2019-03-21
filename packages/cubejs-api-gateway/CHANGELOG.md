@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.5](https://github.com/statsbotco/cubejs-client/compare/v0.4.4...v0.4.5) (2019-03-21)
+
+
+### Features
+
+* Make API path namespace configurable ([#53](https://github.com/statsbotco/cubejs-client/issues/53)) ([b074a3d](https://github.com/statsbotco/cubejs-client/commit/b074a3d))
+
+
+
+
+
 ## [0.4.4](https://github.com/statsbotco/cubejs-client/compare/v0.4.3...v0.4.4) (2019-03-17)
 
 

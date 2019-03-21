@@ -1,12 +1,12 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "dependencies": {
     "@babel/preset-env": "^7.3.4",
     "@babel/preset-react": "^7.0.0",
     "@babel/standalone": "^7.3.4",
-    "@cubejs-client/core": "^0.4.4",
-    "@cubejs-client/react": "^0.4.4",
+    "@cubejs-client/core": "^0.4.5",
+    "@cubejs-client/react": "^0.4.5",
     "antd": "^3.14.1",
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
