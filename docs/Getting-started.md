@@ -24,7 +24,7 @@ Run the following command to get started with Cube.js
 $ cubejs create <project name> -d <database type>
 ```
 
-specifying the project name and your database using `-d` flag. Available options: 
+specifying the project name and your database using `-d` flag. Available options:
 
 * `postgres`
 * `mysql`
@@ -39,32 +39,28 @@ $ cubejs create hello-world -d postgres
 
 Once run, the `create` command will create a new project directory that contains the scaffolding for your new Cube.js project. This includes all the files necessary to spin up the Cube.js backend, example frontend code for displaying the results of Cube.js queries in a React app, and some example schema files to highlight the format of the Cube.js Data Schema layer.
 
-The `.env` file in this project directory contains placeholders for the relevant database credentials. For MySQL, MongoBI and PostgreSQL, you'll need to fill in the target host, database name, user and password. For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
-
-[Learn more about connecting to different databases with Cube.js](connecting-to-the-database)
+The `.env` file in this project directory contains placeholders for the relevant database credentials. For MySQL and PostgreSQL, you'll need to fill in the target host, database name, user and password. For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
 
 ## 3. Define Your Data Schema
 
 Cube.js uses Data Schema to generate and execute SQL.
 
-It acts as an ORM for your database and it is flexible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](getting-started-cubejs-schema).
+It acts as an ORM for your database and it is flexible enough to model everything from simple counts to cohort retention and funnel analysis. [Read more about Cube.js Schema](https://cube.dev/docs/getting-started-cubejs-schema).
 
-You can generate schema files from your database tables using the `cubejs` CLI, or write them manually:
-
-### Generating Data Schema files for MySQL, Postgres
-
-Since you've defined the target database in the `CUBEJS_DB_NAME` environment variable, in the `.env` file above, you can simply specify a comma-separated list of tables for which you want to generate Data Schema files as the argument for the `-t` option:
+You can generate schema files using developer Playground.
+To do so please start dev server from project directory
 
 ```bash
-$ cubejs generate -t orders,customers
+$ npm run dev
 ```
 
-### Generating Data Schema files for Athena
+Then go to `http://localhost:4000` and use UI to generate schema files.
 
-Generating Data Schema files for Athena requires you to pass the target database and table in the format `db.table`. For example:
+The Cube.js backend requires a Redis server running on your local machine on the default port of `6379`. This default location can be changed by setting the `REDIS_URL` environment variable to your Redis server. Please make sure your Redis server is up before proceeding:
 
 ```bash
-$ cubejs generate -t my_db.orders
+$ redis-cli ping
+PONG
 ```
 
 ### Manually creating Data Schema files
@@ -101,20 +97,13 @@ cube(`Users`, {
 ## 4. Visualize Results
 The Cube.js client connects to the Cube.js Backend and lets you visualize your data. This section shows how to use Cube.js Javascript client.
 
-The Cube.js backend requires a Redis server running on your local machine on the default port of `6379`. This default location can be changed by setting the `REDIS_URL` environment variable to your Redis server. Please make sure your Redis server is up before proceeding:
-
-```bash
-$ redis-cli ping
-PONG
-```
-
 As a shortcut you can run your dev server first:
 
 ```
 $ npm run dev
 ```
 
-Then open `http://localhost:4000` to see visualization examples. This will open a [codesandbox.io](https://codesandbox.io) sample React app you can edit. You can change the metrics and dimensions of the example to use the schema you defined above, change the chart types, and more!
+Then open `http://localhost:4000` to see visualization examples. This will open a Developer Playground app. You can change the metrics and dimensions of the example to use the schema you defined above, change the chart types, generate sample code out of it and more!
 
 ### Cube.js Client Installation
 
@@ -152,7 +141,7 @@ const resultSet = await cubejsApi.load({
     granularity: 'month'
   }]
 })
-const context = document.getElementById("myChart");
+const context = document.getElementById('myChart');
 new Chart(context, chartjsConfig(resultSet));
 ```
 
