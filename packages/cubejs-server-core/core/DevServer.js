@@ -80,10 +80,11 @@ class DevServer {
       this.cubejsServer.event('Dev Server Get Dashboard App Files');
       if (!await fs.pathExists(dashboardAppPath)) {
         if (!this.createReactAppInit) {
-          // TODO error handling
+          this.cubejsServer.event('Dev Server Create Dashboard App');
           this.createReactAppInit = executeCommand('npx', ['create-react-app', dashboardAppPath]);
         }
         await this.createReactAppInit;
+        this.cubejsServer.event('Dev Server Create Dashboard App Success');
         this.createReactAppInit = null;
       }
 
@@ -119,7 +120,9 @@ class DevServer {
       const packageJson = await fs.readJson(path.join(dashboardAppPath, 'package.json'));
       const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
       if (toInstall.length) {
+        this.cubejsServer.event('Dev Server Dashboard Npm Install');
         await executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(dashboardAppPath) });
+        this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
       }
       res.json({ toInstall });
     }));
