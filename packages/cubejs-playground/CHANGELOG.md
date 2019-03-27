@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.6](https://github.com/statsbotco/cubejs-client/compare/v0.4.5...v0.4.6) (2019-03-27)
+
+
+### Features
+
+* Dashboard Generator for Playground ([28a42ee](https://github.com/statsbotco/cubejs-client/commit/28a42ee))
+
+
+
+
+
 ## [0.4.5](https://github.com/statsbotco/cubejs-client/compare/v0.4.4...v0.4.5) (2019-03-21)
 
 

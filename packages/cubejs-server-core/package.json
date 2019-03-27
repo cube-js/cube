@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Statsbot, Inc.",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "engines": {
     "node": ">=8.11.1"
   },
