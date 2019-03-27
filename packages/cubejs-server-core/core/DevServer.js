@@ -30,29 +30,39 @@ class DevServer {
     console.log(`🦅 Dev environment available at ${apiUrl}`);
     this.cubejsServer.event('Dev Server Start');
     const serveStatic = require('serve-static');
-    app.get('/playground/context', (req, res) => {
+
+    const catchErrors = (handler) => async (req, res, next) => {
+      try {
+        await handler(req, res, next);
+      } catch (e) {
+        this.cubejsServer.event('Dev Server Error', { error: (e.stack || e).toString() });
+        res.status(500).json({ error: (e.stack || e).toString() });
+      }
+    };
+
+    app.get('/playground/context', catchErrors((req, res) => {
       this.cubejsServer.event('Dev Server Env Open');
       res.json({
         cubejsToken: jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }),
         apiUrl,
         anonymousId: this.cubejsServer.anonymousId
       });
-    });
+    }));
 
-    app.get('/playground/db-schema', async (req, res) => {
+    app.get('/playground/db-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server DB Schema Load');
       const driver = await this.cubejsServer.getDriver();
       const tablesSchema = await driver.tablesSchema();
       res.json({ tablesSchema });
-    });
+    }));
 
-    app.get('/playground/files', async (req, res) => {
+    app.get('/playground/files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Files Load');
       const files = await this.cubejsServer.repository.dataSchemaFiles();
       res.json({ files });
-    });
+    }));
 
-    app.post('/playground/generate-schema', async (req, res) => {
+    app.post('/playground/generate-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Generate Schema');
       const driver = await this.cubejsServer.getDriver();
       const tablesSchema = await driver.tablesSchema();
@@ -62,11 +72,11 @@ class DevServer {
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables);
       await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
       res.json({ files });
-    });
+    }));
 
     const dashboardAppPath = this.cubejsServer.options.dashboardAppPath || 'dashboard-app';
 
-    app.get('/playground/dashboard-app-files', async (req, res) => {
+    app.get('/playground/dashboard-app-files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Get Dashboard App Files');
       if (!await fs.pathExists(dashboardAppPath)) {
         if (!this.createReactAppInit) {
@@ -94,16 +104,16 @@ class DevServer {
         }))).reduce((a, b) => a.concat(b), []);
 
       res.json({ fileContents });
-    });
+    }));
 
-    app.post('/playground/dashboard-app-files', async (req, res) => {
+    app.post('/playground/dashboard-app-files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server App File Write');
       const { files } = req.body;
       await Promise.all(files.map(file => fs.writeFile(path.join(file.fileName), file.content)));
       res.json({ files });
-    });
+    }));
 
-    app.post('/playground/ensure-dependencies', async (req, res) => {
+    app.post('/playground/ensure-dependencies', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server App Ensure Dependencies');
       const { dependencies } = req.body;
       const packageJson = await fs.readJson(path.join(dashboardAppPath, 'package.json'));
@@ -112,7 +122,7 @@ class DevServer {
         await executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(dashboardAppPath) });
       }
       res.json({ toInstall });
-    });
+    }));
 
     app.use(serveStatic(path.join(__dirname, '../playground')));
   }

@@ -25,7 +25,19 @@ const DashboardItem = ({ children, title }) => (
 )
 `;
 
-const fetchWithRetry = (url, options, retries) => fetch(url, options).catch(e => {
+const fetchWithRetry = (url, options, retries) => fetch(url, options).then(async r => {
+  if (r.status === 500) {
+    let errorText = await r.text();
+    try {
+      const json = JSON.parse(errorText);
+      errorText = json.error;
+    } catch (e) {
+      // Nothing
+    }
+    throw errorText;
+  }
+  return r;
+}).catch(e => {
   if (e.message === 'Network request failed') {
     return retries > 0 ? fetchWithRetry(url, options, retries - 1) : fetch(url, options);
   }
