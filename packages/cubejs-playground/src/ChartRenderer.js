@@ -1,5 +1,4 @@
 import React from 'react';
-import ChartContainer from './ChartContainer';
 import SourceRender from 'react-source-render';
 import presetEnv from '@babel/preset-env';
 import presetReact from '@babel/preset-react';
@@ -8,15 +7,16 @@ import * as cubejsReact from '@cubejs-client/react';
 import * as antd from 'antd';
 import { Alert } from 'antd';
 
+import ChartContainer from './ChartContainer';
 import * as bizChartLibrary from './libraries/bizChart';
 import * as chartjsLibrary from './libraries/chartjs';
 
-const libraryToTemplate = {
+export const libraryToTemplate = {
   bizcharts: bizChartLibrary,
   chartjs: chartjsLibrary
 };
 
-const babelConfig = {
+export const babelConfig = {
   presets: [
     presetEnv,
     presetReact
@@ -24,15 +24,15 @@ const babelConfig = {
 };
 
 const sourceCodeTemplate = (props) => {
-  const { chartLibrary, query, apiUrl, cubejsToken } = props;
+  const {
+    chartLibrary, query, apiUrl, cubejsToken, chartType
+  } = props;
+  const renderFnName = `${chartType}Render`;
   return `import React from 'react';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 import { Spin } from 'antd';
-${libraryToTemplate[chartLibrary].sourceCodeTemplate(props)}
-
-const query =
-${typeof query === 'object' ? JSON.stringify(query, null, 2) : query};
+${libraryToTemplate[chartLibrary].sourceCodeTemplate({ ...props, renderFnName })}
 
 const API_URL = "${apiUrl}"; // change to your actual endpoint
 
@@ -41,18 +41,21 @@ const cubejsApi = cubejs(
   { apiUrl: API_URL + "/cubejs-api/v1" }
 );
 
+const renderChart = (Component) => ({ resultSet, error }) => (
+  (resultSet && <Component resultSet={resultSet} />) ||
+  (error && error.toString()) || 
+  (<Spin />)
+)
+
 const ChartRenderer = () => <QueryRenderer
-  query={query}
+  query={${(typeof query === 'object' ? JSON.stringify(query, null, 2) : query).split('\n').map((l, i) => i > 0 ? `  ${l}` : l).join('\n')}}
   cubejsApi={cubejsApi}
-  render={({ resultSet, error }) => (
-    (resultSet && renderChart(resultSet)) ||
-    (error && error.toString()) || 
-    (<Spin />)
-  )}
+  render={renderChart(${renderFnName})}
 />;
 
 export default ChartRenderer;
-`};
+`;
+};
 
 const withDomRender = (source) => `import ReactDOM from 'react-dom';
 ${source}
@@ -61,7 +64,7 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(<ChartRenderer />, rootElement);
 `;
 
-const ChartRenderer = (props) => {
+export const ChartRenderer = (props) => {
   let {
     query,
     sourceCodeFn,
@@ -69,7 +72,8 @@ const ChartRenderer = (props) => {
     resultSet,
     error,
     sqlQuery,
-    chartLibrary
+    chartLibrary,
+    dashboardSource
   } = props;
   sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
   const source = sourceCodeFn(props);
@@ -80,31 +84,34 @@ const ChartRenderer = (props) => {
     react: React,
     ...libraryToTemplate[chartLibrary].imports
   };
-  return (<SourceRender
-    babelConfig={babelConfig}
-    onError={error => console.log(error)}
-    onSuccess={(error, { markup }) => console.log('HTML', markup)}
-    resolver={importName => dependencies[importName]}
-    source={source}
-  >
-    <SourceRender.Consumer>{({ element, error: jsCompilingError }) =>
-      <ChartContainer
-        title={title}
-        query={query}
-        resultSet={resultSet}
-        error={error}
-        sqlQuery={sqlQuery}
-        codeExample={source}
-        codeSandboxSource={withDomRender(source)}
-        dependencies={dependencies}
-        render={() => jsCompilingError ? (<Alert
-          message="Error occurred while compiling JS"
-          description={<pre>{jsCompilingError.toString()}</pre>}
-          type="error"
-        />) : element}
-      />
-    }</SourceRender.Consumer>
-  </SourceRender>);
+  return (
+    <SourceRender
+      babelConfig={babelConfig}
+      onError={error => console.log(error)}
+      onSuccess={(error, { markup }) => console.log('HTML', markup)}
+      resolver={importName => dependencies[importName]}
+      source={source}
+    >
+      <SourceRender.Consumer>
+        {({ element, error: jsCompilingError }) => (
+          <ChartContainer
+            title={title}
+            query={query}
+            resultSet={resultSet}
+            error={error}
+            sqlQuery={sqlQuery}
+            codeExample={source}
+            codeSandboxSource={withDomRender(source)}
+            dependencies={dependencies}
+            dashboardSource={dashboardSource}
+            render={() => jsCompilingError ? (<Alert
+              message="Error occurred while compiling JS"
+              description={<pre>{jsCompilingError.toString()}</pre>}
+              type="error"
+            />) : element}
+          />
+        )}
+      </SourceRender.Consumer>
+    </SourceRender>
+  );
 };
-
-export default ChartRenderer;

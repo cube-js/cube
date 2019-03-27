@@ -5,6 +5,7 @@ import { createHashHistory } from 'history';
 import IndexPage from './IndexPage';
 import ExplorePage from './ExplorePage';
 import SchemaPage from './SchemaPage';
+import DashboardPage from './DashboardPage';
 import App from './App';
 import { page } from './events';
 
@@ -31,6 +32,11 @@ ReactDOM.render(
         key="schema"
         path="/schema"
         component={SchemaPage}
+      />
+      <Route
+        key="dashboard"
+        path="/dashboard"
+        component={DashboardPage}
       />
     </App>
   </Router>,

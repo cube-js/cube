@@ -1,10 +1,9 @@
 /* eslint-disable global-require */
 const ApiGateway = require('@cubejs-backend/api-gateway');
-const fs = require('fs-extra');
-const path = require('path');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
+const DevServer = require('./DevServer');
 
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
@@ -53,10 +52,11 @@ class CubejsServerCore {
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || 'schema';
     this.dbType = options.dbType;
-    this.logger = options.logger || ((msg, params) => { console.log(`${msg}: ${JSON.stringify(params)}`)});
+    this.logger = options.logger || ((msg, params) => { console.log(`${msg}: ${JSON.stringify(params)}`); });
     this.repository = new FileRepository(this.schemaPath);
 
     if (this.options.devServer) {
+      this.devServer = new DevServer(this);
       const Analytics = require('analytics-node');
       const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
       const { machineIdSync } = require('node-machine-id');
@@ -133,54 +133,8 @@ class CubejsServerCore {
     );
     apiGateway.initApp(app);
     if (this.options.devServer) {
-      this.initDevEnv(app);
+      this.devServer.initDevEnv(app);
     }
-  }
-
-  initDevEnv(app) {
-    const port = process.env.PORT || 4000; // TODO
-    const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
-    const jwt = require('jsonwebtoken');
-    const cubejsToken = jwt.sign({}, this.apiSecret, { expiresIn: '1d' });
-    console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
-    console.log(`🦅 Dev environment available at ${apiUrl}`);
-    this.event('Dev Server Start');
-    const serveStatic = require('serve-static');
-    app.get('/playground/context', (req, res) => {
-      this.event('Dev Server Env Open');
-      res.json({
-        cubejsToken: jwt.sign({}, this.apiSecret, { expiresIn: '1d' }),
-        apiUrl,
-        anonymousId: this.anonymousId
-      });
-    });
-
-    app.get('/playground/db-schema', async (req, res) => {
-      this.event('Dev Server DB Schema Load');
-      const driver = await this.getDriver();
-      const tablesSchema = await driver.tablesSchema();
-      res.json({ tablesSchema });
-    });
-
-    app.get('/playground/files', async (req, res) => {
-      this.event('Dev Server Files Load');
-      const files = await this.repository.dataSchemaFiles();
-      res.json({ files });
-    });
-
-    app.post('/playground/generate-schema', async (req, res) => {
-      this.event('Dev Server Generate Schema');
-      const driver = await this.getDriver();
-      const tablesSchema = await driver.tablesSchema();
-
-      const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema);
-      const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables);
-      await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
-      res.json({ files });
-    });
-
-    app.use(serveStatic(path.join(__dirname, '../playground')));
   }
 
   createCompilerApi(repository) {

@@ -4,7 +4,7 @@ import {
   Row, Col, Button, Menu, Dropdown, Divider, Icon, Card, Select, Input
 } from 'antd';
 import { QueryBuilder } from '@cubejs-client/react';
-import ChartRenderer from './ChartRenderer';
+import { ChartRenderer } from './ChartRenderer';
 import { playgroundAction } from './events';
 
 // Can't be a Pure Component due to Dropdown lookups overlay component type to set appropriate styles
@@ -23,7 +23,7 @@ const MemberGroup = ({
 }) => (
   <span>
     {members.map(m => (
-      <Button.Group style={{ marginRight: 8 }}>
+      <Button.Group style={{ marginRight: 8 }} key={m.index || m.name}>
         <Dropdown
           overlay={
             memberMenu(updateWith => {
@@ -364,7 +364,7 @@ ChartType.propTypes = {
 };
 
 const PlaygroundQueryBuilder = ({
-  query, cubejsApi, apiUrl, cubejsToken
+  query, cubejsApi, apiUrl, cubejsToken, dashboardSource
 }) => (
   <QueryBuilder
     query={query}
@@ -440,6 +440,7 @@ const PlaygroundQueryBuilder = ({
               apiUrl={apiUrl}
               cubejsToken={cubejsToken}
               chartType={chartType}
+              dashboardSource={dashboardSource}
               chartLibrary="bizcharts"
             />
           ) : <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>}
@@ -452,6 +453,7 @@ const PlaygroundQueryBuilder = ({
 PlaygroundQueryBuilder.propTypes = {
   query: PropTypes.object,
   cubejsApi: PropTypes.object,
+  dashboardSource: PropTypes.object,
   apiUrl: PropTypes.string,
   cubejsToken: PropTypes.string
 };
@@ -459,6 +461,7 @@ PlaygroundQueryBuilder.propTypes = {
 PlaygroundQueryBuilder.defaultProps = {
   query: {},
   cubejsApi: null,
+  dashboardSource: null,
   apiUrl: '/cubejs-api/v1',
   cubejsToken: null
 };

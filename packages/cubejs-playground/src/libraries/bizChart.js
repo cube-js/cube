@@ -1,4 +1,3 @@
-import React from 'react';
 import * as bizcharts from 'bizcharts';
 import moment from 'moment';
 
@@ -36,11 +35,11 @@ const chartTypeToTemplate = {
 };
 
 
-export const sourceCodeTemplate = ({chartType, query}) => (
+export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
   `import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
 import moment from 'moment';
 
-const renderChart = (resultSet) => (${chartTypeToTemplate[chartType]}
+const ${renderFnName} = ({ resultSet }) => (${chartTypeToTemplate[chartType]}
 );`
 );
 

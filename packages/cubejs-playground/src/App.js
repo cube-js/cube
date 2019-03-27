@@ -29,6 +29,7 @@ class App extends Component {
             style={{ lineHeight: '64px' }}
           >
             <Menu.Item key="/explore"><Link to="/explore">Explore</Link></Menu.Item>
+            <Menu.Item key="/dashboard"><Link to="/dashboard">Dashboard</Link></Menu.Item>
             <Menu.Item key="/schema"><Link to="/schema">Schema</Link></Menu.Item>
           </Menu>
         </Header>

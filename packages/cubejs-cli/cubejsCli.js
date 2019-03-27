@@ -28,9 +28,7 @@ const executeCommand = (command, args) => {
   return new Promise((resolve, reject) => {
     child.on('close', code => {
       if (code !== 0) {
-        reject({
-          command: `${command} ${args.join(' ')}`,
-        });
+        reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
         return;
       }
       resolve();
