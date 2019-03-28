@@ -1,0 +1,33 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@cubejs-client/core": "^0.4.5",
+    "@cubejs-client/react": "^0.4.5",
+    "bootstrap": "^4.3.1",
+    "moment": "^2.24.0",
+    "numeral": "^2.0.6",
+    "react": "^16.8.5",
+    "react-dom": "^16.8.5",
+    "react-scripts": "2.1.8",
+    "reactstrap": "^7.1.0",
+    "recharts": "^1.5.0"
+  },
+  "homepage": "https://statsbotco.github.io/cubejs/react-dashboard",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ]
+}
