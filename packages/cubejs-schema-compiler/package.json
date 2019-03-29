@@ -16,7 +16,7 @@
     "babylon": "^6.17.4",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
-    "joi": "^10.6.0",
+    "joi": "^14.3.1",
     "moment-range": "^4.0.1",
     "moment-timezone": "^0.5.13",
     "node-dijkstra": "^2.5.0",
