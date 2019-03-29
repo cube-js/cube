@@ -239,7 +239,7 @@ export default () => {
 - [Building a Serverless Stripe Analytics Dashboard](https://statsbot.co/blog/building-serverless-stripe-analytics-dashboard/)
 ### Advanced
 - [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://statsbot.co/blog/building-an-open-source-mixpanel-alternative-1/)
-- [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://statsbot.co/blog/building-open-source-mixpanel-alternative-2/)}
+- [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://statsbot.co/blog/building-open-source-mixpanel-alternative-2/)
 - [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
 - [React Query Builder with Cube.js](https://statsbot.co/blog/react-query-builder-with-cubejs/)
 
