@@ -44,6 +44,7 @@ Cube.js has necessary infrastructure for every analytic application that heavily
 - [Community](#community)
 - [Architecture](#architecture)
 - [Security](#security)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## Getting Started
@@ -278,6 +279,8 @@ Learn more: [Data Schema docs](https://cube.dev/docs/cube#context-variables-user
 
 > *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
 > Learn more: [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
+
+## Contributing
 
 Contributions are **welcome and extremely helpful** 🙌 Please refer to [the contribution guide](https://github.com/statsbotco/cube.js/blob/master/CONTRIBUTING.md) for more information.
 
