@@ -259,8 +259,9 @@ The Cube.js javascript Client performs queries, expressed via dimensions, measur
 ## Security
 
 Cube.js auth tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
+Cube.js auth tokens are passed to `cubejs(authToken)` as a first param.
 You should use API Secret to generate your own client side auth tokens.
-You can find library for JWT generation [here](https://jwt.io/#libraries-io).
+You can find library for JWT generation [here](https://jwt.io/#libraries-io) or generate it manually on [JWT tokens site](https://jwt.io/) for testing purpose.
 API Secret is generated on app creation and saved in `.env` file as `CUBEJS_API_SECRET` variable.
 
 You can generate two types of tokens:
