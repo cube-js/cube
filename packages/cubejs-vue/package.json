@@ -4,7 +4,6 @@
   "description": "Vue.js components for cube.js",
   "author": "Ricardo Tapia",
   "license": "MIT",
-  "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
