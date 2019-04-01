@@ -43,7 +43,6 @@ Cube.js has necessary infrastructure for every analytic application that heavily
 - [Tutorials](#tutorials)
 - [Community](#community)
 - [Architecture](#architecture)
-- [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -255,32 +254,6 @@ __Cube.js acts as an analytics backend__, translating business logic (metrics an
 The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The Server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is visualization agnostic and works well with any chart library.
 
 <p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
-
-## Security
-
-Cube.js auth tokens used to access an API are in fact [JWT tokens](https://jwt.io/).
-Cube.js auth tokens are passed to `cubejs(authToken)` as a first param.
-You should use API Secret to generate your own client side auth tokens.
-You can find library for JWT generation [here](https://jwt.io/#libraries-io) or generate it manually on [JWT tokens site](https://jwt.io/) for testing purpose.
-API Secret is generated on app creation and saved in `.env` file as `CUBEJS_API_SECRET` variable.
-
-You can generate two types of tokens:
-- Without security context. It implies same data access permissions for all users.
-- With security context. User or role-based security models can be implemented using this approach.
-
-Security context can be provided by passing `u` param for payload.
-For example if you want to pass user id in security context you can create token with payload:
-```json
-{
-  "u": { "id": 42 }
-}
-```
-
-In this case `{ "id": 42 }` object will be accessible as `USER_CONTEXT` in cube.js Data Schema.
-Learn more: [Data Schema docs](https://cube.dev/docs/cube#context-variables-user-context).
-
-> *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
-> Learn more: [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
 
 ## Contributing
 
