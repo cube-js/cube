@@ -16,6 +16,7 @@ module.exports = {
     "no-mixed-operators": 0,
     "no-else-return": 0,
     "prefer-promise-reject-errors": 0,
+    "no-plusplus": 0,
     "operator-linebreak": ["error", "after"],
     'max-len': ['error', 120, 2, {
       ignoreUrls: true,

@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const R = require('ramda');
-const redis = require('redis');
+const RedisCacheDriver = require('./RedisCacheDriver');
+const LocalCacheDriver = require('./LocalCacheDriver');
 
 const QueryCache = require('./QueryCache');
 const ContinueWaitError = require('./ContinueWaitError');
@@ -50,15 +51,15 @@ class PreAggregationLoadCache {
     this.queryCache = queryCache;
     this.preAggregations = preAggregations;
     this.queryResults = {};
-    this.redisClient = preAggregations.redisClient;
+    this.cacheDriver = preAggregations.cacheDriver;
   }
 
   async tablesFromCache(schema) {
-    let tables = JSON.parse(await this.redisClient.getAsync(this.tablesRedisKey()));
+    let tables = await this.cacheDriver.get(this.tablesRedisKey());
     if (!tables) {
       const client = await this.driverFactory();
       tables = await client.getTablesQuery(schema);
-      await this.redisClient.setAsync(this.tablesRedisKey(), JSON.stringify(tables), 'EX', 120);
+      await this.cacheDriver.set(this.tablesRedisKey(), tables, 120);
     }
     return tables;
   }
@@ -106,7 +107,7 @@ class PreAggregationLoadCache {
     this.tables = undefined;
     this.queryStageState = undefined;
     this.versionEnries = undefined;
-    await this.redisClient.delAsync(this.tablesRedisKey());
+    await this.cacheDriver.remove(this.tablesRedisKey());
   }
 }
 
@@ -312,7 +313,9 @@ class PreAggregations {
     this.queryCache = queryCache;
     this.refreshErrors = {}; // TODO should be in redis
     this.tablesUsedInQuery = {}; // TODO should be in redis
-    this.redisClient = redis.createClient(process.env.REDIS_URL);
+    this.cacheDriver = process.env.NODE_ENV === 'production' || process.env.REDIS_URL ?
+      new RedisCacheDriver() :
+      new LocalCacheDriver();
   }
 
   loadAllPreAggregationsIfNeeded (queryBody) {

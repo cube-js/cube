@@ -1,7 +1,8 @@
-const redis = require('redis');
 const crypto = require('crypto');
 const QueryQueue = require('./QueryQueue');
 const ContinueWaitError = require('./ContinueWaitError');
+const RedisCacheDriver = require('./RedisCacheDriver');
+const LocalCacheDriver = require('./LocalCacheDriver');
 
 class QueryCache {
   constructor(redisPrefix, clientFactory, logger, options) {
@@ -9,7 +10,9 @@ class QueryCache {
     this.redisPrefix = redisPrefix;
     this.driverFactory = clientFactory;
     this.logger = logger;
-    this.redisClient = redis.createClient(process.env.REDIS_URL);
+    this.cacheDriver = process.env.NODE_ENV === 'production' || process.env.REDIS_URL ?
+      new RedisCacheDriver() :
+      new LocalCacheDriver();
   }
 
   cachedQueryResult (queryBody, preAggregationsTablesToTempTables) {
@@ -193,7 +196,7 @@ class QueryCache {
           result: res,
           renewalKey
         };
-        return this.redisClient.setAsync(redisKey, JSON.stringify(result), 'EX', expiration)
+        return this.cacheDriver.set(redisKey, result, expiration)
           .then(() => {
             this.logger('Renewed', { cacheKey });
             return res
@@ -201,7 +204,7 @@ class QueryCache {
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
           this.logger('Dropping Cache', { cacheKey, error: e.stack || e });
-          this.redisClient.delAsync(redisKey)
+          this.cacheDriver.remove(redisKey)
             .catch(e => this.logger('Error removing key', { cacheKey, error: e.stack || e }));
         }
         throw e;
@@ -213,9 +216,9 @@ class QueryCache {
       return fetchNew();
     }
 
-    return this.redisClient.getAsync(redisKey).then(res => {
+    return this.cacheDriver.get(redisKey).then(res => {
       if (res) {
-        const parsedResult = JSON.parse(res);
+        const parsedResult = res;
         const renewedAgo = (new Date()).getTime() - parsedResult.time;
         this.logger('Found cache entry', {
           cacheKey,
