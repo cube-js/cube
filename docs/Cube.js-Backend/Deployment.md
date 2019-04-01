@@ -16,7 +16,7 @@ Create Cube.js Serverless app:
 
 ```bash
 $ npm install -g serverless
-$ cubejs create -d athena -t serverless
+$ cubejs create cubejs-serverless -d athena -t serverless
 ```
 
 ### Setup Redis
@@ -73,49 +73,59 @@ $ serverless logs -t -f cubejsProcess
 
 ## Heroku
 
-### Create new app using Cube.js-CLI:
+### Create new app using Cube.js-CLI
 
 ```bash
-cubejs create cubejs-heroku-demo -d postgres
-cd cubejs-heroku-demo
+$ cubejs create cubejs-heroku-demo -d postgres
+$ cd cubejs-heroku-demo
 ```
 
-### Init a git repository:
+### Init a git repository
 
 ```bash
-git init
+$ git init
 ```
 
-### Create new Heroku app:
+### Create new Heroku app
 
 ```bash
-heroku create cubejs-heroku-demo
+$ heroku create cubejs-heroku-demo
 ```
 
-### Provision Redis:
+### Provision Redis
+
+You can use any Redis server. If you don't have one, you can use a free Redis provided by Heroku:
 
 ```bash
-heroku addons:create heroku-redis:hobby-dev -a cubejs-heroku-demo
+$ heroku addons:create heroku-redis:hobby-dev -a cubejs-heroku-demo
 ```
 
-### Create Heroku `Procfile`:
+If you use another Redis server, you should pass your Redis URL as an environment variable:
 
 ```bash
-echo "web: node index.js" > Procfile
+$ heroku config:set REDIS_URL:<YOUR-REDIS-URL>
 ```
 
-### Deploy app to Heroku:
+Note that Cube.js requires at least 15 concurrent connections allowed by Redis server.
+
+### Create Heroku `Procfile`
 
 ```bash
-git add -A
-git commit -am "Initial"
-git push heroku master
+$ echo "web: node index.js" > Procfile
 ```
 
-### Set up connection to your database:
+### Deploy app to Heroku
 
 ```bash
-heroku config:set \
+$ git add -A
+$ git commit -am "Initial"
+$ git push heroku master
+```
+
+### Set up connection to your database
+
+```bash
+$ heroku config:set \
   CUBEJS_DB_HOST=<YOUR-DB-HOST> \
   CUBEJS_DB_NAME=<YOUR-DB-NAME> \
   CUBEJS_DB_USER=<YOUR-DB-USER> \
