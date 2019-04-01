@@ -21,7 +21,7 @@ $ npm install -g cubejs-cli
 
 #### Yarn
 ```bash
-$ yarn global add prisma
+$ yarn global add cubejs-cli
 ```
 
 ## Quickstart
