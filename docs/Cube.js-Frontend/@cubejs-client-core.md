@@ -11,7 +11,7 @@ Cube.js Backend.
 
 Create instance of `CubejsApi`.
 
-* `apiKey` - API key used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API key to the console on on startup.
+* `apiToken` - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup.
 * `options` - options object.
    * `apiUrl` - URL of your Cube.js Backend. By default, in the development environment it is http://localhost:4000/cubejs-api/v1.
 
