@@ -94,13 +94,6 @@ $ npm run dev
 
 Then go to `http://localhost:4000` and use UI to generate schema files.
 
-The Cube.js backend requires a Redis server running on your local machine on the default port of `6379`. This default location can be changed by setting the `REDIS_URL` environment variable to your Redis server. Please make sure your Redis server is up before proceeding:
-
-```bash
-$ redis-cli ping
-PONG
-```
-
 #### Manually creating Data Schema files
 
 You can also add schema files to the `schema` folder manually:
