@@ -70,3 +70,54 @@ $ serverless deploy -v
 $ serverless logs -t -f cubejs
 $ serverless logs -t -f cubejsProcess
 ```
+
+## Heroku
+
+### Create new app using Cube.js-CLI:
+
+```bash
+cubejs create cubejs-heroku-demo -d postgres
+cd cubejs-heroku-demo
+```
+
+### Init a git repository:
+
+```bash
+git init
+```
+
+### Create new Heroku app:
+
+```bash
+heroku create cubejs-heroku-demo
+```
+
+### Provision Redis:
+
+```bash
+heroku addons:create heroku-redis:hobby-dev -a cubejs-heroku-demo
+```
+
+### Create Heroku `Procfile`:
+
+```bash
+echo "web: node index.js" > Procfile
+```
+
+### Deploy app to Heroku:
+
+```bash
+git add -A
+git commit -am "Initial"
+git push heroku master
+```
+
+### Set up connection to your database:
+
+```bash
+heroku config:set \
+  CUBEJS_DB_HOST=<YOUR-DB-HOST> \
+  CUBEJS_DB_NAME=<YOUR-DB-NAME> \
+  CUBEJS_DB_USER=<YOUR-DB-USER> \
+  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
+```
