@@ -97,6 +97,39 @@ const bundle = (name, globalName, baseConfig) => {
         })
       ],
       output: [{ file: `packages/${name}/dist/${name}.js`, format: "cjs" }]
+    },
+    // // ES module (for bundlers) build.
+    {
+      ...baseConfig,
+      plugins: [
+        ...baseConfig.plugins,
+        babel({
+          exclude: 'node_modules/**',
+          runtimeHelpers: true,
+          "presets": [
+            '@babel/preset-react',
+            [
+              "@babel/preset-env",
+              {
+                shippedProposals: true,
+                "useBuiltIns": "usage"
+              }
+            ]
+          ],
+          "plugins": [
+            [
+              "@babel/plugin-transform-runtime",
+              {
+                "corejs": false,
+                "helpers": true,
+                "regenerator": true,
+                "useESModules": false
+              }
+            ]
+          ]
+        })
+      ],
+      output: [{ file: `packages/${name}/dist/${name}.esm.js`, format: "es" }]
     }
   ]
 };
@@ -108,5 +141,10 @@ export default bundle('cubejs-client-core', 'cubejs', {
   external: [
     'react',
     'prop-types'
+  ],
+})).concat(bundle('cubejs-vue', 'cubejsVue', {
+  input: "packages/cubejs-vue/src/index.js",
+  external: [
+    'vue',
   ],
 }));
