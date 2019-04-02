@@ -112,6 +112,13 @@ $ npm i --save @cubejs-client/core
 $ npm i --save @cubejs-client/react
 ```
 
+Vue:
+
+```bash
+$ npm i --save @cubejs-client/core
+$ npm i --save @cubejs-client/vue
+```
+
 ### Example Usage
 
 #### Vanilla Javascript
@@ -174,4 +181,73 @@ export default () => {
     />
   )
 }
+```
+
+#### Vue
+Import `cubejs` and `QueryRenderer` components, and use them to fetch the data.
+In the example below we use Vue-Chartkick to visualize data.
+
+```jsx
+<template>
+  <div class="hello">
+    <query-renderer :cubejs-api="cubejsApi" :query="query">
+      <template v-slot="{ measures, resultSet, loading }">
+        <line-chart :data="transformData(resultSet)"></line-chart>
+      </template>
+    </query-renderer>
+  </div>
+</template>
+
+<script>
+import cubejs from '@cubejs-client/core';
+import { QueryBuilder } from '@cubejs-client/vue';
+import Vue from 'vue';
+import VueChartkick from 'vue-chartkick';
+import Chart from 'chart.js';
+
+Vue.use(VueChartkick, { adapter: Chart });
+
+const cubejsApi = cubejs(
+  'YOUR-CUBEJS-API-TOKEN',
+  { apiUrl: 'http://localhost:4000/cubejs-api/v1' },
+);
+
+export default {
+  name: 'HelloWorld',
+  components: {
+    QueryBuilder,
+  },
+  props: {
+    msg: String,
+  },
+  data() {
+    const query = {
+      measures: ['LineItems.count', 'LineItems.quantity', 'Orders.count'],
+      timeDimensions: [
+        {
+          dimension: 'LineItems.createdAt',
+          granularity: 'month',
+        },
+      ],
+    };
+
+    return {
+      cubejsApi,
+      query,
+    };
+  },
+  methods: {
+    transformData(resultSet) {
+      const seriesNames = resultSet.seriesNames();
+      const pivot = resultSet.chartPivot();
+      const series = [];
+      seriesNames.forEach((e) => {
+        const data = pivot.map(p => [p.x, p[e.key]]);
+        series.push({ name: e.key, data });
+      });
+      return series;
+    },
+  },
+};
+</script>
 ```

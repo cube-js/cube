@@ -14,13 +14,18 @@ export default Vue.component('QueryRenderer', {
       type: Object,
       required: true,
     },
+    builderProps: {
+      type: Object,
+      required: false,
+      default: () => ({}),
+    },
   },
   data() {
     return {
       mutexObj: {},
       error: undefined,
       resultSet: undefined,
-      loadingState: false,
+      loading: true,
       sqlQuery: undefined,
     };
   },
@@ -35,19 +40,21 @@ export default Vue.component('QueryRenderer', {
       await this.loadQueries(queries);
     }
   },
-  // TODO: handle update
   render(createElement) {
     const { resultSet, error, loading, sqlQuery } = this;
 
-    if (this.$slots.default) {
+    if (!loading) {
+      const slotProps = {
+        resultSet: this.queries ? (resultSet || {}) : resultSet,
+        error,
+        isLoading: loading,
+        sqlQuery,
+        ...this.builderProps,
+      };
+
       return createElement(
         'div',
-        this.$scopedSlots.default({
-          resultSet: this.queries ? (resultSet || {}) : resultSet,
-          error,
-          loadingState: { isLoading: loading, },
-          sqlQuery,
-        }),
+        this.$scopedSlots.default(slotProps),
       );
     } else {
       return null;

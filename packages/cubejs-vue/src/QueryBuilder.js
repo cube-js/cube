@@ -19,16 +19,18 @@ export default Vue.component('QueryBuilder', {
   },
   render(createElement) {
     const { cubejsApi } = this;
+    const props = this.prepareRenderProps();
 
     return createElement(QueryRenderer, {
       props: {
-        query: this.validatedQuery(),
+        query: this.validatedQuery,
         cubejsApi,
+        builderProps: props,
       },
-      // TODO: check passable props
-    }, this.$scopedSlots.default(this.prepareRenderProps()));
+      scopedSlots: this.$scopedSlots,
+    });
   },
-  methods: {
+  computed: {
     isQueryPresent() {
       const { query } = this;
 
@@ -44,7 +46,9 @@ export default Vue.component('QueryBuilder', {
         filters: (query.filters || []).filter(f => f.operator),
       };
     },
-    prepareRenderProps(queryRendererProps) {
+  },
+  methods: {
+    prepareRenderProps() {
       const getName = member => member.name;
       const toTimeDimension = member => ({
         dimension: member.dimension.name,
@@ -68,7 +72,6 @@ export default Vue.component('QueryBuilder', {
           const members = (this.query[memberType] || []).concat([]);
           members.splice(member.index, 1);
 
-          // TODO: check return state
           this.query = {
             ...this.query,
             [memberType]: members,
@@ -78,7 +81,6 @@ export default Vue.component('QueryBuilder', {
           const members = (this.query[memberType] || []).concat([]);
           members.splice(member.index, 1, toQuery(updateWith));
 
-          // TODO: check return state
           this.query = {
             ...this.query,
             [memberType]: members,
@@ -97,8 +99,8 @@ export default Vue.component('QueryBuilder', {
       return {
         meta: this.meta,
         query: this.query,
-        validatedQuery: this.validatedQuery(),
-        isQueryPresent: this.isQueryPresent(),
+        validatedQuery: this.validatedQuery,
+        isQueryPresent: this.isQueryPresent,
         chartType: this.chartType,
         measures: (this.meta && this.query.measures || [])
           .map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') })),
@@ -132,7 +134,6 @@ export default Vue.component('QueryBuilder', {
         updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
         updateFilters: updateMethods('filters', toFilter),
         updateChartType: (chartType) => { this.chartType = chartType; },
-        ...queryRendererProps,
       };
     },
   },
