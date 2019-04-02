@@ -108,18 +108,10 @@ $ heroku config:set REDIS_URL:<YOUR-REDIS-URL>
 
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis server.
 
-### Create Heroku `Procfile`
+### Create Heroku Procfile
 
 ```bash
 $ echo "web: node index.js" > Procfile
-```
-
-### Deploy app to Heroku
-
-```bash
-$ git add -A
-$ git commit -am "Initial"
-$ git push heroku master
 ```
 
 ### Set up connection to your database
@@ -130,4 +122,12 @@ $ heroku config:set \
   CUBEJS_DB_NAME=<YOUR-DB-NAME> \
   CUBEJS_DB_USER=<YOUR-DB-USER> \
   CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
+```
+
+### Deploy app to Heroku
+
+```bash
+$ git add -A
+$ git commit -am "Initial"
+$ git push heroku master
 ```
