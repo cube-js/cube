@@ -1,5 +1,5 @@
 ---
-title: Reference
+title: Command Reference
 permalink: /reference
 category: Cube.js CLI
 ---
@@ -38,7 +38,7 @@ $ cubejs create demo-app -d athena -t serverless
 ## generate
 
 `generate` command helps building data schema for existing database tables.
-You can only run `generate` from an Cube.js app directory.
+You can only run `generate` from the Cube.js app directory.
 This command could not be used without an active [Database connection](/connecting-to-the-database).
 
 ### Usage
