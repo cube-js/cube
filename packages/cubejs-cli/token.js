@@ -19,6 +19,9 @@ const token = async (options = {}) => {
   const { expiry = defaultExpiry, secret = process.env.CUBEJS_API_SECRET } = options;
   if (!secret) throw new Error('No app secret found').message;
 
+  const extraOptions = {};
+  if (expiry !== "0") extraOptions.expiresIn = expiry;
+
   const payload = parsePayload(options.payload);
 
   console.log("Generating Cube.js JWT token");
@@ -26,7 +29,7 @@ const token = async (options = {}) => {
   console.log("Payload: ", chalk.green(JSON.stringify(payload)));
   console.log("");
 
-  const signedToken = jwt.sign(payload, secret, { expiresIn: expiry });
+  const signedToken = jwt.sign(payload, secret, extraOptions);
   console.log(signedToken);
   return signedToken;
 };
