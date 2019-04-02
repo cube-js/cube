@@ -10,7 +10,8 @@ const DriverDependencies = {
   mysql: '@cubejs-backend/mysql-driver',
   athena: '@cubejs-backend/athena-driver',
   jdbc: '@cubejs-backend/jdbc-driver',
-  mongobi: '@cubejs-backend/mongobi-driver'
+  mongobi: '@cubejs-backend/mongobi-driver',
+  bigquery: '@cubejs-backend/bigquery-driver'
 };
 
 const checkEnvForPlaceholders = () => {

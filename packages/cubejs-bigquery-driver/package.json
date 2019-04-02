@@ -1,0 +1,22 @@
+{
+  "name": "@cubejs-backend/bigquery-driver",
+  "description": "Cube.js BigQuery database driver",
+  "author": "Statsbot, Inc.",
+  "version": "0.5.0",
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/BigQueryDriver.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.5.0",
+    "@google-cloud/bigquery": "^2.1.0",
+    "ramda": "^0.26.1"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}
