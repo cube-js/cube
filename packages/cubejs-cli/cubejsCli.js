@@ -276,7 +276,7 @@ program
     console.log('');
     console.log('Examples:');
     console.log('');
-    console.log('  $ cubejs create hello-world -d postgres');
+    console.log('  $ cubejs token -e "1 day" -p foo=bar -p cool=true');
   });
 
 if (!process.argv.slice(2).length) {
