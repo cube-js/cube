@@ -61,3 +61,7 @@ $ cat /path/to/key-file.json | base64
 ```
 
 Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key.
+
+### Contributing
+
+If you'd like to connect a database that is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/statsbotco/cube.js/blob/master/CONTRIBUTING.md#implementing-driver).
