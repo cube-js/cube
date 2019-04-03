@@ -227,15 +227,15 @@ export default () => {
 ## Tutorials
 
 ### Getting Started Tutorials
-- [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://statsbot.co/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
-- [Building MongoDB Dashboard using Node.js](https://statsbot.co/blog/building-mongodb-dashboard-using-node.js)
-- [Node Express Analytics Dashboard with Cube.js](https://statsbot.co/blog/node-express-analytics-dashboard-with-cubejs/)
-- [Building a Serverless Stripe Analytics Dashboard](https://statsbot.co/blog/building-serverless-stripe-analytics-dashboard/)
+- [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
+- [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
+- [Node Express Analytics Dashboard with Cube.js](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)
+- [Building a Serverless Stripe Analytics Dashboard](https://cube.dev/blog/building-serverless-stripe-analytics-dashboard/)
 ### Advanced
-- [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://statsbot.co/blog/building-an-open-source-mixpanel-alternative-1/)
-- [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://statsbot.co/blog/building-open-source-mixpanel-alternative-2/)
-- [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
-- [React Query Builder with Cube.js](https://statsbot.co/blog/react-query-builder-with-cubejs/)
+- [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)
+- [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
+- [Building Open Source Google Analytics from Scratch](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)
+- [React Query Builder with Cube.js](https://cube.dev/blog/react-query-builder-with-cubejs/)
 
 
 ## Community

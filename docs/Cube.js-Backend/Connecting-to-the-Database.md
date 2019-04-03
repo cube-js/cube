@@ -17,7 +17,7 @@ Cube.js currently provides connectors to the following databases:
 
 _To use Cube.js with MongoDB you need to install MongoDB Connector for BI. You
 can download it [here](https://www.mongodb.com/download-center/bi-connector). [Learn more about setup for MongoDB
-here.](https://statsbot.co/blog/building-mongodb-dashboard-using-node.js)_
+here.](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)_
 
 ### Configuring Connection for Cube.js CLI Created Apps
 
