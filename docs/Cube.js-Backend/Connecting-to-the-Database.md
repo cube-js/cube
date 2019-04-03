@@ -12,6 +12,7 @@ Cube.js currently provides connectors to the following databases:
 | MySQL                | mysql         |
 | AWS Athena           | athena        |
 | MongoDB (via MongoDB Connector for BI)           | mongobi        |
+| Google BigQuery           | bigquery        |
 
 
 _To use Cube.js with MongoDB you need to install MongoDB Connector for BI. You
@@ -39,5 +40,24 @@ The table below shows which environment variables are used for different databas
 | -------------------- |--------------- |
 | PostgreSQL, MySQL, MongoDB    | `CUBEJS_DB_TYPE`, `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 | AWS Athena           | `CUBEJS_DB_TYPE`, `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION` |
+| Google Bigquery           | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS` |
+
+## Notes
+
+### AWS Athena
 
 For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
+
+### Google BigQuery
+
+In order to connect BigQuery to Cube.js, you need to provide service account credentials.
+Cube.js requires the service account to have **BigQuery Data Viewer** and **BigQuery Job User** roles enabled.
+You can set `CUBEJS_DB_BQ_KEY_FILE` environment variable with a path to **JSON** key file.
+
+Another way is to encode the key file with **base64**:
+
+```bash
+$ cat /path/to/key-file.json | base64
+```
+
+Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key.

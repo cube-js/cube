@@ -68,6 +68,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `mysql`
 * `mongobi`
 * `athena`
+* `bigquery`
 
 For example,
 
