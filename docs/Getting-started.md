@@ -99,6 +99,8 @@ $ npm run dev
 
 Then open `http://localhost:4000` to see visualization examples. This will open a Developer Playground app. You can change the metrics and dimensions of the example to use the schema you defined above, change the chart types, generate sample code out of it and more!
 
+Cube.js Backend also provides [REST API](/rest-api) for accessing your data.
+
 ### Cube.js Client Installation
 
 Vanilla JS:
