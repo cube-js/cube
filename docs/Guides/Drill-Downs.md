@@ -2,6 +2,7 @@
 title: Drill Downs
 permalink: /drill-downs
 category: Guides
+menuOrder: 12
 ---
 
 Drill Down is a powerful feature to facilitate data exploration. It allows to build an interface to let users dive deeper into visualizations and data tables.

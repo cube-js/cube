@@ -2,6 +2,7 @@
 title: Query Format
 permalink: /query-format
 category: Cube.js Frontend
+menuOrder: 1
 ---
 
 Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`.

@@ -3,6 +3,7 @@ title: Joins
 permalink: /joins
 scope: cubejs
 category: Reference
+menuOrder: 5
 ---
 
 `joins` parameter declares a block to define relationships between cubes.

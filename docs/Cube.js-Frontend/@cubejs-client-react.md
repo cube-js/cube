@@ -2,6 +2,7 @@
 title: '@cubejs-client/react'
 permalink: /@cubejs-client-react
 category: Cube.js Frontend
+menuOrder: 3
 ---
 
 `@cubejs-client/react` provides React Components for easy integration Cube.js

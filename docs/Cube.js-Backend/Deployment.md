@@ -2,6 +2,7 @@
 title: Deployment
 permalink: /deployment
 category: Cube.js Backend
+menuOrder: 3
 ---
 
 ## Serverless

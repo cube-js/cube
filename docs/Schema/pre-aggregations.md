@@ -3,6 +3,7 @@ title: Pre-aggregations
 permalink: /pre-aggregations
 scope: cubejs
 category: Reference
+menuOrder: 8
 ---
 
 Pre-aggregations are materialized query results persisted as tables.

@@ -3,6 +3,7 @@ title: Dimensions
 permalink: /dimensions
 scope: cubejs
 category: Reference
+menuOrder: 4
 ---
 
 `Dimensions` parameter contains a set of dimensions. You can think about dimension as an attribute related to a measure, e.g. measure `userCount` can have dimensions like `country`, `age`, `occupation` and etc.

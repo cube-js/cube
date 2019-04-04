@@ -2,6 +2,7 @@
 title: Security
 permalink: /security
 category: Cube.js Backend
+menuOrder: 4
 ---
 
 Cube.js uses [JSON Web Tokens (JWT)](https://jwt.io/) as an auth token to access

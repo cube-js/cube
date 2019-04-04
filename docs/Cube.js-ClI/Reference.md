@@ -2,6 +2,7 @@
 title: Command Reference
 permalink: /reference
 category: Cube.js CLI
+menuOrder: 2
 ---
 
 ## create

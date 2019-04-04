@@ -3,6 +3,7 @@ title: Dynamically Union Tables
 permalink: /dynamically-union-tables
 scope: cubejs
 category: Guides
+menuOrder: 8
 ---
 
 [comment]: # (PROOFREAD: DONE)

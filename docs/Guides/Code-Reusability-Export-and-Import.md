@@ -3,6 +3,7 @@ title: 'Code Reusability: Export and Import'
 permalink: /export-import
 scope: cubejs
 category: Guides
+menuOrder: 5
 ---
 
 [comment]: # (PROOFREAD: DONE)

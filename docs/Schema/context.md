@@ -3,6 +3,7 @@ title: Contexts
 permalink: /context
 scope: cubejs
 category: Reference
+menuOrder: 9
 ---
 
 A `context` is a combination of related cubes. Contexts are used to organize
