@@ -29,7 +29,7 @@ export default Vue.component('QueryRenderer', {
       sqlQuery: undefined,
     };
   },
-  async mounted() {
+  async created() {
     const { query, queries } = this;
 
     if (query) {
@@ -43,7 +43,7 @@ export default Vue.component('QueryRenderer', {
   render(createElement) {
     const { resultSet, error, loading, sqlQuery } = this;
 
-    if (!loading) {
+    if (!loading && resultSet) {
       const slotProps = {
         resultSet: this.queries ? (resultSet || {}) : resultSet,
         error,
@@ -57,7 +57,16 @@ export default Vue.component('QueryRenderer', {
         this.$scopedSlots.default(slotProps),
       );
     } else {
-      return null;
+
+      return createElement(
+        'div',
+        this.$scopedSlots.default({
+          loading,
+          error,
+          sqlQuery,
+          ...this.builderProps,
+        }),
+      );
     }
   },
   methods: {
