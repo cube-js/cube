@@ -6,4 +6,4 @@ Pure Javascript Postgres driver.
 
 ### License
 
-Cube.js CLI is [Apache 2.0 licensed](./LICENSE).
+Cube.js Postgres driver is [Apache 2.0 licensed](./LICENSE).

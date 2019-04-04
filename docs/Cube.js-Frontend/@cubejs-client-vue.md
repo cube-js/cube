@@ -48,7 +48,7 @@ API from Cube.js Backend.
 
 ### Example
 [Open in CodeSandbox](https://codesandbox.io/s/3rlxjkv2p)
-```vue
+```js
 <template>
   <div class="hello">
     <query-builder :cubejs-api="cubejsApi" :query="query">

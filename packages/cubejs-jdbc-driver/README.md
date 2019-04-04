@@ -4,4 +4,4 @@
 
 ### License
 
-Cube.js CLI is [Apache 2.0 licensed](./LICENSE).
+Cube.js JDBC Database Driver is [Apache 2.0 licensed](./LICENSE).

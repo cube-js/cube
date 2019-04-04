@@ -1,7 +1,7 @@
 
 <p align="center"><a href="https://www.statsbot.co/cubejs"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
-[Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://statsbot.co/blog) • [Slack](https://publicslack.com/slacks/cubejs/invites/new) • [Twitter](https://twitter.com/thecubejs)
+[Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://publicslack.com/slacks/cubejs/invites/new) • [Twitter](https://twitter.com/thecubejs)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 
@@ -68,6 +68,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `mysql`
 * `mongobi`
 * `athena`
+* `bigquery`
 
 For example,
 
@@ -226,15 +227,16 @@ export default () => {
 ## Tutorials
 
 ### Getting Started Tutorials
-- [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://statsbot.co/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
-- [Building MongoDB Dashboard using Node.js](https://statsbot.co/blog/building-mongodb-dashboard-using-node.js)
-- [Node Express Analytics Dashboard with Cube.js](https://statsbot.co/blog/node-express-analytics-dashboard-with-cubejs/)
-- [Building a Serverless Stripe Analytics Dashboard](https://statsbot.co/blog/building-serverless-stripe-analytics-dashboard/)
+- [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
+- [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
+- [Node Express Analytics Dashboard with Cube.js](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)
+- [Building a Serverless Stripe Analytics Dashboard](https://cube.dev/blog/building-serverless-stripe-analytics-dashboard/)
 ### Advanced
-- [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://statsbot.co/blog/building-an-open-source-mixpanel-alternative-1/)
-- [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://statsbot.co/blog/building-open-source-mixpanel-alternative-2/)
-- [Building Open Source Google Analytics from Scratch](https://statsbot.co/blog/building-open-source-google-analytics-from-scratch/)
-- [React Query Builder with Cube.js](https://statsbot.co/blog/react-query-builder-with-cubejs/)
+- [High Performance Data Analytics with Cube.js Pre-Aggregations](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/)
+- [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)
+- [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
+- [Building Open Source Google Analytics from Scratch](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)
+- [React Query Builder with Cube.js](https://cube.dev/blog/react-query-builder-with-cubejs/)
 
 
 ## Community

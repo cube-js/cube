@@ -17,6 +17,7 @@ module.exports = {
     "no-else-return": 0,
     "prefer-promise-reject-errors": 0,
     "no-plusplus": 0,
+    "no-await-in-loop": 0,
     "operator-linebreak": ["error", "after"],
     'max-len': ['error', 120, 2, {
       ignoreUrls: true,

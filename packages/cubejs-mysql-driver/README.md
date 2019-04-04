@@ -6,4 +6,4 @@ Pure Javascript MySQL driver.
 
 ### License
 
-Cube.js CLI is [Apache 2.0 licensed](./LICENSE).
+Cube.js MySQL Database Driver is [Apache 2.0 licensed](./LICENSE).

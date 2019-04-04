@@ -6,4 +6,4 @@ Pure Javascript MongoBI driver.
 
 ### License
 
-Cube.js CLI is [Apache 2.0 licensed](./LICENSE).
+Cube.js MongoBI Driver is [Apache 2.0 licensed](./LICENSE).
