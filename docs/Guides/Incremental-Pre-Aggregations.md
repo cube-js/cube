@@ -3,6 +3,7 @@ title: Incremental Pre-aggregations
 permalink: /incremental-pre-aggregations
 scope: cubejs
 category: Guides
+menuOrder: 10
 ---
 
 When you use partitioned rollups on immutable data there's an opportunity to build pre-aggregations incrementally.

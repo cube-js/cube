@@ -3,6 +3,7 @@ title: Segments
 permalink: /segments
 scope: cubejs
 category: Reference
+menuOrder: 6
 ---
 
 `segments` parameter declares a block to specify some partitions.

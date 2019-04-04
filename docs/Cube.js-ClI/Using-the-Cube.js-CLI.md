@@ -2,6 +2,7 @@
 title: Using the Cube.js CLI
 permalink: /using-the-cubejs-cli
 category: Cube.js CLI
+menuOrder: 1
 ---
 
 The Cube.js command line interface (CLI) is used for various Cube.js workflows.

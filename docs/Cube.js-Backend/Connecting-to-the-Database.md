@@ -2,6 +2,7 @@
 title: Connecting to the Database
 permalink: /connecting-to-the-database
 category: Cube.js Backend
+menuOrder: 1
 ---
 
 Cube.js currently provides connectors to the following databases:

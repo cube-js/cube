@@ -3,6 +3,7 @@ title: Data Blending
 permalink: /data-blending
 scope: cubejs
 category: Guides
+menuOrder: 9
 ---
 
 In case you want to plot two measures from different cubes on one chart or

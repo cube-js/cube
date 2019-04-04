@@ -3,6 +3,7 @@ title: Measures
 permalink: /measures
 scope: cubejs
 category: Reference
+menuOrder: 3
 ---
 
 `measures` parameter contains a set of measures and each measure is an aggregation over certain column in your database table. Any measure should have name, sql parameter and type.

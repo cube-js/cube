@@ -2,6 +2,7 @@
 title: Getting Started with Cube.js Schema
 permalink: /getting-started-cubejs-schema
 category: Reference
+menuOrder: 1
 ---
 
 Cube.js Schema is used to model raw data into meaningful business definitions and pre-aggregate and optimize results.

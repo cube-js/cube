@@ -2,6 +2,7 @@
 title: '@cubejs-client/core'
 permalink: /@cubejs-client-core
 category: Cube.js Frontend
+menuOrder: 2
 ---
 
 `@cubejs-client/core` is a Javascript client library to use with

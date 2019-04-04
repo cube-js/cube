@@ -2,6 +2,7 @@
 title: cubejs-backend-server-core
 permalink: /@cubejs-backend-server-core
 category: Cube.js Backend
+menuOrder: 5
 ---
 
 `@cubejs-backend/server-core` could be used to embed Cube.js Backend into your

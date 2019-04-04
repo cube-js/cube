@@ -3,6 +3,7 @@ title: Direction of Joins
 permalink: /direction-of-joins
 scope: cubejs
 category: Guides
+menuOrder: 3
 ---
 
 As mentioned in [Joins](/joins) the direction of joins influences the result set greatly. For example, we have two cubes Orders and Customers:

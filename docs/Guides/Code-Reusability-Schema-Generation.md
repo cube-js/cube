@@ -3,6 +3,7 @@ title: 'Code Reusability: Schema Generation'
 permalink: /schema-generation
 scope: cubejs
 category: Guides
+menuOrder: 7
 ---
 
 Cube.js Schema is a Javascript code, so full power of this language can be used to configure your schema definitions.

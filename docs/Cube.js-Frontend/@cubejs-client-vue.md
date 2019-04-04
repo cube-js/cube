@@ -2,6 +2,7 @@
 title: '@cubejs-client/vue'
 permalink: /@cubejs-client-vue
 category: Cube.js Frontend
+menuOrder: 4
 ---
 
 `@cubejs-client/vue` provides Vue Components for easy integration Cube.js

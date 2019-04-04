@@ -2,6 +2,7 @@
 title: Funnels
 permalink: /funnels
 category: Funnels
+menuOrder: 13
 ---
 
 Funnels are representing a series of events that lead users towards a defined goal. It's commonly used in product, marketing and sales analytics.
