@@ -22,6 +22,8 @@ application.
 
 ## Advanced
 
+* [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) - Pre-Aggregations is one of the most powerful Cube.js features. By using it you can significantly speed up performance of your dashboards and reports. This tutorial is a good first step to master pre-aggregations.
+
 * Building an Open Source Mixpanel Alternative - It's a series of tutorials on
 building a production ready application with Cube.js.
   - [Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1)

@@ -232,6 +232,7 @@ export default () => {
 - [Node Express Analytics Dashboard with Cube.js](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)
 - [Building a Serverless Stripe Analytics Dashboard](https://cube.dev/blog/building-serverless-stripe-analytics-dashboard/)
 ### Advanced
+- [High Performance Data Analytics with Cube.js Pre-Aggregations](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/)
 - [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)
 - [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
 - [Building Open Source Google Analytics from Scratch](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)
