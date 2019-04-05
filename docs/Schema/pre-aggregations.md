@@ -3,6 +3,7 @@ title: Pre-aggregations
 permalink: /pre-aggregations
 scope: cubejs
 category: Reference
+subCategory: Reference
 menuOrder: 8
 ---
 

@@ -3,6 +3,7 @@ title: Joins
 permalink: /joins
 scope: cubejs
 category: Reference
+subCategory: Reference
 menuOrder: 5
 ---
 

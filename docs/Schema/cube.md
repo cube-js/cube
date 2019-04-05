@@ -4,6 +4,7 @@ permalink: /cube
 scope: cubejs
 category: Reference
 menuOrder: 2
+subCategory: Reference
 ---
 
 A `cube` represents a table of data in Cube.js. Cubes are typically declared in separate files with one cube per file. Within each cube are definitions of measures, dimensions and joins between cubes. Cube should always be declared with capital letter.

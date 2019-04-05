@@ -3,6 +3,7 @@ title: Dimensions
 permalink: /dimensions
 scope: cubejs
 category: Reference
+subCategory: Reference
 menuOrder: 4
 ---
 

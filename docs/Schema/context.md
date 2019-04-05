@@ -3,6 +3,7 @@ title: Contexts
 permalink: /context
 scope: cubejs
 category: Reference
+subCategory: Reference
 menuOrder: 9
 ---
 

@@ -2,6 +2,7 @@
 title: cubejs-backend-server-core
 permalink: /@cubejs-backend-server-core
 category: Cube.js Backend
+subCategory: Reference
 menuOrder: 5
 ---
 

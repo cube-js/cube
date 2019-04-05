@@ -3,6 +3,7 @@ title: Segments
 permalink: /segments
 scope: cubejs
 category: Reference
+subCategory: Reference
 menuOrder: 6
 ---
 

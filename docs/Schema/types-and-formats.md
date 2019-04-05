@@ -3,6 +3,7 @@ title: Types and Formats
 permalink: /types-and-formats
 scope: cubejs
 category: Reference
+subCategory: Reference
 menuOrder: 7
 ---
 

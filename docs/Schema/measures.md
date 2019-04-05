@@ -3,6 +3,7 @@ title: Measures
 permalink: /measures
 scope: cubejs
 category: Reference
+subCategory: Reference
 menuOrder: 3
 ---
 
