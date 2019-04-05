@@ -17,9 +17,9 @@ export default class QueryBuilder extends React.Component {
 
   isQueryPresent() {
     const { query } = this.state;
-    return query.measures && query.measures.length ||
-      query.dimensions && query.dimensions.length ||
-      query.timeDimensions && query.timeDimensions.length;
+    return query.measures && query.measures.length
+      || query.dimensions && query.dimensions.length
+      || query.timeDimensions && query.timeDimensions.length;
   }
 
   prepareRenderProps(queryRendererProps) {

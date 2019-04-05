@@ -1191,10 +1191,10 @@
 	    return capability.promise;
 	  }
 	});
-	_export(_export.S + _export.F * (!USE_NATIVE), PROMISE, {
+	_export(_export.S + _export.F * (_library || !USE_NATIVE), PROMISE, {
 	  // 25.4.4.6 Promise.resolve(x)
 	  resolve: function resolve(x) {
-	    return _promiseResolve(this, x);
+	    return _promiseResolve(_library && this === Wrapper ? $Promise : this, x);
 	  }
 	});
 	_export(_export.S + _export.F * !(USE_NATIVE && _iterDetect(function (iter) {
@@ -1242,20 +1242,16 @@
 	  }
 	});
 
-	// true  -> String#at
-	// false -> String#codePointAt
-	var _stringAt = function (TO_STRING) {
-	  return function (that, pos) {
-	    var s = String(_defined(that));
-	    var i = _toInteger(pos);
-	    var l = s.length;
-	    var a, b;
-	    if (i < 0 || i >= l) return TO_STRING ? '' : undefined;
-	    a = s.charCodeAt(i);
-	    return a < 0xd800 || a > 0xdbff || i + 1 === l || (b = s.charCodeAt(i + 1)) < 0xdc00 || b > 0xdfff
-	      ? TO_STRING ? s.charAt(i) : a
-	      : TO_STRING ? s.slice(i, i + 2) : (a - 0xd800 << 10) + (b - 0xdc00) + 0x10000;
-	  };
+	// 22.1.3.31 Array.prototype[@@unscopables]
+	var UNSCOPABLES = _wks('unscopables');
+	var ArrayProto$1 = Array.prototype;
+	if (ArrayProto$1[UNSCOPABLES] == undefined) _hide(ArrayProto$1, UNSCOPABLES, {});
+	var _addToUnscopables = function (key) {
+	  ArrayProto$1[UNSCOPABLES][key] = true;
+	};
+
+	var _iterStep = function (done, value) {
+	  return { value: value, done: !!done };
 	};
 
 	// to indexed object, toObject with fallback for non-array-like ES3 strings
@@ -1440,7 +1436,7 @@
 	      // Set @@toStringTag to native iterators
 	      _setToStringTag(IteratorPrototype, TAG, true);
 	      // fix for some old engines
-	      if (!_library && typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
+	      if (typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
 	    }
 	  }
 	  // fix Array#{values, @@iterator}.name in V8 / FF
@@ -1449,7 +1445,7 @@
 	    $default = function values() { return $native.call(this); };
 	  }
 	  // Define iterator
-	  if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR$3])) {
+	  if (BUGGY || VALUES_BUG || !proto[ITERATOR$3]) {
 	    _hide(proto, ITERATOR$3, $default);
 	  }
 	  // Plug for library
@@ -1466,35 +1462,6 @@
 	    } else _export(_export.P + _export.F * (BUGGY || VALUES_BUG), NAME, methods);
 	  }
 	  return methods;
-	};
-
-	var $at = _stringAt(true);
-
-	// 21.1.3.27 String.prototype[@@iterator]()
-	_iterDefine(String, 'String', function (iterated) {
-	  this._t = String(iterated); // target
-	  this._i = 0;                // next index
-	// 21.1.5.2.1 %StringIteratorPrototype%.next()
-	}, function () {
-	  var O = this._t;
-	  var index = this._i;
-	  var point;
-	  if (index >= O.length) return { value: undefined, done: true };
-	  point = $at(O, index);
-	  this._i += point.length;
-	  return { value: point, done: false };
-	});
-
-	// 22.1.3.31 Array.prototype[@@unscopables]
-	var UNSCOPABLES = _wks('unscopables');
-	var ArrayProto$1 = Array.prototype;
-	if (ArrayProto$1[UNSCOPABLES] == undefined) _hide(ArrayProto$1, UNSCOPABLES, {});
-	var _addToUnscopables = function (key) {
-	  ArrayProto$1[UNSCOPABLES][key] = true;
-	};
-
-	var _iterStep = function (done, value) {
-	  return { value: value, done: !!done };
 	};
 
 	// 22.1.3.4 Array.prototype.entries()
@@ -1578,25 +1545,37 @@
 	  }
 	}
 
-	// most Object methods by ES6 should accept primitives
-
-
-
-	var _objectSap = function (KEY, exec) {
-	  var fn = (_core.Object || {})[KEY] || Object[KEY];
-	  var exp = {};
-	  exp[KEY] = exec(fn);
-	  _export(_export.S + _export.F * _fails(function () { fn(1); }), 'Object', exp);
+	// true  -> String#at
+	// false -> String#codePointAt
+	var _stringAt = function (TO_STRING) {
+	  return function (that, pos) {
+	    var s = String(_defined(that));
+	    var i = _toInteger(pos);
+	    var l = s.length;
+	    var a, b;
+	    if (i < 0 || i >= l) return TO_STRING ? '' : undefined;
+	    a = s.charCodeAt(i);
+	    return a < 0xd800 || a > 0xdbff || i + 1 === l || (b = s.charCodeAt(i + 1)) < 0xdc00 || b > 0xdfff
+	      ? TO_STRING ? s.charAt(i) : a
+	      : TO_STRING ? s.slice(i, i + 2) : (a - 0xd800 << 10) + (b - 0xdc00) + 0x10000;
+	  };
 	};
 
-	// 19.1.2.14 Object.keys(O)
+	var $at = _stringAt(true);
 
-
-
-	_objectSap('keys', function () {
-	  return function keys(it) {
-	    return _objectKeys(_toObject(it));
-	  };
+	// 21.1.3.27 String.prototype[@@iterator]()
+	_iterDefine(String, 'String', function (iterated) {
+	  this._t = String(iterated); // target
+	  this._i = 0;                // next index
+	// 21.1.5.2.1 %StringIteratorPrototype%.next()
+	}, function () {
+	  var O = this._t;
+	  var index = this._i;
+	  var point;
+	  if (index >= O.length) return { value: undefined, done: true };
+	  point = $at(O, index);
+	  this._i += point.length;
+	  return { value: point, done: false };
 	});
 
 	function _isPlaceholder(a) {
@@ -2929,6 +2908,27 @@
 	/*#__PURE__*/
 	_curry2(function _xmap(f, xf) {
 	  return new XMap(f, xf);
+	});
+
+	// most Object methods by ES6 should accept primitives
+
+
+
+	var _objectSap = function (KEY, exec) {
+	  var fn = (_core.Object || {})[KEY] || Object[KEY];
+	  var exp = {};
+	  exp[KEY] = exec(fn);
+	  _export(_export.S + _export.F * _fails(function () { fn(1); }), 'Object', exp);
+	};
+
+	// 19.1.2.14 Object.keys(O)
+
+
+
+	_objectSap('keys', function () {
+	  return function keys(it) {
+	    return _objectKeys(_toObject(it));
+	  };
 	});
 
 	function _has$1(prop, obj) {
@@ -6811,28 +6811,37 @@
 	  _createClass(QueryRenderer, [{
 	    key: "componentDidMount",
 	    value: function componentDidMount() {
-	      if (this.props.query) {
-	        this.load(this.props.query);
+	      var _this$props = this.props,
+	          query = _this$props.query,
+	          queries = _this$props.queries;
+
+	      if (query) {
+	        this.load(query);
 	      }
 
-	      if (this.props.queries) {
-	        this.loadQueries(this.props.queries);
+	      if (queries) {
+	        this.loadQueries(queries);
 	      }
 	    }
 	  }, {
 	    key: "componentDidUpdate",
 	    value: function componentDidUpdate(prevProps) {
-	      var query = this.props.query;
+	      var _this$props2 = this.props,
+	          query = _this$props2.query,
+	          queries = _this$props2.queries;
 
 	      if (!equals(prevProps.query, query)) {
 	        this.load(query);
 	      }
 
-	      var queries = this.props.queries;
-
 	      if (!equals(prevProps.queries, queries)) {
 	        this.loadQueries(queries);
 	      }
+	    }
+	  }, {
+	    key: "isQueryPresent",
+	    value: function isQueryPresent(query) {
+	      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
 	    }
 	  }, {
 	    key: "load",
@@ -6845,10 +6854,13 @@
 	        error: null,
 	        sqlQuery: null
 	      });
+	      var _this$props3 = this.props,
+	          loadSql = _this$props3.loadSql,
+	          cubejsApi = _this$props3.cubejsApi;
 
-	      if (query && Object.keys(query).length) {
-	        if (this.props.loadSql === 'only') {
-	          this.props.cubejsApi.sql(query, {
+	      if (query && this.isQueryPresent(query)) {
+	        if (loadSql === 'only') {
+	          cubejsApi.sql(query, {
 	            mutexObj: this.mutexObj,
 	            mutexKey: 'sql'
 	          }).then(function (sqlQuery) {
@@ -6864,11 +6876,11 @@
 	              isLoading: false
 	            });
 	          });
-	        } else if (this.props.loadSql) {
-	          Promise.all([this.props.cubejsApi.sql(query, {
+	        } else if (loadSql) {
+	          Promise.all([cubejsApi.sql(query, {
 	            mutexObj: this.mutexObj,
 	            mutexKey: 'sql'
-	          }), this.props.cubejsApi.load(query, {
+	          }), cubejsApi.load(query, {
 	            mutexObj: this.mutexObj,
 	            mutexKey: 'query'
 	          })]).then(function (_ref) {
@@ -6890,7 +6902,7 @@
 	            });
 	          });
 	        } else {
-	          this.props.cubejsApi.load(query, {
+	          cubejsApi.load(query, {
 	            mutexObj: this.mutexObj,
 	            mutexKey: 'query'
 	          }).then(function (resultSet) {

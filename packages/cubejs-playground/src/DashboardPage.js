@@ -20,7 +20,13 @@ class DashboardPage extends Component {
 
   render() {
     const { appCode, sourceFiles } = this.state;
-    return appCode && <DashboardRenderer source={appCode} sourceFiles={sourceFiles}/> || <Spin />;
+    return appCode && <DashboardRenderer source={appCode} sourceFiles={sourceFiles}/>
+      || (
+        <h2 style={{ textAlign: 'center' }}>
+          <Spin />
+          &nbsp;Creating dashboard react-app. It may take several minutes...
+        </h2>
+      );
   }
 }
 

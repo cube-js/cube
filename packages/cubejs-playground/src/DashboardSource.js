@@ -2,7 +2,7 @@ import { parse } from '@babel/parser';
 import traverse from "@babel/traverse";
 import generator from "@babel/generator";
 import * as t from "@babel/types";
-import { fetch } from 'whatwg-fetch';
+import fetch from './playgroundFetch';
 
 const prettier = require("prettier/standalone");
 // eslint-disable-next-line global-require
@@ -25,24 +25,7 @@ const DashboardItem = ({ children, title }) => (
 )
 `;
 
-const fetchWithRetry = (url, options, retries) => fetch(url, options).then(async r => {
-  if (r.status === 500) {
-    let errorText = await r.text();
-    try {
-      const json = JSON.parse(errorText);
-      errorText = json.error;
-    } catch (e) {
-      // Nothing
-    }
-    throw errorText;
-  }
-  return r;
-}).catch(e => {
-  if (e.message === 'Network request failed') {
-    return retries > 0 ? fetchWithRetry(url, options, retries - 1) : fetch(url, options);
-  }
-  throw e;
-});
+const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
 class DashboardSource {
   async load() {
@@ -69,7 +52,7 @@ class DashboardSource {
         const dependency = importName[0].indexOf('@') === 0 ? [importName[0], importName[1]].join('/') : importName[0];
         return { [dependency]: 'latest' };
       }).reduce((a, b) => ({ ...a, ...b }));
-    await fetchWithRetry('/playground/ensure-dependencies', {
+    fetchWithRetry('/playground/ensure-dependencies', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

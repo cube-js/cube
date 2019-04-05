@@ -7,10 +7,9 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 require('core-js/modules/es6.array.map');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 require('core-js/modules/es6.promise');
-require('core-js/modules/es6.string.iterator');
 require('core-js/modules/web.dom.iterable');
 require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.keys');
+require('core-js/modules/es6.string.iterator');
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
 var _possibleConstructorReturn = _interopDefault(require('@babel/runtime/helpers/possibleConstructorReturn'));
@@ -48,28 +47,37 @@ function (_React$Component) {
   _createClass(QueryRenderer, [{
     key: "componentDidMount",
     value: function componentDidMount() {
-      if (this.props.query) {
-        this.load(this.props.query);
+      var _this$props = this.props,
+          query = _this$props.query,
+          queries = _this$props.queries;
+
+      if (query) {
+        this.load(query);
       }
 
-      if (this.props.queries) {
-        this.loadQueries(this.props.queries);
+      if (queries) {
+        this.loadQueries(queries);
       }
     }
   }, {
     key: "componentDidUpdate",
     value: function componentDidUpdate(prevProps) {
-      var query = this.props.query;
+      var _this$props2 = this.props,
+          query = _this$props2.query,
+          queries = _this$props2.queries;
 
       if (!ramda.equals(prevProps.query, query)) {
         this.load(query);
       }
 
-      var queries = this.props.queries;
-
       if (!ramda.equals(prevProps.queries, queries)) {
         this.loadQueries(queries);
       }
+    }
+  }, {
+    key: "isQueryPresent",
+    value: function isQueryPresent(query) {
+      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
     }
   }, {
     key: "load",
@@ -82,10 +90,13 @@ function (_React$Component) {
         error: null,
         sqlQuery: null
       });
+      var _this$props3 = this.props,
+          loadSql = _this$props3.loadSql,
+          cubejsApi = _this$props3.cubejsApi;
 
-      if (query && Object.keys(query).length) {
-        if (this.props.loadSql === 'only') {
-          this.props.cubejsApi.sql(query, {
+      if (query && this.isQueryPresent(query)) {
+        if (loadSql === 'only') {
+          cubejsApi.sql(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'sql'
           }).then(function (sqlQuery) {
@@ -101,11 +112,11 @@ function (_React$Component) {
               isLoading: false
             });
           });
-        } else if (this.props.loadSql) {
-          Promise.all([this.props.cubejsApi.sql(query, {
+        } else if (loadSql) {
+          Promise.all([cubejsApi.sql(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'sql'
-          }), this.props.cubejsApi.load(query, {
+          }), cubejsApi.load(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'query'
           })]).then(function (_ref) {
@@ -127,7 +138,7 @@ function (_React$Component) {
             });
           });
         } else {
-          this.props.cubejsApi.load(query, {
+          cubejsApi.load(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'query'
           }).then(function (resultSet) {

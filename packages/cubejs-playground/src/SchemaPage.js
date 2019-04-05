@@ -1,11 +1,12 @@
 import React, { Component } from 'react';
 import cubejs from '@cubejs-client/core';
-import { fetch } from 'whatwg-fetch';
 import {
-  Layout, Menu, Button, Tree, Tabs, Dropdown
+  Layout, Menu, Button, Tree, Tabs, Dropdown, Spin, Alert
 } from 'antd';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
+
+import fetch from './playgroundFetch';
 
 const {
   Content, Sider,
@@ -37,34 +38,9 @@ class SchemaPage extends Component {
     };
   }
 
-  cubejsApi() {
-    if (!this.cubejsApiInstance && this.state.cubejsToken) {
-      this.cubejsApiInstance = cubejs(this.state.cubejsToken, {
-        apiUrl: `${this.state.apiUrl}/cubejs-api/v1`
-      });
-    }
-    return this.cubejsApiInstance;
-  }
-
   async componentDidMount() {
     await this.loadDBSchema();
     await this.loadFiles();
-  }
-
-  async loadDBSchema() {
-    const res = await fetch('/playground/db-schema');
-    const result = await res.json();
-    this.setState({
-      tablesSchema: result.tablesSchema
-    });
-  }
-
-  async loadFiles() {
-    const res = await fetch('/playground/files');
-    const result = await res.json();
-    this.setState({
-      files: result.files
-    });
   }
 
   onExpand(expandedKeys) {
@@ -80,18 +56,52 @@ class SchemaPage extends Component {
     this.setState({ checkedKeys });
   }
 
-  onSelect(selectedKeys, info) {
+  onSelect(selectedKeys) {
     this.setState({ selectedKeys });
   }
 
+  cubejsApi() {
+    const { cubejsToken, apiUrl } = this.state;
+    if (!this.cubejsApiInstance && cubejsToken) {
+      this.cubejsApiInstance = cubejs(cubejsToken, {
+        apiUrl: `${apiUrl}/cubejs-api/v1`
+      });
+    }
+    return this.cubejsApiInstance;
+  }
+
+  async loadDBSchema() {
+    this.setState({ schemaLoading: true });
+    try {
+      const res = await fetch('/playground/db-schema');
+      const result = await res.json();
+      this.setState({
+        tablesSchema: result.tablesSchema
+      });
+    } catch (e) {
+      this.setState({ schemaLoadingError: e });
+    } finally {
+      this.setState({ schemaLoading: false });
+    }
+  }
+
+  async loadFiles() {
+    const res = await fetch('/playground/files');
+    const result = await res.json();
+    this.setState({
+      files: result.files
+    });
+  }
+
   async generateSchema() {
+    const { checkedKeys } = this.state;
     playgroundAction('Generate Schema');
     const res = await fetch('/playground/generate-schema', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ tables: this.state.checkedKeys.filter(k => k.split('.').length === 2) })
+      body: JSON.stringify({ tables: checkedKeys.filter(k => k.split('.').length === 2) })
     });
     if (res.status === 200) {
       playgroundAction('Generate Schema Success');
@@ -102,7 +112,16 @@ class SchemaPage extends Component {
     }
   }
 
+  selectedFileContent() {
+    const {
+      files, selectedFile
+    } = this.state;
+    const file = files.find(f => f.fileName === selectedFile);
+    return file && file.content;
+  }
+
   renderFilesMenu() {
+    const { selectedFile, files } = this.state;
     return (
       <Menu
       mode="inline"
@@ -110,14 +129,19 @@ class SchemaPage extends Component {
         playgroundAction('Select File');
         this.setState({ selectedFile: key });
       }}
-      selectedKeys={this.state.selectedFile ? [this.state.selectedFile] : []}
+      selectedKeys={selectedFile ? [selectedFile] : []}
       >
-        {this.state.files.map(f => <Menu.Item key={f.fileName}>{f.fileName}</Menu.Item>)}
+        {files.map(f => <Menu.Item key={f.fileName}>{f.fileName}</Menu.Item>)}
       </Menu>
     );
   }
 
   render() {
+    const {
+      schemaLoading, schemaLoadingError, tablesSchema, selectedFile,
+      expandedKeys, autoExpandParent, checkedKeys, selectedKeys,
+      activeTab
+    } = this.state;
     const renderTreeNodes = data => data.map((item) => {
       if (item.children) {
         return (
@@ -137,14 +161,43 @@ class SchemaPage extends Component {
       </Menu>
     );
 
+    const renderTree = () => (Object.keys(tablesSchema || {}).length > 0 ? (
+      <Tree
+        checkable
+        onExpand={this.onExpand.bind(this)}
+        expandedKeys={expandedKeys}
+        autoExpandParent={autoExpandParent}
+        onCheck={this.onCheck.bind(this)}
+        checkedKeys={checkedKeys}
+        onSelect={this.onSelect.bind(this)}
+        selectedKeys={selectedKeys}
+      >
+        {renderTreeNodes(schemaToTreeData(tablesSchema || {}))}
+      </Tree>
+    ) : (
+      <Alert
+        message="Empty DB Schema"
+        description="Please check connection settings"
+        type="warning"
+      />
+    ));
+
+    const renderTreeOrError = () => (schemaLoadingError ? (
+      <Alert
+        message="Error while loading DB schema"
+        description={schemaLoadingError.toString()}
+        type="error"
+      />
+    ) : renderTree());
+
     return (
       <Layout style={{ height: '100%' }}>
         <Sider width={300} style={{ background: '#fff' }} className="schema-sidebar">
           <Tabs
-            activeKey={this.state.activeTab}
-             onChange={(activeTab) => this.setState({ activeTab })}
+            activeKey={activeTab}
+            onChange={(tab) => this.setState({ activeTab: tab })}
             tabBarExtraContent={(
-              <Dropdown overlay={menu} placement="bottomRight" disabled={!this.state.checkedKeys.length}>
+              <Dropdown overlay={menu} placement="bottomRight" disabled={!checkedKeys.length}>
                 <Button
                 shape="circle"
                 icon="plus"
@@ -155,18 +208,7 @@ class SchemaPage extends Component {
 )}
           >
             <TabPane tab="Tables" key="schema">
-              <Tree
-                checkable
-                onExpand={this.onExpand.bind(this)}
-                expandedKeys={this.state.expandedKeys}
-                autoExpandParent={this.state.autoExpandParent}
-                onCheck={this.onCheck.bind(this)}
-                checkedKeys={this.state.checkedKeys}
-                onSelect={this.onSelect.bind(this)}
-                selectedKeys={this.state.selectedKeys}
-              >
-                {renderTreeNodes(schemaToTreeData(this.state.tablesSchema || {}))}
-              </Tree>
+              {schemaLoading ? <Spin style={{ width: '100%' }}/> : renderTreeOrError()}
             </TabPane>
             <TabPane tab="Files" key="files">
               {this.renderFilesMenu()}
@@ -174,7 +216,7 @@ class SchemaPage extends Component {
           </Tabs>
         </Sider>
         <Content style={{ minHeight: 280 }}>
-          {this.state.selectedFile
+          {selectedFile
             ? <PrismCode code={this.selectedFileContent()} style={{ padding: 12 }}/>
             : <h2 style={{ padding: 24, textAlign: 'center' }}>Select tables to generate Cube.js schema</h2>
           }
@@ -182,11 +224,6 @@ class SchemaPage extends Component {
         </Content>
       </Layout>
     );
-  }
-
-  selectedFileContent() {
-    const file = this.state.files.find(f => f.fileName === this.state.selectedFile);
-    return file && file.content;
   }
 }
 

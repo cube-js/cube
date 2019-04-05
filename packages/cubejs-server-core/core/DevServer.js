@@ -53,6 +53,10 @@ class DevServer {
       this.cubejsServer.event('Dev Server DB Schema Load');
       const driver = await this.cubejsServer.getDriver();
       const tablesSchema = await driver.tablesSchema();
+      this.cubejsServer.event('Dev Server DB Schema Load Success');
+      if (Object.keys(tablesSchema || {})) {
+        this.cubejsServer.event('Dev Server DB Schema Load Empty');
+      }
       res.json({ tablesSchema });
     }));
 
@@ -121,6 +125,21 @@ class DevServer {
       const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
       if (toInstall.length) {
         this.cubejsServer.event('Dev Server Dashboard Npm Install');
+        const cmd = () => executeCommand(
+          'npm',
+          ['install', '--save'].concat(toInstall),
+          { cwd: path.resolve(dashboardAppPath) }
+        );
+        if (this.curNpmInstall) {
+          this.curNpmInstall = this.curNpmInstall.then(cmd);
+        } else {
+          this.curNpmInstall = cmd();
+        }
+        const { curNpmInstall } = this;
+        await this.curNpmInstall;
+        if (curNpmInstall === this.curNpmInstall) {
+          this.curNpmInstall = null;
+        }
         await executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(dashboardAppPath) });
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
       }

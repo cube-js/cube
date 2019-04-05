@@ -1,6 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { equals, map, toPairs, fromPairs } from 'ramda';
+import { equals, toPairs, fromPairs } from 'ramda';
 
 export default class QueryRenderer extends React.Component {
   constructor(props) {
@@ -10,43 +10,54 @@ export default class QueryRenderer extends React.Component {
   }
 
   componentDidMount() {
-    if (this.props.query) {
-      this.load(this.props.query);
+    const { query, queries } = this.props;
+    if (query) {
+      this.load(query);
     }
-    if (this.props.queries) {
-      this.loadQueries(this.props.queries);
+    if (queries) {
+      this.loadQueries(queries);
     }
   }
 
   componentDidUpdate(prevProps) {
-    let query = this.props.query;
+    const { query, queries } = this.props;
     if (!equals(prevProps.query, query)) {
       this.load(query);
     }
 
-    let queries = this.props.queries;
     if (!equals(prevProps.queries, queries)) {
       this.loadQueries(queries);
     }
   }
 
+  isQueryPresent(query) {
+    return query.measures && query.measures.length
+      || query.dimensions && query.dimensions.length
+      || query.timeDimensions && query.timeDimensions.length;
+  }
+
   load(query) {
-    this.setState({ isLoading: true, resultSet: null, error: null, sqlQuery: null });
-    if (query && Object.keys(query).length) {
-      if (this.props.loadSql === 'only') {
-        this.props.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
+    this.setState({
+      isLoading: true, resultSet: null, error: null, sqlQuery: null
+    });
+    const { loadSql, cubejsApi } = this.props;
+    if (query && this.isQueryPresent(query)) {
+      if (loadSql === 'only') {
+        cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
           .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))
-          .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
-      } else if (this.props.loadSql) {
+          .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
+      } else if (loadSql) {
         Promise.all([
-          this.props.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
-          this.props.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
-        ]).then(([sqlQuery, resultSet]) => this.setState({ sqlQuery, resultSet, error: null, isLoading: false }))
-          .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+          cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
+          cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
+        ]).then(([sqlQuery, resultSet]) => this.setState({
+          sqlQuery, resultSet, error: null, isLoading: false
+        }))
+          .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
       } else {
-        this.props.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
+        cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
           .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
-          .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+          .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
       }
     }
   }

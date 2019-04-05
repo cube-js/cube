@@ -84,7 +84,8 @@ const logStage = (stage) => {
 };
 
 const createApp = async (projectName, options) => {
-  const createAppOptions = { projectName, dbType: options.dbType };
+  const template = options.template || 'express';
+  const createAppOptions = { projectName, dbType: options.dbType, template };
   event('Create App', createAppOptions);
   if (!options.dbType) {
     await displayError([
@@ -102,7 +103,6 @@ const createApp = async (projectName, options) => {
       createAppOptions
     );
   }
-  const template = options.template || 'express';
   if (!templates[template]) {
     await displayError(
       `Unknown template ${chalk.red(template)}`,

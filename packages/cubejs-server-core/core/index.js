@@ -1,5 +1,7 @@
 /* eslint-disable global-require */
 const ApiGateway = require('@cubejs-backend/api-gateway');
+const crypto = require('crypto');
+const fs = require('fs-extra');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
@@ -57,26 +59,38 @@ class CubejsServerCore {
     this.logger = options.logger || ((msg, params) => { console.log(`${msg}: ${JSON.stringify(params)}`); });
     this.repository = new FileRepository(this.schemaPath);
 
+    const Analytics = require('analytics-node');
+    const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
+    const { machineIdSync } = require('node-machine-id');
+    const { promisify } = require('util');
+    const anonymousId = machineIdSync();
+    this.anonymousId = anonymousId;
+    this.event = async (name, props) => {
+      try {
+        if (!this.projectFingerprint) {
+          try {
+            this.projectFingerprint =
+              crypto.createHash('md5').update(JSON.stringify(await fs.readJson('package.json'))).digest('hex');
+          } catch (e) {
+            // console.error(e);
+          }
+        }
+        await promisify(client.track.bind(client))({
+          event: name,
+          anonymousId,
+          properties: {
+            projectFingerprint: this.projectFingerprint,
+            ...props
+          }
+        });
+        await promisify(client.flush.bind(client))();
+      } catch (e) {
+        // console.error(e);
+      }
+    };
+
     if (this.options.devServer) {
       this.devServer = new DevServer(this);
-      const Analytics = require('analytics-node');
-      const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
-      const { machineIdSync } = require('node-machine-id');
-      const { promisify } = require('util');
-      const anonymousId = machineIdSync();
-      this.anonymousId = anonymousId;
-      this.event = async (name, props) => {
-        try {
-          await promisify(client.track.bind(client))({
-            event: name,
-            anonymousId,
-            properties: props
-          });
-          await promisify(client.flush.bind(client))();
-        } catch (e) {
-          // console.error(e);
-        }
-      };
       if (!options.logger) {
         this.logger = ((msg, params) => {
           if (
@@ -113,6 +127,8 @@ class CubejsServerCore {
         await causeErrorPromise;
         process.exit(1);
       });
+    } else {
+      this.event('Server Start');
     }
   }
 
