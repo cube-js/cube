@@ -12,7 +12,7 @@ git clone git@github.com:statsbotco/cubejs-client.git
 
 Install Node dependencies:
 ```
-cd cubejs-clients/examples/examples-gallery
+cd cubejs-client/examples/examples-gallery
 yarn install # or `npm install`
 ```
 
