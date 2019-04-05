@@ -1,7 +1,8 @@
 ---
 title: Funnels
 permalink: /funnels
-category: Funnels
+category: Reference
+subCategory: Tutorials
 menuOrder: 13
 ---
 
