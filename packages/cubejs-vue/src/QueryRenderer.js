@@ -29,7 +29,7 @@ export default Vue.component('QueryRenderer', {
       sqlQuery: undefined,
     };
   },
-  async created() {
+  async mounted() {
     const { query, queries } = this;
 
     if (query) {
@@ -106,6 +106,18 @@ export default Vue.component('QueryRenderer', {
       } catch (exc) {
         this.error = exc;
         this.loading = false;
+      }
+    },
+  },
+  watch: {
+    query(val) {
+      if (val) {
+        this.load(val);
+      }
+    },
+    queries(val) {
+      if (val) {
+        this.loadQueries(val);
       }
     },
   },
