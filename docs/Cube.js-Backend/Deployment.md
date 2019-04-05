@@ -5,6 +5,16 @@ category: Cube.js Backend
 menuOrder: 3
 ---
 
+## Prerequisites
+
+Running Cube.js Backend in production requres some changes in configuration:
+
+  * Set `NODE_ENV` environment variable to `production`
+  * Provide Redis using environment variable `REDIS_URL`
+
+On Heroku, `NODE_ENV` is set to `production` by default.
+Running Cube.js Backend in development doesn't require Redis.
+
 ## Serverless
 
 Cube.js could be deployed in serverless mode with [Serverless
@@ -131,4 +141,77 @@ $ heroku config:set \
 $ git add -A
 $ git commit -am "Initial"
 $ git push heroku master
+```
+
+## Docker
+
+### Create new app using Cube.js-CLI
+
+```bash
+$ cubejs create cubejs-docker-demo -d postgres
+$ cd cubejs-docker-demo
+```
+
+### Create Dockerfile and .dockerignore files
+
+```bash
+$ touch Dockerfile
+$ touch .dockerignore
+```
+
+Example Dockerfile
+
+```dockerfile
+FROM node:10-alpine
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 4000
+```
+
+Example .dockerignore
+
+```
+node_modules
+npm-debug.log
+.env
+schema
+```
+
+### Build Docker image
+
+```bash
+$ docker build -t <YOUR-USERNAME>/cubejs-docker-demo .
+```
+
+### Run Docker image
+
+To run docker image, you have to set environment variables needed for Cube.js Backend to work.
+Generate a secret for JWT Tokens as described in [Security](/security) section and fill in database credentials.
+Also you have to provide a path to the directory for [Data schema](/getting-started-cubejs-schema) files.
+
+```bash
+$ docker run -p 49160:8080 \
+  -d \
+  --name cubejs-docker-demo \
+  -e CUBEJS_API_SECRET=<YOUR-API-SECRET> \
+  -e CUBEJS_DB_HOST=<YOUR-DB-HOST-HERE> \
+  -e CUBEJS_DB_NAME=<YOUR-DB-NAME-HERE> \
+  -e CUBEJS_DB_USER=<YOUR-DB-USER-HERE> \
+  -e CUBEJS_DB_PASS=<YOUR-DB-PASS-HERE> \
+  -e CUBEJS_DB_TYPE=postgres \
+  -v <PATH-TO-SCHEMA>:/usr/src/app/schema \
+  <YOUR-USERNAME>/cubejs-docker-demo
+```
+
+### Stop Docker image
+
+```bash
+$ docker stop cubejs-docker-demo
 ```
