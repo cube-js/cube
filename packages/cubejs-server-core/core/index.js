@@ -11,7 +11,8 @@ const DriverDependencies = {
   athena: '@cubejs-backend/athena-driver',
   jdbc: '@cubejs-backend/jdbc-driver',
   mongobi: '@cubejs-backend/mongobi-driver',
-  bigquery: '@cubejs-backend/bigquery-driver'
+  bigquery: '@cubejs-backend/bigquery-driver',
+  redshift: '@cubejs-backend/postgres-driver'
 };
 
 const checkEnvForPlaceholders = () => {
