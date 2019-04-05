@@ -82,7 +82,7 @@ class DevServer {
 
     app.get('/playground/dashboard-app-files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Get Dashboard App Files');
-      if (!await fs.pathExists(dashboardAppPath)) {
+      if (!await fs.pathExists(dashboardAppPath) || this.createReactAppInit) {
         if (!this.createReactAppInit) {
           this.cubejsServer.event('Dev Server Create Dashboard App');
           this.createReactAppInit = executeCommand('npx', ['create-react-app', dashboardAppPath]);
