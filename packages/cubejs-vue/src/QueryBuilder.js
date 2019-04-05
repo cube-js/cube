@@ -36,7 +36,7 @@ export default Vue.component('QueryBuilder', {
     const { cubejsApi, meta } = this;
 
     if (meta) {
-      const toQuery = member => member.name;
+      let toQuery = member => member.name;
       const queryElements = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
 
       const childProps = {
@@ -73,6 +73,20 @@ export default Vue.component('QueryBuilder', {
       };
 
       queryElements.forEach((e) => {
+        if (e === 'timeDimensions') {
+          toQuery = (member) => ({
+            dimension: member.dimension.name,
+            granularity: member.granularity,
+            dateRange: member.dateRange,
+          });
+        } else if (e === 'filters') {
+          toQuery = (member) => ({
+            dimension: member.dimension.name,
+            operator: member.operator,
+            values: member.values,
+          });
+        }
+
         const name = e.charAt(0).toUpperCase() + e.slice(1);
 
         childProps[`add${name}`] = (member) => {
@@ -140,20 +154,6 @@ export default Vue.component('QueryBuilder', {
     },
   },
   methods: {
-    toTimeDimension(member) {
-      return {
-        dimension: member.dimension.name,
-        granularity: member.granularity,
-        dateRange: member.dateRange,
-      };
-    },
-    toFilter(member) {
-      return {
-        dimension: member.dimension.name,
-        operator: member.operator,
-        values: member.values,
-      };
-    },
     updateChart(chartType) {
       this.chartType = chartType;
     },
