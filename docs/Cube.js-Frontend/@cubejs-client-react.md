@@ -2,6 +2,7 @@
 title: '@cubejs-client/react'
 permalink: /@cubejs-client-react
 category: Cube.js Frontend
+subCategory: Reference
 menuOrder: 3
 ---
 

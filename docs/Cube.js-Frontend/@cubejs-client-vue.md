@@ -2,6 +2,7 @@
 title: '@cubejs-client/vue'
 permalink: /@cubejs-client-vue
 category: Cube.js Frontend
+subCategory: Reference
 menuOrder: 4
 ---
 
