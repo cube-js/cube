@@ -177,7 +177,7 @@ EXPOSE 4000
 
 Example .dockerignore
 
-```
+```bash
 node_modules
 npm-debug.log
 .env
