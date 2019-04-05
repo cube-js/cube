@@ -3,7 +3,7 @@ title: Event Analytics
 permalink: /event-analytics
 category: Reference
 subCategory: Tutorials
-menuOrder: 14
+menuOrder: 12
 ---
 [comment]: # (DOCUMENT IS PROOFREADED, MAKE CHANGES WITH CONFIDENCE)
 
@@ -25,7 +25,7 @@ We’ll explore the subject using the data from [Segment.com](https://segment.co
 
 A session is defined as a group of interactions one user takes within a given time frame on your app. Usually that time frame defaults to 30 minutes, meaning that whatever a user does on your app (e.g. browses pages, downloads resources, purchases products) before they leave equals one session.
 
-<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/schema/session-schema.png" width="100%" />
+<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/Schema/session-schema.png" width="100%" />
 
 ## Unify events and page views into single cube
 
@@ -176,7 +176,7 @@ measures: {
 ## Connecting Events to Sessions
 
 The next step is to identify the events contained within the session and the events ending the session. It’s required to get metrics such as session duration and events per session, or to identify sessions where specific events occurred (we’re going to use that for funnel analysis later on).
-We’re going to [declare join](joins), that Events `belongsTo` Sessions and a specify condition, such as all users' events from session start (inclusive) till the start of the next session (exclusive) belong to that session.
+We’re going to [declare join](/joins), that Events `belongsTo` Sessions and a specify condition, such as all users' events from session start (inclusive) till the start of the next session (exclusive) belong to that session.
 
 ```javascript
 // Add the joins block to the Events cube
@@ -192,7 +192,7 @@ joins: {
 }
 ```
 
-To determine the end of the session, we’re going to use the [subQuery feature](subquery) in Cube.js.
+To determine the end of the session, we’re going to use the [subQuery feature](/subquery) in Cube.js.
 
 ```javascript
 // Add the lastEventTimestamp measure to the measures block in the Events cube
