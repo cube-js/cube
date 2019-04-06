@@ -4,14 +4,17 @@ permalink: /deployment
 category: Cube.js Backend
 menuOrder: 3
 ---
-
-## Prerequisites
-
 When running Cube.js Backend in production make sure `NODE_ENV` is set to `production`. Such platforms, such as Heroku, do it by default.
 
 Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. It uses it for query caching
 and queue. Set `REDIS_URL` environment variable to provide Cube.js with Redis
 connection. Make sure, your Redis allows at least 15 concurrent connections.
+
+Below you can find guides for popular deployment environments:
+
+- [AWS Lambda with Serverless Framework](#serverless)
+- [Heroku](#heroku)
+- [Docker](#docker)
 
 ## Serverless
 
@@ -190,9 +193,9 @@ $ docker build -t <YOUR-USERNAME>/cubejs-docker-demo .
 
 ### Run Docker image
 
-To run docker image, you have to set environment variables needed for Cube.js Backend to work.
+To run docker image, you need to set environment variables required by Cube.js Backend.
 Generate a secret for JWT Tokens as described in [Security](/security) section and fill in database credentials.
-Also you have to provide a path to the directory for [Data schema](/getting-started-cubejs-schema) files.
+Also you need to provide a path to the directory with [Data schema](/getting-started-cubejs-schema) files.
 
 ```bash
 $ docker run -p 49160:8080 \
