@@ -10,7 +10,6 @@ Cube.js currently provides connectors to the following databases:
 | Database             | Cube.js DB Type |
 | -------------------- |---------------- |
 | PostgreSQL           | postgres      |
-| PostgreSQL           | postgres      |
 | MySQL                | mysql         |
 | AWS Athena           | athena        |
 | AWS Redshift         | redshift      |
