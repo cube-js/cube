@@ -16,10 +16,7 @@ Cube.js currently provides connectors to the following databases:
 | MongoDB (via MongoDB Connector for BI)           | mongobi        |
 | Google BigQuery           | bigquery        |
 
-
-_To use Cube.js with MongoDB you need to install MongoDB Connector for BI. You
-can download it [here](https://www.mongodb.com/download-center/bi-connector). [Learn more about setup for MongoDB
-here.](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)_
+_If you'd like to connect to a database which is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/statsbotco/cube.js/blob/master/CONTRIBUTING.md#implementing-driver)._
 
 ### Configuring Connection for Cube.js CLI Created Apps
 
@@ -46,6 +43,12 @@ The table below shows which environment variables are used for different databas
 
 ## Notes
 
+### MongoDB
+
+To use Cube.js with MongoDB you need to install MongoDB Connector for BI. You
+can download it [here](https://www.mongodb.com/download-center/bi-connector). [Learn more about setup for MongoDB
+here.](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
+
 ### AWS Athena
 
 For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
@@ -63,7 +66,3 @@ $ cat /path/to/key-file.json | base64
 ```
 
 Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key.
-
-### Contributing
-
-If you'd like to connect a database that is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/statsbotco/cube.js/blob/master/CONTRIBUTING.md#implementing-driver).
