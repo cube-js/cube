@@ -94,7 +94,7 @@ The Cube.js client connects to the Cube.js Backend and lets you visualize your d
 
 As a shortcut you can run your dev server first:
 
-```
+```bash
 $ npm run dev
 ```
 
