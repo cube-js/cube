@@ -195,7 +195,7 @@ class ApiGateway {
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       try {
-        const query = await Joi.validate(JSON.parse(req.query.query),querySchema)
+        const query = JSON.parse(req.query.query)
         this.log(req, {
           type: 'Load Request',
           query: req.query.query
