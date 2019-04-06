@@ -7,13 +7,11 @@ menuOrder: 3
 
 ## Prerequisites
 
-Running Cube.js Backend in production requres some changes in configuration:
+When running Cube.js Backend in production make sure `NODE_ENV` is set to `production`. Such platforms, such as Heroku, do it by default.
 
-  * Set `NODE_ENV` environment variable to `production`
-  * Provide Redis using environment variable `REDIS_URL`
-
-On Heroku, `NODE_ENV` is set to `production` by default.
-Running Cube.js Backend in development doesn't require Redis.
+Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. It uses it for query caching
+and queue. Set `REDIS_URL` environment variable to provide Cube.js with Redis
+connection. Make sure, your Redis allows at least 15 concurrent connections.
 
 ## Serverless
 
