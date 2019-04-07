@@ -54,7 +54,7 @@ class DevServer {
       const driver = await this.cubejsServer.getDriver();
       const tablesSchema = await driver.tablesSchema();
       this.cubejsServer.event('Dev Server DB Schema Load Success');
-      if (Object.keys(tablesSchema || {})) {
+      if (Object.keys(tablesSchema || {}).length === 0) {
         this.cubejsServer.event('Dev Server DB Schema Load Empty');
       }
       res.json({ tablesSchema });
