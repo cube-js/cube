@@ -216,3 +216,60 @@ $ docker run -p 49160:8080 \
 ```bash
 $ docker stop cubejs-docker-demo
 ```
+
+## Docker Compose
+
+To run the server in docker-compose we need to add a redis server and a .env file to include the environment variables needed to connect to the database, the secret api secret and redis hostname. 
+
+Example .env file
+
+```
+REDIS_URL=redis://redis_db:6379/0
+
+CUBEJS_DB_HOST=<YOUR-DB-HOST-HERE>
+CUBEJS_DB_NAME=<YOUR-DB-NAME-HERE>
+CUBEJS_DB_USER=<YOUR-DB-USER-HERE>
+CUBEJS_DB_PASS=<YOUR-DB-PASS-HERE>
+CUBEJS_DB_TYPE=postgres
+CUBEJS_API_SECRET=<YOUR-API-SECRET>
+```
+
+Example docker-compose file
+
+```
+redis_db:
+  image: redis
+  ports:
+    - "6379"
+
+cube:
+  build: ./cube
+  env_file: .env
+  expose:
+    - "4000"
+  volumes:
+    - ./cube/schema:/usr/src/app/schema
+  command: node index.js
+  links:
+    - redis_db
+```
+
+`./cube` is te path to your cube js main folder, `./cube/schema` is the path to your schema folder and the `.env` file should be at the same level of the docker-compose file.
+
+Build the containers
+
+```bash
+$ docker-compose build
+```
+
+### Start/Stop the containers 
+
+```bash
+$ docker-compose up
+```
+
+```bash
+$ docker-compose stop
+```
+
+
