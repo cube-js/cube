@@ -15,14 +15,19 @@ Express application.
 
 Create an instance of `CubejsServerCore` to embed it in an `Express` application.
 
-* `options` - Options object.
-    * `dbType` - Type of your database.
-    * `driverFactory()` - Pass function of the driver factory with your database type.
-    * `logger(msg, params)` - Pass function for your custom logger.
-    * `schemaPath` - Path to the `schema` location. By default, it is `/schema`.
-    * `devServer` - Enable development server. By default, it is `true`.
-    * `basePath` - Path where _Cube.js_ is mounted to. By default, it is `/cubejs-api`.
-    * `checkAuthMiddleware` - Pass express-style middleware to check authentication. Set `req.authInfo = { u: { ...userContextObj } }` inside middleware if you want to provide `USER_CONTEXT`. [Learn more](/cube#context-variables-user-context).
+#### Options object
+
+| Option | Description | Required |
+| ------ | ----------- | -------- |
+| `dbType` | Type of your database | **required** |
+| `schemaPath` | Path to schema files | optional, default: `/schema` |
+| `basePath` | [REST API](/rest-api) base path.| optional, default: `/cubejs-api` |
+| `devServer` | Enable development server | optional, default: `true` in development, `false` in production |
+| `logger(msg, params)` | Pass function for your custom logger. | optional |
+| `driverFactory` | Pass function of the driver factory with your database type. | optional |
+| `checkAuthMiddleware` | Express-style middleware to check authentication. Set `req.authInfo = { u: { ...userContextObj } }` inside middleware if you want to provide `USER_CONTEXT`. [Learn more](/cube#context-variables-user-context). | optional |
+
+#### Example
 
 ```javascript
 import * as CubejsServerCore from "@cubejs-backend/server-core";
@@ -35,7 +40,6 @@ const dbType = 'mysql';
 const options = {
   dbType,
   devServer: false,
-  driverFactory: () => CubejsServerCore.createDriver(dbType),
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
   },
