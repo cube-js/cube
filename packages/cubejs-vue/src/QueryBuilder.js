@@ -14,127 +14,148 @@ export default Vue.component('QueryBuilder', {
       required: true,
     },
   },
+  data() {
+    return {
+      meta: undefined,
+      updatedQuery: this.query,
+      granularities: [],
+    };
+  },
   async mounted() {
     this.meta = await this.cubejsApi.meta();
+
+    this.granularities = [
+      { name: 'hour', title: 'Hour' },
+      { name: 'day', title: 'Day' },
+      { name: 'week', title: 'Week' },
+      { name: 'month', title: 'Month' },
+      { name: 'year', title: 'Year' },
+    ];
   },
   render(createElement) {
-    const { cubejsApi } = this;
-    const props = this.prepareRenderProps();
+    const { cubejsApi, meta } = this;
 
-    return createElement(QueryRenderer, {
-      props: {
-        query: this.validatedQuery,
-        cubejsApi,
-        builderProps: props,
-      },
-      scopedSlots: this.$scopedSlots,
-    });
+    if (meta) {
+      let toQuery = member => member.name;
+      const queryElements = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
+
+      const childProps = {
+        meta,
+        query: this.updatedQuery,
+        validatedQuery: this.validatedQuery,
+        isQueryPresent: this.isQueryPresent,
+        chartType: this.chartType,
+        measures: (this.updatedQuery.measures || [])
+          .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'measures') })),
+        dimensions: (this.updatedQuery.dimensions || [])
+          .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'dimensions') })),
+        segments: (this.updatedQuery.segments || [])
+          .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
+        timeDimensions: (this.updatedQuery.timeDimensions || [])
+          .map((m, i) => ({
+            ...m,
+            dimension: { ...meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
+            index: i
+          })),
+        filters: (this.updatedQuery.filters || [])
+          .map((m, i) => ({
+            ...m,
+            dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
+            operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
+            index: i
+          })),
+        availableMeasures: meta.membersForQuery(this.updatedQuery, 'measures') || [],
+        availableDimensions: meta.membersForQuery(this.updatedQuery, 'dimensions') || [],
+        availableTimeDimensions: (meta.membersForQuery(this.updatedQuery, 'dimensions') || [])
+          .filter(m => m.type === 'time'),
+        availableSegments: meta.membersForQuery(this.updatedQuery, 'segments') || [],
+        updateChartType: this.updateChart,
+      };
+
+      queryElements.forEach((e) => {
+        if (e === 'timeDimensions') {
+          toQuery = (member) => ({
+            dimension: member.dimension.name,
+            granularity: member.granularity,
+            dateRange: member.dateRange,
+          });
+        } else if (e === 'filters') {
+          toQuery = (member) => ({
+            dimension: member.dimension.name,
+            operator: member.operator,
+            values: member.values,
+          });
+        }
+
+        const name = e.charAt(0).toUpperCase() + e.slice(1);
+
+        childProps[`add${name}`] = (member) => {
+          this.updatedQuery = {
+            ...this.updatedQuery,
+            [e]: (this.updatedQuery[e] || []).concat(toQuery(member)),
+          };
+        };
+
+        childProps[`update${name}`] = (member, updateWith) => {
+          const members = (this.updatedQuery[e] || []).concat([]);
+          members.splice(member.index, 1, toQuery(updateWith));
+
+          this.updatedQuery = {
+            ...this.updatedQuery,
+            [e]: members,
+          };
+        };
+
+        childProps[`remove${name}`] = (member) => {
+          const members = (this.updatedQuery[e] || []).concat([]);
+          members.splice(member.index, 1);
+
+          this.updatedQuery = {
+            ...this.updatedQuery,
+            [e]: members,
+          };
+        };
+
+        childProps[`set${name}`] = (members) => {
+          this.updatedQuery = {
+            ...this.updatedQuery,
+            [e]: members.map(e => e.name) || [],
+          };
+        };
+      });
+
+      return createElement(QueryRenderer, {
+        props: {
+          query: this.validatedQuery,
+          cubejsApi,
+          builderProps: childProps,
+        },
+        scopedSlots: this.$scopedSlots,
+      });
+    } else {
+      return null;
+    }
   },
   computed: {
     isQueryPresent() {
-      const { query } = this;
+      const { updatedQuery: query } = this;
 
-      return query.measures && query.measures.length ||
-        query.dimensions && query.dimensions.length ||
-        query.timeDimensions && query.timeDimensions.length;
+      return query.measures && query.measures.length  > 0 ||
+        query.dimensions && query.dimensions.length > 0 ||
+        query.timeDimensions && query.timeDimensions.length > 0;
     },
     validatedQuery() {
-      const { query } = this;
+      const { updatedQuery } = this;
 
       return {
-        ...query,
-        filters: (query.filters || []).filter(f => f.operator),
+        ...updatedQuery,
+        filters: (updatedQuery.filters || []).filter(f => f.operator),
       };
     },
   },
   methods: {
-    prepareRenderProps() {
-      const getName = member => member.name;
-      const toTimeDimension = member => ({
-        dimension: member.dimension.name,
-        granularity: member.granularity,
-        dateRange: member.dateRange,
-      });
-      const toFilter = member => ({
-        dimension: member.dimension.name,
-        operator: member.operator,
-        values: member.values,
-      });
-
-      const updateMethods = (memberType, toQuery = getName) => ({
-        add(member) {
-          this.query = {
-            ...this.query,
-            [memberType]: (this.query[memberType] || []).concat(toQuery(member)),
-          };
-        },
-        remove(member) {
-          const members = (this.query[memberType] || []).concat([]);
-          members.splice(member.index, 1);
-
-          this.query = {
-            ...this.query,
-            [memberType]: members,
-          };
-        },
-        update(member, updateWith) {
-          const members = (this.query[memberType] || []).concat([]);
-          members.splice(member.index, 1, toQuery(updateWith));
-
-          this.query = {
-            ...this.query,
-            [memberType]: members,
-          };
-        },
-      });
-
-      const granularities = [
-        { name: 'hour', title: 'Hour' },
-        { name: 'day', title: 'Day' },
-        { name: 'week', title: 'Week' },
-        { name: 'month', title: 'Month' },
-        { name: 'year', title: 'Year' },
-      ];
-
-      return {
-        meta: this.meta,
-        query: this.query,
-        validatedQuery: this.validatedQuery,
-        isQueryPresent: this.isQueryPresent,
-        chartType: this.chartType,
-        measures: (this.meta && this.query.measures || [])
-          .map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') })),
-        dimensions: (this.meta && this.query.dimensions || [])
-          .map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') })),
-        segments: (this.meta && this.query.segments || [])
-          .map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'segments') })),
-        timeDimensions: (this.meta && this.query.timeDimensions || [])
-          .map((m, i) => ({
-            ...m,
-            dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities },
-            index: i
-          })),
-        filters: (this.meta && this.query.filters || [])
-          .map((m, i) => ({
-            ...m,
-            dimension: this.meta.resolveMember(m.dimension, ['dimensions', 'measures']),
-            operators: this.meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
-            index: i
-          })),
-        availableMeasures: this.meta && this.meta.membersForQuery(this.query, 'measures') || [],
-        availableDimensions: this.meta && this.meta.membersForQuery(this.query, 'dimensions') || [],
-        availableTimeDimensions: (
-          this.meta && this.meta.membersForQuery(this.query, 'dimensions') || []
-        ).filter(m => m.type === 'time'),
-        availableSegments: this.meta && this.meta.membersForQuery(this.query, 'segments') || [],
-
-        updateMeasures: updateMethods('measures'),
-        updateDimensions: updateMethods('dimensions'),
-        updateSegments: updateMethods('segments'),
-        updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
-        updateFilters: updateMethods('filters', toFilter),
-        updateChartType: (chartType) => { this.chartType = chartType; },
-      };
+    updateChart(chartType) {
+      this.chartType = chartType;
     },
   },
 });

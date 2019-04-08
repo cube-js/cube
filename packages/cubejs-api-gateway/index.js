@@ -101,7 +101,7 @@ const operators = [
 ];
 
 const querySchema = Joi.object().keys({
-  measures: Joi.array().items(id),
+  measures: Joi.array().items(id.required()),
   dimensions: Joi.array().items(dimensionWithTime),
   filters: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
@@ -116,7 +116,7 @@ const querySchema = Joi.object().keys({
   segments: Joi.array().items(id),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(1).max(50000)
-});
+}).or("measures","dimensions");
 
 const normalizeQuery = (query) => {
   // eslint-disable-next-line no-unused-vars
@@ -195,7 +195,7 @@ class ApiGateway {
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       try {
-        const query = JSON.parse(req.query.query);
+        const query = JSON.parse(req.query.query)
         this.log(req, {
           type: 'Load Request',
           query: req.query.query

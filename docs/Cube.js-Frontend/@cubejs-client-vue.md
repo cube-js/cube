@@ -40,7 +40,10 @@ selected query builder members.
 - `availableMeasures`, `availableDimensions`, `availableTimeDimensions`,
 `availableSegments` - arrays of available to select members. They are loaded via
 API from Cube.js Backend.
-- `updateMeasures`, `updateDimensions`, `updateSegments`, `updateTimeDimensions` - objects with three functions: `add`, `remove`, and `update`. They are used to control the state of the query builder. Ex: `updateMeasures.add(newMeasure)`
+- `addMeasures`, `addDimensions`, `addSegments`, `addTimeDimensions` - function to control the adding of new members to query builder
+- `removeMeasures`, `removeDimensions`, `removeSegments`, `removeTimeDimensions` - function to control the removing of member to query builder
+- `setMeasures`, `setDimensions`, `setSegments`, `setTimeDimensions` - function to control the set of members to query builder
+- `updateMeasures`, `updateDimensions`, `updateSegments`, `updateTimeDimensions` - function to control the update of member to query builder
 - `chartType` - string, containing currently selected chart type.
 - `updateChartType` - function-setter for chart type.
 - `isQueryPresent` - Bool indicating whether is query ready to be displayed or

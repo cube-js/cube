@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.5.2](https://github.com/statsbotco/cubejs-client/compare/v0.5.1...v0.5.2) (2019-04-05)
+
+
+### Features
+
+* Add redshift to postgres driver link ([#71](https://github.com/statsbotco/cubejs-client/issues/71)) ([4797588](https://github.com/statsbotco/cubejs-client/commit/4797588))
+* Playground UX improvements ([6760a1d](https://github.com/statsbotco/cubejs-client/commit/6760a1d))
+
+
+
+
+
 ## [0.5.1](https://github.com/statsbotco/cubejs-client/compare/v0.5.0...v0.5.1) (2019-04-02)
 
 

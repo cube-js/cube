@@ -54,7 +54,7 @@ class DevServer {
       const driver = await this.cubejsServer.getDriver();
       const tablesSchema = await driver.tablesSchema();
       this.cubejsServer.event('Dev Server DB Schema Load Success');
-      if (Object.keys(tablesSchema || {})) {
+      if (Object.keys(tablesSchema || {}).length === 0) {
         this.cubejsServer.event('Dev Server DB Schema Load Empty');
       }
       res.json({ tablesSchema });
@@ -82,7 +82,7 @@ class DevServer {
 
     app.get('/playground/dashboard-app-files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Get Dashboard App Files');
-      if (!await fs.pathExists(dashboardAppPath)) {
+      if (!await fs.pathExists(dashboardAppPath) || this.createReactAppInit) {
         if (!this.createReactAppInit) {
           this.cubejsServer.event('Dev Server Create Dashboard App');
           this.createReactAppInit = executeCommand('npx', ['create-react-app', dashboardAppPath]);
