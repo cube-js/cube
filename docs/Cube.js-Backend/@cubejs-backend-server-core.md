@@ -65,7 +65,7 @@ _Please note that this is advanced configuration._
 
 | Option | Description | Default Value |
 | ------ | ----------- | ------------- |
-| redisPrefix | Prefix to be set an all Redis keys | `''` |
+| redisPrefix | Prefix to be set an all Redis keys | `STANDALONE` |
 | queryCacheOptions | Query cache options for DB queries | `{}`
 | preAggregationsOptions | Query cache options for pre-aggregations | `{}`
 
@@ -83,7 +83,7 @@ const queueOptions = {
 | continueWaitTimeout | Polling timeout | `5` |
 | executionTimeout | Total timeout of single query | `600` |
 | orphanedTimeout | Inactivity timeout for query | `120` |
-| heartBeatInterval | Heartbeat interval | `30` |
+| heartBeatInterval | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled. | `30` |
 
 ### Example
 
