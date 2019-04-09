@@ -15,6 +15,7 @@ Below you can find guides for popular deployment environments:
 - [AWS Lambda with Serverless Framework](#serverless)
 - [Heroku](#heroku)
 - [Docker](#docker)
+- [Docker Compose](#docker-compose)
 
 ## Serverless
 
@@ -223,7 +224,7 @@ To run the server in docker-compose we need to add a redis server and a .env fil
 
 Example .env file
 
-```
+```bash
 REDIS_URL=redis://redis_db:6379/0
 
 CUBEJS_DB_HOST=<YOUR-DB-HOST-HERE>
@@ -236,7 +237,7 @@ CUBEJS_API_SECRET=<YOUR-API-SECRET>
 
 Example docker-compose file
 
-```
+```yaml
 redis_db:
   image: redis
   ports:
