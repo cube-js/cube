@@ -3,18 +3,25 @@ import moment from 'moment';
 
 const chartTypeToTemplate = {
   line: `
-  <Chart scale={{ category: { tickCount: 8 } }} height={400} data={resultSet.chartPivot()} forceFit>
-    <Axis name="category" />
-    {resultSet.seriesNames().map(s => (<Axis name={s.key} />))}
+  <Chart scale={{ x: { tickCount: 8 } }} height={400} data={stackedChartData(resultSet)} forceFit>
+    <Axis name="x" />
+    <Axis name="measure" />
     <Tooltip crosshairs={{type : 'y'}} />
-    {resultSet.seriesNames().map(s => (<Geom type="line" position={\`category*\${s.key}\`} size={2} />))}
+    <Geom type="line" position={\`x*measure\`} size={2} color="color" />
   </Chart>`,
   bar: `
-  <Chart scale={{ category: { tickCount: 8 } }} height={400} data={resultSet.chartPivot()} forceFit>
-    <Axis name="category" />
-    {resultSet.seriesNames().map(s => (<Axis name={s.key} />))}
+  <Chart scale={{ x: { tickCount: 8 } }} height={400} data={stackedChartData(resultSet)} forceFit>
+    <Axis name="x" />
+    <Axis name="measure" />
     <Tooltip />
-    {resultSet.seriesNames().map(s => (<Geom type="interval" position={\`category*\${s.key}\`} />))}
+    <Geom type="intervalStack" position={\`x*measure\`} color="color" />
+  </Chart>`,
+  area: `
+  <Chart scale={{ x: { tickCount: 8 } }} height={400} data={stackedChartData(resultSet)} forceFit>
+    <Axis name="x" />
+    <Axis name="measure" />
+    <Tooltip crosshairs={{type : 'y'}} />
+    <Geom type="areaStack" position={\`x*measure\`} size={2} color="color" />
   </Chart>`,
   barStacked: `
 <Chart height={400} data={resultSet.rawData()} forceFit>
@@ -31,13 +38,45 @@ const chartTypeToTemplate = {
     <Legend position='right' />
     <Tooltip />
     {resultSet.seriesNames().map(s => (<Geom type="intervalStack" position={s.key} color="category" />))}
-  </Chart>`
+  </Chart>`,
+  number: `
+  <Row type="flex" justify="center" align="middle" style={{ height: '100%' }}>
+    <Col>
+      {resultSet
+        .seriesNames()
+        .map(s => (
+          <Statistic value={resultSet.totalRow()[s.key]} />
+        ))}
+    </Col>
+  </Row>
+  `,
+  table: `
+  <Table 
+    pagination={false}
+    columns={resultSet.tableColumns().map(c => ({ ...c, dataIndex: c.key }))} 
+    dataSource={resultSet.tablePivot()} 
+  />
+  `
 };
 
 
 export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
   `import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
+import { Row, Col, Statistic, Table } from 'antd';
 import moment from 'moment';
+
+const stackedChartData = (resultSet) => {
+  const data = resultSet.pivot().map(
+    ({ xValues, yValuesArray }) =>
+      yValuesArray.map(([yValues, m]) => ({
+        x: resultSet.axisValuesString(xValues, ', '),
+        color: resultSet.axisValuesString(yValues, ', '),
+        measure: m && Number.parseFloat(m)
+      }))
+  ).reduce((a, b) => a.concat(b));
+
+  return data;
+}
 
 const ${renderFnName} = ({ resultSet }) => (${chartTypeToTemplate[chartType]}
 );`

@@ -53,6 +53,15 @@ export default class Meta {
     return member;
   }
 
+  defaultTimeDimensionNameFor(memberName) {
+    const [cube] = memberName.split('.');
+    if (!this.cubesMap[cube]) {
+      return null;
+    }
+    return Object.keys(this.cubesMap[cube].dimensions || {})
+      .find(d => this.cubesMap[cube].dimensions[d].type === 'time');
+  }
+
   filterOperatorsForMember(memberName, memberType) {
     const member = this.resolveMember(memberName, memberType);
     return operators[member.type] || operators.string;

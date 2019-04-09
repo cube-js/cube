@@ -1,25 +1,22 @@
-import { groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy } from 'ramda';
+import {
+  groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
+} from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
 
 const moment = momentRange.extendMoment(Moment);
 
 const TIME_SERIES = {
-  day: (range) =>
-    Array.from(range.by('day'))
-      .map(d => d.format('YYYY-MM-DDT00:00:00.000')),
-  month: (range) =>
-    Array.from(range.snapTo('month').by('month'))
-      .map(d => d.format('YYYY-MM-01T00:00:00.000')),
-  year: (range) =>
-    Array.from(range.snapTo('year').by('year'))
-      .map(d => d.format('YYYY-01-01T00:00:00.000')),
-  hour: (range) =>
-    Array.from(range.by('hour'))
-      .map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
-  week: (range) =>
-    Array.from(range.snapTo('isoweek').by('week'))
-      .map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
+  day: (range) => Array.from(range.by('day'))
+    .map(d => d.format('YYYY-MM-DDT00:00:00.000')),
+  month: (range) => Array.from(range.snapTo('month').by('month'))
+    .map(d => d.format('YYYY-MM-01T00:00:00.000')),
+  year: (range) => Array.from(range.snapTo('year').by('year'))
+    .map(d => d.format('YYYY-01-01T00:00:00.000')),
+  hour: (range) => Array.from(range.by('hour'))
+    .map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
+  week: (range) => Array.from(range.snapTo('isoweek').by('week'))
+    .map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
 };
 
 export default class ResultSet {
@@ -35,11 +32,10 @@ export default class ResultSet {
   }
 
   axisValues(axis) {
-    const query = this.loadResponse.query;
+    const { query } = this.loadResponse;
     return row => {
-      const value = (measure) =>
-        axis.filter(d => d !== 'measures')
-        .map(d => row[d] != null ? row[d] : null).concat(measure ? [measure] : []);
+      const value = (measure) => axis.filter(d => d !== 'measures')
+        .map(d => (row[d] != null ? row[d] : null)).concat(measure ? [measure] : []);
       if (axis.find(d => d === 'measures') && (query.measures || []).length) {
         return query.measures.map(value);
       }
@@ -61,8 +57,8 @@ export default class ResultSet {
   }
 
   normalizePivotConfig(pivotConfig) {
-    const query = this.loadResponse.query;
-    let timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+    const { query } = this.loadResponse;
+    const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
     pivotConfig = pivotConfig || (timeDimensions.length ? {
       x: timeDimensions.map(td => td.dimension),
       y: query.dimensions || []
@@ -81,13 +77,13 @@ export default class ResultSet {
 
   static measureFromAxis(axisValues) {
     return axisValues[axisValues.length - 1];
-  };
+  }
 
   timeSeries(timeDimension) {
     if (!timeDimension.granularity) {
       return null;
     }
-    let dateRange = timeDimension.dateRange;
+    let { dateRange } = timeDimension;
     if (!dateRange) {
       const dates = pipe(
         map(row => row[timeDimension.dimension] && moment(row[timeDimension.dimension])),
@@ -115,6 +111,7 @@ export default class ResultSet {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     let groupByXAxis = groupBy(({ xValues }) => this.axisValuesString(xValues));
 
+    // eslint-disable-next-line no-unused-vars
     let measureValue = (row, measure, xValues) => row[measure];
 
     if (
@@ -128,11 +125,15 @@ export default class ResultSet {
       const series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
       if (series) {
         groupByXAxis = (rows) => {
-          const byXValues = groupBy(({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS), rows);
+          const byXValues = groupBy(
+            ({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
+            rows
+          );
           return series.map(d => ({ [d]: byXValues[d] || [{ xValues: [d], row: {} }] }))
             .reduce((a, b) => Object.assign(a, b), {});
         };
 
+        // eslint-disable-next-line no-unused-vars
         measureValue = (row, measure, xValues) => row[measure] || 0;
       }
     }
@@ -146,14 +147,16 @@ export default class ResultSet {
 
     const allYValues = pipe(
       map(
+        // eslint-disable-next-line no-unused-vars
         ([xValuesString, rows]) => unnest(rows.map(({ row }) => this.axisValues(pivotConfig.y)(row)))
       ),
       unnest,
       uniq
     )(xGrouped);
 
+    // eslint-disable-next-line no-unused-vars
     return xGrouped.map(([xValuesString, rows]) => {
-      const xValues = rows[0].xValues;
+      const { xValues } = rows[0];
       const yGrouped = pipe(
         map(({ row }) => this.axisValues(pivotConfig.y)(row).map(yValues => ({ yValues, row }))),
         unnest,
@@ -162,10 +165,11 @@ export default class ResultSet {
       return {
         xValues,
         yValuesArray: unnest(allYValues.map(yValues => {
-          let measure = pivotConfig.x.find(d => d === 'measures') ?
+          const measure = pivotConfig.x.find(d => d === 'measures') ?
             ResultSet.measureFromAxis(xValues) :
             ResultSet.measureFromAxis(yValues);
-          return (yGrouped[this.axisValuesString(yValues)] || [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure, xValues)])
+          return (yGrouped[this.axisValuesString(yValues)] ||
+            [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure, xValues)]);
         }))
       };
     });
@@ -177,7 +181,7 @@ export default class ResultSet {
 
   chartPivot(pivotConfig) {
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
-      category: this.axisValuesString(xValues, ', '), //TODO deprecated
+      category: this.axisValuesString(xValues, ', '), // TODO deprecated
       x: this.axisValuesString(xValues, ', '),
       ...(
         yValuesArray
@@ -187,11 +191,47 @@ export default class ResultSet {
     }));
   }
 
+  tablePivot(pivotConfig) {
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const valueToObject =
+      (valuesArray, measureValue) => (
+        (field, index) => ({
+          [field === 'measures' ? valuesArray[index] : field]: field === 'measures' ? measureValue : valuesArray[index]
+        })
+      );
+
+    return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => (
+      yValuesArray.map(([yValues, m]) => (
+        normalizedPivotConfig.x.map(valueToObject(xValues, m))
+          .concat(normalizedPivotConfig.y.map(valueToObject(yValues, m)))
+          .reduce((a, b) => Object.assign(a, b), {})
+      ))
+    )).reduce((a, b) => a.concat(b));
+  }
+
+  tableColumns(pivotConfig) {
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const column = field => (
+      field === 'measures' ?
+        (this.query().measures || []).map(m => ({ key: m, title: this.loadResponse.annotation.measures[m].title })) :
+        [{
+          key: field,
+          title: (
+            this.loadResponse.annotation.dimensions[field] ||
+            this.loadResponse.annotation.timeDimensions[field]
+          ).title
+        }]
+    );
+    return normalizedPivotConfig.x.map(column)
+      .concat(normalizedPivotConfig.y.map(column))
+      .reduce((a, b) => a.concat(b));
+  }
+
   totalRow() {
     return this.chartPivot()[0];
   }
 
-  categories(pivotConfig) { //TODO
+  categories(pivotConfig) { // TODO
     return this.chartPivot(pivotConfig);
   }
 
@@ -203,7 +243,7 @@ export default class ResultSet {
           .concat(this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) :
         axisValues, ', '),
       key: this.axisValuesString(axisValues)
-    }))
+    }));
   }
 
   query() {

@@ -14491,7 +14491,7 @@
 	      var groupByXAxis = groupBy(function (_ref3) {
 	        var xValues = _ref3.xValues;
 	        return _this2.axisValuesString(xValues);
-	      });
+	      }); // eslint-disable-next-line no-unused-vars
 
 	      var measureValue = function measureValue(row, measure, xValues) {
 	        return row[measure];
@@ -14518,7 +14518,8 @@
 	            }).reduce(function (a, b) {
 	              return Object.assign(a, b);
 	            }, {});
-	          };
+	          }; // eslint-disable-next-line no-unused-vars
+
 
 	          measureValue = function measureValue(row, measure, xValues) {
 	            return row[measure] || 0;
@@ -14534,7 +14535,8 @@
 	          };
 	        });
 	      }), unnest, groupByXAxis, toPairs)(this.loadResponse.data);
-	      var allYValues = pipe(map(function (_ref6) {
+	      var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
+	      function (_ref6) {
 	        var _ref7 = _slicedToArray(_ref6, 2),
 	            xValuesString = _ref7[0],
 	            rows = _ref7[1];
@@ -14543,7 +14545,8 @@
 	          var row = _ref8.row;
 	          return _this2.axisValues(pivotConfig.y)(row);
 	        }));
-	      }), unnest, uniq)(xGrouped);
+	      }), unnest, uniq)(xGrouped); // eslint-disable-next-line no-unused-vars
+
 	      return xGrouped.map(function (_ref9) {
 	        var _ref10 = _slicedToArray(_ref9, 2),
 	            xValuesString = _ref10[0],
@@ -14594,7 +14597,7 @@
 	            yValuesArray = _ref14.yValuesArray;
 	        return _objectSpread({
 	          category: _this3.axisValuesString(xValues, ', '),
-	          //TODO deprecated
+	          // TODO deprecated
 	          x: _this3.axisValuesString(xValues, ', ')
 	        }, yValuesArray.map(function (_ref15) {
 	          var _ref16 = _slicedToArray(_ref15, 2),
@@ -14608,6 +14611,56 @@
 	      });
 	    }
 	  }, {
+	    key: "tablePivot",
+	    value: function tablePivot(pivotConfig) {
+	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+	      var valueToObject = function valueToObject(valuesArray, measureValue) {
+	        return function (field, index) {
+	          return _defineProperty({}, field === 'measures' ? valuesArray[index] : field, field === 'measures' ? measureValue : valuesArray[index]);
+	        };
+	      };
+
+	      return this.pivot(pivotConfig).map(function (_ref19) {
+	        var xValues = _ref19.xValues,
+	            yValuesArray = _ref19.yValuesArray;
+	        return yValuesArray.map(function (_ref20) {
+	          var _ref21 = _slicedToArray(_ref20, 2),
+	              yValues = _ref21[0],
+	              m = _ref21[1];
+
+	          return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
+	            return Object.assign(a, b);
+	          }, {});
+	        });
+	      }).reduce(function (a, b) {
+	        return a.concat(b);
+	      });
+	    }
+	  }, {
+	    key: "tableColumns",
+	    value: function tableColumns(pivotConfig) {
+	      var _this4 = this;
+
+	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+	      var column = function column(field) {
+	        return field === 'measures' ? (_this4.query().measures || []).map(function (m) {
+	          return {
+	            key: m,
+	            title: _this4.loadResponse.annotation.measures[m].title
+	          };
+	        }) : [{
+	          key: field,
+	          title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title
+	        }];
+	      };
+
+	      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
+	        return a.concat(b);
+	      });
+	    }
+	  }, {
 	    key: "totalRow",
 	    value: function totalRow() {
 	      return this.chartPivot()[0];
@@ -14615,21 +14668,21 @@
 	  }, {
 	    key: "categories",
 	    value: function categories(pivotConfig) {
-	      //TODO
+	      // TODO
 	      return this.chartPivot(pivotConfig);
 	    }
 	  }, {
 	    key: "seriesNames",
 	    value: function seriesNames(pivotConfig) {
-	      var _this4 = this;
+	      var _this5 = this;
 
 	      pivotConfig = this.normalizePivotConfig(pivotConfig);
 	      return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(function (axisValues) {
 	        return {
-	          title: _this4.axisValuesString(pivotConfig.y.find(function (d) {
+	          title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
 	            return d === 'measures';
-	          }) ? dropLast$1(1, axisValues).concat(_this4.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-	          key: _this4.axisValuesString(axisValues)
+	          }) ? dropLast$1(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+	          key: _this5.axisValuesString(axisValues)
 	        };
 	      });
 	    }
@@ -14786,6 +14839,23 @@
 	      }
 
 	      return member;
+	    }
+	  }, {
+	    key: "defaultTimeDimensionNameFor",
+	    value: function defaultTimeDimensionNameFor(memberName) {
+	      var _this2 = this;
+
+	      var _memberName$split3 = memberName.split('.'),
+	          _memberName$split4 = _slicedToArray(_memberName$split3, 1),
+	          cube = _memberName$split4[0];
+
+	      if (!this.cubesMap[cube]) {
+	        return null;
+	      }
+
+	      return Object.keys(this.cubesMap[cube].dimensions || {}).find(function (d) {
+	        return _this2.cubesMap[cube].dimensions[d].type === 'time';
+	      });
 	    }
 	  }, {
 	    key: "filterOperatorsForMember",

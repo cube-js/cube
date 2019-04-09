@@ -1,4 +1,5 @@
 import React from 'react';
+import * as PropTypes from 'prop-types';
 import QueryRenderer from './QueryRenderer.jsx';
 
 export default class QueryBuilder extends React.Component {
@@ -11,7 +12,8 @@ export default class QueryBuilder extends React.Component {
   }
 
   async componentDidMount() {
-    const meta = await this.props.cubejsApi.meta();
+    const { cubejsApi } = this.props;
+    const meta = await cubejsApi.meta();
     this.setState({ meta });
   }
 
@@ -35,35 +37,41 @@ export default class QueryBuilder extends React.Component {
       values: member.values
     });
     const updateMethods = (memberType, toQuery = getName) => ({
-      add: (member) => this.setState({
-        query: {
-          ...this.state.query,
-          [memberType]: (this.state.query[memberType] || []).concat(toQuery(member))
-        }
-      }),
-      remove: (member) => {
-        const members = (this.state.query[memberType] || []).concat([]);
-        members.splice(member.index, 1);
-        return this.setState({
+      add: (member) => {
+        const { query } = this.state;
+        this.setState(this.applyStateChangeHeuristics({
           query: {
-            ...this.state.query,
+            ...query,
+            [memberType]: (query[memberType] || []).concat(toQuery(member))
+          }
+        }));
+      },
+      remove: (member) => {
+        const { query } = this.state;
+        const members = (query[memberType] || []).concat([]);
+        members.splice(member.index, 1);
+        return this.setState(this.applyStateChangeHeuristics({
+          query: {
+            ...query,
             [memberType]: members
           }
-        });
+        }));
       },
       update: (member, updateWith) => {
-        const members = (this.state.query[memberType] || []).concat([]);
+        const { query } = this.state;
+        const members = (query[memberType] || []).concat([]);
         members.splice(member.index, 1, toQuery(updateWith));
-        return this.setState({
+        return this.setState(this.applyStateChangeHeuristics({
           query: {
-            ...this.state.query,
+            ...query,
             [memberType]: members
           }
-        });
+        }));
       }
     });
 
     const granularities = [
+      { name: undefined, title: 'w/o grouping' },
       { name: 'hour', title: 'Hour' },
       { name: 'day', title: 'Day' },
       { name: 'week', title: 'Week' },
@@ -71,44 +79,46 @@ export default class QueryBuilder extends React.Component {
       { name: 'year', title: 'Year' }
     ];
 
+    const { meta, query, chartType } = this.state;
+
     return {
-      meta: this.state.meta,
-      query: this.state.query,
+      meta,
+      query,
       validatedQuery: this.validatedQuery(),
       isQueryPresent: this.isQueryPresent(),
-      chartType: this.state.chartType,
-      measures: (this.state.meta && this.state.query.measures || [])
-        .map((m, i) => ({ index: i, ...this.state.meta.resolveMember(m, 'measures') })),
-      dimensions: (this.state.meta && this.state.query.dimensions || [])
-        .map((m, i) => ({ index: i, ...this.state.meta.resolveMember(m, 'dimensions') })),
-      segments: (this.state.meta && this.state.query.segments || [])
-        .map((m, i) => ({ index: i, ...this.state.meta.resolveMember(m, 'segments') })),
-      timeDimensions: (this.state.meta && this.state.query.timeDimensions || [])
+      chartType,
+      measures: (meta && query.measures || [])
+        .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'measures') })),
+      dimensions: (meta && query.dimensions || [])
+        .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'dimensions') })),
+      segments: (meta && query.segments || [])
+        .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
+      timeDimensions: (meta && query.timeDimensions || [])
         .map((m, i) => ({
           ...m,
-          dimension: { ...this.state.meta.resolveMember(m.dimension, 'dimensions'), granularities },
+          dimension: { ...meta.resolveMember(m.dimension, 'dimensions'), granularities },
           index: i
         })),
-      filters: (this.state.meta && this.state.query.filters || [])
+      filters: (meta && query.filters || [])
         .map((m, i) => ({
           ...m,
-          dimension: this.state.meta.resolveMember(m.dimension, ['dimensions', 'measures']),
-          operators: this.state.meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
+          dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
+          operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
           index: i
         })),
-      availableMeasures: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'measures') || [],
-      availableDimensions: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'dimensions') || [],
+      availableMeasures: meta && meta.membersForQuery(query, 'measures') || [],
+      availableDimensions: meta && meta.membersForQuery(query, 'dimensions') || [],
       availableTimeDimensions: (
-        this.state.meta && this.state.meta.membersForQuery(this.state.query, 'dimensions') || []
+        meta && meta.membersForQuery(query, 'dimensions') || []
       ).filter(m => m.type === 'time'),
-      availableSegments: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'segments') || [],
+      availableSegments: meta && meta.membersForQuery(query, 'segments') || [],
 
       updateMeasures: updateMethods('measures'),
       updateDimensions: updateMethods('dimensions'),
       updateSegments: updateMethods('segments'),
       updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
       updateFilters: updateMethods('filters', toFilter),
-      updateChartType: (chartType) => this.setState({ chartType }),
+      updateChartType: (newChartType) => this.setState(this.applyStateChangeHeuristics({ chartType: newChartType })),
       ...queryRendererProps
     };
   }
@@ -119,6 +129,149 @@ export default class QueryBuilder extends React.Component {
       ...query,
       filters: (query.filters || []).filter(f => f.operator)
     };
+  }
+
+  defaultHeuristics(newState) {
+    const { query, sessionGranularity } = this.state;
+    const defaultGranularity = sessionGranularity || 'day';
+    if (newState.query) {
+      const oldQuery = query;
+      let newQuery = newState.query;
+
+      const { meta } = this.state;
+
+      if (
+        (oldQuery.timeDimensions || []).length === 1
+        && (newQuery.timeDimensions || []).length === 1
+        && newQuery.timeDimensions[0].granularity
+        && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
+      ) {
+        newState = {
+          ...newState,
+          sessionGranularity: newQuery.timeDimensions[0].granularity
+        };
+      }
+
+      if (
+        (oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0
+        || (
+          (oldQuery.measures || []).length === 1
+          && (newQuery.measures || []).length === 1
+          && oldQuery.measures[0] !== newQuery.measures[0]
+        )
+      ) {
+        const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
+        newQuery = {
+          ...newQuery,
+          timeDimensions: defaultTimeDimension ? [{
+            dimension: defaultTimeDimension,
+            granularity: defaultGranularity
+          }] : [],
+        };
+        return {
+          ...newState,
+          query: newQuery,
+          chartType: defaultTimeDimension ? 'line' : 'number'
+        };
+      }
+
+      if (
+        (oldQuery.dimensions || []).length === 0
+        && (newQuery.dimensions || []).length > 0
+      ) {
+        newQuery = {
+          ...newQuery,
+          timeDimensions: (newQuery.timeDimensions || []).map(td => ({ ...td, granularity: undefined })),
+        };
+        return {
+          ...newState,
+          query: newQuery,
+          chartType: 'table'
+        };
+      }
+
+      if (
+        (oldQuery.dimensions || []).length > 0
+        && (newQuery.dimensions || []).length === 0
+      ) {
+        newQuery = {
+          ...newQuery,
+          timeDimensions: (newQuery.timeDimensions || []).map(td => ({
+            ...td, granularity: td.granularity || defaultGranularity
+          })),
+        };
+        return {
+          ...newState,
+          query: newQuery,
+          chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
+        };
+      }
+
+      if (
+        (
+          (oldQuery.dimensions || []).length > 0
+          || (oldQuery.measures || []).length > 0
+        )
+        && (newQuery.dimensions || []).length === 0
+        && (newQuery.measures || []).length === 0
+      ) {
+        newQuery = {
+          ...newQuery,
+          timeDimensions: [],
+          filters: []
+        };
+        return {
+          ...newState,
+          query: newQuery,
+          sessionGranularity: null
+        };
+      }
+      return newState;
+    }
+
+    if (newState.chartType) {
+      const newChartType = newState.chartType;
+      if (
+        (newChartType === 'line' || newChartType === 'area')
+        && (query.timeDimensions || []).length === 1
+        && !query.timeDimensions[0].granularity
+      ) {
+        const [td] = query.timeDimensions;
+        return {
+          ...newState,
+          query: {
+            ...query,
+            timeDimensions: [{ ...td, granularity: defaultGranularity }]
+          }
+        };
+      }
+
+      if (
+        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number')
+        && (query.timeDimensions || []).length === 1
+        && query.timeDimensions[0].granularity
+      ) {
+        const [td] = query.timeDimensions;
+        return {
+          ...newState,
+          query: {
+            ...query,
+            timeDimensions: [{ ...td, granularity: undefined }]
+          }
+        };
+      }
+    }
+
+    return newState;
+  }
+
+  applyStateChangeHeuristics(newState) {
+    const { stateChangeHeuristics, disableHeuristics } = this.props;
+    if (disableHeuristics) {
+      return newState;
+    }
+    return stateChangeHeuristics && stateChangeHeuristics(this.state, newState)
+      || this.defaultHeuristics(newState);
   }
 
   render() {
@@ -137,3 +290,18 @@ export default class QueryBuilder extends React.Component {
     );
   }
 }
+
+QueryBuilder.propTypes = {
+  render: PropTypes.func,
+  stateChangeHeuristics: PropTypes.func,
+  cubejsApi: PropTypes.object.isRequired,
+  disableHeuristics: PropTypes.bool,
+  query: PropTypes.object
+};
+
+QueryBuilder.defaultProps = {
+  query: {},
+  stateChangeHeuristics: null,
+  disableHeuristics: false,
+  render: null
+};

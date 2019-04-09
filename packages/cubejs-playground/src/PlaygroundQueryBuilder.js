@@ -325,8 +325,11 @@ TimeGroup.propTypes = {
 const ChartType = ({ chartType, updateChartType }) => {
   const chartTypes = [
     { name: 'line', title: 'Line', icon: 'line-chart' },
+    { name: 'area', title: 'Area', icon: 'area-chart' },
     { name: 'bar', title: 'Bar', icon: 'bar-chart' },
-    { name: 'pie', title: 'Pie', icon: 'pie-chart' }
+    { name: 'pie', title: 'Pie', icon: 'pie-chart' },
+    { name: 'table', title: 'Table', icon: 'table' },
+    { name: 'number', title: 'Number', icon: 'info-circle' }
   ];
 
   const menu = (

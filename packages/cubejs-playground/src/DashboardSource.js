@@ -90,7 +90,9 @@ class DashboardSource {
     this.definitions = [];
     traverse(this.appAst, {
       VariableDeclaration: (path) => {
-        this.definitions.push(...path.get('declarations'));
+        if (path.parent.type === 'Program') {
+          this.definitions.push(...path.get('declarations'));
+        }
       }
     });
   }
@@ -217,19 +219,20 @@ class DashboardSource {
 
     traverse(chartAst, {
       VariableDeclaration: (path) => {
-        if (path.get('declarations')[0].get('id').get('name').node === 'ChartRenderer') {
-          const chartRendererElement = path.get('declarations')[0].get('init').get('body');
-          console.log(path.get('declarations')[0].get('init').get('body'));
-          this.dashboardElement.parentPath.pushContainer(
-            'children',
-            t.JSXElement(
-              t.JSXOpeningElement(t.JSXIdentifier('DashboardItem'), []),
-              t.JSXClosingElement(t.JSXIdentifier('DashboardItem')),
-              [chartRendererElement.node]
-            )
-          );
-        } else {
-          definitions.push(path);
+        if (path.parent.type === 'Program') {
+          if (path.get('declarations')[0].get('id').get('name').node === 'ChartRenderer') {
+            const chartRendererElement = path.get('declarations')[0].get('init').get('body');
+            this.dashboardElement.parentPath.pushContainer(
+              'children',
+              t.JSXElement(
+                t.JSXOpeningElement(t.JSXIdentifier('DashboardItem'), []),
+                t.JSXClosingElement(t.JSXIdentifier('DashboardItem')),
+                [chartRendererElement.node]
+              )
+            );
+          } else {
+            definitions.push(path);
+          }
         }
       }
     });

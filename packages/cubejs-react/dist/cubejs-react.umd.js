@@ -126,7 +126,7 @@
 	  return store[key] || (store[key] = value !== undefined ? value : {});
 	})('versions', []).push({
 	  version: _core.version,
-	  mode: 'global',
+	  mode: _library ? 'pure' : 'global',
 	  copyright: '© 2019 Denis Pushkarev (zloirock.ru)'
 	});
 	});
@@ -1191,10 +1191,10 @@
 	    return capability.promise;
 	  }
 	});
-	_export(_export.S + _export.F * (_library || !USE_NATIVE), PROMISE, {
+	_export(_export.S + _export.F * (!USE_NATIVE), PROMISE, {
 	  // 25.4.4.6 Promise.resolve(x)
 	  resolve: function resolve(x) {
-	    return _promiseResolve(_library && this === Wrapper ? $Promise : this, x);
+	    return _promiseResolve(this, x);
 	  }
 	});
 	_export(_export.S + _export.F * !(USE_NATIVE && _iterDetect(function (iter) {
@@ -7764,21 +7764,22 @@
 	      var _componentDidMount = _asyncToGenerator(
 	      /*#__PURE__*/
 	      regeneratorRuntime.mark(function _callee() {
-	        var meta;
+	        var cubejsApi, meta;
 	        return regeneratorRuntime.wrap(function _callee$(_context) {
 	          while (1) {
 	            switch (_context.prev = _context.next) {
 	              case 0:
-	                _context.next = 2;
-	                return this.props.cubejsApi.meta();
+	                cubejsApi = this.props.cubejsApi;
+	                _context.next = 3;
+	                return cubejsApi.meta();
 
-	              case 2:
+	              case 3:
 	                meta = _context.sent;
 	                this.setState({
 	                  meta: meta
 	                });
 
-	              case 4:
+	              case 5:
 	              case "end":
 	                return _context.stop();
 	            }
@@ -7827,28 +7828,35 @@
 	        var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
 	        return {
 	          add: function add(member) {
-	            return _this2.setState({
-	              query: _objectSpread({}, _this2.state.query, _defineProperty({}, memberType, (_this2.state.query[memberType] || []).concat(toQuery(member))))
-	            });
+	            var query = _this2.state.query;
+
+	            _this2.setState(_this2.applyQueryChangeHeuristics({
+	              query: _objectSpread({}, query, _defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))))
+	            }));
 	          },
 	          remove: function remove(member) {
-	            var members = (_this2.state.query[memberType] || []).concat([]);
+	            var query = _this2.state.query;
+	            var members = (query[memberType] || []).concat([]);
 	            members.splice(member.index, 1);
-	            return _this2.setState({
-	              query: _objectSpread({}, _this2.state.query, _defineProperty({}, memberType, members))
-	            });
+	            return _this2.setState(_this2.applyQueryChangeHeuristics({
+	              query: _objectSpread({}, query, _defineProperty({}, memberType, members))
+	            }));
 	          },
 	          update: function update(member, updateWith) {
-	            var members = (_this2.state.query[memberType] || []).concat([]);
+	            var query = _this2.state.query;
+	            var members = (query[memberType] || []).concat([]);
 	            members.splice(member.index, 1, toQuery(updateWith));
-	            return _this2.setState({
-	              query: _objectSpread({}, _this2.state.query, _defineProperty({}, memberType, members))
-	            });
+	            return _this2.setState(_this2.applyQueryChangeHeuristics({
+	              query: _objectSpread({}, query, _defineProperty({}, memberType, members))
+	            }));
 	          }
 	        };
 	      };
 
 	      var granularities = [{
+	        name: undefined,
+	        title: 'w/o grouping'
+	      }, {
 	        name: 'hour',
 	        title: 'Hour'
 	      }, {
@@ -7864,57 +7872,61 @@
 	        name: 'year',
 	        title: 'Year'
 	      }];
+	      var _this$state = this.state,
+	          meta = _this$state.meta,
+	          query = _this$state.query,
+	          chartType = _this$state.chartType;
 	      return _objectSpread({
-	        meta: this.state.meta,
-	        query: this.state.query,
+	        meta: meta,
+	        query: query,
 	        validatedQuery: this.validatedQuery(),
 	        isQueryPresent: this.isQueryPresent(),
-	        chartType: this.state.chartType,
-	        measures: (this.state.meta && this.state.query.measures || []).map(function (m, i) {
+	        chartType: chartType,
+	        measures: (meta && query.measures || []).map(function (m, i) {
 	          return _objectSpread({
 	            index: i
-	          }, _this2.state.meta.resolveMember(m, 'measures'));
+	          }, meta.resolveMember(m, 'measures'));
 	        }),
-	        dimensions: (this.state.meta && this.state.query.dimensions || []).map(function (m, i) {
+	        dimensions: (meta && query.dimensions || []).map(function (m, i) {
 	          return _objectSpread({
 	            index: i
-	          }, _this2.state.meta.resolveMember(m, 'dimensions'));
+	          }, meta.resolveMember(m, 'dimensions'));
 	        }),
-	        segments: (this.state.meta && this.state.query.segments || []).map(function (m, i) {
+	        segments: (meta && query.segments || []).map(function (m, i) {
 	          return _objectSpread({
 	            index: i
-	          }, _this2.state.meta.resolveMember(m, 'segments'));
+	          }, meta.resolveMember(m, 'segments'));
 	        }),
-	        timeDimensions: (this.state.meta && this.state.query.timeDimensions || []).map(function (m, i) {
+	        timeDimensions: (meta && query.timeDimensions || []).map(function (m, i) {
 	          return _objectSpread({}, m, {
-	            dimension: _objectSpread({}, _this2.state.meta.resolveMember(m.dimension, 'dimensions'), {
+	            dimension: _objectSpread({}, meta.resolveMember(m.dimension, 'dimensions'), {
 	              granularities: granularities
 	            }),
 	            index: i
 	          });
 	        }),
-	        filters: (this.state.meta && this.state.query.filters || []).map(function (m, i) {
+	        filters: (meta && query.filters || []).map(function (m, i) {
 	          return _objectSpread({}, m, {
-	            dimension: _this2.state.meta.resolveMember(m.dimension, ['dimensions', 'measures']),
-	            operators: _this2.state.meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
+	            dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
+	            operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
 	            index: i
 	          });
 	        }),
-	        availableMeasures: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'measures') || [],
-	        availableDimensions: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'dimensions') || [],
-	        availableTimeDimensions: (this.state.meta && this.state.meta.membersForQuery(this.state.query, 'dimensions') || []).filter(function (m) {
+	        availableMeasures: meta && meta.membersForQuery(query, 'measures') || [],
+	        availableDimensions: meta && meta.membersForQuery(query, 'dimensions') || [],
+	        availableTimeDimensions: (meta && meta.membersForQuery(query, 'dimensions') || []).filter(function (m) {
 	          return m.type === 'time';
 	        }),
-	        availableSegments: this.state.meta && this.state.meta.membersForQuery(this.state.query, 'segments') || [],
+	        availableSegments: meta && meta.membersForQuery(query, 'segments') || [],
 	        updateMeasures: updateMethods('measures'),
 	        updateDimensions: updateMethods('dimensions'),
 	        updateSegments: updateMethods('segments'),
 	        updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
 	        updateFilters: updateMethods('filters', toFilter),
-	        updateChartType: function updateChartType(chartType) {
-	          return _this2.setState({
-	            chartType: chartType
-	          });
+	        updateChartType: function updateChartType(newChartType) {
+	          return _this2.setState(_this2.applyQueryChangeHeuristics({
+	            chartType: newChartType
+	          }));
 	        }
 	      }, queryRendererProps);
 	    }
@@ -7929,13 +7941,133 @@
 	      });
 	    }
 	  }, {
+	    key: "defaultHeuristics",
+	    value: function defaultHeuristics(newState) {
+	      var _this$state2 = this.state,
+	          query = _this$state2.query,
+	          sessionGranularity = _this$state2.sessionGranularity;
+	      var defaultGranularity = sessionGranularity || 'day';
+
+	      if (newState.query) {
+	        var oldQuery = query;
+	        var newQuery = newState.query;
+	        var meta = this.state.meta;
+
+	        if ((oldQuery.timeDimensions || []).length === 1 && (newQuery.timeDimensions || []).length === 1 && newQuery.timeDimensions[0].granularity && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity) {
+	          newState = _objectSpread({}, newState, {
+	            sessionGranularity: newQuery.timeDimensions[0].granularity
+	          });
+	        }
+
+	        if ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0 || (oldQuery.measures || []).length === 1 && (newQuery.measures || []).length === 1 && oldQuery.measures[0] !== newQuery.measures[0]) {
+	          var defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
+	          newQuery = _objectSpread({}, newQuery, {
+	            timeDimensions: defaultTimeDimension ? [{
+	              dimension: defaultTimeDimension,
+	              granularity: defaultGranularity
+	            }] : []
+	          });
+	          return _objectSpread({}, newState, {
+	            query: newQuery,
+	            chartType: defaultTimeDimension ? 'line' : 'number'
+	          });
+	        }
+
+	        if ((oldQuery.dimensions || []).length === 0 && (newQuery.dimensions || []).length > 0) {
+	          newQuery = _objectSpread({}, newQuery, {
+	            timeDimensions: (newQuery.timeDimensions || []).map(function (td) {
+	              return _objectSpread({}, td, {
+	                granularity: undefined
+	              });
+	            })
+	          });
+	          return _objectSpread({}, newState, {
+	            query: newQuery,
+	            chartType: 'table'
+	          });
+	        }
+
+	        if ((oldQuery.dimensions || []).length > 0 && (newQuery.dimensions || []).length === 0) {
+	          newQuery = _objectSpread({}, newQuery, {
+	            timeDimensions: (newQuery.timeDimensions || []).map(function (td) {
+	              return _objectSpread({}, td, {
+	                granularity: td.granularity || defaultGranularity
+	              });
+	            })
+	          });
+	          return _objectSpread({}, newState, {
+	            query: newQuery,
+	            chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
+	          });
+	        }
+
+	        if (((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0) && (newQuery.dimensions || []).length === 0 && (newQuery.measures || []).length === 0) {
+	          newQuery = _objectSpread({}, newQuery, {
+	            timeDimensions: [],
+	            filters: []
+	          });
+	          return _objectSpread({}, newState, {
+	            query: newQuery,
+	            sessionGranularity: null
+	          });
+	        }
+
+	        return newState;
+	      }
+
+	      if (newState.chartType) {
+	        var newChartType = newState.chartType;
+
+	        if ((newChartType === 'line' || newChartType === 'area') && (query.timeDimensions || []).length === 1 && !query.timeDimensions[0].granularity) {
+	          var _query$timeDimensions = _slicedToArray(query.timeDimensions, 1),
+	              td = _query$timeDimensions[0];
+
+	          return _objectSpread({}, newState, {
+	            query: _objectSpread({}, query, {
+	              timeDimensions: [_objectSpread({}, td, {
+	                granularity: defaultGranularity
+	              })]
+	            })
+	          });
+	        }
+
+	        if ((newChartType === 'pie' || newChartType === 'table' || newChartType === 'number') && (query.timeDimensions || []).length === 1 && query.timeDimensions[0].granularity) {
+	          var _query$timeDimensions2 = _slicedToArray(query.timeDimensions, 1),
+	              _td = _query$timeDimensions2[0];
+
+	          return _objectSpread({}, newState, {
+	            query: _objectSpread({}, query, {
+	              timeDimensions: [_objectSpread({}, _td, {
+	                granularity: undefined
+	              })]
+	            })
+	          });
+	        }
+	      }
+
+	      return newState;
+	    }
+	  }, {
+	    key: "applyQueryChangeHeuristics",
+	    value: function applyQueryChangeHeuristics(newState) {
+	      var _this$props = this.props,
+	          queryChangeHeuristics = _this$props.queryChangeHeuristics,
+	          disableHeuristics = _this$props.disableHeuristics;
+
+	      if (disableHeuristics) {
+	        return newState;
+	      }
+
+	      return queryChangeHeuristics && queryChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
+	    }
+	  }, {
 	    key: "render",
 	    value: function render() {
 	      var _this3 = this;
 
-	      var _this$props = this.props,
-	          cubejsApi = _this$props.cubejsApi,
-	          _render = _this$props.render;
+	      var _this$props2 = this.props,
+	          cubejsApi = _this$props2.cubejsApi,
+	          _render = _this$props2.render;
 	      return React.createElement(QueryRenderer, {
 	        query: this.validatedQuery(),
 	        cubejsApi: cubejsApi,
@@ -7952,6 +8084,19 @@
 
 	  return QueryBuilder;
 	}(React.Component);
+	QueryBuilder.propTypes = {
+	  render: PropTypes.func,
+	  queryChangeHeuristics: PropTypes.func,
+	  cubejsApi: PropTypes.object.isRequired,
+	  disableHeuristics: PropTypes.bool,
+	  query: PropTypes.object
+	};
+	QueryBuilder.defaultProps = {
+	  query: {},
+	  queryChangeHeuristics: null,
+	  disableHeuristics: false,
+	  render: null
+	};
 
 	exports.QueryRenderer = QueryRenderer;
 	exports.QueryRendererWithTotals = QueryRendererWithTotals;
