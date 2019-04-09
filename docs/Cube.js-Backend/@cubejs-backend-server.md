@@ -12,7 +12,7 @@ menuOrder: 6
 
 ### CubejsServer.create(options)
 
-Create an instance of `CubejsServer`. `options` object is passed to [Cube.js Backend Server Core](@cubejs-backend-server-core#api-reference-cubejs-server-core-create-options).
+Create an instance of `CubejsServer`. `options` object is passed to [Cube.js Backend Server Core](@cubejs-backend-server-core#api-reference-cubejs-server-core-create-options). You can set server port using `PORT` environment variable. Default port is `4000`.
 
 ### Example
 
