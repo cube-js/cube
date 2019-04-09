@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Statsbot, Inc.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "engines": {
     "node": ">=8.11.1"
   },
