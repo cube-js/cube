@@ -135,7 +135,10 @@ import cubejs from '@cubejs-client/core';
 import Chart from 'chart.js';
 import chartjsConfig from './toChartjsData';
 
-const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
+const cubejsApi = cubejs(
+  'YOUR-CUBEJS-API-TOKEN',
+  { apiUrl: 'http://localhost:4000/cubejs-api/v1' },
+);
 
 const resultSet = await cubejsApi.load({
   measures: ['Stories.count'],
@@ -159,7 +162,10 @@ import { LineChart, Line, XAxis, YAxis } from 'recharts';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 
-const cubejsApi = cubejs('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpIjozODU5NH0.5wEbQo-VG2DEjR2nBpRpoJeIcE_oJqnrm78yUo9lasw');
+const cubejsApi = cubejs(
+  'YOUR-CUBEJS-API-TOKEN',
+  { apiUrl: 'http://localhost:4000/cubejs-api/v1' },
+);
 
 export default () => {
   return (
