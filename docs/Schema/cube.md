@@ -159,9 +159,16 @@ cube(`OrderFacts`, {
 
 ### Filter Params
 
-Filter params allows you to use filter values selected by user during SQL generation.
+`FILTER_PARAMS` allows you to use filter values during SQL generation. You can add it for any valid SQL expression as in case of dimension.
 
-You can add it for any valid SQL expression as in case of dimension.
+It has the following structure -
+
+```javascript
+FILTER_PARAMS.<CUBE_NAME>.<FILTER_NAME>.filter(expression)
+```
+
+`filter` function accepts expression, which could be either `String` or `Function`. See
+examples below.
 
 ```javascript
 cube(`OrderFacts`, {
