@@ -116,7 +116,7 @@ const querySchema = Joi.object().keys({
   segments: Joi.array().items(id),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(1).max(50000)
-}).or("measures","dimensions");
+}).or("measures", "dimensions");
 
 const normalizeQuery = (query) => {
   // eslint-disable-next-line no-unused-vars
@@ -195,7 +195,7 @@ class ApiGateway {
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       try {
-        const query = JSON.parse(req.query.query)
+        const query = JSON.parse(req.query.query);
         this.log(req, {
           type: 'Load Request',
           query: req.query.query
@@ -297,10 +297,20 @@ class ApiGateway {
         req.authInfo = jwt.verify(auth, secret);
         return next && next();
       } catch (e) {
-        res.status(403).json({ error: 'Invalid token' });
+        if (process.env.NODE_ENV === 'production') {
+          res.status(403).json({ error: 'Invalid token' });
+        } else {
+          this.log(req, {
+            type: 'Invalid Token',
+            error: e.stack || e.toString()
+          });
+          return next && next();
+        }
       }
-    } else {
+    } else if (process.env.NODE_ENV === 'production') {
       res.status(403).send({ error: "Authorization header isn't set" });
+    } else {
+      return next && next();
     }
     return null;
   }
