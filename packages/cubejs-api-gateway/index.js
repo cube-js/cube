@@ -302,6 +302,7 @@ class ApiGateway {
         } else {
           this.log(req, {
             type: 'Invalid Token',
+            token: auth,
             error: e.stack || e.toString()
           });
           return next && next();

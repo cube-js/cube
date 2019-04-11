@@ -56,7 +56,14 @@ class CubejsServerCore {
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || 'schema';
     this.dbType = options.dbType;
-    this.logger = options.logger || ((msg, params) => { console.log(`${msg}: ${JSON.stringify(params)}`); });
+    this.logger = options.logger || ((msg, params) => {
+      const { error, ...restParams } = params;
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`${msg}: ${JSON.stringify(restParams)}${error ? `\n${error}` : ''}`);
+      } else {
+        console.log(JSON.stringify({ message: msg, ...params }));
+      }
+    });
     this.repository = new FileRepository(this.schemaPath);
 
     const Analytics = require('analytics-node');
@@ -91,21 +98,20 @@ class CubejsServerCore {
 
     if (this.options.devServer) {
       this.devServer = new DevServer(this);
-      if (!options.logger) {
-        this.logger = ((msg, params) => {
-          if (
-            msg === 'Load Request' ||
-            msg === 'Load Request Success' ||
-            msg === 'Orchestrator error' ||
-            msg === 'Internal Server Error' ||
-            msg === 'User Error' ||
-            msg === 'Compiling schema'
-          ) {
-            this.event(msg, { error: params.error });
-          }
-          console.log(`${msg}: ${JSON.stringify(params)}`);
-        });
-      }
+      const oldLogger = this.logger;
+      this.logger = ((msg, params) => {
+        if (
+          msg === 'Load Request' ||
+          msg === 'Load Request Success' ||
+          msg === 'Orchestrator error' ||
+          msg === 'Internal Server Error' ||
+          msg === 'User Error' ||
+          msg === 'Compiling schema'
+        ) {
+          this.event(msg, { error: params.error });
+        }
+        oldLogger(msg, params);
+      });
       let causeErrorPromise;
       process.on('uncaughtException', async (e) => {
         console.error(e.stack || e);
