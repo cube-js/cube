@@ -223,19 +223,25 @@ const TimeGroup = ({
 
   const dateRanges = [
     { title: 'All time', value: undefined },
-    {
-      title: 'Last 30 days',
-      value: [
-        last30DaysFrom.toISOString().substring(0, 10), yesterday.toISOString().substring(0, 10)
-      ]
-    }
+    { value: 'Today' },
+    { value: 'Yesterday' },
+    { value: 'This week' },
+    { value: 'This month' },
+    { value: 'This quarter' },
+    { value: 'This year' },
+    { value: 'Last 7 days' },
+    { value: 'Last 30 days' },
+    { value: 'Last week' },
+    { value: 'Last month' },
+    { value: 'Last quarter' },
+    { value: 'Last year' }
   ];
 
   const dateRangeMenu = (onClick) => (
     <Menu>
       {dateRanges.map(m => (
-        <Menu.Item key={m.title} onClick={() => onClick(m)}>
-          {m.title}
+        <Menu.Item key={m.title || m.value} onClick={() => onClick(m)}>
+          {m.title || m.value}
         </Menu.Item>
       ))}
     </Menu>
@@ -276,7 +282,7 @@ const TimeGroup = ({
           trigger={['click']}
         >
           <Button style={{ marginLeft: 8, marginRight: 8 }}>
-            {m.dateRange && m.dateRange.join(' - ') || 'All time'}
+            {m.dateRange || 'All time'}
           </Button>
         </Dropdown>,
         <b>BY</b>,

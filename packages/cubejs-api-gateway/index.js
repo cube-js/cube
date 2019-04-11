@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const R = require('ramda');
 const Joi = require('joi');
 const moment = require('moment');
+const dateParser = require('./dateParser');
 
 class UserError extends Error {}
 
@@ -111,7 +112,10 @@ const querySchema = Joi.object().keys({
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
     granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', null),
-    dateRange: Joi.array().items(Joi.string()).min(1).max(2)
+    dateRange: [
+      Joi.array().items(Joi.string()).min(1).max(2),
+      Joi.string()
+    ]
   })),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
@@ -160,15 +164,24 @@ const normalizeQuery = (query) => {
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
   }));
+  const timezone = query.timezone || 'UTC';
   return {
     ...query,
     rowLimit: query.rowLimit || query.limit,
-    timezone: query.timezone || 'UTC', // TODO get from bot
+    timezone,
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
-    timeDimensions: (query.timeDimensions || []).map(td => ({
-      ...td,
-      dateRange: td.dateRange && td.dateRange.length === 1 ? [td.dateRange[0], td.dateRange[0]] : td.dateRange
-    })).concat(regularToTimeDimension)
+    timeDimensions: (query.timeDimensions || []).map(td => {
+      let dateRange;
+      if (typeof td.dateRange === 'string') {
+        dateRange = dateParser(td.dateRange);
+      } else {
+        dateRange = td.dateRange && td.dateRange.length === 1 ? [td.dateRange[0], td.dateRange[0]] : td.dateRange;
+      }
+      return {
+        ...td,
+        dateRange
+      };
+    }).concat(regularToTimeDimension)
   };
 };
 
