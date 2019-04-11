@@ -48,7 +48,7 @@ class DevServer {
       this.cubejsServer.event('Dev Server Env Open');
       res.json({
         cubejsToken: jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }),
-        apiUrl,
+        apiUrl: process.env.CUBEJS_API_URL,
         anonymousId: this.cubejsServer.anonymousId
       });
     }));

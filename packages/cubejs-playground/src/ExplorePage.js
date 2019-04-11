@@ -1,3 +1,4 @@
+/* global window */
 import React, { Component } from 'react';
 import cubejs from '@cubejs-client/core';
 import { fetch } from 'whatwg-fetch';
@@ -16,27 +17,31 @@ class ExplorePage extends Component {
     const result = await res.json();
     this.setState({
       cubejsToken: result.cubejsToken,
-      apiUrl: result.apiUrl
+      apiUrl: result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, '')
     });
   }
 
   cubejsApi() {
-    if (!this.cubejsApiInstance && this.state.cubejsToken) {
-      this.cubejsApiInstance = cubejs(this.state.cubejsToken, {
-        apiUrl: this.state.apiUrl + '/cubejs-api/v1'
+    const { cubejsToken, apiUrl } = this.state;
+    if (!this.cubejsApiInstance && cubejsToken) {
+      this.cubejsApiInstance = cubejs(cubejsToken, {
+        apiUrl: `${apiUrl}/cubejs-api/v1`
       });
     }
     return this.cubejsApiInstance;
   }
 
   render() {
-    return this.cubejsApi() && (<PlaygroundQueryBuilder
-      query={{}}
-      cubejsApi={this.cubejsApi()}
-      apiUrl={this.state.apiUrl}
-      cubejsToken={this.state.cubejsToken}
-      dashboardSource={this.dashboardSource}
-    />) || null;
+    const { cubejsToken, apiUrl } = this.state;
+    return this.cubejsApi() && (
+      <PlaygroundQueryBuilder
+        query={{}}
+        cubejsApi={this.cubejsApi()}
+        apiUrl={apiUrl}
+        cubejsToken={cubejsToken}
+        dashboardSource={this.dashboardSource}
+      />
+    ) || null;
   }
 }
 
