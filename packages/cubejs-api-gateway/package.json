@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Statsbot, Inc.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "engines": {
     "node": ">=8.11.1"
   },

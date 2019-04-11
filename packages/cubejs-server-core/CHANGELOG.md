@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.1](https://github.com/statsbotco/cubejs-client/compare/v0.6.0...v0.6.1) (2019-04-11)
+
+
+### Bug Fixes
+
+* Get Playground API_URL from window.location until provided explicitly in env. Remote server playground case. ([7b1a0ff](https://github.com/statsbotco/cubejs-client/commit/7b1a0ff))
+
+
+### Features
+
+* Disable authentication checks in developer mode ([bc09eba](https://github.com/statsbotco/cubejs-client/commit/bc09eba))
+* Formatted error logging in developer mode ([3376a50](https://github.com/statsbotco/cubejs-client/commit/3376a50))
+
+
+
+
+
 # [0.6.0](https://github.com/statsbotco/cubejs-client/compare/v0.5.2...v0.6.0) (2019-04-09)
 
 
