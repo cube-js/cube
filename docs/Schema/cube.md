@@ -124,10 +124,12 @@ cube(`ExtendedOrderFacts`, {
 
 Cube.js caching layer uses `refreshKey` queries to get current version of content for specific cube.
 If query result changes Cube.js will invalidate all queries that rely on that cube.
-If `refreshKey` is not set Cube.js will try to use time dimension which have `'updated'` substring in name,
-then will check if any other time dimension exists.
-If time dimension is found then `max` value of this time dimension will be used as `refreshKey`.
-Otherwise count of rows for this cube will be used as a `refreshKey` by default.
+If `refreshKey` is not set Cube.js will use default strategy -
+
+1. Check the `max` of time dimensions with `updated` in the name, if none exist…
+2. Check the `max` of any existing time dimension, if none exist…
+3. Check the count of rows for this cube.
+
 Result of `refreshKey` query itself is cached for 2 minutes by default.
 
 You can use existing timestamp from your tables. Make sure to select max
