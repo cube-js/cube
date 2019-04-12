@@ -185,3 +185,31 @@ cube(`Orders`, {
 ```
 
 `maxPreAggregations` sets trade-off between initial waiting time and average response times. More rollup tables you have more time is required to refresh them. On other hand more granular rollup tables reduce average response times. In some cases column count in rollup can affect it's refresh performance as well.
+
+## refreshKey
+
+Cube.js also takes care of keeping pre-aggregations up to date. Every two minutes on a new request Cube.js will initiate the refresh check.
+
+The default strategy works the following way:
+
+- Check the `max` of time dimensions with `updated` in the name, if none exist…
+- Check the `max` of any existing time dimension, if none exist…
+- Check the count of rows for this cube.
+
+You can set up a custom refresh check strategy by using `refreshKey`.
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  preAggregations: {
+    main: {
+      type: `autoRollup`,
+      maxPreAggregations: 20,
+      refreshKey: {
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
+    }
+  }
+});
+```
