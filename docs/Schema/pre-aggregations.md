@@ -190,11 +190,7 @@ cube(`Orders`, {
 
 Cube.js also takes care of keeping pre-aggregations up to date. Every two minutes on a new request Cube.js will initiate the refresh check.
 
-The default strategy works the following way:
-
-- Check the `max` of time dimensions with `updated` in the name, if none exist…
-- Check the `max` of any existing time dimension, if none exist…
-- Check the count of rows for this cube.
+By default pre-aggregations are refreshed **every hour**.
 
 You can set up a custom refresh check strategy by using `refreshKey`.
 

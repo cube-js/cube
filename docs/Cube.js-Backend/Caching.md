@@ -30,8 +30,6 @@ not. The cache entry will be refreshed in the background, if one of the two foll
 - Cache is expired. The default expiration time is 6 hours.
 - The result of the `refreshKey` SQL query is different from the previous one.
 
-### refreshKey
-
 You can set up a custom refresh check SQL by changing [refreshKey](cube#parameters-refresh-key) property on the cube level. The default strategy works the following way:
 
 1. Check the `max` of time dimensions with `updated` in the name, if none exist…
@@ -71,6 +69,9 @@ Every two minutes on a new request Cube.js will initiate the refresh
 check. Refresh strategy could be customized by setting the `refreshKey` property
 for the pre-aggregation.
 
+The default value of the `refreshKey` is `select date_trunc('hour', now())`. It means
+that by default pre-aggregations would refresh **every hour**.
+
 ```javascript
 preAggregations: {
   amountByCreated: {
@@ -85,4 +86,3 @@ preAggregations: {
 }
 ```
 
-The default `refreshKey` works [the same as way for in-memory cache.](http://localhost:8000/caching#in-memory-cache-refresh-key)
