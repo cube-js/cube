@@ -117,6 +117,7 @@ const querySchema = Joi.object().keys({
       Joi.string()
     ]
   })),
+  order: Joi.object().pattern(id, Joi.valid('asc', 'desc')),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(1).max(50000)
@@ -165,10 +166,15 @@ const normalizeQuery = (query) => {
     granularity: d.split('.')[2]
   }));
   const timezone = query.timezone || 'UTC';
+  const order = query.order && Object.keys(query.order).map(k => ({
+    id: k,
+    desc: query.order[k] === 'desc'
+  }));
   return {
     ...query,
     rowLimit: query.rowLimit || query.limit,
     timezone,
+    order,
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
