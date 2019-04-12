@@ -2,6 +2,7 @@
 const ApiGateway = require('@cubejs-backend/api-gateway');
 const crypto = require('crypto');
 const fs = require('fs-extra');
+const path = require('path');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
@@ -78,6 +79,8 @@ class CubejsServerCore {
           try {
             this.projectFingerprint =
               crypto.createHash('md5').update(JSON.stringify(await fs.readJson('package.json'))).digest('hex');
+            const coreServerJson = await fs.readJson(path.join(__dirname, '..', 'package.json'));
+            this.coreServerVersion = coreServerJson.version;
           } catch (e) {
             // console.error(e);
           }
@@ -87,6 +90,7 @@ class CubejsServerCore {
           anonymousId,
           properties: {
             projectFingerprint: this.projectFingerprint,
+            coreServerVersion: this.coreServerVersion,
             ...props
           }
         });

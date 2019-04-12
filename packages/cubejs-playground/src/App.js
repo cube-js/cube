@@ -23,7 +23,23 @@ class App extends Component {
         error: e
       });
       notification.error({
-        message: 'Error',
+        message: (
+          <span>
+            <b>Error</b>
+            &nbsp;😢
+            <div>
+              Ask about it in&nbsp;
+              <a
+                href="https://publicslack.com/slacks/cubejs/invites/new"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Slack
+              </a>
+              . These guys know how to fix this for sure!
+            </div>
+          </span>
+        ),
         description: e,
       });
     });
