@@ -3,7 +3,8 @@ title: String Time Dimensions
 permalink: /working-with-string-time-dimensions
 scope: cubejs
 category: Guides
-menuOrder: 4
+subCategory: Tutorials
+menuOrder: 19
 ---
 Cube.js always expects `timestamp with timezone` or compatible type as an input to time dimension.
 There're a lot of cases when in your underlying fact table datetime information is stored as a string.

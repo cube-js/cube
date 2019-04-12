@@ -3,7 +3,8 @@ title: Polymorphic Cubes
 permalink: /polymorphic-cubes
 scope: cubejs
 category: Guides
-menuOrder: 11
+subCategory: Tutorials
+menuOrder: 26
 ---
 
 [comment]: # (PROOFREAD: DONE)

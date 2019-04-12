@@ -3,7 +3,8 @@ title: 'Code Reusability: Extending Cubes'
 permalink: /extending-cubes
 scope: cubejs
 category: Guides
-menuOrder: 6
+subCategory: Tutorials
+menuOrder: 21
 ---
 
 [comment]: # (PROOFREAD: DONE)

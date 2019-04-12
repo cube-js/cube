@@ -3,7 +3,8 @@ title: Subquery
 permalink: /subquery
 scope: cubejs
 category: Guides
-menuOrder: 1
+subCategory: Tutorials
+menuOrder: 16
 ---
 
 [comment]: # (PROOFREAD: DONE)
