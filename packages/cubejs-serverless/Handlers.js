@@ -54,6 +54,8 @@ class Handlers {
       })
     };
     this.serverCore = new ServerCore(options);
+    this.api = this.api.bind(this);
+    this.process = this.process.bind(this);
   }
 
   getApiHandler() {
