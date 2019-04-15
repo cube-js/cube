@@ -11,6 +11,7 @@ const DevServer = require('./DevServer');
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
   mysql: '@cubejs-backend/mysql-driver',
+  mssql: '@cubejs-backend/mssql-driver',
   athena: '@cubejs-backend/athena-driver',
   jdbc: '@cubejs-backend/jdbc-driver',
   mongobi: '@cubejs-backend/mongobi-driver',
