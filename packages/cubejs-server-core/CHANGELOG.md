@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.7.0](https://github.com/statsbotco/cubejs-client/compare/v0.6.2...v0.7.0) (2019-04-15)
+
+
+### Features
+
+* App multi-tenancy support in single ServerCore instance ([6f0220f](https://github.com/statsbotco/cubejs-client/commit/6f0220f))
+
+
+
+
+
 ## [0.6.2](https://github.com/statsbotco/cubejs-client/compare/v0.6.1...v0.6.2) (2019-04-12)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
