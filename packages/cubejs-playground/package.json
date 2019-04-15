@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "dependencies": {
     "@babel/generator": "^7.4.0",
     "@babel/parser": "^7.4.2",
