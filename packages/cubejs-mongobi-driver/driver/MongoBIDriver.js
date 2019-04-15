@@ -9,8 +9,8 @@ class MongoBIDriver extends BaseDriver {
 
     let ssl = {};
 
-    if (process.env.CUBEJS_DB_SSL_PRESET) {
-      ssl = process.env.CUBEJS_DB_SSL_PRESET;
+    if (process.env.CUBEJS_DB_SSL) {
+      ssl = process.env.CUBEJS_DB_SSL;
     } else {
       const sslOptions = [
         { name: 'ca', value: 'CUBEJS_DB_SSL_CA' },
