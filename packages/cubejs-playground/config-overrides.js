@@ -7,7 +7,7 @@ module.exports = function override(config, env) {
       new TerserPlugin({
         cache: true,
         parallel: true,
-        chunkFilter: (chunk) => chunk.name.indexOf('babel') === -1 // && chunk.name.indexOf('vendors') === -1
+        // chunkFilter: (chunk) => chunk.name.indexOf('babel') === -1 // && chunk.name.indexOf('vendors') === -1
       })
     ],
     splitChunks: {

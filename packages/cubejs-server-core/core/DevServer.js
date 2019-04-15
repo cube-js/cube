@@ -1,5 +1,5 @@
 /* eslint-disable global-require */
-// Playground version: 0.7.1
+// Playground version: 0.7.2
 const fs = require('fs-extra');
 const path = require('path');
 const spawn = require('cross-spawn');
