@@ -2,29 +2,30 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/api-gateway@^0.4.5":
-  version "0.4.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.4.5.tgz#a4dbf10a39cd1225c97e6c86e8913d7de8325256"
-  integrity sha512-E3NNqQs4oq76n2e1G9yv0q6NdxWPT/MiFVwA83Zzg0hcM/V4QFj5d8f+x2Hx0iTJ+EYSPZ6UFLtJO7ef2xasgg==
+"@cubejs-backend/api-gateway@^0.6.2":
+  version "0.6.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.6.2.tgz#64a8f6f1975863907d6e38300160ca0fe63ad3f5"
+  integrity sha512-Dtv6GblNvNYK1y3Gb6S3lG1woULVgEWQpYttrKs3x8grUSF4AP7y+vpOpgq3abMaJhEG3FMR8hrbp308tUlq7A==
   dependencies:
+    chrono-node "^1.3.11"
     joi "^14.0.6"
     jsonwebtoken "^8.3.0"
     moment "^2.24.0"
     ramda "^0.25.0"
 
-"@cubejs-backend/query-orchestrator@^0.4.4":
-  version "0.4.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.4.4.tgz#92d2eeb9c85547d6b2ebbb698b3c8d1b05e6dfbd"
-  integrity sha512-GQHYCS3TcWk5jzoWTC9rPQG4Xw/atIok8GlQJtTgG1LRvKhldvKfveLZCKb7vqt//eqQri72/MLTmiJ4LrQ4tQ==
+"@cubejs-backend/query-orchestrator@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.6.0.tgz#5650556f9d9397777cc44384412dae68a3e6bb8d"
+  integrity sha512-Z04QvH+ZFHmztClHcnf4xA7LRxPcYHAI+c+6OcBzlNaz6GrIXyljlfhLqL904XrRm3ykuuW4WSp2HZ6pg9qJ9g==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
     util-promisifyall "^1.0.4"
 
-"@cubejs-backend/schema-compiler@^0.4.4":
-  version "0.4.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.4.4.tgz#a51dacf5e0abfd3d049e7c7645b734dd09078583"
-  integrity sha512-4oDV+K0vckD8jiLrldfist6a+LaUq1dirQHksckM7nXZJTMzGrmgqdpKMZWqVxjFbepqPzQLXEf4JhCIEZoSUg==
+"@cubejs-backend/schema-compiler@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.6.0.tgz#6c8a5c0cb2ec50e32bd66c19e3df4a08c4b26b2d"
+  integrity sha512-Rm76ice0kmPfocs1qbK70RvUCdCsqs/2vI/D/0hgqpxYCw8vxxUN/3aZE23673QA8f4yMdBT0Kk3zAS39dXEuA==
   dependencies:
     babel-generator "^6.25.0"
     babel-traverse "^6.25.0"
@@ -32,7 +33,7 @@
     babylon "^6.17.4"
     humps "^2.0.1"
     inflection "^1.12.0"
-    joi "^10.6.0"
+    joi "^14.3.1"
     moment-range "^4.0.1"
     moment-timezone "^0.5.13"
     node-dijkstra "^2.5.0"
@@ -310,6 +311,13 @@ charenc@~0.0.1:
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/charenc/-/charenc-0.0.2.tgz#c0a1d2f3a7092e03774bfa83f14c0fc5790a8667"
   integrity sha1-wKHS86cJLgN3S/qD8UwPxXkKhmc=
+
+chrono-node@^1.3.11:
+  version "1.3.11"
+  resolved "https://registry.yarnpkg.com/chrono-node/-/chrono-node-1.3.11.tgz#b86a26b7e3157edcc4fe3374e1b6f90caedc8e39"
+  integrity sha512-jDWRnY6nYvzfV3HPYBqo+tot7tcsUs9i3arGbMdI0TouPSXP2C2y/Ctp27rxKTQDi6yuTxAB2cw+Q6igGhOhdQ==
+  dependencies:
+    moment "2.21.0"
 
 circular-json@^0.3.1:
   version "0.3.3"
@@ -799,11 +807,6 @@ he@1.1.1:
   resolved "https://registry.yarnpkg.com/he/-/he-1.1.1.tgz#93410fd21b009735151f8868c2f271f3427e23fd"
   integrity sha1-k0EP0hsAlzUVH4howvJx80J+I/0=
 
-hoek@4.x.x:
-  version "4.2.1"
-  resolved "https://registry.yarnpkg.com/hoek/-/hoek-4.2.1.tgz#9634502aa12c445dd5a7c5734b572bb8738aacbb"
-  integrity sha512-QLg82fGkfnJ/4iy1xZ81/9SIJiq1NGFUMGs6ParyjBZr6jW2Ufj/snDqTHixNlHdPNwN2RLVD0Pi3igeK9+JfA==
-
 hoek@6.x.x:
   version "6.1.2"
   resolved "https://registry.yarnpkg.com/hoek/-/hoek-6.1.2.tgz#99e6d070561839de74ee427b61aa476bd6bddfd6"
@@ -923,11 +926,6 @@ isarray@~1.0.0:
   resolved "https://registry.yarnpkg.com/isarray/-/isarray-1.0.0.tgz#bb935d48582cba168c06834957a54a3e07124f11"
   integrity sha1-u5NdSFgsuhaMBoNJV6VKPgcSTxE=
 
-isemail@2.x.x:
-  version "2.2.1"
-  resolved "https://registry.yarnpkg.com/isemail/-/isemail-2.2.1.tgz#0353d3d9a62951080c262c2aa0a42b8ea8e9e2a6"
-  integrity sha1-A1PT2aYpUQgMJiwqoKQrjqjp4qY=
-
 isemail@3.x.x:
   version "3.2.0"
   resolved "https://registry.yarnpkg.com/isemail/-/isemail-3.2.0.tgz#59310a021931a9fb06bbb51e155ce0b3f236832c"
@@ -949,22 +947,7 @@ istextorbinary@2.2.1:
     editions "^1.3.3"
     textextensions "2"
 
-items@2.x.x:
-  version "2.1.2"
-  resolved "https://registry.yarnpkg.com/items/-/items-2.1.2.tgz#0849354595805d586dac98e7e6e85556ea838558"
-  integrity sha512-kezcEqgB97BGeZZYtX/MA8AG410ptURstvnz5RAgyFZ8wQFPMxHY8GpTq+/ZHKT3frSlIthUq7EvLt9xn3TvXg==
-
-joi@^10.6.0:
-  version "10.6.0"
-  resolved "https://registry.yarnpkg.com/joi/-/joi-10.6.0.tgz#52587f02d52b8b75cdb0c74f0b164a191a0e1fc2"
-  integrity sha512-hBF3LcqyAid+9X/pwg+eXjD2QBZI5eXnBFJYaAkH4SK3mp9QSRiiQnDYlmlz5pccMvnLcJRS4whhDOTCkmsAdQ==
-  dependencies:
-    hoek "4.x.x"
-    isemail "2.x.x"
-    items "2.x.x"
-    topo "2.x.x"
-
-joi@^14.0.6:
+joi@^14.0.6, joi@^14.3.1:
   version "14.3.1"
   resolved "https://registry.yarnpkg.com/joi/-/joi-14.3.1.tgz#164a262ec0b855466e0c35eea2a885ae8b6c703c"
   integrity sha512-LQDdM+pkOrpAn4Lp+neNIFV3axv1Vna3j38bisbQhETPMANYRbFJFUyOZcOClYvM/hppMhGWuKSFEK9vjrB+bQ==
@@ -1186,6 +1169,11 @@ moment-timezone@^0.5.13:
   integrity sha512-WHFH85DkCfiNMDX5D3X7hpNH3/PUhjTGcD0U1SgfBGZxJ3qUmJh5FdvaFjcClxOvB3rzdfj4oRffbI38jEnC1w==
   dependencies:
     moment ">= 2.9.0"
+
+moment@2.21.0:
+  version "2.21.0"
+  resolved "https://registry.yarnpkg.com/moment/-/moment-2.21.0.tgz#2a114b51d2a6ec9e6d83cf803f838a878d8a023a"
+  integrity sha512-TCZ36BjURTeFTM/CwRcViQlfkMvL1/vFISuNLO5GkcVm1+QHfbSiNqZuWeMFjj1/3+uAjXswgRk30j1kkLYJBQ==
 
 "moment@>= 2.9.0":
   version "2.23.0"
@@ -1708,13 +1696,6 @@ to-fast-properties@^1.0.3:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/to-fast-properties/-/to-fast-properties-1.0.3.tgz#b83571fa4d8c25b82e231b06e3a3055de4ca1a47"
   integrity sha1-uDVx+k2MJbguIxsG46MFXeTKGkc=
-
-topo@2.x.x:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/topo/-/topo-2.0.2.tgz#cd5615752539057c0dc0491a621c3bc6fbe1d182"
-  integrity sha1-zVYVdSU5BXwNwEkaYhw7xvvh0YI=
-  dependencies:
-    hoek "4.x.x"
 
 topo@3.x.x:
   version "3.0.3"

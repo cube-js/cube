@@ -1063,10 +1063,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.4.5":
-  version "0.4.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.4.5.tgz#6df4b6c15fbf678323d14bbaae83607ca1ebe437"
-  integrity sha512-EGitKr6zPtsOcMyFSDe6fLKS7nzFhMIptnbMgEPbvfhlqw4CyvSACSBoThMC4Sa3NVOjpmGOTnzKrglzegE3sw==
+"@cubejs-client/core@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.6.0.tgz#86b36526936a569e9de0b61bab4aecf9f9bb7584"
+  integrity sha512-z23Hghs6QH5E1/8nNAzqjWRtlmyqIsIFM8oSjj+/5npjwVl63RgHILex+nNzlTCanYZrHtkC+Fnta4ThmG9O5g==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -1075,10 +1075,10 @@
     ramda "^0.25.0"
     whatwg-fetch "^3.0.0"
 
-"@cubejs-client/react@^0.4.5":
-  version "0.4.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.4.5.tgz#4cc4dbf86865a53a37d63f8ee09ff1f5653cf078"
-  integrity sha512-hryecjoLOqFs1fEHtu0ErZZidbDGQIw6CJiUVXzQbqt7jhh7/GaD3jVcbshm0UDfH9sAPDKoYT0+jZv54o2lbA==
+"@cubejs-client/react@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.6.0.tgz#31516d96467a3d09fb018fb00b9f619cb465b7e1"
+  integrity sha512-9xwVp7ankCrF4wVdEbnYLNYNHMInavJCGnKObKhpzpAV0gqD3sGZHPAzmS2bf+WzxF9PWDkIJiooUCiTlJT9pQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     prop-types "^15.6.2"
@@ -10806,6 +10806,20 @@ terser-webpack-plugin@1.2.2, terser-webpack-plugin@^1.1.0:
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/terser-webpack-plugin/-/terser-webpack-plugin-1.2.2.tgz#9bff3a891ad614855a7dde0d707f7db5a927e3d9"
   integrity sha512-1DMkTk286BzmfylAvLXwpJrI7dWa5BnFmscV/2dCr8+c56egFcbaeFAl7+sujAjdmpLam21XRdhA4oifLyiWWg==
+  dependencies:
+    cacache "^11.0.2"
+    find-cache-dir "^2.0.0"
+    schema-utils "^1.0.0"
+    serialize-javascript "^1.4.0"
+    source-map "^0.6.1"
+    terser "^3.16.1"
+    webpack-sources "^1.1.0"
+    worker-farm "^1.5.2"
+
+terser-webpack-plugin@^1.2.3:
+  version "1.2.3"
+  resolved "https://registry.yarnpkg.com/terser-webpack-plugin/-/terser-webpack-plugin-1.2.3.tgz#3f98bc902fac3e5d0de730869f50668561262ec8"
+  integrity sha512-GOK7q85oAb/5kE12fMuLdn2btOS9OBZn4VsecpHDywoUC/jLhSAKOiYo0ezx7ss2EXPMzyEWFoE0s1WLE+4+oA==
   dependencies:
     cacache "^11.0.2"
     find-cache-dir "^2.0.0"

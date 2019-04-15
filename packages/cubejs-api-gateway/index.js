@@ -221,8 +221,8 @@ class ApiGateway {
         });
         const normalizedQuery = normalizeQuery(query);
         const [compilerSqlResult, metaConfigResult] = await Promise.all([
-          this.compilerApi.getSql(coerceForSqlQuery(normalizedQuery, req)),
-          this.compilerApi.metaConfig()
+          this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req)),
+          this.getCompilerApi(req).metaConfig()
         ]);
         const sqlQuery = compilerSqlResult;
         const metaConfig = metaConfigResult;
@@ -231,7 +231,7 @@ class ApiGateway {
         const toExecute = {
           ...sqlQuery, query: sqlQuery.sql[0], values: sqlQuery.sql[1], continueWait: true
         };
-        const response = await this.adapterApi.executeQuery(toExecute);
+        const response = await this.getAdapterApi(req).executeQuery(toExecute);
         this.log(req, {
           type: 'Load Request Success',
           query: req.query.query,
@@ -255,7 +255,7 @@ class ApiGateway {
       try {
         const query = JSON.parse(req.query.query);
         const normalizedQuery = normalizeQuery(query);
-        const sqlQuery = await this.compilerApi.getSql(coerceForSqlQuery(normalizedQuery, req));
+        const sqlQuery = await this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req));
         res.json({
           sql: sqlQuery
         });
@@ -266,13 +266,31 @@ class ApiGateway {
 
     app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
       try {
-        const metaConfig = await this.compilerApi.metaConfig();
+        const metaConfig = await this.getCompilerApi(req).metaConfig();
         const cubes = metaConfig.map(c => c.config);
         res.json({ cubes });
       } catch (e) {
         this.handleError(e, req, res);
       }
     }));
+  }
+
+  getCompilerApi(req) {
+    if (typeof this.compilerApi === 'function') {
+      return this.compilerApi(this.contextByReq(req));
+    }
+    return this.compilerApi;
+  }
+
+  getAdapterApi(req) {
+    if (typeof this.adapterApi === 'function') {
+      return this.adapterApi(this.contextByReq(req));
+    }
+    return this.adapterApi;
+  }
+
+  contextByReq(req) {
+    return { authInfo: req.authInfo };
   }
 
   handleError(e, req, res) {

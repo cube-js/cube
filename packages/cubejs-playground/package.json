@@ -34,7 +34,7 @@
   },
   "scripts": {
     "start": "react-app-rewired start",
-    "build": "react-app-rewired build && cp -R build/ ../cubejs-server-core/playground/",
+    "build": "react-app-rewired build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject"
   },
@@ -59,6 +59,7 @@
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.12.4",
-    "react-app-rewired": "^2.1.0"
+    "react-app-rewired": "^2.1.0",
+    "terser-webpack-plugin": "^1.2.3"
   }
 }

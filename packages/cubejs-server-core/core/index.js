@@ -66,6 +66,15 @@ class CubejsServerCore {
       }
     });
     this.repository = new FileRepository(this.schemaPath);
+    this.repositoryFactory = options.repositoryFactory || (() => this.repository);
+    this.contextToDbType = typeof options.dbType === 'function' ? options.dbType : () => options.dbType;
+    this.appIdToCompilerApi = {};
+    this.appIdToOrchestratorApi = {};
+    this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
+    this.orchestratorOptions =
+      typeof options.orchestratorOptions === 'function' ?
+        options.orchestratorOptions :
+        () => options.orchestratorOptions;
 
     const Analytics = require('analytics-node');
     const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
@@ -148,12 +157,10 @@ class CubejsServerCore {
 
   async initApp(app) {
     checkEnvForPlaceholders();
-    this.compilerApi = this.createCompilerApi(this.repository);
-    this.orchestratorApi = this.createOrchestratorApi();
     const apiGateway = new ApiGateway(
       this.apiSecret,
-      this.compilerApi,
-      this.orchestratorApi,
+      this.getCompilerApi.bind(this),
+      this.getOrchestratorApi.bind(this),
       this.logger, {
         basePath: this.options.basePath,
         checkAuthMiddleware: this.options.checkAuthMiddleware
@@ -165,18 +172,55 @@ class CubejsServerCore {
     }
   }
 
-  createCompilerApi(repository) {
-    return new CompilerApi(repository, this.dbType, {
-      schemaVersion: this.options.schemaVersion,
+  getCompilerApi(context) {
+    const appId = this.contextToAppId(context);
+    if (!this.appIdToCompilerApi[appId]) {
+      this.appIdToCompilerApi[appId] = this.createCompilerApi(
+        this.repositoryFactory(context), {
+          dbType: this.contextToDbType(context),
+          schemaVersion: this.options.schemaVersion && (() => this.options.schemaVersion(context))
+        }
+      );
+    }
+    return this.appIdToCompilerApi[appId];
+  }
+
+  getOrchestratorApi(context) {
+    const appId = this.contextToAppId(context);
+    if (!this.appIdToOrchestratorApi[appId]) {
+      let driverPromise;
+      this.appIdToOrchestratorApi[appId] = this.createOrchestratorApi({
+        getDriver: () => {
+          if (!driverPromise) {
+            const driver = this.driverFactory(context);
+            driverPromise = driver.testConnection().then(() => driver).catch(e => {
+              driverPromise = null;
+              throw e;
+            });
+          }
+          return driverPromise;
+        },
+        redisPrefix: appId,
+        orchestratorOptions: this.orchestratorOptions(context)
+      });
+    }
+    return this.appIdToOrchestratorApi[appId];
+  }
+
+  createCompilerApi(repository, options) {
+    options = options || {};
+    return new CompilerApi(repository, options.dbType || this.dbType, {
+      schemaVersion: options.schemaVersion || this.options.schemaVersion,
       devServer: this.options.devServer,
       logger: this.logger
     });
   }
 
-  createOrchestratorApi() {
-    return new OrchestratorApi(() => this.getDriver(), this.logger, {
-      redisPrefix: process.env.CUBEJS_APP,
-      ...this.options.orchestratorOptions
+  createOrchestratorApi(options) {
+    options = options || {};
+    return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
+      redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
+      ...(options.orchestratorOptions || this.options.orchestratorOptions)
     });
   }
 
