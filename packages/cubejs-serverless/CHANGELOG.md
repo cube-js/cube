@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.1](https://github.com/statsbotco/cubejs-client/compare/v0.7.0...v0.7.1) (2019-04-15)
+
+
+### Bug Fixes
+
+* **serverless:** `getApiHandler` called on undefined ([0ee5121](https://github.com/statsbotco/cubejs-client/commit/0ee5121))
+
+
+
+
+
 # [0.7.0](https://github.com/statsbotco/cubejs-client/compare/v0.6.2...v0.7.0) (2019-04-15)
 
 
