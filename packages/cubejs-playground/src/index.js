@@ -9,7 +9,7 @@ import DashboardPage from './DashboardPage';
 import App from './App';
 import { page } from './events';
 
-const history = createHashHistory({ basename: process.env.PUBLIC_URL });
+const history = createHashHistory();
 history.listen((location) => {
   page(location);
 });

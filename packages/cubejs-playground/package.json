@@ -52,6 +52,7 @@
     "public",
     "build"
   ],
+  "homepage": ".",
   "proxy": "http://localhost:4000",
   "license": "MIT",
   "devDependencies": {
