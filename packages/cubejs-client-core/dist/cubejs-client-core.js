@@ -30,7 +30,7 @@ var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'))
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
 require('core-js/modules/es6.promise');
-var whatwgFetch = require('whatwg-fetch');
+require('isomorphic-fetch');
 
 var moment = momentRange.extendMoment(Moment);
 var TIME_SERIES = {
@@ -634,7 +634,8 @@ function () {
   _createClass(CubejsApi, [{
     key: "request",
     value: function request(url, config) {
-      return whatwgFetch.fetch("".concat(this.apiUrl).concat(url), Object.assign({
+      // eslint-disable-next-line no-undef
+      return fetch("".concat(this.apiUrl).concat(url), Object.assign({
         headers: {
           Authorization: this.apiToken,
           'Content-Type': 'application/json'
@@ -727,7 +728,7 @@ function () {
                   return _context.stop();
               }
             }
-          }, _callee);
+          }, _callee, this);
         }));
 
         return function loadImpl() {

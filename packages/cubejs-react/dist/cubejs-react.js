@@ -293,11 +293,9 @@ function (_React$Component) {
         }, _callee, this);
       }));
 
-      function componentDidMount() {
+      return function componentDidMount() {
         return _componentDidMount.apply(this, arguments);
-      }
-
-      return componentDidMount;
+      };
     }()
   }, {
     key: "isQueryPresent",
@@ -336,7 +334,7 @@ function (_React$Component) {
           add: function add(member) {
             var query = _this2.state.query;
 
-            _this2.setState(_this2.applyQueryChangeHeuristics({
+            _this2.setState(_this2.applyStateChangeHeuristics({
               query: _objectSpread({}, query, _defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))))
             }));
           },
@@ -344,7 +342,7 @@ function (_React$Component) {
             var query = _this2.state.query;
             var members = (query[memberType] || []).concat([]);
             members.splice(member.index, 1);
-            return _this2.setState(_this2.applyQueryChangeHeuristics({
+            return _this2.setState(_this2.applyStateChangeHeuristics({
               query: _objectSpread({}, query, _defineProperty({}, memberType, members))
             }));
           },
@@ -352,7 +350,7 @@ function (_React$Component) {
             var query = _this2.state.query;
             var members = (query[memberType] || []).concat([]);
             members.splice(member.index, 1, toQuery(updateWith));
-            return _this2.setState(_this2.applyQueryChangeHeuristics({
+            return _this2.setState(_this2.applyStateChangeHeuristics({
               query: _objectSpread({}, query, _defineProperty({}, memberType, members))
             }));
           }
@@ -430,7 +428,7 @@ function (_React$Component) {
         updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
         updateFilters: updateMethods('filters', toFilter),
         updateChartType: function updateChartType(newChartType) {
-          return _this2.setState(_this2.applyQueryChangeHeuristics({
+          return _this2.setState(_this2.applyStateChangeHeuristics({
             chartType: newChartType
           }));
         }
@@ -554,17 +552,17 @@ function (_React$Component) {
       return newState;
     }
   }, {
-    key: "applyQueryChangeHeuristics",
-    value: function applyQueryChangeHeuristics(newState) {
+    key: "applyStateChangeHeuristics",
+    value: function applyStateChangeHeuristics(newState) {
       var _this$props = this.props,
-          queryChangeHeuristics = _this$props.queryChangeHeuristics,
+          stateChangeHeuristics = _this$props.stateChangeHeuristics,
           disableHeuristics = _this$props.disableHeuristics;
 
       if (disableHeuristics) {
         return newState;
       }
 
-      return queryChangeHeuristics && queryChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
+      return stateChangeHeuristics && stateChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
     }
   }, {
     key: "render",
@@ -592,14 +590,14 @@ function (_React$Component) {
 }(React.Component);
 QueryBuilder.propTypes = {
   render: PropTypes.func,
-  queryChangeHeuristics: PropTypes.func,
+  stateChangeHeuristics: PropTypes.func,
   cubejsApi: PropTypes.object.isRequired,
   disableHeuristics: PropTypes.bool,
   query: PropTypes.object
 };
 QueryBuilder.defaultProps = {
   query: {},
-  queryChangeHeuristics: null,
+  stateChangeHeuristics: null,
   disableHeuristics: false,
   render: null
 };

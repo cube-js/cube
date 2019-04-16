@@ -23,7 +23,7 @@ const bundle = (name, globalName, baseConfig) => {
       ...baseConfig.plugins,
       commonjs(),
       resolve({
-        module: true
+        mainFields: ['browser', 'module', 'main']
       }),
       babel({
         exclude: ['node_modules/**', /\/core-js\//],
