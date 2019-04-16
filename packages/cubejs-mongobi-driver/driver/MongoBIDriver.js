@@ -6,15 +6,40 @@ const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver
 class MongoBIDriver extends BaseDriver {
   constructor(config) {
     super();
+
+    let ssl = {};
+
+    if (process.env.CUBEJS_DB_SSL) {
+      ssl = process.env.CUBEJS_DB_SSL;
+    } else {
+      const sslOptions = [
+        { name: 'ca', value: 'CUBEJS_DB_SSL_CA' },
+        { name: 'cert', value: 'CUBEJS_DB_SSL_CERT' },
+        { name: 'ciphers', value: 'CUBEJS_DB_SSL_CIPHERS' },
+        { name: 'passphrase', value: 'CUBEJS_DB_SSL_PASSPHRASE' },
+      ];
+
+      ssl = sslOptions.reduce(
+        (agg, { name, value }) => ({
+          ...agg,
+          ...(process.env[value] ? { [name]: process.env[value] } : {}),
+        }),
+        {}
+      );
+
+      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
+        ssl.rejectUnauthorized =
+          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
+      }
+    }
+
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ssl: process.env.CUBEJS_DB_SSL && {
-        ssl: process.env.CUBEJS_DB_SSL
-      },
+      ssl,
       authSwitchHandler: (data, cb) => {
         const buffer = Buffer.from((process.env.CUBEJS_DB_PASS || '').concat('\0'));
         cb(null, buffer);
