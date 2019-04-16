@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.3](https://github.com/statsbotco/cubejs-client/compare/v0.7.2...v0.7.3) (2019-04-16)
+
+
+### Bug Fixes
+
+* Allow SSR: use isomorphic-fetch instead of whatwg-fetch. ([902e581](https://github.com/statsbotco/cubejs-client/commit/902e581)), closes [#1](https://github.com/statsbotco/cubejs-client/issues/1)
+
+
+
+
+
 # [0.7.0](https://github.com/statsbotco/cubejs-client/compare/v0.6.2...v0.7.0) (2019-04-15)
 
 **Note:** Version bump only for package @cubejs-client/core
