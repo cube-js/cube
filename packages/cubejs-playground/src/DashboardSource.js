@@ -28,11 +28,18 @@ const DashboardItem = ({ children, title }) => (
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
 class DashboardSource {
-  async load() {
+  async load(createApp) {
+    if (createApp) {
+      await fetchWithRetry('/playground/ensure-dashboard-app', undefined, 5);
+    }
     const res = await fetchWithRetry('/playground/dashboard-app-files', undefined, 5);
     const result = await res.json();
-    this.sourceFiles = result.fileContents;
-    this.parse(result.fileContents);
+    if (result.error) {
+      this.loadError = result.error;
+    } else {
+      this.sourceFiles = result.fileContents;
+      this.parse(result.fileContents);
+    }
   }
 
   async persist() {
@@ -192,7 +199,10 @@ class DashboardSource {
   }
 
   async addChart(chartCode) {
-    await this.load();
+    await this.load(true);
+    if (this.loadError) {
+      return;
+    }
     this.ensureDashboardIsInApp();
     this.performAddition(dashboardComponents);
     this.performAddition(chartCode);

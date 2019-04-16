@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Spin } from 'antd';
+import { Spin, Button } from 'antd';
 import DashboardSource from "./DashboardSource";
 import DashboardRenderer from './DashboardRenderer';
 
@@ -11,15 +11,43 @@ class DashboardPage extends Component {
 
   async componentDidMount() {
     this.dashboardSource = new DashboardSource();
-    await this.dashboardSource.load();
+    await this.loadDashboard();
+  }
+
+  async loadDashboard(createApp) {
     this.setState({
-      appCode: this.dashboardSource.dashboardAppCode(),
-      sourceFiles: this.dashboardSource.sourceFiles
+      appCode: null,
+      sourceFiles: null,
+      loadError: null
+    });
+    await this.dashboardSource.load(createApp);
+    this.setState({
+      appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardAppCode(),
+      sourceFiles: this.dashboardSource.sourceFiles,
+      loadError: this.dashboardSource.loadError
     });
   }
 
   render() {
-    const { appCode, sourceFiles } = this.state;
+    const { appCode, sourceFiles, loadError } = this.state;
+    if (loadError) {
+      return (
+        <div style={{ textAlign: 'center' }}>
+          <h2>
+            {loadError}
+          </h2>
+          <p style={{ textAlign: 'center' }}>
+            <Button
+              type="primary"
+              size="large"
+              onClick={() => this.loadDashboard(true)}
+            >
+              Create dashboard app template in your project directory
+            </Button>
+          </p>
+        </div>
+      );
+    }
     return appCode && <DashboardRenderer source={appCode} sourceFiles={sourceFiles}/>
       || (
         <h2 style={{ textAlign: 'center' }}>

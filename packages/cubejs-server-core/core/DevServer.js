@@ -85,8 +85,8 @@ class DevServer {
 
     const dashboardAppPath = this.cubejsServer.options.dashboardAppPath || 'dashboard-app';
 
-    app.get('/playground/dashboard-app-files', catchErrors(async (req, res) => {
-      this.cubejsServer.event('Dev Server Get Dashboard App Files');
+    app.get('/playground/ensure-dashboard-app', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server Ensure Dashboard App');
       if (!await fs.pathExists(dashboardAppPath) || this.createReactAppInit) {
         if (!this.createReactAppInit) {
           this.cubejsServer.event('Dev Server Create Dashboard App');
@@ -97,7 +97,29 @@ class DevServer {
         this.createReactAppInit = null;
       }
 
+      res.json();
+    }));
+
+    app.get('/playground/dashboard-app-files', catchErrors(async (req, res) => {
       const sourcePath = await path.join(dashboardAppPath, 'src');
+
+      if (this.createReactAppInit) {
+        await this.createReactAppInit;
+      }
+
+      if (!(await fs.pathExists(sourcePath))) {
+        res.status(404).json({
+          error: await fs.pathExists(dashboardAppPath) ?
+            `Dashboard app corrupted. Please remove '${dashboardAppPath}' directory and recreate it` :
+            `Dashboard app not found in '${dashboardAppPath}' directory`
+        });
+        return;
+      }
+
+      if (!(await fs.pathExists(sourcePath))) {
+        res.status(404).json({ error: 'Dashboard app not found' });
+        return;
+      }
 
       const files = await fs.readdir(sourcePath);
       const fileContents = (await Promise.all(files
