@@ -10,12 +10,8 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class BigqueryFilter extends BaseFilter {
-  containsWhere(column) {
-    return `LOWER(${column}) LIKE CONCAT('%', LOWER(?) ,'%')`;
-  }
-
-  notContainsWhere(column) {
-    return `LOWER(${column}) NOT LIKE CONCAT('%', LOWER(?) ,'%') OR ${column} IS NULL`;
+  likeIgnoreCase(column, not) {
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(?) ,'%')`;
   }
 
   castParameter() {

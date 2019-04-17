@@ -101,26 +101,21 @@ class BaseFilter extends BaseDimension {
   }
 
   containsWhere(column) {
-    if (this.isArrayValues()) {
-      return this.likeOr(column);
-    }
-
-    return `${column} ILIKE '%' || ? || '%'`;
+    return this.likeOr(column);
   }
 
   notContainsWhere(column) {
-    if (this.isArrayValues()) {
-      return this.likeOr(column, true);
-    }
-
-    return `${column} NOT ILIKE '%' || ? || '%' OR ${column} IS NULL`;
+    return this.likeOr(column, true);
   }
 
   likeOr(column, not) {
-    const basePart = `${column} ${not ? 'NOT' : ''} ILIKE '%' || ? || '%'`;
-    const multiplePart = `${not ? 'AND' : 'OR'} ${basePart}`;
+    const basePart = this.likeIgnoreCase(column, not);
     const nullCheck = `${not ? ` OR ${column} IS NULL` : ''}`;
-    return `${basePart} ${join(' ', repeat(multiplePart, this.values.length - 1))} ${nullCheck}`;
+    return `${join(not ? ' AND ' : ' OR ', repeat(basePart, this.values.length))}${nullCheck}`;
+  }
+
+  likeIgnoreCase(column, not) {
+    return `${column}${not ? ' NOT' : ''} ILIKE '%' || ? || '%'`;
   }
 
   equalsWhere(column) {

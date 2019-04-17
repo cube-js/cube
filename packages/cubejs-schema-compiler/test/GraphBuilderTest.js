@@ -1236,6 +1236,28 @@ describe('JoinGraph', () => {
     ])
   );
 
+  it(
+    'contains filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins.source',
+        operator: 'contains',
+        values: ['goo']
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    }, [
+      { 'visitors.source': 'some' }
+    ])
+  );
+
   it('year granularity', () =>
     runQueryTest({
       measures: [

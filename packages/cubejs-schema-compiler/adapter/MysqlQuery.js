@@ -12,12 +12,8 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class MysqlFilter extends BaseFilter {
-  containsWhere(column) {
-    return `${column} LIKE CONCAT('%', ?, '%')`;
-  }
-
-  notContainsWhere(column) {
-    return `${column} NOT LIKE CONCAT('%', ?, '%') OR ${column} IS NULL`;
+  likeIgnoreCase(column, not) {
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ?, '%')`;
   }
 }
 
