@@ -1,5 +1,5 @@
 const redis = require('redis');
-const promisifyAll = require('util-promisifyall');
+const { promisifyAll } = require('bluebird');
 const R = require('ramda');
 
 const BaseQueueDriver = require('./BaseQueueDriver');
