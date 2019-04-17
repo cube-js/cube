@@ -102,7 +102,7 @@ const operators = [
 ];
 
 const querySchema = Joi.object().keys({
-  measures: Joi.array().items(id.required()),
+  measures: Joi.array().items(id),
   dimensions: Joi.array().items(dimensionWithTime),
   filters: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
@@ -121,13 +121,21 @@ const querySchema = Joi.object().keys({
   segments: Joi.array().items(id),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(1).max(50000)
-}).or("measures", "dimensions");
+});
 
 const normalizeQuery = (query) => {
   // eslint-disable-next-line no-unused-vars
   const { error, value } = Joi.validate(query, querySchema);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+  }
+  const validQuery = query.measures && query.measures.length ||
+    query.dimensions && query.dimensions.length ||
+    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
+  if (!validQuery) {
+    throw new UserError(
+      'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
+    );
   }
   const filterWithoutOperator = (query.filters || []).find(f => !f.operator);
   if (filterWithoutOperator) {
