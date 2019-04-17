@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.4](https://github.com/statsbotco/cubejs-client/compare/v0.7.3...v0.7.4) (2019-04-17)
+
+
+### Bug Fixes
+
+* Make dashboard app creation explicit. Show error messages if dashboard failed to create. ([3b2a22b](https://github.com/statsbotco/cubejs-client/commit/3b2a22b))
+
+
+
+
+
 ## [0.7.2](https://github.com/statsbotco/cubejs-client/compare/v0.7.1...v0.7.2) (2019-04-15)
 
 

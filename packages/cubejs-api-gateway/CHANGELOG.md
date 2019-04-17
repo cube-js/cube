@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.4](https://github.com/statsbotco/cubejs-client/compare/v0.7.3...v0.7.4) (2019-04-17)
+
+
+### Bug Fixes
+
+* **api-gateway:** measures is always required ([04adb7d](https://github.com/statsbotco/cubejs-client/commit/04adb7d))
+
+
+
+
+
 # [0.7.0](https://github.com/statsbotco/cubejs-client/compare/v0.6.2...v0.7.0) (2019-04-15)
 
 
