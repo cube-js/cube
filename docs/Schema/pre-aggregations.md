@@ -29,7 +29,7 @@ You can use `0-9`,`_` and letters when naming pre-aggregations.
 ## Original SQL
 
 Original SQL pre-aggregation is a simplest type of pre-aggregation.
-As the name states it justs persists SQL of a cube where it's defined.
+As the name states it just persists SQL of a cube where it's defined.
 
 For example you can materialize all completed `Orders` as following:
 ```javascript
@@ -46,23 +46,41 @@ cube(`Orders`, {
 
 ## Rollup
 
+Rollup pre-aggregations are most effective way to boost performance of any analytical application.
+Blazing fast performance of tools like Google Analytics or Mixpanel backed by similar concept.
+Theory behind it lies in multi-dimensional analysis and Rollup pre-aggregation is in fact result of [Roll-up Operation on a OLAP cube](https://en.wikipedia.org/wiki/OLAP_cube#Operations).
+Rollup pre-aggregation is basically summarized data of original cube grouped by selected dimensions of interest.
+
+The most winning type of Rollup pre-aggregation is Additive Rollup: all measures of which are based on [Decomposable aggregate functions](https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions).
+Additive measure types are: `count`, `sum`, `min`, `max` or `countDistinctApprox`.
+Performance boost in this case is based on two main properties of Additive Rollup pre-aggregation:
+1. Rollup pre-aggregation table usually contains much less rows than an original fact table.
+Less dimensions you selected to roll-up less rows you get.
+Less rows means less time to query Rollup pre-aggregation tables.
+2. If your query is in fact subset of dimensions and measures of Additive Rollup then it can be used to calculate such query without accessing raw data.
+More dimensions and measures you select to roll-up more queries you can cover with this particular Rollup.
+
+### Rollup selection rules
+
 Rollup pre-aggregation defines set of measures and dimensions used to construct query for pre-aggregation table.
 Each query issued against cube where pre-aggregation is defined will be checked if specific rollup pre-aggregation can be used by following algorithm:
 1. Determine type of a query as one of *Additive*, *Leaf Measure Additive*, *Not Additive*.
-2. If query is *Additive* check if rollup contains all dimensions and measures used in query.
-3. If query is *Leaf Measure Additive* check if rollup contains all dimensions and all *Leaf Measures* used in query.
+2. If query is *Additive* check if rollup contains all dimensions, filter dimensions and measures used in query.
+3. If query is *Leaf Measure Additive* check if rollup contains all dimensions, filter dimensions and *Leaf Measures* used in query.
 4. If query is *Not Additive* check if query time dimension granularity is set, all query filter dimensions are included in query dimensions, rollup defines exact set of dimensions used in query and rollup contains all measures used in query.
 
 Here:
-- Query is *Additive* if all of it's measures are either `count`, `sum` or `countDistinctApprox` type.
-- Query is *Leaf Measure Additive* if all of it's *Leaf Measures* are either `count`, `sum` or `countDistinctApprox` type.
+- Query is *Additive* if all of it's measures are either `count`, `sum`, `min`, `max` or `countDistinctApprox` type.
+- Query is *Leaf Measure Additive* if all of it's *Leaf Measures* are either `count`, `sum`, `min`, `max` or `countDistinctApprox` type.
 - Query is *Not Additive* if it's not *Additive* and not *Leaf Measure Additive*.
 - *Leaf Measures* are measures that do not reference any other measures in it's definition.
 - Time dimension together with granularity constitute dimension.
 
+### Rollup examples
+
 There're two types of definitions allowed for rollup pre-aggregation: with or without time dimension.
 
-Rollup pre-aggregation can be defined as following:
+Let's consider an example:
 
 ```javascript
 cube(`Orders`, {
@@ -109,7 +127,7 @@ cube(`Orders`, {
 ```
 
 Granularity can be either `hour`, `day`, `week` or `month`.
-If `timeDimensionReference` is set, `granularity` should be set as well otherwise it should be ommitted.
+If `timeDimensionReference` is set, `granularity` should be set as well otherwise it should be omitted.
 
 In this particular example these queries will use `categoryAndDate` pre-aggregation:
 - Order Revenue by Category this month
