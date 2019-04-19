@@ -1,11 +1,7 @@
-const redis = require('redis');
-const promisifyAll = require('util-promisifyall');
 const R = require('ramda');
 
 const BaseQueueDriver = require('./BaseQueueDriver');
-
-promisifyAll(redis.RedisClient.prototype);
-promisifyAll(redis.Multi.prototype);
+const createRedisClient = require('./RedisFactory');
 
 class RedisQueueDriverConnection {
   constructor(driver, options) {
@@ -20,13 +16,13 @@ class RedisQueueDriverConnection {
 
   async getResultBlocking(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
-    const result = await this.redisClient.brpopAsync([resultListKey, this.continueWaitTimeout]);
+    const result = await this.redisClient.brpop([resultListKey, this.continueWaitTimeout]);
     return result && JSON.parse(result[1]);
   }
 
   async getResult(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
-    const result = await this.redisClient.rpopAsync(resultListKey);
+    const result = await this.redisClient.rpop(resultListKey);
     return result && JSON.parse(result);
   }
 
@@ -46,11 +42,11 @@ class RedisQueueDriverConnection {
   }
 
   getToProcessQueries() {
-    return this.redisClient.zrangeAsync([this.toProcessRedisKey(), 0, -1]);
+    return this.redisClient.zrange([this.toProcessRedisKey(), 0, -1]);
   }
 
   getActiveQueries() {
-    return this.redisClient.zrangeAsync([this.activeRedisKey(), 0, -1]);
+    return this.redisClient.zrange([this.activeRedisKey(), 0, -1]);
   }
 
   async getQueryAndRemove(queryKey) {
@@ -84,13 +80,13 @@ class RedisQueueDriverConnection {
   }
 
   getOrphanedQueries() {
-    return this.redisClient.zrangebyscoreAsync(
+    return this.redisClient.zrangebyscore(
       [this.recentRedisKey(), 0, (new Date().getTime() - this.orphanedTimeout * 1000)]
     );
   }
 
   getStalledQueries() {
-    return this.redisClient.zrangebyscoreAsync(
+    return this.redisClient.zrangebyscore(
       [this.activeRedisKey(), 0, (new Date().getTime() - this.heartBeatTimeout * 1000)]
     );
   }
@@ -105,12 +101,12 @@ class RedisQueueDriverConnection {
   }
 
   async getQueryDef(queryKey) {
-    const query = await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]);
+    const query = await this.redisClient.hget([this.queriesDefKey(), this.redisHash(queryKey)]);
     return JSON.parse(query);
   }
 
   updateHeartBeat(queryKey) {
-    return this.redisClient.zaddAsync([this.activeRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
+    return this.redisClient.zadd([this.activeRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
   }
 
   retrieveForProcessing(queryKey) {
@@ -182,7 +178,7 @@ class RedisQueueDriverConnection {
 class RedisQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
-    this.createRedisClient = options.createRedisClient || (() => redis.createClient(process.env.REDIS_URL));
+    this.createRedisClient = options.createRedisClient || (() => createRedisClient(process.env.REDIS_URL));
     this.options = options;
   }
 
