@@ -72,6 +72,9 @@ class DashboardSource {
 
   parse(sourceFiles) {
     this.appFile = sourceFiles.find(f => f.fileName.indexOf('src/App.js') !== -1);
+    if (!this.appFile) {
+      throw new Error(`src/App.js file not found. Can't parse dashboard app.`);
+    }
     this.appAst = parse(this.appFile.content, {
       sourceFilename: this.appFile.fileName,
       sourceType: 'module',
@@ -252,7 +255,7 @@ class DashboardSource {
   }
 
   dashboardAppCode() {
-    return generator(this.appAst, {}, this.appFile.content).code;
+    return this.appAst && generator(this.appAst, {}, this.appFile.content).code;
   }
 }
 
