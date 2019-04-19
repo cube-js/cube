@@ -41,7 +41,10 @@ You can set up a custom refresh check SQL by changing [refreshKey](cube#paramete
 
 The **pre-aggregation** engine builds a layer of aggregated data in your database during the runtime and maintains it to be up-to-date.
 
-![](https://media.graphcms.com/vDrAJk9eREy9wxVBllzj)
+<img
+src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/pre-aggregations-schema.png"
+style="border: none"
+/>
 
 Upon an incoming request, Cube.js will first look for a relevant pre-aggregation. If it cannot find any, it will build a new one. Once the pre-aggregation is built, all the subsequent requests will go to the pre-aggregated layer instead of hitting the raw data. It could speed the response time by hundreds or even thousands of times.
 
