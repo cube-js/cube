@@ -1,4 +1,4 @@
-import 'isomorphic-fetch';
+import fetch from 'cross-fetch';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
