@@ -105,10 +105,11 @@ const querySchema = Joi.object().keys({
   measures: Joi.array().items(id),
   dimensions: Joi.array().items(dimensionWithTime),
   filters: Joi.array().items(Joi.object().keys({
-    dimension: id.required(),
+    dimension: id,
+    member: id,
     operator: Joi.valid(operators).required(),
     values: Joi.array().items(Joi.string().allow(''))
-  })),
+  }).xor('dimension', 'member')),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
     granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', null),
@@ -183,6 +184,12 @@ const normalizeQuery = (query) => {
     rowLimit: query.rowLimit || query.limit,
     timezone,
     order,
+    filters: (query.filters || []).map(f => (
+      {
+        ...f,
+        dimension: (f.dimension || f.member)
+      }
+    )),
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
