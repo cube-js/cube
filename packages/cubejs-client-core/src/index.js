@@ -1,4 +1,4 @@
-import 'isomorphic-fetch';
+import fetch from 'cross-fetch';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
@@ -24,7 +24,6 @@ class CubejsApi {
   }
 
   request(url, config) {
-    // eslint-disable-next-line no-undef
     return fetch(
       `${this.apiUrl}${url}`,
       Object.assign({ headers: { Authorization: this.apiToken, 'Content-Type': 'application/json' }}, config || {})

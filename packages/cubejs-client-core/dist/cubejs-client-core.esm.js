@@ -1,36 +1,32 @@
-'use strict';
-
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
-
-require('core-js/modules/es6.number.constructor');
-require('core-js/modules/es6.number.parse-float');
-var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
-var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
-require('core-js/modules/es6.object.assign');
-var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
-require('core-js/modules/es6.array.reduce');
-require('core-js/modules/es6.array.find');
-require('core-js/modules/es6.array.filter');
-var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
-var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
-var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
-require('core-js/modules/es6.string.iterator');
-require('core-js/modules/es6.array.from');
-require('core-js/modules/es6.array.map');
-var ramda = require('ramda');
-var Moment = _interopDefault(require('moment'));
-var momentRange = _interopDefault(require('moment-range'));
-require('core-js/modules/web.dom.iterable');
-require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.keys');
-require('core-js/modules/es6.array.is-array');
-require('core-js/modules/es6.regexp.split');
-require('core-js/modules/es6.function.name');
-var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
-require('regenerator-runtime/runtime');
-var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
-require('core-js/modules/es6.promise');
-var fetch = _interopDefault(require('cross-fetch'));
+import 'core-js/modules/es6.number.constructor';
+import 'core-js/modules/es6.number.parse-float';
+import _objectSpread from '@babel/runtime/helpers/objectSpread';
+import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
+import 'core-js/modules/es6.object.assign';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
+import 'core-js/modules/es6.array.reduce';
+import 'core-js/modules/es6.array.find';
+import 'core-js/modules/es6.array.filter';
+import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
+import _createClass from '@babel/runtime/helpers/createClass';
+import 'core-js/modules/es6.string.iterator';
+import 'core-js/modules/es6.array.from';
+import 'core-js/modules/es6.array.map';
+import { groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, fromPairs } from 'ramda';
+import Moment from 'moment';
+import momentRange from 'moment-range';
+import 'core-js/modules/web.dom.iterable';
+import 'core-js/modules/es6.array.iterator';
+import 'core-js/modules/es6.object.keys';
+import 'core-js/modules/es6.array.is-array';
+import 'core-js/modules/es6.regexp.split';
+import 'core-js/modules/es6.function.name';
+import _regeneratorRuntime from '@babel/runtime/regenerator';
+import 'regenerator-runtime/runtime';
+import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+import 'core-js/modules/es6.promise';
+import fetch from 'cross-fetch';
 
 var moment = momentRange.extendMoment(Moment);
 var TIME_SERIES = {
@@ -170,14 +166,14 @@ function () {
       var dateRange = timeDimension.dateRange;
 
       if (!dateRange) {
-        var dates = ramda.pipe(ramda.map(function (row) {
+        var dates = pipe(map(function (row) {
           return row[timeDimension.dimension] && moment(row[timeDimension.dimension]);
-        }), ramda.filter(function (r) {
+        }), filter(function (r) {
           return !!r;
         }))(this.loadResponse.data);
-        dateRange = dates.length && [ramda.reduce(ramda.minBy(function (d) {
+        dateRange = dates.length && [reduce(minBy(function (d) {
           return d.toDate();
-        }), dates[0], dates), ramda.reduce(ramda.maxBy(function (d) {
+        }), dates[0], dates), reduce(maxBy(function (d) {
           return d.toDate();
         }), dates[0], dates)] || null;
       }
@@ -202,7 +198,7 @@ function () {
       var _this2 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      var groupByXAxis = ramda.groupBy(function (_ref3) {
+      var groupByXAxis = groupBy(function (_ref3) {
         var xValues = _ref3.xValues;
         return _this2.axisValuesString(xValues);
       }); // eslint-disable-next-line no-unused-vars
@@ -211,7 +207,7 @@ function () {
         return row[measure];
       };
 
-      if (pivotConfig.fillMissingDates && pivotConfig.x.length === 1 && ramda.equals(pivotConfig.x, (this.loadResponse.query.timeDimensions || []).filter(function (td) {
+      if (pivotConfig.fillMissingDates && pivotConfig.x.length === 1 && equals(pivotConfig.x, (this.loadResponse.query.timeDimensions || []).filter(function (td) {
         return !!td.granularity;
       }).map(function (td) {
         return td.dimension;
@@ -220,7 +216,7 @@ function () {
 
         if (series) {
           groupByXAxis = function groupByXAxis(rows) {
-            var byXValues = ramda.groupBy(function (_ref4) {
+            var byXValues = groupBy(function (_ref4) {
               var xValues = _ref4.xValues;
               return moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
             }, rows);
@@ -241,25 +237,25 @@ function () {
         }
       }
 
-      var xGrouped = ramda.pipe(ramda.map(function (row) {
+      var xGrouped = pipe(map(function (row) {
         return _this2.axisValues(pivotConfig.x)(row).map(function (xValues) {
           return {
             xValues: xValues,
             row: row
           };
         });
-      }), ramda.unnest, groupByXAxis, ramda.toPairs)(this.loadResponse.data);
-      var allYValues = ramda.pipe(ramda.map( // eslint-disable-next-line no-unused-vars
+      }), unnest, groupByXAxis, toPairs)(this.loadResponse.data);
+      var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
       function (_ref6) {
         var _ref7 = _slicedToArray(_ref6, 2),
             xValuesString = _ref7[0],
             rows = _ref7[1];
 
-        return ramda.unnest(rows.map(function (_ref8) {
+        return unnest(rows.map(function (_ref8) {
           var row = _ref8.row;
           return _this2.axisValues(pivotConfig.y)(row);
         }));
-      }), ramda.unnest, ramda.uniq)(xGrouped); // eslint-disable-next-line no-unused-vars
+      }), unnest, uniq)(xGrouped); // eslint-disable-next-line no-unused-vars
 
       return xGrouped.map(function (_ref9) {
         var _ref10 = _slicedToArray(_ref9, 2),
@@ -267,7 +263,7 @@ function () {
             rows = _ref10[1];
 
         var xValues = rows[0].xValues;
-        var yGrouped = ramda.pipe(ramda.map(function (_ref11) {
+        var yGrouped = pipe(map(function (_ref11) {
           var row = _ref11.row;
           return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
             return {
@@ -275,13 +271,13 @@ function () {
               row: row
             };
           });
-        }), ramda.unnest, ramda.groupBy(function (_ref12) {
+        }), unnest, groupBy(function (_ref12) {
           var yValues = _ref12.yValues;
           return _this2.axisValuesString(yValues);
         }))(rows);
         return {
           xValues: xValues,
-          yValuesArray: ramda.unnest(allYValues.map(function (yValues) {
+          yValuesArray: unnest(allYValues.map(function (yValues) {
             var measure = pivotConfig.x.find(function (d) {
               return d === 'measures';
             }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
@@ -391,11 +387,11 @@ function () {
       var _this5 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      return ramda.pipe(ramda.map(this.axisValues(pivotConfig.y)), ramda.unnest, ramda.uniq)(this.loadResponse.data).map(function (axisValues) {
+      return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(function (axisValues) {
         return {
           title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
-          }) ? ramda.dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+          }) ? dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
           key: _this5.axisValuesString(axisValues)
         };
       });
@@ -445,7 +441,7 @@ function () {
 }();
 
 var memberMap = function memberMap(memberArray) {
-  return ramda.fromPairs(memberArray.map(function (m) {
+  return fromPairs(memberArray.map(function (m) {
     return [m.name, m];
   }));
 };
@@ -506,7 +502,7 @@ function () {
     this.meta = metaResponse;
     var cubes = this.meta.cubes;
     this.cubes = cubes;
-    this.cubesMap = ramda.fromPairs(cubes.map(function (c) {
+    this.cubesMap = fromPairs(cubes.map(function (c) {
       return [c.name, {
         measures: memberMap(c.measures),
         dimensions: memberMap(c.dimensions),
@@ -518,7 +514,7 @@ function () {
   _createClass(Meta, [{
     key: "membersForQuery",
     value: function membersForQuery(query, memberType) {
-      return ramda.unnest(this.cubes.map(function (c) {
+      return unnest(this.cubes.map(function (c) {
         return c[memberType];
       }));
     }
@@ -787,4 +783,4 @@ var index = (function (apiToken, options) {
   return new CubejsApi(apiToken, options);
 });
 
-module.exports = index;
+export default index;
