@@ -6,8 +6,8 @@ module.exports = function createRedisClient(url) {
 
   const client = redis.createClient(url);
 
-  ['brpop', 'del', 'exec', 'get', 'hget', 'rpop', 'set', 'zadd', 'zrange', 'zrangebyscore'].forEach(
-    k => client[k] = promisify(client[k])
+  ['brpop', 'del', 'get', 'hget', 'rpop', 'set', 'zadd', 'zrange', 'zrangebyscore'].forEach(
+    k => client[`${k}Async`] = promisify(client[k])
   );
 
   return client;

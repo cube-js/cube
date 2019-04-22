@@ -6,16 +6,16 @@ class RedisCacheDriver {
   }
 
   async get(key) {
-    const res = await this.redisClient.get(key);
+    const res = await this.redisClient.getAsync(key);
     return res && JSON.parse(res);
   }
 
   set(key, value, expiration) {
-    return this.redisClient.set(key, JSON.stringify(value), 'EX', expiration);
+    return this.redisClient.setAsync(key, JSON.stringify(value), 'EX', expiration);
   }
 
   remove(key) {
-    return this.redisClient.del(key);
+    return this.redisClient.delAsync(key);
   }
 }
 
