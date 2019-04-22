@@ -1,11 +1,7 @@
-const redis = require('redis');
-const promisifyAll = require('util-promisifyall');
 const R = require('ramda');
 
 const BaseQueueDriver = require('./BaseQueueDriver');
-
-promisifyAll(redis.RedisClient.prototype);
-promisifyAll(redis.Multi.prototype);
+const createRedisClient = require('./RedisFactory');
 
 class RedisQueueDriverConnection {
   constructor(driver, options) {
@@ -182,7 +178,7 @@ class RedisQueueDriverConnection {
 class RedisQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
-    this.createRedisClient = options.createRedisClient || (() => redis.createClient(process.env.REDIS_URL));
+    this.createRedisClient = options.createRedisClient || (() => createRedisClient(process.env.REDIS_URL));
     this.options = options;
   }
 

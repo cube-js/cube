@@ -1,8 +1,8 @@
-const redis = require('redis');
+const createRedisClient = require('./RedisFactory');
 
 class RedisCacheDriver {
   constructor() {
-    this.redisClient = redis.createClient(process.env.REDIS_URL);
+    this.redisClient = createRedisClient(process.env.REDIS_URL);
   }
 
   async get(key) {

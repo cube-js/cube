@@ -11,8 +11,7 @@
   },
   "dependencies": {
     "ramda": "^0.24.1",
-    "redis": "^2.8.0",
-    "util-promisifyall": "^1.0.4"
+    "redis": "^2.8.0"
   },
   "devDependencies": {
     "eslint": "^4.14.0",

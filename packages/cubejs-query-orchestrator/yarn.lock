@@ -1009,11 +1009,6 @@ util-deprecate@~1.0.1:
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
   integrity sha1-RQ1Nyfpw3nMnYvvS1KKJgUGaDM8=
 
-util-promisifyall@^1.0.4:
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/util-promisifyall/-/util-promisifyall-1.0.4.tgz#82047e87e0637ca799b3480cd6ede3ddeedadf09"
-  integrity sha512-dgR84x56iVKsSMNo5GGED+xciS1bLS84Wsi5sYHW59Wf/P0mVdJckx2o7vLHrChG94J4c/T9EXoRJSoNy6qSEQ==
-
 which@^1.2.9:
   version "1.3.1"
   resolved "https://registry.yarnpkg.com/which/-/which-1.3.1.tgz#a45043d54f5805316da8d62f9f50918d3da70b0a"
