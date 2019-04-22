@@ -14603,7 +14603,6 @@
 	  _createClass(CubejsApi, [{
 	    key: "request",
 	    value: function request(url, config) {
-	      // eslint-disable-next-line no-undef
 	      return browserPonyfill("".concat(this.apiUrl).concat(url), Object.assign({
 	        headers: {
 	          Authorization: this.apiToken,
