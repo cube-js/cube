@@ -69,6 +69,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `mongobi`
 * `athena`
 * `bigquery`
+* `redshift`
 
 For example,
 

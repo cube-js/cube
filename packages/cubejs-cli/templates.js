@@ -14,6 +14,12 @@ const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 const sharedDotEnvVars = env => `CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}`;
 
+const defaultDotEnvVars = env => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
+CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
+CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
+CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
+${sharedDotEnvVars(env)}`;
+
 const athenaDotEnvVars = env => `CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
 CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
@@ -22,13 +28,18 @@ CUBEJS_AWS_S3_OUTPUT_LOCATION=<S3 OUTPUT LOCATION>
 CUBEJS_JDBC_DRIVER=athena
 ${sharedDotEnvVars(env)}`;
 
-const defaultDotEnvVars = env => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
-${sharedDotEnvVars(env)}`;
+const mongobiDotEnvVars = env => `${defaultDotEnvVars(env)}
+#CUBEJS_DB_SSL=<SSL_PROFILE>
+#CUBEJS_DB_SSL_CA=<SSL_CA>
+#CUBEJS_DB_SSL_CERT=<SSL_CERT>
+#CUBEJS_DB_SSL_CIPHERS=<SSL_CIPHERS>
+#CUBEJS_DB_SSL_PASSPHRASE=<SSL_PASSPHRASE>
+#CUBEJS_DB_SSL_REJECT_UNAUTHORIZED=<SSL_REJECT_UNAUTHORIZED>`;
 
-const dotEnv = env => (env.dbType === 'athena' ? athenaDotEnvVars(env) : defaultDotEnvVars(env));
+const dotEnv = env => ({
+  athena: athenaDotEnvVars(env),
+  mongobi: mongobiDotEnvVars(env)
+}[env.dbType] || defaultDotEnvVars(env));
 
 const serverlessYml = env => `service: ${env.projectName}
 
