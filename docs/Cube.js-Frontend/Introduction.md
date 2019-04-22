@@ -23,7 +23,7 @@ $ yarn add @cubejs-client/core
 First import `cubejs` from `@cubejs-client/core` and initiate client with your
 Cube.js [API Token](security) and API URL. The default API URL for Cube.js Backend in development mode is `http://localhost:4000/cubejs-api/v1`.
 
-Then, use [CubejsApi.load](http://localhost:8000/@cubejs-client-core#cubejs-api-load) to load data from the backend. The `load` method accepts a query, which is plain Javascript object. [Learn more about query format
+Then, use [CubejsApi.load](@cubejs-client-core#cubejs-api-load) to load data from the backend. The `load` method accepts a query, which is plain Javascript object. [Learn more about query format
 here.](query-format)
 
 Below example shows how to use Cube.js Javascript Client with [Echarts charting
