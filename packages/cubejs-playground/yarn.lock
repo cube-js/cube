@@ -1063,22 +1063,22 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.6.0":
-  version "0.6.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.6.0.tgz#86b36526936a569e9de0b61bab4aecf9f9bb7584"
-  integrity sha512-z23Hghs6QH5E1/8nNAzqjWRtlmyqIsIFM8oSjj+/5npjwVl63RgHILex+nNzlTCanYZrHtkC+Fnta4ThmG9O5g==
+"@cubejs-client/core@^0.7.3":
+  version "0.7.3"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.7.3.tgz#5944c1e21922fccfb3b7baf1b4cfc2a4afeb0eb4"
+  integrity sha512-DFoCrankXUu1OHCqa9zpC4LwlrqlWUvB8myZ8xjIzQM1wKCfUXueWySPYnOR43ihu3NaTofctNqpz9J0F3Xr3g==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
+    isomorphic-fetch "^2.2.1"
     moment "^2.22.2"
     moment-range "^4.0.1"
     ramda "^0.25.0"
-    whatwg-fetch "^3.0.0"
 
-"@cubejs-client/react@^0.6.0":
-  version "0.6.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.6.0.tgz#31516d96467a3d09fb018fb00b9f619cb465b7e1"
-  integrity sha512-9xwVp7ankCrF4wVdEbnYLNYNHMInavJCGnKObKhpzpAV0gqD3sGZHPAzmS2bf+WzxF9PWDkIJiooUCiTlJT9pQ==
+"@cubejs-client/react@^0.7.3":
+  version "0.7.3"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.7.3.tgz#f2b44aea6ff13297c9fe8dca99e41173879fae18"
+  integrity sha512-zJJ719l8Qu3hHU//0/WbYVCiXou8sYjXlgrAFczt2lIMIBHwj+UbKxEYU4urg9vGY/VUV6nw4bWmX4cg/Gn/PQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     prop-types "^15.6.2"
@@ -5994,7 +5994,7 @@ isobject@^3.0.0, isobject@^3.0.1:
   resolved "https://registry.yarnpkg.com/isobject/-/isobject-3.0.1.tgz#4e431e92b11a9731636aa1f9c8d1ccbcfdab78df"
   integrity sha1-TkMekrEalzFjaqH5yNHMvP2reN8=
 
-isomorphic-fetch@^2.1.1:
+isomorphic-fetch@^2.1.1, isomorphic-fetch@^2.2.1:
   version "2.2.1"
   resolved "https://registry.yarnpkg.com/isomorphic-fetch/-/isomorphic-fetch-2.2.1.tgz#611ae1acf14f5e81f729507472819fe9733558a9"
   integrity sha1-YRrhrPFPXoH3KVB0coGf6XM1WKk=
