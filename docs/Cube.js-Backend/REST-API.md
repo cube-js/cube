@@ -9,11 +9,19 @@ menuOrder: 2
 ### Base path
 
 REST API is used to communicate with Cube.js backend.
-All requests are prefixed with **basePath** described in [Backend Server Core](/@cubejs-backend-server-core). By default it's `/cubejs-api`.
+All requests are prefixed with **basePath** described in [Backend Server Core](@cubejs-backend-server-core). By default it's `/cubejs-api`.
 
 ### Authentication
 
-You need to pass your API Token in Authorization Header. How to generate API Tokens is described in [Security section](/security). In Development environment a temporary API Token is generated on every launch and printed into terminal.
+Cube.js uses API Token for requests' authorization and also for passing
+additional user context, which could be used in [USER_CONTEXT](cube#context-variables-user-context) object in the Data
+Schema.
+
+The API Token is passed via the Authorization Header. The token itself is a [JSON
+Web Token](https://jwt.io), the [Security section](security) describes how to generate it.
+
+In the development environment the token in not required for authorization, but
+you can still use it to pass a user context.
 
 ### Example request
 
