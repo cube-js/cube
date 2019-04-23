@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.6](https://github.com/statsbotco/cubejs-client/compare/v0.7.5...v0.7.6) (2019-04-23)
+
+
+### Features
+
+* Support member key in filters in query ([#91](https://github.com/statsbotco/cubejs-client/issues/91)) ([e1fccc0](https://github.com/statsbotco/cubejs-client/commit/e1fccc0))
+
+
+
+
+
 ## [0.7.4](https://github.com/statsbotco/cubejs-client/compare/v0.7.3...v0.7.4) (2019-04-17)
 
 

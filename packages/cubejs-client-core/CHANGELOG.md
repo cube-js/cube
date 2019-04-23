@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.6](https://github.com/statsbotco/cubejs-client/compare/v0.7.5...v0.7.6) (2019-04-23)
+
+
+### Bug Fixes
+
+* Use cross-fetch instead of isomorphic-fetch to allow React-Native builds ([#92](https://github.com/statsbotco/cubejs-client/issues/92)) ([79150f4](https://github.com/statsbotco/cubejs-client/commit/79150f4))
+
+
+
+
+
 ## [0.7.3](https://github.com/statsbotco/cubejs-client/compare/v0.7.2...v0.7.3) (2019-04-16)
 
 

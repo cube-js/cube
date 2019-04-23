@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.6](https://github.com/statsbotco/cubejs-client/compare/v0.7.5...v0.7.6) (2019-04-23)
+
+
+### Bug Fixes
+
+* **playground:** Cannot read property 'content' of undefined at e.value ([7392feb](https://github.com/statsbotco/cubejs-client/commit/7392feb))
+
+
+
+
+
 ## [0.7.4](https://github.com/statsbotco/cubejs-client/compare/v0.7.3...v0.7.4) (2019-04-17)
 
 
