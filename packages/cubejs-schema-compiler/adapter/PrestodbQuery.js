@@ -39,7 +39,7 @@ class PrestodbQuery extends BaseQuery {
   }
 
   dateTimeCast(value) {
-    return `CAST(${value} as TIMESTAMP)`; // TODO
+    return `from_iso8601_timestamp(${value})`;
   }
 
   convertTz(field) {
@@ -53,11 +53,22 @@ class PrestodbQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
+  subtractInterval(date, interval) {
+    const [intervalValue, intervalUnit] = interval.split(" ");
+    return `${date} - interval '${intervalValue}' ${intervalUnit}`;
+  }
+
   addInterval(date, interval) {
     const [intervalValue, intervalUnit] = interval.split(" ");
     return `${date} + interval '${intervalValue}' ${intervalUnit}`;
   }
 
+  seriesSql(timeDimension) {
+    const values = timeDimension.timeSeries().map(
+      ([from, to]) => `select '${from}' f, '${to}' t`
+    ).join(' UNION ALL ');
+    return `SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to FROM (${values}) AS dates`;
+  }
 }
 
 module.exports = PrestodbQuery;
