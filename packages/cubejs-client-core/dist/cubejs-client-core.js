@@ -335,7 +335,7 @@ function () {
         };
       };
 
-      return this.pivot(pivotConfig).map(function (_ref19) {
+      return this.pivot(normalizedPivotConfig).map(function (_ref19) {
         var xValues = _ref19.xValues,
             yValuesArray = _ref19.yValuesArray;
         return yValuesArray.map(function (_ref20) {
@@ -346,9 +346,9 @@ function () {
           return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
             return Object.assign(a, b);
           }, {});
-        });
-      }).reduce(function (a, b) {
-        return a.concat(b);
+        }).reduce(function (a, b) {
+          return Object.assign(a, b);
+        }, {});
       });
     }
   }, {

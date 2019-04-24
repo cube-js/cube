@@ -200,13 +200,13 @@ export default class ResultSet {
         })
       );
 
-    return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => (
+    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => (
       yValuesArray.map(([yValues, m]) => (
         normalizedPivotConfig.x.map(valueToObject(xValues, m))
           .concat(normalizedPivotConfig.y.map(valueToObject(yValues, m)))
           .reduce((a, b) => Object.assign(a, b), {})
-      ))
-    )).reduce((a, b) => a.concat(b));
+      )).reduce((a, b) => Object.assign(a, b), {})
+    ));
   }
 
   tableColumns(pivotConfig) {
