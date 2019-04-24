@@ -143,7 +143,10 @@ class DevServer {
       this.cubejsServer.event('Dev Server App File Write');
       const { files } = req.body;
       await Promise.all(
-        files.map(file => path.join(...[dashboardAppPath].concat(file.fileName.split('/'))))
+        files.map(file => fs.writeFile(
+          path.join(...[dashboardAppPath].concat(file.fileName.split('/'))),
+          file.content
+        ))
       );
       res.json({ files });
     }));
