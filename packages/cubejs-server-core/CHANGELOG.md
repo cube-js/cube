@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.8](https://github.com/statsbotco/cubejs-client/compare/v0.7.7...v0.7.8) (2019-04-24)
+
+
+### Bug Fixes
+
+* **playground:** Dashboard doesn't work on Windows ([48a2ec4](https://github.com/statsbotco/cubejs-client/commit/48a2ec4)), closes [#82](https://github.com/statsbotco/cubejs-client/issues/82)
+
+
+
+
+
 ## [0.7.7](https://github.com/statsbotco/cubejs-client/compare/v0.7.6...v0.7.7) (2019-04-24)
 
 
