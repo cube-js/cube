@@ -115,6 +115,18 @@ class DashboardSource {
         }
       }
     });
+    if (!this.appClass) {
+      traverse(this.appAst, {
+        FunctionDeclaration: (path) => {
+          if (path.get('id').node.name === 'App') {
+            this.appClass = path;
+          }
+        }
+      });
+    }
+    if (!this.appClass) {
+      throw new Error(`App class not found. Can't parse dashboard app.`);
+    }
   }
 
   ensureDashboardIsInApp() {

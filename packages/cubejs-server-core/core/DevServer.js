@@ -129,7 +129,8 @@ class DevServer {
           if (!stats.isDirectory()) {
             const content = await fs.readFile(fileName, "utf-8");
             return [{
-              fileName, content
+              fileName: fileName.replace(dashboardAppPath, '').replace(/\\/g, '/'),
+              content
             }];
           }
           return [];
@@ -141,7 +142,9 @@ class DevServer {
     app.post('/playground/dashboard-app-files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server App File Write');
       const { files } = req.body;
-      await Promise.all(files.map(file => fs.writeFile(path.join(file.fileName), file.content)));
+      await Promise.all(
+        files.map(file => path.join(...[dashboardAppPath].concat(file.fileName.split('/'))))
+      );
       res.json({ files });
     }));
 
