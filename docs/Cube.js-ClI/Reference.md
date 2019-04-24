@@ -19,7 +19,7 @@ $ cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
 
 | Parameter | Description | Values |
 | --------- | ----------- | ------ |
-| -d, --db-type <db-type> | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift` |
+| -d, --db-type <db-type> | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql` |
 | -t, --template <template> | Framework running Cube.js backend. | `express` (default), `serverless` |
 
 ### Example

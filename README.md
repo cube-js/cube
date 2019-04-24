@@ -70,6 +70,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `athena`
 * `bigquery`
 * `redshift`
+* `mssql`
 
 For example,
 

@@ -32,6 +32,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `athena`
 * `redshift`
 * `bigquery`
+* `mssql`
 
 For example,
 
