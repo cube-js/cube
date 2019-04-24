@@ -23,6 +23,9 @@ Query has the following properties:
 - `timeDimensions`: A convient way to specify a time dimension with a filter. It is an array of objects in [timeDimension format.](#time-dimensions-format)
 - `segments`: An array of segments. Segment is a named filter, created in the Data Schema.
 - `limit`: A row limit for your query. The hard limit is set to 5000 rows by default.
+- `order`: An object, where keys are measures or dimensions to order by and
+    their corresponding values are either `asc` or `desc`. The order of the
+    fields to order is based on the order of the keys in the object.
 - `timezone`: All time based calculations performed within Cube.js are timezone-aware. Using this property you can set your desired timezone in [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.: `America/Los_Angeles`. The default value is `UTC`.
 
 ```js
@@ -40,9 +43,21 @@ Query has the following properties:
     granularity: 'month'
   }],
   limit: 100,
+  order: {
+    'Stories.time': 'asc',
+    'Stories.count': 'desc'
+  },
   timezone: 'America/Los_Angeles'
 }
 ```
+
+### Default order
+
+If `order` property is not specified in the query, Cube.js sorts results by default using the following rules:
+
+- The first time dimension with granularity, ascending. If no time dimension with granularity exists...
+- The first measure, descending. If no measure exists...
+- The first dimension, ascending.
 
 ## Filters Format
 
@@ -278,8 +293,8 @@ The same as `beforeDate`, but used to get all results after specific date.
 Since grouping and filtering by a time dimension is quite a common case, Cube.js provides a convient shortcut to pass a dimension and a filter as a `timeDimension` property.
 
   - `dimension`: Time dimension name.
-  - `dateRange`: An array of dates with following format '2015-01-01', if only one date specified the filter would be set exactly to this date. You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
-  - `granularity`: A granularity for a time dimension. It supports following values `hour`, `day`, `week`, `month`.
+  - `dateRange`: An array of dates with the following format `YYYY-MM-DD`, e.g. `2015-01-01`, if only one date specified the filter would be set exactly to this date. You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
+  - `granularity`: A granularity for a time dimension. It supports following values `hour`, `day`, `week`, `month`, `year`. If you pass `null` to the granularity, the Cube.js will only perform a filtering by specified time dimension, without grouping.
 
 ```js
 {
