@@ -47,7 +47,9 @@ class App extends Component {
     const res = await fetch('/playground/context');
     const result = await res.json();
     if (window.analytics) {
-      window.analytics.identify(result.anonymousId);
+      window.analytics.identify(result.anonymousId, {
+        coreServerVersion: result.coreServerVersion
+      });
     }
   }
 
