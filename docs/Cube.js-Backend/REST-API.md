@@ -14,13 +14,13 @@ All requests are prefixed with **basePath** described in [Backend Server Core](@
 ### Authentication
 
 Cube.js uses API Token for requests' authorization and also for passing
-additional user context, which could be used in [USER_CONTEXT](cube#context-variables-user-context) object in the Data
+additional user context, which could be used in the [USER_CONTEXT](cube#context-variables-user-context) object in the Data
 Schema.
 
 The API Token is passed via the Authorization Header. The token itself is a [JSON
 Web Token](https://jwt.io), the [Security section](security) describes how to generate it.
 
-In the development environment the token in not required for authorization, but
+In the development environment the token is not required for authorization, but
 you can still use it to pass a user context.
 
 ### Example request
@@ -57,7 +57,7 @@ Get data for a query.
 
 | Parameter | Description |
 | --- | --- |
-| query | URLencoded Cube.js [Query](/query-format) |
+| query | URL encoded Cube.js [Query](/query-format) |
 
 Response
 
