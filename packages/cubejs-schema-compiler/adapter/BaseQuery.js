@@ -1299,16 +1299,32 @@ class BaseQuery {
   contextSymbolsProxy(symbols) {
     return new Proxy(symbols, {
       get: (target, name) => {
-        const paramValue = target[name];
-        return {
-          filter: (column) => (paramValue ? `${column} = ${this.paramAllocator.allocateParam(paramValue)}` : '1 = 1'),
+        const propValue = target[name];
+        const methods = (paramValue) => ({
+          filter: (column) => {
+            if (paramValue) {
+              const value = Array.isArray(paramValue) ?
+                paramValue.map(this.paramAllocator.allocateParam.bind(this.paramAllocator)) :
+                this.paramAllocator.allocateParam(paramValue);
+              if (typeof column === "function") {
+                return column(value);
+              } else {
+                return `${column} = ${value}`;
+              }
+            } else {
+              return '1 = 1';
+            }
+          },
           requiredFilter: (column) => {
             if (!paramValue) {
               throw new UserError(`Filter for ${column} is required`);
             }
-            return `${column} = ${this.paramAllocator.allocateParam(paramValue)}`;
+            return methods.filter(column);
           }
-        };
+        });
+        return methods(target)[name] ||
+          typeof propValue === 'object' && this.contextSymbolsProxy(propValue) ||
+          methods(propValue);
       }
     });
   }

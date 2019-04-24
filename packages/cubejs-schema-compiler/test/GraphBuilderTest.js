@@ -17,7 +17,8 @@ describe('JoinGraph', () => {
   
     cube(\`visitors\`, {
       sql: \`
-      select * from visitors WHERE \${USER_CONTEXT.source.filter('source')}
+      select * from visitors WHERE \${USER_CONTEXT.source.filter('source')} AND
+      \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
       
       sqlAlias: 'visitors_table',
@@ -1174,6 +1175,30 @@ describe('JoinGraph', () => {
       });
     });
   });
+
+  it('user context array', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.revenue_per_checkin'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      contextSymbols: {
+        userContext: {
+          sourceArray: ['some', 'google']
+        }
+      }
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{ "visitor_checkins.revenue_per_checkin": "50" }]
+      );
+    });
+  }));
 
   it('reference cube sql', () =>
     runQueryTest({
