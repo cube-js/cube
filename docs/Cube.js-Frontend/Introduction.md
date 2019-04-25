@@ -4,7 +4,9 @@ permalink: /frontend-introduction
 category: Cube.js Frontend
 ---
 
-Alongside with [REST API](rest-api) Cube.js comes with Javascript client and bindings for
+You can send queries to Cube.js Backend using JSON [Query Format](query-format) via [REST API](rest-api).
+
+Alongside with it, Cube.js comes with Javascript client and bindings for
 popular frameworks such as React and Vue.
 
 The client itself doesn't provide any visualizations and is designed to work with existing chart libraries. It provides set of methods to access Cube.js API and to work with query result.
