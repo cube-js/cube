@@ -53,7 +53,7 @@ export default class ResultSet {
         return v;
       }
     };
-    return axisValues.map(formatValue).join(delimiter || ':');
+    return axisValues.map(formatValue).join(delimiter || ', ');
   }
 
   normalizePivotConfig(pivotConfig) {
