@@ -10,6 +10,7 @@
     "@cubejs-backend/server": "^0.7.6",
     "@cubejs-backend/serverless": "^0.7.6",
     "aws-sdk": "^2.441.0",
+    "humps": "^2.0.1",
     "ramda": "^0.26.1",
     "redis": "^2.8.0",
     "scrape-it": "^5.1.4"

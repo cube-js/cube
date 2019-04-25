@@ -4,6 +4,7 @@ const zlib = require('zlib');
 const AWS = require('aws-sdk');
 const redis = require('redis');
 const { promisify } = require('util');
+const humps = require('humps');
 
 const redisClient = redis.createClient(process.env.REDIS_URL);
 
@@ -17,6 +18,7 @@ const s3 = new AWS.S3();
 
 const toStoriesData = (data) => {
   const { stories } = data;
+  const snapshotTimestamp = new Date().toISOString();
   return stories.map(({ commentAndHoursAgo, ...story }) => ({
     ...story,
     rank: story.rank && parseInt(story.rank.match(/(\d+)\./)[1] || '0', 10),
@@ -25,7 +27,8 @@ const toStoriesData = (data) => {
       commentAndHoursAgo.match(/(\d+)\s+comments/) &&
       commentAndHoursAgo.match(/(\d+)\s+comments/)[1] || '0',
       10
-    )
+    ),
+    snapshotTimestamp
   }));
 };
 
@@ -101,7 +104,8 @@ exports.storyListEventDiff = async (oldStories, newStories) => {
     ...idToNewStories[id],
     ...(
       ['rank', 'score', 'commentsCount'].map(p => intDiff(p, idToOldStories[id], idToNewStories[id])))
-      .reduce((a, b) => ({ ...a, ...b }))
+      .reduce((a, b) => ({ ...a, ...b })),
+    prevSnapshotTimestamp: idToOldStories[id].snapshotTimestamp
   }));
   const timestamp = new Date().toISOString();
   return addedStories.map(s => ({ ...s, event: 'added', timestamp })).concat(
@@ -119,7 +123,7 @@ const changeEvents = async (state, page, listFn) => {
 const uploadEvents = async (events) => {
   const outStream = zlib.createGzip();
   events.forEach(e => {
-    outStream.write(`${JSON.stringify(e)}\n`, 'utf8');
+    outStream.write(`${JSON.stringify(humps.decamelizeKeys(e))}\n`, 'utf8');
   });
   outStream.end();
   const fileName = `${new Date().toISOString()}.json.gz`;
@@ -137,7 +141,6 @@ const hnInsightsStateKey = 'HN_INSIGHTS_STATE';
 
 exports.generateChangeEvents = async () => {
   const state = JSON.parse(await redisClient.getAsync(hnInsightsStateKey)) || {};
-  console.log(state);
   const frontPageDiff = await changeEvents(state, 'front', exports.scrapeFrontPage);
   const newestDiff = await changeEvents(
     state,
