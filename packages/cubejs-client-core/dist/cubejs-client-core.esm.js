@@ -125,7 +125,7 @@ function () {
         }
       };
 
-      return axisValues.map(formatValue).join(delimiter || ':');
+      return axisValues.map(formatValue).join(delimiter || ', ');
     }
   }, {
     key: "normalizePivotConfig",

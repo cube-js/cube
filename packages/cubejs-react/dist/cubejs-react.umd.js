@@ -1189,10 +1189,10 @@
 	    return capability.promise;
 	  }
 	});
-	_export(_export.S + _export.F * (!USE_NATIVE), PROMISE, {
+	_export(_export.S + _export.F * (_library || !USE_NATIVE), PROMISE, {
 	  // 25.4.4.6 Promise.resolve(x)
 	  resolve: function resolve(x) {
-	    return _promiseResolve(this, x);
+	    return _promiseResolve(_library && this === Wrapper ? $Promise : this, x);
 	  }
 	});
 	_export(_export.S + _export.F * !(USE_NATIVE && _iterDetect(function (iter) {
@@ -1434,7 +1434,7 @@
 	      // Set @@toStringTag to native iterators
 	      _setToStringTag(IteratorPrototype, TAG, true);
 	      // fix for some old engines
-	      if (!_library && typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
+	      if (typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
 	    }
 	  }
 	  // fix Array#{values, @@iterator}.name in V8 / FF
@@ -1443,7 +1443,7 @@
 	    $default = function values() { return $native.call(this); };
 	  }
 	  // Define iterator
-	  if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR$3])) {
+	  if (BUGGY || VALUES_BUG || !proto[ITERATOR$3]) {
 	    _hide(proto, ITERATOR$3, $default);
 	  }
 	  // Plug for library
