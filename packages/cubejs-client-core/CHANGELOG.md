@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.10](https://github.com/statsbotco/cubejs-client/compare/v0.7.9...v0.7.10) (2019-04-25)
+
+
+### Bug Fixes
+
+* **client-core:** Table pivot incorrectly behaves with multiple measures ([adb2270](https://github.com/statsbotco/cubejs-client/commit/adb2270))
+* **client-core:** use ',' as standard axisValue delimiter ([e889955](https://github.com/statsbotco/cubejs-client/commit/e889955)), closes [#19](https://github.com/statsbotco/cubejs-client/issues/19)
+
+
+
+
+
 ## [0.7.6](https://github.com/statsbotco/cubejs-client/compare/v0.7.5...v0.7.6) (2019-04-23)
 
 
