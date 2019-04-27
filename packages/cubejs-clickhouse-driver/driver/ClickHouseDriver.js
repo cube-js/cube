@@ -1,6 +1,7 @@
 const ClickHouse = require('@apla/clickhouse');
 const genericPool = require('generic-pool');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const uuid = require('uuidv4');
 
 class ClickHouseDriver extends BaseDriver {
   constructor(config) {
@@ -41,22 +42,20 @@ class ClickHouseDriver extends BaseDriver {
   withConnection(fn) {
     const self = this;
     const connectionPromise = this.pool.acquire();
+    const queryId = uuid();
 
     let cancelled = false;
     const cancelObj = {};
-    const promise = connectionPromise.then(conn => {
+    const promise = connectionPromise.then(connection => {
       cancelObj.cancel = async () => {
         cancelled = true;
-        await self.withConnection(async conn => {
-          const processRows = await conn.querying('SHOW PROCESSLIST');
-          await Promise.all(processRows.filter(row => row.elapsed >= 599).map(row => {
-            return conn.execute(`KILL QUERY WHERE query_id = '${row.query_id}'`);
-          }));
+        await self.withConnection(async connection => {
+          await connection.querying(`KILL QUERY WHERE query_id = '${queryId}'`);
         });
       };
-      return fn(conn)
+      return fn(connection, queryId)
         .then(res => {
-          return this.pool.release(conn).then(() => {
+          return this.pool.release(connection).then(() => {
             if (cancelled) {
               throw new Error('Query cancelled');
             }
@@ -64,7 +63,7 @@ class ClickHouseDriver extends BaseDriver {
           });
         })
         .catch((err) => {
-          return this.pool.release(conn).then(() => {
+          return this.pool.release(connection).then(() => {
             if (cancelled) {
               throw new Error('Query cancelled');
             }
@@ -83,8 +82,8 @@ class ClickHouseDriver extends BaseDriver {
   query(query, values) {
     // TODO: handle values
     const self = this;
-    return this.withConnection(connection => {
-      return connection.querying(query, {dataObjects:true})
+    return this.withConnection((connection, queryId) => {
+      return connection.querying(query, { dataObjects: true, queryOptions: { query_id: queryId } })
         .then(res => res.data);
     });
   }
