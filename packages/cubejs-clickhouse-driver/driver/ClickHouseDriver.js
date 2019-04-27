@@ -1,4 +1,4 @@
-const ClickHouse = require('clickhouse');
+const ClickHouse = require('@apla/clickhouse');
 const genericPool = require('generic-pool');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
@@ -8,9 +8,9 @@ class ClickHouseDriver extends BaseDriver {
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT,
-      auth: process.env.CUBEJS_DB_USER + ":" + process.env.CUBEJS_DB_PASS,
+      auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? process.env.CUBEJS_DB_USER + ":" + process.env.CUBEJS_DB_PASS : '',
       queryOptions: {
-        database: process.env.CUBEJS_DB_NAME
+        database: process.env.CUBEJS_DB_NAME || config.database
       },
       ...config
     };
@@ -76,21 +76,16 @@ class ClickHouseDriver extends BaseDriver {
     return promise;
   }
 
-  async testConnection() {
-    const conn = await this.pool._factory.create();
-    try {
-      return await conn.querying('SELECT 1');
-    } finally {
-      await this.pool._factory.destroy(conn);
-    }
+  testConnection() {
+    return this.query("SELECT 1")
   }
 
   query(query, values) {
     // TODO: handle values
     const self = this;
     return this.withConnection(connection => {
-      return connection.querying(query)
-        .then(res => res);
+      return connection.querying(query, {dataObjects:true})
+        .then(res => res.data);
     });
   }
 
@@ -109,6 +104,18 @@ class ClickHouseDriver extends BaseDriver {
        WHERE database = '${this.config.database}'
     `;
   }
+
+  async createSchemaIfNotExists(schemaName) {
+    let schemas = await this.query(`SELECT name FROM system.databases WHERE name = '${schemaName}'`)
+    if (schemas.length === 0) {
+      await this.query(`CREATE DATABASE ${schemaName}`);
+    }
+  }
+  
+  getTablesQuery(schemaName) {
+    return this.query(`SELECT name as table_name FROM system.tables WHERE database = '${schemaName}'`)
+  }
+
 }
 
 module.exports = ClickHouseDriver;
