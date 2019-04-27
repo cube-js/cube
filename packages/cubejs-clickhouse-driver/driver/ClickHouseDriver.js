@@ -2,6 +2,7 @@ const ClickHouse = require('@apla/clickhouse');
 const genericPool = require('generic-pool');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const uuid = require('uuidv4');
+const sqlstring = require('sqlstring');
 
 class ClickHouseDriver extends BaseDriver {
   constructor(config) {
@@ -80,10 +81,10 @@ class ClickHouseDriver extends BaseDriver {
   }
 
   query(query, values) {
-    // TODO: handle values
-    const self = this;
+    const formattedQuery = sqlstring.format(query, values);
+    
     return this.withConnection((connection, queryId) => {
-      return connection.querying(query, { dataObjects: true, queryOptions: { query_id: queryId } })
+      return connection.querying(formattedQuery, { dataObjects: true, queryOptions: { query_id: queryId } })
         .then(res => res.data);
     });
   }
@@ -105,14 +106,11 @@ class ClickHouseDriver extends BaseDriver {
   }
 
   async createSchemaIfNotExists(schemaName) {
-    let schemas = await this.query(`SELECT name FROM system.databases WHERE name = '${schemaName}'`)
-    if (schemas.length === 0) {
-      await this.query(`CREATE DATABASE ${schemaName}`);
-    }
+    await this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`);
   }
   
   getTablesQuery(schemaName) {
-    return this.query(`SELECT name as table_name FROM system.tables WHERE database = '${schemaName}'`)
+    return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName])
   }
 
 }
