@@ -250,19 +250,21 @@ describe('DataSchemaCompiler', () => {
     })
     `);
     const responses = [
-      [{ 'visitors.created_at_date': '2017-01-03T00:00:00.000Z' }],
+      [{ 'visitors.created_at': '2017-01-03T00:00:00.000Z' }],
       [
-        { 'visitors.created_at_date': '2017-01-05T00:00:00.000Z' },
-        { 'visitors.created_at_date': '2017-01-07T00:00:00.000Z' },
-        { 'visitors.created_at_date': '2017-01-06T00:00:00.000Z' }
+        { 'visitors.created_at': '2016-09-07T00:00:00.000Z' },
+        { 'visitors.created_at': '2017-01-05T00:00:00.000Z' },
+        { 'visitors.created_at': '2017-01-06T00:00:00.000Z' },
+        { 'visitors.created_at': '2017-01-07T00:00:00.000Z' }
       ],
-      [{ 'visitors.created_at_date': '2017-01-06T00:00:00.000Z' }],
+      [{ 'visitors.created_at': '2017-01-07T00:00:00.000Z' }],
       [
-        { 'visitors.created_at_date': '2017-01-03T00:00:00.000Z' },
-        { 'visitors.created_at_date': '2017-01-05T00:00:00.000Z' },
-        { 'visitors.created_at_date': '2017-01-06T00:00:00.000Z' }
+        { 'visitors.created_at': '2016-09-07T00:00:00.000Z' },
+        { 'visitors.created_at': '2017-01-03T00:00:00.000Z' },
+        { 'visitors.created_at': '2017-01-05T00:00:00.000Z' },
+        { 'visitors.created_at': '2017-01-06T00:00:00.000Z' }
       ],
-      [{ 'visitors.created_at_date': '2017-01-07T00:00:00.000Z' }]
+      [{ 'visitors.created_at': '2017-01-07T00:00:00.000Z' }]
     ];
     const result = compiler.compile().then(() => {
       const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
@@ -276,12 +278,15 @@ describe('DataSchemaCompiler', () => {
             dimension: 'visitors.created_at',
             values: filterValues
           }],
-          order: [],
+          order: [{
+            id: 'visitors.created_at',
+            desc: false
+          }],
           timezone: 'America/Los_Angeles'
         });
       });
 
-      Promise.all(queries.map(async (query, index) => {
+      return Promise.all(queries.map(async (query, index) => {
         console.log(query.buildSqlAndParams());
         const res = await dbRunner.testQuery(query.buildSqlAndParams());
 
