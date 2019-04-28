@@ -2,11 +2,19 @@ const ClickHouseDriver = require('../driver/ClickHouseDriver');
 require('should');
 const { GenericContainer } = require("testcontainers");
 
-
 describe('ClickHouseDriver', () => {
+    let container, config;
 
-    
-    let container, config
+    const doWithDriver = async (callback) => {
+        let driver = new ClickHouseDriver(config);
+
+        try {
+            await callback(driver)
+        } finally {
+            await driver.release()
+        }
+    };
+
     before(async function() {
         this.timeout(20000);
 
@@ -15,30 +23,19 @@ describe('ClickHouseDriver', () => {
             .start();
 
         config = {
-            host:'localhost',
-            port:container.getMappedPort(8123),
-        }
-
+            host: 'localhost',
+            port: container.getMappedPort(8123),
+        };
     });
 
-    after(async ()=>{
+    after(async () => {
         if (container) {
             await container.stop()
         }
     });
 
-    async function doWithDriver(callback) {
-        let driver = new ClickHouseDriver(config)
-        try {
-            await callback(driver)
-        }
-        finally {
-            await driver.release()
-        }
-    }
-
     it('should construct', async () => {
-        await doWithDriver(driver=>{})
+        await doWithDriver(driver => {})
     });
 
     it('should test connection', async () => {
@@ -146,4 +143,4 @@ describe('ClickHouseDriver', () => {
             }
         })
     });
-  })
+  });

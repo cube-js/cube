@@ -81,7 +81,7 @@ class ClickHouseDriver extends BaseDriver {
   }
 
   testConnection() {
-    return this.query("SELECT 1")
+    return this.query("SELECT 1");
   }
 
   query(query, values) {
@@ -116,7 +116,6 @@ class ClickHouseDriver extends BaseDriver {
   getTablesQuery(schemaName) {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName])
   }
-
 }
 
 module.exports = ClickHouseDriver;
