@@ -17,7 +17,11 @@ class ClickHouseDriver extends BaseDriver {
       ...config
     };
     this.pool = genericPool.createPool({
-      create: () => new ClickHouse(this.config),
+      create: () => new ClickHouse(Object.assign({}, this.config, { 
+        queryOptions: { 
+          join_use_nulls: 1
+        } 
+      })),
       destroy: (connection) => {
         return Promise.resolve();
       },
@@ -84,7 +88,7 @@ class ClickHouseDriver extends BaseDriver {
     const formattedQuery = sqlstring.format(query, values);
     
     return this.withConnection((connection, queryId) => {
-      return connection.querying(formattedQuery, { dataObjects: true, queryOptions: { query_id: queryId } })
+      return connection.querying(formattedQuery, { dataObjects: true, queryOptions: { query_id: queryId, join_use_nulls: 1 } })
         .then(res => res.data);
     });
   }

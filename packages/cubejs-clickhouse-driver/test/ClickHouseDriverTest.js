@@ -19,13 +19,13 @@ describe('ClickHouseDriver', () => {
             port:container.getMappedPort(8123),
         }
 
-    })
+    });
 
     after(async ()=>{
         if (container) {
             await container.stop()
         }
-    })
+    });
 
     async function doWithDriver(callback) {
         let driver = new ClickHouseDriver(config)
@@ -39,12 +39,14 @@ describe('ClickHouseDriver', () => {
 
     it('should construct', async () => {
         await doWithDriver(driver=>{})
-    })
+    });
+
     it('should test connection', async () => {
         await doWithDriver(async (driver) => {
           await driver.testConnection()
         })
-    })
+    });
+
     it('should select raw sql', async () => {
         await doWithDriver(async (driver) => {
             let numbers = await driver.query("SELECT number FROM system.numbers LIMIT 10")
@@ -61,7 +63,8 @@ describe('ClickHouseDriver', () => {
                 { number: '9' },
             ])
         })
-    })
+    });
+
     it('should select raw sql multiple times', async () => {
         await doWithDriver(async (driver) => {
             let numbers = await driver.query("SELECT number FROM system.numbers LIMIT 5")
@@ -81,7 +84,8 @@ describe('ClickHouseDriver', () => {
                 { number: '4' },
             ])
         })
-    })
+    });
+
     it('should get tables', async () => {
         await doWithDriver(async (driver) => {
             let tables = await driver.getTablesQuery("system")
@@ -89,7 +93,7 @@ describe('ClickHouseDriver', () => {
                 {table_name:"numbers"},
             ])
         })
-    })
+    });
 
     it('should create schema if not exists', async () => {
         await doWithDriver(async (driver) => {
@@ -101,7 +105,7 @@ describe('ClickHouseDriver', () => {
                 await driver.query(`DROP DATABASE ${name}`)
             }
         })
-    })
+    });
 
     it('should substitute parameters', async () => {
         await doWithDriver(async (driver) => {
@@ -117,5 +121,29 @@ describe('ClickHouseDriver', () => {
                 await driver.query(`DROP DATABASE ${name}`)
             }
         })
-    })
+    });
+
+    it('should return null for missing values on left outer join', async () => {
+        await doWithDriver(async (driver) => {
+            let name = `temp_${Date.now()}`
+            try {
+                await driver.createSchemaIfNotExists(name);
+                await driver.query(`CREATE TABLE ${name}.a (x Int32, s String) ENGINE Log`);
+                await driver.query(`INSERT INTO ${name}.a VALUES (?, ?), (?, ?), (?, ?)`, [1, 'str1', 2, 'str2', 3, 'str3']);
+
+                await driver.query(`CREATE TABLE ${name}.b (x Int32, s String) ENGINE Log`);
+                await driver.query(`INSERT INTO ${name}.b VALUES (?, ?), (?, ?), (?, ?)`, [2, 'str2', 3, 'str3', 4, 'str4']);
+
+                const values = await driver.query(`SELECT * FROM ${name}.a LEFT OUTER JOIN ${name}.b ON a.x = b.x`);
+                values.should.deepEqual([
+                    { x: 1, s: 'str1', 'b.x': 0, 'b.s': null },
+                    { x: 2, s: 'str2', 'b.x': 2, 'b.s': 'str2' },
+                    { x: 3, s: 'str3', 'b.x': 3, 'b.s': 'str3' }
+                ])
+            }
+            finally {
+                await driver.query(`DROP DATABASE ${name}`)
+            }
+        })
+    });
   })
