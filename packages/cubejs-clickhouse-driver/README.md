@@ -10,9 +10,7 @@ To test follow the following steps
 
 ```
 $ yarn
-$ docker-compose up -d
 $ yarn test
-$ docker-compose stop
 ```
 
 ### License
