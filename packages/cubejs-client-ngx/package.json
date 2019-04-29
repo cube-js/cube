@@ -1,0 +1,19 @@
+{
+  "name": "@cubejs-client/ngx",
+  "version": "0.0.1",
+  "description": "Cube.js client for Angular",
+  "main": "src/public_api.ts",
+  "license": "MIT",
+  "peerDependencies": {
+    "@angular/core": "^6.1.0 || ^7.0.0",
+    "rxjs": "^6.0.0",
+    "@cubejs-client/core": "^0.7.6"
+  },
+  "scripts": {
+    "build": "ng-packagr -p package.json"
+  },
+  "devDependencies": {
+    "ng-packagr": "^5.1.0",
+    "@cubejs-client/core": "^0.7.6"
+  }
+}
