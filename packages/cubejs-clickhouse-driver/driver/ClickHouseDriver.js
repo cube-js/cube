@@ -19,7 +19,8 @@ class ClickHouseDriver extends BaseDriver {
     this.pool = genericPool.createPool({
       create: () => new ClickHouse(Object.assign({}, this.config, { 
         queryOptions: { 
-          join_use_nulls: 1
+          join_use_nulls: 1,
+          session_id: uuid()
         } 
       })),
       destroy: (connection) => {
