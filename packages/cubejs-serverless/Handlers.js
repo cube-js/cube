@@ -1,19 +1,7 @@
-const aws = require('aws-sdk');
 const express = require('serverless-express/express');
 const handler = require('serverless-express/handler');
 const cors = require('cors');
 const ServerCore = require('@cubejs-backend/server-core');
-
-const sns = new aws.SNS();
-
-const topicArn = (topic) => `arn:aws:sns:${process.env.AWS_REGION}:${process.env.AWS_ACCOUNT_ID}:${topic}`;
-const sendSnsMessage = async (message, type, context) => {
-  const params = {
-    Message: JSON.stringify({ message, type, context }),
-    TopicArn: topicArn(`${process.env.CUBEJS_APP || 'cubejs'}-process`)
-  };
-  await sns.publish(params).promise();
-};
 
 const processHandlers = {
   queryProcess: async (queryKey, orchestrator) => {
@@ -37,25 +25,28 @@ const processHandlers = {
 class Handlers {
   constructor(options) {
     options = {
-      ...options,
       orchestratorOptions: (context) => ({
         queryCacheOptions: {
           queueOptions: {
-            sendProcessMessageFn: async (queryKey) => sendSnsMessage(queryKey, 'queryProcess', context),
-            sendCancelMessageFn: async (query) => sendSnsMessage(query, 'queryCancel', context)
+            sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'queryProcess', context),
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'queryCancel', context)
           }
         },
         preAggregationsOptions: {
           queueOptions: {
-            sendProcessMessageFn: async (queryKey) => sendSnsMessage(queryKey, 'preAggregationProcess', context),
-            sendCancelMessageFn: async (query) => sendSnsMessage(query, 'preAggregationCancel', context)
+            sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'preAggregationProcess', context),
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'preAggregationCancel', context)
           }
         }
-      })
+      }),
+      ...options
     };
     this.serverCore = new ServerCore(options);
-    this.api = this.api.bind(this);
-    this.process = this.process.bind(this);
+  }
+
+  // eslint-disable-next-line no-unused-vars
+  async sendNotificationMessage(message, type, context) {
+    throw new Error(`sendNotificationMessage is not implemented`);
   }
 
   getApiHandler() {
@@ -72,20 +63,18 @@ class Handlers {
     return this.getApiHandler()(event, context);
   }
 
+  // eslint-disable-next-line no-unused-vars
   async process(event) {
-    await Promise.all(event.Records.map(async record => {
-      const message = JSON.parse(record.Sns.Message);
-      const processFn = processHandlers[message.type];
-      if (!processFn) {
-        throw new Error(`Unrecognized message type: ${message.type}`);
-      }
-      const orchestratorApi = this.serverCore.getOrchestratorApi(message.context);
-      await processFn(message.message, orchestratorApi.orchestrator);
-    }));
+    throw new Error(`process is not implemented`);
+  }
 
-    return {
-      statusCode: 200
-    };
+  async processMessage(message) {
+    const processFn = processHandlers[message.type];
+    if (!processFn) {
+      throw new Error(`Unrecognized message type: ${message.type}`);
+    }
+    const orchestratorApi = this.serverCore.getOrchestratorApi(message.context);
+    await processFn(message.message, orchestratorApi.orchestrator);
   }
 }
 

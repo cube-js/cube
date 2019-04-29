@@ -155,5 +155,5 @@ exports.serverless = {
     '.env': dotEnv,
     'schema/Orders.js': () => ordersJs
   },
-  dependencies: ['@cubejs-backend/serverless']
+  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
 };
