@@ -71,6 +71,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `bigquery`
 * `redshift`
 * `mssql`
+* `clickhouse`
 
 For example,
 

@@ -234,7 +234,7 @@ program
   .option(
     '-d, --db-type <db-type>',
     'Preconfigure for selected database.\n\t\t\t     ' +
-    'Options: postgres, mysql, mongobi, athena, bigquery, redshift'
+    'Options: postgres, mysql, mongobi, athena, bigquery, redshift, clickhouse'
   )
   .option('-t, --template <template>', 'App template. Options: express (default), serverless.')
   .description('Create new Cube.js app')
