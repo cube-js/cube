@@ -35,7 +35,7 @@ into Vue.js app.
 
 ### Scoped Slot Props
 
-- `measurers`, `dimensions`, `segments`, `timeDimensions`, `filters` - arrays of
+- `measures`, `dimensions`, `segments`, `timeDimensions`, `filters` - arrays of
 selected query builder members.
 - `availableMeasures`, `availableDimensions`, `availableTimeDimensions`,
 `availableSegments` - arrays of available to select members. They are loaded via
