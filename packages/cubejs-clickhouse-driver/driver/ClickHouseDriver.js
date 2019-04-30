@@ -10,22 +10,20 @@ class ClickHouseDriver extends BaseDriver {
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT,
-      auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? process.env.CUBEJS_DB_USER + ":" + process.env.CUBEJS_DB_PASS : '',
+      auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
       queryOptions: {
         database: process.env.CUBEJS_DB_NAME || config.database
       },
       ...config
     };
     this.pool = genericPool.createPool({
-      create: () => new ClickHouse(Object.assign({}, this.config, { 
-        queryOptions: { 
+      create: () => new ClickHouse(Object.assign({}, this.config, {
+        queryOptions: {
           join_use_nulls: 1,
           session_id: uuid()
-        } 
+        }
       })),
-      destroy: (connection) => {
-        return Promise.resolve();
-      },
+      destroy: () => Promise.resolve(),
       validate: async (connection) => {
         try {
           await connection.querying('SELECT 1');
@@ -55,27 +53,23 @@ class ClickHouseDriver extends BaseDriver {
     const promise = connectionPromise.then(connection => {
       cancelObj.cancel = async () => {
         cancelled = true;
-        await self.withConnection(async connection => {
-          await connection.querying(`KILL QUERY WHERE query_id = '${queryId}'`);
+        await self.withConnection(async conn => {
+          await conn.querying(`KILL QUERY WHERE query_id = '${queryId}'`);
         });
       };
       return fn(connection, queryId)
-        .then(res => {
-          return this.pool.release(connection).then(() => {
-            if (cancelled) {
-              throw new Error('Query cancelled');
-            }
-            return res;
-          });
-        })
-        .catch((err) => {
-          return this.pool.release(connection).then(() => {
-            if (cancelled) {
-              throw new Error('Query cancelled');
-            }
-            throw err;
-          });
-        })
+        .then(res => this.pool.release(connection).then(() => {
+          if (cancelled) {
+            throw new Error('Query cancelled');
+          }
+          return res;
+        }))
+        .catch((err) => this.pool.release(connection).then(() => {
+          if (cancelled) {
+            throw new Error('Query cancelled');
+          }
+          throw err;
+        }));
     });
     promise.cancel = () => cancelObj.cancel();
     return promise;
@@ -87,44 +81,41 @@ class ClickHouseDriver extends BaseDriver {
 
   query(query, values) {
     const formattedQuery = sqlstring.format(query, values);
-    
-    return this.withConnection((connection, queryId) => {
-      return connection.querying(formattedQuery, { dataObjects: true, queryOptions: { query_id: queryId, join_use_nulls: 1 } })
-        .then(res => this._normaliseResponse(res));
-    });
+
+    return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
+      dataObjects: true,
+      queryOptions: { query_id: queryId, join_use_nulls: 1 }
+    }).then(res => this.normaliseResponse(res)));
   }
 
-  _normaliseResponse(res) {
+  normaliseResponse(res) {
     //
     //
     //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
     //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
     //
-    //  ClickHouse returns some number types as js numbers, others as js string, normalise them all to strings  
+    //  ClickHouse returns some number types as js numbers, others as js string, normalise them all to strings
     //
     //
     if (res.data) {
-      res.data.forEach(row=>{
-        for (let field in row) {
-          let value = row[field]
+      res.data.forEach(row => {
+        Object.keys(row).forEach(field => {
+          const value = row[field];
           if (value !== null) {
-            let meta = res.meta.find(m=>m.name == field)
+            const meta = res.meta.find(m => m.name === field);
             if (meta.type.includes("DateTime")) {
-              row[field] = value.substring(0, 10) + "T" + value.substring(11, 22) + ".000"
-            } 
-            else if (meta.type.includes("Date")) {
-              row[field] = value + "T00:00:00.000"
-            } 
-            else if (meta.type.includes("Int") || meta.type.includes("Float")) {
+              row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
+            } else if (meta.type.includes("Date")) {
+              row[field] = `${value}T00:00:00.000`;
+            } else if (meta.type.includes("Int") || meta.type.includes("Float")) {
               // convert all numbers into strings
-              row[field] = `${value}`
+              row[field] = `${value}`;
             }
           }
-        }
-      })
+        });
+      });
     }
-    return res.data
-      return res.data
+    return res.data;
   }
 
   async release() {
@@ -146,9 +137,9 @@ class ClickHouseDriver extends BaseDriver {
   async createSchemaIfNotExists(schemaName) {
     await this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`);
   }
-  
+
   getTablesQuery(schemaName) {
-    return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName])
+    return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
   }
 }
 
