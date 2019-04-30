@@ -31,6 +31,10 @@ class BigQueryDriver extends BaseDriver {
     this.toObjectFromId = this.toObjectFromId.bind(this);
   }
 
+  static driverEnvVariables() {
+    return ['CUBEJS_DB_BQ_PROJECT_ID', 'CUBEJS_DB_BQ_KEY_FILE'];
+  }
+
   testConnection() {
     return this.bigquery.query({
       query: 'SELECT ? AS number', params: ['1']

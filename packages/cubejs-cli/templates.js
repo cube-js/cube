@@ -36,10 +36,16 @@ const mongobiDotEnvVars = env => `${defaultDotEnvVars(env)}
 #CUBEJS_DB_SSL_PASSPHRASE=<SSL_PASSPHRASE>
 #CUBEJS_DB_SSL_REJECT_UNAUTHORIZED=<SSL_REJECT_UNAUTHORIZED>`;
 
-const dotEnv = env => ({
-  athena: athenaDotEnvVars(env),
-  mongobi: mongobiDotEnvVars(env)
-}[env.dbType] || defaultDotEnvVars(env));
+const dotEnv = env => {
+  if (env.driverEnvVariables) {
+    const envVars = env.driverEnvVariables.map(v => `${v}=<${v.replace('CUBEJS', 'YOUR')}>`).join('\n');
+    return `${envVars}\n${sharedDotEnvVars(env)}`;
+  }
+  return {
+    athena: athenaDotEnvVars(env),
+    mongobi: mongobiDotEnvVars(env)
+  }[env.dbType] || defaultDotEnvVars(env);
+};
 
 const serverlessYml = env => `service: ${env.projectName}
 

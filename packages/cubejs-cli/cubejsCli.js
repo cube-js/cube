@@ -159,11 +159,14 @@ const createApp = async (projectName, options) => {
 
   logStage('Writing files from template');
 
+  const driverClass = requireFromPackage(driverDependencies[0]);
+
   const templateConfig = templates[template];
   const env = {
     dbType: options.dbType,
     apiSecret: crypto.randomBytes(64).toString('hex'),
-    projectName
+    projectName,
+    driverEnvVariables: driverClass.driverEnvVariables && driverClass.driverEnvVariables()
   };
   await Promise.all(Object.keys(templateConfig.files).map(async fileName => {
     await fs.ensureDir(path.dirname(fileName));
