@@ -107,6 +107,57 @@ plugins:
   - serverless-express
 `;
 
+const serverlessGoogleYml = env => `service: ${env.projectName} # NOTE: Don't put the word "google" in here
+
+provider:
+  name: google
+  stage: dev
+  runtime: nodejs8
+  region: us-central1
+  project: <YOUR_GOOGLE_PROJECT_ID_HERE>
+  # The GCF credentials can be a little tricky to set up. Luckily we've documented this for you here:
+  # https://serverless.com/framework/docs/providers/google/guide/credentials/
+  #
+  # the path to the credentials file needs to be absolute
+  credentials: </path/to/service/account/keyfile.json>
+  environment:
+    CUBEJS_DB_TYPE: ${env.dbType}
+    CUBEJS_DB_HOST: <YOUR_DB_HOST_HERE>
+    CUBEJS_DB_NAME: <YOUR_DB_NAME_HERE>
+    CUBEJS_DB_USER: <YOUR_DB_USER_HERE>
+    CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
+    CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
+    CUBEJS_DB_BQ_PROJECT_ID: "\${self:provider.project}"
+    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_API_SECRET: ${env.apiSecret}
+    CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
+    CUBEJS_SERVERLESS_PLATFORM: "\${self:provider.name}"
+
+plugins:
+  - serverless-google-cloudfunctions
+  - serverless-express
+
+# needs more granular excluding in production as only the serverless provider npm
+# package should be excluded (and not the whole node_modules directory)
+package:
+  exclude:
+    - node_modules/**
+    - .gitignore
+    - .git/**
+
+functions:
+  cubejs:
+    handler: api
+    events:
+      - http: ANY
+  cubejsProcess:
+    handler: process
+    events:
+      - event:
+          eventType: providers/cloud.pubsub/eventTypes/topic.publish
+          resource: "projects/\${self:provider.project}/topics/\${self:service.name}-\${self:provider.stage}-process"
+`;
+
 const ordersJs = `cube(\`Orders\`, {
   sql: \`
   select 1 as id, 100 as amount, 'new' status
@@ -156,4 +207,16 @@ exports.serverless = {
     'schema/Orders.js': () => ordersJs
   },
   dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
+};
+
+
+exports['serverless-google'] = {
+  files: {
+    'index.js': () => handlerJs,
+    'serverless.yml': serverlessGoogleYml,
+    '.env': dotEnv,
+    'schema/Orders.js': () => ordersJs
+  },
+  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],
+  devDependencies: ['serverless-google-cloudfunctions']
 };

@@ -77,7 +77,9 @@ const displayError = async (text, options) => {
 
 const requireFromPackage = (module) => require(path.join(process.cwd(), 'node_modules', module));
 
-const npmInstall = (dependencies) => executeCommand('npm', ['install', '--save'].concat(dependencies));
+const npmInstall = (dependencies, isDev) => executeCommand(
+  'npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies)
+);
 
 const logStage = (stage) => {
   console.log(`- ${stage}`);
@@ -171,6 +173,11 @@ const createApp = async (projectName, options) => {
   if (templateConfig.dependencies) {
     logStage('Installing template dependencies');
     await npmInstall(templateConfig.dependencies);
+  }
+
+  if (templateConfig.devDependencies) {
+    logStage('Installing template dev dependencies');
+    await npmInstall(templateConfig.devDependencies);
   }
 
   await event('Create App Success', { projectName, dbType: options.dbType });
