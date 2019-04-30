@@ -2,18 +2,23 @@
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
+var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
+require('regenerator-runtime/runtime');
+var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
+require('core-js/modules/es6.object.assign');
+var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
+var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
+require('core-js/modules/es6.promise');
+var fetch = _interopDefault(require('cross-fetch'));
 require('core-js/modules/es6.number.constructor');
 require('core-js/modules/es6.number.parse-float');
 var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
-require('core-js/modules/es6.object.assign');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 require('core-js/modules/es6.array.reduce');
 require('core-js/modules/es6.array.find');
 require('core-js/modules/es6.array.filter');
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
-var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
-var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
 require('core-js/modules/es6.string.iterator');
 require('core-js/modules/es6.array.from');
 require('core-js/modules/es6.array.map');
@@ -26,11 +31,6 @@ require('core-js/modules/es6.object.keys');
 require('core-js/modules/es6.array.is-array');
 require('core-js/modules/es6.regexp.split');
 require('core-js/modules/es6.function.name');
-var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
-require('regenerator-runtime/runtime');
-var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
-require('core-js/modules/es6.promise');
-var fetch = _interopDefault(require('cross-fetch'));
 
 var moment = momentRange.extendMoment(Moment);
 var TIME_SERIES = {
