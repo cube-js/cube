@@ -46,9 +46,9 @@ The rest will be done by `BaseDriver` class.
 
 ## Style guides
 
-We're passionate about what code can do rather than how it's formatted.
+We're passionate about what code can do rather how it's formatted.
 But in order to make code and docs maintainable following style guides will be enforced.
-Following these guidelines it's not a requirement but you can save some time for maintainers if apply those to your contribution beforehand.
+Following these guidelines is not a requirement but you can save some time for maintainers if you apply those to your contribution beforehand.
 
 ### Code
 
