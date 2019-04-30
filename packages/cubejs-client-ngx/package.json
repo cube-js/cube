@@ -3,8 +3,6 @@
   "version": "0.0.1",
   "description": "Cube.js client for Angular",
   "main": "dist/cubejs-client-ngx.umd.js",
-  "module": "dist/cubejs-client-ngx.js",
-  "typings": "dist/index.d.ts",
   "license": "MIT",
   "peerDependencies": {
     "@angular/core": "^6.1.0 || ^7.0.0",
