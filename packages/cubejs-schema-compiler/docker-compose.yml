@@ -1,0 +1,17 @@
+version: "3"
+
+services:
+
+  clickhouse-server:
+    image: yandex/clickhouse-server
+    ports:
+      - "18123:8123"
+
+  postgresql-server:
+    image: postgres:11.2
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: model_test
+      POSTGRES_PASSWORD: test      
+      POSTGRES_USER: test      

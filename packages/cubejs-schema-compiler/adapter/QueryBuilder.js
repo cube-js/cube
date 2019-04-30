@@ -7,6 +7,7 @@ const redshift = require('./RedshiftQuery');
 const prestodb = require('./PrestodbQuery');
 const vertica = require('./VerticaQuery');
 const snowflake = require('./SnowflakeQuery');
+const clickhouse = require('./ClickHouseQuery');
 
 const ADAPTERS = {
   postgres,
@@ -19,9 +20,9 @@ const ADAPTERS = {
   qubole_prestodb: prestodb,
   athena: prestodb,
   vertica,
-  snowflake
+  snowflake,
+  clickhouse,
 };
-
 exports.query = (compilers, adapter, queryOptions) => {
   if (!ADAPTERS[adapter]) {
     return null;

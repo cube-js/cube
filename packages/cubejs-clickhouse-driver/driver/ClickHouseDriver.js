@@ -90,8 +90,41 @@ class ClickHouseDriver extends BaseDriver {
     
     return this.withConnection((connection, queryId) => {
       return connection.querying(formattedQuery, { dataObjects: true, queryOptions: { query_id: queryId, join_use_nulls: 1 } })
-        .then(res => res.data);
+        .then(res => this._normaliseResponse(res));
     });
+  }
+
+  _normaliseResponse(res) {
+    //
+    //
+    //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
+    //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
+    //
+    //  ClickHouse returns some number types as js numbers, others as js string, normalise them all to strings  
+    //
+    //
+    if (res.data) {
+      res.data.forEach(row=>{
+        for (let field in row) {
+          let value = row[field]
+          if (value !== null) {
+            let meta = res.meta.find(m=>m.name == field)
+            if (meta.type.includes("DateTime")) {
+              row[field] = value.substring(0, 10) + "T" + value.substring(11, 22) + ".000"
+            } 
+            else if (meta.type.includes("Date")) {
+              row[field] = value + "T00:00:00.000"
+            } 
+            else if (meta.type.includes("Int") || meta.type.includes("Float")) {
+              // convert all numbers into strings
+              row[field] = `${value}`
+            }
+          }
+        }
+      })
+    }
+    return res.data
+      return res.data
   }
 
   async release() {
