@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/clickhouse-driver",
   "description": "Cube.js ClickHouse database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.0.1",
+  "version": "0.8.1",
   "engines": {
     "node": ">=8.11.1"
   },
