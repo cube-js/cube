@@ -42,3 +42,21 @@ The rest will be done by `BaseDriver` class.
 1. Find most similar `BaseQuery` implementation in `@cubejs-backend/schema-compiler/adapter`.
 2. Copy it and adjust SQL generation accordingly.
 3. Add `BaseQuery` implementation to `@cubejs-backend/schema-compiler/adapter/QueryBuilder.js` with same name as driver.
+
+
+## Style guides
+
+We're passionate about what code can do rather than how it's formatted.
+But in order to make code and docs maintainable following style guides will be enforced.
+Following these guidelines it's not a requirement but you can save some time for maintainers if apply those to your contribution beforehand.
+
+### Code
+
+1. Run `npm run lint` in package before committing your changes.
+If package doesn't have lint script, please add it and run.
+There's one root `.eslintrc.js` file for all packages except client ones.
+Client packages has it's own `.eslintrc.js` files.
+2. Run `npm test` before committing if package has tests.
+3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
+It'll be used to build change logs.
+All PRs are merged using squash so only PR name matters.
