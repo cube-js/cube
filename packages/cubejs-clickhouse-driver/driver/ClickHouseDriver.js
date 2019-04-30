@@ -97,8 +97,8 @@ class ClickHouseDriver extends BaseDriver {
   _normaliseResponse(res) {
     //
     //
-    //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS" in UTC timezone
-    //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000Z", so translate them based on the metadata returned
+    //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
+    //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
     //
     //  ClickHouse returns some number types as js numbers, others as js string, normalise them all to strings  
     //
