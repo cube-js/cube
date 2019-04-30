@@ -104,6 +104,64 @@ describe('ClickHouseDriver', () => {
         })
     });
 
+    // Int8
+    // Int16
+    // Int32
+    // Int64
+    // UInt8
+    // UInt16
+    // UInt32
+    // UInt64
+    // Float32
+    // Float64
+    it('should normalise all numbers as strings', async () => {
+        await doWithDriver(async (driver) => {
+            let name = `temp_${Date.now()}`
+            try {
+                await driver.createSchemaIfNotExists(name);
+                await driver.query(`CREATE TABLE ${name}.a (int8 Int8, int16 Int16, int32 Int32, int64 Int64, uint8 UInt8, uint16 UInt16, uint32 UInt32, uint64 UInt64, float32 Float32, float64 Float64) ENGINE Log`);
+                await driver.query(`INSERT INTO ${name}.a VALUES (1,1,1,1,1,1,1,1,1,1)`);
+
+                const values = await driver.query(`SELECT * FROM ${name}.a`);
+                values.should.deepEqual([{
+                    int8: '1',
+                    int16: '1',
+                    int32: '1',
+                    int64: '1',
+                    uint8: '1',
+                    uint16: '1',
+                    uint32: '1',
+                    uint64: '1',
+                    float32: '1',
+                    float64: '1',                
+                }])
+            }
+            finally {
+                await driver.query(`DROP DATABASE ${name}`)
+            }
+        })
+    });
+
+    it('should normalise all dates as ISO8601', async () => {
+        await doWithDriver(async (driver) => {
+            let name = `temp_${Date.now()}`
+            try {
+                await driver.createSchemaIfNotExists(name);
+                await driver.query(`CREATE TABLE ${name}.a (dateTime DateTime, date Date) ENGINE Log`);
+                await driver.query(`INSERT INTO ${name}.a VALUES ('2019-04-30 11:55:00', '2019-04-30')`);
+
+                const values = await driver.query(`SELECT * FROM ${name}.a`);
+                values.should.deepEqual([{
+                    dateTime: '2019-04-30T11:55:00.000Z',
+                    date: '2019-04-30T00:00:00.000Z',
+                }])
+            }
+            finally {
+                await driver.query(`DROP DATABASE ${name}`)
+            }
+        })
+    });
+
     it('should substitute parameters', async () => {
         await doWithDriver(async (driver) => {
             let name = `temp_${Date.now()}`
@@ -112,7 +170,7 @@ describe('ClickHouseDriver', () => {
                 await driver.query(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`);
                 await driver.query(`INSERT INTO ${name}.test VALUES (?, ?), (?, ?), (?, ?)`, [1, "str1", 2, "str2", 3, "str3"]);
                 const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = ?`, 2);
-                values.should.deepEqual([{x: 2, s: "str2"}])
+                values.should.deepEqual([{x: '2', s: "str2"}])
             }
             finally {
                 await driver.query(`DROP DATABASE ${name}`)
@@ -133,9 +191,9 @@ describe('ClickHouseDriver', () => {
 
                 const values = await driver.query(`SELECT * FROM ${name}.a LEFT OUTER JOIN ${name}.b ON a.x = b.x`);
                 values.should.deepEqual([
-                    { x: 1, s: 'str1', 'b.x': 0, 'b.s': null },
-                    { x: 2, s: 'str2', 'b.x': 2, 'b.s': 'str2' },
-                    { x: 3, s: 'str3', 'b.x': 3, 'b.s': 'str3' }
+                    { x: '1', s: 'str1', 'b.x': '0', 'b.s': null },
+                    { x: '2', s: 'str2', 'b.x': '2', 'b.s': 'str2' },
+                    { x: '3', s: 'str3', 'b.x': '3', 'b.s': 'str3' }
                 ])
             }
             finally {
@@ -143,4 +201,6 @@ describe('ClickHouseDriver', () => {
             }
         })
     });
+
+
   });
