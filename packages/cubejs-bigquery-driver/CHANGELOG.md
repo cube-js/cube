@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.2](https://github.com/statsbotco/cubejs-client/compare/v0.8.1...v0.8.2) (2019-04-30)
+
+
+### Bug Fixes
+
+* Wrong variables when creating new BigQuery backed project ([bae6348](https://github.com/statsbotco/cubejs-client/commit/bae6348)), closes [#97](https://github.com/statsbotco/cubejs-client/issues/97)
+
+
+
+
+
 ## [0.8.1](https://github.com/statsbotco/cubejs-client/compare/v0.8.0...v0.8.1) (2019-04-30)
 
 **Note:** Version bump only for package @cubejs-backend/bigquery-driver
