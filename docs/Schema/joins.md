@@ -136,6 +136,20 @@ dimensions: {
 }
 ```
 
+if don't have a single column in a cube's table which can act as a primary key,
+you can create a composite primary key as shown below.
+
+_The example uses Postgres string concatenation; note that SQL may be
+different depending on your database._
+
+```javascript
+id: {
+  sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
+  type: `number`,
+  primaryKey: true
+}
+```
+
 ## CUBE reference
 
 When you have several joined cubes you should accurately use column's names to avoid any mistakes. One way to make no mistake is to use `${CUBE}` reference. It allows to specify column's names in cubes without any ambiguity. During the implementation of the query this reference will be used as an alias for basic cube. Take a look at the following example:
