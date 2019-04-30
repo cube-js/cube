@@ -2,7 +2,9 @@
   "name": "@cubejs-client/ngx",
   "version": "0.0.1",
   "description": "Cube.js client for Angular",
-  "main": "src/public_api.ts",
+  "main": "dist/cubejs-client-ngx.umd.js",
+  "module": "dist/cubejs-client-ngx.js",
+  "typings": "dist/index.d.ts",
   "license": "MIT",
   "peerDependencies": {
     "@angular/core": "^6.1.0 || ^7.0.0",
@@ -13,8 +15,11 @@
     "build": "ng-packagr -p package.json"
   },
   "devDependencies": {
-    "ng-packagr": "^5.1.0",
+    "@angular/compiler": "^7.2.14",
+    "@angular/compiler-cli": "^7.2.14",
     "@angular/core": "7.2.0",
-    "@cubejs-client/core": "^0.7.6"
+    "@cubejs-client/core": "^0.7.6",
+    "ng-packagr": "^5.1.0",
+    "typescript": "^3.1.1"
   }
 }
