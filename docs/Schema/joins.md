@@ -143,10 +143,12 @@ _The example uses Postgres string concatenation; note that SQL may be
 different depending on your database._
 
 ```javascript
-id: {
-  sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
-  type: `number`,
-  primaryKey: true
+dimensions: {
+  id: {
+    sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
+    type: `number`,
+    primaryKey: true
+  }
 }
 ```
 
