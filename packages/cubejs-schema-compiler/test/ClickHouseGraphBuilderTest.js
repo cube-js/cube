@@ -1,15 +1,20 @@
-const CompileError = require('../compiler/CompileError');
+/* globals describe, after, it */
 const UserError = require('../compiler/UserError');
-const BigqueryQuery = require('../adapter/BigqueryQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 
-const prepareCompiler = PrepareCompiler.prepareCompiler;
+const { prepareCompiler } = PrepareCompiler;
 const dbRunner = require('./ClickHouseDbRunner');
 
 const { debugLog, logSqlAndParams } = require('./TestUtil');
 
-describe('ClickHouse JoinGraph', () => {
+describe('ClickHouse JoinGraph', function test() {
+  this.timeout(20000);
+
+  after(async () => {
+    await dbRunner.tearDown();
+  });
+
   const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',

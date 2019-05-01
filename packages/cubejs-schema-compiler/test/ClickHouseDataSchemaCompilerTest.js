@@ -1,3 +1,4 @@
+/* globals describe, before, after, it */
 const CompileError = require('../compiler/CompileError');
 const PrepareCompiler = require('./PrepareCompiler');
 const MainPrepareCompiler = require('../compiler/PrepareCompiler');
@@ -8,7 +9,16 @@ const dbRunner = require('./ClickHouseDbRunner');
 
 const { debugLog, logSqlAndParams } = require('./TestUtil');
 
-describe('ClickHouse DataSchemaCompiler', async () => {
+describe('ClickHouse DataSchemaCompiler', function test() {
+  this.timeout(20000);
+
+  before(async function before() {
+    this.timeout(20000);
+  });
+
+  after(async () => {
+    await dbRunner.tearDown();
+  });
 
   it('gutter', () => {
     const { compiler } = prepareCompiler(`
