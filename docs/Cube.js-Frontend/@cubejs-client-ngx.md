@@ -76,9 +76,11 @@ which passes [resultSet](/@cubejs-client-core#result-set) into callback function
 Also you can use [RxJS Subject](https://rxjs-dev.firebaseapp.com/guide/subject) with a query using `watch` method:
 
 ```typescript
+private query;
+
 ngOnInit() {
-  const query = new Subject();
-  this.cubejs.watch(query).subscribe(
+  this.query = new Subject();
+  this.cubejs.watch(this.query).subscribe(
     resultSet => {
       console.log(resultSet.chartPivot()[0].x);
       console.log(resultSet.seriesNames()[0]);
@@ -87,8 +89,12 @@ ngOnInit() {
   );
 }
 
-    query.next({ query_1 });
+button1ClickHandler() {
+  this.query.next({ query_1 });
+}
 
-    query.next({ query_2 });
+button2ClickHandler() {
+  this.query.next({ query_2 });
+}
 ```
 
