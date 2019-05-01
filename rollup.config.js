@@ -10,12 +10,12 @@ import typescript from 'rollup-plugin-typescript';
 
 const bundle = (name, globalName, baseConfig) => {
   baseConfig = {
-    ...baseConfig,
     plugins: [
       replace({
         "process.env.CUBEJS_API_URL": `"${process.env.CUBEJS_API_URL || "https://statsbot.co/cubejs-api/v1"}"`
       })
-    ]
+    ],
+    ...baseConfig
   };
 
   const baseUmdConfig = {
@@ -26,7 +26,9 @@ const bundle = (name, globalName, baseConfig) => {
         mainFields: ['browser', 'module', 'main']
       }),
       ...baseConfig.plugins,
-      commonjs(),
+      commonjs({
+        extensions: ['.js', '.ts']
+      }),
       babel({
         exclude: ['node_modules/**', /\/core-js\//],
         runtimeHelpers: true,
@@ -43,8 +45,7 @@ const bundle = (name, globalName, baseConfig) => {
       }),
       alias({
         '@cubejs-client/core': '../cubejs-client-core/src/index.js'
-      }),
-      typescript()
+      })
     ]
   };
 
@@ -153,13 +154,13 @@ export default bundle('cubejs-client-core', 'cubejs', {
 })).concat(bundle('cubejs-client-ngx', 'cubejsngx', {
   input: "packages/cubejs-client-ngx/index.ts",
   external: [
-    'angular/core',
-    'rxjs',
+    '@angular/core',
+    'rxjs'
   ],
   plugins: [
-    resolve({
-      extensions: [ '.ts', '.js', '.json' ]
-    }),
-    typescript()
+    typescript({
+      tsconfig: 'packages/cubejs-client-ngx/tsconfig.json',
+      typescript: require('typescript')
+    })
   ]
 }));
