@@ -33,4 +33,15 @@ export class CubejsClient {
   public meta(...params):Observable<MetaResult> {
     return from(<Promise<MetaResult>>this.apiInstace().meta(...params));
   }
+
+  public watch(query, params = {}):Observable<ResultSet> {
+    return Observable.create(observer =>
+      query.subscribe({
+        next: async query => {
+          const resultSet = await this.apiInstace().load(query, params);
+          observer.next(resultSet);
+        }
+      })
+    );
+  }
 }

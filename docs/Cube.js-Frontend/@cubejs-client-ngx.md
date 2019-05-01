@@ -73,3 +73,22 @@ export class AppComponent {
 The difference is that instead of Promise it returns an [Observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html),
 which passes [resultSet](/@cubejs-client-core#result-set) into callback function.
 
+Also you can use [RxJS Subject](https://rxjs-dev.firebaseapp.com/guide/subject) with a query using `watch` method:
+
+```typescript
+ngOnInit() {
+  const query = new Subject();
+  this.cubejs.watch(query).subscribe(
+    resultSet => {
+      console.log(resultSet.chartPivot()[0].x);
+      console.log(resultSet.seriesNames()[0]);
+    },
+    err => console.log('HTTP Error', err)
+  );
+}
+
+    query.next({ query_1 });
+
+    query.next({ query_2 });
+```
+
