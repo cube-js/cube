@@ -17,12 +17,14 @@ class ClickHouseDriver extends BaseDriver {
       ...config
     };
     this.pool = genericPool.createPool({
-      create: () => new ClickHouse(Object.assign({}, this.config, {
+      create: () => new ClickHouse({
+        ...this.config,
         queryOptions: {
           join_use_nulls: 1,
-          session_id: uuid()
+          session_id: uuid(),
+          ...this.config.queryOptions,
         }
-      })),
+      }),
       destroy: () => Promise.resolve(),
       validate: async (connection) => {
         try {
