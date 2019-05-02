@@ -6,24 +6,28 @@ import replace from "rollup-plugin-replace";
 import pkg from "./package.json";
 import uglify from "rollup-plugin-uglify";
 import alias from 'rollup-plugin-alias';
+import typescript from 'rollup-plugin-typescript';
 
 const bundle = (name, globalName, baseConfig) => {
   baseConfig = {
-    ...baseConfig,
     plugins: [
       replace({
         "process.env.CUBEJS_API_URL": `"${process.env.CUBEJS_API_URL || "https://statsbot.co/cubejs-api/v1"}"`
-      }),
-    ]
+      })
+    ],
+    ...baseConfig
   };
 
   const baseUmdConfig = {
     ...baseConfig,
     plugins: [
-      ...baseConfig.plugins,
-      commonjs(),
       resolve({
+        extensions: [ '.ts', '.js', '.json' ],
         mainFields: ['browser', 'module', 'main']
+      }),
+      ...baseConfig.plugins,
+      commonjs({
+        extensions: ['.js', '.ts']
       }),
       babel({
         exclude: ['node_modules/**', /\/core-js\//],
@@ -147,4 +151,14 @@ export default bundle('cubejs-client-core', 'cubejs', {
   external: [
     'vue',
   ],
+})).concat(bundle('cubejs-client-ngx', 'cubejsngx', {
+  input: "packages/cubejs-client-ngx/index.ts",
+  external: [
+  ],
+  plugins: [
+    typescript({
+      tsconfig: 'packages/cubejs-client-ngx/tsconfig.json',
+      typescript: require('typescript')
+    })
+  ]
 }));

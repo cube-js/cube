@@ -30,17 +30,20 @@
     "babelrc-rollup": "^3.0.0",
     "http-server": "^0.11.1",
     "lerna": "^3.13.1",
-    "rollup": "^0.65.2",
+    "rollup": "^0.68",
     "rollup-plugin-alias": "^1.4.0",
     "rollup-plugin-babel": "^4.0.3",
     "rollup-plugin-commonjs": "^9.1.6",
     "rollup-plugin-node-resolve": "^4.2.3",
     "rollup-plugin-replace": "^2.0.0",
-    "rollup-plugin-uglify": "^5.0.2"
+    "rollup-plugin-typescript": "^1.0.1",
+    "rollup-plugin-uglify": "^5.0.2",
+    "tslib": "^1.9.3",
+    "typescript": "^3.4.5"
   },
   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/statsbotco/cube.js.git"
+    "type": "git",
+    "url": "https://github.com/statsbotco/cube.js.git"
   },
   "license": "MIT"
 }
