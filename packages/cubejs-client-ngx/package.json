@@ -1,13 +1,13 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.0.1",
+  "version": "0.8.4",
   "description": "Cube.js client for Angular",
   "main": "dist/cubejs-client-ngx.umd.js",
   "license": "MIT",
   "dependencies": {
     "@angular/core": "^6.1.0 || ^7.0.0",
-    "rxjs": "^6.0.0",
-    "@cubejs-client/core": "^0.7.6"
+    "@cubejs-client/core": "^0.7.6",
+    "rxjs": "^6.0.0"
   },
   "scripts": {
     "build": "ng-packagr -p package.json"
