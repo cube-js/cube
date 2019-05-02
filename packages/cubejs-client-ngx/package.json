@@ -4,7 +4,7 @@
   "description": "Cube.js client for Angular",
   "main": "dist/cubejs-client-ngx.umd.js",
   "license": "MIT",
-  "peerDependencies": {
+  "dependencies": {
     "@angular/core": "^6.1.0 || ^7.0.0",
     "rxjs": "^6.0.0",
     "@cubejs-client/core": "^0.7.6"
@@ -15,8 +15,6 @@
   "devDependencies": {
     "@angular/compiler": "^7.2.14",
     "@angular/compiler-cli": "^7.2.14",
-    "@angular/core": "7.2.0",
-    "@cubejs-client/core": "^0.7.6",
     "ng-packagr": "^5.1.0",
     "typescript": "^3.1.1"
   }

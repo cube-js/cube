@@ -154,8 +154,6 @@ export default bundle('cubejs-client-core', 'cubejs', {
 })).concat(bundle('cubejs-client-ngx', 'cubejsngx', {
   input: "packages/cubejs-client-ngx/index.ts",
   external: [
-    '@angular/core',
-    'rxjs'
   ],
   plugins: [
     typescript({
