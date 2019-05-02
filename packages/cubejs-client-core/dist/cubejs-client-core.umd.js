@@ -1,8 +1,8 @@
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
 	typeof define === 'function' && define.amd ? define(factory) :
-	(global = global || self, global.cubejs = factory());
-}(this, function () { 'use strict';
+	(global.cubejs = factory());
+}(this, (function () { 'use strict';
 
 	var commonjsGlobal = typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -43,7 +43,7 @@
 	  return store[key] || (store[key] = value !== undefined ? value : {});
 	})('versions', []).push({
 	  version: _core.version,
-	  mode: 'global',
+	  mode: _library ? 'pure' : 'global',
 	  copyright: '© 2018 Denis Pushkarev (zloirock.ru)'
 	});
 	});
@@ -1166,10 +1166,10 @@
 	    return capability.promise;
 	  }
 	});
-	_export(_export.S + _export.F * (_library || !USE_NATIVE), PROMISE, {
+	_export(_export.S + _export.F * (!USE_NATIVE), PROMISE, {
 	  // 25.4.4.6 Promise.resolve(x)
 	  resolve: function resolve(x) {
-	    return _promiseResolve(_library && this === Wrapper ? $Promise : this, x);
+	    return _promiseResolve(this, x);
 	  }
 	});
 	_export(_export.S + _export.F * !(USE_NATIVE && _iterDetect(function (iter) {
@@ -3168,7 +3168,6 @@
 
 	var _typedArray = createCommonjsModule(function (module) {
 	if (_descriptors) {
-	  var LIBRARY = _library;
 	  var global = _global;
 	  var fails = _fails;
 	  var $export = _export;
@@ -3590,7 +3589,7 @@
 	        if (!(key in TypedArray)) hide(TypedArray, key, Base[key]);
 	      });
 	      TypedArray[PROTOTYPE] = TypedArrayPrototype;
-	      if (!LIBRARY) TypedArrayPrototype.constructor = TypedArray;
+	      TypedArrayPrototype.constructor = TypedArray;
 	    }
 	    var $nativeIterator = TypedArrayPrototype[ITERATOR];
 	    var CORRECT_ITER_NAME = !!$nativeIterator
@@ -3630,7 +3629,7 @@
 
 	    $export($export.P + $export.F * !CORRECT_ITER_NAME, NAME, $iterators);
 
-	    if (!LIBRARY && TypedArrayPrototype.toString != arrayToString) TypedArrayPrototype.toString = arrayToString;
+	    if (TypedArrayPrototype.toString != arrayToString) TypedArrayPrototype.toString = arrayToString;
 
 	    $export($export.P + $export.F * fails(function () {
 	      new TypedArray(1).slice();
@@ -3643,7 +3642,7 @@
 	    })), NAME, { toLocaleString: $toLocaleString });
 
 	    Iterators[NAME] = CORRECT_ITER_NAME ? $nativeIterator : $iterator;
-	    if (!LIBRARY && !CORRECT_ITER_NAME) hide(TypedArrayPrototype, ITERATOR, $iterator);
+	    if (!CORRECT_ITER_NAME) hide(TypedArrayPrototype, ITERATOR, $iterator);
 	  };
 	} else module.exports = function () { /* empty */ };
 	});
@@ -14759,4 +14758,4 @@
 
 	return index;
 
-}));
+})));
