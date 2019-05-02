@@ -17,5 +17,8 @@
     "@angular/compiler-cli": "^7.2.14",
     "ng-packagr": "^5.1.0",
     "typescript": "^3.1.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
