@@ -69,7 +69,7 @@ const displayError = async (text, options) => {
   console.error(chalk.yellow('Need some help? -------------------------------------'));
   await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString(), ...options });
   console.error('');
-  console.error(`${chalk.yellow(`  Ask this question in Cube.js Slack:`)} https://publicslack.com/slacks/cubejs/invites/new`);
+  console.error(`${chalk.yellow(`  Ask this question in Cube.js Slack:`)} https://cubejs-community.herokuapp.com`);
   console.error(`${chalk.yellow(`  Post an issue:`)} https://github.com/statsbotco/cube.js/issues`);
   console.error('');
   process.exit(1);
