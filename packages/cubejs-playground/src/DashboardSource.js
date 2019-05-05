@@ -59,7 +59,7 @@ class DashboardSource {
         const dependency = importName[0].indexOf('@') === 0 ? [importName[0], importName[1]].join('/') : importName[0];
         return { [dependency]: 'latest' };
       }).reduce((a, b) => ({ ...a, ...b }));
-    fetchWithRetry('/playground/ensure-dependencies', {
+    await fetchWithRetry('/playground/ensure-dependencies', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

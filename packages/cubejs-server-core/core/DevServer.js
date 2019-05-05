@@ -91,7 +91,8 @@ class DevServer {
       if (!await fs.pathExists(dashboardAppPath) || this.createReactAppInit) {
         if (!this.createReactAppInit) {
           this.cubejsServer.event('Dev Server Create Dashboard App');
-          this.createReactAppInit = executeCommand('npx', ['create-react-app', dashboardAppPath]);
+          this.createReactAppInit = executeCommand('npm', ['install', '-g', 'create-react-app'])
+            .then(() => executeCommand('create-react-app', [dashboardAppPath]));
         }
         await this.createReactAppInit;
         this.cubejsServer.event('Dev Server Create Dashboard App Success');
@@ -155,29 +156,74 @@ class DevServer {
     app.post('/playground/ensure-dependencies', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server App Ensure Dependencies');
       const { dependencies } = req.body;
-      const packageJson = await fs.readJson(path.join(dashboardAppPath, 'package.json'));
-      const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
-      if (toInstall.length) {
-        this.cubejsServer.event('Dev Server Dashboard Npm Install');
-        const cmd = () => executeCommand(
-          'npm',
-          ['install', '--save'].concat(toInstall),
-          { cwd: path.resolve(dashboardAppPath) }
-        );
-        if (this.curNpmInstall) {
-          this.curNpmInstall = this.curNpmInstall.then(cmd);
-        } else {
-          this.curNpmInstall = cmd();
+      const cmd = async () => {
+        const packageJson = await fs.readJson(path.join(dashboardAppPath, 'package.json'));
+        const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
+        if (toInstall.length) {
+          this.cubejsServer.event('Dev Server Dashboard Npm Install');
+          await executeCommand(
+            'npm',
+            ['install', '--save'].concat(toInstall),
+            { cwd: path.resolve(dashboardAppPath) }
+          );
+          this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
         }
-        const { curNpmInstall } = this;
-        await this.curNpmInstall;
-        if (curNpmInstall === this.curNpmInstall) {
-          this.curNpmInstall = null;
-        }
-        await executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(dashboardAppPath) });
-        this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
+        return toInstall;
+      };
+      if (this.curNpmInstall) {
+        this.curNpmInstall = this.curNpmInstall.then(cmd);
+      } else {
+        this.curNpmInstall = cmd();
+      }
+      const { curNpmInstall } = this;
+      const toInstall = await this.curNpmInstall;
+      if (curNpmInstall === this.curNpmInstall) {
+        this.curNpmInstall = null;
       }
       res.json({ toInstall });
+    }));
+
+    const dashboardAppPort = this.cubejsServer.options.dashboardAppPort || 3050;
+
+    app.get('/playground/start-dashboard-app', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server Start Dashboard App');
+      if (!this.dashboardAppProcess) {
+        this.dashboardAppProcess = spawn('npm', ['run', 'start'], {
+          cwd: dashboardAppPath,
+          env: {
+            ...process.env,
+            PORT: dashboardAppPort
+          }
+        });
+        this.dashboardAppProcess.dashboardUrlPromise = new Promise((resolve) => {
+          this.dashboardAppProcess.stdout.on('data', (data) => {
+            console.log(data.toString());
+            if (data.toString().match(/Compiled/)) {
+              resolve(dashboardAppPort);
+            }
+          });
+        });
+
+        this.dashboardAppProcess.on('close', exitCode => {
+          if (exitCode !== 0) {
+            console.log(`Dashboard react-app failed with exit code ${exitCode}`);
+            this.cubejsServer.event('Dev Server Dashboard App Failed', { exitCode });
+          }
+          this.dashboardAppProcess = null;
+        });
+      }
+
+      await this.dashboardAppProcess.dashboardUrlPromise;
+      res.json({ dashboardPort: dashboardAppPort });
+    }));
+
+    app.get('/playground/dashboard-app-status', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server Dashboard App Status');
+      const dashboardPort = this.dashboardAppProcess && await this.dashboardAppProcess.dashboardUrlPromise;
+      res.json({
+        running: !!dashboardPort,
+        dashboardPort
+      });
     }));
 
     app.use(serveStatic(path.join(__dirname, '../playground')));
