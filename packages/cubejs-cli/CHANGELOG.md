@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.6](https://github.com/statsbotco/cubejs-client/compare/v0.8.5...v0.8.6) (2019-05-05)
+
+
+### Bug Fixes
+
+* **cli:** Update Slack Community Link ([#101](https://github.com/statsbotco/cubejs-client/issues/101)) ([c5fd43f](https://github.com/statsbotco/cubejs-client/commit/c5fd43f))
+
+
+
+
+
 ## [0.8.4](https://github.com/statsbotco/cubejs-client/compare/v0.8.3...v0.8.4) (2019-05-02)
 
 **Note:** Version bump only for package cubejs-cli

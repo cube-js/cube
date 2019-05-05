@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.6](https://github.com/statsbotco/cubejs-client/compare/v0.8.5...v0.8.6) (2019-05-05)
+
+
+### Bug Fixes
+
+* **playground:** Update Slack Community Link ([#102](https://github.com/statsbotco/cubejs-client/issues/102)) ([61a9bb0](https://github.com/statsbotco/cubejs-client/commit/61a9bb0))
+
+
+### Features
+
+* Replace codesandbox by running dashboard react-app directly ([861c817](https://github.com/statsbotco/cubejs-client/commit/861c817))
+
+
+
+
+
 ## [0.8.4](https://github.com/statsbotco/cubejs-client/compare/v0.8.3...v0.8.4) (2019-05-02)
 
 **Note:** Version bump only for package @cubejs-client/playground
