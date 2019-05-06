@@ -33,6 +33,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `redshift`
 * `bigquery`
 * `mssql`
+* `clickhouse`
 
 For example,
 
