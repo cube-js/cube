@@ -54,14 +54,32 @@ class PreAggregationLoadCache {
     this.cacheDriver = preAggregations.cacheDriver;
   }
 
-  async tablesFromCache(schema) {
-    let tables = await this.cacheDriver.get(this.tablesRedisKey());
+  async tablesFromCache(schema, forceRenew) {
+    let tables = forceRenew ? null : await this.cacheDriver.get(this.tablesRedisKey());
     if (!tables) {
-      const client = await this.driverFactory();
-      tables = await client.getTablesQuery(schema);
-      await this.cacheDriver.set(this.tablesRedisKey(), tables, 120);
+      if (this.fetchTablesPromise) {
+        tables = await this.fetchTablesPromise;
+      } else {
+        this.fetchTablesPromise = this.fetchTables(schema);
+        try {
+          tables = await this.fetchTablesPromise;
+        } finally {
+          this.fetchTablesPromise = null;
+        }
+      }
     }
     return tables;
+  }
+
+  async fetchTables(schema) {
+    const client = await this.driverFactory();
+    const newTables = await client.getTablesQuery(schema);
+    await this.cacheDriver.set(
+      this.tablesRedisKey(),
+      newTables,
+      this.preAggregations.options.preAggregationsSchemaCacheDuration || 60 * 60
+    );
+    return newTables;
   }
 
   tablesRedisKey() {
@@ -103,11 +121,11 @@ class PreAggregationLoadCache {
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
   }
 
-  async reset() {
+  async reset(schema) {
     this.tables = undefined;
     this.queryStageState = undefined;
     this.versionEnries = undefined;
-    await this.cacheDriver.remove(this.tablesRedisKey());
+    await this.tablesFromCache(schema, true);
   }
 }
 
@@ -180,7 +198,7 @@ class PreAggregationLoader {
     };
 
     const mostRecentTargetTableName = async () => {
-      await this.loadCache.reset();
+      await this.loadCache.reset(this.preAggregation.preAggregationsSchema);
       return this.targetTableName(
         getVersionEntryByContentVersion(
           await this.loadCache.getVersionEntries(this.preAggregation.preAggregationsSchema)
@@ -293,7 +311,7 @@ class PreAggregationLoader {
       .filter(t => tablesToSave.indexOf(t) === -1);
     this.logger('Dropping orphaned tables', { tablesToDrop: JSON.stringify(toDrop) });
     await Promise.all(toDrop.map(table => client.dropTable(table)));
-    await this.loadCache.reset();
+    await this.loadCache.reset(this.preAggregation.preAggregationsSchema);
   }
 
   flushUsedTables() {
