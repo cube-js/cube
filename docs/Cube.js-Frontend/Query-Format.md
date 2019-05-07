@@ -63,7 +63,7 @@ If `order` property is not specified in the query, Cube.js sorts results by defa
 
 A filter is a Javascript object with the following properties:
 
-- `member`: Dimension or measure to be used in the filter, for example: `Stories.isDraft`. See below on difference on filtering dimensions vs filtering measures.
+- `dimension`: Dimension or measure to be used in the filter, for example: `Stories.isDraft`. See below on difference on filtering dimensions vs filtering measures.
 - `operator`: An operator to be used in filter. Only some operators are available for measures, for dimensions available operators depend on the type
     of the dimension. Please see the reference below for the full list of available
     operators.
@@ -87,7 +87,7 @@ Use it when you need an exact match. It supports multiple values.
 
 ```js
 {
-  member: "Users.country",
+  dimension: "Users.country",
   operator: "equals",
   values: ["US", "Germany", "Israel"]
 }
@@ -102,7 +102,7 @@ An opposite operator of `equals`. It supports multiple values.
 
 ```js
 {
-  member: "Users.country",
+  dimension: "Users.country",
   operator: "notEquals",
   values: ["France"]
 }
@@ -116,7 +116,7 @@ An opposite operator of `equals`. It supports multiple values.
 
 ```js
 {
-  member: "Posts.title",
+  dimension: "Posts.title",
   operator: "contains",
   values: ["serverless", "aws"]
 }
@@ -130,7 +130,7 @@ An opposite operator of `contains`. It supports multiple values.
 
 ```js
 {
-  member: "Posts.title",
+  dimension: "Posts.title",
   operator: "notContains",
   values: ["ruby"]
 }
@@ -145,7 +145,7 @@ The `gt` operator means **greater than** and is used with measures or dimensions
 
 ```js
 {
-  member: "Posts.upvotesCount",
+  dimension: "Posts.upvotesCount",
   operator: "gt",
   values: ["100"]
 }
@@ -160,7 +160,7 @@ The `gte` operator means **greater than or equal to** and is used with measures 
 
 ```js
 {
-  member: "Posts.upvotesCount",
+  dimension: "Posts.upvotesCount",
   operator: "gte",
   values: ["100"]
 }
@@ -175,7 +175,7 @@ The `lt` operator means **less than** and is used with measures or dimensions of
 
 ```js
 {
-  member: "Posts.upvotesCount",
+  dimension: "Posts.upvotesCount",
   operator: "lt",
   values: ["10"]
 }
@@ -190,7 +190,7 @@ The `lte` operator means **less than or equal to** and is used with measures or 
 
 ```js
 {
-  member: "Posts.upvotesCount",
+  dimension: "Posts.upvotesCount",
   operator: "lte",
   values: ["10"]
 }
@@ -198,7 +198,7 @@ The `lte` operator means **less than or equal to** and is used with measures or 
 
 ### set
 
-Operator `set` checks whether the value of the member **is not** `NULL`. You don't
+Operator `set` checks whether the value of the dimension **is not** `NULL`. You don't
 need to pass `values` for this operator.
 
 * Applied to measures.
@@ -206,14 +206,14 @@ need to pass `values` for this operator.
 
 ```js
 {
-  member: "Posts.authorName",
+  dimension: "Posts.authorName",
   operator: "set"
 }
 ```
 
 ### notSet
 
-An opposite to `set` operator. It checks whether the value of the member **is** `NULL`. You don't
+An opposite to `set` operator. It checks whether the value of the dimension **is** `NULL`. You don't
 need to pass `values` for this operator.
 
 * Applied to measures.
@@ -221,7 +221,7 @@ need to pass `values` for this operator.
 
 ```js
 {
-  member: "Posts.authorName",
+  dimension: "Posts.authorName",
   operator: "notSet"
 }
 ```
@@ -237,7 +237,7 @@ timeDimensions query property here](#time-dimensions-format)
 
 ```js
 {
-  member: "Posts.time",
+  dimension: "Posts.time",
   operator: "inDateRange",
   values: ['2015-01-01', '2015-12-31']
 }
@@ -251,7 +251,7 @@ An opposite operator to `inDateRange`, use it when you want to exclude specific 
 
 ```js
 {
-  member: "Posts.time",
+  dimension: "Posts.time",
   operator: "notInDateRange",
   values: ['2015-01-01', '2015-12-31']
 }
@@ -266,7 +266,7 @@ values should be an array of one element in `YYYY-MM-DD` format.
 
 ```js
 {
-  member: "Posts.time",
+  dimension: "Posts.time",
   operator: "beforeDate",
   values: ['2015-01-01']
 }
@@ -281,7 +281,7 @@ The same as `beforeDate`, but used to get all results after specific date.
 
 ```js
 {
-  member: "Posts.time",
+  dimension: "Posts.time",
   operator: "afterDate",
   values: ['2015-01-01']
 }
