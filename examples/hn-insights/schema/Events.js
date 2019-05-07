@@ -33,6 +33,8 @@ cube(`Events`, {
       type: `sum`,
       filters: [{
         sql: `${timestamp} + interval '60' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
       }]
     },
 
@@ -43,12 +45,68 @@ cube(`Events`, {
         sql: `${timestamp} + interval '60' minute < now()`
       }, {
         sql: `${timestamp} + interval '120' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    commentsChangeLastHour: {
+      sql: `comments_count_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    commentsChangePrevHour: {
+      sql: `comments_count_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute < now()`
+      }, {
+        sql: `${timestamp} + interval '120' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    rankHourAgo: {
+      sql: `rank`,
+      type: `min`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute < now()`
+      }, {
+        sql: `${timestamp} + interval '65' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
       }]
     },
 
     currentRank: {
       sql: `rank`,
       type: `min`,
+      filters: [{
+        sql: `${timestamp} + interval '5' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    currentScore: {
+      sql: `score`,
+      type: `max`,
+      filters: [{
+        sql: `${timestamp} + interval '5' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    currentComments: {
+      sql: `comments_count`,
+      type: `max`,
       filters: [{
         sql: `${timestamp} + interval '5' minute > now()`
       }, {

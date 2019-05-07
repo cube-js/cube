@@ -80,19 +80,11 @@ const velocityListRender = ({ resultSet }) => {
   );
 };
 
-const API_URL = "http://localhost:4000";
-const cubejsApi = cubejs(
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NTYxMzU5NDIsImV4cCI6MTU1NjIyMjM0Mn0.aW71JQ-eVm7N7XXCsdbzK2FPxLpqamL8QFD0h8BHaoU",
-  {
-    apiUrl: API_URL + "/cubejs-api/v1"
-  }
-);
-
 const renderChart = Component => ({ resultSet, error }) =>
   (resultSet && <Component resultSet={resultSet} />) ||
   (error && error.toString()) || <Spin />;
 
-const IndexPage = () => {
+const IndexPage = ({ cubejsApi }) => {
   return (
     <Dashboard>
       <DashboardItem size={12} title="Velocity Leader Board">

@@ -18,7 +18,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "upload": "react-scripts build && aws s3 sync build/ s3://hn-insights-dashboard"
   },
   "eslintConfig": {
     "extends": "react-app"

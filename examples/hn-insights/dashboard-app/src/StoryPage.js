@@ -1,7 +1,6 @@
 import React from "react";
-import { Row, Col, Card, Spin, Statistic, Table, Layout } from "antd";
+import { Row, Col, Card, Spin, Statistic, Table, Layout, Icon } from "antd";
 import "antd/dist/antd.css";
-import cubejs from "@cubejs-client/core";
 import { QueryRenderer } from "@cubejs-client/react";
 import { Chart, Axis, Tooltip, Geom, Coord, Legend } from "bizcharts";
 import moment from "moment";
@@ -75,15 +74,12 @@ const storyCardRender = ({ resultSet }) => {
         span={12}
         title="Title"
         description={
-          <span>
-            {data['Events.currentRank'] && `${data['Events.currentRank']}. `}
-            <a
-              href={data['Stories.href'].indexOf('http') !== 0 ? `https://news.ycombinator.com/${data['Stories.href']}` : data['Stories.href']}
-              target="_blank" rel="noopener noreferrer"
-            >
-              {data['Stories.title']}
-            </a>
-            </span>
+          <a
+            href={`https://news.ycombinator.com/item?id=${data['Stories.id']}`}
+            target="_blank" rel="noopener noreferrer"
+          >
+            {data['Stories.title']}
+          </a>
         }
       />
       <StoryCardMeta
@@ -121,23 +117,54 @@ const storyCardRender = ({ resultSet }) => {
         title="Minutes on First Page"
         description={<span>{data['Events.minutesOnFirstPage']}</span>}
       />
+      <StoryCardMeta
+        span={12}
+        title="Score"
+        description={<span>{data['Events.currentScore']}</span>}
+      />
+      <StoryCardMeta
+        span={12}
+        title="Comments"
+        description={<span>{data['Events.currentComments']}</span>}
+      />
+      <StoryCardMeta
+        span={12}
+        title="Rank"
+        description={<span>{data['Events.currentRank']}</span>}
+      />
+      <StoryCardMeta
+        span={12}
+        title="User"
+        description={<a
+          href={`https://news.ycombinator.com/user?id=${data['Stories.user']}`}
+          target="_blank" rel="noopener noreferrer"
+        >
+          {data['Stories.user']}
+        </a>}
+      />
     </Row>
   );
 };
 
-const API_URL = "http://localhost:4000";
-const cubejsApi = cubejs(
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NTYxMzU5NDIsImV4cCI6MTU1NjIyMjM0Mn0.aW71JQ-eVm7N7XXCsdbzK2FPxLpqamL8QFD0h8BHaoU",
-  {
-    apiUrl: API_URL + "/cubejs-api/v1"
-  }
-);
+const renderStatisticCard = (currentField, prevField, isRank) => ({ resultSet }) => {
+  const scoreLastHour = resultSet.totalRow()[currentField] && parseInt(resultSet.totalRow()[currentField], 10);
+  const scorePrevHour = resultSet.totalRow()[prevField] && parseInt(resultSet.totalRow()[prevField], 10) || null;
+  const positiveDiff = isRank ? scoreLastHour <= scorePrevHour : scoreLastHour >= scorePrevHour;
+  const prefix = isRank ? '' : '+';
+  return <div style={{ textAlign: 'center' }}><Statistic
+    value={`${prefix}${scoreLastHour}`}
+    valueStyle={{ color: scorePrevHour && (positiveDiff ? '#3f8600' : '#cf1322') }}
+    prefix={scorePrevHour && <Icon
+      type={positiveDiff ? 'arrow-up' : 'arrow-down'}/>}
+    suffix={scorePrevHour && <span>&nbsp;{`/ ${prefix}${scorePrevHour}`}</span>}
+  /></div>
+};
 
 const renderChart = Component => ({ resultSet, error }) =>
   (resultSet && <Component resultSet={resultSet} />) ||
   (error && error.toString()) || <Spin />;
 
-const StoryPage = ({ match: { params: { storyId } } }) => {
+const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
   return (
     <Dashboard>
       <DashboardItem size={12} title="Story">
@@ -148,7 +175,9 @@ const StoryPage = ({ match: { params: { storyId } } }) => {
               "Events.commentsBeforeAddedToFrontPage",
               "Events.minutesOnFirstPage",
               "Events.topRank",
-              "Events.currentRank"
+              "Events.currentRank",
+              "Events.currentScore",
+              "Events.currentComments"
             ],
             timeDimensions: [
               {
@@ -160,6 +189,7 @@ const StoryPage = ({ match: { params: { storyId } } }) => {
               "Stories.id",
               "Stories.title",
               "Stories.href",
+              "Stories.user",
               "Stories.postedTime",
               "Stories.addedToFrontPage",
               "Stories.minutesToFrontPage"
@@ -176,6 +206,110 @@ const StoryPage = ({ match: { params: { storyId } } }) => {
           render={renderChart(storyCardRender)}
         />
       </DashboardItem>
+      <Col span={12}>
+        <Dashboard>
+          <DashboardItem size={12} title="Points last/prev hour">
+            <QueryRenderer
+              query={{
+                measures: [
+                  "Events.scoreChangeLastHour",
+                  "Events.scoreChangePrevHour"
+                ],
+                timeDimensions: [
+                  {
+                    dimension: "Events.timestamp",
+                    dateRange: "from 7 days ago to now"
+                  }
+                ],
+                "filters": [
+                  {
+                    "dimension": "Stories.id",
+                    "operator": "equals",
+                    "values": [storyId]
+                  }
+                ]
+              }}
+              cubejsApi={cubejsApi}
+              render={renderChart(renderStatisticCard("Events.scoreChangeLastHour", "Events.scoreChangePrevHour"))}
+            />
+          </DashboardItem>
+          <DashboardItem size={12} title="Comments last/prev hour">
+            <QueryRenderer
+              query={{
+                measures: [
+                  "Events.commentsChangeLastHour",
+                  "Events.commentsChangePrevHour"
+                ],
+                timeDimensions: [
+                  {
+                    dimension: "Events.timestamp",
+                    dateRange: "from 7 days ago to now"
+                  }
+                ],
+                "filters": [
+                  {
+                    "dimension": "Stories.id",
+                    "operator": "equals",
+                    "values": [storyId]
+                  }
+                ]
+              }}
+              cubejsApi={cubejsApi}
+              render={renderChart(renderStatisticCard("Events.commentsChangeLastHour", "Events.commentsChangePrevHour"))}
+            />
+          </DashboardItem>
+          <DashboardItem size={12} title="Rank current/hour ago">
+            <QueryRenderer
+              query={{
+                measures: [
+                  "Events.currentRank",
+                  "Events.rankHourAgo"
+                ],
+                timeDimensions: [
+                  {
+                    dimension: "Events.timestamp",
+                    dateRange: "from 7 days ago to now"
+                  }
+                ],
+                "filters": [
+                  {
+                    "dimension": "Stories.id",
+                    "operator": "equals",
+                    "values": [storyId]
+                  }
+                ]
+              }}
+              cubejsApi={cubejsApi}
+              render={renderChart(renderStatisticCard("Events.currentRank", "Events.rankHourAgo", true))}
+            />
+          </DashboardItem>
+          <DashboardItem size={12} title="Comments last/prev hour">
+            <QueryRenderer
+              query={{
+                measures: [
+                  "Events.commentsChangeLastHour",
+                  "Events.commentsChangePrevHour"
+                ],
+                timeDimensions: [
+                  {
+                    dimension: "Events.timestamp",
+                    dateRange: "from 7 days ago to now"
+                  }
+                ],
+                "filters": [
+                  {
+                    "dimension": "Stories.id",
+                    "operator": "equals",
+                    "values": [storyId]
+                  }
+                ]
+              }}
+              cubejsApi={cubejsApi}
+              render={renderChart(renderStatisticCard("Events.commentsChangeLastHour", "Events.commentsChangePrevHour"))}
+            />
+          </DashboardItem>
+        </Dashboard>
+      </Col>
       <DashboardItem size={12} title="Points per hour">
         <QueryRenderer
           query={{
