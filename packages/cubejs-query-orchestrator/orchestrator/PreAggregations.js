@@ -290,10 +290,12 @@ class PreAggregationLoader {
         .then(() => this.dropOrphanedTables(client, this.targetTableName(newVersionEntry)));
       resultPromise.cancel = queryPromise.cancel;
       return resultPromise;
-    }
+    };
   }
 
   async dropOrphanedTables(client, justCreatedTable) {
+    // call reset just after pre-aggregation table is created to ensure cache and schema in sync
+    await this.loadCache.reset(this.preAggregation.preAggregationsSchema);
     this.flushUsedTables();
     const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
     const versionEntries = tablesToVersionEntries(this.preAggregation.preAggregationsSchema, actualTables);
