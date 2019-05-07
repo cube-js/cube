@@ -7,8 +7,8 @@
   },
   "dependencies": {
     "@cubejs-backend/athena-driver": "^0.7.0",
-    "@cubejs-backend/server": "^0.7.6",
-    "@cubejs-backend/serverless": "^0.7.6",
+    "@cubejs-backend/server": "^0.8.6",
+    "@cubejs-backend/serverless": "^0.8.6",
     "aws-sdk": "^2.441.0",
     "humps": "^2.0.1",
     "ramda": "^0.26.1",

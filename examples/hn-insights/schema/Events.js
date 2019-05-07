@@ -1,5 +1,8 @@
 cube(`Events`, {
-  sql: `SELECT * FROM "hn-insights".intra_events`,
+  sql: `
+  SELECT * FROM hn_insights.events 
+  WHERE ${FILTER_PARAMS.Events.timestamp.filter(`from_iso8601_timestamp(dt || ':00:00.000')`)}
+  `,
 
   refreshKey: {
     sql: `select current_timestamp`
@@ -25,14 +28,45 @@ cube(`Events`, {
       type: `sum`
     },
 
-    commentsCount: {
+    scoreChangeLastHour: {
+      sql: `score_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute > now()`
+      }]
+    },
+
+    scoreChangePrevHour: {
+      sql: `score_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute < now()`
+      }, {
+        sql: `${timestamp} + interval '120' minute > now()`
+      }]
+    },
+
+    currentRank: {
+      sql: `rank`,
+      type: `min`,
+      filters: [{
+        sql: `${timestamp} + interval '5' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    commentsChange: {
       sql: `comments_count_diff`,
       type: `sum`
     },
 
     topRank: {
       sql: `rank`,
-      type: `min`
+      type: `min`,
+      filters: [{
+        sql: `${page} = 'front'`
+      }]
     },
 
     addedToFrontPage: {
@@ -74,6 +108,16 @@ cube(`Events`, {
         sql: `${timestamp} < ${Stories.addedToFrontPage}`
       }, {
         sql: `page = 'newest'`
+      }]
+    },
+
+    minutesOnFirstPage: {
+      sql: `date_diff('second', ${prevSnapshotTimestamp}, ${snapshotTimestamp}) / 60.0`,
+      type: `sum`,
+      filters: [{
+        sql: `${rank} < 31`
+      }, {
+        sql: `${page} = 'front'`
       }]
     },
 
@@ -139,6 +183,22 @@ cube(`Events`, {
     page: {
       sql: `page`,
       type: `string`
+    },
+
+    rank: {
+      sql: `rank`,
+      type: `number`
+    }
+  },
+
+  preAggregations: {
+    perStory: {
+      type: `rollup`,
+      measureReferences: [scoreChange, commentsChange, topRank],
+      dimensionReferences: [Stories.id, Events.page],
+      timeDimensionReference: timestamp,
+      granularity: `hour`,
+      partitionGranularity: `day`
     }
   }
 });

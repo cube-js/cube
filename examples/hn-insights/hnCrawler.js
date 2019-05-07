@@ -5,6 +5,7 @@ const AWS = require('aws-sdk');
 const redis = require('redis');
 const { promisify } = require('util');
 const humps = require('humps');
+const AthenaDriver = require('@cubejs-backend/athena-driver');
 
 const redisClient = redis.createClient(process.env.REDIS_URL);
 
@@ -126,7 +127,9 @@ const uploadEvents = async (events) => {
     outStream.write(`${JSON.stringify(humps.decamelizeKeys(e))}\n`, 'utf8');
   });
   outStream.end();
-  const fileName = `${new Date().toISOString()}.json.gz`;
+  const date = new Date().toISOString();
+  const partitionPrefix = date.substring(0, 13);
+  const fileName = `dt=${partitionPrefix}/${date}.json.gz`;
   const params = {
     Bucket: process.env.HN_INSIGHTS_EVENTS_BUCKET || 'hn-insights-events',
     Key: fileName,
@@ -153,6 +156,14 @@ exports.generateChangeEvents = async () => {
   }
   await redisClient.setAsync(hnInsightsStateKey, JSON.stringify(state));
   return result;
+};
+
+exports.refreshPartitions = async () => {
+  const athenaDriver = new AthenaDriver();
+  await athenaDriver.query('MSCK REPAIR TABLE hn_insights.events');
+  return {
+    statusCode: 200
+  };
 };
 
 exports.schedule = async () => {
