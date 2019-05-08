@@ -328,8 +328,8 @@ Be aware that e.g. `Last 7 days` does not include the current date. If you need 
   measures: ['Stories.count'],
   timeDimensions: [{
     dimension: 'Stories.time',
-    dateRange: 'last week',
-    granularity: 'from 6 days ago to now'
+    dateRange: 'from 6 days ago to now',
+    granularity: 'day'
   }]
 }
 ```
