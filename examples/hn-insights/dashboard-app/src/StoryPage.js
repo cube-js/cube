@@ -109,6 +109,11 @@ const storyCardRender = ({ resultSet }) => {
       />
       <StoryCardMeta
         span={12}
+        title="Karma Added Before Front Page"
+        description={<span>{data['Events.karmaChangeBeforeAddedToFrontPage']}</span>}
+      />
+      <StoryCardMeta
+        span={12}
         title="Comments Before Front Page"
         description={<span>{data['Events.commentsBeforeAddedToFrontPage']}</span>}
       />
@@ -172,6 +177,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           query={{
             measures: [
               "Events.scoreChangeBeforeAddedToFrontPage",
+              "Events.karmaChangeBeforeAddedToFrontPage",
               "Events.commentsBeforeAddedToFrontPage",
               "Events.minutesOnFirstPage",
               "Events.topRank",
@@ -283,12 +289,12 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
               render={renderChart(renderStatisticCard("Events.currentRank", "Events.rankHourAgo", true))}
             />
           </DashboardItem>
-          <DashboardItem size={12} title="Comments last/prev hour">
+          <DashboardItem size={12} title="Karma last/prev hour">
             <QueryRenderer
               query={{
                 measures: [
-                  "Events.commentsChangeLastHour",
-                  "Events.commentsChangePrevHour"
+                  "Events.karmaChangeLastHour",
+                  "Events.karmaChangePrevHour"
                 ],
                 timeDimensions: [
                   {
@@ -305,7 +311,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
                 ]
               }}
               cubejsApi={cubejsApi}
-              render={renderChart(renderStatisticCard("Events.commentsChangeLastHour", "Events.commentsChangePrevHour"))}
+              render={renderChart(renderStatisticCard("Events.karmaChangeLastHour", "Events.karmaChangePrevHour"))}
             />
           </DashboardItem>
         </Dashboard>
@@ -315,6 +321,38 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           query={{
             "measures": [
               "Events.scoreChange"
+            ],
+            "timeDimensions": [
+              {
+                "dimension": "Events.timestamp",
+                "granularity": "hour",
+                dateRange: "today"
+              }
+            ],
+            "filters": [
+              {
+                "dimension": "Stories.id",
+                "operator": "equals",
+                "values": [storyId]
+              },
+              {
+                "dimension": "Events.page",
+                "operator": "equals",
+                "values": [
+                  "front"
+                ]
+              }
+            ]
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Karma per hour">
+        <QueryRenderer
+          query={{
+            "measures": [
+              "Events.karmaChange"
             ],
             "timeDimensions": [
               {

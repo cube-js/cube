@@ -28,6 +28,11 @@ cube(`Events`, {
       type: `sum`
     },
 
+    karmaChange: {
+      sql: `karma_diff`,
+      type: `sum`
+    },
+
     scoreChangeLastHour: {
       sql: `score_diff`,
       type: `sum`,
@@ -40,6 +45,28 @@ cube(`Events`, {
 
     scoreChangePrevHour: {
       sql: `score_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute < now()`
+      }, {
+        sql: `${timestamp} + interval '120' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    karmaChangeLastHour: {
+      sql: `karma_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    karmaChangePrevHour: {
+      sql: `karma_diff`,
       type: `sum`,
       filters: [{
         sql: `${timestamp} + interval '60' minute < now()`
@@ -153,7 +180,7 @@ cube(`Events`, {
       sql: `comments_count_diff`,
       type: `sum`,
       filters: [{
-        sql: `${timestamp} < ${Stories.addedToFrontPage}`
+        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
       }, {
         sql: `page = 'newest'`
       }]
@@ -163,7 +190,17 @@ cube(`Events`, {
       sql: `score_diff`,
       type: `sum`,
       filters: [{
-        sql: `${timestamp} < ${Stories.addedToFrontPage}`
+        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
+      }, {
+        sql: `page = 'newest'`
+      }]
+    },
+
+    karmaChangeBeforeAddedToFrontPage: {
+      sql: `karma_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
       }, {
         sql: `page = 'newest'`
       }]
@@ -183,7 +220,7 @@ cube(`Events`, {
       sql: `date_diff('second', ${prevSnapshotTimestamp}, ${snapshotTimestamp}) / 60.0`,
       type: `sum`,
       filters: [{
-        sql: `${timestamp} < ${Stories.addedToFrontPage}`
+        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
       }, {
         sql: `page = 'newest'`
       }],

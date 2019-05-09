@@ -6,6 +6,8 @@ const redis = require('redis');
 const { promisify } = require('util');
 const humps = require('humps');
 const AthenaDriver = require('@cubejs-backend/athena-driver');
+const promiseRetry = require('promise-retry');
+const fetch = require('node-fetch');
 
 const redisClient = redis.createClient(process.env.REDIS_URL);
 
@@ -66,12 +68,93 @@ const scrapeStoryList = async (url) => scrapeIt(url, {
   }
 });
 
+const scrapeUser = async (userId) => {
+  const { data, response, body } = await scrapeIt(`https://news.ycombinator.com/user?id=${userId}`, {
+    properties: {
+      listItem: 'table table tr',
+      data: {
+        name: {
+          selector: 'td:first-child'
+        },
+        value: {
+          selector: 'td:last-child'
+        }
+      }
+    }
+  });
+  if (response.statusCode === 403) {
+    throw new Error(`Banned`);
+  }
+  if (response.statusCode !== 200) {
+    console.log(response.statusCode);
+    console.log(body);
+    throw new Error(`Error fetching user: ${userId}, status: ${response.statusCode}`);
+  }
+  const result = data.properties
+    .map(({ name, value }) => (name.match(/(.*):/) && { [name.match(/(.*):/)[1]]: value }))
+    .filter(p => !!p)
+    .reduce((a, b) => ({ ...a, ...b }));
+  if (result.user !== userId) {
+    console.log(response.statusCode);
+    console.log(body);
+    throw new Error(`User ${userId} fetch problem`);
+  }
+  return result;
+};
+
+const fetchUser = async (userId) => {
+  return (await fetch(`https://hacker-news.firebaseio.com/v0/user/${userId}.json`)).json();
+};
+
+exports.scrapeUser = scrapeUser;
+
+const cached = async (key, getFn, expire) => {
+  let value = await redisClient.getAsync(key);
+  value = value !== 'undefined' && JSON.parse(value) || null;
+  if (!value) {
+    value = await getFn();
+    await redisClient.setAsync(key, JSON.stringify(value), 'EX', expire || 3600);
+  }
+  return value;
+};
+
+const sleep = (timeout) => new Promise(resolve => setTimeout(() => resolve(), timeout));
+
 const scrapePages = async (baseUrl, url, pages) => {
-  let result = [];
+  const result = [];
   let moreLink = null;
   for (let i = 0; i < pages; i++) {
+    console.log(`Scraping ${url}: page ${i}`);
     const { data } = await scrapeStoryList(moreLink && `${baseUrl}${moreLink}` || url);
-    result = result.concat(toStoriesData(data));
+    const stories = toStoriesData(data);
+    await stories.map((s) => async () => {
+      const user = s.user && await cached(
+        `HN_INSIGHTS_USER_${s.user}_${s.score}`,
+        async () => {
+          const res = await promiseRetry(async (retry, number) => {
+            if (number > 1) {
+              console.log(`Retrying ${s.user} fetch...${number}`);
+            }
+            try {
+              return await fetchUser(s.user);
+            } catch (e) {
+              if (e.message === 'Banned') {
+                console.log(`Skipping user ${s.user} due to DDoS ban...`);
+                return {}; // TODO skip user for 10 minutes
+              }
+              await retry(e);
+            }
+          }, { retries: 4 });
+          // await sleep(300);
+          return res;
+        },
+        10 * 60
+      );
+      result.push({
+        ...s,
+        karma: user && parseInt(user.karma || '0', 10)
+      });
+    }).reduce((a, b) => a.then(b), Promise.resolve());
     // eslint-disable-next-line prefer-destructuring
     moreLink = data.moreLink;
   }
@@ -79,7 +162,7 @@ const scrapePages = async (baseUrl, url, pages) => {
 };
 
 exports.scrapeFrontPage =
-  async () => scrapePages('https://news.ycombinator.com/', 'https://news.ycombinator.com/', 10);
+  async () => scrapePages('https://news.ycombinator.com/', 'https://news.ycombinator.com/', 5);
 
 exports.scrapeNewest =
   async () => scrapePages('https://news.ycombinator.com/', 'https://news.ycombinator.com/newest', 5);
@@ -104,7 +187,7 @@ exports.storyListEventDiff = async (oldStories, newStories) => {
   ).map(id => ({
     ...idToNewStories[id],
     ...(
-      ['rank', 'score', 'commentsCount'].map(p => intDiff(p, idToOldStories[id], idToNewStories[id])))
+      ['rank', 'score', 'commentsCount', 'karma'].map(p => intDiff(p, idToOldStories[id], idToNewStories[id])))
       .reduce((a, b) => ({ ...a, ...b })),
     prevSnapshotTimestamp: idToOldStories[id].snapshotTimestamp
   }));
@@ -144,12 +227,12 @@ const hnInsightsStateKey = 'HN_INSIGHTS_STATE';
 
 exports.generateChangeEvents = async () => {
   const state = JSON.parse(await redisClient.getAsync(hnInsightsStateKey)) || {};
-  const frontPageDiff = await changeEvents(state, 'front', exports.scrapeFrontPage);
   const newestDiff = await changeEvents(
     state,
     'newest',
     async () => (await exports.scrapeNewest()).map(({ rank, ...s }) => ({ ...s }))
   );
+  const frontPageDiff = await changeEvents(state, 'front', exports.scrapeFrontPage);
   const result = frontPageDiff.concat(newestDiff);
   if (result.length) {
     await uploadEvents(result);

@@ -28,9 +28,17 @@ function App({ children, location }) {
             margin: "25px"
           }}
         >
-          <Breadcrumb style={{ margin: '0 0 16px 0' }}>
-            <Breadcrumb.Item><Link to="/">Dashboard</Link></Breadcrumb.Item>
-            {match && match.params && match.params.storyId && <Breadcrumb.Item>Story #{match.params.storyId}</Breadcrumb.Item>}
+          <Breadcrumb
+            style={{
+              margin: "0 0 16px 0"
+            }}
+          >
+            <Breadcrumb.Item>
+              <Link to="/">Dashboard</Link>
+            </Breadcrumb.Item>
+            {match && match.params && match.params.storyId && (
+              <Breadcrumb.Item>Story #{match.params.storyId}</Breadcrumb.Item>
+            )}
           </Breadcrumb>
           {children}
         </Content>

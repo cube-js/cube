@@ -80,6 +80,28 @@ const velocityListRender = ({ resultSet }) => {
   );
 };
 
+const lineRender = ({ resultSet }) => (
+  <Chart
+    scale={{
+      x: {
+        tickCount: 8
+      }
+    }}
+    height={400}
+    data={stackedChartData(resultSet)}
+    forceFit
+  >
+    <Axis name="x" />
+    <Axis name="measure" />
+    <Tooltip
+      crosshairs={{
+        type: "y"
+      }}
+    />
+    <Geom type="line" position={`x*measure`} size={2} color="color" />
+  </Chart>
+);
+
 const renderChart = Component => ({ resultSet, error }) =>
   (resultSet && <Component resultSet={resultSet} />) ||
   (error && error.toString()) || <Spin />;
@@ -156,6 +178,52 @@ const IndexPage = ({ cubejsApi }) => {
           }}
           cubejsApi={cubejsApi}
           render={renderChart(velocityListRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Score on /newest page">
+        <QueryRenderer
+          query={{
+            measures: ["Events.scoreChange"],
+            timeDimensions: [
+              {
+                dimension: "Events.timestamp",
+                granularity: "hour",
+                dateRange: "Today"
+              }
+            ],
+            filters: [
+              {
+                dimension: "Events.page",
+                operator: "equals",
+                values: ["newest"]
+              }
+            ]
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Karma on /newest page">
+        <QueryRenderer
+          query={{
+            measures: ["Events.karmaChange"],
+            timeDimensions: [
+              {
+                dimension: "Events.timestamp",
+                granularity: "hour",
+                dateRange: "Today"
+              }
+            ],
+            filters: [
+              {
+                dimension: "Events.page",
+                operator: "equals",
+                values: ["newest"]
+              }
+            ]
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
         />
       </DashboardItem>
     </Dashboard>
