@@ -320,3 +320,16 @@ year`, or `last 6 months`.
   }]
 }
 ```
+
+Be aware that e.g. `Last 7 days` does not include the current date. If you need the current date also you can use `from N days ago to now`.
+
+```js
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: 'from 6 days ago to now',
+    granularity: 'day'
+  }]
+}
+```
