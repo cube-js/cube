@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.7](https://github.com/statsbotco/cubejs-client/compare/v0.8.6...v0.8.7) (2019-05-09)
+
+
+### Bug Fixes
+
+* **cubejs-react:** add core-js dependency ([#107](https://github.com/statsbotco/cubejs-client/issues/107)) ([0e13ffe](https://github.com/statsbotco/cubejs-client/commit/0e13ffe))
+
+
+
+
+
 ## [0.8.4](https://github.com/statsbotco/cubejs-client/compare/v0.8.3...v0.8.4) (2019-05-02)
 
 **Note:** Version bump only for package @cubejs-client/react
