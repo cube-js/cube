@@ -109,75 +109,50 @@ const renderChart = Component => ({ resultSet, error }) =>
 const IndexPage = ({ cubejsApi }) => {
   return (
     <Dashboard>
-      <DashboardItem size={12} title="Velocity Leader Board">
+      <DashboardItem size={12} title="Score on /newest page">
         <QueryRenderer
           query={{
-            measures: [
-              "Events.scoreChangeLastHour",
-              "Events.scoreChangePrevHour",
-              "Events.scoreChange",
-              "Events.currentRank"
-            ],
+            measures: ["Events.scoreChangeBeforeAddedToFrontPage"],
             timeDimensions: [
               {
                 dimension: "Events.timestamp",
-                dateRange: "from 7 days ago to now"
+                granularity: "hour",
+                dateRange: "Today"
               }
-            ],
-            dimensions: [
-              "Stories.id",
-              "Stories.title"
             ],
             filters: [
               {
                 dimension: "Events.page",
                 operator: "equals",
-                values: ["front"]
+                values: ["newest"]
               }
-            ],
-            order: {
-              "Events.scoreChangeLastHour": 'desc'
-            },
-            limit: 20
+            ]
           }}
           cubejsApi={cubejsApi}
-          render={renderChart(velocityListRender)}
+          render={renderChart(lineRender)}
         />
       </DashboardItem>
-      <DashboardItem size={12} title="Recently Added to Front Page">
+      <DashboardItem size={12} title="Karma on /newest page">
         <QueryRenderer
           query={{
-            measures: [
-              "Events.scoreChangeLastHour",
-              "Events.scoreChangePrevHour",
-              "Events.scoreChangeBeforeAddedToFrontPage",
-              "Events.currentRank"
-            ],
+            measures: ["Events.karmaChangeBeforeAddedToFrontPage"],
             timeDimensions: [
               {
                 dimension: "Events.timestamp",
-                dateRange: "from 7 days ago to now"
+                granularity: "hour",
+                dateRange: "Today"
               }
             ],
             filters: [
               {
-                dimension: "Stories.minutesToFrontPage",
-                operator: "set"
+                dimension: "Events.page",
+                operator: "equals",
+                values: ["newest"]
               }
-            ],
-            dimensions: [
-              "Stories.id",
-              "Stories.title",
-              "Stories.postedTime",
-              "Stories.addedToFrontPage"
-            ],
-            order: {
-              "Stories.addedToFrontPage": "desc"
-            },
-            limit: 20
+            ]
           }}
           cubejsApi={cubejsApi}
-          render={renderChart(velocityListRender)}
+          render={renderChart(lineRender)}
         />
       </DashboardItem>
     </Dashboard>

@@ -5,6 +5,7 @@ import { createHashHistory } from 'history';
 import cubejs from "@cubejs-client/core";
 import IndexPage from './IndexPage';
 import StoryPage from './StoryPage';
+import StatisticsPage from './StatisticsPage';
 import App from './App';
 
 const history = createHashHistory();
@@ -36,6 +37,11 @@ ReactDOM.render(
         key="story"
         path="/stories/:storyId"
         render={(props) => <StoryPage cubejsApi={cubejsApi} {...props} />}
+      />
+      <Route
+        key="statistics"
+        path="/statistics"
+        render={(props) => <StatisticsPage cubejsApi={cubejsApi} {...props} />}
       />
     </App>
   </Router>,

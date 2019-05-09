@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, matchPath, withRouter } from 'react-router-dom'
-import { Layout, Breadcrumb } from "antd";
+import { Layout, Breadcrumb, Menu } from "antd";
 import "antd/dist/antd.css";
 const { Header, Content } = Layout;
 
@@ -14,13 +14,26 @@ function App({ children, location }) {
     <div className="App">
       <Layout>
         <Header>
-          <h2
-            style={{
-              color: "#fff"
-            }}
+          <div style={{ float: 'left' }}>
+            <h2
+              style={{
+                color: "#fff",
+                margin: 0,
+                marginRight: '1em'
+              }}
+            >
+              HN Insights
+            </h2>
+          </div>
+          <Menu
+            theme="dark"
+            mode="horizontal"
+            selectedKeys={[location.pathname]}
+            style={{ lineHeight: '64px' }}
           >
-            HN Insights
-          </h2>
+            <Menu.Item key="/"><Link to="/">Leaders</Link></Menu.Item>
+            <Menu.Item key="/statistics"><Link to="/statistics">Statistics</Link></Menu.Item>
+          </Menu>
         </Header>
         <Content
           style={{
