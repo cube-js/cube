@@ -68,6 +68,10 @@ const StoryCardMeta = ({ span, title, description }) => (
 const storyCardRender = ({ resultSet }) => {
   const data = resultSet.tablePivot()[0];
 
+  if (!data) {
+    return <h2>Not found</h2>
+  }
+
   return (
     <Row type="flex" gutter={24}>
       <StoryCardMeta
@@ -157,7 +161,7 @@ const renderStatisticCard = (currentField, prevField, isRank) => ({ resultSet })
   const positiveDiff = isRank ? scoreLastHour <= scorePrevHour : scoreLastHour >= scorePrevHour;
   const prefix = isRank ? '' : '+';
   return <div style={{ textAlign: 'center' }}><Statistic
-    value={`${prefix}${scoreLastHour}`}
+    value={scoreLastHour && `${prefix}${scoreLastHour}`}
     valueStyle={{ color: scorePrevHour && (positiveDiff ? '#3f8600' : '#cf1322') }}
     prefix={scorePrevHour && <Icon
       type={positiveDiff ? 'arrow-up' : 'arrow-down'}/>}
@@ -170,44 +174,46 @@ const renderChart = Component => ({ resultSet, error }) =>
   (error && error.toString()) || <Spin />;
 
 const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
+  let propQuery = {
+    measures: [
+      "Events.scoreChangeBeforeAddedToFrontPage",
+      "Events.karmaChangeBeforeAddedToFrontPage",
+      "Events.commentsBeforeAddedToFrontPage",
+      "Events.minutesOnFirstPage",
+      "Events.topRank",
+      "Events.currentRank",
+      "Events.currentScore",
+      "Events.currentComments",
+      "Events.scoreChangeLastHour",
+      "Events.scoreChangePrevHour",
+      "Events.commentsChangeLastHour",
+      "Events.commentsChangePrevHour",
+      "Events.rankHourAgo",
+      "Events.karmaChangeLastHour",
+      "Events.karmaChangePrevHour"
+    ],
+    dimensions: [
+      "Stories.id",
+      "Stories.title",
+      "Stories.href",
+      "Stories.user",
+      "Stories.postedTime",
+      "Stories.addedToFrontPage",
+      "Stories.minutesToFrontPage"
+    ],
+    "filters": [
+      {
+        "dimension": "Stories.id",
+        "operator": "equals",
+        "values": [storyId]
+      }
+    ]
+  };
   return (
     <Dashboard>
       <DashboardItem size={12} title="Story">
         <QueryRenderer
-          query={{
-            measures: [
-              "Events.scoreChangeBeforeAddedToFrontPage",
-              "Events.karmaChangeBeforeAddedToFrontPage",
-              "Events.commentsBeforeAddedToFrontPage",
-              "Events.minutesOnFirstPage",
-              "Events.topRank",
-              "Events.currentRank",
-              "Events.currentScore",
-              "Events.currentComments"
-            ],
-            timeDimensions: [
-              {
-                dimension: "Events.timestamp",
-                dateRange: "from 7 days ago to now"
-              }
-            ],
-            dimensions: [
-              "Stories.id",
-              "Stories.title",
-              "Stories.href",
-              "Stories.user",
-              "Stories.postedTime",
-              "Stories.addedToFrontPage",
-              "Stories.minutesToFrontPage"
-            ],
-            "filters": [
-              {
-                "dimension": "Stories.id",
-                "operator": "equals",
-                "values": [storyId]
-              }
-            ]
-          }}
+          query={propQuery}
           cubejsApi={cubejsApi}
           render={renderChart(storyCardRender)}
         />
@@ -216,100 +222,28 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
         <Dashboard>
           <DashboardItem size={12} title="Points last/prev hour">
             <QueryRenderer
-              query={{
-                measures: [
-                  "Events.scoreChangeLastHour",
-                  "Events.scoreChangePrevHour"
-                ],
-                timeDimensions: [
-                  {
-                    dimension: "Events.timestamp",
-                    dateRange: "from 7 days ago to now"
-                  }
-                ],
-                "filters": [
-                  {
-                    "dimension": "Stories.id",
-                    "operator": "equals",
-                    "values": [storyId]
-                  }
-                ]
-              }}
+              query={propQuery}
               cubejsApi={cubejsApi}
               render={renderChart(renderStatisticCard("Events.scoreChangeLastHour", "Events.scoreChangePrevHour"))}
             />
           </DashboardItem>
           <DashboardItem size={12} title="Comments last/prev hour">
             <QueryRenderer
-              query={{
-                measures: [
-                  "Events.commentsChangeLastHour",
-                  "Events.commentsChangePrevHour"
-                ],
-                timeDimensions: [
-                  {
-                    dimension: "Events.timestamp",
-                    dateRange: "from 7 days ago to now"
-                  }
-                ],
-                "filters": [
-                  {
-                    "dimension": "Stories.id",
-                    "operator": "equals",
-                    "values": [storyId]
-                  }
-                ]
-              }}
+              query={propQuery}
               cubejsApi={cubejsApi}
               render={renderChart(renderStatisticCard("Events.commentsChangeLastHour", "Events.commentsChangePrevHour"))}
             />
           </DashboardItem>
           <DashboardItem size={12} title="Rank current/hour ago">
             <QueryRenderer
-              query={{
-                measures: [
-                  "Events.currentRank",
-                  "Events.rankHourAgo"
-                ],
-                timeDimensions: [
-                  {
-                    dimension: "Events.timestamp",
-                    dateRange: "from 7 days ago to now"
-                  }
-                ],
-                "filters": [
-                  {
-                    "dimension": "Stories.id",
-                    "operator": "equals",
-                    "values": [storyId]
-                  }
-                ]
-              }}
+              query={propQuery}
               cubejsApi={cubejsApi}
               render={renderChart(renderStatisticCard("Events.currentRank", "Events.rankHourAgo", true))}
             />
           </DashboardItem>
           <DashboardItem size={12} title="Karma last/prev hour">
             <QueryRenderer
-              query={{
-                measures: [
-                  "Events.karmaChangeLastHour",
-                  "Events.karmaChangePrevHour"
-                ],
-                timeDimensions: [
-                  {
-                    dimension: "Events.timestamp",
-                    dateRange: "from 7 days ago to now"
-                  }
-                ],
-                "filters": [
-                  {
-                    "dimension": "Stories.id",
-                    "operator": "equals",
-                    "values": [storyId]
-                  }
-                ]
-              }}
+              query={propQuery}
               cubejsApi={cubejsApi}
               render={renderChart(renderStatisticCard("Events.karmaChangeLastHour", "Events.karmaChangePrevHour"))}
             />

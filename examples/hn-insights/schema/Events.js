@@ -122,23 +122,13 @@ cube(`Events`, {
     },
 
     currentScore: {
-      sql: `score`,
-      type: `max`,
-      filters: [{
-        sql: `${timestamp} + interval '5' minute > now()`
-      }, {
-        sql: `${page} = 'front'`
-      }]
+      sql: `CAST(NULLIF(score, '') as integer)`,
+      type: `max`
     },
 
     currentComments: {
       sql: `comments_count`,
-      type: `max`,
-      filters: [{
-        sql: `${timestamp} + interval '5' minute > now()`
-      }, {
-        sql: `${page} = 'front'`
-      }]
+      type: `max`
     },
 
     commentsChange: {
@@ -180,7 +170,7 @@ cube(`Events`, {
       sql: `comments_count_diff`,
       type: `sum`,
       filters: [{
-        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
+        sql: `${timestamp} <= ${Stories.addedToFrontPage} or ${Stories.addedToFrontPage} is null`
       }, {
         sql: `page = 'newest'`
       }]
@@ -190,7 +180,7 @@ cube(`Events`, {
       sql: `score_diff`,
       type: `sum`,
       filters: [{
-        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
+        sql: `${timestamp} <= ${Stories.addedToFrontPage} or ${Stories.addedToFrontPage} is null`
       }, {
         sql: `page = 'newest'`
       }]
@@ -200,7 +190,7 @@ cube(`Events`, {
       sql: `karma_diff`,
       type: `sum`,
       filters: [{
-        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
+        sql: `${timestamp} <= ${Stories.addedToFrontPage} or ${Stories.addedToFrontPage} is null`
       }, {
         sql: `page = 'newest'`
       }]
@@ -220,7 +210,7 @@ cube(`Events`, {
       sql: `date_diff('second', ${prevSnapshotTimestamp}, ${snapshotTimestamp}) / 60.0`,
       type: `sum`,
       filters: [{
-        sql: `${timestamp} <= ${Stories.addedToFrontPage}`
+        sql: `${timestamp} <= ${Stories.addedToFrontPage} or ${Stories.addedToFrontPage} is null`
       }, {
         sql: `page = 'newest'`
       }],
@@ -261,17 +251,17 @@ cube(`Events`, {
     },
 
     timestamp: {
-      sql: `from_iso8601_timestamp(timestamp)`,
+      sql: `cast(from_iso8601_timestamp(timestamp) as timestamp)`,
       type: `time`
     },
 
     snapshotTimestamp: {
-      sql: `from_iso8601_timestamp(snapshot_timestamp)`,
+      sql: `cast(from_iso8601_timestamp(snapshot_timestamp) as timestamp)`,
       type: `time`
     },
 
     prevSnapshotTimestamp: {
-      sql: `from_iso8601_timestamp(prev_snapshot_timestamp)`,
+      sql: `cast(from_iso8601_timestamp(prev_snapshot_timestamp) as timestamp)`,
       type: `time`
     },
 
@@ -289,11 +279,46 @@ cube(`Events`, {
   preAggregations: {
     perStory: {
       type: `rollup`,
-      measureReferences: [scoreChange, commentsChange, topRank],
+      measureReferences: [scoreChange, commentsChange, karmaChange, topRank],
       dimensionReferences: [Stories.id, Events.page],
       timeDimensionReference: timestamp,
       granularity: `hour`,
-      partitionGranularity: `day`
+      partitionGranularity: `day`,
+      refreshKey: {
+        sql: `select current_timestamp`
+      }
+    },
+    leaderBoard: {
+      type: `rollup`,
+      measureReferences: [
+        scoreChangeLastHour,
+        scoreChangePrevHour,
+        commentsChangeLastHour,
+        commentsChangePrevHour,
+        karmaChangeLastHour,
+        karmaChangePrevHour,
+        rankHourAgo,
+        currentRank,
+        scoreChangeBeforeAddedToFrontPage,
+        karmaChangeBeforeAddedToFrontPage,
+        commentsBeforeAddedToFrontPage,
+        minutesOnFirstPage,
+        topRank,
+        currentScore,
+        currentComments
+      ],
+      dimensionReferences: [
+        Stories.id,
+        Stories.title,
+        Stories.href,
+        Stories.user,
+        Stories.postedTime,
+        Stories.addedToFrontPage,
+        Stories.minutesToFrontPage
+      ],
+      refreshKey: {
+        sql: `select current_timestamp`
+      },
     }
   }
 });

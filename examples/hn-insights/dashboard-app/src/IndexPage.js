@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from 'react-router-dom'
 import { Row, Col, Card, Spin, Statistic, Table, Layout, List, Icon } from "antd";
 import "antd/dist/antd.css";
+import "./index.css";
 import cubejs from "@cubejs-client/core";
 import { QueryRenderer } from "@cubejs-client/react";
 import { Chart, Axis, Tooltip, Geom, Coord, Legend } from "bizcharts";
@@ -66,7 +67,7 @@ const velocityListRender = ({ resultSet }) => {
       const scoreLastHour = item['Events.scoreChangeLastHour'] && parseInt(item['Events.scoreChangeLastHour'], 10);
       const scorePrevHour = item['Events.scoreChangePrevHour'] && parseInt(item['Events.scoreChangePrevHour'], 10) || null;
       return <Statistic
-        value={`+${scoreLastHour}`}
+        value={scoreLastHour && `+${scoreLastHour}`}
         valueStyle={{ color: scorePrevHour && (scoreLastHour >= scorePrevHour ? '#3f8600' : '#cf1322') }}
         prefix={scorePrevHour && <Icon
           type={scoreLastHour >= scorePrevHour ? 'arrow-up' : 'arrow-down'}/>}
@@ -115,25 +116,11 @@ const IndexPage = ({ cubejsApi }) => {
             measures: [
               "Events.scoreChangeLastHour",
               "Events.scoreChangePrevHour",
-              "Events.scoreChange",
               "Events.currentRank"
-            ],
-            timeDimensions: [
-              {
-                dimension: "Events.timestamp",
-                dateRange: "from 7 days ago to now"
-              }
             ],
             dimensions: [
               "Stories.id",
               "Stories.title"
-            ],
-            filters: [
-              {
-                dimension: "Events.page",
-                operator: "equals",
-                values: ["front"]
-              }
             ],
             order: {
               "Events.scoreChangeLastHour": 'desc'
@@ -150,14 +137,7 @@ const IndexPage = ({ cubejsApi }) => {
             measures: [
               "Events.scoreChangeLastHour",
               "Events.scoreChangePrevHour",
-              "Events.scoreChangeBeforeAddedToFrontPage",
               "Events.currentRank"
-            ],
-            timeDimensions: [
-              {
-                dimension: "Events.timestamp",
-                dateRange: "from 7 days ago to now"
-              }
             ],
             filters: [
               {

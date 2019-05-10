@@ -22,9 +22,9 @@ cube(`Stories`, {
       type: `count`
     },
 
-    scorePerMinute: {
-      sql: `${scoreChange} / ${eventTimeSpan}`,
-      type: `number`
+    avgMinutesToFrontPage: {
+      sql: `${minutesToFrontPage}`,
+      type: `avg`
     }
   },
 

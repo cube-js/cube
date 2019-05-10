@@ -7,9 +7,9 @@
   },
   "dependencies": {
     "@cubejs-backend/athena-driver": "^0.7.0",
-    "@cubejs-backend/server": "^0.8.6",
-    "@cubejs-backend/serverless": "^0.8.6",
-    "@cubejs-backend/serverless-aws": "^0.8.6",
+    "@cubejs-backend/server": "^0.8.7",
+    "@cubejs-backend/serverless": "^0.8.7",
+    "@cubejs-backend/serverless-aws": "^0.8.7",
     "aws-sdk": "^2.441.0",
     "humps": "^2.0.1",
     "node-fetch": "^2.5.0",

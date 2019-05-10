@@ -31,10 +31,10 @@
     redis "^2.8.0"
     util-promisifyall "^1.0.4"
 
-"@cubejs-backend/query-orchestrator@^0.8.4":
-  version "0.8.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.8.4.tgz#7cc3c71a868328da780de27dd4ba051f07e85409"
-  integrity sha512-adQui9hSzOMIoAA1F/8RgYFAxKiawFCS1qPdKt5XjHwTKWA0bf1BvcEB9m+ngAXxOIrdg2Nb2n0bVWW3g2POpQ==
+"@cubejs-backend/query-orchestrator@^0.8.7":
+  version "0.8.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.8.7.tgz#9b0d87757b3202c8f0df7d2cc8cc282d5e479578"
+  integrity sha512-qIhsZtU4Dz2nvMouTwSIMYOSNIEracZq1PkffD6/rxwQCFvfnzUdv1mE/hMFbIe52i5ZG28ft08WVHLabaOrwA==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
@@ -57,13 +57,13 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.8.6":
-  version "0.8.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.8.6.tgz#88e832c90a6487dd48cfdc5f6e724d82662cbe28"
-  integrity sha512-eC1UKaC9QfBowL/S7AF+hTwgXkw0bfWnz+Sle8ijJi9/RFvsSgjlJkco8UpYVaUWpL1ZyqeD11LKzGggcihVnw==
+"@cubejs-backend/server-core@^0.8.7":
+  version "0.8.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.8.7.tgz#8f2da15ad6e72ff1b5424d3fa32afbe8e1f4323d"
+  integrity sha512-kX6toSEhq2eikgo45EVKEY65M31izuurSQVPLAdArWe6Rt1DGoLusHihbYjyHaP/ruqvy2XR6m/ciSXzR70LVQ==
   dependencies:
     "@cubejs-backend/api-gateway" "^0.8.4"
-    "@cubejs-backend/query-orchestrator" "^0.8.4"
+    "@cubejs-backend/query-orchestrator" "^0.8.7"
     "@cubejs-backend/schema-compiler" "^0.8.4"
     analytics-node "^3.3.0"
     codesandbox-import-utils "^1.3.8"
@@ -75,12 +75,12 @@
     ramda "^0.25.0"
     serve-static "^1.13.2"
 
-"@cubejs-backend/server@^0.8.6":
-  version "0.8.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.8.6.tgz#82462495e4718a78e4e648ab8e68b6016c65533f"
-  integrity sha512-8GB3efc0W1TKZhdONLLvqZcoZcu1iSpSzdoNclVhp/5RqkqQsgUpu7SsVmCZ+sUzRwJInrrEAAM7lIEwsyNHgA==
+"@cubejs-backend/server@^0.8.7":
+  version "0.8.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.8.7.tgz#2fc971b2329d27e86a26c9195f83b05b6ad82923"
+  integrity sha512-vZN5w5hUwUxx4M9fgMbkvUSjRb4irXsS49XqFX3tM/4BSIOKcCFi5NSYkjqMRinN5pxOrmQINGyvZxTEjKjPKw==
   dependencies:
-    "@cubejs-backend/server-core" "^0.8.6"
+    "@cubejs-backend/server-core" "^0.8.7"
     analytics-node "^3.3.0"
     body-parser "^1.15.2"
     codesandbox-import-utils "^1.3.8"
@@ -90,20 +90,20 @@
     jsonwebtoken "^8.4.0"
     node-machine-id "^1.1.10"
 
-"@cubejs-backend/serverless-aws@^0.8.6":
-  version "0.8.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/serverless-aws/-/serverless-aws-0.8.6.tgz#257dd2abb18d759085a941913641a3b5209c3c03"
-  integrity sha512-ot+kSrhM1NvLI3XlkC7V6sWZifuU+jOvVLS7fsdKHBb9+Z8hj0un2kmaybkIyL0q/xqqW5kPdTMbZ+8b0a5pkw==
+"@cubejs-backend/serverless-aws@^0.8.7":
+  version "0.8.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/serverless-aws/-/serverless-aws-0.8.7.tgz#4f95be27ff210be5ce47785d4c600ae3d31e7825"
+  integrity sha512-562+miDtlVPEKGUhM4HVsMXTRlQprOG+kfZjik5UIFfALhTK6AmTpTxGZ0zg6pX6WxOQ9XIIUKdA6E6ac7lgNw==
   dependencies:
-    "@cubejs-backend/serverless" "^0.8.6"
+    "@cubejs-backend/serverless" "^0.8.7"
     aws-sdk "^2.404.0"
 
-"@cubejs-backend/serverless@^0.8.6":
-  version "0.8.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/serverless/-/serverless-0.8.6.tgz#c2bd6d81757ae70a5a709d62a07e9cacd61390bc"
-  integrity sha512-iqbftbLWvMvBXFGTGAWyd/mhPlnrqy5Y9wq/uPHG6R7rmCzbwH5FcyLc6y29l3cv7pVST1aTRkd8z8weVb0dRg==
+"@cubejs-backend/serverless@^0.8.7":
+  version "0.8.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/serverless/-/serverless-0.8.7.tgz#9ae523cf0b25c10b8cbdee68928931780215d210"
+  integrity sha512-wLsMq50ho3X5PZ6Awel0OiZ3vgmdjrVBFFiEgHDwjP1fQHcZWy4zh5m5UsN8KjIFyQh+eaMS0CHMOwfYGCNGkQ==
   dependencies:
-    "@cubejs-backend/server-core" "^0.8.6"
+    "@cubejs-backend/server-core" "^0.8.7"
     cors "^2.8.5"
     serverless-express "^2.0.11"
 
