@@ -13,32 +13,23 @@
     moment "^2.24.0"
     ramda "^0.25.0"
 
-"@cubejs-backend/athena-driver@^0.9.0":
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/athena-driver/-/athena-driver-0.9.0.tgz#92cc4d23a9fe76638dc3587036361649841a3708"
-  integrity sha512-xjuavRatptoX0fgeBNEnxTSxgOqJ1pX3foJAXEhW5WIGXBeNgneYm860ujV9LVqdhQ9Xu0Msy1Wq7e5v7MCfwg==
+"@cubejs-backend/athena-driver@^0.9.1":
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/athena-driver/-/athena-driver-0.9.1.tgz#52e5754ba3dc9a95e2c1ea6180195eb8bf686271"
+  integrity sha512-L14iFxSb9QLkjYuxOedicEogSFPfQ+r7euVLdOm64DP9yPWoIQbttT+sgmQHBjulUqn8TnXjuuQCEVAFEQS/lg==
   dependencies:
-    "@cubejs-backend/query-orchestrator" "^0.0.21"
+    "@cubejs-backend/query-orchestrator" "^0.9.0"
     aws-sdk "^2.403.0"
     sqlstring "^2.3.1"
 
-"@cubejs-backend/mysql-driver@^0.9.0":
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/mysql-driver/-/mysql-driver-0.9.0.tgz#6114bf095587895ac7859a6a1abf8787af4234f5"
-  integrity sha512-nbP5QVBnpx01/DOEFPlnJ5d+Aak7gVIqNvJ5KpNy/PpR9VCyq/1W4JvgsD7ohKoXzJtgTcCNI/VCAaEI92C+NA==
+"@cubejs-backend/mysql-driver@^0.9.1":
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/mysql-driver/-/mysql-driver-0.9.1.tgz#e89f32715d4d87e7b7c8906dde5174a2dadde3f6"
+  integrity sha512-r0kTRFlHG/anB8lzhIIo67TN+GgqVOU5my9vGx7yNQyaGpy+4uQGpywJqHCZEWH2DejmUs4TL3LORmbHRV5GeQ==
   dependencies:
-    "@cubejs-backend/query-orchestrator" "^0.0.21"
+    "@cubejs-backend/query-orchestrator" "^0.9.0"
     generic-pool "^3.6.0"
     mysql "^2.16.0"
-
-"@cubejs-backend/query-orchestrator@^0.0.21":
-  version "0.0.21"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.0.21.tgz#b5a0422a34931a834f4429280679460d08dc6112"
-  integrity sha512-jQS5F2D9PzKEJ4guzba6S2PymruA5pTIFu4DnOnM7Y3sFQkjVDcl7KYEr5VmpX6+Hu1u+naApuCQo2l6PtOXKg==
-  dependencies:
-    ramda "^0.24.1"
-    redis "^2.8.0"
-    util-promisifyall "^1.0.4"
 
 "@cubejs-backend/query-orchestrator@^0.9.0":
   version "0.9.0"
@@ -2154,11 +2145,6 @@ util-deprecate@^1.0.1, util-deprecate@~1.0.1:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
   integrity sha1-RQ1Nyfpw3nMnYvvS1KKJgUGaDM8=
-
-util-promisifyall@^1.0.4:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/util-promisifyall/-/util-promisifyall-1.0.6.tgz#03439a5a76461e1f71f76954d945cffc8bd6aad8"
-  integrity sha512-l+o62sbaqStC1xt7oEhlafC4jWBgkOjBXvlPwxkvOYmNqpY8dNXuKdOa+VHjkYz2Fw98e0HvJtNKUg0+6hfP2w==
 
 utils-merge@1.0.1:
   version "1.0.1"

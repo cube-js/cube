@@ -6,8 +6,8 @@
     "dev": "./node_modules/.bin/cubejs-dev-server"
   },
   "dependencies": {
-    "@cubejs-backend/athena-driver": "^0.9.0",
-    "@cubejs-backend/mysql-driver": "^0.9.0",
+    "@cubejs-backend/athena-driver": "^0.9.1",
+    "@cubejs-backend/mysql-driver": "^0.9.1",
     "@cubejs-backend/server": "^0.9.0",
     "@cubejs-backend/serverless": "^0.9.0",
     "@cubejs-backend/serverless-aws": "^0.9.0",
