@@ -126,6 +126,13 @@ class MySqlDriver extends BaseDriver {
   fromGenericType(columnType) {
     return GenericTypeToMySql[columnType] || super.fromGenericType(columnType);
   }
+
+  toColumnValue(value, genericType) {
+    if (genericType === 'text') {
+      return value && value.replace(/[\u0800-\uFFFF]/g, '');
+    }
+    return super.toColumnValue(value, genericType);
+  }
 }
 
 module.exports = MySqlDriver;

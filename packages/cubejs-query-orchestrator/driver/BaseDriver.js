@@ -80,7 +80,7 @@ class BaseDriver {
     return this.query(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
       [schemaName]
-    )
+    );
   }
 
   loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx) {
@@ -108,14 +108,23 @@ class BaseDriver {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
     await this.createTable(table, columns);
-    for (let i = 0; i < tableData.rows.length; i++) {
-      await this.query(
-        `INSERT INTO ${table}
+    try {
+      for (let i = 0; i < tableData.rows.length; i++) {
+        await this.query(
+          `INSERT INTO ${table}
         (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
         VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
-        columns.map(c => tableData.rows[i][c.name])
-      );
+          columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
+        );
+      }
+    } catch (e) {
+      await this.dropTable(table);
+      throw e;
     }
+  }
+
+  toColumnValue(value, genericType) {
+    return value;
   }
 
   async tableColumnTypes(table) {

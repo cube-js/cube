@@ -349,7 +349,7 @@ class PreAggregationLoader {
         .concat(versionEntriesToSave.map(v => this.targetTableName(v)))
         .concat([justCreatedTable]);
     const toDrop = actualTables
-      .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name}`)
+      .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
       .filter(t => tablesToSave.indexOf(t) === -1);
     this.logger('Dropping orphaned tables', { tablesToDrop: JSON.stringify(toDrop) });
     await Promise.all(toDrop.map(table => client.dropTable(table)));
