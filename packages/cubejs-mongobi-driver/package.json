@@ -11,7 +11,7 @@
     "test": "mocha"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.0.21",
+    "@cubejs-backend/query-orchestrator": "^0.9.0",
     "generic-pool": "^3.6.0",
     "mysql2": "^1.6.5"
   },

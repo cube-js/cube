@@ -11,7 +11,7 @@
     "test": "mocha"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.0.21",
+    "@cubejs-backend/query-orchestrator": "^0.9.0",
     "aws-sdk": "^2.403.0",
     "sqlstring": "^2.3.1"
   },
