@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.1](https://github.com/statsbotco/cubejs-client/compare/v0.9.0...v0.9.1) (2019-05-11)
+
+
+### Bug Fixes
+
+* update BaseDriver dependencies ([a7aef2b](https://github.com/statsbotco/cubejs-client/commit/a7aef2b))
+
+
+
+
+
 # [0.9.0](https://github.com/statsbotco/cubejs-client/compare/v0.8.7...v0.9.0) (2019-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/mongobi-driver
