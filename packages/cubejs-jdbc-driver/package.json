@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/jdbc-driver",
   "description": "Cube.js JDBC database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.8.4",
+  "version": "0.9.0",
   "engines": {
     "node": ">=8.11.1"
   },
