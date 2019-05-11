@@ -111,13 +111,13 @@ class QueryCache {
   getExternalQueue() {
     if (!this.externalQueue) {
       this.externalQueue = QueryCache.createQueue(
-        `SQL_QUERY_${this.redisPrefix}`,
+        `SQL_QUERY_EXT_${this.redisPrefix}`,
         this.externalDriverFactory,
         (client, q) => client.query(q.query, q.values),
         {
           logger: this.logger,
           concurrency: 6,
-          ...this.options.queueOptions
+          ...this.options.externalQueueOptions
         }
       );
     }

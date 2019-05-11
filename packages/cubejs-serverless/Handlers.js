@@ -12,6 +12,14 @@ const processHandlers = {
     const queue = orchestrator.queryCache.getQueue();
     await queue.processCancel(query);
   },
+  externalQueryProcess: async (queryKey, orchestrator) => {
+    const queue = orchestrator.queryCache.getExternalQueue();
+    await queue.processQuery(queryKey);
+  },
+  externalQueryCancel: async (query, orchestrator) => {
+    const queue = orchestrator.queryCache.getExternalQueue();
+    await queue.processCancel(query);
+  },
   preAggregationProcess: async (queryKey, orchestrator) => {
     const queue = orchestrator.preAggregations.getQueue();
     await queue.processQuery(queryKey);
@@ -30,6 +38,10 @@ class Handlers {
           queueOptions: {
             sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'queryProcess', context),
             sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'queryCancel', context)
+          },
+          externalQueueOptions: {
+            sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'externalQueryProcess', context),
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'externalQueryCancel', context)
           }
         },
         preAggregationsOptions: {
