@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.2](https://github.com/statsbotco/cube.js/compare/v0.9.1...v0.9.2) (2019-05-11)
+
+
+### Bug Fixes
+
+* External rollups serverless implementation ([6d13370](https://github.com/statsbotco/cube.js/commit/6d13370))
+
+
+
+
+
 ## [0.9.1](https://github.com/statsbotco/cube.js/compare/v0.9.0...v0.9.1) (2019-05-11)
 
 
