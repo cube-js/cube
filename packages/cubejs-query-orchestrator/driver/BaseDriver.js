@@ -10,6 +10,21 @@ const sortByKeys = (unordered) => {
   return ordered;
 };
 
+const DbTypeToGenericType = {
+  'timestamp without time zone': 'timestamp',
+  'integer': 'int',
+  'character varying': 'text',
+  'varchar': 'text',
+  'text': 'text',
+  'string': 'text',
+  'boolean': 'boolean',
+  'bigint': 'bigint',
+  'time': 'string',
+  'datetime': 'timestamp',
+  'date': 'date',
+  'double precision': 'decimal'
+};
+
 class BaseDriver {
   informationSchemaQuery() {
     return `
@@ -77,11 +92,65 @@ class BaseDriver {
   }
 
   param(/* paramIndex */) {
-    return '?'
+    return '?';
   }
 
   testConnectionTimeout() {
     return 10000;
+  }
+
+  async downloadTable(table) {
+    return { rows: await this.query(`SELECT * FROM ${table}`) };
+  }
+
+  async uploadTable(table, columns, tableData) {
+    if (!tableData.rows) {
+      throw new Error(`${this.constructor} driver supports only rows upload`);
+    }
+    await this.createTable(table, columns);
+    for (let i = 0; i < tableData.rows.length; i++) {
+      await this.query(
+        `INSERT INTO ${table}
+        (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
+        VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
+        columns.map(c => tableData.rows[i][c.name])
+      );
+    }
+  }
+
+  async tableColumnTypes(table) {
+    const [schema, name] = table.split('.');
+    const columns = await this.query(
+      `SELECT columns.column_name,
+             columns.table_name,
+             columns.table_schema,
+             columns.data_type
+      FROM information_schema.columns 
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      [name, schema]
+    );
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+  }
+
+  createTable(quotedTableName, columns) {
+    return this.query(this.createTableSql(quotedTableName, columns), []);
+  }
+
+  createTableSql(quotedTableName, columns) {
+    columns = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`);
+    return `CREATE TABLE ${quotedTableName} (${columns.join(', ')})`;
+  }
+
+  toGenericType(columnType) {
+    return DbTypeToGenericType[columnType] || columnType;
+  }
+
+  fromGenericType(columnType) {
+    return columnType;
+  }
+
+  quoteIdentifier(identifier) {
+    return `"${identifier}"`;
   }
 }
 

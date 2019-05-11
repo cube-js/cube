@@ -56,6 +56,7 @@ class CubejsServerCore {
     }
     this.options = options;
     this.driverFactory = options.driverFactory;
+    this.externalDriverFactory = options.externalDriverFactory;
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || 'schema';
     this.dbType = options.dbType;
@@ -70,6 +71,9 @@ class CubejsServerCore {
     this.repository = new FileRepository(this.schemaPath);
     this.repositoryFactory = options.repositoryFactory || (() => this.repository);
     this.contextToDbType = typeof options.dbType === 'function' ? options.dbType : () => options.dbType;
+    this.contextToExternalDbType = typeof options.externalDbType === 'function' ?
+      options.externalDbType :
+      () => options.externalDbType;
     this.appIdToCompilerApi = {};
     this.appIdToOrchestratorApi = {};
     this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
@@ -180,6 +184,7 @@ class CubejsServerCore {
       this.appIdToCompilerApi[appId] = this.createCompilerApi(
         this.repositoryFactory(context), {
           dbType: this.contextToDbType(context),
+          externalDbType: this.contextToExternalDbType(context),
           schemaVersion: this.options.schemaVersion && (() => this.options.schemaVersion(context))
         }
       );
@@ -191,6 +196,7 @@ class CubejsServerCore {
     const appId = this.contextToAppId(context);
     if (!this.appIdToOrchestratorApi[appId]) {
       let driverPromise;
+      let externalPreAggregationsDriverPromise;
       this.appIdToOrchestratorApi[appId] = this.createOrchestratorApi({
         getDriver: () => {
           if (!driverPromise) {
@@ -201,6 +207,16 @@ class CubejsServerCore {
             });
           }
           return driverPromise;
+        },
+        getExternalDriverFactory: () => {
+          if (!externalPreAggregationsDriverPromise) {
+            const driver = this.externalDriverFactory(context);
+            externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
+              externalPreAggregationsDriverPromise = null;
+              throw e;
+            });
+          }
+          return externalPreAggregationsDriverPromise;
         },
         redisPrefix: appId,
         orchestratorOptions: this.orchestratorOptions(context)
@@ -214,7 +230,8 @@ class CubejsServerCore {
     return new CompilerApi(repository, options.dbType || this.dbType, {
       schemaVersion: options.schemaVersion || this.options.schemaVersion,
       devServer: this.options.devServer,
-      logger: this.logger
+      logger: this.logger,
+      externalDbType: options.externalDbType
     });
   }
 
@@ -222,6 +239,7 @@ class CubejsServerCore {
     options = options || {};
     return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
       redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
+      externalDriverFactory: options.getExternalDriverFactory,
       ...(options.orchestratorOptions || this.options.orchestratorOptions)
     });
   }

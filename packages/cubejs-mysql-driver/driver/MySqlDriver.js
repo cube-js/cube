@@ -3,6 +3,10 @@ const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
+const GenericTypeToMySql = {
+  'string': 'varchar(255)'
+};
+
 class MySqlDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -113,6 +117,14 @@ class MySqlDriver extends BaseDriver {
 
   informationSchemaQuery() {
     return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`
+  }
+
+  quoteIdentifier(identifier) {
+    return `\`${identifier}\``;
+  }
+
+  fromGenericType(columnType) {
+    return GenericTypeToMySql[columnType] || super.fromGenericType(columnType);
   }
 }
 

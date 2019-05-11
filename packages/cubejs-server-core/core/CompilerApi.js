@@ -31,10 +31,13 @@ class CompilerApi {
   async getSql(query) {
     const sqlGenerator = QueryBuilder.query(
       await this.getCompilers(),
-      this.dbType,
-      query
+      this.dbType, {
+        ...query,
+        externalDbType: this.options.externalDbType
+      }
     );
     return (await this.getCompilers()).compiler.withQuery(sqlGenerator, () => ({
+      external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,

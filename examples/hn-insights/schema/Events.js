@@ -286,7 +286,8 @@ cube(`Events`, {
       partitionGranularity: `day`,
       refreshKey: {
         sql: `select current_timestamp`
-      }
+      },
+      external: true
     },
     leaderBoard: {
       type: `rollup`,
@@ -319,6 +320,7 @@ cube(`Events`, {
       refreshKey: {
         sql: `select current_timestamp`
       },
+      external: true
     }
   }
 });

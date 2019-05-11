@@ -23,10 +23,13 @@ const ADAPTERS = {
   snowflake,
   clickhouse,
 };
-exports.query = (compilers, adapter, queryOptions) => {
-  if (!ADAPTERS[adapter]) {
+exports.query = (compilers, dbType, queryOptions) => {
+  if (!ADAPTERS[dbType]) {
     return null;
   }
 
-  return new (ADAPTERS[adapter])(compilers, queryOptions);
+  return new (ADAPTERS[dbType])(compilers, {
+    ...queryOptions,
+    externalQueryClass: queryOptions.externalDbType && ADAPTERS[queryOptions.externalDbType]
+  });
 };

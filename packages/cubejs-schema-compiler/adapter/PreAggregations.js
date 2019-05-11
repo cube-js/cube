@@ -86,7 +86,8 @@ class PreAggregations {
       preAggregationsSchema: this.query.preAggregationSchema(),
       tableName,
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
-      invalidateKeyQueries: this.query.preAggregationInvalidateKeyQueries(cube, preAggregation)
+      invalidateKeyQueries: this.query.preAggregationInvalidateKeyQueries(cube, preAggregation),
+      external: preAggregation.external
     };
   }
 

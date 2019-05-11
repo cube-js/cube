@@ -64,6 +64,7 @@ const BasePreAggregation = {
     sql: Joi.func().required()
   }),
   useOriginalSqlPreAggregations: Joi.boolean(),
+  external: Joi.boolean(),
   partitionGranularity: Joi.any().valid('day', 'week', 'month', 'year')
 };
 

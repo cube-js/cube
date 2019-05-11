@@ -75,6 +75,8 @@ class BaseQuery {
     if (this.order.length === 0) {
       this.order = this.defaultOrder();
     }
+
+    this.externalQueryClass = this.options.externalQueryClass;
   }
 
   get subQueryDimensions() {
@@ -160,7 +162,27 @@ class BaseQuery {
     return this.fullKeyQueryAggregate();
   }
 
+  externalPreAggregationQuery() {
+    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
+      if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   buildSqlAndParams() {
+    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
+      if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
+        const ExternalQuery = this.externalQueryClass;
+        return new ExternalQuery(this.compilers, {
+          ...this.options,
+          externalQueryClass: null
+        }).buildSqlAndParams();
+      }
+    }
     return this.compilers.compiler.withQuery(
       this,
       () => this.paramAllocator.buildSqlAndParams(this.buildParamAnnotatedSql())

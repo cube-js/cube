@@ -7,19 +7,26 @@ class QueryOrchestrator {
     this.redisPrefix = redisPrefix;
     this.driverFactory = driverFactory;
     this.logger = logger;
+    const { externalDriverFactory } = options;
     this.queryCache = new QueryCache(
-      this.redisPrefix, this.driverFactory, this.logger, options.queryCacheOptions
+      this.redisPrefix, this.driverFactory, this.logger, {
+        externalDriverFactory,
+        ...options.queryCacheOptions,
+      }
     );
     this.preAggregations = new PreAggregations(
-      this.redisPrefix, this.driverFactory, this.logger, this.queryCache, options.preAggregationsOptions
+      this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
+        externalDriverFactory,
+        ...options.preAggregationsOptions
+      }
     );
   }
 
   async fetchQuery(queryBody) {
     return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
-      .then(preAggregationsTablesToTempTables =>
-        this.queryCache.cachedQueryResult(queryBody, preAggregationsTablesToTempTables)
-      );
+      .then(preAggregationsTablesToTempTables => this.queryCache.cachedQueryResult(
+        queryBody, preAggregationsTablesToTempTables
+      ));
   }
 
   async queryStage(queryBody) {
@@ -28,7 +35,9 @@ class QueryOrchestrator {
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
-          .map(p => queue.getQueryStage(PreAggregations.preAggregationQueryCacheKey(p), 10, preAggregationsQueryStageState))
+          .map(p => queue.getQueryStage(
+            PreAggregations.preAggregationQueryCacheKey(p), 10, preAggregationsQueryStageState
+          ))
       )).findIndex(p => !!p);
     if (pendingPreAggregationIndex === -1) {
       return this.queryCache.getQueue().getQueryStage(QueryCache.queryCacheKey(queryBody));
