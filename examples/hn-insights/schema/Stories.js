@@ -48,6 +48,12 @@ cube(`Stories`, {
       subQuery: true
     },
 
+    lastEventTime: {
+      sql: `${Events.lastEventTime}`,
+      type: `time`,
+      subQuery: true
+    },
+
     title: {
       sql: `title`,
       type: `string`

@@ -166,6 +166,12 @@ cube(`Events`, {
       shown: false
     },
 
+    lastEventTime: {
+      sql: `${timestamp}`,
+      type: `max`,
+      shown: false
+    },
+
     commentsBeforeAddedToFrontPage: {
       sql: `comments_count_diff`,
       type: `sum`,
@@ -315,6 +321,7 @@ cube(`Events`, {
         Stories.user,
         Stories.postedTime,
         Stories.addedToFrontPage,
+        Stories.lastEventTime,
         Stories.minutesToFrontPage
       ],
       refreshKey: {
