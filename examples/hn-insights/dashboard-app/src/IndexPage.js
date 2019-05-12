@@ -67,7 +67,7 @@ const velocityListRender = ({ resultSet }) => {
       const scoreLastHour = item['Events.scoreChangeLastHour'] && parseInt(item['Events.scoreChangeLastHour'], 10);
       const scorePrevHour = item['Events.scoreChangePrevHour'] && parseInt(item['Events.scoreChangePrevHour'], 10) || null;
       return <Statistic
-        value={scoreLastHour && `+${scoreLastHour}`}
+        value={scoreLastHour && `+${scoreLastHour}` || 'N/A'}
         valueStyle={{ color: scorePrevHour && (scoreLastHour >= scorePrevHour ? '#3f8600' : '#cf1322') }}
         prefix={scorePrevHour && <Icon
           type={scoreLastHour >= scorePrevHour ? 'arrow-up' : 'arrow-down'}/>}
