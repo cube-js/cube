@@ -1,5 +1,5 @@
 import React from "react";
-import { Row, Col, Card, Spin, Statistic, Table, Layout, Icon } from "antd";
+import { Row, Col, Card, Spin, Statistic, Table, Layout, Icon, Popover } from "antd";
 import "antd/dist/antd.css";
 import { QueryRenderer } from "@cubejs-client/react";
 import { Chart, Axis, Tooltip, Geom, Coord, Legend } from "bizcharts";
@@ -57,7 +57,7 @@ const lineRender = ({ resultSet }) => (
 );
 
 const StoryCardMeta = ({ span, title, description }) => (
-  <Col span={span} style={{ marginBottom: 16 }}>
+  <Col lg={span} style={{ marginBottom: 16 }} span={24}>
     <Card.Meta
       title={title}
       description={description}
@@ -89,22 +89,22 @@ const storyCardRender = ({ resultSet }) => {
       <StoryCardMeta
         span={12}
         title="Top Rank"
-        description={<span>{data['Events.topRank']}</span>}
+        description={<span>{data['Events.topRank'] || 'N/A'}</span>}
       />
       <StoryCardMeta
         span={12}
         title="Posted Time"
-        description={<span>{data['Stories.postedTime']}</span>}
+        description={<span>{data['Stories.postedTime'] && moment(data['Stories.postedTime']).format('LLL')}</span>}
       />
       <StoryCardMeta
         span={12}
         title="Added to Front Page"
-        description={<span>{data['Stories.addedToFrontPage']}</span>}
+        description={<span>{data['Stories.addedToFrontPage'] && moment(data['Stories.addedToFrontPage']).format('LLL') || 'N/A'}</span>}
       />
       <StoryCardMeta
         span={12}
         title="Minutes to Front Page"
-        description={<span>{data['Stories.minutesToFrontPage']}</span>}
+        description={<span>{data['Stories.minutesToFrontPage'] || 'N/A'}</span>}
       />
       <StoryCardMeta
         span={12}
@@ -124,7 +124,7 @@ const storyCardRender = ({ resultSet }) => {
       <StoryCardMeta
         span={12}
         title="Minutes on First Page"
-        description={<span>{data['Events.minutesOnFirstPage']}</span>}
+        description={<span>{data['Events.minutesOnFirstPage'] && parseInt(data['Events.minutesOnFirstPage'], 10) || 'N/A'}</span>}
       />
       <StoryCardMeta
         span={12}
@@ -139,7 +139,7 @@ const storyCardRender = ({ resultSet }) => {
       <StoryCardMeta
         span={12}
         title="Rank"
-        description={<span>{data['Events.currentRank']}</span>}
+        description={<span>{data['Events.currentRank'] || 'N/A'}</span>}
       />
       <StoryCardMeta
         span={12}
@@ -190,7 +190,8 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
       "Events.commentsChangePrevHour",
       "Events.rankHourAgo",
       "Events.karmaChangeLastHour",
-      "Events.karmaChangePrevHour"
+      "Events.karmaChangePrevHour",
+      "Events.scoreEstimateLastHour"
     ],
     dimensions: [
       "Stories.id",
@@ -215,7 +216,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
       <DashboardItem size={12} title="Story">
         {renderChart(storyCardRender)(propRes)}
       </DashboardItem>
-      <Col span={12}>
+      <Col span={24} lg={12}>
         <Dashboard>
           <DashboardItem size={12} title="Points last/prev hour">
             {renderChart(renderStatisticCard("Events.scoreChangeLastHour", "Events.scoreChangePrevHour"))(propRes)}
@@ -229,6 +230,16 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           <DashboardItem size={12} title="Karma last/prev hour">
             {renderChart(renderStatisticCard("Events.karmaChangeLastHour", "Events.karmaChangePrevHour"))(propRes)}
           </DashboardItem>
+          <DashboardItem size={12} title={
+            <span>
+              Points last hour / average&nbsp;
+              <Popover content="Points added last hour vs average performance estimate based on rank of this story">
+                <Icon type="info-circle" />
+              </Popover>
+            </span>
+          }>
+            {renderChart(renderStatisticCard("Events.scoreChangeLastHour", "Events.scoreEstimateLastHour"))(propRes)}
+          </DashboardItem>
         </Dashboard>
       </Col>
       {propRes.resultSet && propRes.resultSet.tablePivot()[0] && [
@@ -236,7 +247,43 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           <QueryRenderer
             query={{
               "measures": [
-                "Events.scoreChange"
+                "Events.scoreChange",
+                "Events.averageScoreEstimate"
+              ],
+              "timeDimensions": [
+                {
+                  "dimension": "Events.timestamp",
+                  "granularity": "hour",
+                  dateRange: [
+                    propRes.resultSet.tablePivot()[0]['Stories.postedTime'],
+                    propRes.resultSet.tablePivot()[0]['Stories.lastEventTime'],
+                  ]
+                }
+              ],
+              "filters": [
+                {
+                  "dimension": "Stories.id",
+                  "operator": "equals",
+                  "values": [storyId]
+                },
+                {
+                  "dimension": "Events.page",
+                  "operator": "equals",
+                  "values": [
+                    "front"
+                  ]
+                }
+              ]
+            }}
+            cubejsApi={cubejsApi}
+            render={renderChart(lineRender)}
+          />
+        </DashboardItem>,
+        <DashboardItem size={12} title="Rank" key="4">
+          <QueryRenderer
+            query={{
+              "measures": [
+                "Events.avgRank"
               ],
               "timeDimensions": [
                 {
@@ -336,41 +383,6 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
             cubejsApi={cubejsApi}
             render={renderChart(lineRender)}
             />
-        </DashboardItem>,
-        <DashboardItem size={12} title="Rank" key="4">
-          <QueryRenderer
-            query={{
-              "measures": [
-                "Events.topRank"
-              ],
-              "timeDimensions": [
-                {
-                  "dimension": "Events.timestamp",
-                  "granularity": "hour",
-                  dateRange: [
-                    propRes.resultSet.tablePivot()[0]['Stories.postedTime'],
-                    propRes.resultSet.tablePivot()[0]['Stories.lastEventTime'],
-                  ]
-                }
-              ],
-              "filters": [
-                {
-                  "dimension": "Stories.id",
-                  "operator": "equals",
-                  "values": [storyId]
-                },
-                {
-                  "dimension": "Events.page",
-                  "operator": "equals",
-                  "values": [
-                    "front"
-                  ]
-                }
-              ]
-            }}
-            cubejsApi={cubejsApi}
-            render={renderChart(lineRender)}
-          />
         </DashboardItem>
       ]}
 

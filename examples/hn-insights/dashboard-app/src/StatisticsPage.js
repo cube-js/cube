@@ -109,6 +109,46 @@ const renderChart = Component => ({ resultSet, error }) =>
 const IndexPage = ({ cubejsApi }) => {
   return (
     <Dashboard>
+      <DashboardItem size={12} title="Score on front page by day of week and hour">
+        <QueryRenderer
+          query={{
+            "measures": [
+              "AverageVelocity.averageScorePerHour"
+            ],
+            "timeDimensions": [],
+            "dimensions": [
+              "AverageVelocity.day",
+              "AverageVelocity.hour"
+            ],
+            order: {
+              "AverageVelocity.day": 'asc',
+              "AverageVelocity.hour": 'asc'
+            },
+            "filters": []
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Score on front page by rank">
+        <QueryRenderer
+          query={{
+            "measures": [
+              "AverageVelocity.averageScorePerHour"
+            ],
+            "timeDimensions": [],
+            "dimensions": [
+              "AverageVelocity.rank"
+            ],
+            order: {
+              "AverageVelocity.rank": 'asc'
+            },
+            "filters": []
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
       <DashboardItem size={12} title="Score on /newest page">
         <QueryRenderer
           query={{

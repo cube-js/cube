@@ -4,6 +4,15 @@ cube(`Events`, {
   WHERE ${FILTER_PARAMS.Events.timestamp.filter(`from_iso8601_timestamp(dt || ':00:00.000')`)}
   `,
 
+  joins: {
+    AverageVelocity: {
+      sql: `${Events}.rank = ${AverageVelocity}.rank AND 
+      ${Events.hour} = ${AverageVelocity}.hour AND 
+      ${Events.day} = ${AverageVelocity}.day`,
+      relationship: `belongsTo`
+    }
+  },
+
   refreshKey: {
     sql: `select current_timestamp`
   },
@@ -13,14 +22,33 @@ cube(`Events`, {
       type: `count`
     },
 
-    scorePerMinute: {
+    scorePerHour: {
       sql: `${scoreChange} / ${eventTimeSpan}`,
       type: `number`
     },
 
-    eventTimeSpan: {
-      sql: `date_diff('second', ${prevSnapshotTimestamp}, ${snapshotTimestamp}) / 60.0`,
+    averageScoreEstimate: {
+      sql: `${AverageVelocity.scorePerHour} * ${eventTimeSpanInHours}`,
       type: `sum`
+    },
+
+    eventTimeSpan: {
+      sql: `date_diff('second', ${prevSnapshotTimestamp}, ${snapshotTimestamp}) / 3600.0`,
+      type: `sum`
+    },
+
+    totalRank: {
+      sql: `rank`,
+      type: `sum`,
+      filters: [{
+        sql: `${page} = 'front'`
+      }],
+      shown: false
+    },
+
+    avgRank: {
+      sql: `${totalRank} / ${count}`,
+      type: `number`
     },
 
     scoreChange: {
@@ -35,6 +63,16 @@ cube(`Events`, {
 
     scoreChangeLastHour: {
       sql: `score_diff`,
+      type: `sum`,
+      filters: [{
+        sql: `${timestamp} + interval '60' minute > now()`
+      }, {
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    scoreEstimateLastHour: {
+      sql: `${AverageVelocity.scorePerHour} * ${eventTimeSpanInHours}`,
       type: `sum`,
       filters: [{
         sql: `${timestamp} + interval '60' minute > now()`
@@ -227,6 +265,11 @@ cube(`Events`, {
       sql: `${scoreChangeBeforeAddedToFrontPage} / ${eventTimeSpanBeforeAddedToFrontPage}`,
       type: `number`
     },
+
+    eventTimeSpanInHours: {
+      sql: `date_diff('second', ${prevSnapshotTimestamp}, ${snapshotTimestamp}) / 3600.0`,
+      type: `number`
+    }
   },
 
   dimensions: {
@@ -246,7 +289,7 @@ cube(`Events`, {
     },
 
     id: {
-      sql: `id || timestamp`,
+      sql: `${CUBE}.id || ${CUBE}.timestamp`,
       type: `string`,
       primaryKey: true
     },
@@ -279,13 +322,23 @@ cube(`Events`, {
     rank: {
       sql: `rank`,
       type: `number`
+    },
+
+    hour: {
+      sql: `hour(${snapshotTimestamp})`,
+      type: `number`
+    },
+
+    day: {
+      sql: `day_of_week(${snapshotTimestamp})`,
+      type: `number`
     }
   },
 
   preAggregations: {
     perStory: {
       type: `rollup`,
-      measureReferences: [scoreChange, commentsChange, karmaChange, topRank],
+      measureReferences: [scoreChange, commentsChange, karmaChange, topRank, averageScoreEstimate, totalRank, count],
       dimensionReferences: [Stories.id, Events.page],
       timeDimensionReference: timestamp,
       granularity: `hour`,
@@ -312,7 +365,8 @@ cube(`Events`, {
         minutesOnFirstPage,
         topRank,
         currentScore,
-        currentComments
+        currentComments,
+        scoreEstimateLastHour
       ],
       dimensionReferences: [
         Stories.id,
@@ -328,6 +382,54 @@ cube(`Events`, {
         sql: `select current_timestamp`
       },
       external: true
+    }
+  }
+});
+
+cube(`AverageVelocity`, {
+  sql: `SELECT
+    hour(from_iso8601_timestamp(snapshot_timestamp)) as hour,
+    day_of_week(from_iso8601_timestamp(snapshot_timestamp)) as day,
+    rank, 
+    sum(score_diff) * 3600.0 / sum(date_diff('second', from_iso8601_timestamp(prev_snapshot_timestamp), from_iso8601_timestamp(snapshot_timestamp))) as avg_score_per_hour
+    FROM hn_insights.events
+    WHERE page = 'front' 
+    GROUP BY 1, 2, 3
+    `,
+
+  measures: {
+    averageScorePerHour: {
+      sql: `avg_score_per_hour`,
+      type: `avg`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `rank || day || hour`,
+      type: `number`,
+      primaryKey: true,
+      shown: true
+    },
+
+    rank: {
+      sql: `rank`,
+      type: `number`
+    },
+
+    day: {
+      sql: `day`,
+      type: `number`
+    },
+
+    hour: {
+      sql: `hour`,
+      type: `number`
+    },
+
+    scorePerHour: {
+      sql: `avg_score_per_hour`,
+      type: `number`
     }
   }
 });
