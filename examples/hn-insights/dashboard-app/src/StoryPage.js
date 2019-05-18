@@ -1,5 +1,6 @@
 import React from "react";
-import { Row, Col, Card, Spin, Statistic, Table, Layout, Icon, Popover } from "antd";
+import { Row, Col, Card, Spin, Statistic, Table, Layout, Icon, Popover, Tabs } from "antd";
+import { Link } from 'react-router-dom'
 import "antd/dist/antd.css";
 import { QueryRenderer } from "@cubejs-client/react";
 import { Chart, Axis, Tooltip, Geom, Coord, Legend } from "bizcharts";
@@ -39,13 +40,45 @@ const stackedChartData = resultSet => {
   return data;
 };
 
-const tableRender = ({ resultSet }) => (
-  <Table
-    pagination={false}
-    columns={resultSet.tableColumns().map(c => ({ ...c, dataIndex: c.key }))}
-    dataSource={resultSet.tablePivot()}
-  />
-);
+const velocityListRender = ({ resultSet }) => {
+  const columns = [{
+    title: 'Story',
+    key: 'story',
+    render: (text, item) => (
+      <span>
+        {item['Stories.currentRank'] || '-'}.&nbsp;
+        <Link to={`/stories/${item['Stories.id']}`}>{item['Stories.title']}</Link>
+      </span>
+    ),
+  }, {
+    title: 'Points last/prev hour',
+    key: 'scoreChange',
+    render: (text, item) => {
+      const scoreLastHour = item['Events.scoreChangeLastHour'] && parseInt(item['Events.scoreChangeLastHour'], 10);
+      const scorePrevHour = item['Events.scoreChangePrevHour'] && parseInt(item['Events.scoreChangePrevHour'], 10) || null;
+      return <Statistic
+        value={scoreLastHour && `+${scoreLastHour}` || 'N/A'}
+        valueStyle={{ color: scorePrevHour && (scoreLastHour >= scorePrevHour ? '#3f8600' : '#cf1322') }}
+        prefix={scorePrevHour && <Icon
+          type={scoreLastHour >= scorePrevHour ? 'arrow-up' : 'arrow-down'}/>}
+        suffix={scorePrevHour && `+${scorePrevHour}`}
+      />
+    },
+  }, {
+    title: 'Rank Points',
+    key: 'currentRankPoints',
+    render: (text, item) => {
+      const score = item["Stories.currentRankScore"] && Math.round(item["Stories.currentRankScore"] * 1000);
+      return <Statistic
+        value={score || 'N/A'}
+      />
+    },
+  }];
+
+  return (
+    <Table dataSource={resultSet.tablePivot()} columns={columns} pagination={false} />
+  );
+};
 
 const lineRender = ({ resultSet }) => (
   <Chart scale={{ x: { tickCount: 8 } }} height={400} data={stackedChartData(resultSet)} forceFit>
@@ -129,17 +162,17 @@ const storyCardRender = ({ resultSet }) => {
       <StoryCardMeta
         span={12}
         title="Score"
-        description={<span>{data['Events.currentScore']}</span>}
+        description={<span>{data['Stories.currentScore']}</span>}
       />
       <StoryCardMeta
         span={12}
         title="Comments"
-        description={<span>{data['Events.currentComments']}</span>}
+        description={<span>{data['Stories.currentComments']}</span>}
       />
       <StoryCardMeta
         span={12}
-        title="Rank"
-        description={<span>{data['Events.currentRank'] || 'N/A'}</span>}
+        title="Age"
+        description={<span>{data['Stories.ageInHours'] && Math.round(data['Stories.ageInHours'] * 10) / 10 || 'N/A'} hours</span>}
       />
       <StoryCardMeta
         span={12}
@@ -156,8 +189,9 @@ const storyCardRender = ({ resultSet }) => {
 };
 
 const renderStatisticCard = (currentField, prevField, isRank) => ({ resultSet }) => {
-  const scoreLastHour = resultSet.totalRow()[currentField] && parseInt(resultSet.totalRow()[currentField], 10);
-  const scorePrevHour = resultSet.totalRow()[prevField] && parseInt(resultSet.totalRow()[prevField], 10) || null;
+  const totalRow = resultSet.tablePivot()[0];
+  const scoreLastHour = totalRow[currentField] && parseInt(totalRow[currentField], 10);
+  const scorePrevHour = totalRow[prevField] && parseInt(totalRow[prevField], 10) || null;
   const positiveDiff = isRank ? scoreLastHour <= scorePrevHour : scoreLastHour >= scorePrevHour;
   const prefix = isRank ? '' : '+';
   return <div style={{ textAlign: 'center' }}><Statistic
@@ -166,6 +200,20 @@ const renderStatisticCard = (currentField, prevField, isRank) => ({ resultSet })
     prefix={scorePrevHour && <Icon
       type={positiveDiff ? 'arrow-up' : 'arrow-down'}/>}
     suffix={scorePrevHour && <span>&nbsp;{`/ ${prefix}${scorePrevHour}`}</span>}
+  /></div>
+};
+
+const renderScoreCard = (currentField, prevField, isRank) => ({ resultSet }) => {
+  const totalRow = resultSet.tablePivot()[0];
+  const scoreLastHour = totalRow[currentField] && Math.round(totalRow[currentField] * 1000);
+  const scorePrevHour = totalRow[prevField] && Math.round(totalRow[prevField] * 1000);
+  const positiveDiff = isRank ? scoreLastHour <= scorePrevHour : scoreLastHour >= scorePrevHour;
+  return <div style={{ textAlign: 'center' }}><Statistic
+    value={scoreLastHour || 'N/A'}
+    valueStyle={{ color: scorePrevHour && (positiveDiff ? '#3f8600' : '#cf1322') }}
+    prefix={scorePrevHour && <Icon
+      type={positiveDiff ? 'arrow-up' : 'arrow-down'}/>}
+    suffix={scorePrevHour && <span>&nbsp;{`/ ${scorePrevHour}`}</span>}
   /></div>
 };
 
@@ -181,14 +229,12 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
       "Events.commentsBeforeAddedToFrontPage",
       "Events.minutesOnFirstPage",
       "Events.topRank",
-      "Events.currentRank",
-      "Events.currentScore",
-      "Events.currentComments",
       "Events.scoreChangeLastHour",
       "Events.scoreChangePrevHour",
       "Events.commentsChangeLastHour",
       "Events.commentsChangePrevHour",
       "Events.rankHourAgo",
+      "Events.rankScoreHourAgo",
       "Events.karmaChangeLastHour",
       "Events.karmaChangePrevHour",
       "Events.scoreEstimateLastHour"
@@ -201,7 +247,12 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
       "Stories.postedTime",
       "Stories.lastEventTime",
       "Stories.addedToFrontPage",
-      "Stories.minutesToFrontPage"
+      "Stories.minutesToFrontPage",
+      "Stories.ageInHours",
+      "Stories.currentRank",
+      "Stories.currentRankScore",
+      "Stories.currentScore",
+      "Stories.currentComments"
     ],
     "filters": [
       {
@@ -211,7 +262,108 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
       }
     ]
   };
-  const pageDashboard = (propRes) => (
+
+  const historyDashboard = (propRes) => {
+    const chartQuery = (query) => ({
+      "timeDimensions": [
+        {
+          "dimension": "Events.timestamp",
+          "granularity": "hour",
+          dateRange: [
+            propRes.resultSet.tablePivot()[0]['Stories.postedTime'],
+            propRes.resultSet.tablePivot()[0]['Stories.lastEventTime'],
+          ]
+        }
+      ],
+      "filters": [
+        {
+          "dimension": "Stories.id",
+          "operator": "equals",
+          "values": [storyId]
+        },
+        {
+          "dimension": "Events.page",
+          "operator": "equals",
+          "values": [
+            "front"
+          ]
+        }
+      ],
+      ...query
+    });
+
+    return <Dashboard>
+      <DashboardItem size={12} title="Points per hour" key="1">
+        <QueryRenderer
+          query={chartQuery({
+            "measures": [
+              "Events.scoreChange",
+              "Events.averageScoreEstimate"
+            ]
+          })}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Penalty" key="penalty">
+        <QueryRenderer
+          query={chartQuery({
+            "measures": [
+              "Events.topPenalty"
+            ]
+          })}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Average Rank Score" key="penalty">
+        <QueryRenderer
+          query={chartQuery({
+            "measures": [
+              "Events.avgRankScore"
+            ]
+          })}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Rank" key="4">
+        <QueryRenderer
+          query={chartQuery({
+            "measures": [
+              "Events.avgRank"
+            ]
+          })}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Karma per hour" key="2">
+        <QueryRenderer
+          query={chartQuery({
+            "measures": [
+              "Events.karmaChange"
+            ]
+          })}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Comments per hour" key="3">
+        <QueryRenderer
+          query={chartQuery({
+            "measures": [
+              "Events.commentsChange"
+            ]
+          })}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+    </Dashboard>
+  };
+
+  const pageDashboard = (propRes) => ([
     <Dashboard>
       <DashboardItem size={12} title="Story">
         {renderChart(storyCardRender)(propRes)}
@@ -221,11 +373,31 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           <DashboardItem size={12} title="Points last/prev hour">
             {renderChart(renderStatisticCard("Events.scoreChangeLastHour", "Events.scoreChangePrevHour"))(propRes)}
           </DashboardItem>
+          <DashboardItem size={12} title={
+            <span>
+              Rank Score&nbsp;
+              <Popover content={
+                <span>
+                  Calculated as<br />
+                  <img src="http://static.righto.com/images/rank2.gif"/><br/>
+                  Result is multiplied by 1000.<br/>
+                  <a
+                    href="http://www.righto.com/2013/11/how-hacker-news-ranking-really-works.html"
+                    target="_blank" rel="noopener noreferrer"
+                  >Learn more</a>.
+                </span>
+              }>
+                <Icon type="info-circle" />
+              </Popover>
+            </span>
+          }>
+            {renderChart(renderScoreCard("Stories.currentRankScore", "Events.rankScoreHourAgo"))(propRes)}
+          </DashboardItem>
           <DashboardItem size={12} title="Comments last/prev hour">
             {renderChart(renderStatisticCard("Events.commentsChangeLastHour", "Events.commentsChangePrevHour"))(propRes)}
           </DashboardItem>
           <DashboardItem size={12} title="Rank current/hour ago">
-            {renderChart(renderStatisticCard("Events.currentRank", "Events.rankHourAgo", true))(propRes)}
+            {renderChart(renderStatisticCard("Stories.currentRank", "Events.rankHourAgo", true))(propRes)}
           </DashboardItem>
           <DashboardItem size={12} title="Karma last/prev hour">
             {renderChart(renderStatisticCard("Events.karmaChangeLastHour", "Events.karmaChangePrevHour"))(propRes)}
@@ -242,152 +414,53 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           </DashboardItem>
         </Dashboard>
       </Col>
-      {propRes.resultSet && propRes.resultSet.tablePivot()[0] && [
-        <DashboardItem size={12} title="Points per hour" key="1">
-          <QueryRenderer
-            query={{
-              "measures": [
-                "Events.scoreChange",
-                "Events.averageScoreEstimate"
-              ],
-              "timeDimensions": [
-                {
-                  "dimension": "Events.timestamp",
-                  "granularity": "hour",
-                  dateRange: [
-                    propRes.resultSet.tablePivot()[0]['Stories.postedTime'],
-                    propRes.resultSet.tablePivot()[0]['Stories.lastEventTime'],
-                  ]
-                }
-              ],
-              "filters": [
-                {
-                  "dimension": "Stories.id",
-                  "operator": "equals",
-                  "values": [storyId]
-                },
-                {
-                  "dimension": "Events.page",
-                  "operator": "equals",
-                  "values": [
-                    "front"
-                  ]
-                }
-              ]
-            }}
-            cubejsApi={cubejsApi}
-            render={renderChart(lineRender)}
-          />
-        </DashboardItem>,
-        <DashboardItem size={12} title="Rank" key="4">
-          <QueryRenderer
-            query={{
-              "measures": [
-                "Events.avgRank"
-              ],
-              "timeDimensions": [
-                {
-                  "dimension": "Events.timestamp",
-                  "granularity": "hour",
-                  dateRange: [
-                    propRes.resultSet.tablePivot()[0]['Stories.postedTime'],
-                    propRes.resultSet.tablePivot()[0]['Stories.lastEventTime'],
-                  ]
-                }
-              ],
-              "filters": [
-                {
-                  "dimension": "Stories.id",
-                  "operator": "equals",
-                  "values": [storyId]
-                },
-                {
-                  "dimension": "Events.page",
-                  "operator": "equals",
-                  "values": [
-                    "front"
-                  ]
-                }
-              ]
-            }}
-            cubejsApi={cubejsApi}
-            render={renderChart(lineRender)}
-          />
-        </DashboardItem>,
-        <DashboardItem size={12} title="Karma per hour" key="2">
-          <QueryRenderer
-            query={{
-              "measures": [
-                "Events.karmaChange"
-              ],
-              "timeDimensions": [
-                {
-                  "dimension": "Events.timestamp",
-                  "granularity": "hour",
-                  dateRange: [
-                    propRes.resultSet.tablePivot()[0]['Stories.postedTime'],
-                    propRes.resultSet.tablePivot()[0]['Stories.lastEventTime'],
-                  ]
-                }
-              ],
-              "filters": [
-                {
-                  "dimension": "Stories.id",
-                  "operator": "equals",
-                  "values": [storyId]
-                },
-                {
-                  "dimension": "Events.page",
-                  "operator": "equals",
-                  "values": [
-                    "front"
-                  ]
-                }
-              ]
-            }}
-            cubejsApi={cubejsApi}
-            render={renderChart(lineRender)}
-          />
-        </DashboardItem>,
-        <DashboardItem size={12} title="Comments per hour" key="3">
-          <QueryRenderer
-            query={{
-              "measures": [
-                "Events.commentsChange"
-              ],
-              "timeDimensions": [
-                {
-                  "dimension": "Events.timestamp",
-                  "granularity": "hour",
-                  dateRange: [
-                    propRes.resultSet.tablePivot()[0]['Stories.postedTime'],
-                    propRes.resultSet.tablePivot()[0]['Stories.lastEventTime'],
-                  ]
-                }
-              ],
-              "filters": [
-                {
-                  "dimension": "Stories.id",
-                  "operator": "equals",
-                  "values": [storyId]
-                },
-                {
-                  "dimension": "Events.page",
-                  "operator": "equals",
-                  "values": [
-                    "front"
-                  ]
-                }
-              ]
-            }}
-            cubejsApi={cubejsApi}
-            render={renderChart(lineRender)}
-            />
-        </DashboardItem>
-      ]}
-
-    </Dashboard>
-  );
+    </Dashboard>,
+    propRes.resultSet && propRes.resultSet.tablePivot()[0] && (
+      <Tabs defaultActiveKey="competition">
+        <Tabs.TabPane tab="Competition" key="competition">
+          <Dashboard>
+            <DashboardItem size={24} title="Top Stories">
+              <QueryRenderer
+                query={{
+                  measures: [
+                    "Events.scoreChangeLastHour",
+                    "Events.scoreChangePrevHour"
+                  ],
+                  dimensions: [
+                    "Stories.id",
+                    "Stories.title",
+                    "Stories.currentRank",
+                    "Stories.currentRankScore"
+                  ],
+                  order: {
+                    "Stories.currentRank": 'asc'
+                  },
+                  filters: propRes.resultSet.tablePivot()[0]['Stories.currentRank'] ? [{
+                    dimension: "Stories.currentRank",
+                    operator: 'lt',
+                    values: [`${propRes.resultSet.tablePivot()[0]['Stories.currentRank']}`]
+                  }] : [{
+                    dimension: "Stories.currentRank",
+                    operator: 'set'
+                  }, {
+                    dimension: "Stories.currentRankScore",
+                    operator: 'gt',
+                    values: [`${propRes.resultSet.tablePivot()[0]['Stories.currentRankScore']}`]
+                  }],
+                  limit: 20
+                }}
+                cubejsApi={cubejsApi}
+                render={renderChart(velocityListRender)}
+              />
+            </DashboardItem>
+          </Dashboard>
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="History" key="history">
+          {historyDashboard(propRes)}
+        </Tabs.TabPane>
+      </Tabs>
+    ) || null
+  ]);
 
   return (
     <QueryRenderer

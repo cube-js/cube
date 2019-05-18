@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from 'react-router-dom'
-import { Row, Col, Card, Spin, Statistic, Table, Layout, List, Icon } from "antd";
+import { Row, Col, Card, Spin, Statistic, Table, Layout, List, Icon, Input } from "antd";
 import "antd/dist/antd.css";
 import "./index.css";
 import cubejs from "@cubejs-client/core";
@@ -56,7 +56,7 @@ const velocityListRender = ({ resultSet }) => {
     key: 'story',
     render: (text, item) => (
       <span>
-        {item['Events.currentRank'] || '-'}.&nbsp;
+        {item['Stories.currentRank'] || '-'}.&nbsp;
         <Link to={`/stories/${item['Stories.id']}`}>{item['Stories.title']}</Link>
       </span>
     ),
@@ -72,6 +72,15 @@ const velocityListRender = ({ resultSet }) => {
         prefix={scorePrevHour && <Icon
           type={scoreLastHour >= scorePrevHour ? 'arrow-up' : 'arrow-down'}/>}
         suffix={scorePrevHour && `+${scorePrevHour}`}
+      />
+    },
+  }, {
+    title: 'Rank Points',
+    key: 'currentRankPoints',
+    render: (text, item) => {
+      const score = item["Stories.currentRankScore"] && Math.round(item["Stories.currentRankScore"] * 1000);
+      return <Statistic
+        value={score || 'N/A'}
       />
     },
   }];
@@ -108,23 +117,28 @@ const renderChart = Component => ({ resultSet, error }) =>
   (error && error.toString()) || <Spin />;
 
 const IndexPage = ({ cubejsApi }) => {
-  return (
+  const leaderBoard = (
     <Dashboard>
-      <DashboardItem size={12} title="Velocity Leader Board">
+      <DashboardItem size={12} title="Top Stories">
         <QueryRenderer
           query={{
             measures: [
               "Events.scoreChangeLastHour",
-              "Events.scoreChangePrevHour",
-              "Events.currentRank"
+              "Events.scoreChangePrevHour"
             ],
             dimensions: [
               "Stories.id",
-              "Stories.title"
+              "Stories.title",
+              "Stories.currentRank",
+              "Stories.currentRankScore"
             ],
             order: {
-              "Events.scoreChangeLastHour": 'desc'
+              "Stories.currentRank": 'asc'
             },
+            filters: [{
+              dimension: "Stories.currentRank",
+              operator: 'set'
+            }],
             limit: 20
           }}
           cubejsApi={cubejsApi}
@@ -136,8 +150,7 @@ const IndexPage = ({ cubejsApi }) => {
           query={{
             measures: [
               "Events.scoreChangeLastHour",
-              "Events.scoreChangePrevHour",
-              "Events.currentRank"
+              "Events.scoreChangePrevHour"
             ],
             filters: [
               {
@@ -149,7 +162,9 @@ const IndexPage = ({ cubejsApi }) => {
               "Stories.id",
               "Stories.title",
               "Stories.postedTime",
-              "Stories.addedToFrontPage"
+              "Stories.addedToFrontPage",
+              "Stories.currentRank",
+              "Stories.currentRankScore"
             ],
             order: {
               "Stories.addedToFrontPage": "desc"
@@ -161,6 +176,54 @@ const IndexPage = ({ cubejsApi }) => {
         />
       </DashboardItem>
     </Dashboard>
+  );
+
+  const [search, setSearch] = useState('');
+
+  const idMatch = search.match(/\?id=(\d+)|^(\d+)$/);
+
+  return (
+    <div>
+      <Input.Search
+        placeholder="Story id, url or title"
+        onSearch={setSearch}
+        size="large"
+        enterButton
+        style={{ marginBottom: 16 }}
+      />
+      {search ? <Dashboard>
+        <DashboardItem size={24} title="Search Results">
+          <QueryRenderer
+            query={{
+              measures: [
+                "Events.scoreChangeLastHour",
+                "Events.scoreChangePrevHour",
+              ],
+              dimensions: [
+                "Stories.id",
+                "Stories.title",
+                "Stories.currentRank"
+              ],
+              filters: [idMatch ? {
+                dimension:  'Stories.id',
+                operator: 'equals',
+                values: [idMatch[1] || idMatch[2]]
+              } : {
+                dimension:  'Stories.title',
+                operator: 'contains',
+                values: [search]
+              }],
+              order: {
+                "Stories.postedTime": 'desc'
+              },
+              limit: 20
+            }}
+            cubejsApi={cubejsApi}
+            render={renderChart(velocityListRender)}
+          />
+        </DashboardItem>
+      </Dashboard> : <div><h2 style={{ textAlign: 'center' }}>Search story to track its performance</h2>{leaderBoard}</div>}
+    </div>
   );
 };
 

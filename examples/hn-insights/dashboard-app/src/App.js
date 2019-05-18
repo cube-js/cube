@@ -31,9 +31,8 @@ function App({ children, location }) {
             selectedKeys={[location.pathname]}
             style={{ lineHeight: '64px' }}
           >
-            <Menu.Item key="/"><Link to="/">Leaders</Link></Menu.Item>
+            <Menu.Item key="/"><Link to="/">Track Stories</Link></Menu.Item>
             <Menu.Item key="/statistics"><Link to="/statistics">Statistics</Link></Menu.Item>
-            <Menu.Item key="/search"><Link to="/search">Track Story</Link></Menu.Item>
           </Menu>
         </Header>
         <Content

@@ -106,6 +106,10 @@ const fetchUser = async (userId) => {
   return (await fetch(`https://hacker-news.firebaseio.com/v0/user/${userId}.json`)).json();
 };
 
+const fetchStory = async (storyId) => {
+  return (await fetch(`https://hacker-news.firebaseio.com/v0/item/${storyId}.json`)).json();
+};
+
 exports.scrapeUser = scrapeUser;
 
 const cached = async (key, getFn, expire) => {
@@ -197,9 +201,69 @@ exports.storyListEventDiff = async (oldStories, newStories) => {
   ).concat(changedStories.map(s => ({ ...s, event: 'changed', timestamp })));
 };
 
+const hnInsightsStateKey = 'HN_INSIGHTS_STATE';
+
+const storyAddedEventRedisKey = (s) => `${hnInsightsStateKey}_ADDED_TO_FRONT_EVENT_${s.id}`;
+
 const changeEvents = async (state, page, listFn) => {
-  const newList = await listFn();
-  const diff = await exports.storyListEventDiff(state[page] || [], newList);
+  const oldList = state[page];
+  let newList = await listFn();
+  if (page === 'front') {
+    newList = await Promise.all(newList.map(async (s) => {
+      const storyFromApi = await cached(`${hnInsightsStateKey}_STORY_${s.id}`, () => fetchStory(s.id), 60 * 60);
+      const addedToFrontEvent = JSON.parse(await redisClient.getAsync(storyAddedEventRedisKey(s)));
+      const oldStory = oldList && oldList.find(old => old.id === s.id);
+      if (storyFromApi && s.score) {
+        let timeBase = new Date(s.snapshotTimestamp).getTime() - new Date(storyFromApi.time * 1000).getTime();
+        // second chance pool
+        if (timeBase / (1000 * 60 * 60) > 10 && s.rank < 60 && addedToFrontEvent) {
+          timeBase = new Date(s.snapshotTimestamp).getTime() - new Date(addedToFrontEvent.snapshotTimestamp).getTime();
+        }
+        const originalRankScore = Math.pow(s.score - 1, 0.8) / Math.pow(
+          timeBase / (1000 * 60 * 60) + 2,
+          1.8
+        );
+        const penalty = oldStory && oldStory.penalty || 1;
+        const rankScore = originalRankScore * penalty;
+        return {
+          ...s,
+          originalRankScore,
+          rankScore,
+          penalty,
+          createdTimestamp: new Date(storyFromApi.time * 1000).toISOString(),
+          addedToFrontTimestamp: addedToFrontEvent && addedToFrontEvent.snapshotTimestamp
+        };
+      } else {
+        return s;
+      }
+    }));
+    newList = newList.map(s => {
+      let prevStory = newList.find(prev => prev.rank === s.rank - 1);
+      if (prevStory && !prevStory.rankScore) {
+        prevStory = newList.find(prev => prev.rank === s.rank - 2); // TODO
+      }
+      if (s.originalRankScore) {
+        const penalty =
+          s.rank === 1 ? 1 : (
+            prevStory &&
+            prevStory.rankScore && (
+              prevStory.rankScore / s.originalRankScore < 0.1 ?
+                Math.min(Math.round(100.0 * prevStory.rankScore / s.originalRankScore) / 100, 1) :
+                Math.min(Math.round(10.0 * prevStory.rankScore / s.originalRankScore) / 10, 1)
+            )
+          );
+        // penalty = Math.min(s.penalty || 1, penalty); TODO
+        return penalty ? {
+          ...s,
+          penalty,
+          rankScore: s.originalRankScore * penalty
+        } : s;
+      } else {
+        return s;
+      }
+    });
+  }
+  const diff = await exports.storyListEventDiff(oldList || [], newList);
   state[page] = newList;
   return diff.map(e => ({ ...e, page }));
 };
@@ -223,8 +287,6 @@ const uploadEvents = async (events) => {
   console.log(`Uploading ${fileName} done`);
 };
 
-const hnInsightsStateKey = 'HN_INSIGHTS_STATE';
-
 exports.generateChangeEvents = async () => {
   const state = JSON.parse(await redisClient.getAsync(hnInsightsStateKey)) || {};
   const newestDiff = await changeEvents(
@@ -232,7 +294,15 @@ exports.generateChangeEvents = async () => {
     'newest',
     async () => (await exports.scrapeNewest()).map(({ rank, ...s }) => ({ ...s }))
   );
+
   const frontPageDiff = await changeEvents(state, 'front', exports.scrapeFrontPage);
+
+  const addedToFront = frontPageDiff.filter(e => e.event === 'added');
+  await Promise.all(
+    addedToFront.map(
+      s => redisClient.setAsync(storyAddedEventRedisKey(s), JSON.stringify(s), 'EX', 60 * 60 * 24 * 10)
+    )
+  );
   const result = frontPageDiff.concat(newestDiff);
   if (result.length) {
     await uploadEvents(result);

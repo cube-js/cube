@@ -46,8 +46,22 @@ cube(`Events`, {
       shown: false
     },
 
+    totalRankScore: {
+      sql: `rank_score`,
+      type: `sum`,
+      filters: [{
+        sql: `${page} = 'front'`
+      }],
+      shown: false
+    },
+
     avgRank: {
       sql: `${totalRank} / ${count}`,
+      type: `number`
+    },
+
+    avgRankScore: {
+      sql: `1000.0 * ${totalRankScore} / ${count}`,
       type: `number`
     },
 
@@ -149,24 +163,16 @@ cube(`Events`, {
       }]
     },
 
-    currentRank: {
-      sql: `rank`,
+    rankScoreHourAgo: {
+      sql: `rank_score`,
       type: `min`,
       filters: [{
-        sql: `${timestamp} + interval '5' minute > now()`
+        sql: `${timestamp} + interval '60' minute < now()`
+      }, {
+        sql: `${timestamp} + interval '65' minute > now()`
       }, {
         sql: `${page} = 'front'`
       }]
-    },
-
-    currentScore: {
-      sql: `CAST(NULLIF(score, '') as integer)`,
-      type: `max`
-    },
-
-    currentComments: {
-      sql: `comments_count`,
-      type: `max`
     },
 
     commentsChange: {
@@ -176,6 +182,14 @@ cube(`Events`, {
 
     topRank: {
       sql: `rank`,
+      type: `min`,
+      filters: [{
+        sql: `${page} = 'front'`
+      }]
+    },
+
+    topPenalty: {
+      sql: `penalty`,
       type: `min`,
       filters: [{
         sql: `${page} = 'front'`
@@ -289,7 +303,7 @@ cube(`Events`, {
     },
 
     id: {
-      sql: `${CUBE}.id || ${CUBE}.timestamp`,
+      sql: `${CUBE}.id || ${CUBE}.timestamp || ${CUBE}.page || ${CUBE}.event`,
       type: `string`,
       primaryKey: true
     },
@@ -338,7 +352,10 @@ cube(`Events`, {
   preAggregations: {
     perStory: {
       type: `rollup`,
-      measureReferences: [scoreChange, commentsChange, karmaChange, topRank, averageScoreEstimate, totalRank, count],
+      measureReferences: [
+        scoreChange, commentsChange, karmaChange, topRank, averageScoreEstimate,
+        totalRank, totalRankScore, count, topPenalty
+      ],
       dimensionReferences: [Stories.id, Events.page],
       timeDimensionReference: timestamp,
       granularity: `hour`,
@@ -358,14 +375,12 @@ cube(`Events`, {
         karmaChangeLastHour,
         karmaChangePrevHour,
         rankHourAgo,
-        currentRank,
+        rankScoreHourAgo,
         scoreChangeBeforeAddedToFrontPage,
         karmaChangeBeforeAddedToFrontPage,
         commentsBeforeAddedToFrontPage,
         minutesOnFirstPage,
         topRank,
-        currentScore,
-        currentComments,
         scoreEstimateLastHour
       ],
       dimensionReferences: [
@@ -376,7 +391,12 @@ cube(`Events`, {
         Stories.postedTime,
         Stories.addedToFrontPage,
         Stories.lastEventTime,
-        Stories.minutesToFrontPage
+        Stories.minutesToFrontPage,
+        Stories.ageInHours,
+        Stories.currentRank,
+        Stories.currentScore,
+        Stories.currentRankScore,
+        Stories.currentComments,
       ],
       refreshKey: {
         sql: `select current_timestamp`
@@ -424,6 +444,89 @@ cube(`AverageVelocity`, {
 
     hour: {
       sql: `hour`,
+      type: `number`
+    },
+
+    scorePerHour: {
+      sql: `avg_score_per_hour`,
+      type: `number`
+    }
+  }
+});
+
+
+cube(`AverageVelocityAnalysis`, {
+  sql: `SELECT
+    hour(from_iso8601_timestamp(snapshot_timestamp)) as hour,
+    day_of_week(from_iso8601_timestamp(snapshot_timestamp)) as day,
+    date_diff('hour', from_iso8601_timestamp(story.posted_time), from_iso8601_timestamp(timestamp)) hours_since_posted,
+    e.rank, 
+    sum(score_diff) * 3600.0 / sum(date_diff('second', from_iso8601_timestamp(prev_snapshot_timestamp), from_iso8601_timestamp(snapshot_timestamp))) as avg_score_per_hour,
+    sum(date_diff('second', from_iso8601_timestamp(prev_snapshot_timestamp), from_iso8601_timestamp(snapshot_timestamp))) as seconds_time_span,
+    count(distinct e.id) story_count
+    FROM hn_insights.events e
+    LEFT JOIN (
+      select 
+        id, 
+        min(timestamp) posted_time 
+      from hn_insights.events GROUP BY 1
+    ) story ON e.id = story.id
+    WHERE page = 'front' 
+    GROUP BY 1, 2, 3, 4
+    `,
+
+  measures: {
+    averageScorePerHour: {
+      sql: `avg_score_per_hour`,
+      type: `avg`
+    },
+
+    secondsTimeSpan: {
+      sql: `seconds_time_span`,
+      type: `sum`
+    },
+
+    storyCount: {
+      sql: `story_count`,
+      type: `sum`
+    },
+
+    averageTimeSpan: {
+      sql: `${secondsTimeSpan} / ${storyCount} / 3600.0`,
+      type: `number`
+    },
+
+    timeSpanToVelocity: {
+      sql: `${averageTimeSpan} / NULLIF(${averageScorePerHour}, 0)`,
+      type: `number`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `rank || day || hour`,
+      type: `number`,
+      primaryKey: true,
+      shown: true
+    },
+
+    rank: {
+      sql: `rank`,
+      type: `number`
+    },
+
+    day: {
+      sql: `day`,
+      type: `number`
+    },
+
+    hour: {
+      sql: `hour`,
+      type: `number`
+    },
+
+    hoursSincePosted: {
+      sql: `hours_since_posted`,
       type: `number`
     },
 
