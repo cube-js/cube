@@ -117,8 +117,42 @@ const renderChart = Component => ({ resultSet, error }) =>
   (error && error.toString()) || <Spin />;
 
 const IndexPage = ({ cubejsApi }) => {
+  const [search, setSearch] = useState('');
+  const [searchInputValue, setSearchInputValue] = useState('');
+  const recentSearchKey = 'RECENT_SEARCH';
+  const [recentSearch, setRecentSearch] = useState(
+    window &&
+    window.localStorage &&
+    window.localStorage.getItem(recentSearchKey) &&
+    JSON.parse(window.localStorage.getItem(recentSearchKey)) ||
+    []
+  );
+
+  const onSearch = (searchInput) => {
+    setSearch(searchInput);
+    setSearchInputValue(searchInput);
+    if (searchInput && searchInput.trim() && recentSearch.indexOf(searchInput) === -1) {
+      const newRecentSearch = recentSearch.concat(searchInput);
+      setRecentSearch(newRecentSearch);
+      if (window.localStorage) {
+        window.localStorage.setItem(recentSearchKey, JSON.stringify(newRecentSearch));
+      }
+    }
+  };
+
   const leaderBoard = (
     <Dashboard>
+      <DashboardItem size={12} title="Recent Searches">
+        <Table dataSource={recentSearch.concat([]).reverse()} columns={[
+          {
+            title: 'Search',
+            key: 'Search',
+            render: (text, item) => {
+              return <a onClick={() => onSearch(item)}>{item}</a>
+            },
+          }
+        ]} />
+      </DashboardItem>
       <DashboardItem size={12} title="Top Stories">
         <QueryRenderer
           query={{
@@ -145,48 +179,18 @@ const IndexPage = ({ cubejsApi }) => {
           render={renderChart(velocityListRender)}
         />
       </DashboardItem>
-      <DashboardItem size={12} title="Recently Added to Front Page">
-        <QueryRenderer
-          query={{
-            measures: [
-              "Events.scoreChangeLastHour",
-              "Events.scoreChangePrevHour"
-            ],
-            filters: [
-              {
-                dimension: "Stories.minutesToFrontPage",
-                operator: "set"
-              }
-            ],
-            dimensions: [
-              "Stories.id",
-              "Stories.title",
-              "Stories.postedTime",
-              "Stories.addedToFrontPage",
-              "Stories.currentRank",
-              "Stories.currentRankScore"
-            ],
-            order: {
-              "Stories.addedToFrontPage": "desc"
-            },
-            limit: 20
-          }}
-          cubejsApi={cubejsApi}
-          render={renderChart(velocityListRender)}
-        />
-      </DashboardItem>
     </Dashboard>
   );
-
-  const [search, setSearch] = useState('');
 
   const idMatch = search.match(/\?id=(\d+)|^(\d+)$/);
 
   return (
     <div>
       <Input.Search
+        value={searchInputValue}
+        onChange={(e) => setSearchInputValue(e.target.value)}
         placeholder="Story id, url or title"
-        onSearch={setSearch}
+        onSearch={onSearch}
         size="large"
         enterButton
         style={{ marginBottom: 16 }}

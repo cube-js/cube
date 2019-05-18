@@ -216,7 +216,10 @@ const changeEvents = async (state, page, listFn) => {
       if (storyFromApi && s.score) {
         let timeBase = new Date(s.snapshotTimestamp).getTime() - new Date(storyFromApi.time * 1000).getTime();
         // second chance pool
-        if (timeBase / (1000 * 60 * 60) > 10 && s.rank < 60 && addedToFrontEvent) {
+        if (
+          timeBase / (1000 * 60 * 60) > 10 && s.rank < 60 && addedToFrontEvent ||
+          timeBase / (1000 * 60 * 60) > 5 && s.rank < 15 && addedToFrontEvent
+        ) {
           timeBase = new Date(s.snapshotTimestamp).getTime() - new Date(addedToFrontEvent.snapshotTimestamp).getTime();
         }
         const originalRankScore = Math.pow(s.score - 1, 0.8) / Math.pow(
