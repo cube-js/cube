@@ -205,11 +205,27 @@ const hnInsightsStateKey = 'HN_INSIGHTS_STATE';
 
 const storyAddedEventRedisKey = (s) => `${hnInsightsStateKey}_ADDED_TO_FRONT_EVENT_${s.id}`;
 
+const findPrevStory = (newList, s) => {
+  let story = newList.find(prev => prev.rank === s.rank - 1);
+  if (story && !story.rankScore) {
+    story = newList.find(prev => prev.rank === s.rank - 2); // TODO
+  }
+  return story;
+};
+
+const calculateRankScore = (s, timeBase) => {
+  return Math.pow(s.score - 1, 0.8) / Math.pow(
+    timeBase / (1000 * 60 * 60) + 2,
+    1.8
+  );
+};
+
 const changeEvents = async (state, page, listFn) => {
   const oldList = state[page];
   let newList = await listFn();
   if (page === 'front') {
     newList = await Promise.all(newList.map(async (s) => {
+      const prevStory = findPrevStory(oldList, s);
       const storyFromApi = await cached(`${hnInsightsStateKey}_STORY_${s.id}`, () => fetchStory(s.id), 60 * 60);
       const addedToFrontEvent = JSON.parse(await redisClient.getAsync(storyAddedEventRedisKey(s)));
       const oldStory = oldList && oldList.find(old => old.id === s.id);
@@ -217,15 +233,15 @@ const changeEvents = async (state, page, listFn) => {
         let timeBase = new Date(s.snapshotTimestamp).getTime() - new Date(storyFromApi.time * 1000).getTime();
         // second chance pool
         if (
-          timeBase / (1000 * 60 * 60) > 10 && s.rank < 60 && addedToFrontEvent ||
-          timeBase / (1000 * 60 * 60) > 5 && s.rank < 15 && addedToFrontEvent
+          addedToFrontEvent && (
+            timeBase / (1000 * 60 * 60) > 10 && s.rank < 60 ||
+            timeBase / (1000 * 60 * 60) > 5 && s.rank < 15 ||
+            prevStory && prevStory.rankScore && (prevStory.rankScore / calculateRankScore(s, timeBase) > 1.4)
+          )
         ) {
           timeBase = new Date(s.snapshotTimestamp).getTime() - new Date(addedToFrontEvent.snapshotTimestamp).getTime();
         }
-        const originalRankScore = Math.pow(s.score - 1, 0.8) / Math.pow(
-          timeBase / (1000 * 60 * 60) + 2,
-          1.8
-        );
+        const originalRankScore = calculateRankScore(s, timeBase);
         const penalty = oldStory && oldStory.penalty || 1;
         const rankScore = originalRankScore * penalty;
         return {
@@ -241,10 +257,7 @@ const changeEvents = async (state, page, listFn) => {
       }
     }));
     newList = newList.map(s => {
-      let prevStory = newList.find(prev => prev.rank === s.rank - 1);
-      if (prevStory && !prevStory.rankScore) {
-        prevStory = newList.find(prev => prev.rank === s.rank - 2); // TODO
-      }
+      const prevStory = findPrevStory(newList, s);
       if (s.originalRankScore) {
         const penalty =
           s.rank === 1 ? 1 : (
