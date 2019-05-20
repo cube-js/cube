@@ -40,7 +40,7 @@ const stackedChartData = resultSet => {
   return data;
 };
 
-const velocityListRender = ({ resultSet }) => {
+const velocityListRender = (storyResult) => ({ resultSet }) => {
   const columns = [{
     title: 'Story',
     key: 'story',
@@ -51,7 +51,7 @@ const velocityListRender = ({ resultSet }) => {
       </span>
     ),
   }, {
-    title: 'Points last/prev hour',
+    title: 'Points Added Last/Prev Hour',
     key: 'scoreChange',
     render: (text, item) => {
       const scoreLastHour = item['Events.scoreChangeLastHour'] && parseInt(item['Events.scoreChangeLastHour'], 10);
@@ -65,14 +65,25 @@ const velocityListRender = ({ resultSet }) => {
       />
     },
   }, {
-    title: 'Rank Points',
+    title: 'Rank Score',
     key: 'currentRankPoints',
     render: (text, item) => {
       const score = item["Stories.currentRankScore"] && Math.round(item["Stories.currentRankScore"] * 1000);
       return <Statistic
         value={score || 'N/A'}
       />
-    },
+    }
+  }, {
+    title: 'Score Required for this Place',
+    key: 'currentRankPoints',
+    render: (text, item) => {
+      const score = item["Stories.currentRankScore"];
+      const storyRow = storyResult.resultSet.tablePivot()[0];
+      const scoreToGet = Math.round(Math.pow(score * Math.pow(storyRow['Stories.ageInHours'] + 2, 1.8), 1 / 0.8));
+      return <Statistic
+        value={scoreToGet || 'N/A'}
+      />
+    }
   }];
 
   return (
@@ -293,7 +304,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
     });
 
     return <Dashboard>
-      <DashboardItem size={12} title="Points per hour" key="1">
+      <DashboardItem size={12} title="Points per Hour" key="1">
         <QueryRenderer
           query={chartQuery({
             "measures": [
@@ -338,7 +349,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           render={renderChart(lineRender)}
         />
       </DashboardItem>
-      <DashboardItem size={12} title="Karma per hour" key="2">
+      <DashboardItem size={12} title="Karma per Hour" key="2">
         <QueryRenderer
           query={chartQuery({
             "measures": [
@@ -349,7 +360,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           render={renderChart(lineRender)}
         />
       </DashboardItem>
-      <DashboardItem size={12} title="Comments per hour" key="3">
+      <DashboardItem size={12} title="Comments per Hour" key="3">
         <QueryRenderer
           query={chartQuery({
             "measures": [
@@ -370,7 +381,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
       </DashboardItem>
       <Col span={24} lg={12}>
         <Dashboard>
-          <DashboardItem size={12} title="Points last/prev hour">
+          <DashboardItem size={12} title="Points Added Last/Prev Hour">
             {renderChart(renderStatisticCard("Events.scoreChangeLastHour", "Events.scoreChangePrevHour"))(propRes)}
           </DashboardItem>
           <DashboardItem size={12} title={
@@ -393,18 +404,18 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
           }>
             {renderChart(renderScoreCard("Stories.currentRankScore", "Events.rankScoreHourAgo"))(propRes)}
           </DashboardItem>
-          <DashboardItem size={12} title="Comments last/prev hour">
+          <DashboardItem size={12} title="Comments Added Last/Prev Hour">
             {renderChart(renderStatisticCard("Events.commentsChangeLastHour", "Events.commentsChangePrevHour"))(propRes)}
           </DashboardItem>
-          <DashboardItem size={12} title="Rank current/hour ago">
+          <DashboardItem size={12} title="Rank Current/Hour Ago">
             {renderChart(renderStatisticCard("Stories.currentRank", "Events.rankHourAgo", true))(propRes)}
           </DashboardItem>
-          <DashboardItem size={12} title="Karma last/prev hour">
+          <DashboardItem size={12} title="Karma Last/Prev Hour">
             {renderChart(renderStatisticCard("Events.karmaChangeLastHour", "Events.karmaChangePrevHour"))(propRes)}
           </DashboardItem>
           <DashboardItem size={12} title={
             <span>
-              Points last hour / average&nbsp;
+              Points Last Hour / Average&nbsp;
               <Popover content="Points added last hour vs average performance estimate based on rank of this story">
                 <Icon type="info-circle" />
               </Popover>
@@ -450,7 +461,7 @@ const StoryPage = ({ match: { params: { storyId } }, cubejsApi }) => {
                   limit: 20
                 }}
                 cubejsApi={cubejsApi}
-                render={renderChart(velocityListRender)}
+                render={renderChart(velocityListRender(propRes))}
               />
             </DashboardItem>
           </Dashboard>

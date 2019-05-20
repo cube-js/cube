@@ -61,7 +61,7 @@ const velocityListRender = ({ resultSet }) => {
       </span>
     ),
   }, {
-    title: 'Points last/prev hour',
+    title: 'Points Added Last/Prev Hour',
     key: 'scoreChange',
     render: (text, item) => {
       const scoreLastHour = item['Events.scoreChangeLastHour'] && parseInt(item['Events.scoreChangeLastHour'], 10);
@@ -75,7 +75,7 @@ const velocityListRender = ({ resultSet }) => {
       />
     },
   }, {
-    title: 'Rank Points',
+    title: 'Rank Score',
     key: 'currentRankPoints',
     render: (text, item) => {
       const score = item["Stories.currentRankScore"] && Math.round(item["Stories.currentRankScore"] * 1000);

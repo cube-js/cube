@@ -41,45 +41,6 @@ const stackedChartData = resultSet => {
   return data;
 };
 
-const tableRender = ({ resultSet }) => (
-  <Table
-    pagination={false}
-    columns={resultSet.tableColumns().map(c => ({ ...c, dataIndex: c.key }))}
-    dataSource={resultSet.tablePivot()}
-  />
-);
-
-const velocityListRender = ({ resultSet }) => {
-  const columns = [{
-    title: 'Story',
-    key: 'story',
-    render: (text, item) => (
-      <span>
-        {item['Events.currentRank'] || '-'}.&nbsp;
-        <Link to={`/stories/${item['Stories.id']}`}>{item['Stories.title']}</Link>
-      </span>
-    ),
-  }, {
-    title: 'Points last/prev hour',
-    key: 'scoreChange',
-    render: (text, item) => {
-      const scoreLastHour = item['Events.scoreChangeLastHour'] && parseInt(item['Events.scoreChangeLastHour'], 10);
-      const scorePrevHour = item['Events.scoreChangePrevHour'] && parseInt(item['Events.scoreChangePrevHour'], 10) || null;
-      return <Statistic
-        value={`+${scoreLastHour}`}
-        valueStyle={{ color: scorePrevHour && (scoreLastHour >= scorePrevHour ? '#3f8600' : '#cf1322') }}
-        prefix={scorePrevHour && <Icon
-          type={scoreLastHour >= scorePrevHour ? 'arrow-up' : 'arrow-down'}/>}
-        suffix={scorePrevHour && `+${scorePrevHour}`}
-      />
-    },
-  }];
-
-  return (
-    <Table dataSource={resultSet.tablePivot()} columns={columns} pagination={false} />
-  );
-};
-
 const lineRender = ({ resultSet }) => (
   <Chart
     scale={{

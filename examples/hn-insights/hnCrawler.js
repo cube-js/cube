@@ -268,13 +268,13 @@ const changeEvents = async (state, page, listFn) => {
                 Math.min(Math.round(10.0 * prevStory.rankScore / s.originalRankScore) / 10, 1)
             )
           );
-        const nextStories = [1, 2, 3, 4, 5, 6]
-          .map(i => newList.find(next => next.rank === s.rank + i))
-          .filter(nextStory => nextStory && nextStory.originalRankScore);
+        const prevStories = [1, 2, 3, 4, 5, 6]
+          .map(i => newList.find(next => next.rank === s.rank - i))
+          .filter(story => story && story.rankScore);
         if (
-          nextStories.filter(
-            nextStory => nextStory.originalRankScore > (s.originalRankScore * penalty)
-          ).length >= nextStories.length / 2
+          prevStories.filter(
+            story => story.rankScore > s.originalRankScore
+          ).length > prevStories.length / 2
         ) {
           penalty = 1;
         }

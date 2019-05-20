@@ -2,6 +2,7 @@ import React from "react";
 import { Link, matchPath, withRouter } from 'react-router-dom'
 import { Layout, Breadcrumb, Menu } from "antd";
 import "antd/dist/antd.css";
+import GithubCorner from 'react-github-corner';
 const { Header, Content } = Layout;
 
 function App({ children, location }) {
@@ -54,8 +55,14 @@ function App({ children, location }) {
             )}
           </Breadcrumb>
           {children}
+          <div style={{ textAlign: 'center' }}>
+            <a href="https://cube.dev/">
+              <img src='./powered-by-cubejs-color.svg' style={{ width: 200 }}/>
+            </a>
+          </div>
         </Content>
       </Layout>
+      <GithubCorner size={120} href="https://github.com/statsbotco/cube.js/tree/master/examples/hn-insights" />
     </div>
   );
 }
