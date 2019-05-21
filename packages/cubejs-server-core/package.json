@@ -10,6 +10,7 @@
     "test": "mocha"
   },
   "main": "core/index.js",
+  "types": "core/index.d.ts",
   "files": [
     "core",
     "playground"
