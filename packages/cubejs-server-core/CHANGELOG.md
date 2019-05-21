@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.3](https://github.com/statsbotco/cubejs-client/compare/v0.9.2...v0.9.3) (2019-05-21)
+
+
+### Bug Fixes
+
+* **playground:** revert back create-react-app to npx as there're much more problems with global npm ([e434939](https://github.com/statsbotco/cubejs-client/commit/e434939))
+
+
+
+
+
 ## [0.9.2](https://github.com/statsbotco/cubejs-client/compare/v0.9.1...v0.9.2) (2019-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

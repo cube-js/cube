@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/serverless",
   "description": "Cube.js Serverless",
   "author": "Statsbot, Inc.",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -11,7 +11,7 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.9.2",
+    "@cubejs-backend/server-core": "^0.9.3",
     "cors": "^2.8.5",
     "serverless-express": "^2.0.11"
   },
