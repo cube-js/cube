@@ -91,8 +91,12 @@ class DevServer {
       if (!await fs.pathExists(dashboardAppPath) || this.createReactAppInit) {
         if (!this.createReactAppInit) {
           this.cubejsServer.event('Dev Server Create Dashboard App');
-          this.createReactAppInit = executeCommand('npm', ['install', '-g', 'create-react-app'])
-            .then(() => executeCommand('create-react-app', [dashboardAppPath]));
+          this.createReactAppInit = executeCommand('npx', ['create-react-app', dashboardAppPath]).catch(e => {
+            if (e.toString().indexOf('ENOENT') !== -1) {
+              throw new Error(`npx is not installed. Please update your npm: \`$ npm install -g npm\`.`);
+            }
+            throw e;
+          });
         }
         await this.createReactAppInit;
         this.cubejsServer.event('Dev Server Create Dashboard App Success');
