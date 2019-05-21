@@ -344,7 +344,31 @@ cube(`Events`, {
     },
 
     day: {
-      sql: `day_of_week(${snapshotTimestamp})`,
+      case: {
+        when: [{
+          sql: `day_of_week(${snapshotTimestamp}) = 1`,
+          label: `1. Monday`
+        }, {
+          sql: `day_of_week(${snapshotTimestamp}) = 2`,
+          label: `2. Tuesday`
+        }, {
+          sql: `day_of_week(${snapshotTimestamp}) = 3`,
+          label: `3. Wednesday`
+        }, {
+          sql: `day_of_week(${snapshotTimestamp}) = 4`,
+          label: `4. Thursday`
+        }, {
+          sql: `day_of_week(${snapshotTimestamp}) = 5`,
+          label: `5. Friday`
+        }, {
+          sql: `day_of_week(${snapshotTimestamp}) = 6`,
+          label: `6. Saturday`
+        }, {
+          sql: `day_of_week(${snapshotTimestamp}) = 7`,
+          label: `7. Sunday`
+        }
+        ]
+      },
       type: `number`
     }
   },

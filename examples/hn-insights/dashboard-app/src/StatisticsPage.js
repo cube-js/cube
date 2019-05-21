@@ -70,28 +70,72 @@ const renderChart = Component => ({ resultSet, error }) =>
 const IndexPage = ({ cubejsApi }) => {
   return (
     <Dashboard>
-      <DashboardItem size={12} title="Score on front page by day of week and hour">
+      <DashboardItem size={12} title="Average Score on Front Page by Day of Week and Hour">
         <QueryRenderer
           query={{
             "measures": [
-              "AverageVelocity.averageScorePerHour"
+              "Events.scorePerHour"
             ],
-            "timeDimensions": [],
+            timeDimensions: [{
+              dimension: "Events.snapshotTimestamp",
+              dateRange: 'last 7 days'
+            }],
             "dimensions": [
-              "AverageVelocity.day",
-              "AverageVelocity.hour"
+              "Events.day",
+              "Events.hour"
+
             ],
+            "filters": [],
             order: {
-              "AverageVelocity.day": 'asc',
-              "AverageVelocity.hour": 'asc'
+              'Events.day': 'asc',
+              'Events.hour': 'asc'
             },
-            "filters": []
           }}
           cubejsApi={cubejsApi}
           render={renderChart(lineRender)}
         />
       </DashboardItem>
-      <DashboardItem size={12} title="Score on front page by rank">
+      <DashboardItem size={12} title="Score on Newest Page by Day of Week and Hour">
+        <QueryRenderer
+          query={{
+            "measures": [
+              "Events.scoreChangeBeforeAddedToFrontPage"
+            ],
+            "timeDimensions": [],
+            "dimensions": [
+              "Events.day",
+              "Events.hour"
+
+            ],
+            "filters": [],
+            order: {
+              'Events.day': 'asc',
+              'Events.hour': 'asc'
+            }
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Story Count Added To Front Page by Day of Week and Hour">
+        <QueryRenderer
+          query={{
+            measures: ["Stories.count"],
+            timeDimensions: [{
+              dimension: "Stories.postedTime",
+              dateRange: 'last 7 days'
+            }],
+            dimensions: ["Stories.postedTimeDay", "Stories.postedTimeHour"],
+            order: {
+              "Stories.postedTimeDay": "asc",
+              "Stories.postedTimeHour": "asc"
+            }
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Score on Front Page by Rank">
         <QueryRenderer
           query={{
             "measures": [
@@ -110,33 +154,10 @@ const IndexPage = ({ cubejsApi }) => {
           render={renderChart(lineRender)}
         />
       </DashboardItem>
-      <DashboardItem size={12} title="Score on /newest page">
+      <DashboardItem size={12} title="Score on Newest Page Today">
         <QueryRenderer
           query={{
             measures: ["Events.scoreChangeBeforeAddedToFrontPage"],
-            timeDimensions: [
-              {
-                dimension: "Events.timestamp",
-                granularity: "hour",
-                dateRange: "Today"
-              }
-            ],
-            filters: [
-              {
-                dimension: "Events.page",
-                operator: "equals",
-                values: ["newest"]
-              }
-            ]
-          }}
-          cubejsApi={cubejsApi}
-          render={renderChart(lineRender)}
-        />
-      </DashboardItem>
-      <DashboardItem size={12} title="Karma on /newest page">
-        <QueryRenderer
-          query={{
-            measures: ["Events.karmaChangeBeforeAddedToFrontPage"],
             timeDimensions: [
               {
                 dimension: "Events.timestamp",

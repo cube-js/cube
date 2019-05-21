@@ -59,6 +59,40 @@ cube(`Stories`, {
       subQuery: true
     },
 
+    postedTimeHour: {
+      sql: `hour(${postedTime})`,
+      type: `number`
+    },
+
+    postedTimeDay: {
+      case: {
+        when: [{
+          sql: `day_of_week(${postedTime}) = 1`,
+          label: `1. Monday`
+        }, {
+          sql: `day_of_week(${postedTime}) = 2`,
+          label: `2. Tuesday`
+        }, {
+          sql: `day_of_week(${postedTime}) = 3`,
+          label: `3. Wednesday`
+        }, {
+          sql: `day_of_week(${postedTime}) = 4`,
+          label: `4. Thursday`
+        }, {
+          sql: `day_of_week(${postedTime}) = 5`,
+          label: `5. Friday`
+        }, {
+          sql: `day_of_week(${postedTime}) = 6`,
+          label: `6. Saturday`
+        }, {
+          sql: `day_of_week(${postedTime}) = 7`,
+          label: `7. Sunday`
+        }
+        ]
+      },
+      type: `number`
+    },
+
     lastEventTime: {
       sql: `${Events.lastEventTime}`,
       type: `time`,
