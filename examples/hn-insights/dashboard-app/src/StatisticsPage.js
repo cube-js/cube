@@ -122,13 +122,13 @@ const IndexPage = ({ cubejsApi }) => {
           query={{
             measures: ["Stories.count"],
             timeDimensions: [{
-              dimension: "Stories.postedTime",
+              dimension: "Stories.addedToFrontPage",
               dateRange: 'last 7 days'
             }],
-            dimensions: ["Stories.postedTimeDay", "Stories.postedTimeHour"],
+            dimensions: ["Stories.addedToFrontDay", "Stories.addedToFrontHour"],
             order: {
-              "Stories.postedTimeDay": "asc",
-              "Stories.postedTimeHour": "asc"
+              "Stories.addedToFrontDay": "asc",
+              "Stories.addedToFrontHour": "asc"
             }
           }}
           cubejsApi={cubejsApi}
@@ -172,6 +172,20 @@ const IndexPage = ({ cubejsApi }) => {
                 values: ["newest"]
               }
             ]
+          }}
+          cubejsApi={cubejsApi}
+          render={renderChart(lineRender)}
+        />
+      </DashboardItem>
+      <DashboardItem size={12} title="Stories Added To Front Page Today">
+        <QueryRenderer
+          query={{
+            measures: ["Stories.count"],
+            timeDimensions: [{
+              dimension: "Stories.addedToFrontPage",
+              dateRange: 'today',
+              granularity: 'hour'
+            }]
           }}
           cubejsApi={cubejsApi}
           render={renderChart(lineRender)}

@@ -8,7 +8,7 @@ cube(`Events`, {
     AverageVelocity: {
       sql: `${Events}.rank = ${AverageVelocity}.rank AND 
       ${Events.hour} = ${AverageVelocity}.hour AND 
-      ${Events.day} = ${AverageVelocity}.day`,
+      ${Events.dayOfWeek} = ${AverageVelocity}.day`,
       relationship: `belongsTo`
     }
   },
@@ -338,6 +338,11 @@ cube(`Events`, {
       type: `number`
     },
 
+    dayOfWeek: {
+      sql: `day_of_week(${snapshotTimestamp})`,
+      type: `number`
+    },
+
     hour: {
       sql: `hour(${snapshotTimestamp})`,
       type: `number`
@@ -346,25 +351,25 @@ cube(`Events`, {
     day: {
       case: {
         when: [{
-          sql: `day_of_week(${snapshotTimestamp}) = 1`,
+          sql: `${dayOfWeek} = 1`,
           label: `1. Monday`
         }, {
-          sql: `day_of_week(${snapshotTimestamp}) = 2`,
+          sql: `${dayOfWeek} = 2`,
           label: `2. Tuesday`
         }, {
-          sql: `day_of_week(${snapshotTimestamp}) = 3`,
+          sql: `${dayOfWeek} = 3`,
           label: `3. Wednesday`
         }, {
-          sql: `day_of_week(${snapshotTimestamp}) = 4`,
+          sql: `${dayOfWeek} = 4`,
           label: `4. Thursday`
         }, {
-          sql: `day_of_week(${snapshotTimestamp}) = 5`,
+          sql: `${dayOfWeek} = 5`,
           label: `5. Friday`
         }, {
-          sql: `day_of_week(${snapshotTimestamp}) = 6`,
+          sql: `${dayOfWeek} = 6`,
           label: `6. Saturday`
         }, {
-          sql: `day_of_week(${snapshotTimestamp}) = 7`,
+          sql: `${dayOfWeek} = 7`,
           label: `7. Sunday`
         }
         ]

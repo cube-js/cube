@@ -59,33 +59,33 @@ cube(`Stories`, {
       subQuery: true
     },
 
-    postedTimeHour: {
-      sql: `hour(${postedTime})`,
+    addedToFrontHour: {
+      sql: `hour(${addedToFrontPage})`,
       type: `number`
     },
 
-    postedTimeDay: {
+    addedToFrontDay: {
       case: {
         when: [{
-          sql: `day_of_week(${postedTime}) = 1`,
+          sql: `day_of_week(${addedToFrontPage}) = 1`,
           label: `1. Monday`
         }, {
-          sql: `day_of_week(${postedTime}) = 2`,
+          sql: `day_of_week(${addedToFrontPage}) = 2`,
           label: `2. Tuesday`
         }, {
-          sql: `day_of_week(${postedTime}) = 3`,
+          sql: `day_of_week(${addedToFrontPage}) = 3`,
           label: `3. Wednesday`
         }, {
-          sql: `day_of_week(${postedTime}) = 4`,
+          sql: `day_of_week(${addedToFrontPage}) = 4`,
           label: `4. Thursday`
         }, {
-          sql: `day_of_week(${postedTime}) = 5`,
+          sql: `day_of_week(${addedToFrontPage}) = 5`,
           label: `5. Friday`
         }, {
-          sql: `day_of_week(${postedTime}) = 6`,
+          sql: `day_of_week(${addedToFrontPage}) = 6`,
           label: `6. Saturday`
         }, {
-          sql: `day_of_week(${postedTime}) = 7`,
+          sql: `day_of_week(${addedToFrontPage}) = 7`,
           label: `7. Sunday`
         }
         ]
