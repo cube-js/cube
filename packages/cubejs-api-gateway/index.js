@@ -121,7 +121,8 @@ const querySchema = Joi.object().keys({
   order: Joi.object().pattern(id, Joi.valid('asc', 'desc')),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(1).max(50000)
+  limit: Joi.number().integer().min(1).max(50000),
+  renewQuery: Joi.boolean()
 });
 
 const normalizeQuery = (query) => {
@@ -244,7 +245,11 @@ class ApiGateway {
         const annotation = prepareAnnotation(metaConfig, normalizedQuery);
         const aliasToMemberNameMap = prepareAliasToMemberNameMap(metaConfig, sqlQuery, normalizedQuery);
         const toExecute = {
-          ...sqlQuery, query: sqlQuery.sql[0], values: sqlQuery.sql[1], continueWait: true
+          ...sqlQuery,
+          query: sqlQuery.sql[0],
+          values: sqlQuery.sql[1],
+          continueWait: true,
+          renewQuery: normalizedQuery.renewQuery
         };
         const response = await this.getAdapterApi(req).executeQuery(toExecute);
         this.log(req, {
