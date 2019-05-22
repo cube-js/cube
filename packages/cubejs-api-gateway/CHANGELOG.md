@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.5](https://github.com/statsbotco/cubejs-client/compare/v0.9.4...v0.9.5) (2019-05-22)
+
+
+### Features
+
+* Propagate `renewQuery` option from API to orchestrator ([9c640ba](https://github.com/statsbotco/cubejs-client/commit/9c640ba)), closes [#112](https://github.com/statsbotco/cubejs-client/issues/112)
+
+
+
+
+
 # [0.9.0](https://github.com/statsbotco/cubejs-client/compare/v0.8.7...v0.9.0) (2019-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
