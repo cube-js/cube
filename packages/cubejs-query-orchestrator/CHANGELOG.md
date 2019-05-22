@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.4](https://github.com/statsbotco/cubejs-client/compare/v0.9.3...v0.9.4) (2019-05-22)
+
+
+### Features
+
+* Add `refreshKeyRenewalThreshold` option ([aa69449](https://github.com/statsbotco/cubejs-client/commit/aa69449)), closes [#112](https://github.com/statsbotco/cubejs-client/issues/112)
+
+
+
+
+
 ## [0.9.2](https://github.com/statsbotco/cubejs-client/compare/v0.9.1...v0.9.2) (2019-05-11)
 
 
