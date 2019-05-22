@@ -3,11 +3,8 @@ import { Link } from 'react-router-dom'
 import { Row, Col, Card, Spin, Statistic, Table, Layout, List, Icon, Input } from "antd";
 import "antd/dist/antd.css";
 import "./index.css";
-import cubejs from "@cubejs-client/core";
 import { QueryRenderer } from "@cubejs-client/react";
-import { Chart, Axis, Tooltip, Geom, Coord, Legend } from "bizcharts";
 import moment from "moment";
-const { Header, Footer, Sider, Content } = Layout;
 
 const Dashboard = ({ children }) => (
   <Row type="flex" justify="space-around" align="top" gutter={24}>
@@ -28,27 +25,44 @@ const DashboardItem = ({ children, title, size }) => (
   </Col>
 );
 
-const stackedChartData = resultSet => {
-  const data = resultSet
-    .pivot()
-    .map(({ xValues, yValuesArray }) =>
-      yValuesArray.map(([yValues, m]) => ({
-        x: resultSet.axisValuesString(xValues, ", "),
-        color: resultSet.axisValuesString(yValues, ", "),
-        measure: m && Number.parseFloat(m)
-      }))
-    )
-    .reduce((a, b) => a.concat(b));
-  return data;
-};
+const searchListRender = ({ resultSet }) => {
+  const columns = [{
+    title: 'Story',
+    key: 'story',
+    render: (text, item) => (
+      <span>
+        {item['Stories.currentRank'] || '-'}.&nbsp;
+        <Link to={`/stories/${item['Stories.id']}`}>{item['Stories.title']}</Link>
+      </span>
+    ),
+  }, {
+    title: 'Score',
+    key: 'score',
+    render: (text, item) => {
+      return <Statistic
+        value={item['Stories.currentScore']}
+      />
+    },
+  }, {
+    title: 'Top Rank on Front Page',
+    key: 'topRank',
+    render: (text, item) => {
+      return <Statistic
+        value={item["Events.topRank"] || 'N/A'}
+      />
+    },
+  }, {
+    title: 'Posted Time',
+    key: 'postedTime',
+    render: (text, item) => {
+      return item['Stories.postedTime'] && moment(item['Stories.postedTime']).format('LLL')
+    },
+  }];
 
-const tableRender = ({ resultSet }) => (
-  <Table
-    pagination={false}
-    columns={resultSet.tableColumns().map(c => ({ ...c, dataIndex: c.key }))}
-    dataSource={resultSet.tablePivot()}
-  />
-);
+  return (
+    <Table dataSource={resultSet.tablePivot()} columns={columns} pagination={false} />
+  );
+};
 
 const velocityListRender = ({ resultSet }) => {
   const columns = [{
@@ -89,28 +103,6 @@ const velocityListRender = ({ resultSet }) => {
     <Table dataSource={resultSet.tablePivot()} columns={columns} pagination={false} />
   );
 };
-
-const lineRender = ({ resultSet }) => (
-  <Chart
-    scale={{
-      x: {
-        tickCount: 8
-      }
-    }}
-    height={400}
-    data={stackedChartData(resultSet)}
-    forceFit
-  >
-    <Axis name="x" />
-    <Axis name="measure" />
-    <Tooltip
-      crosshairs={{
-        type: "y"
-      }}
-    />
-    <Geom type="line" position={`x*measure`} size={2} color="color" />
-  </Chart>
-);
 
 const renderChart = Component => ({ resultSet, error }) =>
   (resultSet && <Component resultSet={resultSet} />) ||
@@ -186,6 +178,7 @@ const IndexPage = ({ cubejsApi }) => {
 
   return (
     <div>
+      <h1 style={{ textAlign: 'center' }}>Track HN Stories in Real Time</h1>
       <Input.Search
         value={searchInputValue}
         onChange={(e) => setSearchInputValue(e.target.value)}
@@ -200,13 +193,14 @@ const IndexPage = ({ cubejsApi }) => {
           <QueryRenderer
             query={{
               measures: [
-                "Events.scoreChangeLastHour",
-                "Events.scoreChangePrevHour",
+                "Events.topRank",
               ],
               dimensions: [
                 "Stories.id",
                 "Stories.title",
-                "Stories.currentRank"
+                "Stories.currentRank",
+                "Stories.postedTime",
+                "Stories.currentScore"
               ],
               filters: [idMatch ? {
                 dimension:  'Stories.id',
@@ -223,10 +217,10 @@ const IndexPage = ({ cubejsApi }) => {
               limit: 20
             }}
             cubejsApi={cubejsApi}
-            render={renderChart(velocityListRender)}
+            render={renderChart(searchListRender)}
           />
         </DashboardItem>
-      </Dashboard> : <div><h2 style={{ textAlign: 'center' }}>Search story to track its performance</h2>{leaderBoard}</div>}
+      </Dashboard> : <div><h3 style={{ textAlign: 'center', marginBottom: 100 }}>Search for your story to see how it's performing and standing against competing posts</h3>{leaderBoard}</div>}
     </div>
   );
 };
