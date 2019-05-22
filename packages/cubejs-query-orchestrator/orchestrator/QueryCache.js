@@ -174,15 +174,13 @@ class QueryCache {
   renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
     options = options || {};
     return Promise.all(
-      cacheKeyQueries.map(q =>
-        this.cacheQueryResult(
-          Array.isArray(q) ? q[0] : q,
-          Array.isArray(q) ? q[1] : [],
-          q,
-          expireSecs,
-          { renewalThreshold: 2 * 60, renewalKey: q, waitForRenew: true }
-        )
-      )
+      cacheKeyQueries.map(q => this.cacheQueryResult(
+        Array.isArray(q) ? q[0] : q,
+        Array.isArray(q) ? q[1] : [],
+        q,
+        expireSecs,
+        { renewalThreshold: this.options.refreshKeyRenewalThreshold || 2 * 60, renewalKey: q, waitForRenew: true }
+      ))
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
