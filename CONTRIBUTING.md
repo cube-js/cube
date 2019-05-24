@@ -37,6 +37,13 @@ The rest will be done by `BaseDriver` class.
 8. Please use yarn to add any dependencies and run `$ yarn` within the package before committing to ensure right `yarn.lock` is in place.
 9. Add this driver dependency to [cubejs-server-core/core/index.js](https://github.com/statsbotco/cube.js/blob/master/packages/cubejs-server-core/core/index.js#L8).
 
+### Implementing JDBC Driver
+
+If there's existing JDBC Driver in place for Database of interest you can just create `DbTypes` configuration inside
+[cubejs-jdbc-driver/driver/JDBCDriver.js](https://github.com/statsbotco/cube.js/blob/master/packages/cubejs-jdbc-driver/driver/JDBCDriver.js#L31).
+Most of times no additional adjustments required for base `JDBCDriver` implementation as JDBC is pretty standard.
+In case you need to tweak it a little bit please follow [Implementing Driver](#implementing-driver) steps but use `JDBCDriver` as your base driver class.
+
 ### Implementing SQL Dialect
 
 1. Find most similar `BaseQuery` implementation in `@cubejs-backend/schema-compiler/adapter`.
