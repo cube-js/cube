@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.6](https://github.com/statsbotco/cubejs-client/compare/v0.9.5...v0.9.6) (2019-05-24)
+
+
+### Features
+
+* better npm fail message in Playground ([545a020](https://github.com/statsbotco/cubejs-client/commit/545a020))
+
+
+
+
+
 ## [0.9.5](https://github.com/statsbotco/cubejs-client/compare/v0.9.4...v0.9.5) (2019-05-22)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
