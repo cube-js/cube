@@ -73,7 +73,7 @@ class DashboardSource {
   parse(sourceFiles) {
     this.appFile = sourceFiles.find(f => f.fileName.indexOf('src/App.js') !== -1);
     if (!this.appFile) {
-      throw new Error(`src/App.js file not found. Can't parse dashboard app.`);
+      throw new Error(`src/App.js file not found. Can't parse dashboard app. Please delete dashboard-app directory and try to create it again.`);
     }
     this.appAst = parse(this.appFile.content, {
       sourceFilename: this.appFile.fileName,
@@ -125,7 +125,7 @@ class DashboardSource {
       });
     }
     if (!this.appClass) {
-      throw new Error(`App class not found. Can't parse dashboard app.`);
+      throw new Error(`App class not found. Can't parse dashboard app.  Please delete dashboard-app directory and try to create it again.`);
     }
   }
 
