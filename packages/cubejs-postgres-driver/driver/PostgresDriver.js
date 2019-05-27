@@ -22,8 +22,15 @@ class PostgresDriver extends BaseDriver {
     });
   }
 
-  testConnection() {
-    return this.pool.query('SELECT $1::int AS number', ['1']);
+  async testConnection() {
+    try {
+      return await this.pool.query('SELECT $1::int AS number', ['1']);
+    } catch (e) {
+      if (e.toString().indexOf('no pg_hba.conf entry for host') !== -1) {
+        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${e.toString()}`);
+      }
+      throw e;
+    }
   }
 
   async query(query, values) {
