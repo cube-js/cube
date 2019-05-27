@@ -1,7 +1,7 @@
 declare module '@cubejs-backend/server-core' {
   export function create(options?: CreateOptions): any;
 
-  export function createDriver(dbType: string): DriverFactory;
+  export function createDriver(dbType: DatabaseType): DriverFactory;
 
   export interface CreateOptions {
     apiSecret?: string;
