@@ -80,6 +80,7 @@ const queueOptions = {
 | Option | Description | Default Value |
 | ------ | ----------- | ------------- |
 | concurrency | Maximum number of queries to be processed simultaneosly | `2` |
+| refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check | `120` |
 | continueWaitTimeout | Polling timeout | `5` |
 | executionTimeout | Total timeout of single query | `600` |
 | orphanedTimeout | Inactivity timeout for query | `120` |

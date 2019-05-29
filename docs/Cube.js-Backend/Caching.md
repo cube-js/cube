@@ -36,6 +36,10 @@ You can set up a custom refresh check SQL by changing [refreshKey](cube#paramete
 2. Check the `max` of any existing time dimension, if none exist…
 3. Check the count of rows for this cube.
 
+Result of `refreshKey` query itself is cached for 2 minutes by default. You can
+change it by passing [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) option when configuring
+Cube.js Server.
+
 ### Force Query Renewal
 
 If you need a specific query to bypass cache and return data from the

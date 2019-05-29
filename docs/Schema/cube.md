@@ -130,7 +130,9 @@ If `refreshKey` is not set Cube.js will use default strategy -
 2. Check the `max` of any existing time dimension, if none exist…
 3. Check the count of rows for this cube.
 
-Result of `refreshKey` query itself is cached for 2 minutes by default.
+Result of `refreshKey` query itself is cached for 2 minutes by default. You can
+change it by passing [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) option when configuring
+Cube.js Server.
 
 You can use existing timestamp from your tables. Make sure to select max
 timestamp in that case.
