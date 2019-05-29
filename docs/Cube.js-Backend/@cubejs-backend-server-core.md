@@ -47,6 +47,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   logger: Function,
   driverFactory: Function,
   contextToAppId: Function,
+  repositoryFactory: Function,
   checkAuthMiddleware: Function,
   orchestratorOptions: {
     redisPrefix: String,
@@ -122,8 +123,22 @@ It is a [Multitenancy Setup](multitenancy-setup) option.
 
 ```javascript
 CubejsServerCore.create({
-  contextToAppId: ({ user_id }) => `CUBEJS_APP_${authInfo.user_id}`
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`
 })
+```
+
+### repositoryFactory
+
+This option allows to customize the repository for Cube.js data schema files. It
+is a function, which accepts a context object and can dynamically select
+repositories with schema files. Learn more about it in [Multitenancy Setup](multitenancy-setup) guide.
+
+```javascript
+const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
+
+CubejsServerCore.create({
+  repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
+});
 ```
 
 ### checkAuthMiddleware

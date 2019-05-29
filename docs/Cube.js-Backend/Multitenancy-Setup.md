@@ -42,15 +42,96 @@ const cubejsToken = jwt.sign(
 );
 ```
 
-Now, we can access them inside the `driverFactory` option.
+Now, we can access them as `authInfo` object inside the context object. Let's
+first use `contextToAppId` to create a dynamic Cube.js App ID for every combination of
+`appId` and `userId`. Cube.js App ID is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
+
+
+```javascript
+new CubejsServer({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`
+})
+```
+
+Next, we can use `driverFactory` to dynamically select database, based on
+`appId` and `userId`.
 
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 
 new CubejsServer({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
   driverFactory: ({ authInfo }) =>
     new PostgresDriver({
       database: `my_app_${authInfo.appId}_${authInfo.userId}`
     })
+});
+```
+
+What if for application with ID 3 data is stored not in Postgres, but in
+MongoDB? We can instruct Cube.js to connect to MongoDB in that case, instead of
+Postgres. For that purpose we'll use `dbType` option to dynamically set database
+type. We also need to modify our `driverFactory` option.
+
+```javascript
+const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
+
+new CubejsServer({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
+  dbType: ({ authInfo }) => {
+    if (authInfo.appId === 3) {
+      return 'mongobi';
+    } else {
+      return 'postgres';
+    }
+  },
+  driverFactory: ({ authInfo }) => {
+    if (authInfo.appId === 3) {
+      return new MongoBIDriver({
+        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+        port: 3307
+      })
+    } else {
+      return new PostgresDriver({
+        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+      })
+    }
+  }
+});
+```
+
+Lastly, we want to have separate data schemas for every application. In this case we can
+use `repositoryFactory` option to dynamically set a repository with schema files depending on the `appId`.
+
+Below you can find final setup with `repositoryFactory` option.
+
+```javascript
+const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
+const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
+
+new CubejsServer({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
+  dbType: ({ authInfo }) => {
+    if (authInfo.appId === 3) {
+      return 'mongobi';
+    } else {
+      return 'postgres';
+    }
+  },
+  driverFactory: ({ authInfo }) => {
+    if (authInfo.appId === 3) {
+      return new MongoBIDriver({
+        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+        port: 3307
+      })
+    } else {
+      return new PostgresDriver({
+        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+      })
+    }
+  },
+  repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
 });
 ```
