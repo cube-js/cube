@@ -46,7 +46,10 @@ const displayError = async (text, options = {}) => {
 exports.displayError = displayError;
 
 exports.requireFromPackage = async (module) => {
-  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', module)))) {
+  if (
+    !(await fs.pathExists(path.join(process.cwd(), 'node_modules', module))) &&
+    !(await fs.pathExists(path.join(process.cwd(), 'node_modules', `${module}.js`)))
+  ) {
     await displayError(
       `${module} dependency not found. Please run this command from project directory.`
     );
