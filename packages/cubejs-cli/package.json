@@ -16,6 +16,8 @@
   "files": [
     "index.js",
     "cubejsCli.js",
+    "token.js",
+    "utils.js",
     "templates.js",
     "yarn.lock",
     "README.md",
