@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.8](https://github.com/statsbotco/cubejs-client/compare/v0.9.7...v0.9.8) (2019-05-29)
+
+
+### Features
+
+* **postgres-driver:** SSL error hint for Heroku users ([0e9b9cb](https://github.com/statsbotco/cubejs-client/commit/0e9b9cb))
+
+
+
+
+
 ## [0.9.7](https://github.com/statsbotco/cubejs-client/compare/v0.9.6...v0.9.7) (2019-05-27)
 
 

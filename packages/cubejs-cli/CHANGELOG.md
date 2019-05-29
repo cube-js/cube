@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.8](https://github.com/statsbotco/cubejs-client/compare/v0.9.7...v0.9.8) (2019-05-29)
+
+
+### Features
+
+* **cubejs-cli:** add token generation ([#67](https://github.com/statsbotco/cubejs-client/issues/67)) ([2813fed](https://github.com/statsbotco/cubejs-client/commit/2813fed))
+
+
+
+
+
 # [0.9.0](https://github.com/statsbotco/cubejs-client/compare/v0.8.7...v0.9.0) (2019-05-11)
 
 **Note:** Version bump only for package cubejs-cli
