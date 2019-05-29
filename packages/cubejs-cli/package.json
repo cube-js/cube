@@ -11,7 +11,7 @@
   },
   "scripts": {
     "test": "jest",
-    "lint": "eslint -c .eslintrc.js *.js"
+    "lint": "eslint -c ../../.eslintrc.js *.js"
   },
   "files": [
     "index.js",
@@ -26,7 +26,6 @@
     "chalk": "^2.4.2",
     "commander": "^2.19.0",
     "cross-spawn": "^6.0.5",
-    "dotenv": "^7.0.0",
     "fs-extra": "^7.0.1",
     "jsonwebtoken": "^8.5.1",
     "node-machine-id": "^1.1.10"

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
 const chalk = require('chalk');
+
+const { requireFromPackage, event } = require('./utils');
 
 const defaultExpiry = '30 days';
 
@@ -16,7 +17,9 @@ const parsePayload = (payloadArray = []) => {
 };
 
 const token = async (options = {}) => {
-  const { expiry = defaultExpiry, secret = process.env.CUBEJS_API_SECRET } = options;
+  event('Generate Token');
+  const CubejsServer = await requireFromPackage('@cubejs-backend/server');
+  const { expiry = defaultExpiry, secret = CubejsServer.apiSecret() } = options;
   if (!secret) throw new Error('No app secret found').message;
 
   const extraOptions = {};
@@ -24,13 +27,20 @@ const token = async (options = {}) => {
 
   const payload = parsePayload(options.payload);
 
-  console.log("Generating Cube.js JWT token");
-  console.log("Expires in: ", chalk.green(expiry));
-  console.log("Payload: ", chalk.green(JSON.stringify(payload)));
-  console.log("");
+  console.log(`Generating Cube.js JWT token`);
+  console.log(``);
+  console.log(`${chalk.yellow('-----------------------------------------------------------------------------------------')}`);
+  console.log(`  ${chalk.yellow(`Use these manually generated tokens in production with caution.`)}`);
+  console.log(`  ${chalk.yellow(`Please refer to ${chalk.cyan('https://cube.dev/docs/security')} for production security best practices.`)}`);
+  console.log(`${chalk.yellow('-----------------------------------------------------------------------------------------')}`);
+  console.log(``);
+  console.log(`Expires in: ${chalk.green(expiry)}`);
+  console.log(`Payload: ${chalk.green(JSON.stringify(payload))}`);
+  console.log(``);
 
   const signedToken = jwt.sign(payload, secret, extraOptions);
-  console.log(signedToken);
+  console.log(`Token: ${chalk.green(signedToken)}`);
+  await event('Generate Token Success');
   return signedToken;
 };
 

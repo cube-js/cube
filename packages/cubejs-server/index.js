@@ -42,6 +42,10 @@ class CubejsServer {
   static driverDependencies(dbType) {
     return CubejsServerCore.driverDependencies(dbType);
   }
+
+  static apiSecret() {
+    return process.env.CUBEJS_API_SECRET;
+  }
 }
 
 module.exports = CubejsServer;
