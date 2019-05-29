@@ -17,6 +17,7 @@ const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval
 const { machineIdSync } = require('node-machine-id');
 const { promisify } = require('util');
 const templates = require('./templates');
+const { token, defaultExpiry, collect } = require('./token');
 
 const packageJson = require('./package.json');
 
@@ -56,7 +57,7 @@ const writePackageJson = async (json) => fs.writeJson('package.json', json, {
   EOL: os.EOL
 });
 
-const displayError = async (text, options) => {
+const displayError = async (text, options = {}) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
@@ -273,6 +274,23 @@ program
     console.log('Examples:');
     console.log('');
     console.log('  $ cubejs generate -t orders,customers');
+  });
+
+program
+  .command('token')
+  .option('-e, --expiry [expiry]', 'Token expiry. Set to 0 for no expiry', defaultExpiry)
+  .option('-s, --secret [secret]', 'Cube.js app secret. Also can be set via environment variable CUBEJS_API_SECRET')
+  .option('-p, --payload [values]', 'Payload. Example: -p foo=bar', collect, [])
+  .description('Create JWT token')
+  .action(
+    (options) => token(options)
+      .catch(e => displayError(e.stack || e))
+  )
+  .on('--help', () => {
+    console.log('');
+    console.log('Examples:');
+    console.log('');
+    console.log('  $ cubejs token -e "1 day" -p foo=bar -p cool=true');
   });
 
 if (!process.argv.slice(2).length) {
