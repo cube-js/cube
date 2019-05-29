@@ -27,6 +27,7 @@ Query has the following properties:
     their corresponding values are either `asc` or `desc`. The order of the
     fields to order is based on the order of the keys in the object.
 - `timezone`: All time based calculations performed within Cube.js are timezone-aware. Using this property you can set your desired timezone in [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.: `America/Los_Angeles`. The default value is `UTC`.
+- `renewQuery`: If `renewQuery` is set to `true`, query will always refresh cache and return the latest data from the database. The default value is `false`.
 
 ```js
 {

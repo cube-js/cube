@@ -36,6 +36,19 @@ You can set up a custom refresh check SQL by changing [refreshKey](cube#paramete
 2. Check the `max` of any existing time dimension, if none exist…
 3. Check the count of rows for this cube.
 
+### Force Query Renewal
+
+If you need a specific query to bypass cache and return data from the
+database, e.g. some real time metrics, you can use `renewQuery` option in the
+query. To use it add `renewQuery: true` to your Cube.js query as shown below:
+
+```javascript
+{
+  measures: ['Orders.count'],
+  dimensions: ['Orders.status'],
+  renewQuery: true
+}
+```
 
 ## Pre-Aggregations
 
