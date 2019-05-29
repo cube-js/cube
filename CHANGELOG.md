@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.9](https://github.com/statsbotco/cube.js/compare/v0.9.8...v0.9.9) (2019-05-29)
+
+
+### Bug Fixes
+
+* **cli:** missing package files ([81e8549](https://github.com/statsbotco/cube.js/commit/81e8549))
+
+
+
+
+
 ## [0.9.8](https://github.com/statsbotco/cube.js/compare/v0.9.7...v0.9.8) (2019-05-29)
 
 
