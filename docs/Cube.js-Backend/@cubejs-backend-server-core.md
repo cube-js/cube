@@ -51,15 +51,19 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   checkAuthMiddleware: Function,
   orchestratorOptions: {
     redisPrefix: String,
-    queryCacheOptions: QueueOptions
-    preAggregationsOptions: QueueOptions
+    queryCacheOptions: {
+      refreshKeyRenewalThreshold: number,
+      queueOptions: QueueOptions
+    }
+    preAggregationsOptions: {
+      queueOptions: QueueOptions
+    }
   }
 }
 
 // QueueOptions
 {
   concurrency: number
-  refreshKeyRenewalThreshold: number,
   continueWaitTimeout: number,
   executionTimeout: number,
   orphanedTimeout: number,
@@ -169,27 +173,35 @@ _Please note that this is advanced configuration._
 | queryCacheOptions | Query cache options for DB queries | `{}`
 | preAggregationsOptions | Query cache options for pre-aggregations | `{}`
 
-To set options for `queryCache` and `preAggregations`, set an object with key queueOptions. `queryCacheOptions` are used while querying database tables, while `preAggregationsOptions` settings are used to query pre-aggregated tables. Example:
+To set options for `queryCache` and `preAggregations`, set an object with key queueOptions. `queryCacheOptions` are used while querying database tables, while `preAggregationsOptions` settings are used to query pre-aggregated tables.
+
+`queryCacheOptions` also has `refreshKeyRenewalThreshold` option to set time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check. The default value is `120`.
+
 ```javascript
 const queueOptions = {
-  concurrency: 3,
-  refreshKeyRenewalThreshold: 30
+  concurrency: 3
 };
 
 CubejsServerCore.create({
   orchestratorOptions: {
-    queryCacheOptions: { queueOptions },
+    queryCacheOptions: {
+      refreshKeyRenewalThreshold: 30,
+      queueOptions
+    },
     preAggregationsOptions: { queueOptions }
   }
 });
 ```
 
+#### QueueOptions
+
+Timeout and interval options' values are in seconds.
+
 | Option | Description | Default Value |
 | ------ | ----------- | ------------- |
 | concurrency | Maximum number of queries to be processed simultaneosly | `2` |
-| refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check | `120` |
-| continueWaitTimeout | Polling timeout | `5` |
+| continueWaitTimeout | Long polling interval | `5` |
 | executionTimeout | Total timeout of single query | `600` |
-| orphanedTimeout | Inactivity timeout for query | `120` |
+| orphanedTimeout | Query will be marked for cancellation if not requested during this period. | `120` |
 | heartBeatInterval | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled. | `30` |
 

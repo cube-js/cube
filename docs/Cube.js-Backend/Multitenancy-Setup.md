@@ -68,8 +68,9 @@ new CubejsServer({
 });
 ```
 
-What if for application with ID 3 data is stored not in Postgres, but in
-MongoDB? We can instruct Cube.js to connect to MongoDB in that case, instead of
+What if for application with ID 3 data is stored not in Postgres, but in MongoDB?
+
+We can instruct Cube.js to connect to MongoDB in that case, instead of
 Postgres. For that purpose we'll use `dbType` option to dynamically set database
 type. We also need to modify our `driverFactory` option.
 
