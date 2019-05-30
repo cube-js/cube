@@ -42,8 +42,7 @@ Cube.js Server.
 
 ### Force Query Renewal
 
-If you need a specific query to bypass cache and return data from the
-database, e.g. some real time metrics, you can use `renewQuery` option in the
+If you need to force specific query to load fresh data from the database (if it is available), e.g. some real time metrics, you can use `renewQuery` option in the
 query. To use it add `renewQuery: true` to your Cube.js query as shown below:
 
 ```javascript

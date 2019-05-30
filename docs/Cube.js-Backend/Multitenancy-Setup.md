@@ -7,7 +7,7 @@ menuOrder: 5
 
 Cube.js supports multitenancy out of the box, both on database and data schema levels. Multiple drivers are also supported, meaning that you can have one customer’s data in MongoDB and others in Postgres with one Cube.js instance.
 
-There are 4 configuration options you can leverage to make your multitenancy setup. You
+There are 4 [configuration options](@cubejs-backend-server-core#options-reference) you can leverage to make your multitenancy setup. You
 can use all of them or just a couple, depending on your specific case. The
 options are:
 
