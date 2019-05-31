@@ -148,7 +148,10 @@ export default class ResultSet {
     const allYValues = pipe(
       map(
         // eslint-disable-next-line no-unused-vars
-        ([xValuesString, rows]) => unnest(rows.map(({ row }) => this.axisValues(pivotConfig.y)(row)))
+        ([xValuesString, rows]) => unnest(
+          // collect Y values only from filled rows
+          rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
+        )
       ),
       unnest,
       uniq
