@@ -230,6 +230,9 @@ class ApiGateway {
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       try {
+        if (!req.query.query) {
+          throw new UserError(`query param is required`);
+        }
         const query = JSON.parse(req.query.query);
         this.log(req, {
           type: 'Load Request',
@@ -273,6 +276,9 @@ class ApiGateway {
 
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
       try {
+        if (!req.query.query) {
+          throw new UserError(`query param is required`);
+        }
         const query = JSON.parse(req.query.query);
         const normalizedQuery = normalizeQuery(query);
         const sqlQuery = await this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req));
