@@ -15,6 +15,7 @@ import 'core-js/modules/es6.object.keys';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import 'core-js/modules/es6.array.reduce';
+import 'core-js/modules/es6.array.index-of';
 import 'core-js/modules/es6.array.find';
 import 'core-js/modules/es6.array.filter';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
@@ -143,6 +144,15 @@ function () {
         x: query.dimensions || [],
         y: []
       });
+      pivotConfig.x = pivotConfig.x || [];
+      pivotConfig.y = pivotConfig.y || [];
+      var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+      var allDimensions = timeDimensions.map(function (td) {
+        return td.dimension;
+      }).concat(query.dimensions);
+      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
+        return allIncludedDimensions.indexOf(d) === -1;
+      }));
 
       if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
         return d === 'measures';
@@ -251,7 +261,8 @@ function () {
             xValuesString = _ref7[0],
             rows = _ref7[1];
 
-        return unnest(rows.filter(function (_ref8) {
+        return unnest( // collect Y values only from filled rows
+        rows.filter(function (_ref8) {
           var row = _ref8.row;
           return Object.keys(row).length > 0;
         }).map(function (_ref9) {

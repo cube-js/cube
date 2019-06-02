@@ -66,6 +66,11 @@ export default class ResultSet {
       x: query.dimensions || [],
       y: []
     });
+    pivotConfig.x = pivotConfig.x || [];
+    pivotConfig.y = pivotConfig.y || [];
+    const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+    const allDimensions = timeDimensions.map(td => td.dimension).concat(query.dimensions);
+    pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(d => allIncludedDimensions.indexOf(d) === -1));
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
     }

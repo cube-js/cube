@@ -19,6 +19,7 @@ require('core-js/modules/es6.object.keys');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 require('core-js/modules/es6.array.reduce');
+require('core-js/modules/es6.array.index-of');
 require('core-js/modules/es6.array.find');
 require('core-js/modules/es6.array.filter');
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
@@ -147,6 +148,15 @@ function () {
         x: query.dimensions || [],
         y: []
       });
+      pivotConfig.x = pivotConfig.x || [];
+      pivotConfig.y = pivotConfig.y || [];
+      var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+      var allDimensions = timeDimensions.map(function (td) {
+        return td.dimension;
+      }).concat(query.dimensions);
+      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
+        return allIncludedDimensions.indexOf(d) === -1;
+      }));
 
       if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
         return d === 'measures';
@@ -255,7 +265,8 @@ function () {
             xValuesString = _ref7[0],
             rows = _ref7[1];
 
-        return ramda.unnest(rows.filter(function (_ref8) {
+        return ramda.unnest( // collect Y values only from filled rows
+        rows.filter(function (_ref8) {
           var row = _ref8.row;
           return Object.keys(row).length > 0;
         }).map(function (_ref9) {
