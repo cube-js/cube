@@ -108,7 +108,7 @@ ordersCompletedCount: {
   sql: `id`,
   type: `count`,
   filters: [
-    { sql: `${TABLE}.status = 'completed'` }
+    { sql: `${CUBE}.status = 'completed'` }
   ]
 }
 ```

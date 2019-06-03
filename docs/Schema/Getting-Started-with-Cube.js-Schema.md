@@ -150,7 +150,7 @@ cube(`Users`, {
       sql: `id`,
       type: `count`,
       filters: [
-        { sql: `${TABLE}.paying = 'true'` }
+        { sql: `${CUBE}.paying = 'true'` }
       ]
     },
 

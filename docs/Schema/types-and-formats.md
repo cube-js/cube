@@ -233,10 +233,10 @@ amount: {
 location: {
   type: `geo`,
   latitude: {
-    sql: `${TABLE}.latitude`,
+    sql: `${CUBE}.latitude`,
   },
   longitude: {
-    sql: `${TABLE}.longitude`
+    sql: `${CUBE}.longitude`
   }
 }
 ```

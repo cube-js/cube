@@ -76,7 +76,7 @@ measures: {
     sql: `event_id`,
     type: `count`,
     filters: [
-      { sql: `${TABLE}.event = 'pageview'` }
+      { sql: `${CUBE}.event = 'pageview'` }
     ]
   }
 }
@@ -212,15 +212,15 @@ endRaw: {
 
 endAt: {
   sql:
-`CASE WHEN ${endRaw} + INTERVAL '1 minutes' > ${TABLE}.next_session_start_at
-     THEN ${TABLE}.next_session_start_at
+`CASE WHEN ${endRaw} + INTERVAL '1 minutes' > ${CUBE}.next_session_start_at
+     THEN ${CUBE}.next_session_start_at
      ELSE ${endRaw} + INTERVAL '30 minutes'
      END`,
   type: `time`
 },
 
 durationMinutes: {
-  sql: `datediff(minutes, ${TABLE}.session_start_at, ${endAt})`,
+  sql: `datediff(minutes, ${CUBE}.session_start_at, ${endAt})`,
   type: `number`
 }
 
@@ -276,7 +276,7 @@ Once we have it, we can create a dimension `userId`, which will be either a `use
 ```javascript
 // Add a new dimension to the Sessions cube
 userId: {
-  sql: `coalesce(${Identifies.userId}, ${TABLE}.anonymous_id)`,
+  sql: `coalesce(${Identifies.userId}, ${CUBE}.anonymous_id)`,
   type: `string`
 }
 ```
@@ -365,7 +365,7 @@ Same as for the first referrer. We already have a `session_sequence` field in th
 isFirst: {
   type: `string`,
   case: {
-    when: [{ sql: `${TABLE}.session_sequence = 1`, label: `First`}],
+    when: [{ sql: `${CUBE}.session_sequence = 1`, label: `First`}],
     else: { label: `Repeat` }
   }
 }
@@ -402,7 +402,7 @@ formSubmittedCount: {
   sql: `event_id`,
   type: `count`,
   filters: [
-    { sql: `${TABLE}.event = 'form_submitted'` }
+    { sql: `${CUBE}.event = 'form_submitted'` }
   ]
 }
 ```
