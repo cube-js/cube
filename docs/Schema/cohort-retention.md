@@ -90,7 +90,7 @@ cube(`monthlyRetention`, {
      type: `countDistinct`,
      drillMembers: [Users.id, Users.email],
      filters: [
-       { sql: `${TABLE}.monthly_pageviews > 0`}
+       { sql: `${CUBE}.monthly_pageviews > 0`}
      ]
    },
   
@@ -110,7 +110,7 @@ To be able to build cohorts, we need to group by two dimensions: **signup date**
 cube(`monthlyRetention`, {
  dimensions: {
    monthsSinceSignup: {
-     sql: `DATEDIFF('month', ${TABLE}.signup_month, ${TABLE}.activity_month)`,
+     sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
      type: `number`
    },
   
