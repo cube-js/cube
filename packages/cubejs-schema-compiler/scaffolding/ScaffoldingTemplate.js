@@ -8,6 +8,10 @@ class ScaffoldingTemplate {
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema);
   }
 
+  escapeName(name) {
+    return `"${name}"`;
+  }
+
   generateFilesByTableNames(tableNames) {
     const schemaForTables = this.scaffoldingSchema.generateForTables(tableNames.map(n => this.resolveTableName(n)));
     return schemaForTables.map(tableSchema => ({
@@ -40,16 +44,16 @@ class ScaffoldingTemplate {
   schemaDescriptorForTable(tableSchema) {
     return {
       cube: tableSchema.cube,
-      sql: `SELECT * FROM ${tableSchema.schema}.${tableSchema.table}`, // TODO escape
+      sql: `SELECT * FROM ${this.escapeName(tableSchema.schema)}.${this.escapeName(tableSchema.table)}`, // TODO escape
       joins: tableSchema.joins.map(j => ({
         [j.cubeToJoin]: {
-          sql: `\${CUBE}.${j.thisTableColumn} = \${${j.cubeToJoin}}.${j.columnToJoin}`,
+          sql: `\${CUBE}.${this.escapeName(j.thisTableColumn)} = \${${j.cubeToJoin}}.${this.escapeName(j.columnToJoin)}`,
           relationship: j.relationship
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       measures: tableSchema.measures.map(m => ({
         [this.memberName(m)]: {
-          sql: m.name,
+          sql: `${this.escapeName(m.name)}`,
           type: m.types[0],
           title: this.memberTitle(m)
         }
@@ -61,7 +65,7 @@ class ScaffoldingTemplate {
       }),
       dimensions: tableSchema.dimensions.map(m => ({
         [this.memberName(m)]: {
-          sql: m.name,
+          sql: `${this.escapeName(m.name)}`,
           type: m.types[0],
           title: this.memberTitle(m),
           primaryKey: m.isPrimaryKey ? true : undefined

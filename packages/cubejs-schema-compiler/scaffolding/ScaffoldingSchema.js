@@ -69,7 +69,7 @@ class ScaffoldingSchema {
     }
     if (!this.dbSchema[schema][table]) {
       throw new UserError(`Can't resolve ${tableName}: '${table}' does not exist`);
-    }
+    } 
     return this.dbSchema[schema][table];
   }
 
@@ -148,10 +148,11 @@ class ScaffoldingSchema {
   };
 
   joins(tableName, tableDefinition) {
+    const idRegex = '_id$|id$';
     return R.unnest(tableDefinition
-      .filter(column => column.name.toLowerCase().indexOf('id') !== -1 && column.name.toLowerCase() !== 'id')
+      .filter(column => (column.name.match(new RegExp(idRegex, "i")) && column.name.toLowerCase() !== 'id'))
       .map(column => {
-        const withoutId = column.name.replace('_id', '').replace('id', '');
+        const withoutId = column.name.replace(new RegExp(idRegex, "i"), '');
         const tablesToJoin = this.tableNamesToTables[withoutId] || this.tableNamesToTables[inflection.tableize(withoutId)];
 
         if (!tablesToJoin) {
