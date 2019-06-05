@@ -49,7 +49,7 @@ class ScaffoldingTemplate {
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       measures: tableSchema.measures.map(m => ({
         [this.memberName(m)]: {
-          sql: `"${m.name}"`,
+          sql: `\${CUBE}."${m.name}"`,
           type: m.types[0],
           title: this.memberTitle(m)
         }
@@ -61,7 +61,7 @@ class ScaffoldingTemplate {
       }),
       dimensions: tableSchema.dimensions.map(m => ({
         [this.memberName(m)]: {
-          sql: `"${m.name}"`,
+          sql: `\${CUBE}."${m.name}"`,
           type: m.types[0],
           title: this.memberTitle(m),
           primaryKey: m.isPrimaryKey ? true : undefined
