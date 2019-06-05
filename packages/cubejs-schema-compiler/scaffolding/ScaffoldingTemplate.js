@@ -40,16 +40,16 @@ class ScaffoldingTemplate {
   schemaDescriptorForTable(tableSchema) {
     return {
       cube: tableSchema.cube,
-      sql: `SELECT * FROM "${tableSchema.schema}"."${tableSchema.table}"`, // TODO escape
+      sql: `SELECT * FROM ${tableSchema.schema}.${tableSchema.table}`, // TODO escape
       joins: tableSchema.joins.map(j => ({
         [j.cubeToJoin]: {
-          sql: `\${CUBE}."${j.thisTableColumn}" = \${${j.cubeToJoin}}."${j.columnToJoin}"`,
+          sql: `\${CUBE}.${j.thisTableColumn} = \${${j.cubeToJoin}}.${j.columnToJoin}`,
           relationship: j.relationship
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       measures: tableSchema.measures.map(m => ({
         [this.memberName(m)]: {
-          sql: `\${CUBE}."${m.name}"`,
+          sql: m.name,
           type: m.types[0],
           title: this.memberTitle(m)
         }
@@ -61,7 +61,7 @@ class ScaffoldingTemplate {
       }),
       dimensions: tableSchema.dimensions.map(m => ({
         [this.memberName(m)]: {
-          sql: `\${CUBE}."${m.name}"`,
+          sql: m.name,
           type: m.types[0],
           title: this.memberTitle(m),
           primaryKey: m.isPrimaryKey ? true : undefined

@@ -983,7 +983,7 @@ class BaseQuery {
 
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
-    return this.aliasName(`"${prefix ? prefix + '__' : ''}${cubeName}"`);
+    return this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`);
   }
 
   collectCubeNamesFor(fn) {
