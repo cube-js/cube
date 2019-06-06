@@ -148,15 +148,11 @@ class ScaffoldingSchema {
   };
 
   joins(tableName, tableDefinition) {
-    const key = "id";
+    const idRegex = '_id$|id$';
     return R.unnest(tableDefinition
-      .filter(column => {
-        const columnName = column.name.toLowerCase();
-        const columnKeyPosition = columnName.length - columnName.lastIndexOf(key) - key.length;
-        return (columnKeyPosition === 0 && columnName !== 'id')
-      })
+      .filter(column => (column.name.match(new RegExp(idRegex, "i")) && column.name.toLowerCase() !== 'id'))
       .map(column => {
-        const withoutId = column.name.replace(new RegExp('_id$', "i"), '').replace(new RegExp('id$', "i"), '');
+        const withoutId = column.name.replace(new RegExp(idRegex, "i"), '');
         const tablesToJoin = this.tableNamesToTables[withoutId] || this.tableNamesToTables[inflection.tableize(withoutId)];
 
         if (!tablesToJoin) {
