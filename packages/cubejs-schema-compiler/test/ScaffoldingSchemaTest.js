@@ -2,6 +2,10 @@ const ScaffoldingSchema = require('../scaffolding/ScaffoldingSchema');
 const ScaffoldingTemplate = require('../scaffolding/ScaffoldingTemplate');
 require('should');
 
+const driver = {
+  quoteIdentifier: (name) => `"${name}"`
+};
+
 describe('ScaffoldingSchema', () => {
   it('schema', () => {
     const schema = new ScaffoldingSchema({
@@ -29,8 +33,8 @@ describe('ScaffoldingSchema', () => {
           "attributes": []
         }]
       }
-    });
-    let schemaForTables = schema.generateForTables(['public.orders', 'public.customers']);
+    }, driver);
+    const schemaForTables = schema.generateForTables(['public.orders', 'public.customers']);
     schemaForTables.should.be.deepEqual([
       {
         "cube": "Orders",
@@ -123,7 +127,7 @@ describe('ScaffoldingSchema', () => {
         ],
         "joins": []
       }
-    ])
+    ]);
   });
 
   it('template', () => {
@@ -138,7 +142,7 @@ describe('ScaffoldingSchema', () => {
           "type": "integer",
           "attributes": []
         }, {
-          "name": "customer_id",
+          "name": "customerId",
           "type": "integer",
           "attributes": []
         }],
@@ -156,7 +160,7 @@ describe('ScaffoldingSchema', () => {
           "attributes": []
         }]
       }
-    });
+    }, driver);
     template.generateFilesByTableNames(['public.orders', 'public.customers']).should.be.deepEqual([
       {
         fileName: 'Orders.js',
@@ -165,7 +169,7 @@ describe('ScaffoldingSchema', () => {
   
   joins: {
     Customers: {
-      sql: \`\${CUBE}.customer_id = \${Customers}.id\`,
+      sql: \`\${CUBE}."customerId" = \${Customers}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -228,6 +232,6 @@ describe('ScaffoldingSchema', () => {
 });
 `
       }
-    ])
+    ]);
   });
 });

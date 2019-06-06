@@ -185,7 +185,7 @@ const generateSchema = async (options) => {
 
   logStage('Generating schema files');
   const ScaffoldingTemplate = await requireFromPackage('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
-  const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema);
+  const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
   const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
   await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 

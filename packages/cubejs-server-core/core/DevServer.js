@@ -78,7 +78,7 @@ class DevServer {
       const tablesSchema = await driver.tablesSchema();
 
       const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema);
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver);
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables);
       await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
       res.json({ files });
