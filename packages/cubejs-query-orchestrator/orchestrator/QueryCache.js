@@ -11,7 +11,7 @@ class QueryCache {
     this.driverFactory = clientFactory;
     this.externalDriverFactory = options.externalDriverFactory;
     this.logger = logger;
-    this.cacheDriver = process.env.NODE_ENV === 'production' || process.env.REDIS_URL ?
+    this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver() :
       new LocalCacheDriver();
   }
@@ -101,8 +101,11 @@ class QueryCache {
       this.queue = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}`,
         this.driverFactory,
-        (client, q) => client.query(q.query, q.values),
-        { logger: this.logger, ...this.options.queueOptions }
+        (client, q) => client.query(q.query, q.values), {
+          logger: this.logger,
+          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          ...this.options.queueOptions
+        }
       );
     }
     return this.queue;
@@ -117,6 +120,7 @@ class QueryCache {
         {
           logger: this.logger,
           concurrency: 6,
+          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           ...this.options.externalQueueOptions
         }
       );
