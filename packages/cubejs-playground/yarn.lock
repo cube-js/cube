@@ -1063,24 +1063,25 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.7.3":
-  version "0.7.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.7.3.tgz#5944c1e21922fccfb3b7baf1b4cfc2a4afeb0eb4"
-  integrity sha512-DFoCrankXUu1OHCqa9zpC4LwlrqlWUvB8myZ8xjIzQM1wKCfUXueWySPYnOR43ihu3NaTofctNqpz9J0F3Xr3g==
+"@cubejs-client/core@^0.9.12":
+  version "0.9.12"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.9.12.tgz#d8aea508afd6b26d73b2543ab381c5ccbe838d24"
+  integrity sha512-uTl8nFO1pKEQazPadcmjTCiV2FqKMqrzhc5FynoyCb2nmJqgpM45uKHKW3Q8qYKumm2Dy5F/OMu7+YlySggjWg==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
-    isomorphic-fetch "^2.2.1"
+    cross-fetch "^3.0.2"
     moment "^2.22.2"
     moment-range "^4.0.1"
     ramda "^0.25.0"
 
-"@cubejs-client/react@^0.7.3":
-  version "0.7.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.7.3.tgz#f2b44aea6ff13297c9fe8dca99e41173879fae18"
-  integrity sha512-zJJ719l8Qu3hHU//0/WbYVCiXou8sYjXlgrAFczt2lIMIBHwj+UbKxEYU4urg9vGY/VUV6nw4bWmX4cg/Gn/PQ==
+"@cubejs-client/react@^0.9.0":
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.9.0.tgz#89fde5e3b72be7a1bda352811f2944267570fbc4"
+  integrity sha512-ZzXkhG3Pqs1vPnQZV3X8FOI2jQ6cwt85WY+vMp6va2X8NdcYXQq+sEBEpza50G7pCGL+ROHOl1g32BJtYeEk+Q==
   dependencies:
     "@babel/runtime" "^7.1.2"
+    core-js "^2.5.3"
     prop-types "^15.6.2"
     ramda "^0.25.0"
     react "^16.5.2"
@@ -3100,6 +3101,14 @@ create-react-context@^0.2.2:
   dependencies:
     fbjs "^0.8.0"
     gud "^1.0.0"
+
+cross-fetch@^3.0.2:
+  version "3.0.3"
+  resolved "https://registry.yarnpkg.com/cross-fetch/-/cross-fetch-3.0.3.tgz#b988beab275939cb77ad4e362c873f7fa8a221a5"
+  integrity sha512-mplYkc4CopHu+AdHK8wxjJcPskUxp5CvPTdtDij3MUgVNBa0xOb9CQqbbn1zO23qISM4WLxIBociyEVQL7WQAg==
+  dependencies:
+    node-fetch "2.6.0"
+    whatwg-fetch "3.0.0"
 
 cross-spawn@6.0.5, cross-spawn@^6.0.0, cross-spawn@^6.0.5:
   version "6.0.5"
@@ -5994,7 +6003,7 @@ isobject@^3.0.0, isobject@^3.0.1:
   resolved "https://registry.yarnpkg.com/isobject/-/isobject-3.0.1.tgz#4e431e92b11a9731636aa1f9c8d1ccbcfdab78df"
   integrity sha1-TkMekrEalzFjaqH5yNHMvP2reN8=
 
-isomorphic-fetch@^2.1.1, isomorphic-fetch@^2.2.1:
+isomorphic-fetch@^2.1.1:
   version "2.2.1"
   resolved "https://registry.yarnpkg.com/isomorphic-fetch/-/isomorphic-fetch-2.2.1.tgz#611ae1acf14f5e81f729507472819fe9733558a9"
   integrity sha1-YRrhrPFPXoH3KVB0coGf6XM1WKk=
@@ -7298,6 +7307,11 @@ no-case@^2.2.0:
   integrity sha512-rmTZ9kz+f3rCvK2TD1Ue/oZlns7OGoIWP4fc3llxxRXlOkHKoWPPWJOfFYpITabSow43QJbRIoHQXtt10VldyQ==
   dependencies:
     lower-case "^1.1.1"
+
+node-fetch@2.6.0:
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.0.tgz#e633456386d4aa55863f676a7ab0daa8fdecb0fd"
+  integrity sha512-8dG4H5ujfvFiqDmVu9fQ5bOHUC15JMjMY/Zumv26oOvvVJjM67KF8koCWIabKQ1GJIa9r2mMZscBq/TbdOcmNA==
 
 node-fetch@^1.0.1:
   version "1.7.3"
