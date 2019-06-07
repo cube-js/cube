@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.14](https://github.com/statsbotco/cubejs-client/compare/v0.9.13...v0.9.14) (2019-06-07)
+
+
+### Features
+
+* Added SparkSQL and Hive support to the JDBC driver. ([#127](https://github.com/statsbotco/cubejs-client/issues/127)) ([659c24c](https://github.com/statsbotco/cubejs-client/commit/659c24c))
+
+
+
+
+
 # [0.9.0](https://github.com/statsbotco/cubejs-client/compare/v0.8.7...v0.9.0) (2019-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver
