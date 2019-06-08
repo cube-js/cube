@@ -20,6 +20,15 @@ class PostgresQuery extends BaseQuery {
     return new PostgresParamAllocator();
   }
 
+  escapeColumnName(name) {
+    return `"${name}"`;
+  }
+
+  cubeAlias(cubeName) {
+    const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
+    return this.escapeColumnName(this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`));
+  }
+
   convertTz(field) {
     return `(${field}::timestamptz AT TIME ZONE '${this.timezone}')`;
   }
