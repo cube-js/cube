@@ -151,8 +151,9 @@ const createApp = async (projectName, options) => {
   console.log();
   console.log(`📊 Next step: run dev server`);
   console.log();
-  console.log(`     $ cd ${projectName}`);
-  console.log(`     $ npm run dev`);
+  console.log(`     1. $ cd ${projectName}`);
+  console.log(`     2. Edit .env file to set your DB credentials`);
+  console.log(`     3. $ npm run dev`);
   console.log();
 };
 
