@@ -586,7 +586,7 @@ class BaseQuery {
     const columnsForSelect =
       this.dimensionColumns(this.escapeColumnName('keys')).concat(selectedMeasures).filter(s => !!s).join(', ');
     const keyInMeasureSelect = shouldBuildJoinForMeasureSelect ?
-      `${this.escapeColumnName(this.cubeAlias(keyCubeName))}.${primaryKeyDimension.aliasName()}` :
+      `${this.cubeAlias(keyCubeName)}.${primaryKeyDimension.aliasName()}` :
       this.dimensionSql(primaryKeyDimension);
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? '' : measureSubQueryDimensions.map(d => this.subQueryJoin(d)).join("\n");
@@ -983,7 +983,7 @@ class BaseQuery {
 
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
-    return this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`);
+    return this.escapeColumnName(this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`));
   }
 
   collectCubeNamesFor(fn) {
