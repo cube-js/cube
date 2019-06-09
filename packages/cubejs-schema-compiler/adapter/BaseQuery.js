@@ -977,9 +977,12 @@ class BaseQuery {
     return this.evaluateSymbolSqlWithContext(fn, { cubeAliasPrefix });
   }
 
+  // TODO merge fail. Remove sqlAlias us unused?
+  /*
   cubeAlias(cube) {
     return this.cubeAlias(this.cubeEvaluator.cubeFromPath(cube).sqlAlias || cube);
   }
+  */
 
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
