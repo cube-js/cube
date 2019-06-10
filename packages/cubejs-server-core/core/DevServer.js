@@ -230,7 +230,14 @@ class DevServer {
       });
     }));
 
-    app.use(serveStatic(path.join(__dirname, '../playground')));
+    app.use(serveStatic(path.join(__dirname, '../playground'), {
+      lastModified: false,
+      setHeaders: (res, url) => {
+        if (url.indexOf('/index.html') !== -1) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      }
+    }));
   }
 }
 
