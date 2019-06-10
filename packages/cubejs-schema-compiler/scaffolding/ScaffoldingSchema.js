@@ -117,10 +117,9 @@ class ScaffoldingSchema {
   }
 
   numberMeasures(tableDefinition) {
-    console.log(tableDefinition);
     return tableDefinition.filter(column =>
       !column.name.startsWith('_') && !column.name.match(new RegExp(idRegex, "i")) &&
-      (this.columnType(column) === 'number' || this.columnType(column) === 'integer') &&
+      (this.columnType(column) === 'number') &&
       this.fromMeasureDictionary(column)
     ).map(column => ({
       name: column.name,
