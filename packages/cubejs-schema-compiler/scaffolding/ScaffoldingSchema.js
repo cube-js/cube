@@ -118,7 +118,7 @@ class ScaffoldingSchema {
 
   numberMeasures(tableDefinition) {
     return tableDefinition.filter(column =>
-      !column.name.startsWith('_') && !column.name.match(new RegExp(idRegex, "i")) &&
+      !column.name.startsWith('_') && 
       (this.columnType(column) === 'number') &&
       this.fromMeasureDictionary(column)
     ).map(column => ({
@@ -129,7 +129,7 @@ class ScaffoldingSchema {
   }
 
   fromMeasureDictionary(column) {
-    return !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().indexOf(word) !== -1)
+    return !column.name.match(new RegExp(idRegex, "i")) && !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().endsWith(word));
   }
 
   dimensionColumns(tableDefinition) {

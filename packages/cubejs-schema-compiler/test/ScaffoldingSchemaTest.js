@@ -52,6 +52,10 @@ describe('ScaffoldingSchema', () => {
           "name": "failure_count",
           "type": "integer",
           "attributes": []
+        }, {
+          "name": "account_status",
+          "type": "character varying",
+          "attributes": []
         }],
       }
     }, driver);
@@ -196,6 +200,14 @@ describe('ScaffoldingSchema', () => {
               "string"
             ],
             "title": "Password",
+            "isPrimaryKey": false
+          },
+          {
+            "name": "account_status",
+            "types": [
+              "string"
+            ],
+            "title": "Account Status",
             "isPrimaryKey": false
           }
         ],
