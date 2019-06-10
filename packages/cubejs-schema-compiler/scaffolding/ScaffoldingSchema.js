@@ -33,6 +33,8 @@ const DRILL_MEMBERS_DICTIONARY = [
   'date'
 ];
 
+const idRegex = '_id$|id$';
+
 class ScaffoldingSchema {
   constructor(dbSchema) {
     this.dbSchema = dbSchema;
@@ -116,7 +118,7 @@ class ScaffoldingSchema {
 
   numberMeasures(tableDefinition) {
     return tableDefinition.filter(column =>
-      !column.name.startsWith('_') &&
+      !column.name.startsWith('_') && 
       (this.columnType(column) === 'number') &&
       this.fromMeasureDictionary(column)
     ).map(column => ({
@@ -127,7 +129,7 @@ class ScaffoldingSchema {
   }
 
   fromMeasureDictionary(column) {
-    return !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().indexOf(word) !== -1)
+    return !column.name.match(new RegExp(idRegex, "i")) && !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().endsWith(word));
   }
 
   dimensionColumns(tableDefinition) {
@@ -148,7 +150,6 @@ class ScaffoldingSchema {
   };
 
   joins(tableName, tableDefinition) {
-    const idRegex = '_id$|id$';
     return R.unnest(tableDefinition
       .filter(column => (column.name.match(new RegExp(idRegex, "i")) && column.name.toLowerCase() !== 'id'))
       .map(column => {
