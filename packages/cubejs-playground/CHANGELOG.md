@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.16](https://github.com/statsbotco/cubejs-client/compare/v0.9.15...v0.9.16) (2019-06-10)
+
+
+### Features
+
+* **playground:** Go to explore modal after schema generation ([5325c2d](https://github.com/statsbotco/cubejs-client/commit/5325c2d))
+
+
+
+
+
 ## [0.9.14](https://github.com/statsbotco/cubejs-client/compare/v0.9.13...v0.9.14) (2019-06-07)
 
 
