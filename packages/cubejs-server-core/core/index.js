@@ -17,7 +17,8 @@ const DriverDependencies = {
   mongobi: '@cubejs-backend/mongobi-driver',
   bigquery: '@cubejs-backend/bigquery-driver',
   redshift: '@cubejs-backend/postgres-driver',
-  clickhouse: '@cubejs-backend/clickhouse-driver'
+  clickhouse: '@cubejs-backend/clickhouse-driver',
+  hive: '@cubejs-backend/jdbc-driver'
 };
 
 const checkEnvForPlaceholders = () => {
@@ -260,7 +261,10 @@ class CubejsServerCore {
   }
 
   static driverDependencies(dbType) {
-    return DriverDependencies[dbType] || DriverDependencies.jdbc;
+    if (!DriverDependencies[dbType]) {
+      throw new Error(`Unsupported db type: ${dbType}`);
+    }
+    return DriverDependencies[dbType];
   }
 }
 

@@ -92,6 +92,9 @@ const createApp = async (projectName, options) => {
   logStage('Installing DB driver dependencies');
   const CubejsServer = await requireFromPackage('@cubejs-backend/server');
   let driverDependencies = CubejsServer.driverDependencies(options.dbType);
+  if (!driverDependencies) {
+    await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
+  }
   driverDependencies = Array.isArray(driverDependencies) ? driverDependencies : [driverDependencies];
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
     driverDependencies.push('node-java-maven');
@@ -151,9 +154,9 @@ const createApp = async (projectName, options) => {
   console.log();
   console.log(`📊 Next step: run dev server`);
   console.log();
-  console.log(`     1. $ cd ${projectName}`);
-  console.log(`     2. Edit .env file to set your DB credentials`);
-  console.log(`     3. $ npm run dev`);
+  console.log(`     $ cd ${projectName}`);
+  console.log(`     Edit .env file to set your DB credentials`);
+  console.log(`     $ npm run dev`);
   console.log();
 };
 
