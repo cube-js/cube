@@ -10,6 +10,7 @@ class MSSqlDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT && parseInt(process.env.CUBEJS_DB_PORT, 10),
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
+      domain: process.env.CUBEJS_DB_DOMAIN,
       options: {
         encrypt: !!process.env.CUBEJS_DB_SSL || false
       },
@@ -27,6 +28,12 @@ class MSSqlDriver extends BaseDriver {
     this.connectionPool = new sql.ConnectionPool(this.config);
     this.initialConnectPromise = this.connectionPool.connect();
     this.config = config;
+  }
+
+  static driverEnvVariables() {
+    return [
+      'CUBEJS_DB_HOST', 'CUBEJS_DB_NAME', 'CUBEJS_DB_PORT', 'CUBEJS_DB_USER', 'CUBEJS_DB_PASS', 'CUBEJS_DB_DOMAIN'
+    ];
   }
 
   testConnection() {
