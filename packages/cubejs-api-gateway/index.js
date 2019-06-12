@@ -4,7 +4,7 @@ const Joi = require('joi');
 const moment = require('moment');
 const dateParser = require('./dateParser');
 
-class UserError extends Error {}
+const UserError = require('./UserError');
 
 const toConfigMap = (metaConfig) => (
   R.pipe(

@@ -1,5 +1,6 @@
 const chrono = require('chrono-node');
 const moment = require('moment');
+const UserError = require('./UserError');
 
 module.exports = (dateString) => {
   let momentRange;
@@ -28,6 +29,9 @@ module.exports = (dateString) => {
     momentRange = [yesterday, yesterday];
   } else {
     const results = chrono.parse(dateString);
+    if (!results) {
+      throw new UserError(`Can't parse date: '${dateString}'`);
+    }
     momentRange = results[0].end ? [
       results[0].start.moment(),
       results[0].end.moment()
