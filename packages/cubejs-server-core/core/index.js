@@ -46,6 +46,7 @@ class CubejsServerCore {
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
       devServer: process.env.NODE_ENV !== 'production',
+      telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
       ...options
     };
     if (
@@ -90,6 +91,9 @@ class CubejsServerCore {
     const anonymousId = machineIdSync();
     this.anonymousId = anonymousId;
     this.event = async (name, props) => {
+      if (!options.telemetry) {
+        return;
+      }
       try {
         if (!this.projectFingerprint) {
           try {
