@@ -11,6 +11,7 @@ class MSSqlDriver extends BaseDriver {
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
       domain: process.env.CUBEJS_DB_DOMAIN,
+      requestTimeout: 10 * 60 * 1000, // 10 minutes
       options: {
         encrypt: !!process.env.CUBEJS_DB_SSL || false
       },
