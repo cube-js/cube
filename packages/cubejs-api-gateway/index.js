@@ -71,10 +71,17 @@ const transformValue = (value, type) => {
 
 const transformData = (aliasToMemberNameMap, annotation, data) => (data.map(r => R.pipe(
   R.toPairs,
-  R.map(p => [
-    aliasToMemberNameMap[p[0]],
-    transformValue(p[1], annotation[aliasToMemberNameMap[p[0]]].type)
-  ]),
+  R.map(p => {
+    const memberName = aliasToMemberNameMap[p[0]];
+    const annotationForMember = annotation[memberName];
+    if (!annotationForMember) {
+      throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\``);
+    }
+    return [
+      memberName,
+      transformValue(p[1], annotationForMember.type)
+    ];
+  }),
   R.fromPairs
 )(r)));
 
