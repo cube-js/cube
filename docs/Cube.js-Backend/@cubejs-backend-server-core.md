@@ -164,8 +164,9 @@ CubejsServerCore.create({
 
 ### telemetry
 
-Cube.js collects anonymous events to better understand our
-users. You can opt out of event tracking any time by setting `telemetry` option to
+Cube.js collects high-level anonymous usage statistics for servers started in development mode. It doesn't track any credentials, schema contents or queries issued. This statistics is used solely for the purpose of constant cube.js improvement.
+
+You can opt out of it any time by setting `telemetry` option to
 `false` or, alternatively, by setting `CUBEJS_TELEMETRY` environment variable to
 `false`.
 
