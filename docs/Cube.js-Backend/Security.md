@@ -26,14 +26,27 @@ you can still use it to [pass a security context](security#security-context).
 
 Auth token is generated based on your API secret. Cube.js CLI generates API Secret on app creation and saves it in `.env` file as `CUBEJS_API_SECRET` variable.
 
-You can find a library for JWT generation [here](https://jwt.io/#libraries-io) or generate it manually on [JWT tokens site](https://jwt.io/) for testing purpose.
-
 You can generate two types of tokens:
 - Without security context. It implies same data access permissions for all users.
 - With security context. User or role-based security models can be implemented using this approach.
 
-> *NOTE*: We strongly encourage you to use `exp` expiration claim to limit life time of your public tokens.
-> Learn more: [JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim).
+_It is considered best practice to use `exp` expiration claim to limit life time of your public tokens.
+[Learn more at JWT docs](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim)._
+
+### Using CLI
+
+You can use a Cube.js CLI [token](reference#token) command to generate an API token.
+
+```bash
+$ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
+```
+
+However it is handy to create an API token with CLI command for testing
+purposes, we strongly recommend to programmatically generate tokens in production.
+
+### Programmatically
+
+You can find a library for JWT generation for your programming language [here](https://jwt.io/#libraries-io).
 
 Below you can find an example on how to generate an API token in Node.js with
 `jsonwebtoken` package:
