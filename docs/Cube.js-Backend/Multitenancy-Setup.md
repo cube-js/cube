@@ -148,10 +148,10 @@ const AWSHandlers = require('@cubejs-backend/serverless-aws');
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 
 module.exports = new AWSHandlers({
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}`,
   driverFactory: ({ authInfo }) =>
     new PostgresDriver({
-      database: `my_app_${authInfo.appId}_${authInfo.userId}`
+      database: `my_app_${authInfo.appId}`
     })
 });
 ```
