@@ -123,6 +123,9 @@ class BaseTimeDimension extends BaseFilter {
   }
 
   timeSeries() {
+    if (!this.dateRange) {
+      throw new UserError(`Time series queries without dateRange aren't supported`);
+    }
     if (!this.granularity) {
       return [
         [this.dateFromFormatted(), this.dateToFormatted()]
