@@ -136,3 +136,22 @@ new CubejsServer({
   repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
 });
 ```
+
+## Serverless Deployment
+
+If you are deploying Cube.js to AWS Lambda with [serverless template](deployment#serverless) you need to use `AWSHandlers` from `@cubejs-backend/serverless-aws` package.
+
+Add the following code to your `cube.js` file for the serverless multitenancy setup.
+
+```javascript
+const AWSHandlers = require('@cubejs-backend/serverless-aws');
+const PostgresDriver = require("@cubejs-backend/postgres-driver");
+
+module.exports = new AWSHandlers({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
+  driverFactory: ({ authInfo }) =>
+    new PostgresDriver({
+      database: `my_app_${authInfo.appId}_${authInfo.userId}`
+    })
+});
+```
