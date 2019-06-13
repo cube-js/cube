@@ -49,6 +49,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   contextToAppId: Function,
   repositoryFactory: Function,
   checkAuthMiddleware: Function,
+  telemetry: Boolean,
   orchestratorOptions: {
     redisPrefix: String,
     queryCacheOptions: {
@@ -158,6 +159,19 @@ CubejsServerCore.create({
   checkAuthMiddleware: (req, res, next) => {
     return next && next();
   }
+});
+```
+
+### telemetry
+
+Cube.js collects anonymous events to better understand our
+users. You can opt out of event tracking any time by setting `telemetry` option to
+`false` or, alternatively, by setting `CUBEJS_TELEMETRY` environment variable to
+`false`.
+
+```javascript
+CubejsServerCore.create({
+  telemetry: false
 });
 ```
 

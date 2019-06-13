@@ -90,6 +90,11 @@ cube(`Users`, {
    }
 });
 ```
+<br />
+
+Cube.js collects anonymous events to better understand our
+users. You can opt out of event tracking any time by setting
+`CUBEJS_TELEMETRY=false`.
 
 ## 4. Visualize Results
 The Cube.js client provides set of methods to access Cube.js API and to work with query result.  The client itself doesn't provide any visualizations and is designed to work with existing chart libraries.
