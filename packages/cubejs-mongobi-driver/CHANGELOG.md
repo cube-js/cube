@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.19](https://github.com/statsbotco/cubejs-client/compare/v0.9.18...v0.9.19) (2019-06-13)
+
+
+### Bug Fixes
+
+* issue with query generator for Mongobi for nested fields in document ([907b234](https://github.com/statsbotco/cubejs-client/commit/907b234)), closes [#56](https://github.com/statsbotco/cubejs-client/issues/56)
+
+
+
+
+
 ## [0.9.14](https://github.com/statsbotco/cubejs-client/compare/v0.9.13...v0.9.14) (2019-06-07)
 
 **Note:** Version bump only for package @cubejs-backend/mongobi-driver
