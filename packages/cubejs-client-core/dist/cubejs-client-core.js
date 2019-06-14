@@ -13,9 +13,13 @@ var fetch = _interopDefault(require('cross-fetch'));
 require('core-js/modules/es6.number.constructor');
 require('core-js/modules/es6.number.parse-float');
 var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
+require('core-js/modules/web.dom.iterable');
+require('core-js/modules/es6.array.iterator');
+require('core-js/modules/es6.object.keys');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 require('core-js/modules/es6.array.reduce');
+require('core-js/modules/es6.array.index-of');
 require('core-js/modules/es6.array.find');
 require('core-js/modules/es6.array.filter');
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
@@ -25,9 +29,6 @@ require('core-js/modules/es6.array.map');
 var ramda = require('ramda');
 var Moment = _interopDefault(require('moment'));
 var momentRange = _interopDefault(require('moment-range'));
-require('core-js/modules/web.dom.iterable');
-require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.keys');
 require('core-js/modules/es6.array.is-array');
 require('core-js/modules/es6.regexp.split');
 require('core-js/modules/es6.function.name');
@@ -147,6 +148,15 @@ function () {
         x: query.dimensions || [],
         y: []
       });
+      pivotConfig.x = pivotConfig.x || [];
+      pivotConfig.y = pivotConfig.y || [];
+      var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+      var allDimensions = timeDimensions.map(function (td) {
+        return td.dimension;
+      }).concat(query.dimensions);
+      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
+        return allIncludedDimensions.indexOf(d) === -1;
+      }));
 
       if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
         return d === 'measures';
@@ -255,28 +265,32 @@ function () {
             xValuesString = _ref7[0],
             rows = _ref7[1];
 
-        return ramda.unnest(rows.map(function (_ref8) {
+        return ramda.unnest( // collect Y values only from filled rows
+        rows.filter(function (_ref8) {
           var row = _ref8.row;
+          return Object.keys(row).length > 0;
+        }).map(function (_ref9) {
+          var row = _ref9.row;
           return _this2.axisValues(pivotConfig.y)(row);
         }));
       }), ramda.unnest, ramda.uniq)(xGrouped); // eslint-disable-next-line no-unused-vars
 
-      return xGrouped.map(function (_ref9) {
-        var _ref10 = _slicedToArray(_ref9, 2),
-            xValuesString = _ref10[0],
-            rows = _ref10[1];
+      return xGrouped.map(function (_ref10) {
+        var _ref11 = _slicedToArray(_ref10, 2),
+            xValuesString = _ref11[0],
+            rows = _ref11[1];
 
         var xValues = rows[0].xValues;
-        var yGrouped = ramda.pipe(ramda.map(function (_ref11) {
-          var row = _ref11.row;
+        var yGrouped = ramda.pipe(ramda.map(function (_ref12) {
+          var row = _ref12.row;
           return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
             return {
               yValues: yValues,
               row: row
             };
           });
-        }), ramda.unnest, ramda.groupBy(function (_ref12) {
-          var yValues = _ref12.yValues;
+        }), ramda.unnest, ramda.groupBy(function (_ref13) {
+          var yValues = _ref13.yValues;
           return _this2.axisValuesString(yValues);
         }))(rows);
         return {
@@ -287,8 +301,8 @@ function () {
             }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
             return (yGrouped[_this2.axisValuesString(yValues)] || [{
               row: {}
-            }]).map(function (_ref13) {
-              var row = _ref13.row;
+            }]).map(function (_ref14) {
+              var row = _ref14.row;
               return [yValues, measureValue(row, measure, xValues)];
             });
           }))
@@ -306,17 +320,17 @@ function () {
     value: function chartPivot(pivotConfig) {
       var _this3 = this;
 
-      return this.pivot(pivotConfig).map(function (_ref14) {
-        var xValues = _ref14.xValues,
-            yValuesArray = _ref14.yValuesArray;
+      return this.pivot(pivotConfig).map(function (_ref15) {
+        var xValues = _ref15.xValues,
+            yValuesArray = _ref15.yValuesArray;
         return _objectSpread({
           category: _this3.axisValuesString(xValues, ', '),
           // TODO deprecated
           x: _this3.axisValuesString(xValues, ', ')
-        }, yValuesArray.map(function (_ref15) {
-          var _ref16 = _slicedToArray(_ref15, 2),
-              yValues = _ref16[0],
-              m = _ref16[1];
+        }, yValuesArray.map(function (_ref16) {
+          var _ref17 = _slicedToArray(_ref16, 2),
+              yValues = _ref17[0],
+              m = _ref17[1];
 
           return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && Number.parseFloat(m));
         }).reduce(function (a, b) {
@@ -335,13 +349,13 @@ function () {
         };
       };
 
-      return this.pivot(normalizedPivotConfig).map(function (_ref19) {
-        var xValues = _ref19.xValues,
-            yValuesArray = _ref19.yValuesArray;
-        return yValuesArray.map(function (_ref20) {
-          var _ref21 = _slicedToArray(_ref20, 2),
-              yValues = _ref21[0],
-              m = _ref21[1];
+      return this.pivot(normalizedPivotConfig).map(function (_ref20) {
+        var xValues = _ref20.xValues,
+            yValuesArray = _ref20.yValuesArray;
+        return yValuesArray.map(function (_ref21) {
+          var _ref22 = _slicedToArray(_ref21, 2),
+              yValues = _ref22[0],
+              m = _ref22[1];
 
           return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
             return Object.assign(a, b);

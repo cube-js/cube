@@ -22,11 +22,13 @@ Query has the following properties:
 - `filters`: An array of objects, describing filters. Learn about [filters format](#filters-format).
 - `timeDimensions`: A convient way to specify a time dimension with a filter. It is an array of objects in [timeDimension format.](#time-dimensions-format)
 - `segments`: An array of segments. Segment is a named filter, created in the Data Schema.
-- `limit`: A row limit for your query. The hard limit is set to 5000 rows by default.
+- `limit`: A row limit for your query. The default value is `10000`. The
+    maximum allowed limit is `50000`.
 - `order`: An object, where keys are measures or dimensions to order by and
     their corresponding values are either `asc` or `desc`. The order of the
     fields to order is based on the order of the keys in the object.
 - `timezone`: All time based calculations performed within Cube.js are timezone-aware. Using this property you can set your desired timezone in [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.: `America/Los_Angeles`. The default value is `UTC`.
+- `renewQuery`: If `renewQuery` is set to `true`, query will always refresh cache and return the latest data from the database. The default value is `false`.
 
 ```js
 {

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.11](https://github.com/statsbotco/cubejs-client/compare/v0.9.10...v0.9.11) (2019-05-31)
+
+
+### Bug Fixes
+
+* **client-core:** ResultSet series returns a series with no data ([715e170](https://github.com/statsbotco/cubejs-client/commit/715e170)), closes [#38](https://github.com/statsbotco/cubejs-client/issues/38)
+
+
+
+
+
 # [0.9.0](https://github.com/statsbotco/cubejs-client/compare/v0.8.7...v0.9.0) (2019-05-11)
 
 **Note:** Version bump only for package @cubejs-client/ngx

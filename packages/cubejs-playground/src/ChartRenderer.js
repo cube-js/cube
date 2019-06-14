@@ -73,7 +73,8 @@ export const ChartRenderer = (props) => {
     error,
     sqlQuery,
     chartLibrary,
-    dashboardSource
+    dashboardSource,
+    cubejsApi
   } = props;
   sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
   const source = sourceCodeFn(props);
@@ -104,6 +105,7 @@ export const ChartRenderer = (props) => {
             codeSandboxSource={withDomRender(source)}
             dependencies={dependencies}
             dashboardSource={dashboardSource}
+            cubejsApi={cubejsApi}
             render={() => jsCompilingError ? (<Alert
               message="Error occurred while compiling JS"
               description={<pre>{jsCompilingError.toString()}</pre>}

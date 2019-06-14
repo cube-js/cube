@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
+import * as PropTypes from 'prop-types';
 import cubejs from '@cubejs-client/core';
 import {
-  Layout, Menu, Button, Tree, Tabs, Dropdown, Spin, Alert
+  Layout, Menu, Button, Tree, Tabs, Dropdown, Spin, Alert, Modal
 } from 'antd';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
@@ -95,6 +96,7 @@ class SchemaPage extends Component {
 
   async generateSchema() {
     const { checkedKeys } = this.state;
+    const { history } = this.props;
     playgroundAction('Generate Schema');
     const res = await fetch('/playground/generate-schema', {
       method: 'POST',
@@ -107,6 +109,16 @@ class SchemaPage extends Component {
       playgroundAction('Generate Schema Success');
       await this.loadFiles();
       this.setState({ checkedKeys: [], activeTab: 'files' });
+      Modal.success({
+        title: 'Schema files successfully generated!',
+        content: 'You can start building the charts',
+        okText: 'Explore',
+        cancelText: 'Close',
+        okCancel: true,
+        onOk() {
+          history.push('/explore');
+        }
+      });
     } else {
       playgroundAction('Generate Schema Fail', { error: await res.text() });
     }
@@ -226,5 +238,9 @@ class SchemaPage extends Component {
     );
   }
 }
+
+SchemaPage.propTypes = {
+  history: PropTypes.object.isRequired
+};
 
 export default SchemaPage;

@@ -449,6 +449,7 @@ const PlaygroundQueryBuilder = ({
               apiUrl={apiUrl}
               cubejsToken={cubejsToken}
               chartType={chartType}
+              cubejsApi={cubejsApi}
               dashboardSource={dashboardSource}
               chartLibrary="bizcharts"
             />

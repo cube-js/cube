@@ -5,7 +5,7 @@ class RedshiftQuery extends PostgresQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
-    return `SELECT f::timestamp date_from, t::timestamp date_to FROM (${values})`;
+    return `SELECT dates.f::timestamp date_from, dates.t::timestamp date_to FROM (${values}) dates`;
   }
 
   nowTimestampSql() {

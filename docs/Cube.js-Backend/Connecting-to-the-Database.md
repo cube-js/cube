@@ -69,3 +69,12 @@ $ cat /path/to/key-file.json | base64
 ```
 
 Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key.
+
+### Connecting to Multiple Databases
+
+Cube.js supports connection to multiple databases out-of-the-box. Please refer to [Multitenancy Guide](multitenancy-setup) to learn more.
+
+### SSL
+
+Cube.js supports connection via SSL for **Postgres** and **Mongo**. To enable it set
+`CUBEJS_DB_SSL` environment variable to `true`.

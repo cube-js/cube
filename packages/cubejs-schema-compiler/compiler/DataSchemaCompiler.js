@@ -110,7 +110,11 @@ class DataSchemaCompiler {
       const content = babelGenerator(ast, {}, file.content).code;
       return Object.assign({}, file, { content });
     } catch (e) {
-      errorsReport.error(e);
+      if (e.toString().indexOf('SyntaxError') !== -1) {
+        errorsReport.error(`Syntax error during '${file.fileName}' parsing: ${e.message}`);
+      } else {
+        errorsReport.error(e);
+      }
     }
     return undefined;
   }

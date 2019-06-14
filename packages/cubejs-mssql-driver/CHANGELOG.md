@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.18](https://github.com/statsbotco/cubejs-client/compare/v0.9.17...v0.9.18) (2019-06-12)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Set default request timeout to 10 minutes ([c411484](https://github.com/statsbotco/cubejs-client/commit/c411484))
+
+
+
+
+
+## [0.9.17](https://github.com/statsbotco/cubejs-client/compare/v0.9.16...v0.9.17) (2019-06-11)
+
+
+### Features
+
+* **mssql-driver:** Add domain env variable ([bb4c4a8](https://github.com/statsbotco/cubejs-client/commit/bb4c4a8))
+
+
+
+
+
+## [0.9.14](https://github.com/statsbotco/cubejs-client/compare/v0.9.13...v0.9.14) (2019-06-07)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
 ## [0.9.4](https://github.com/statsbotco/cubejs-client/compare/v0.9.3...v0.9.4) (2019-05-22)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver

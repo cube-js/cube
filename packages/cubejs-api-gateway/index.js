@@ -4,7 +4,7 @@ const Joi = require('joi');
 const moment = require('moment');
 const dateParser = require('./dateParser');
 
-class UserError extends Error {}
+const UserError = require('./UserError');
 
 const toConfigMap = (metaConfig) => (
   R.pipe(
@@ -71,10 +71,17 @@ const transformValue = (value, type) => {
 
 const transformData = (aliasToMemberNameMap, annotation, data) => (data.map(r => R.pipe(
   R.toPairs,
-  R.map(p => [
-    aliasToMemberNameMap[p[0]],
-    transformValue(p[1], annotation[aliasToMemberNameMap[p[0]]].type)
-  ]),
+  R.map(p => {
+    const memberName = aliasToMemberNameMap[p[0]];
+    const annotationForMember = annotation[memberName];
+    if (!annotationForMember) {
+      throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\``);
+    }
+    return [
+      memberName,
+      transformValue(p[1], annotationForMember.type)
+    ];
+  }),
   R.fromPairs
 )(r)));
 
@@ -230,6 +237,9 @@ class ApiGateway {
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       try {
+        if (!req.query.query) {
+          throw new UserError(`query param is required`);
+        }
         const query = JSON.parse(req.query.query);
         this.log(req, {
           type: 'Load Request',
@@ -273,6 +283,9 @@ class ApiGateway {
 
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
       try {
+        if (!req.query.query) {
+          throw new UserError(`query param is required`);
+        }
         const query = JSON.parse(req.query.query);
         const normalizedQuery = normalizeQuery(query);
         const sqlQuery = await this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req));

@@ -4,6 +4,8 @@ import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
 import { Redirect } from 'react-router-dom';
+import { QueryRenderer } from '@cubejs-client/react';
+import sqlFormatter from "sql-formatter";
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
 
@@ -53,7 +55,9 @@ class ChartContainer extends React.Component {
   }
 
   render() {
-    const { redirectToDashboard, showCode, sandboxId, addingToDashboard } = this.state;
+    const {
+      redirectToDashboard, showCode, sandboxId, addingToDashboard
+    } = this.state;
     const {
       resultSet,
       error,
@@ -63,7 +67,9 @@ class ChartContainer extends React.Component {
       codeSandboxSource,
       dependencies,
       dashboardSource,
-      hideActions
+      hideActions,
+      query,
+      cubejsApi
     } = this.props;
 
     if (redirectToDashboard) {
@@ -94,13 +100,24 @@ class ChartContainer extends React.Component {
           <Button
             onClick={() => {
               playgroundAction('Show Code');
-              this.setState({ showCode: !showCode });
+              this.setState({ showCode: showCode === 'code' ? null : 'code' });
             }}
             icon="code"
             size="small"
-            type={showCode ? 'primary' : 'default'}
+            type={showCode === 'code' ? 'primary' : 'default'}
           >
-            {showCode ? 'Hide Code' : 'Show Code'}
+            Code
+          </Button>
+          <Button
+            onClick={() => {
+              playgroundAction('Show SQL');
+              this.setState({ showCode: showCode === 'sql' ? null : 'sql' });
+            }}
+            icon="question-circle"
+            size="small"
+            type={showCode === 'sql' ? 'primary' : 'default'}
+          >
+            SQL
           </Button>
           <Button
             icon="code-sandbox"
@@ -114,13 +131,29 @@ class ChartContainer extends React.Component {
       </form>
     );
 
+    const code = () => {
+      if (showCode === 'code') {
+        return <PrismCode code={codeExample} />;
+      } else if (showCode === 'sql') {
+        return (
+          <QueryRenderer
+            loadSql="only"
+            query={query}
+            cubejsApi={cubejsApi}
+            render={({ sqlQuery }) => <PrismCode code={sqlQuery && sqlFormatter.format(sqlQuery.sql())} />}
+          />
+        );
+      }
+      return null;
+    };
+
     return hideActions ? render({ resultSet, error, sandboxId }) : (
       <Card
         title={title}
         style={{ minHeight: 420 }}
         extra={extra}
       >
-        {showCode ? <PrismCode code={codeExample} /> : render({ resultSet, error, sandboxId })}
+        {showCode ? code() : render({ resultSet, error, sandboxId })}
       </Card>
     );
   }

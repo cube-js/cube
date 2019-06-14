@@ -11,12 +11,10 @@ const os = require('os');
 const chalk = require('chalk');
 const spawn = require('cross-spawn');
 const crypto = require('crypto');
-const Analytics = require('analytics-node');
 
-const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
-const { machineIdSync } = require('node-machine-id');
-const { promisify } = require('util');
 const templates = require('./templates');
+const { token, defaultExpiry, collect } = require('./token');
+const { requireFromPackage, event, displayError } = require('./utils');
 
 const packageJson = require('./package.json');
 
@@ -36,46 +34,10 @@ const executeCommand = (command, args) => {
   });
 };
 
-const anonymousId = machineIdSync();
-
-const event = async (name, props) => {
-  try {
-    client.track({
-      event: name,
-      anonymousId,
-      properties: props
-    });
-    await promisify(client.flush.bind(client))();
-  } catch (e) {
-    // ignore
-  }
-};
-
 const writePackageJson = async (json) => fs.writeJson('package.json', json, {
   spaces: 2,
   EOL: os.EOL
 });
-
-const displayError = async (text, options) => {
-  console.error('');
-  console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
-  console.error('');
-  if (Array.isArray(text)) {
-    text.forEach((str) => console.error(str));
-  } else {
-    console.error(text);
-  }
-  console.error('');
-  console.error(chalk.yellow('Need some help? -------------------------------------'));
-  await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString(), ...options });
-  console.error('');
-  console.error(`${chalk.yellow(`  Ask this question in Cube.js Slack:`)} https://cubejs-community.herokuapp.com`);
-  console.error(`${chalk.yellow(`  Post an issue:`)} https://github.com/statsbotco/cube.js/issues`);
-  console.error('');
-  process.exit(1);
-};
-
-const requireFromPackage = (module) => require(path.join(process.cwd(), 'node_modules', module));
 
 const npmInstall = (dependencies, isDev) => executeCommand(
   'npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies)
@@ -128,8 +90,11 @@ const createApp = async (projectName, options) => {
   await npmInstall(['@cubejs-backend/server']);
 
   logStage('Installing DB driver dependencies');
-  const CubejsServer = requireFromPackage('@cubejs-backend/server');
+  const CubejsServer = await requireFromPackage('@cubejs-backend/server');
   let driverDependencies = CubejsServer.driverDependencies(options.dbType);
+  if (!driverDependencies) {
+    await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
+  }
   driverDependencies = Array.isArray(driverDependencies) ? driverDependencies : [driverDependencies];
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
     driverDependencies.push('node-java-maven');
@@ -159,7 +124,7 @@ const createApp = async (projectName, options) => {
 
   logStage('Writing files from template');
 
-  const driverClass = requireFromPackage(driverDependencies[0]);
+  const driverClass = await requireFromPackage(driverDependencies[0]);
 
   const templateConfig = templates[template];
   const env = {
@@ -190,6 +155,7 @@ const createApp = async (projectName, options) => {
   console.log(`📊 Next step: run dev server`);
   console.log();
   console.log(`     $ cd ${projectName}`);
+  console.log(`     Edit .env file to set your DB credentials`);
   console.log(`     $ npm run dev`);
   console.log();
 };
@@ -213,7 +179,7 @@ const generateSchema = async (options) => {
   }
 
   logStage('Fetching DB schema');
-  const CubejsServer = requireFromPackage('@cubejs-backend/server');
+  const CubejsServer = await requireFromPackage('@cubejs-backend/server');
   const driver = await CubejsServer.createDriver();
   await driver.testConnection();
   const dbSchema = await driver.tablesSchema();
@@ -222,8 +188,8 @@ const generateSchema = async (options) => {
   }
 
   logStage('Generating schema files');
-  const ScaffoldingTemplate = requireFromPackage('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
-  const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema);
+  const ScaffoldingTemplate = await requireFromPackage('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
+  const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
   const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
   await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 
@@ -273,6 +239,23 @@ program
     console.log('Examples:');
     console.log('');
     console.log('  $ cubejs generate -t orders,customers');
+  });
+
+program
+  .command('token')
+  .option('-e, --expiry [expiry]', 'Token expiry. Set to 0 for no expiry', defaultExpiry)
+  .option('-s, --secret [secret]', 'Cube.js app secret. Also can be set via environment variable CUBEJS_API_SECRET')
+  .option('-p, --payload [values]', 'Payload. Example: -p foo=bar', collect, [])
+  .description('Create JWT token')
+  .action(
+    (options) => token(options)
+      .catch(e => displayError(e.stack || e))
+  )
+  .on('--help', () => {
+    console.log('');
+    console.log('Examples:');
+    console.log('');
+    console.log('  $ cubejs token -e "1 day" -p foo=bar -p cool=true');
   });
 
 if (!process.argv.slice(2).length) {

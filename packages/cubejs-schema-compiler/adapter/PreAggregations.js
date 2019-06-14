@@ -418,15 +418,13 @@ class PreAggregations {
     );
     const filters =
       segmentFilters
-      .concat(this.query.filters).concat(this.query.timeDimensions.map(dimension =>
-      dimension.dateRange && ({
-        filterToWhere: () => this.query.timeRangeFilter(
-          this.query.dimensionSql(dimension),
-          this.query.timeStampInClientTz(dimension.dateFromParam()),
-          this.query.timeStampInClientTz(dimension.dateToParam())
-        )
-      })
-    ));
+        .concat(this.query.filters).concat(this.query.timeDimensions.map(dimension => dimension.dateRange && ({
+          filterToWhere: () => this.query.timeRangeFilter(
+            this.query.dimensionSql(dimension),
+            this.query.timeStampInClientTz(dimension.dateFromParam()),
+            this.query.timeStampInClientTz(dimension.dateToParam())
+          )
+        }))).filter(f => !!f);
 
     const renderedReference = R.pipe(
       R.map(path => {

@@ -3,9 +3,17 @@ const ScaffoldingSchema = require('./ScaffoldingSchema');
 const UserError = require('../compiler/UserError');
 
 class ScaffoldingTemplate {
-  constructor(dbSchema) {
+  constructor(dbSchema, driver) {
     this.dbSchema = dbSchema;
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema);
+    this.driver = driver;
+  }
+
+  escapeName(name) {
+    if (name.match(/^[a-z0-9_]+$/)) {
+      return name;
+    }
+    return this.driver.quoteIdentifier(name);
   }
 
   generateFilesByTableNames(tableNames) {
@@ -13,7 +21,7 @@ class ScaffoldingTemplate {
     return schemaForTables.map(tableSchema => ({
       fileName: tableSchema.cube + '.js',
       content: this.renderFile(this.schemaDescriptorForTable(tableSchema))
-    }))
+    }));
   }
 
   resolveTableName(tableName) {
@@ -40,16 +48,16 @@ class ScaffoldingTemplate {
   schemaDescriptorForTable(tableSchema) {
     return {
       cube: tableSchema.cube,
-      sql: `SELECT * FROM ${tableSchema.schema}.${tableSchema.table}`, // TODO escape
+      sql: `SELECT * FROM ${this.escapeName(tableSchema.schema)}.${this.escapeName(tableSchema.table)}`, // TODO escape
       joins: tableSchema.joins.map(j => ({
         [j.cubeToJoin]: {
-          sql: `\${CUBE}.${j.thisTableColumn} = \${${j.cubeToJoin}}.${j.columnToJoin}`,
+          sql: `\${CUBE}.${this.escapeName(j.thisTableColumn)} = \${${j.cubeToJoin}}.${this.escapeName(j.columnToJoin)}`,
           relationship: j.relationship
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       measures: tableSchema.measures.map(m => ({
         [this.memberName(m)]: {
-          sql: m.name,
+          sql: `${this.escapeName(m.name) !== m.name ? '${CUBE}.' : ''}${this.escapeName(m.name)}`,
           type: m.types[0],
           title: this.memberTitle(m)
         }
@@ -61,7 +69,7 @@ class ScaffoldingTemplate {
       }),
       dimensions: tableSchema.dimensions.map(m => ({
         [this.memberName(m)]: {
-          sql: m.name,
+          sql: `${this.escapeName(m.name) !== m.name ? '${CUBE}.' : ''}${this.escapeName(m.name)}`,
           type: m.types[0],
           title: this.memberTitle(m),
           primaryKey: m.isPrimaryKey ? true : undefined

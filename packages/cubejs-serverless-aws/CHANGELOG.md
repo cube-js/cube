@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.19](https://github.com/statsbotco/cubejs-client/compare/v0.9.18...v0.9.19) (2019-06-13)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.9.17](https://github.com/statsbotco/cubejs-client/compare/v0.9.16...v0.9.17) (2019-06-11)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.9.16](https://github.com/statsbotco/cubejs-client/compare/v0.9.15...v0.9.16) (2019-06-10)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.9.15](https://github.com/statsbotco/cubejs-client/compare/v0.9.14...v0.9.15) (2019-06-07)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.9.14](https://github.com/statsbotco/cubejs-client/compare/v0.9.13...v0.9.14) (2019-06-07)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.9.13](https://github.com/statsbotco/cubejs-client/compare/v0.9.12...v0.9.13) (2019-06-06)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.9.12](https://github.com/statsbotco/cubejs-client/compare/v0.9.11...v0.9.12) (2019-06-03)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.9.11](https://github.com/statsbotco/cubejs-client/compare/v0.9.10...v0.9.11) (2019-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
 ## [0.9.6](https://github.com/statsbotco/cubejs-client/compare/v0.9.5...v0.9.6) (2019-05-24)
 
 **Note:** Version bump only for package @cubejs-backend/serverless-aws
