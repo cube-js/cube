@@ -237,7 +237,7 @@ class ApiGateway {
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       try {
-        if (!req.query.query) {
+        if (!req.query.query || req.query.query === 'undefined') {
           throw new UserError(`query param is required`);
         }
         const query = JSON.parse(req.query.query);
@@ -283,7 +283,7 @@ class ApiGateway {
 
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
       try {
-        if (!req.query.query) {
+        if (!req.query.query || req.query.query === 'undefined') {
           throw new UserError(`query param is required`);
         }
         const query = JSON.parse(req.query.query);
