@@ -3,6 +3,80 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.19](https://github.com/statsbotco/cubejs-client/compare/v0.9.18...v0.9.19) (2019-06-13)
+
+
+### Bug Fixes
+
+* **serverless:** remove redundant CUBEJS_API_URL env variable: Serverless offline framework support ([84a20b3](https://github.com/statsbotco/cubejs-client/commit/84a20b3)), closes [#121](https://github.com/statsbotco/cubejs-client/issues/121)
+
+
+
+
+
+## [0.9.17](https://github.com/statsbotco/cubejs-client/compare/v0.9.16...v0.9.17) (2019-06-11)
+
+
+### Bug Fixes
+
+* **cli:** jdbc-driver fail hides db type not supported errors ([6f7c675](https://github.com/statsbotco/cubejs-client/commit/6f7c675))
+
+
+
+
+
+## [0.9.16](https://github.com/statsbotco/cubejs-client/compare/v0.9.15...v0.9.16) (2019-06-10)
+
+
+### Features
+
+* **cli:** Edit .env after app create help instruction ([f039c01](https://github.com/statsbotco/cubejs-client/commit/f039c01))
+
+
+
+
+
+## [0.9.13](https://github.com/statsbotco/cubejs-client/compare/v0.9.12...v0.9.13) (2019-06-06)
+
+**Note:** Version bump only for package cubejs-cli
+
+
+
+
+
+## [0.9.10](https://github.com/statsbotco/cubejs-client/compare/v0.9.9...v0.9.10) (2019-05-29)
+
+
+### Bug Fixes
+
+* **cli:** @cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate dependency not found ([4296204](https://github.com/statsbotco/cubejs-client/commit/4296204))
+
+
+
+
+
+## [0.9.9](https://github.com/statsbotco/cubejs-client/compare/v0.9.8...v0.9.9) (2019-05-29)
+
+
+### Bug Fixes
+
+* **cli:** missing package files ([81e8549](https://github.com/statsbotco/cubejs-client/commit/81e8549))
+
+
+
+
+
+## [0.9.8](https://github.com/statsbotco/cubejs-client/compare/v0.9.7...v0.9.8) (2019-05-29)
+
+
+### Features
+
+* **cubejs-cli:** add token generation ([#67](https://github.com/statsbotco/cubejs-client/issues/67)) ([2813fed](https://github.com/statsbotco/cubejs-client/commit/2813fed))
+
+
+
+
+
 # [0.9.0](https://github.com/statsbotco/cubejs-client/compare/v0.8.7...v0.9.0) (2019-05-11)
 
 **Note:** Version bump only for package cubejs-cli

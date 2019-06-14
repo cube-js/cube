@@ -372,7 +372,7 @@ class PreAggregations {
     this.queryCache = queryCache;
     this.refreshErrors = {}; // TODO should be in redis
     this.tablesUsedInQuery = {}; // TODO should be in redis
-    this.cacheDriver = process.env.NODE_ENV === 'production' || process.env.REDIS_URL ?
+    this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver() :
       new LocalCacheDriver();
     this.externalDriverFactory = options.externalDriverFactory;
@@ -416,7 +416,12 @@ class PreAggregations {
           new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this)
         );
         return loader.refresh(newVersionEntry)(client);
-      }, { concurrency: 1, logger: this.logger, ...this.options.queueOptions });
+      }, {
+        concurrency: 1,
+        logger: this.logger,
+        cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+        ...this.options.queueOptions
+      });
     }
     return this.queue;
   }

@@ -33,6 +33,8 @@ const DRILL_MEMBERS_DICTIONARY = [
   'date'
 ];
 
+const idRegex = '_id$|id$';
+
 class ScaffoldingSchema {
   constructor(dbSchema) {
     this.dbSchema = dbSchema;
@@ -69,7 +71,7 @@ class ScaffoldingSchema {
     }
     if (!this.dbSchema[schema][table]) {
       throw new UserError(`Can't resolve ${tableName}: '${table}' does not exist`);
-    }
+    } 
     return this.dbSchema[schema][table];
   }
 
@@ -116,7 +118,7 @@ class ScaffoldingSchema {
 
   numberMeasures(tableDefinition) {
     return tableDefinition.filter(column =>
-      !column.name.startsWith('_') &&
+      !column.name.startsWith('_') && 
       (this.columnType(column) === 'number') &&
       this.fromMeasureDictionary(column)
     ).map(column => ({
@@ -127,7 +129,7 @@ class ScaffoldingSchema {
   }
 
   fromMeasureDictionary(column) {
-    return !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().indexOf(word) !== -1)
+    return !column.name.match(new RegExp(idRegex, "i")) && !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().endsWith(word));
   }
 
   dimensionColumns(tableDefinition) {
@@ -149,9 +151,9 @@ class ScaffoldingSchema {
 
   joins(tableName, tableDefinition) {
     return R.unnest(tableDefinition
-      .filter(column => column.name.toLowerCase().indexOf('id') !== -1 && column.name.toLowerCase() !== 'id')
+      .filter(column => (column.name.match(new RegExp(idRegex, "i")) && column.name.toLowerCase() !== 'id'))
       .map(column => {
-        const withoutId = column.name.replace('_id', '').replace('id', '');
+        const withoutId = column.name.replace(new RegExp(idRegex, "i"), '');
         const tablesToJoin = this.tableNamesToTables[withoutId] || this.tableNamesToTables[inflection.tableize(withoutId)];
 
         if (!tablesToJoin) {

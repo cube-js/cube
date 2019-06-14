@@ -3950,7 +3950,7 @@
 
 	function getPromiseCtor(promiseCtor) {
 	  if (!promiseCtor) {
-	    promiseCtor = Promise;
+	    promiseCtor = config.Promise || Promise;
 	  }
 
 	  if (!promiseCtor) {

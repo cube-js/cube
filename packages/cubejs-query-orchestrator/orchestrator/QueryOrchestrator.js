@@ -8,15 +8,24 @@ class QueryOrchestrator {
     this.driverFactory = driverFactory;
     this.logger = logger;
     const { externalDriverFactory } = options;
+    const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
+      process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
+    );
+    if (cacheAndQueueDriver !== 'redis' && cacheAndQueueDriver !== 'memory') {
+      throw new Error(`Only 'redis' or 'memory' are supported for cacheAndQueueDriver option`);
+    }
+
     this.queryCache = new QueryCache(
       this.redisPrefix, this.driverFactory, this.logger, {
         externalDriverFactory,
+        cacheAndQueueDriver,
         ...options.queryCacheOptions,
       }
     );
     this.preAggregations = new PreAggregations(
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
+        cacheAndQueueDriver,
         ...options.preAggregationsOptions
       }
     );

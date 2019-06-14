@@ -2,6 +2,10 @@ const ScaffoldingSchema = require('../scaffolding/ScaffoldingSchema');
 const ScaffoldingTemplate = require('../scaffolding/ScaffoldingTemplate');
 require('should');
 
+const driver = {
+  quoteIdentifier: (name) => `"${name}"`
+};
+
 describe('ScaffoldingSchema', () => {
   it('schema', () => {
     const schema = new ScaffoldingSchema({
@@ -27,10 +31,35 @@ describe('ScaffoldingSchema', () => {
           "name": "name",
           "type": "character varying",
           "attributes": []
-        }]
+        }, {
+          "name": "account_id",
+          "type": "integer",
+          "attributes": []
+        }],
+        accounts: [{
+          "name": "id",
+          "type": "integer",
+          "attributes": []
+        }, {
+          "name": "username",
+          "type": "character varying",
+          "attributes": []
+        }, {
+          "name": "password",
+          "type": "character varying",
+          "attributes": []
+        }, {
+          "name": "failure_count",
+          "type": "integer",
+          "attributes": []
+        }, {
+          "name": "account_status",
+          "type": "character varying",
+          "attributes": []
+        }],
       }
-    });
-    let schemaForTables = schema.generateForTables(['public.orders', 'public.customers']);
+    }, driver);
+    const schemaForTables = schema.generateForTables(['public.orders', 'public.customers', 'public.accounts']);
     schemaForTables.should.be.deepEqual([
       {
         "cube": "Orders",
@@ -121,9 +150,88 @@ describe('ScaffoldingSchema', () => {
             "isPrimaryKey": false
           }
         ],
+        "joins": [
+          {
+            "thisTableColumn": "account_id",
+            "tableName": "public.accounts",
+            "cubeToJoin": "Accounts",
+            "columnToJoin": "id",
+            "relationship": "belongsTo"
+          }
+        ]
+      },
+      {
+        "cube": "Accounts",
+        "schema": "public",
+        "table": "accounts",
+        "tableName": "public.accounts",
+        "measures": [
+          {
+            "name": "failure_count",
+            "types": [
+              "sum",
+              "avg",
+              "min",
+              "max"
+            ],
+            "title": "Failure Count"
+          }
+        ],
+        "dimensions": [
+          {
+            "name": "id",
+            "types": [
+              "number"
+            ],
+            "title": "Id",
+            "isPrimaryKey": true
+          },
+          {
+            "name": "username",
+            "types": [
+              "string"
+            ],
+            "title": "Username",
+            "isPrimaryKey": false
+          },
+          {
+            "name": "password",
+            "types": [
+              "string"
+            ],
+            "title": "Password",
+            "isPrimaryKey": false
+          },
+          {
+            "name": "account_status",
+            "types": [
+              "string"
+            ],
+            "title": "Account Status",
+            "isPrimaryKey": false
+          }
+        ],
+        "drillMembers": [
+          {
+            "name": "id",
+            "types": [
+              "number"
+            ],
+            "title": "Id",
+            "isPrimaryKey": true
+          },
+          {
+            "name": "username",
+            "types": [
+              "string"
+            ],
+            "title": "Username",
+            "isPrimaryKey": false
+          }
+        ],
         "joins": []
       }
-    ])
+    ]);
   });
 
   it('template', () => {
@@ -138,7 +246,7 @@ describe('ScaffoldingSchema', () => {
           "type": "integer",
           "attributes": []
         }, {
-          "name": "customer_id",
+          "name": "customerId",
           "type": "integer",
           "attributes": []
         }],
@@ -154,10 +262,31 @@ describe('ScaffoldingSchema', () => {
           "name": "name",
           "type": "character varying",
           "attributes": []
+        }, {
+          "name": "accountId",
+          "type": "integer",
+          "attributes": []
+        }],
+        accounts: [{
+          "name": "id",
+          "type": "integer",
+          "attributes": []
+        }, {
+          "name": "username",
+          "type": "character varying",
+          "attributes": []
+        }, {
+          "name": "password",
+          "type": "character varying",
+          "attributes": []
+        }, {
+          "name": "failureCount",
+          "type": "integer",
+          "attributes": []
         }]
       }
-    });
-    template.generateFilesByTableNames(['public.orders', 'public.customers']).should.be.deepEqual([
+    }, driver);
+    template.generateFilesByTableNames(['public.orders', 'public.customers', 'public.accounts']).should.be.deepEqual([
       {
         fileName: 'Orders.js',
         content: `cube(\`Orders\`, {
@@ -165,7 +294,7 @@ describe('ScaffoldingSchema', () => {
   
   joins: {
     Customers: {
-      sql: \`\${CUBE}.customer_id = \${Customers}.id\`,
+      sql: \`\${CUBE}."customerId" = \${Customers}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -198,7 +327,10 @@ describe('ScaffoldingSchema', () => {
   sql: \`SELECT * FROM public.customers\`,
   
   joins: {
-    
+    Accounts: {
+      sql: \`\${CUBE}."accountId" = \${Accounts}.id\`,
+      relationship: \`belongsTo\`
+    }
   },
   
   measures: {
@@ -227,7 +359,48 @@ describe('ScaffoldingSchema', () => {
   }
 });
 `
+      },
+      {
+        fileName: 'Accounts.js',
+        content: `cube(\`Accounts\`, {
+  sql: \`SELECT * FROM public.accounts\`,
+  
+  joins: {
+    
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`,
+      drillMembers: [id, username]
+    },
+    
+    failurecount: {
+      sql: \`\${CUBE}."failureCount"\`,
+      type: \`sum\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    username: {
+      sql: \`username\`,
+      type: \`string\`
+    },
+    
+    password: {
+      sql: \`password\`,
+      type: \`string\`
+    }
+  }
+});
+`
       }
-    ])
+    ]);
   });
 });

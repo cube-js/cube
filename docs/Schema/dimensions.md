@@ -89,10 +89,10 @@ size: {
   type: `string`,
   case: {
     when: [
-        { sql: `${TABLE}.meta_value = 'xl-en'`, label: `xl` },
-        { sql: `${TABLE}.meta_value = 'xl'`, label: `xl` },
-        { sql: `${TABLE}.meta_value = 'xxl-en'`, label: `xxl` },
-        { sql: `${TABLE}.meta_value = 'xxl'`, label: `xxl` },
+        { sql: `${CUBE}.meta_value = 'xl-en'`, label: `xl` },
+        { sql: `${CUBE}.meta_value = 'xl'`, label: `xl` },
+        { sql: `${CUBE}.meta_value = 'xxl-en'`, label: `xxl` },
+        { sql: `${CUBE}.meta_value = 'xxl'`, label: `xxl` },
     ],
     else: { label: `Unknown` }
   }

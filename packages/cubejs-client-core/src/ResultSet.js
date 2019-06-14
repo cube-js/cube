@@ -66,6 +66,11 @@ export default class ResultSet {
       x: query.dimensions || [],
       y: []
     });
+    pivotConfig.x = pivotConfig.x || [];
+    pivotConfig.y = pivotConfig.y || [];
+    const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+    const allDimensions = timeDimensions.map(td => td.dimension).concat(query.dimensions);
+    pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(d => allIncludedDimensions.indexOf(d) === -1));
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
     }
@@ -148,7 +153,10 @@ export default class ResultSet {
     const allYValues = pipe(
       map(
         // eslint-disable-next-line no-unused-vars
-        ([xValuesString, rows]) => unnest(rows.map(({ row }) => this.axisValues(pivotConfig.y)(row)))
+        ([xValuesString, rows]) => unnest(
+          // collect Y values only from filled rows
+          rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
+        )
       ),
       unnest,
       uniq

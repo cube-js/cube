@@ -127,7 +127,7 @@ class BaseFilter extends BaseDimension {
   }
 
   inPlaceholders() {
-    return `(${join(', ', repeat('?', this.values.length || 1))})`;
+    return `(${join(', ', repeat(this.castParameter(), this.values.length || 1))})`;
   }
 
   inWhere(column) {

@@ -79,14 +79,6 @@ provider:
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
     NODE_ENV: "\${self:provider.stage}"
-    CUBEJS_API_URL:
-      Fn::Join:
-        - ""
-        - - "https://"
-          - Ref: "ApiGatewayRestApi"
-          - ".execute-api."
-          - Ref: "AWS::Region"
-          - ".amazonaws.com/\${self:provider.stage}"
     AWS_ACCOUNT_ID:
       Fn::Join:
         - ""

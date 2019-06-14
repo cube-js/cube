@@ -25,7 +25,7 @@ class QueryQueue {
       heartBeatTimeout: this.heartBeatInterval * 4,
       createRedisClient: options.createRedisClient
     };
-    this.queueDriver = process.env.NODE_ENV === 'production' || process.env.REDIS_URL || !!options.createRedisClient ?
+    this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :
       new LocalQueueDriver(queueDriverOptions);
   }

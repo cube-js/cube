@@ -142,6 +142,10 @@ class MongoBIDriver extends BaseDriver {
   informationSchemaQuery() {
     return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
   }
+
+  quoteIdentifier(identifier) {
+    return `\`${identifier}\``;
+  }
 }
 
 module.exports = MongoBIDriver;
