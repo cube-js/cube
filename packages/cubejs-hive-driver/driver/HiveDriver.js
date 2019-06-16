@@ -28,7 +28,6 @@ IDLFactory.extractConfig = (config) => {
       path: `../../../idl/Hive_${config.HiveVer}`
     };
   }
-  console.log('Old');
 
   return oldExtractConfig(config);
 };
@@ -47,7 +46,7 @@ class HiveDriver extends BaseDriver {
       username: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
       hiveType: process.env.CUBEJS_DB_HIVE_TYPE === 'CDH' ? HS2Util.HIVE_TYPE.CDH : HS2Util.HIVE_TYPE.HIVE,
-      hiveVer: process.env.CUBEJS_DB_HIVE_VER || '2.3.1',
+      hiveVer: process.env.CUBEJS_DB_HIVE_VER || '2.1.1',
       thriftVer: process.env.CUBEJS_DB_HIVE_THRIFT_VER || '0.9.3',
       cdhVer: process.env.CUBEJS_DB_HIVE_CDH_VER,
       authZid: 'cube.js',
@@ -77,7 +76,14 @@ class HiveDriver extends BaseDriver {
   }
 
   async testConnection() {
-    return this.query('SELECT 1');
+    // eslint-disable-next-line no-underscore-dangle
+    const conn = await this.pool._factory.create();
+    try {
+      return await this.query('SELECT 1', [], conn);
+    } finally {
+      // eslint-disable-next-line no-underscore-dangle
+      await this.pool._factory.destroy(conn);
+    }
   }
 
   sleep(ms) {
@@ -86,10 +92,10 @@ class HiveDriver extends BaseDriver {
     });
   }
 
-  async query(query, values) {
+  async query(query, values, conn) {
     values = values || [];
     const sql = SqlString.format(query, values);
-    const connection = await this.pool.acquire();
+    const connection = conn || await this.pool.acquire();
     try {
       const execResult = await connection.cursor.execute(sql);
       while (true) {
@@ -119,7 +125,9 @@ class HiveDriver extends BaseDriver {
       }
       return allRows;
     } finally {
-      this.pool.release(connection);
+      if (!conn) {
+        this.pool.release(connection);
+      }
     }
   }
 
