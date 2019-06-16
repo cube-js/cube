@@ -1062,7 +1062,10 @@ class BaseQuery {
     if (((this.evaluateSymbolContext || {}).renderedReference || {})[measurePath]) {
       return this.evaluateSymbolContext.renderedReference[measurePath];
     }
-    if (this.safeEvaluateSymbolContext().ungrouped) {
+    if (
+      this.safeEvaluateSymbolContext().ungrouped ||
+      this.safeEvaluateSymbolContext().ungroupedForWrappingGroupBy
+    ) {
       return evaluateSql;
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath]) {

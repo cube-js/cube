@@ -126,12 +126,14 @@ class HiveDriver extends BaseDriver {
   async tablesSchema() {
     const tables = await this.query(`show tables in ${this.config.dbName}`);
 
-    return (await Promise.all(tables.map(async table => {
-      const columns = await this.query(`describe ${this.config.dbName}.${table.tab_name}`);
-      return {
-        [table.tab_name]: columns.map(c => ({ name: c.col_name, type: c.data_type }))
-      };
-    }))).reduce((a, b) => ({ ...a, ...b }), {});
+    return {
+      [this.config.dbName]: (await Promise.all(tables.map(async table => {
+        const columns = await this.query(`describe ${this.config.dbName}.${table.tab_name}`);
+        return {
+          [table.tab_name]: columns.map(c => ({ name: c.col_name, type: c.data_type }))
+        };
+      }))).reduce((a, b) => ({ ...a, ...b }), {})
+    };
   }
 
   async release() {

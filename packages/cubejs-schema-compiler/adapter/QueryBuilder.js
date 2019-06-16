@@ -8,6 +8,7 @@ const prestodb = require('./PrestodbQuery');
 const vertica = require('./VerticaQuery');
 const snowflake = require('./SnowflakeQuery');
 const clickhouse = require('./ClickHouseQuery');
+const hive = require('./HiveQuery');
 
 const ADAPTERS = {
   postgres,
@@ -22,6 +23,7 @@ const ADAPTERS = {
   vertica,
   snowflake,
   clickhouse,
+  hive,
 };
 exports.query = (compilers, dbType, queryOptions) => {
   if (!ADAPTERS[dbType]) {
