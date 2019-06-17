@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.23](https://github.com/statsbotco/cubejs-client/compare/v0.9.22...v0.9.23) (2019-06-17)
+
+
+### Bug Fixes
+
+* **hive-driver:** SparkSQL compatibility ([1f20225](https://github.com/statsbotco/cubejs-client/commit/1f20225))
+
+
+
+
+
 ## [0.9.22](https://github.com/statsbotco/cubejs-client/compare/v0.9.21...v0.9.22) (2019-06-16)
 
 
