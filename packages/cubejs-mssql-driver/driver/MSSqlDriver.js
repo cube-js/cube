@@ -43,14 +43,18 @@ class MSSqlDriver extends BaseDriver {
   }
 
   query(query, values) {
-    return this.initialConnectPromise.then((pool) => {
+    let cancelFn = null;
+    const promise = this.initialConnectPromise.then((pool) => {
       const request = pool.request();
       (values || []).forEach((v, i) => request.input(`_${i + 1}`, v));
 
       // TODO time zone UTC set in driver ?
 
+      cancelFn = () => request.cancel();
       return request.query(query).then(res => res.recordset);
     });
+    promise.cancel = () => cancelFn && cancelFn();
+    return promise;
   }
 
   param(paramIndex) {
