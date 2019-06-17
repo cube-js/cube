@@ -62,6 +62,32 @@ class HiveDriver extends BaseDriver {
         );
         const hiveConnection = new HiveConnection(configuration, idl);
         hiveConnection.cursor = await hiveConnection.connect();
+        hiveConnection.cursor.getOperationStatus = function () {
+          return new Promise((resolve, reject) => {
+            const serviceType = this.Conn.IDL.ServiceType;
+            const request = new serviceType.TGetOperationStatusReq({
+              operationHandle: this.OperationHandle,
+            });
+
+            this.Client.GetOperationStatus(request, (err, res) => {
+              if (err) {
+                reject(new Error(err));
+              } else if (
+                res.status.statusCode === serviceType.TStatusCode.ERROR_STATUS ||
+                res.operationState === serviceType.TOperationState.ERROR_STATE
+              ) {
+                // eslint-disable-next-line no-unused-vars
+                const [errorMessage, infoMessage, message] = HS2Util.getThriftErrorMessage(
+                  res.status, 'ExecuteStatement operation fail'
+                );
+
+                reject(new Error(res.errorMessage || message));
+              } else {
+                resolve(res.operationState);
+              }
+            });
+          });
+        };
         return hiveConnection;
       },
       destroy: (connection) => connection.close()
@@ -119,7 +145,7 @@ class HiveDriver extends BaseDriver {
         }
         allRows = allRows.map(
           row => schema
-            .map((column, i) => ({ [column.columnName.replace(/^_u(.+?)\./, '')]: row[i] }))
+            .map((column, i) => ({ [column.columnName.replace(/^_u(.+?)\./, '')]: row[i] === 'NULL' ? null : row[i] })) // TODO NULL
             .reduce((a, b) => ({ ...a, ...b }), {})
         );
       }
@@ -136,9 +162,10 @@ class HiveDriver extends BaseDriver {
 
     return {
       [this.config.dbName]: (await Promise.all(tables.map(async table => {
-        const columns = await this.query(`describe ${this.config.dbName}.${table.tab_name}`);
+        const tableName = table.tab_name || table.tableName;
+        const columns = await this.query(`describe ${this.config.dbName}.${tableName}`);
         return {
-          [table.tab_name]: columns.map(c => ({ name: c.col_name, type: c.data_type }))
+          [tableName]: columns.map(c => ({ name: c.col_name, type: c.data_type }))
         };
       }))).reduce((a, b) => ({ ...a, ...b }), {})
     };
