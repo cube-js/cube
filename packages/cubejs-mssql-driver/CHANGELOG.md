@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.24](https://github.com/statsbotco/cubejs-client/compare/v0.9.23...v0.9.24) (2019-06-17)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Fix domain passed as an empty string case: ConnectionError: Login failed. The login is from an untrusted domain and cannot be used with Windows authentication ([89383dc](https://github.com/statsbotco/cubejs-client/commit/89383dc))
+
+
+### Features
+
+* **mssql-driver:** Support query cancellation ([22a4bba](https://github.com/statsbotco/cubejs-client/commit/22a4bba))
+
+
+
+
+
 ## [0.9.18](https://github.com/statsbotco/cubejs-client/compare/v0.9.17...v0.9.18) (2019-06-12)
 
 
