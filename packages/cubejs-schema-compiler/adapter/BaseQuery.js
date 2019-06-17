@@ -1066,7 +1066,7 @@ class BaseQuery {
       this.safeEvaluateSymbolContext().ungrouped ||
       this.safeEvaluateSymbolContext().ungroupedForWrappingGroupBy
     ) {
-      return evaluateSql;
+      return evaluateSql === '*' ? '1' : evaluateSql;
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath];
