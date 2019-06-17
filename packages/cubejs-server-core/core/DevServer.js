@@ -27,7 +27,7 @@ class DevServer {
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
     const jwt = require('jsonwebtoken');
     const cubejsToken = jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' });
-    if (process.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production') {
       console.log(`🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.`);
     } else {
       console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
