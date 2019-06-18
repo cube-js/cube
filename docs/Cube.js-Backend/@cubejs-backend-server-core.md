@@ -41,11 +41,13 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
 ```javascript
 {
   dbType: String | Function,
+  externalDbType: String | Function,
   schemaPath: String,
   basePath: String,
   devServer: Boolean,
   logger: Function,
   driverFactory: Function,
+  externalDriverFactory: Function,
   contextToAppId: Function,
   repositoryFactory: Function,
   checkAuthMiddleware: Function,
@@ -78,6 +80,13 @@ Either `String` or `Function` could be passed. Providing a `Function` allows to 
 
 If no option is passed, Cube.js will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve `dbType`.
+
+### externalDbType
+
+Should be used in conjunction with [externalDriverFactory](#external-driver-factory) option.
+Either `String` or `Function` could be passed.
+Providing a `Function` allows to dynamically select a database type depending on the user's context.
+It is usually used in [Multitenancy Setup](multitenancy-setup).
 
 ### schemaPath
 
@@ -116,6 +125,29 @@ const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 CubejsServerCore.create({
   driverFactory: () => new PostgresDriver();
+})
+```
+
+### externalDriverFactory
+
+Set database driver for external rollup database.
+Please refer to [External Rollup](pre-aggregations#external-rollup) documentation for more info.
+The function accepts context object as an argument
+to let dynamically load database drivers, which is usually used
+in [Multitenancy Applications](multitenancy-setup).
+
+```javascript
+const MySQLDriver = require('@cubejs-backend/mysql-driver');
+
+CubejsServerCore.create({
+  externalDbType: 'mysql',
+  externalDriverFactory: () => new MySQLDriver({
+    host: process.env.CUBEJS_EXT_DB_HOST,
+    database: process.env.CUBEJS_EXT_DB_NAME,
+    port: process.env.CUBEJS_EXT_DB_PORT,
+    user: process.env.CUBEJS_EXT_DB_USER,
+    password: process.env.CUBEJS_EXT_DB_PASS,
+  })
 })
 ```
 

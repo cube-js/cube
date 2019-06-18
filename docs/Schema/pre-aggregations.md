@@ -141,8 +141,6 @@ These queries won't use `categoryAndDate` pre-aggregation:
 
 ### Time partitioning
 
-_Experimental_
-
 Any rollup and auto rollup pre-aggregation can be partitioned by time using `partitionGranularity` property:
 
 ```javascript
@@ -169,8 +167,6 @@ For example if `partitionGranularity` is set to `month` Cube.js will generate se
 This can reduce rollup refreshing time and cost significantly.
 
 ## Auto Rollup
-
-_Experimental_
 
 Auto rollup is an extension to rollup which instructs Cube.js to select rollup measures and dimensions at query time.
 Cube.js uses query history to select optimal set of measures and dimensions for a given query.
@@ -203,6 +199,38 @@ cube(`Orders`, {
 ```
 
 `maxPreAggregations` sets trade-off between initial waiting time and average response times. More rollup tables you have more time is required to refresh them. On other hand more granular rollup tables reduce average response times. In some cases column count in rollup can affect it's refresh performance as well.
+
+## External Rollup
+
+You should use this option for scenarios where you need to handle high throughput for big data backend.
+It allows to download rollups prepared in big data backends such as AWS Athena, BigQuery, Presto, Hive and others to low latency databases such as MySQL for actual querying.
+While big data backends aren't very suitable for handling massive amounts of concurrent queries even on pre-aggregated data most of single node RDBMS can do it very well if cardinality of data not so big.
+Leveraging this nuance allows to create setup where you can query huge amounts of data with subsecond response times at cost of time to insight delay.
+
+To setup it just add `external` param to your pre-aggregation:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  //...
+
+  preAggregations: {
+    categoryAndDate: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      dimensionReferences: [category],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+      external: true
+    }
+  }
+});
+```
+
+In order to make external pre-aggregations work you should set
+[externalDriverFactory](@cubejs-backend-server-core#external-driver-factory) and [externalDbType](@cubejs-backend-server-core#external-db-type) params while creating your server instance.
 
 ## refreshKey
 
