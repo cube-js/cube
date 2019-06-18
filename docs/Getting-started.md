@@ -90,10 +90,6 @@ cube(`Users`, {
    }
 });
 ```
-<br />
-
-Cube.js collects high-level anonymous usage statistics for servers started in development mode. It doesn't track any credentials, schema contents or queries issued. This statistics is used solely for the purpose of constant cube.js improvement. You can opt out of it any time by setting
-`CUBEJS_TELEMETRY=false`.
 
 ## 4. Visualize Results
 The Cube.js client provides set of methods to access Cube.js API and to work with query result.  The client itself doesn't provide any visualizations and is designed to work with existing chart libraries.
