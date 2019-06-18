@@ -5,17 +5,18 @@ scope: cubejs
 category: Reference
 subCategory: Reference
 menuOrder: 4
+proofread: 06/18/2019
 ---
 
-`Dimensions` parameter contains a set of dimensions. You can think about dimension as an attribute related to a measure, e.g. measure `userCount` can have dimensions like `country`, `age`, `occupation` and etc.
+The `dimensions` parameter contains a set of dimensions. You can think about a dimension as an attribute related to a measure, e.g. the measure `userCount` can have dimensions like `country`, `age`, `occupation`, etc.
 
-Any dimension should have name, sql parameter and type.
+Any dimension should have a name, sql parameter, and type.
 
-You can name dimension following the same rules as for measure, so each name should:
+You can name a dimension by following the same rules as for measure, so each name should:
 - Be unique within a cube
 - Start with a lowercase letter
 
-You can use `0-9`, `_` and letters when naming dimension.
+You can use `0-9`, `_`, and letters when naming a dimension.
 
 ```javascript
 cube(`Products`, {
@@ -36,8 +37,8 @@ cube(`Products`, {
 ## Parameters
 
 ### title
-You can use `title` parameter to change dimension displayed name. By default Cube.js will humanize your dimension key to create a display name.
-In order to override default behaviour please use `title` parameter.
+You can use the `title` parameter to change a dimension’s displayed name. By default, Cube.js will humanize your dimension key to create a display name.
+In order to override default behavior, please use the `title` parameter.
 
 ```javascript
 dimensions: {
@@ -50,7 +51,7 @@ dimensions: {
 ```
 
 ### description
-You can add details to dimension definition via `description` parameter.
+You can add details to a dimension’s definition via the `description` parameter.
 
 ```javascript
 dimensions: {
@@ -63,7 +64,7 @@ dimensions: {
 ```
 
 ### shown
-You can manage the visibility of the dimension using `shown` parameter. The default value of `shown` is `true`.
+You can manage the visibility of the dimension using the `shown` parameter. The default value of `shown` is `true`.
 
 ```javascript
 dimensions: {
@@ -77,12 +78,12 @@ dimensions: {
 
 ### case
 The `case` statement is used to define if/then/else conditions to display data.
-It contains two parameters `when` and `then`.
-The first `when` statement declares condition and result if rule returns true value.
-The second `else` statement declares result for options when rules return false value.
+It contains two parameters: `when` and `then`.
+The first `when` statement declares a condition and result if the rule returns a true value.
+The second `else` statement declares results for options when rules return a false value.
 
 
-The following example will create `size` dimension with values 'xl' and 'xxl'.
+The following example will create a `size` dimension with values 'xl' and 'xxl'.
 
 ```javascript
 size: {
@@ -100,9 +101,9 @@ size: {
 ```
 
 ### primaryKey
-Specify which dimension is a primary key for Cube. Default value is `false`.
+Specify which dimension is a primary key for a cube. The default value is `false`.
 
-Primary key is used to make [joins](joins) work properly.
+A primary key is used to make [joins](joins) work properly.
 
 <div class="block help-block">
   <p>
@@ -123,7 +124,7 @@ dimensions: {
 ```
 
 ### subQuery
-The `subQuery` statement allows you to reference measure in a dimension. It's an advanced concept and you can learn more about it [here](subquery).
+The `subQuery` statement allows you to reference a measure in a dimension. It's an advanced concept and you can learn more about it [here](subquery).
 
 ```javascript
 dimensions: {

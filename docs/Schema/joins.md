@@ -5,9 +5,10 @@ scope: cubejs
 category: Reference
 subCategory: Reference
 menuOrder: 5
+proofread: 06/18/2019
 ---
 
-`joins` parameter declares a block to define relationships between cubes.
+The `joins` parameter declares a block to define relationships between cubes.
 It allows users to access and compare fields from two or more cubes at the same time.
 
 ```javascript
@@ -28,19 +29,19 @@ It’s important to properly define the type of relationship in order for Cube.j
 to calculate accurate measures.
 
 <div class="block help-block">
-  <p><b>Note:</b> It is very important to define correct order of cubes in join. It affects data in the result-set greatly.</p>
-  <p>The basic cube present the left entity in join, all others would be right. That means that all rows of the left cube are selected, while rows of the right depend on the condition.</p>
-  <p>For more information and specific examples, please take a look at our <a href="direction-of-joins">Guides</a>.</p>
+  <p><b>Note:</b> It is very important to define the correct order of cubes in a join. It affects data in the result-set greatly.</p>
+  <p>The basic cube represents the left entity in a join, all others would be right. That means that all rows of the left cube are selected, while rows of the right depend on the condition.</p>
+  <p>For more information and specific examples, please take a look at our <a href="direction-of-joins">guides</a>.</p>
 </div>
 
 
-The three possible values for relationship are:
+The three possible values for a relationship are:
 
 #### hasOne
 
 A `hasOne` relationship indicates a one-to-one connection with another cube. This relationship
-indicates that the one row in the cube can match only one rows in the joined cube. For example,
-in a model containing users and user profiles, users cube would have the following join:
+indicates that the one row in the cube can match only one row in the joined cube. For example,
+in a model containing users and user profiles, the users cube would have the following join:
 
 ```javascript
 cube("Users", {
@@ -58,7 +59,7 @@ cube("Users", {
 A `hasMany` relationship indicates a one-to-many connection with another cube.
 You'll often find this relationship on the "other side" of a `belongsTo`
 relationship. This relationship indicates that the one row in the cube can match many rows in the joined cube.
-For example, in a model containing authors and books, authors cube would have the following join:
+For example, in a model containing authors and books, the authors cube would have the following join:
 
 ```javascript
 cube("Authors", {
@@ -73,11 +74,7 @@ cube("Authors", {
 
 #### belongsTo
 
-A `belongsTo` relationship indicates a many-to-one connection with another cube. You’ll often find
-this relationship on the “other side” of a `hasMany` relationship. This relationship indicates that
-the one row of the declaring cube match row in the joined instance, while the joined instance can
-have many of row in declaring cube. For example, in a model containing orders and customers, orders cube would
-have the following join:
+A `belongsTo` relationship indicates a many-to-one connection with another cube. You’ll often find this relationship on the “other side” of a `hasMany` relationship. This relationship indicates that the one row of the declaring cube matches a row in the joined instance, while the joined instance can have many rows in the declaring cube. For example, in a model containing orders and customers, the orders cube would have the following join:
 
 ```javascript
 cube("Orders", {
@@ -92,21 +89,20 @@ cube("Orders", {
 
 ### sql
 
-`sql` is necessary to indicate a related column between cubes. It is important to properly specify
-matching column when creating joins. Take a look at example below:
+`sql` is necessary to indicate a related column between cubes. It is important to properly specify a matching column when creating joins. Take a look at the example below:
 ```javascript
   sql: `${Orders}.customer_id = ${Customers}.id`
 ```
 
-## Setting Primary Key
+## Setting a Primary Key
 
-In order to make `join` work it is necessary to define `primaryKey` as specified below.
-It's required when join is defined because Cube.js takes care about row multiplication issue.
+In order to make `join` work, it is necessary to define a `primaryKey` as specified below.
+It's required when a join is defined because Cube.js takes care of row multiplication issues.
 
 Let's imagine you want to calculate `Order Amount` by `Order Item Product Name`.
-In this case `Order` rows will be multiplied by `Order Item` join due to `hasMany` relationship.
-In order to produce correct results Cube.js will select distinct primary keys of `Order` first and then will join these primary keys with `Order` to get correct `Order Amount` sum result.
-Please note that `primaryKey` should be defined in `dimensions` section.
+In this case, `Order` rows will be multiplied by the `Order Item` join due to the `hasMany` relationship.
+In order to produce correct results, Cube.js will select distinct primary keys from `Order` first and then will join these primary keys with `Order` to get the correct `Order Amount` sum result.
+Please note that `primaryKey` should be defined in the `dimensions` section.
 
 ```javascript
 dimensions: {
@@ -120,8 +116,7 @@ dimensions: {
 <div class="block help-block">
   <p>
     <b>Note:</b>
-    Setting <code>primaryKey</code> to <code>true</code> will change the default value of <code>shown</code>
-    parameter to <code>false</code>. If you still want <code>shown</code> to be <code>true</code> - set it manually.
+    Setting <code>primaryKey</code> to <code>true</code> will change the default value of the <code>shown</code> parameter to <code>false</code>. If you still want <code>shown</code> to be <code>true</code>—set it manually.
   </p>
 </div>
 
@@ -136,7 +131,7 @@ dimensions: {
 }
 ```
 
-if don't have a single column in a cube's table which can act as a primary key,
+If you don't have a single column in a cube's table that can act as a primary key,
 you can create a composite primary key as shown below.
 
 _The example uses Postgres string concatenation; note that SQL may be
@@ -154,7 +149,7 @@ dimensions: {
 
 ## CUBE reference
 
-When you have several joined cubes you should accurately use column's names to avoid any mistakes. One way to make no mistake is to use `${CUBE}` reference. It allows to specify column's names in cubes without any ambiguity. During the implementation of the query this reference will be used as an alias for basic cube. Take a look at the following example:
+When you have several joined cubes, you should accurately use columns’ names to avoid any mistakes. One way to make no mistakes is to use the `${CUBE}` reference. It allows you to specify columns’ names in cubes without any ambiguity. During the implementation of the query, this reference will be used as an alias for a basic cube. Take a look at the following example:
 
 ```javascript
 dimensions: {

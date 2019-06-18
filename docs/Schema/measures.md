@@ -5,15 +5,16 @@ scope: cubejs
 category: Reference
 subCategory: Reference
 menuOrder: 3
+proofread: 06/18/2019
 ---
 
-`measures` parameter contains a set of measures and each measure is an aggregation over certain column in your database table. Any measure should have name, sql parameter and type.
+The `measures` parameter contains a set of measures and each measure is an aggregation over a certain column in your database table. Any measure should have a name, sql parameter, and type.
 
-When you give a name to measure there are certain rules to follow. Each measure should:
+When you give a name to a measure, there are certain rules to follow. Each measure should:
 - Be unique within a cube
 - Start with a lowercase letter
 
-You can use `0-9`,`_` and letters when naming measure.
+You can use `0-9`, `_`, and letters when naming a measure.
 
 ```javascript
 cube(`Orders`, {
@@ -33,8 +34,8 @@ cube(`Orders`, {
 
 ## Parameters
 ### type
-`type` is required parameter. There are various types that could be assigned to
-a measure. Please refer to [Measure Types Guide](types-and-formats#measures-types) for the full list of measure types.
+`type` is a required parameter. There are various types that can be assigned to
+a measure. Please refer to the [Measure Types Guide](types-and-formats#measures-types) for the full list of measure types.
 
 ```javascript
 ordersCount: {
@@ -44,8 +45,8 @@ ordersCount: {
 ```
 
 ### sql
-`sql` is required parameter. It can take any valid SQL expression depending on the `type` of the measure.
-Please refer to [Measure Types Guide](types-and-formats#measures-types) for detailed information on corresponding sql parameter.
+`sql` is a required parameter. It can take any valid SQL expression depending on the `type` of the measure.
+Please refer to the [Measure Types Guide](types-and-formats#measures-types) for detailed information on the corresponding sql parameter.
 
 ```javascript
 usersCount: {
@@ -55,8 +56,8 @@ usersCount: {
 ```
 
 ### format
-`format` is an optional parameter. It is used to format the output of measures in different ways, for example as currency for `revenue`.
-Please refer to [Measure Formats Guide](types-and-formats#measures-formats) for the full list of supported formats.
+`format` is an optional parameter. It is used to format the output of measures in different ways, for example, as currency for `revenue`.
+Please refer to the [Measure Formats Guide](types-and-formats#measures-formats) for the full list of supported formats.
 
 ```javascript
 total: {
@@ -67,8 +68,8 @@ total: {
 ```
 
 ### title
-You can use `title` parameter to change measure displayed name. By default Cube.js will humanize your measure key to create a display name.
-In order to override default behaviour please use `title` parameter.
+You can use the `title` parameter to change a measure’s displayed name. By default, Cube.js will humanize your measure key to create a display name.
+In order to override default behavior, please use the `title` parameter.
 
 ```javascript
 ordersCount: {
@@ -79,7 +80,7 @@ ordersCount: {
 ```
 
 ### description
-You can add details to measure definition via `description` parameter.
+You can add details to a measure’s definition via the `description` parameter.
 
 ```javascript
 ordersCount: {
@@ -90,7 +91,7 @@ ordersCount: {
 ```
 
 ### shown
-You can manage the visibility of the measure using `shown` parameter. The default value of `shown` is `true`.
+You can manage the visibility of the measure using the `shown` parameter. The default value of `shown` is `true`.
 
 ```javascript
 ordersCount: {
@@ -101,7 +102,7 @@ ordersCount: {
 ```
 
 ### filters
-If you want to add some conditions for metric's calculation, you should use `filters` parameter. Syntax looks the following way:
+If you want to add some conditions for a metric's calculation, you should use the `filters` parameter. The syntax looks like the following:
 
 ```javascript
 ordersCompletedCount: {
@@ -114,12 +115,12 @@ ordersCompletedCount: {
 ```
 
 ### rollingWindow
-If you want to calculate some metric within a window, for example a week or a month, you should use a `rollingWindow` parameter. `trailing` and `leading` parameters define window size.
+If you want to calculate some metric within a window, for example a week or a month, you should use a `rollingWindow` parameter. The `trailing` and `leading` parameters define window size.
 
-These parameters has format defined as `(-?\d+) (minute|hour|day|week|month|year)`. `trailing` and `leading` parameters can also be set to `unbounded` value which means infinite size for the corresponding window part. You can define `trailing` and `leading` parameters using negative integers.
+These parameters have a format defined as `(-?\d+) (minute|hour|day|week|month|year)`. The `trailing` and `leading` parameters can also be set to an `unbounded` value, which means infinite size for the corresponding window part. You can define `trailing` and `leading` parameters using negative integers.
 
-The `traling` parameter is a window part size before the `offset` point and the `leading` parameter is after it. You can set the window `offset` parameter to either `start` or `end`, which will match start or end of the selected date range.
-By default, `leading` and `trailing` paremeters are set to zero and `offset` is set to `end`.
+The `trailing` parameter is a window part size before the `offset` point and the `leading` parameter is after it. You can set the window `offset` parameter to either `start` or `end`, which will match the start or end of the selected date range.
+By default, the `leading` and `trailing` parameters are set to zero and `offset` is set to `end`.
 
 ```javascript
 rollingCountMonth: {
@@ -132,8 +133,8 @@ rollingCountMonth: {
 ```
 
 ### drillMembers
-Using `drillMembers` parameter you can define a set of [drill down](drill-downs) fields for the measure. `drillMembers` is defined as an array of dimensions. Cube.js automatically injects dimensions names and other cubes names with dimensions in the context, so you can reference these variables in `drillMembers` array.
-[Learn more how to define and use drill downs](drill-downs)
+Using the `drillMembers` parameter, you can define a set of [drill down](drill-downs) fields for the measure. `drillMembers` is defined as an array of dimensions. Cube.js automatically injects dimensions’ names and other cubes’ names with dimensions in the context, so you can reference these variables in the `drillMembers` array.
+[Learn more about how to define and use drill downs](drill-downs).
 
 ```javascript
 revenue: {
@@ -144,7 +145,7 @@ revenue: {
 ```
 
 ## Calculated Measures
-In case when you need to specify a formula for measure calculating with other measures, you can compose a formula in `sql`. For example, you want to calculate conversion of buyers of all users.
+In the case where you need to specify a formula for measure calculating with other measures, you can compose a formula in `sql`. For example, you want to calculate the conversion of buyers of all users.
 
 ```javascript
 purchasesToCreatedAccountRatio: {
@@ -153,4 +154,4 @@ purchasesToCreatedAccountRatio: {
   format: `percent`
 }
 ```
-You can create Calculated Measures from several joined cubes. In this case join will be created automatically.
+You can create Calculated Measures from several joined cubes. In this case, a join will be created automatically.

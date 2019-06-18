@@ -3,6 +3,7 @@ title: Getting Started with Cube.js Schema
 permalink: /getting-started-cubejs-schema
 category: Reference
 menuOrder: 1
+proofread: 06/18/2019
 ---
 
 Cube.js Schema is used to model raw data into meaningful business definitions and pre-aggregate and optimize results.
@@ -28,7 +29,7 @@ We don’t need to write a SQL code for every question. <br /> *Cube.js Schema i
 
 ## 1. Creating a Cube
 
-In Cube.js, [cubes](cube) are used to organize entities and connections between entities. Usually one cube is created for each table in the database, such as `users`, `orders`, `products`, etc. In `sql` parameter of the cube we define a base table for this cube. In our case the base table is simply our `users` table.
+In Cube.js, [cubes](cube) are used to organize entities and connections between entities. Usually one cube is created for each table in the database, such as `users`, `orders`, `products`, etc. In the `sql` parameter of the cube we define a base table for this cube. In our case, the base table is simply our `users` table.
 
 ```javascript
 cube(`Users`, {
@@ -40,8 +41,8 @@ cube(`Users`, {
 Once the base table is defined, the next step is to add [measures](measures) and [dimensions](dimensions) to the cube.
 
 <div class="block help-block">
-  <p><b>Measure</b> is referred to as quantitative data, such as number of units sold, number of unique visits, profit, and so on.</p>
-  <p><b>Dimension</b> is referred to as categorical data, such as state, gender, product name, or units of time (e.g., day, week, month).</p>
+  <p><b>Measures</b> are referred to as quantitative data, such as number of units sold, number of unique visits, profit, and so on.</p>
+  <p><b>Dimensions</b> are referred to as categorical data, such as state, gender, product name, or units of time (e.g., day, week, month).</p>
 </div>
 
 Let's go ahead and create our first measure and two dimensions.
@@ -88,7 +89,7 @@ You can add as many dimensions as you want to your query when you perform groupi
 ## 3. Adding Filters to Measures
 
 Now let's answer the next question – "How many paying users do we have?" To
-accomplish this we will introduce __measure filters__:
+accomplish this, we will introduce __measure filters__:
 
 ```javascript
 cube(`Users`, {
@@ -111,13 +112,12 @@ cube(`Users`, {
 
 <div class="block help-block">
   <p>
-    It is best practice to prefix rerenfeces to table columns with the name of the cube or with <b>CUBE</b> constant when referencing the current cube's column.
+    It is best practice to prefix references to table columns with the name of the cube or with the <b>CUBE</b> constant when referencing the current cube's column.
   </p>
 </div>
 
 That's it! Now we have the `payingCount` measure, which shows only our paying users.
-When this measure is requested Cube.js will generate
-the following SQL:
+When this measure is requested, Cube.js will generate the following SQL:
 
 ```sql
 SELECT
@@ -128,7 +128,7 @@ FROM users
 ```
 
 Since the filters property is an array, you can apply as many filters as you
-like. `payingCount` can be used with dimensions the same way as simple
+like. `payingCount` can be used with dimensions the same way as a simple
 `count`. We can group `payingCount` by `city` and `companyName` simply by adding these
 dimensions alongside measures in the requested query.
 
@@ -136,7 +136,7 @@ dimensions alongside measures in the requested query.
 To answer "What is the percentage of paying users out of the total?" we need to
 calculate the paying users ratio, which is basically `payingCount/count`. Cube.js makes
 it extremely easy to perform this kind of calculation. Let's add a new measure to
-our cube called `payingPercentage'
+our cube called `payingPercentage'.
 
 ```javascript
 cube(`Users`, {
@@ -182,4 +182,4 @@ We've answered all our questions in the beginning of the tutorial. But there is 
 lot more Cube.js can do for you. We recommend checking out the [Reference
 documentation](cube), as well as [Guides](subquery) and [Examples](examples).
 
-If you have any questions or need help - [please join our Slack community](https://publicslack.com/slacks/cubejs/invites/new) of amazing developers and contributors.
+If you have any questions or need help—[please join our Slack community](https://publicslack.com/slacks/cubejs/invites/new) of amazing developers and contributors.
