@@ -38,7 +38,7 @@ click on the measure in the UI and inspect individual records that make up a cou
 [Learn more about Drill Downs.](drill-downs)
 
 ```javascript
-numerOfUsers: {
+numberOfUsers: {
   type: `count`,
   // optional
   drillMembers: [id, name, email, company]
