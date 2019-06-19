@@ -9,8 +9,35 @@ const prettier = require("prettier/standalone");
 const plugins = [require("prettier/parser-babylon")];
 
 const dashboardComponents = `
-import { Row, Col, Card } from 'antd';
+import { Row, Col, Card, Layout } from 'antd';
 import 'antd/dist/antd.css';
+import './index.css'
+
+const AppLayout = ({ children }) => (
+  <Layout>
+    <Layout.Header>
+      <div style={{ float: 'left' }}>
+        <h2
+          style={{
+            color: "#fff",
+            margin: 0,
+            marginRight: '1em'
+          }}
+        >
+          My Dashboard
+        </h2>
+      </div>
+    </Layout.Header>
+    <Layout.Content
+      style={{
+        padding: "0 25px 25px 25px",
+        margin: "25px"
+      }}
+    >
+      {children}
+    </Layout.Content>
+  </Layout>
+)
 
 const Dashboard = ({ children }) => (
   <Row type="flex" justify="space-around" align="top" gutter={24}>{children}</Row>
@@ -23,6 +50,12 @@ const DashboardItem = ({ children, title }) => (
     </Card>
   </Col>
 )
+`;
+
+const indexCss = `
+body {
+  background-color: #f0f2f5 !important;
+}
 `;
 
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
@@ -43,15 +76,21 @@ class DashboardSource {
   }
 
   async persist() {
+    const updateIndexCss = this.appLayoutAdded ? [
+      { ...this.indexCssFile, content: this.indexCssFile.content + indexCss }
+    ] : [];
     await fetchWithRetry('/playground/dashboard-app-files', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        files: [{ ...this.appFile, content: prettier.format(this.dashboardAppCode(), { parser: "babylon", plugins }) }]
+        files: [
+          { ...this.appFile, content: prettier.format(this.dashboardAppCode(), { parser: "babylon", plugins }) }
+        ].concat(updateIndexCss)
       })
     }, 5);
+    this.appLayoutAdded = false;
     const dependencies = this.imports
       .filter(i => i.get('source').node.value.indexOf('.') !== 0)
       .map(i => {
@@ -75,6 +114,7 @@ class DashboardSource {
     if (!this.appFile) {
       throw new Error(`src/App.js file not found. Can't parse dashboard app. Please delete dashboard-app directory and try to create it again.`);
     }
+    this.indexCssFile = sourceFiles.find(f => f.fileName.indexOf('src/index.css') !== -1);
     this.appAst = parse(this.appFile.content, {
       sourceFilename: this.appFile.fileName,
       sourceType: 'module',
@@ -150,11 +190,16 @@ class DashboardSource {
       }
     });
     if (!dashboardAdded && headerElement) {
+      this.appLayoutAdded = true;
       headerElement.parentPath.replaceWith(
         t.JSXElement(
-          t.JSXOpeningElement(t.JSXIdentifier('Dashboard'), []),
-          t.JSXClosingElement(t.JSXIdentifier('Dashboard')),
-          []
+          t.JSXOpeningElement(t.JSXIdentifier('AppLayout'), []),
+          t.JSXClosingElement(t.JSXIdentifier('AppLayout')),
+          [t.JSXElement(
+            t.JSXOpeningElement(t.JSXIdentifier('Dashboard'), []),
+            t.JSXClosingElement(t.JSXIdentifier('Dashboard')),
+            []
+          )]
         )
       );
     }
