@@ -232,6 +232,8 @@ class ApiGateway {
     this.logger = logger;
     this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
     this.basePath = options.basePath || '/cubejs-api';
+    // eslint-disable-next-line no-unused-vars
+    this.queryTransformer = options.queryTransformer || (async (query, context) => query);
   }
 
   initApp(app) {
@@ -245,7 +247,7 @@ class ApiGateway {
           type: 'Load Request',
           query: req.query.query
         });
-        const normalizedQuery = normalizeQuery(query);
+        const normalizedQuery = await this.queryTransformer(normalizeQuery(query), this.contextByReq(req));
         const [compilerSqlResult, metaConfigResult] = await Promise.all([
           this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req)),
           this.getCompilerApi(req).metaConfig()
@@ -287,7 +289,7 @@ class ApiGateway {
           throw new UserError(`query param is required`);
         }
         const query = JSON.parse(req.query.query);
-        const normalizedQuery = normalizeQuery(query);
+        const normalizedQuery = await this.queryTransformer(normalizeQuery(query), this.contextByReq(req));
         const sqlQuery = await this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req));
         res.json({
           sql: sqlQuery

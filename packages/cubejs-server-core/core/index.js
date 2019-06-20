@@ -174,7 +174,8 @@ class CubejsServerCore {
       this.getOrchestratorApi.bind(this),
       this.logger, {
         basePath: this.options.basePath,
-        checkAuthMiddleware: this.options.checkAuthMiddleware
+        checkAuthMiddleware: this.options.checkAuthMiddleware,
+        queryTransformer: this.options.queryTransformer
       }
     );
     apiGateway.initApp(app);
