@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.10.0](https://github.com/statsbotco/cubejs-client/compare/v0.9.24...v0.10.0) (2019-06-21)
+
+
+### Features
+
+* **api-gateway:** `queryTransformer` security hook ([a9c41b2](https://github.com/statsbotco/cubejs-client/commit/a9c41b2))
+
+
+
+
+
 ## [0.9.20](https://github.com/statsbotco/cubejs-client/compare/v0.9.19...v0.9.20) (2019-06-16)
 
 

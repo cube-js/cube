@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.10.0](https://github.com/statsbotco/cubejs-client/compare/v0.9.24...v0.10.0) (2019-06-21)
+
+
+### Features
+
+* **playground:** App layout for dashboard ([f5578dd](https://github.com/statsbotco/cubejs-client/commit/f5578dd))
+
+
+
+
+
 ## [0.9.16](https://github.com/statsbotco/cubejs-client/compare/v0.9.15...v0.9.16) (2019-06-10)
 
 
