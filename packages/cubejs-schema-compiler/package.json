@@ -32,6 +32,8 @@
     "eslint-plugin-node": "^5.2.1",
     "mocha": "^3.4.2",
     "pg-promise": "^7.3.2",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4",
     "should": "^11.2.1",
     "sqlstring": "^2.3.1",
     "testcontainers": "^1.1.10",

@@ -58,6 +58,7 @@ class DataSchemaCompiler {
     this.cubeFactory = options.cubeFactory;
     this.filesToCompile = options.filesToCompile;
     this.omitErrors = options.omitErrors;
+    this.allowNodeRequire = options.allowNodeRequire;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -133,27 +134,41 @@ class DataSchemaCompiler {
     return this.currentQuery;
   }
 
-  compileCubeFiles(compilers, toCompile, errorsReport) {
+  async compileCubeFiles(compilers, toCompile, errorsReport) {
     const self = this;
     const cubes = [];
     const exports = {};
     const contexts = [];
     const dashboardTemplates = [];
     const compiledFiles = {};
+    const asyncModules = [];
     toCompile
       .forEach((file) => {
-        this.compileFile(file, errorsReport, cubes, exports, contexts, dashboardTemplates, toCompile, compiledFiles);
+        this.compileFile(
+          file,
+          errorsReport,
+          cubes,
+          exports,
+          contexts,
+          dashboardTemplates,
+          toCompile,
+          compiledFiles,
+          asyncModules
+        );
       });
+    await asyncModules.reduce((a, b) => a.then(() => b()), Promise.resolve());
     return self.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
-           .then(() => self.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
-           .then(() => self.compileObjects(compilers.dashboardTemplateCompilers || [], dashboardTemplates, errorsReport));
+      .then(() => self.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
+      .then(() => self.compileObjects(compilers.dashboardTemplateCompilers || [], dashboardTemplates, errorsReport));
   }
 
   throwIfAnyErrors() {
     this.errorsReport.throwIfAny();
   }
 
-  compileFile(file, errorsReport, cubes, exports, contexts, dashboardTemplates, toCompile, compiledFiles) {
+  compileFile(
+    file, errorsReport, cubes, exports, contexts, dashboardTemplates, toCompile, compiledFiles, asyncModules
+  ) {
     const self = this;
     if (compiledFiles[file.fileName]) {
       return;
@@ -180,11 +195,18 @@ class DataSchemaCompiler {
         setExport: (obj) => {
           exports[file.fileName] = obj;
         },
+        asyncModule: (fn) => {
+          asyncModules.push(fn);
+        },
         require: (extensionName) => {
           if (self.extensions[extensionName]) {
             return new (self.extensions[extensionName])(this.cubeFactory, self);
           } else {
             const foundFile = self.resolveModuleFile(file, extensionName, toCompile, errorsReport);
+            if (!foundFile && this.allowNodeRequire) {
+              // eslint-disable-next-line global-require,import/no-dynamic-require
+              return require(extensionName);
+            }
             self.compileFile(
               foundFile,
               errorsReport,
@@ -230,6 +252,9 @@ class DataSchemaCompiler {
       throw new UserError(`'${modulePath}' is incorrect`);
     }
     if (!this.isWhiteListedPackage(packagePath)) {
+      if (this.allowNodeRequire) {
+        return null;
+      }
       throw new UserError(`Package '${packagePath}' not found`);
     }
     if (fs.existsSync(absPath)) {

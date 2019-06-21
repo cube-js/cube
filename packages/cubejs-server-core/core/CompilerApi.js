@@ -7,6 +7,7 @@ class CompilerApi {
     this.repository = repository;
     this.dbType = dbType;
     this.options = options || {};
+    this.allowNodeRequire = options.allowNodeRequire == null ? true : options.allowNodeRequire;
     this.logger = this.options.logger;
   }
 
@@ -22,7 +23,10 @@ class CompilerApi {
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
       this.logger('Compiling schema', { version: compilerVersion });
       // TODO check if saving this promise can produce memory leak?
-      this.compilers = PrepareCompiler.compile(this.repository, { adapter: this.dbType });
+      this.compilers = PrepareCompiler.compile(this.repository, {
+        adapter: this.dbType,
+        allowNodeRequire: this.allowNodeRequire
+      });
       this.compilerVersion = compilerVersion;
     }
     return this.compilers;
