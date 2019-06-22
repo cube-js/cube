@@ -125,7 +125,7 @@ cube(`ExtendedOrderFacts`, {
 
 Cube.js caching layer uses `refreshKey` queries to get the current version of content for a specific cube.
 If a query result changes, Cube.js will invalidate all queries that rely on that cube.
-If the `refreshKey` is not set, Cube.js will use the default strategy—
+If the `refreshKey` is not set, Cube.js will use the default strategy:
 
 1. Check the `max` of time dimensions with `updated` in the name, if none exist…
 2. Check the `max` of any existing time dimension, if none exist…
@@ -165,7 +165,7 @@ cube(`OrderFacts`, {
 
 `FILTER_PARAMS` allows you to use filter values during SQL generation. You can add it for any valid SQL expression as in the case of dimensions.
 
-It has the following structure—
+It has the following structure:
 
 ```javascript
 FILTER_PARAMS.<CUBE_NAME>.<FILTER_NAME>.filter(expression)
@@ -187,7 +187,7 @@ cube(`OrderFacts`, {
 });
 ```
 
-It'll generate the following SQL
+This will generate the following SQL:
 
 ```sql
 SELECT * FROM orders WHERE date >= '2018-01-01 00:00:00' and date <= '2018-12-31 23:59:59'
