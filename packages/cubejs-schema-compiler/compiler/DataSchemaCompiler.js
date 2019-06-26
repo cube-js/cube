@@ -112,7 +112,9 @@ class DataSchemaCompiler {
       return Object.assign({}, file, { content });
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
-        errorsReport.error(`Syntax error during '${file.fileName}' parsing: ${e.message}`);
+        const line = file.content.split('\n')[e.loc.line - 1];
+        const spaces = Array(e.loc.column).fill(' ').join('');
+        errorsReport.error(`Syntax error during '${file.fileName}' parsing: ${e.message}:\n${line}\n${spaces}^`);
       } else {
         errorsReport.error(e);
       }
