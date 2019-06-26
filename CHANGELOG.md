@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.6](https://github.com/statsbotco/cube.js/compare/v0.10.5...v0.10.6) (2019-06-26)
+
+
+### Bug Fixes
+
+* Update version to fix audit warnings ([1bce587](https://github.com/statsbotco/cube.js/commit/1bce587))
+
+
+
+
+
 ## [0.10.5](https://github.com/statsbotco/cube.js/compare/v0.10.4...v0.10.5) (2019-06-26)
 
 
