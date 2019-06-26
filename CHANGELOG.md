@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.4](https://github.com/statsbotco/cube.js/compare/v0.10.3...v0.10.4) (2019-06-26)
+
+
+### Bug Fixes
+
+* Gray screen for Playground on version update ([b08333f](https://github.com/statsbotco/cube.js/commit/b08333f))
+
+
+### Features
+
+* More descriptive error for SyntaxError ([f6d12d3](https://github.com/statsbotco/cube.js/commit/f6d12d3))
+
+
+
+
+
 ## [0.10.3](https://github.com/statsbotco/cube.js/compare/v0.10.2...v0.10.3) (2019-06-26)
 
 
