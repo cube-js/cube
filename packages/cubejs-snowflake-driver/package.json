@@ -1,0 +1,20 @@
+{
+  "name": "@cubejs-backend/snowflake-driver",
+  "description": "Cube.js Snowflake database driver",
+  "author": "Statsbot, Inc.",
+  "version": "0.10.0",
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/SnowflakeDriver.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.10.0"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}

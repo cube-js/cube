@@ -18,7 +18,8 @@ const DriverDependencies = {
   bigquery: '@cubejs-backend/bigquery-driver',
   redshift: '@cubejs-backend/postgres-driver',
   clickhouse: '@cubejs-backend/clickhouse-driver',
-  hive: '@cubejs-backend/hive-driver'
+  hive: '@cubejs-backend/hive-driver',
+  snowflake: '@cubejs-backend/snowflake-driver',
 };
 
 const checkEnvForPlaceholders = () => {

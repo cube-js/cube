@@ -1,6 +1,6 @@
 # Cube.js MongoBI Driver
 
-Pure Javascript MongoBI driver.
+Mysql2 based Javascript MongoBI driver.
 
 [Learn more](https://github.com/statsbotco/cube.js#getting-started)
 
