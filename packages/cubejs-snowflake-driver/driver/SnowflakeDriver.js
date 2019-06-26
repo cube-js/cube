@@ -13,11 +13,10 @@ class SnowflakeDriver extends BaseDriver {
       password: process.env.CUBEJS_DB_PASS,
       ...config
     };
-    const connection = snowflake.createConnection(config);
+    const connection = snowflake.createConnection(this.config);
     this.initialConnectPromise = new Promise(
       (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
     );
-    this.config = config;
   }
 
   static driverEnvVariables() {
