@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "engines": {
     "node": ">=8.11.1"
   },
