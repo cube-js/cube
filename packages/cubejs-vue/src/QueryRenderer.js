@@ -46,7 +46,8 @@ export default Vue.component('QueryRenderer', {
   },
   render(createElement) {
     const { $scopedSlots, resultSet, error, loading, sqlQuery } = this;
-    let slot = this.$slots.empty ? this.$slots.empty : {};
+    const empty = createElement('div', {});
+    let slot = this.$slots.empty ? this.$slots.empty : empty;
 
     if (!loading && resultSet && !error) {
       const slotProps = {

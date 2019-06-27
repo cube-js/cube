@@ -17,7 +17,7 @@ export default Vue.component('QueryBuilder', {
   data() {
     return {
       meta: undefined,
-      updatedQuery: this.query,
+      internalQuery: this.query,
       granularities: [],
     };
   },
@@ -41,34 +41,34 @@ export default Vue.component('QueryBuilder', {
 
       const childProps = {
         meta,
-        query: this.updatedQuery,
+        query: this.internalQuery,
         validatedQuery: this.validatedQuery,
         isQueryPresent: this.isQueryPresent,
         chartType: this.chartType,
-        measures: (this.updatedQuery.measures || [])
+        measures: (this.internalQuery.measures || [])
           .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'measures') })),
-        dimensions: (this.updatedQuery.dimensions || [])
+        dimensions: (this.internalQuery.dimensions || [])
           .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'dimensions') })),
-        segments: (this.updatedQuery.segments || [])
+        segments: (this.internalQuery.segments || [])
           .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
-        timeDimensions: (this.updatedQuery.timeDimensions || [])
+        timeDimensions: (this.internalQuery.timeDimensions || [])
           .map((m, i) => ({
             ...m,
             dimension: { ...meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
             index: i
           })),
-        filters: (this.updatedQuery.filters || [])
+        filters: (this.internalQuery.filters || [])
           .map((m, i) => ({
             ...m,
             dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
             operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
             index: i
           })),
-        availableMeasures: meta.membersForQuery(this.updatedQuery, 'measures') || [],
-        availableDimensions: meta.membersForQuery(this.updatedQuery, 'dimensions') || [],
-        availableTimeDimensions: (meta.membersForQuery(this.updatedQuery, 'dimensions') || [])
+        availableMeasures: meta.membersForQuery(this.internalQuery, 'measures') || [],
+        availableDimensions: meta.membersForQuery(this.internalQuery, 'dimensions') || [],
+        availableTimeDimensions: (meta.membersForQuery(this.internalQuery, 'dimensions') || [])
           .filter(m => m.type === 'time'),
-        availableSegments: meta.membersForQuery(this.updatedQuery, 'segments') || [],
+        availableSegments: meta.membersForQuery(this.internalQuery, 'segments') || [],
         updateChartType: this.updateChart,
       };
 
@@ -90,35 +90,35 @@ export default Vue.component('QueryBuilder', {
         const name = e.charAt(0).toUpperCase() + e.slice(1);
 
         childProps[`add${name}`] = (member) => {
-          this.updatedQuery = {
-            ...this.updatedQuery,
-            [e]: (this.updatedQuery[e] || []).concat(toQuery(member)),
+          this.internalQuery = {
+            ...this.internalQuery,
+            [e]: (this.internalQuery[e] || []).concat(toQuery(member)),
           };
         };
 
         childProps[`update${name}`] = (member, updateWith) => {
-          const members = (this.updatedQuery[e] || []).concat([]);
+          const members = (this.internalQuery[e] || []).concat([]);
           members.splice(member.index, 1, toQuery(updateWith));
 
-          this.updatedQuery = {
-            ...this.updatedQuery,
+          this.internalQuery = {
+            ...this.internalQuery,
             [e]: members,
           };
         };
 
         childProps[`remove${name}`] = (member) => {
-          const members = (this.updatedQuery[e] || []).concat([]);
+          const members = (this.internalQuery[e] || []).concat([]);
           members.splice(member.index, 1);
 
-          this.updatedQuery = {
-            ...this.updatedQuery,
+          this.internalQuery = {
+            ...this.internalQuery,
             [e]: members,
           };
         };
 
         childProps[`set${name}`] = (members) => {
-          this.updatedQuery = {
-            ...this.updatedQuery,
+          this.internalQuery = {
+            ...this.internalQuery,
             [e]: members.map(e => e.name) || [],
           };
         };
@@ -138,18 +138,18 @@ export default Vue.component('QueryBuilder', {
   },
   computed: {
     isQueryPresent() {
-      const { updatedQuery: query } = this;
+      const { internalQuery: query } = this;
 
       return query.measures && query.measures.length  > 0 ||
         query.dimensions && query.dimensions.length > 0 ||
         query.timeDimensions && query.timeDimensions.length > 0;
     },
     validatedQuery() {
-      const { updatedQuery } = this;
+      const { internalQuery } = this;
 
       return {
-        ...updatedQuery,
-        filters: (updatedQuery.filters || []).filter(f => f.operator),
+        ...internalQuery,
+        filters: (internalQuery.filters || []).filter(f => f.operator),
       };
     },
   },
