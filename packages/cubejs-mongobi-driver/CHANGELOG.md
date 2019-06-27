@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.7](https://github.com/statsbotco/cubejs-client/compare/v0.10.6...v0.10.7) (2019-06-27)
+
+
+### Bug Fixes
+
+* config provided password not passed to server ([#145](https://github.com/statsbotco/cubejs-client/issues/145)) ([4b1afb1](https://github.com/statsbotco/cubejs-client/commit/4b1afb1))
+
+
+
+
+
 ## [0.10.1](https://github.com/statsbotco/cubejs-client/compare/v0.10.0...v0.10.1) (2019-06-26)
 
 

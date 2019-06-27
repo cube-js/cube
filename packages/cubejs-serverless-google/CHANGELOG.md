@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.7](https://github.com/statsbotco/cubejs-client/compare/v0.10.6...v0.10.7) (2019-06-27)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
 ## [0.10.5](https://github.com/statsbotco/cubejs-client/compare/v0.10.4...v0.10.5) (2019-06-26)
 
 **Note:** Version bump only for package @cubejs-backend/serverless-google
