@@ -131,7 +131,8 @@ class CubejsServerCore {
           msg === 'Orchestrator error' ||
           msg === 'Internal Server Error' ||
           msg === 'User Error' ||
-          msg === 'Compiling schema'
+          msg === 'Compiling schema' ||
+          msg === 'Recompiling schema'
         ) {
           this.event(msg, { error: params.error });
         }
