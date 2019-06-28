@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/prestodb-driver",
   "description": "Cube.js Presto database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.10.3",
+  "version": "0.10.8",
   "engines": {
     "node": ">=8.11.1"
   },
