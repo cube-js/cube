@@ -20,6 +20,7 @@ const DriverDependencies = {
   clickhouse: '@cubejs-backend/clickhouse-driver',
   hive: '@cubejs-backend/hive-driver',
   snowflake: '@cubejs-backend/snowflake-driver',
+  prestodb: '@cubejs-backend/prestodb-driver',
 };
 
 const checkEnvForPlaceholders = () => {

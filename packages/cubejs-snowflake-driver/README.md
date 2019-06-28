@@ -6,4 +6,4 @@ Pure Javascript Snowflake driver.
 
 ### License
 
-Cube.js MS SQL Database Driver is [Apache 2.0 licensed](./LICENSE).
+Cube.js Snowflake Database Driver is [Apache 2.0 licensed](./LICENSE).
