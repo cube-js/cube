@@ -451,7 +451,6 @@ const PlaygroundQueryBuilder = ({
               chartType={chartType}
               cubejsApi={cubejsApi}
               dashboardSource={dashboardSource}
-              chartLibrary="bizcharts"
             />
           ) : <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>}
         </Col>

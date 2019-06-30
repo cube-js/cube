@@ -23,14 +23,6 @@ const chartTypeToTemplate = {
     <Tooltip crosshairs={{type : 'y'}} />
     <Geom type="areaStack" position={\`x*measure\`} size={2} color="color" />
   </Chart>`,
-  barStacked: `
-<Chart height={400} data={resultSet.rawData()} forceFit>
-  <Legend />
-  <Axis name="Stories.time" label={{ formatter: val => moment(val).format("MMM 'YY") }} />
-  <Axis name="Stories.count" />
-  <Tooltip />
-  <Geom type='intervalStack' position="Stories.time*Stories.count" color="Stories.category" />
-</Chart>`,
   pie: `
   <Chart height={400} data={resultSet.chartPivot()} forceFit>
     <Coord type='theta' radius={0.75} />
@@ -38,25 +30,7 @@ const chartTypeToTemplate = {
     <Legend position='right' />
     <Tooltip />
     {resultSet.seriesNames().map(s => (<Geom type="intervalStack" position={s.key} color="category" />))}
-  </Chart>`,
-  number: `
-  <Row type="flex" justify="center" align="middle" style={{ height: '100%' }}>
-    <Col>
-      {resultSet
-        .seriesNames()
-        .map(s => (
-          <Statistic value={resultSet.totalRow()[s.key]} />
-        ))}
-    </Col>
-  </Row>
-  `,
-  table: `
-  <Table 
-    pagination={false}
-    columns={resultSet.tableColumns().map(c => ({ ...c, dataIndex: c.key }))} 
-    dataSource={resultSet.tablePivot()} 
-  />
-  `
+  </Chart>`
 };
 
 

@@ -1,19 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import SourceRender from 'react-source-render';
 import presetEnv from '@babel/preset-env';
 import presetReact from '@babel/preset-react';
 import cubejs from '@cubejs-client/core';
 import * as cubejsReact from '@cubejs-client/react';
+// eslint-disable-next-line import/no-duplicates
 import * as antd from 'antd';
+// eslint-disable-next-line import/no-duplicates
 import { Alert } from 'antd';
 
 import ChartContainer from './ChartContainer';
 import * as bizChartLibrary from './libraries/bizChart';
 import * as chartjsLibrary from './libraries/chartjs';
+import * as tablesLibrary from './libraries/tables';
 
 export const libraryToTemplate = {
-  bizcharts: bizChartLibrary,
-  chartjs: chartjsLibrary
+  bizcharts: { library: bizChartLibrary, title: 'Bizcharts' },
+  chartjs: { library: chartjsLibrary, title: 'Chart.js' }
 };
 
 export const babelConfig = {
@@ -32,7 +35,7 @@ const sourceCodeTemplate = (props) => {
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 import { Spin } from 'antd';
-${libraryToTemplate[chartLibrary].sourceCodeTemplate({ ...props, renderFnName })}
+${chartLibrary.sourceCodeTemplate({ ...props, renderFnName })}
 
 const API_URL = "${apiUrl}"; // change to your actual endpoint
 
@@ -48,7 +51,7 @@ const renderChart = (Component) => ({ resultSet, error }) => (
 )
 
 const ChartRenderer = () => <QueryRenderer
-  query={${(typeof query === 'object' ? JSON.stringify(query, null, 2) : query).split('\n').map((l, i) => i > 0 ? `  ${l}` : l).join('\n')}}
+  query={${(typeof query === 'object' ? JSON.stringify(query, null, 2) : query).split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n')}}
   cubejsApi={cubejsApi}
   render={renderChart(${renderFnName})}
 />;
@@ -72,24 +75,31 @@ export const ChartRenderer = (props) => {
     resultSet,
     error,
     sqlQuery,
-    chartLibrary,
     dashboardSource,
-    cubejsApi
+    cubejsApi,
+    chartType
   } = props;
+
+  const [chartLibrary, setChartLibrary] = useState('bizcharts');
+
   sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
-  const source = sourceCodeFn(props);
+  const selectedChartLibrary = ['table', 'number'].indexOf(chartType) !== -1
+    ? tablesLibrary : libraryToTemplate[chartLibrary].library;
+  const source = sourceCodeFn({
+    ...props,
+    chartLibrary: selectedChartLibrary
+  });
   const dependencies = {
     '@cubejs-client/core': cubejs,
     '@cubejs-client/react': cubejsReact,
     antd,
     react: React,
-    ...libraryToTemplate[chartLibrary].imports
+    ...selectedChartLibrary.imports
   };
   return (
     <SourceRender
       babelConfig={babelConfig}
-      onError={error => console.log(error)}
-      onSuccess={(error, { markup }) => console.log('HTML', markup)}
+      onError={e => console.log(e)}
       resolver={importName => dependencies[importName]}
       source={source}
     >
@@ -105,12 +115,17 @@ export const ChartRenderer = (props) => {
             codeSandboxSource={withDomRender(source)}
             dependencies={dependencies}
             dashboardSource={dashboardSource}
+            chartLibrary={chartLibrary}
+            setChartLibrary={setChartLibrary}
+            chartLibraries={Object.keys(libraryToTemplate).map(k => ({ value: k, title: libraryToTemplate[k].title }))}
             cubejsApi={cubejsApi}
-            render={() => jsCompilingError ? (<Alert
-              message="Error occurred while compiling JS"
-              description={<pre>{jsCompilingError.toString()}</pre>}
-              type="error"
-            />) : element}
+            render={() => (jsCompilingError ? (
+              <Alert
+                message="Error occurred while compiling JS"
+                description={<pre>{jsCompilingError.toString()}</pre>}
+                type="error"
+              />
+            ) : element)}
           />
         )}
       </SourceRender.Consumer>

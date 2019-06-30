@@ -1,25 +1,29 @@
 import React from 'react';
-import { Card, Button } from 'antd';
+import {
+  Card, Button, Menu, Dropdown, Icon
+} from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
 import { Redirect } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from "sql-formatter";
+import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
 
 class ChartContainer extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { showCode: false };
+    this.state = {
+      showCode: false
+    };
   }
 
   async componentDidMount() {
     const {
       codeSandboxSource,
-      dependencies,
-      sandboxId
+      dependencies
     } = this.props;
     const codeSandboxRes = await fetch("https://codesandbox.io/api/v1/sandboxes/define?json=1", {
       method: "POST",
@@ -69,7 +73,10 @@ class ChartContainer extends React.Component {
       dashboardSource,
       hideActions,
       query,
-      cubejsApi
+      cubejsApi,
+      chartLibrary,
+      setChartLibrary,
+      chartLibraries
     } = this.props;
 
     if (redirectToDashboard) {
@@ -78,6 +85,21 @@ class ChartContainer extends React.Component {
 
     const parameters = getParameters(this.codeSandboxDefinition(codeSandboxSource, dependencies));
 
+    console.log(chartLibraries);
+
+    const chartLibrariesMenu = (
+      <Menu onClick={(e) => setChartLibrary(e.key)}>
+        {
+          chartLibraries.map(library => (
+            <Menu.Item key={library.value}>
+              {library.title}
+            </Menu.Item>
+          ))
+        }
+      </Menu>
+    );
+
+    const currentLibraryItem = chartLibraries.find(m => m.value === chartLibrary);
     const extra = (
       <form action="https://codesandbox.io/api/v1/sandboxes/define" method="POST" target="_blank">
         <input type="hidden" name="parameters" value={parameters} />
@@ -97,6 +119,12 @@ class ChartContainer extends React.Component {
               {addingToDashboard ? 'Creating app and installing modules...' : 'Add to Dashboard'}
             </Button>
           )}
+          <Dropdown overlay={chartLibrariesMenu}>
+            <Button size="small">
+              {currentLibraryItem && currentLibraryItem.title}
+              <Icon type="down" />
+            </Button>
+          </Dropdown>
           <Button
             onClick={() => {
               playgroundAction('Show Code');
@@ -158,5 +186,34 @@ class ChartContainer extends React.Component {
     );
   }
 }
+
+ChartContainer.propTypes = {
+  resultSet: PropTypes.object,
+  error: PropTypes.object,
+  codeExample: PropTypes.string,
+  render: PropTypes.func.isRequired,
+  title: PropTypes.string,
+  codeSandboxSource: PropTypes.string,
+  dependencies: PropTypes.array.isRequired,
+  dashboardSource: PropTypes.string,
+  hideActions: PropTypes.array,
+  query: PropTypes.object,
+  cubejsApi: PropTypes.object,
+  chartLibrary: PropTypes.string.isRequired,
+  setChartLibrary: PropTypes.func.isRequired,
+  chartLibraries: PropTypes.array.isRequired
+};
+
+ChartContainer.defaultProps = {
+  query: {},
+  cubejsApi: null,
+  hideActions: null,
+  dashboardSource: null,
+  codeSandboxSource: null,
+  title: null,
+  codeExample: null,
+  error: null,
+  resultSet: null
+};
 
 export default ChartContainer;

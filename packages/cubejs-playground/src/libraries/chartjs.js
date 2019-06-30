@@ -1,11 +1,10 @@
-import React from 'react';
-import * as reactChartjs from 'react-chartjs-2'
+import * as reactChartjs from 'react-chartjs-2';
 import moment from 'moment';
 
 const chartTypeToTemplate = {
   line: `
   const data = {
-    labels: resultSet.categories().map(c => new Date(c.category)),
+    labels: resultSet.categories().map(c => c.category),
     datasets: resultSet.series().map((s, index) => (
       {
         label: s.title,
@@ -15,45 +14,11 @@ const chartTypeToTemplate = {
       }
     )),
   };
-  const options = {
-    scales: { xAxes: [{ type: 'time', time: { unit: 'month' }}] }
-  };
-  return <Line data={data} options={options} />;`,
-  categoryFilter: `
-  const data = {
-    labels: resultSet.categories().map(c => new Date(c.category)),
-    datasets: resultSet.series().map((s, index) => (
-      {
-        label: s.title,
-        data: s.series.map(r => r.value),
-        borderColor: COLORS_SERIES[index],
-        fill: false
-      }
-    )),
-  };
-  const options = {
-    scales: { xAxes: [{ type: 'time', time: { unit: 'month' }}] }
-  };
-  return <Line data={data} options={options} />;`,
-  lineMulti: `
-  const data = {
-    labels: resultSet.categories().map(c => new Date(c.category)),
-    datasets: resultSet.series().map((s, index) => (
-      {
-        label: s.title,
-        data: s.series.map(r => r.value),
-        borderColor: COLORS_SERIES[index],
-        fill: false
-      }
-    )),
-  };
-  const options = {
-    scales: { xAxes: [{ type: 'time', time: { unit: 'month' }}] }
-  };
+  const options = {};
   return <Line data={data} options={options} />;`,
   bar: `
   const data = {
-    labels: resultSet.categories().map(c => new Date(c.category)),
+    labels: resultSet.categories().map(c => c.category),
     datasets: resultSet.series().map((s, index) => (
       {
         label: s.title,
@@ -64,25 +29,24 @@ const chartTypeToTemplate = {
     )),
   };
   const options = {
-    scales: { xAxes: [{ type: 'time', time: { unit: 'month' }}] }
+    scales: { xAxes: [{ stacked: true }] }
   };
   return <Bar data={data} options={options} />;`,
-  barStacked: `
+  area: `
   const data = {
-    labels: resultSet.categories().map(c => new Date(c.category)),
+    labels: resultSet.categories().map(c => c.category),
     datasets: resultSet.series().map((s, index) => (
       {
         label: s.title,
         data: s.series.map(r => r.value),
-        backgroundColor: COLORS_SERIES[index],
-        fill: false
+        backgroundColor: COLORS_SERIES[index]
       }
     )),
   };
   const options = {
-    scales: { xAxes: [{ type: 'time', time: { unit: 'month' }}] }
+    scales: { yAxes: [{ stacked: true }] }
   };
-  return <Bar data={data} options={options} />;`,
+  return <Line data={data} options={options} />;`,
   pie: `
   const data = {
     labels: resultSet.categories().map(c => c.category),
@@ -100,13 +64,13 @@ const chartTypeToTemplate = {
 };
 
 
-export const sourceCodeTemplate = (chartType, query) => (
+export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
   `import { Line, Bar, Pie } from 'react-chartjs-2';
 import moment from 'moment';
 
 const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
 
-const renderChart = (resultSet) => {${chartTypeToTemplate[chartType]}
+const ${renderFnName} = ({ resultSet }) => {${chartTypeToTemplate[chartType]}
 };`
 );
 
