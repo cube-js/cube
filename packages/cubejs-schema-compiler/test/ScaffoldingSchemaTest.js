@@ -6,6 +6,10 @@ const driver = {
   quoteIdentifier: (name) => `"${name}"`
 };
 
+const mySqlDriver = {
+  quoteIdentifier: (name) => `\`${name}\``
+};
+
 describe('ScaffoldingSchema', () => {
   it('schema', () => {
     const schema = new ScaffoldingSchema({
@@ -395,6 +399,64 @@ describe('ScaffoldingSchema', () => {
     
     password: {
       sql: \`password\`,
+      type: \`string\`
+    }
+  }
+});
+`
+      }
+    ]);
+  });
+
+  it('escaping back tick', () => {
+    const template = new ScaffoldingTemplate({
+      public: {
+        someOrders: [{
+          "name": "id",
+          "type": "integer",
+          "attributes": []
+        }, {
+          "name": "amount",
+          "type": "integer",
+          "attributes": []
+        }, {
+          "name": "someDimension",
+          "type": "string",
+          "attributes": []
+        }]
+      }
+    }, mySqlDriver);
+    template.generateFilesByTableNames(['public.someOrders']).should.be.deepEqual([
+      {
+        fileName: 'SomeOrders.js',
+        content: `cube(\`SomeOrders\`, {
+  sql: \`SELECT * FROM public.\\\`someOrders\\\`\`,
+  
+  joins: {
+    
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`,
+      drillMembers: [id]
+    },
+    
+    amount: {
+      sql: \`amount\`,
+      type: \`sum\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    somedimension: {
+      sql: \`\${CUBE}.\\\`someDimension\\\`\`,
       type: \`string\`
     }
   }

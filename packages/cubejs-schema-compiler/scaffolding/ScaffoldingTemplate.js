@@ -97,7 +97,7 @@ class ScaffoldingTemplate {
       const items = descriptor.map(desc => this.render(desc, level + 1)).join(', ');
       return `[${items}]`;
     } else if (typeof descriptor === 'string') {
-      return "`" + descriptor + "`";
+      return `\`${descriptor.replace(/`/g, '\\`')}\``;
     } else if (descriptor instanceof MemberReference) {
       return descriptor.member;
     } else if (typeof descriptor === 'object') {
