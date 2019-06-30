@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.9](https://github.com/statsbotco/cubejs-client/compare/v0.10.8...v0.10.9) (2019-06-30)
+
+
+### Features
+
+* **playground:** Chart.js charting library support ([40bb5d0](https://github.com/statsbotco/cubejs-client/commit/40bb5d0))
+
+
+
+
+
 # [0.10.0](https://github.com/statsbotco/cubejs-client/compare/v0.9.24...v0.10.0) (2019-06-21)
 
 
