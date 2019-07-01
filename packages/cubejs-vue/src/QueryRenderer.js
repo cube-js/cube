@@ -46,8 +46,13 @@ export default Vue.component('QueryRenderer', {
   },
   render(createElement) {
     const { $scopedSlots, resultSet, error, loading, sqlQuery } = this;
-    const empty = createElement('div', {});
+    const empty = createElement('div', { class: { 'no-content': true }});
     let slot = this.$slots.empty ? this.$slots.empty : empty;
+    let controls = createElement('div', { class: { 'no-information': true }});
+
+    if ($scopedSlots.builder && this.builderProps.measures) {
+      controls = $scopedSlots.builder({ ...this.builderProps });
+    }
 
     if (!loading && resultSet && !error) {
       const slotProps = {
@@ -68,7 +73,10 @@ export default Vue.component('QueryRenderer', {
           'cubejs-query-renderer': true,
         },
       },
-      slot,
+      [
+        controls,
+        slot,
+      ],
     );
   },
   methods: {

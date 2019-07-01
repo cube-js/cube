@@ -85,10 +85,10 @@ export default Vue.component('QueryBuilder', {
       availableMeasures,
     } = this;
 
-    let childProps = {};
+    let builderProps = {};
 
     if (meta) {
-      childProps = {
+      builderProps = {
         query,
         validatedQuery,
         isQueryPresent,
@@ -108,19 +108,19 @@ export default Vue.component('QueryBuilder', {
       QUERY_ELEMENTS.forEach((e) => {
         const name = e.charAt(0).toUpperCase() + e.slice(1);
 
-        childProps[`add${name}`] = (member) => {
+        builderProps[`add${name}`] = (member) => {
           this.addMember(e, member);
         };
 
-        childProps[`update${name}`] = (member, updateWith) => {
+        builderProps[`update${name}`] = (member, updateWith) => {
           this.updateMember(e, member, updateWith);
         };
 
-        childProps[`remove${name}`] = (member) => {
+        builderProps[`remove${name}`] = (member) => {
           this.removeMember(e, member);
         };
 
-        childProps[`set${name}`] = (members) => {
+        builderProps[`set${name}`] = (members) => {
           this.setMembers(e, members);
         };
       });
@@ -134,7 +134,7 @@ export default Vue.component('QueryBuilder', {
       props: {
         query: this.validatedQuery,
         cubejsApi,
-        builderProps: childProps,
+        builderProps,
       },
       scopedSlots: this.$scopedSlots,
     }, children);
@@ -169,6 +169,7 @@ export default Vue.component('QueryBuilder', {
           validatedQuery[e] = this[e].map(x => toQuery(x));
         }
       });
+      // TODO: implement default heuristics
 
       if (validatedQuery.filters) {
         validatedQuery.filters = validatedQuery.filters.filter(f => f.operator);
