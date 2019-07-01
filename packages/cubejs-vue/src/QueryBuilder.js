@@ -213,7 +213,7 @@ export default Vue.component('QueryBuilder', {
       let mem;
 
       if (element === 'timeDimensions') {
-        mem = this[`available${name}`].find(m => m.name === member.dimension);
+        mem = this[`available${name}`].find(x => x.name === member);
       } else if (element === 'filters') {
         mem = member;
       } else {

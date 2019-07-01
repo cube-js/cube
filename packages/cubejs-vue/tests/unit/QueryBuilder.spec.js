@@ -26,7 +26,7 @@ describe('QueryBuilder.vue', () => {
     expect(wrapper.text()).toContain(`i'm empty`);
   });
 
-  xit('renders meta information', async () => {
+  it('renders meta information', async () => {
     const cube = CubejsApi('token');
     jest.spyOn(cube, 'request')
       .mockImplementation(fetchMock(load))
@@ -34,7 +34,7 @@ describe('QueryBuilder.vue', () => {
 
     let context;
 
-    const wrapper = mount(QueryBuilder, {
+    mount(QueryBuilder, {
       propsData: {
         cubejsApi: cube,
         query: {
@@ -44,17 +44,12 @@ describe('QueryBuilder.vue', () => {
       scopedSlots: {
         default: (con) => {
           context = con;
-          return `<div>${con.measures}</div>`;
         },
       }
     });
 
     await flushPromises();
-
-    // console.log(context);
-    // console.log(cube.request.mock.calls);
-    // console.log(wrapper.html());
-    expect(wrapper.text()).toContain(`i'm empty`);
+    expect(context.measures[0].name).toBe('Orders.count');
   });
 
   describe('Update background query', () => {
@@ -211,27 +206,33 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.timeDimensions[0].dimension.name).toBe('LineItems.createdAt');
     });
 
-    xit('removes filters', async () => {
+    it('removes timeDimensions', async () => {
       const cube = CubejsApi('token');
       jest.spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
         .mockImplementationOnce(fetchMock(meta));
 
+      const dimension = {
+        dimension: 'Orders.createdAt',
+        dateRange: ['2015-01-01', '2015-12-31'],
+        granularity: 'month'
+      };
+
       const wrapper = mount(QueryBuilder, {
         propsData: {
           cubejsApi: cube,
           query: {
-            measures: ['Orders.count'],
+            timeDimensions: [dimension],
           },
         },
       });
 
       await flushPromises();
 
-      expect(wrapper.vm.measures.length).toBe(1);
-      expect(wrapper.vm.measures[0].name).toBe('Orders.count');
-      wrapper.vm.removeMember('measures', 'Orders.count');
-      expect(wrapper.vm.measures.length).toBe(0);
+      expect(wrapper.vm.timeDimensions.length).toBe(1);
+      expect(wrapper.vm.timeDimensions[0].dimension.name).toBe('Orders.createdAt');
+      wrapper.vm.removeMember('timeDimensions', 'Orders.createdAt');
+      expect(wrapper.vm.timeDimensions.length).toBe(0);
     });
 
     xit('sets filters', async () => {
