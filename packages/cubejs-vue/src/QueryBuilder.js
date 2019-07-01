@@ -109,22 +109,18 @@ export default Vue.component('QueryBuilder', {
         const name = e.charAt(0).toUpperCase() + e.slice(1);
 
         childProps[`add${name}`] = (member) => {
-          // TODO: add deprecation notice
           this.addMember(e, member);
         };
 
         childProps[`update${name}`] = (member, updateWith) => {
-          // TODO: add deprecation notice
           this.updateMember(e, member, updateWith);
         };
 
         childProps[`remove${name}`] = (member) => {
-          // TODO: add deprecation notice
           this.removeMember(e, member);
         };
 
         childProps[`set${name}`] = (members) => {
-          // TODO: add deprecation notice
           this.setMembers(e, members);
         };
       });
