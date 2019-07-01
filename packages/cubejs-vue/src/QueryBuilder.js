@@ -201,7 +201,14 @@ export default Vue.component('QueryBuilder', {
           };
         }
       } else if (element === 'filters') {
-        mem = member;
+        const dimension = {
+          ...this.meta.resolveMember(member.dimension, 'dimensions'),
+        };
+
+        mem = {
+          ...member,
+          dimension,
+        };
       } else {
         mem = this[`available${name}`].find(m => m.name === member);
       }
@@ -246,7 +253,15 @@ export default Vue.component('QueryBuilder', {
           };
         }
       } else if (element === 'filters') {
-        mem = member;
+        index = this[element].findIndex(x => x.dimension === old);
+        const dimension = {
+          ...this.meta.resolveMember(member.dimension, 'dimensions'),
+        };
+
+        mem = {
+          ...member,
+          dimension,
+        };
       } else {
         index = this[element].findIndex(x => x.name === old);
         mem = this[`available${name}`].find(m => m.name === member);
@@ -264,8 +279,27 @@ export default Vue.component('QueryBuilder', {
       members.forEach((m) => {
         if (element === 'timeDimensions') {
           mem = this[`available${name}`].find(x => x.name === m.dimension);
+          if (mem) {
+            const dimension = {
+              ...this.meta.resolveMember(mem.name, 'dimensions'),
+              granularities: this.granularities,
+            };
+
+            mem = {
+              ...mem,
+              dimension,
+              index: this[element].length,
+            };
+          }
         } else if (element === 'filters') {
-          mem = m;
+          const dimension = {
+            ...this.meta.resolveMember(m.dimension, 'dimensions'),
+          };
+
+          mem = {
+            ...m,
+            dimension,
+          };
         } else {
           mem = this[`available${name}`].find(x => x.name === m);
         }
