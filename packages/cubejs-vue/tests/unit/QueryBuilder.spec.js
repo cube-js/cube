@@ -42,7 +42,7 @@ describe('QueryBuilder.vue', () => {
         },
       },
       scopedSlots: {
-        default: (con) => {
+        builder: (con) => {
           context = con;
         },
       }
