@@ -58,7 +58,7 @@ export default Vue.component('QueryRenderer', {
       const slotProps = {
         resultSet,
         sqlQuery,
-        ...this.builderProps,
+        query: this.builderProps.query,
       };
 
       slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
