@@ -6,6 +6,7 @@ const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver
 class MongoBIDriver extends BaseDriver {
   constructor(config) {
     super();
+    config = config || {};
 
     let ssl;
 
