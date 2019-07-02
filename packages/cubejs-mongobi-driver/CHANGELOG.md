@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.10](https://github.com/statsbotco/cubejs-client/compare/v0.10.9...v0.10.10) (2019-07-02)
+
+
+### Bug Fixes
+
+* **mongobi-driver:** accessing password field of undefined ([#147](https://github.com/statsbotco/cubejs-client/issues/147)) ([bdd9580](https://github.com/statsbotco/cubejs-client/commit/bdd9580))
+
+
+
+
+
 ## [0.10.7](https://github.com/statsbotco/cubejs-client/compare/v0.10.6...v0.10.7) (2019-06-27)
 
 
