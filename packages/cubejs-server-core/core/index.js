@@ -161,6 +161,18 @@ class CubejsServerCore {
         process.exit(1);
       });
     } else {
+      const oldLogger = this.logger;
+      let loadRequestCount = 0;
+      this.logger = ((msg, params) => {
+        if (msg === 'Load Request Success') {
+          loadRequestCount++;
+        }
+        oldLogger(msg, params);
+      });
+      setInterval(() => {
+        this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount });
+        loadRequestCount = 0;
+      }, 60000);
       this.event('Server Start');
     }
   }
