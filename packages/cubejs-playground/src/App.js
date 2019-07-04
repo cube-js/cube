@@ -30,7 +30,7 @@ class App extends Component {
             <div>
               Ask about it in&nbsp;
               <a
-                href="https://cubejs-community.herokuapp.com"
+                href="https://slack.cube.dev"
                 target="_blank"
                 rel="noopener noreferrer"
               >

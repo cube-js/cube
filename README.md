@@ -244,7 +244,7 @@ export default () => {
 
 ## Community
 
-If you have any questions or need help - [please join our Slack community](https://cubejs-community.herokuapp.com) of amazing developers and contributors.
+If you have any questions or need help - [please join our Slack community](https://slack.cube.dev) of amazing developers and contributors.
 
 ## Architecture
 __Cube.js acts as an analytics backend__, translating business logic (metrics and dimensions) into SQL and handling database connection. 
