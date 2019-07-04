@@ -163,7 +163,7 @@ class RedisQueueDriverConnection {
   }
 
   queriesDefKey() {
-    return this.queryRedisKey('QUERIES');
+    return this.queueRedisKey('QUERIES');
   }
 
   resultListKey(queryKey) {
