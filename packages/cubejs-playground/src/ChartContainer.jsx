@@ -12,11 +12,29 @@ import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
 
+const frameworks = [{
+  id: 'vanilla',
+  title: 'Vanilla JavaScript',
+  docsLink: 'https://cube.dev/docs/@cubejs-client-core'
+}, {
+  id: 'angular',
+  title: 'Angular',
+  docsLink: 'https://cube.dev/docs/@cubejs-client-ngx'
+}, {
+  id: 'react',
+  title: 'React'
+}, {
+  id: 'vue',
+  title: 'Vue.js',
+  docsLink: 'https://cube.dev/docs/@cubejs-client-vue'
+}];
+
 class ChartContainer extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      showCode: false
+      showCode: false,
+      framework: 'react'
     };
   }
 
@@ -60,7 +78,7 @@ class ChartContainer extends React.Component {
 
   render() {
     const {
-      redirectToDashboard, showCode, sandboxId, addingToDashboard
+      redirectToDashboard, showCode, sandboxId, addingToDashboard, framework
     } = this.state;
     const {
       resultSet,
@@ -99,7 +117,20 @@ class ChartContainer extends React.Component {
       </Menu>
     );
 
+    const frameworkMenu = (
+      <Menu onClick={(e) => this.setState({ framework: e.key })}>
+        {
+          frameworks.map(f => (
+            <Menu.Item key={f.id}>
+              {f.title}
+            </Menu.Item>
+          ))
+        }
+      </Menu>
+    );
+
     const currentLibraryItem = chartLibraries.find(m => m.value === chartLibrary);
+    const frameworkItem = frameworks.find(m => m.id === framework);
     const extra = (
       <form action="https://codesandbox.io/api/v1/sandboxes/define" method="POST" target="_blank">
         <input type="hidden" name="parameters" value={parameters} />
@@ -119,6 +150,12 @@ class ChartContainer extends React.Component {
               {addingToDashboard ? 'Creating app and installing modules...' : 'Add to Dashboard'}
             </Button>
           )}
+          <Dropdown overlay={frameworkMenu}>
+            <Button size="small">
+              {frameworkItem && frameworkItem.title}
+              <Icon type="down" />
+            </Button>
+          </Dropdown>
           <Dropdown overlay={chartLibrariesMenu}>
             <Button size="small">
               {currentLibraryItem && currentLibraryItem.title}
@@ -159,8 +196,23 @@ class ChartContainer extends React.Component {
       </form>
     );
 
-    const code = () => {
-      if (showCode === 'code') {
+    const renderChart = () => {
+      if (frameworkItem && frameworkItem.docsLink) {
+        return (
+          <h2 style={{ padding: 24, textAlign: 'center' }}>
+            We do not support&nbsp;
+            {frameworkItem.title}
+            &nbsp;code generation here yet.
+            < br/>
+            Please refer to&nbsp;
+            <a href={frameworkItem.docsLink} target="_blank">
+              {frameworkItem.title}
+              &nbsp;docs
+            </a>
+            &nbsp;to see on how to use it with Cube.js.
+          </h2>
+        );
+      } else if (showCode === 'code') {
         return <PrismCode code={codeExample} />;
       } else if (showCode === 'sql') {
         return (
@@ -172,7 +224,7 @@ class ChartContainer extends React.Component {
           />
         );
       }
-      return null;
+      return render({ resultSet, error, sandboxId });
     };
 
     return hideActions ? render({ resultSet, error, sandboxId }) : (
@@ -181,7 +233,7 @@ class ChartContainer extends React.Component {
         style={{ minHeight: 420 }}
         extra={extra}
       >
-        {showCode ? code() : render({ resultSet, error, sandboxId })}
+        {renderChart()}
       </Card>
     );
   }
