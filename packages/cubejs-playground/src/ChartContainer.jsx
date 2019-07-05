@@ -106,7 +106,12 @@ class ChartContainer extends React.Component {
     console.log(chartLibraries);
 
     const chartLibrariesMenu = (
-      <Menu onClick={(e) => setChartLibrary(e.key)}>
+      <Menu
+        onClick={(e) => {
+          playgroundAction('Set Chart Library', { chartLibrary: e.key });
+          setChartLibrary(e.key);
+        }}
+      >
         {
           chartLibraries.map(library => (
             <Menu.Item key={library.value}>
@@ -118,7 +123,12 @@ class ChartContainer extends React.Component {
     );
 
     const frameworkMenu = (
-      <Menu onClick={(e) => this.setState({ framework: e.key })}>
+      <Menu
+        onClick={(e) => {
+          playgroundAction('Set Framework', { framework: e.key });
+          this.setState({ framework: e.key });
+        }}
+      >
         {
           frameworks.map(f => (
             <Menu.Item key={f.id}>
@@ -146,6 +156,7 @@ class ChartContainer extends React.Component {
               icon="plus"
               size="small"
               loading={addingToDashboard}
+              disabled={!!frameworkItem.docsLink}
             >
               {addingToDashboard ? 'Creating app and installing modules...' : 'Add to Dashboard'}
             </Button>
@@ -156,8 +167,13 @@ class ChartContainer extends React.Component {
               <Icon type="down" />
             </Button>
           </Dropdown>
-          <Dropdown overlay={chartLibrariesMenu}>
-            <Button size="small">
+          <Dropdown
+            overlay={chartLibrariesMenu}
+            disabled={!!frameworkItem.docsLink}
+          >
+            <Button
+              size="small"
+            >
               {currentLibraryItem && currentLibraryItem.title}
               <Icon type="down" />
             </Button>
@@ -170,6 +186,7 @@ class ChartContainer extends React.Component {
             icon="code"
             size="small"
             type={showCode === 'code' ? 'primary' : 'default'}
+            disabled={!!frameworkItem.docsLink}
           >
             Code
           </Button>
@@ -181,6 +198,7 @@ class ChartContainer extends React.Component {
             icon="question-circle"
             size="small"
             type={showCode === 'sql' ? 'primary' : 'default'}
+            disabled={!!frameworkItem.docsLink}
           >
             SQL
           </Button>
@@ -189,6 +207,7 @@ class ChartContainer extends React.Component {
             size="small"
             onClick={() => playgroundAction('Open Code Sandbox')}
             htmlType="submit"
+            disabled={!!frameworkItem.docsLink}
           >
             Edit
           </Button>
@@ -205,7 +224,12 @@ class ChartContainer extends React.Component {
             &nbsp;code generation here yet.
             < br/>
             Please refer to&nbsp;
-            <a href={frameworkItem.docsLink} target="_blank">
+            <a
+              href={frameworkItem.docsLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => playgroundAction('Unsupported Framework Docs', { framework })}
+            >
               {frameworkItem.title}
               &nbsp;docs
             </a>
