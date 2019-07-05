@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.10.11",
-    "@google-cloud/bigquery": "^2.1.0",
+    "@google-cloud/bigquery": "^4.1.4",
     "ramda": "^0.26.1"
   },
   "license": "Apache-2.0",
