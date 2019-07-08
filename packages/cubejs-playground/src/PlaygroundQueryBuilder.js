@@ -445,7 +445,6 @@ const PlaygroundQueryBuilder = ({
               query={validatedQuery}
               resultSet={resultSet}
               error={error}
-              title="Chart"
               apiUrl={apiUrl}
               cubejsToken={cubejsToken}
               chartType={chartType}

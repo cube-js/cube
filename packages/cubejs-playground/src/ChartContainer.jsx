@@ -1,6 +1,7 @@
+/* global navigator */
 import React from 'react';
 import {
-  Card, Button, Menu, Dropdown, Icon
+  Card, Button, Menu, Dropdown, Icon, notification
 } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
@@ -85,7 +86,6 @@ class ChartContainer extends React.Component {
       error,
       codeExample,
       render,
-      title,
       codeSandboxSource,
       dependencies,
       dashboardSource,
@@ -251,6 +251,46 @@ class ChartContainer extends React.Component {
       return render({ resultSet, error, sandboxId });
     };
 
+    let title;
+
+    const copyCodeToClipboard = async () => {
+      if (!navigator.clipboard) {
+        notification.error({
+          message: `Your browser doesn't support copy to clipboard`
+        });
+      }
+      try {
+        await navigator.clipboard.writeText(codeExample);
+        notification.success({
+          message: `Code has been copied to clipboard`
+        });
+      } catch (e) {
+        notification.error({
+          message: `Can't copy code to clipboard`,
+          description: e,
+        });
+      }
+    };
+
+    if (showCode === 'code') {
+      title = (
+        <Button
+          icon="copy"
+          onClick={() => {
+            copyCodeToClipboard();
+            playgroundAction('Copy to Clipboard');
+          }}
+          type="primary"
+        >
+          Copy Code to Clipboard
+        </Button>
+      );
+    } else if (showCode === 'sql') {
+      title = 'SQL';
+    } else {
+      title = 'Chart';
+    }
+
     return hideActions ? render({ resultSet, error, sandboxId }) : (
       <Card
         title={title}
@@ -268,7 +308,6 @@ ChartContainer.propTypes = {
   error: PropTypes.object,
   codeExample: PropTypes.string,
   render: PropTypes.func.isRequired,
-  title: PropTypes.string,
   codeSandboxSource: PropTypes.string,
   dependencies: PropTypes.array.isRequired,
   dashboardSource: PropTypes.string,
@@ -286,7 +325,6 @@ ChartContainer.defaultProps = {
   hideActions: null,
   dashboardSource: null,
   codeSandboxSource: null,
-  title: null,
   codeExample: null,
   error: null,
   resultSet: null

@@ -106,7 +106,6 @@ export const ChartRenderer = (props) => {
       <SourceRender.Consumer>
         {({ element, error: jsCompilingError }) => (
           <ChartContainer
-            title={title}
             query={query}
             resultSet={resultSet}
             error={error}
