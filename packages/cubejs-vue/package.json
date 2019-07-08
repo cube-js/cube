@@ -18,8 +18,7 @@
   ],
   "dependencies": {
     "core-js": "^2.6.5",
-    "ramda": "^0.26.1",
-    "vue": "^2.6.6"
+    "ramda": "^0.26.1"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.5.0",
@@ -32,7 +31,8 @@
     "babel-jest": "^23.6.0",
     "eslint": "^5.8.0",
     "eslint-plugin-vue": "^5.0.0",
-    "vue-template-compiler": "^2.5.21"
+    "vue-template-compiler": "^2.5.21",
+    "vue": "^2.6.6"
   },
   "eslintConfig": {
     "root": true,

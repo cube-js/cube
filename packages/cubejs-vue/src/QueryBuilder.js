@@ -1,9 +1,8 @@
-import Vue from 'vue';
 import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
 
-export default Vue.component('QueryBuilder', {
+export default {
   components: {
     QueryRenderer,
   },
@@ -193,6 +192,8 @@ export default Vue.component('QueryBuilder', {
 
           mem = {
             ...mem,
+            granularity: member.granularity,
+            dateRange: member.dateRange,
             dimension,
             index: this[element].length,
           };
@@ -246,6 +247,8 @@ export default Vue.component('QueryBuilder', {
           mem = {
             ...mem,
             dimension,
+            granularity: member.granularity,
+            dateRange: member.dateRange,
             index,
           };
         }
@@ -284,6 +287,8 @@ export default Vue.component('QueryBuilder', {
 
             mem = {
               ...mem,
+              granularity: m.granularity,
+              dateRange: m.dateRange,
               dimension,
               index: this[element].length,
             };
@@ -310,4 +315,4 @@ export default Vue.component('QueryBuilder', {
       this.chartType = chartType;
     },
   },
-});
+};

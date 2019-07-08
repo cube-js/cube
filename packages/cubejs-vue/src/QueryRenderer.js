@@ -1,7 +1,6 @@
-import Vue from 'vue';
 import { toPairs, fromPairs } from 'ramda';
 
-export default Vue.component('QueryRenderer', {
+export default {
   props: {
     query: {
       type: Object,
@@ -83,6 +82,7 @@ export default Vue.component('QueryRenderer', {
     async load(query) {
       try {
         this.loading = true;
+        this.error = undefined;
 
         if (query && Object.keys(query).length > 0) {
           if (this.loadSql === 'only') {
@@ -104,6 +104,7 @@ export default Vue.component('QueryRenderer', {
     },
     async loadQueries(queries) {
       try {
+        this.error = undefined;
         this.loading = true;
 
         const resultPromises = Promise.all(toPairs(queries).map(
@@ -131,4 +132,4 @@ export default Vue.component('QueryRenderer', {
       }
     },
   },
-});
+};

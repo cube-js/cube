@@ -151,6 +151,9 @@ export default bundle('cubejs-client-core', 'cubejs', {
   external: [
     'vue',
   ],
+  globals: {
+    vue: 'Vue',
+  },
 })).concat(bundle('cubejs-client-ngx', 'cubejsngx', {
   input: "packages/cubejs-client-ngx/index.ts",
   external: [

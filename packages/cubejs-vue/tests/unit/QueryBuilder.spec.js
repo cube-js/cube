@@ -170,6 +170,7 @@ describe('QueryBuilder.vue', () => {
       });
       expect(wrapper.vm.timeDimensions.length).toBe(1);
       expect(wrapper.vm.timeDimensions[0].name).toBe('Orders.createdAt');
+      expect(wrapper.vm.timeDimensions[0].granularity).toBe('month');
     });
 
     it('updates timeDimensions', async () => {
@@ -187,7 +188,7 @@ describe('QueryBuilder.vue', () => {
       const newDimension = {
         dimension: 'LineItems.createdAt',
         dateRange: ['2015-01-01', '2015-12-31'],
-        granularity: 'month'
+        granularity: 'day'
       };
 
       const wrapper = mount(QueryBuilder, {
@@ -203,9 +204,11 @@ describe('QueryBuilder.vue', () => {
 
       expect(wrapper.vm.timeDimensions.length).toBe(1);
       expect(wrapper.vm.timeDimensions[0].dimension.name).toBe('Orders.createdAt');
+      expect(wrapper.vm.timeDimensions[0].granularity).toBe('month');
       wrapper.vm.updateMember('timeDimensions', dimension, newDimension);
       expect(wrapper.vm.timeDimensions.length).toBe(1);
       expect(wrapper.vm.timeDimensions[0].dimension.name).toBe('LineItems.createdAt');
+      expect(wrapper.vm.timeDimensions[0].granularity).toBe('day');
     });
 
     it('removes timeDimensions', async () => {
@@ -252,7 +255,7 @@ describe('QueryBuilder.vue', () => {
       const newDimension = {
         dimension: 'LineItems.createdAt',
         dateRange: ['2015-01-01', '2015-12-31'],
-        granularity: 'month'
+        granularity: 'day'
       };
 
       const wrapper = mount(QueryBuilder, {
@@ -268,9 +271,11 @@ describe('QueryBuilder.vue', () => {
 
       expect(wrapper.vm.timeDimensions.length).toBe(1);
       expect(wrapper.vm.timeDimensions[0].dimension.name).toBe('Orders.createdAt');
+      expect(wrapper.vm.timeDimensions[0].granularity).toBe('month');
       wrapper.vm.setMembers('timeDimensions', [newDimension]);
       expect(wrapper.vm.timeDimensions.length).toBe(1);
       expect(wrapper.vm.timeDimensions[0].dimension.name).toBe('LineItems.createdAt');
+      expect(wrapper.vm.timeDimensions[0].granularity).toBe('day');
     });
   });
 
