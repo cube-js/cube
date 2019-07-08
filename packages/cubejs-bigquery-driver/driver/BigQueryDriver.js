@@ -140,9 +140,9 @@ class BigQueryDriver extends BaseDriver {
 
   async loadPreAggregationIntoTable(preAggregationTableName, loadSql, params) {
     const [dataSet, tableName] = preAggregationTableName.split('.');
-    const [job] = await this.bigquery.startQuery({
+    const [job] = await this.bigquery.createQueryJob({
       query: loadSql,
-      queryParameters: (params || []).map(BigQuery.valueToQueryParameter_),
+      params,
       parameterMode: 'positional',
       destination: this.bigquery.dataset(dataSet).table(tableName),
       createDisposition: "CREATE_IF_NEEDED",
