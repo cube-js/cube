@@ -6,8 +6,8 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
-    "@cubejs-backend/mongobi-driver": "^0.4.0",
-    "@cubejs-backend/server-core": "^0.4.0",
+    "@cubejs-backend/mongobi-driver": "^0.10.12",
+    "@cubejs-backend/server-core": "^0.10.12",
     "cookie-parser": "~1.4.3",
     "debug": "~2.6.9",
     "dotenv": "^6.2.0",
