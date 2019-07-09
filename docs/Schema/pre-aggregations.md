@@ -205,7 +205,7 @@ cube(`Orders`, {
 You should use this option for scenarios where you need to handle high throughput for big data backend.
 It allows to download rollups prepared in big data backends such as AWS Athena, BigQuery, Presto, Hive and others to low latency databases such as MySQL for actual querying.
 While big data backends aren't very suitable for handling massive amounts of concurrent queries even on pre-aggregated data most of single node RDBMS can do it very well if cardinality of data not so big.
-Leveraging this nuance allows to create setup where you can query huge amounts of data with subsecond response times at cost of time to insight delay.
+Leveraging this nuance allows to create setup where you can query huge amounts of data with subsecond response times at cost of rollup download time.
 
 To setup it just add `external` param to your pre-aggregation:
 
