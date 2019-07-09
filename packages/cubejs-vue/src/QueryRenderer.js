@@ -58,6 +58,9 @@ export default {
         resultSet,
         sqlQuery,
         query: this.builderProps.query,
+        loading,
+        error,
+        ...this.builderProps,
       };
 
       slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
