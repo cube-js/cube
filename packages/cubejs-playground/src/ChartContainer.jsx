@@ -180,6 +180,18 @@ class ChartContainer extends React.Component {
           </Dropdown>
           <Button
             onClick={() => {
+              playgroundAction('Show Query');
+              this.setState({ showCode: showCode === 'query' ? null : 'query' });
+            }}
+            icon="thunderbolt"
+            size="small"
+            type={showCode === 'query' ? 'primary' : 'default'}
+            disabled={!!frameworkItem.docsLink}
+          >
+            JSON Query
+          </Button>
+          <Button
+            onClick={() => {
               playgroundAction('Show Code');
               this.setState({ showCode: showCode === 'code' ? null : 'code' });
             }}
@@ -215,6 +227,8 @@ class ChartContainer extends React.Component {
       </form>
     );
 
+    const queryText = JSON.stringify(query, null, 2);
+
     const renderChart = () => {
       if (frameworkItem && frameworkItem.docsLink) {
         return (
@@ -238,6 +252,8 @@ class ChartContainer extends React.Component {
         );
       } else if (showCode === 'code') {
         return <PrismCode code={codeExample} />;
+      } else if (showCode === 'query') {
+        return <PrismCode code={queryText} />;
       } else if (showCode === 'sql') {
         return (
           <QueryRenderer
@@ -260,13 +276,13 @@ class ChartContainer extends React.Component {
         });
       }
       try {
-        await navigator.clipboard.writeText(codeExample);
+        await navigator.clipboard.writeText(showCode === 'query' ? queryText : codeExample);
         notification.success({
-          message: `Code has been copied to clipboard`
+          message: `Copied to clipboard`
         });
       } catch (e) {
         notification.error({
-          message: `Can't copy code to clipboard`,
+          message: `Can't copy to clipboard`,
           description: e,
         });
       }
@@ -278,11 +294,24 @@ class ChartContainer extends React.Component {
           icon="copy"
           onClick={() => {
             copyCodeToClipboard();
-            playgroundAction('Copy to Clipboard');
+            playgroundAction('Copy Code to Clipboard');
           }}
           type="primary"
         >
           Copy Code to Clipboard
+        </Button>
+      );
+    } else if (showCode === 'query') {
+      title = (
+        <Button
+          icon="copy"
+          onClick={() => {
+            copyCodeToClipboard();
+            playgroundAction('Copy Query to Clipboard');
+          }}
+          type="primary"
+        >
+          Copy Query to Clipboard
         </Button>
       );
     } else if (showCode === 'sql') {

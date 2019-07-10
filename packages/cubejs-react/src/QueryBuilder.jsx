@@ -1,5 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
+import { equals } from 'ramda';
 import QueryRenderer from './QueryRenderer.jsx';
 
 export default class QueryBuilder extends React.Component {
@@ -15,6 +16,14 @@ export default class QueryBuilder extends React.Component {
     const { cubejsApi } = this.props;
     const meta = await cubejsApi.meta();
     this.setState({ meta });
+  }
+
+  componentDidUpdate(prevProps) {
+    const { query } = this.props;
+    if (!equals(prevProps.query, query)) {
+      // eslint-disable-next-line react/no-did-update-set-state
+      this.setState({ query });
+    }
   }
 
   isQueryPresent() {
@@ -39,34 +48,25 @@ export default class QueryBuilder extends React.Component {
     const updateMethods = (memberType, toQuery = getName) => ({
       add: (member) => {
         const { query } = this.state;
-        this.setState(this.applyStateChangeHeuristics({
-          query: {
-            ...query,
-            [memberType]: (query[memberType] || []).concat(toQuery(member))
-          }
-        }));
+        this.updateQuery({
+          [memberType]: (query[memberType] || []).concat(toQuery(member))
+        });
       },
       remove: (member) => {
         const { query } = this.state;
         const members = (query[memberType] || []).concat([]);
         members.splice(member.index, 1);
-        return this.setState(this.applyStateChangeHeuristics({
-          query: {
-            ...query,
-            [memberType]: members
-          }
-        }));
+        return this.updateQuery({
+          [memberType]: members
+        });
       },
       update: (member, updateWith) => {
         const { query } = this.state;
         const members = (query[memberType] || []).concat([]);
         members.splice(member.index, 1, toQuery(updateWith));
-        return this.setState(this.applyStateChangeHeuristics({
-          query: {
-            ...query,
-            [memberType]: members
-          }
-        }));
+        return this.updateQuery({
+          [memberType]: members
+        });
       }
     });
 
@@ -118,9 +118,29 @@ export default class QueryBuilder extends React.Component {
       updateSegments: updateMethods('segments'),
       updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
       updateFilters: updateMethods('filters', toFilter),
-      updateChartType: (newChartType) => this.setState(this.applyStateChangeHeuristics({ chartType: newChartType })),
+      updateChartType: (newChartType) => this.updateVizState({ chartType: newChartType }),
       ...queryRendererProps
     };
+  }
+
+  updateQuery(queryUpdate) {
+    const { query } = this.state;
+    this.updateVizState({
+      query: {
+        ...query,
+        ...queryUpdate
+      }
+    });
+  }
+
+  updateVizState(state) {
+    const { setQuery } = this.props;
+    let finalState = this.applyStateChangeHeuristics(state);
+    this.setState(finalState);
+    finalState = { ...this.state, ...finalState };
+    if (setQuery) {
+      setQuery(finalState.query);
+    }
   }
 
   validatedQuery() {
@@ -294,6 +314,7 @@ export default class QueryBuilder extends React.Component {
 QueryBuilder.propTypes = {
   render: PropTypes.func,
   stateChangeHeuristics: PropTypes.func,
+  setQuery: PropTypes.func,
   cubejsApi: PropTypes.object.isRequired,
   disableHeuristics: PropTypes.bool,
   query: PropTypes.object
@@ -301,6 +322,7 @@ QueryBuilder.propTypes = {
 
 QueryBuilder.defaultProps = {
   query: {},
+  setQuery: null,
   stateChangeHeuristics: null,
   disableHeuristics: false,
   render: null

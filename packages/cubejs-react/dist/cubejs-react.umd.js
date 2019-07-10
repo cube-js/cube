@@ -1436,7 +1436,7 @@
 	      // Set @@toStringTag to native iterators
 	      _setToStringTag(IteratorPrototype, TAG, true);
 	      // fix for some old engines
-	      if (typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
+	      if (!_library && typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
 	    }
 	  }
 	  // fix Array#{values, @@iterator}.name in V8 / FF
@@ -1445,7 +1445,7 @@
 	    $default = function values() { return $native.call(this); };
 	  }
 	  // Define iterator
-	  if (BUGGY || VALUES_BUG || !proto[ITERATOR$3]) {
+	  if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR$3])) {
 	    _hide(proto, ITERATOR$3, $default);
 	  }
 	  // Plug for library
@@ -7745,14 +7745,14 @@
 	function (_React$Component) {
 	  _inherits(QueryBuilder, _React$Component);
 
-	  function QueryBuilder(props) {
+	  function QueryBuilder(props$$1) {
 	    var _this;
 
 	    _classCallCheck(this, QueryBuilder);
 
-	    _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props));
+	    _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props$$1));
 	    _this.state = {
-	      query: props.query,
+	      query: props$$1.query,
 	      chartType: 'line'
 	    };
 	    return _this;
@@ -7792,6 +7792,18 @@
 	      };
 	    }()
 	  }, {
+	    key: "componentDidUpdate",
+	    value: function componentDidUpdate(prevProps) {
+	      var query = this.props.query;
+
+	      if (!equals(prevProps.query, query)) {
+	        // eslint-disable-next-line react/no-did-update-set-state
+	        this.setState({
+	          query: query
+	        });
+	      }
+	    }
+	  }, {
 	    key: "isQueryPresent",
 	    value: function isQueryPresent() {
 	      var query = this.state.query;
@@ -7825,28 +7837,22 @@
 	      var updateMethods = function updateMethods(memberType) {
 	        var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
 	        return {
-	          add: function add(member) {
+	          add: function add$$1(member) {
 	            var query = _this2.state.query;
 
-	            _this2.setState(_this2.applyStateChangeHeuristics({
-	              query: _objectSpread({}, query, _defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))))
-	            }));
+	            _this2.updateQuery(_defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))));
 	          },
-	          remove: function remove(member) {
+	          remove: function remove$$1(member) {
 	            var query = _this2.state.query;
 	            var members = (query[memberType] || []).concat([]);
 	            members.splice(member.index, 1);
-	            return _this2.setState(_this2.applyStateChangeHeuristics({
-	              query: _objectSpread({}, query, _defineProperty({}, memberType, members))
-	            }));
+	            return _this2.updateQuery(_defineProperty({}, memberType, members));
 	          },
-	          update: function update(member, updateWith) {
+	          update: function update$$1(member, updateWith) {
 	            var query = _this2.state.query;
 	            var members = (query[memberType] || []).concat([]);
 	            members.splice(member.index, 1, toQuery(updateWith));
-	            return _this2.setState(_this2.applyStateChangeHeuristics({
-	              query: _objectSpread({}, query, _defineProperty({}, memberType, members))
-	            }));
+	            return _this2.updateQuery(_defineProperty({}, memberType, members));
 	          }
 	        };
 	      };
@@ -7922,11 +7928,31 @@
 	        updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
 	        updateFilters: updateMethods('filters', toFilter),
 	        updateChartType: function updateChartType(newChartType) {
-	          return _this2.setState(_this2.applyStateChangeHeuristics({
+	          return _this2.updateVizState({
 	            chartType: newChartType
-	          }));
+	          });
 	        }
 	      }, queryRendererProps);
+	    }
+	  }, {
+	    key: "updateQuery",
+	    value: function updateQuery(queryUpdate) {
+	      var query = this.state.query;
+	      this.updateVizState({
+	        query: _objectSpread({}, query, queryUpdate)
+	      });
+	    }
+	  }, {
+	    key: "updateVizState",
+	    value: function updateVizState(state) {
+	      var setQuery = this.props.setQuery;
+	      var finalState = this.applyStateChangeHeuristics(state);
+	      this.setState(finalState);
+	      finalState = _objectSpread({}, this.state, finalState);
+
+	      if (setQuery) {
+	        setQuery(finalState.query);
+	      }
 	    }
 	  }, {
 	    key: "validatedQuery",
@@ -8085,12 +8111,14 @@
 	QueryBuilder.propTypes = {
 	  render: PropTypes.func,
 	  stateChangeHeuristics: PropTypes.func,
+	  setQuery: PropTypes.func,
 	  cubejsApi: PropTypes.object.isRequired,
 	  disableHeuristics: PropTypes.bool,
 	  query: PropTypes.object
 	};
 	QueryBuilder.defaultProps = {
 	  query: {},
+	  setQuery: null,
 	  stateChangeHeuristics: null,
 	  disableHeuristics: false,
 	  render: null

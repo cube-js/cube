@@ -373,10 +373,11 @@ ChartType.propTypes = {
 };
 
 const PlaygroundQueryBuilder = ({
-  query, cubejsApi, apiUrl, cubejsToken, dashboardSource
+  query, cubejsApi, apiUrl, cubejsToken, dashboardSource, setQuery
 }) => (
   <QueryBuilder
     query={query}
+    setQuery={setQuery}
     cubejsApi={cubejsApi}
     render={({
       resultSet, error, validatedQuery, isQueryPresent, chartType, updateChartType,
@@ -397,21 +398,21 @@ const PlaygroundQueryBuilder = ({
                   addMemberName="Measure"
                   updateMethods={updateMeasures}
                 />
-                <Divider type="vertical" />
+                <Divider type="vertical"/>
                 <MemberGroup
                   members={dimensions}
                   availableMembers={availableDimensions}
                   addMemberName="Dimension"
                   updateMethods={updateDimensions}
                 />
-                <Divider type="vertical" />
+                <Divider type="vertical"/>
                 <MemberGroup
                   members={segments}
                   availableMembers={availableSegments}
                   addMemberName="Segment"
                   updateMethods={updateSegments}
                 />
-                <Divider type="vertical" />
+                <Divider type="vertical"/>
                 <TimeGroup
                   members={timeDimensions}
                   availableMembers={availableTimeDimensions}
@@ -432,7 +433,7 @@ const PlaygroundQueryBuilder = ({
             </Row>
             <Row type="flex" justify="space-around" align="top" gutter={24}>
               <Col span={24}>
-                <ChartType chartType={chartType} updateChartType={updateChartType} />
+                <ChartType chartType={chartType} updateChartType={updateChartType}/>
               </Col>
             </Row>
           </Card>
@@ -460,6 +461,7 @@ const PlaygroundQueryBuilder = ({
 
 PlaygroundQueryBuilder.propTypes = {
   query: PropTypes.object,
+  setQuery: PropTypes.func,
   cubejsApi: PropTypes.object,
   dashboardSource: PropTypes.object,
   apiUrl: PropTypes.string,
@@ -468,6 +470,7 @@ PlaygroundQueryBuilder.propTypes = {
 
 PlaygroundQueryBuilder.defaultProps = {
   query: {},
+  setQuery: null,
   cubejsApi: null,
   dashboardSource: null,
   apiUrl: '/cubejs-api/v1',

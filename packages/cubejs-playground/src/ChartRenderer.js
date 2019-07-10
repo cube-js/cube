@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import SourceRender from 'react-source-render';
 import presetEnv from '@babel/preset-env';
 import presetReact from '@babel/preset-react';
@@ -68,10 +69,8 @@ ReactDOM.render(<ChartRenderer />, rootElement);
 `;
 
 export const ChartRenderer = (props) => {
-  let {
+  const {
     query,
-    sourceCodeFn,
-    title,
     resultSet,
     error,
     sqlQuery,
@@ -79,6 +78,8 @@ export const ChartRenderer = (props) => {
     cubejsApi,
     chartType
   } = props;
+
+  let { sourceCodeFn } = props;
 
   const [chartLibrary, setChartLibrary] = useState('bizcharts');
 
@@ -130,4 +131,25 @@ export const ChartRenderer = (props) => {
       </SourceRender.Consumer>
     </SourceRender>
   );
+};
+
+ChartRenderer.propTypes = {
+  query: PropTypes.object.isRequired,
+  resultSet: PropTypes.object,
+  error: PropTypes.object,
+  sqlQuery: PropTypes.object,
+  dashboardSource: PropTypes.object,
+  cubejsApi: PropTypes.object,
+  chartType: PropTypes.string,
+  sourceCodeFn: PropTypes.func
+};
+
+ChartRenderer.defaultProps = {
+  resultSet: null,
+  error: null,
+  sqlQuery: null,
+  dashboardSource: null,
+  cubejsApi: null,
+  chartType: null,
+  sourceCodeFn: null
 };

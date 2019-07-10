@@ -2,6 +2,7 @@
 import React, { Component } from 'react';
 import cubejs from '@cubejs-client/core';
 import { fetch } from 'whatwg-fetch';
+import PropTypes from 'prop-types';
 import DashboardSource from './DashboardSource';
 import PlaygroundQueryBuilder from './PlaygroundQueryBuilder';
 
@@ -33,9 +34,13 @@ class ExplorePage extends Component {
 
   render() {
     const { cubejsToken, apiUrl } = this.state;
+    const { location, history } = this.props;
+    const params = new URLSearchParams(location.search);
+    const query = params.get('query') && JSON.parse(params.get('query')) || {};
     return this.cubejsApi() && (
       <PlaygroundQueryBuilder
-        query={{}}
+        query={query}
+        setQuery={(q) => history.push(`/explore?query=${JSON.stringify((q))}`)}
         cubejsApi={this.cubejsApi()}
         apiUrl={apiUrl}
         cubejsToken={cubejsToken}
@@ -44,5 +49,13 @@ class ExplorePage extends Component {
     ) || null;
   }
 }
+
+ExplorePage.propTypes = {
+  location: PropTypes.object.isRequired,
+  history: PropTypes.object.isRequired
+};
+
+ExplorePage.defaultProps = {
+};
 
 export default ExplorePage;
