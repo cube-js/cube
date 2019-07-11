@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.10.12",
-    "oracledb": "^3.1.2"
+    "oracledb": "^3.1.2",
+    "ramda": "^0.26.1"
   },
   "license": "Apache-2.0"
 }
