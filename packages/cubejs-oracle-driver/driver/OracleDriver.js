@@ -65,7 +65,7 @@ class OracleDriver extends BaseDriver {
   }
 
   async tablesSchema() {
-    const data = await query(`
+    const data = await this.query(`
       select tc.owner         "table_schema"
           , tc.table_name     "table_name"
           , tc.column_name    "column_name"
