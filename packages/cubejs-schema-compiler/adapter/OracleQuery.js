@@ -24,7 +24,7 @@ class OracleQuery extends BaseQuery {
   }
 
   get asSyntaxJoin() {
-    return this.asSyntaxTable();
+    return this.asSyntaxTable;
   }
 
   /**
