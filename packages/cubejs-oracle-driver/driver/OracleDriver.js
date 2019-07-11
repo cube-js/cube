@@ -87,14 +87,10 @@ class OracleDriver extends BaseDriver {
   }
 
   async getConnectionFromPool() {
-    try {
-      if (!this.pool) {
-        this.pool = await this.db.createPool(this.config);
-      }
-      return this.pool.getConnection()
-    } catch (e) {
-      throw (e);
+    if (!this.pool) {
+      this.pool = await this.db.createPool(this.config);
     }
+    return this.pool.getConnection()
   }
 
   async testConnection() {
