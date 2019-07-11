@@ -1,4 +1,5 @@
 const BaseQuery = require('./BaseQuery');
+const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_VALUE = {
   date: 'DD',
@@ -8,9 +9,21 @@ const GRANULARITY_VALUE = {
   year: 'YYYY'
 };
 
+class OracleFilter extends BaseFilter {
+  castParameter() {
+    return ':"?"';
+  }
+  /**
+   * "ILIKE" does't support
+   */
+  likeIgnoreCase(column, not) {
+    return `${column}${not ? ' NOT' : ''} LIKE '%' || ${this.castParameter()} || '%'`;
+  }
+}
+
 class OracleQuery extends BaseQuery {
   /**
-   * LIMIT on Oracle it's illegal
+   * "LIMIT" on Oracle it's illegal
    */
   groupByDimensionLimit() {
     return this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;
@@ -55,7 +68,7 @@ class OracleQuery extends BaseQuery {
   }
 
   timeStampParam(timeDimension) {
-    return timeDimension.dateFieldType() === 'string' ? '?' : this.timeStampCast('?');
+    return timeDimension.dateFieldType() === 'string' ? ':"?"' : this.timeStampCast('?');
   }
 
   timeGroupedColumn(granularity, dimension) {
@@ -63,6 +76,10 @@ class OracleQuery extends BaseQuery {
       return dimension;
     }
     return `TRUNC(${dimension}, '${GRANULARITY_VALUE[granularity]}')`;
+  }
+
+  newFilter(filter) {
+    return new OracleFilter(this, filter);
   }
 };
 
