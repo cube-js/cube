@@ -18,13 +18,12 @@ class OracleQuery extends BaseQuery {
 
   /**
    * "AS" for table aliasing on Oracle it's illegal
-   * ORA-00933: SQL command not properly ended
    */
-  asSyntaxTable() {
+  get asSyntaxTable() {
     return '';
   }
 
-  asSyntaxJoin() {
+  get asSyntaxJoin() {
     return this.asSyntaxTable();
   }
 
