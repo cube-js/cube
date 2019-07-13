@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.10.14",
+  "version": "0.10.15",
   "description": "React components for cube.js",
   "author": "Statsbot, Inc.",
   "dependencies": {

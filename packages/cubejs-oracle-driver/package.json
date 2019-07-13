@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/oracle-driver",
   "description": "Cube.js oracle database driver",
   "author": "Trikoz I.",
-  "version": "0.10.14",
+  "version": "0.10.15",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -11,7 +11,7 @@
     "test": "mocha"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.10.12",
+    "@cubejs-backend/query-orchestrator": "^0.10.15",
     "oracledb": "^3.1.2",
     "ramda": "^0.26.1"
   },
