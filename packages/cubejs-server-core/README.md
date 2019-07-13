@@ -2,7 +2,7 @@
 
 Provides wiring of all essential Cube.js components together and can be used as starting point of embedding Cube.js into wide variety of Node.js web application servers.
 
-[Learn more](https://github.com/statsbotco/cube.js#getting-started)
+[Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 

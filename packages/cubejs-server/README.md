@@ -2,7 +2,7 @@
 
 Standalone Cube.js Express server.
 
-[Learn more](https://github.com/statsbotco/cube.js#getting-started)
+[Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 

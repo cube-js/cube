@@ -2,7 +2,7 @@
 
 Mysql2 based Javascript MongoBI driver.
 
-[Learn more](https://github.com/statsbotco/cube.js#getting-started)
+[Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 

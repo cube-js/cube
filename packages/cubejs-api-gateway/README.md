@@ -2,7 +2,7 @@
 
 Provides idempotent long polling API which guarantees analytic query results delivery without request time frame limitations and tolerant to connectivity issues.
 
-[Learn more](https://github.com/statsbotco/cube.js#getting-started)
+[Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 

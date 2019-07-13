@@ -1,6 +1,6 @@
 # Cube.js JDBC Database Driver
 
-[Learn more](https://github.com/statsbotco/cube.js#getting-started)
+[Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 

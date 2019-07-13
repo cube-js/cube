@@ -2,7 +2,7 @@
 
 Cube.js React is a set of helper React components to simplify Cube.js query rendering.
 
-[Learn more](https://github.com/statsbotco/cube.js#getting-started)
+[Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 

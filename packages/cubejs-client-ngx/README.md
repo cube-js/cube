@@ -2,7 +2,7 @@
 
 Cube.js Angular is an Angular Module for Angular 6+.
 
-[Learn more](https://github.com/statsbotco/cube.js#getting-started)
+[Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 
