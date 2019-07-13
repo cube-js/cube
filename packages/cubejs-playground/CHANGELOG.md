@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.14](https://github.com/statsbotco/cubejs-client/compare/v0.10.13...v0.10.14) (2019-07-13)
+
+
+### Features
+
+* **playground:** Show Query ([dc45fcb](https://github.com/statsbotco/cubejs-client/commit/dc45fcb))
+
+
+
+
+
 ## [0.10.13](https://github.com/statsbotco/cubejs-client/compare/v0.10.12...v0.10.13) (2019-07-08)
 
 
