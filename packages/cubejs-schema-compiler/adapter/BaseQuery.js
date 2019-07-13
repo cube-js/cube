@@ -86,6 +86,14 @@ class BaseQuery {
     return this._subQueryDimensions;
   }
 
+  get asSyntaxTable() {
+    return 'AS';
+  }
+
+  get asSyntaxJoin() {
+    return 'AS';
+  }
+
   defaultOrder() {
     if (this.options.preAggregationQuery) {
       return [];
@@ -434,7 +442,7 @@ class BaseQuery {
       this.dimensions.concat(cumulativeMeasures).map(s => s.cumulativeSelectColumns())
     ).filter(c => !!c).join(', ');
     return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
-      ` LEFT JOIN (${baseQuery}) AS ${baseQueryAlias} ON ${dateJoinConditionSql}` +
+      ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
       this.groupByClause();
   }
 
@@ -443,14 +451,14 @@ class BaseQuery {
   }
 
   dateSeriesSql(timeDimension) {
-    return `(${this.seriesSql(timeDimension)}) AS ${timeDimension.dateSeriesAliasName()}`;
+    return `(${this.seriesSql(timeDimension)}) ${this.asSyntaxTable} ${timeDimension.dateSeriesAliasName()}`;
   }
 
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
     );
-    return `SELECT date_from::timestamptz, date_to::timestamptz FROM (VALUES ${values}) AS dates (date_from, date_to)`;
+    return `SELECT date_from::timestamptz, date_to::timestamptz FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
   timeStampParam(timeDimension) {
@@ -505,18 +513,18 @@ class BaseQuery {
 
   joinQuery(join, subQueryDimensions) {
     const joins = join.joins.map(j =>
-      `LEFT JOIN ${this.cubeSql(j.originalTo)} AS ${this.cubeAlias(j.originalTo)}
+      `LEFT JOIN ${this.cubeSql(j.originalTo)} ${this.asSyntaxJoin} ${this.cubeAlias(j.originalTo)}
       ON ${this.evaluateSql(j.originalFrom, j.join.sql)}`
     ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
 
-    return `${this.cubeSql(join.root)} AS ${this.cubeAlias(join.root)}\n${joins.join("\n")}`;
+    return `${this.cubeSql(join.root)} ${this.asSyntaxJoin} ${this.cubeAlias(join.root)}\n${joins.join("\n")}`;
   }
 
   subQueryJoin(dimension) {
     const { prefix, subQuery, cubeName } = this.subQueryDescription(dimension);
     const primaryKey = this.newDimension(this.primaryKeyName(cubeName));
     const subQueryAlias = this.escapeColumnName(this.aliasName(prefix));
-    return `LEFT JOIN (${subQuery.buildParamAnnotatedSql()}) AS ${subQueryAlias}
+    return `LEFT JOIN (${subQuery.buildParamAnnotatedSql()}) ${this.asSyntaxJoin} ${subQueryAlias}
     ON ${subQueryAlias}.${primaryKey.aliasName()} = ${this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName)}`;
   }
 
@@ -590,8 +598,8 @@ class BaseQuery {
       this.dimensionSql(primaryKeyDimension);
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? '' : measureSubQueryDimensions.map(d => this.subQueryJoin(d)).join("\n");
-    return `SELECT ${columnsForSelect} FROM (${this.keysQuery(primaryKeyDimension, filters)}) AS ${this.escapeColumnName('keys')} ` +
-      `LEFT OUTER JOIN ${keyCubeSql} AS ${this.cubeAlias(keyCubeName)} ON
+    return `SELECT ${columnsForSelect} FROM (${this.keysQuery(primaryKeyDimension, filters)}) ${this.asSyntaxTable} ${this.escapeColumnName('keys')} ` +
+      `LEFT OUTER JOIN ${keyCubeSql} ${this.asSyntaxJoin} ${this.cubeAlias(keyCubeName)} ON
       ${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect} ` +
       subQueryJoins +
       (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
@@ -1233,10 +1241,10 @@ class BaseQuery {
           );
           if (cubeNamesForTimeDimension.length === 1 && cubeNamesForTimeDimension[0] === cube) {
             const dimensionSql = this.dimensionSql(foundMainTimeDimension);
-            return `select max(${dimensionSql}) from ${this.cubeSql(cube)} AS ${this.cubeAlias(cube)}`;
+            return `select max(${dimensionSql}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
           }
         }
-        return `select count(*) from ${this.cubeSql(cube)} AS ${this.cubeAlias(cube)}`;
+        return `select count(*) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
       }).map(paramAnnotatedSql => this.paramAllocator.buildSqlAndParams(paramAnnotatedSql));
     return {
       queries,
@@ -1248,7 +1256,7 @@ class BaseQuery {
     return R.fromPairs(this.collectCubeNames()
       .map(cube => [
         cube,
-        this.paramAllocator.buildSqlAndParams(`select count(*) as ${this.escapeColumnName('total_count')} from ${this.cubeSql(cube)} AS ${this.cubeAlias(cube)}`)
+        this.paramAllocator.buildSqlAndParams(`select count(*) as ${this.escapeColumnName('total_count')} from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`)
       ])
     );
   }
@@ -1271,7 +1279,7 @@ class BaseQuery {
 
   preAggregationLoadSql(cube, preAggregation, tableName) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
-    return [`CREATE TABLE ${tableName} AS ${sqlAndParams[0]}`, sqlAndParams[1]];
+    return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
   preAggregationSql(cube, preAggregation) {

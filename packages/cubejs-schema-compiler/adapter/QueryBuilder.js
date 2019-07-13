@@ -9,6 +9,7 @@ const vertica = require('./VerticaQuery');
 const snowflake = require('./SnowflakeQuery');
 const clickhouse = require('./ClickHouseQuery');
 const hive = require('./HiveQuery');
+const oracle = require('./OracleQuery');
 
 const ADAPTERS = {
   postgres,
