@@ -25,6 +25,7 @@ const ADAPTERS = {
   snowflake,
   clickhouse,
   hive,
+  oracle,
 };
 exports.query = (compilers, dbType, queryOptions) => {
   if (!ADAPTERS[dbType]) {
