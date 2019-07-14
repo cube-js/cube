@@ -48,20 +48,26 @@ export default {
     const empty = createElement('div', { class: { 'no-content': true }});
     let slot = this.$slots.empty ? this.$slots.empty : empty;
     let controls = createElement('div', { class: { 'no-information': true }});
+    const onlyDefault = !('empty' in this.$slots) && !('error' in this.$scopedSlots);
 
     if ($scopedSlots.builder && this.builderProps.measures) {
       controls = $scopedSlots.builder({ ...this.builderProps });
     }
 
-    if (!loading && resultSet && !error) {
+    if ((!loading && resultSet && !error) || onlyDefault) {
       const slotProps = {
         resultSet,
         sqlQuery,
         query: this.builderProps.query,
-        loading,
-        error,
-        ...this.builderProps,
       };
+
+      if (onlyDefault) {
+        Object.assign(slotProps, {
+          loading,
+          error,
+          ...this.builderProps,
+        });
+      }
 
       slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
     } else if (error) {
