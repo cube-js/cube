@@ -72,6 +72,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `redshift`
 * `mssql`
 * `clickhouse`
+* `snowflake`
 
 For example,
 

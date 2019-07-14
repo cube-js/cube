@@ -17,6 +17,7 @@ Cube.js currently provides connectors to the following databases:
 | Google BigQuery      | bigquery        |
 | MS SQL               | mssql           |
 | ClickHouse           | clickhouse      |
+| Snowflake            | snowflake       |
 
 _If you'd like to connect to a database which is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver)._
 
@@ -43,6 +44,7 @@ The table below shows which environment variables are used for different databas
 | AWS Athena | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION` |
 | Google Bigquery | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS` |
 | MongoDB | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` |
+| Snowflake | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`|
 
 ## Notes
 

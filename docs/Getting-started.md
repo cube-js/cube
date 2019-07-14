@@ -34,6 +34,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `bigquery`
 * `mssql`
 * `clickhouse`
+* `snowflake`
 
 For example,
 
