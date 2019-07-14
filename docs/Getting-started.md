@@ -35,6 +35,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `mssql`
 * `clickhouse`
 * `snowflake`
+* `presto`
 
 For example,
 
