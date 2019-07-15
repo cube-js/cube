@@ -56,6 +56,11 @@ class MysqlQuery extends BaseQuery {
     ).join(' UNION ALL ');
     return `SELECT TIMESTAMP(dates.f) date_from, TIMESTAMP(dates.t) date_to FROM (${values}) AS dates`;
   }
+
+  concatStringsSql(strings) {
+    return `CONCAT(${strings.join(", ")})`;
+  }
+
 }
 
 module.exports = MysqlQuery;
