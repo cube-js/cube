@@ -136,7 +136,7 @@ class ScaffoldingSchema {
     const dimensionColumns = tableDefinition.filter(
       column =>
         !column.name.startsWith('_') && this.columnType(column) === 'string' ||
-        column.attributes && column.attributes.primaryKey ||
+        column.attributes && column.attributes.indexOf('primaryKey') !== -1 ||
         column.name.toLowerCase() === 'id'
     );
 
