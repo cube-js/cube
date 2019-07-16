@@ -19,13 +19,6 @@ const reduceCb = (result, i) => {
 
   if (i.key_type === "P" || i.key_type === "U") {
     attributes.push(["primaryKey"]);
-    /**
-     * ScaffoldingSchema.js line 139
-     * seems like a bug
-     * TODO: remove this after method
-     * dimensionColumns change
-     */
-    attributes.primaryKey = true;
   }
 
   tables.push({
