@@ -43,7 +43,6 @@ describe('QueryRenderer.vue', () => {
       await flushPromises();
 
       expect(wrapper.text()).toContain('error message');
-      expect(wrapper.classes()).toContain('cubejs-query-renderer');
       expect(cube.request.mock.calls.length).toBe(1);
     });
 
@@ -66,7 +65,6 @@ describe('QueryRenderer.vue', () => {
       await flushPromises();
 
       expect(wrapper.text()).toContain('Result set is loaded');
-      expect(wrapper.classes()).toContain('cubejs-query-renderer');
       expect(cube.request.mock.calls.length).toBe(1);
     });
   });

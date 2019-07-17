@@ -45,9 +45,9 @@ export default {
   },
   render(createElement) {
     const { $scopedSlots, resultSet, error, loading, sqlQuery } = this;
-    const empty = createElement('div', { class: { 'no-content': true }});
+    const empty = createElement('div', {});
     let slot = this.$slots.empty ? this.$slots.empty : empty;
-    let controls = createElement('div', { class: { 'no-information': true }});
+    let controls = createElement('div', {});
     const onlyDefault = !('empty' in this.$slots) && !('error' in this.$scopedSlots);
 
     if ($scopedSlots.builder && this.builderProps.measures) {
@@ -76,11 +76,7 @@ export default {
 
     return createElement(
       'div',
-      {
-        class: {
-          'cubejs-query-renderer': true,
-        },
-      },
+      {},
       [
         controls,
         slot,
