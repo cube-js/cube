@@ -1,14 +1,17 @@
-import Vue from 'vue';
 import { toPairs, fromPairs } from 'ramda';
 
-export default Vue.component('QueryRenderer', {
+export default {
   props: {
     query: {
       type: Object,
       default: () => ({}),
     },
+    // TODO: validate with current react implementation
     queries: {
       type: Object,
+    },
+    loadSql: {
+      required: false,
     },
     cubejsApi: {
       type: Object,
@@ -41,40 +44,52 @@ export default Vue.component('QueryRenderer', {
     }
   },
   render(createElement) {
-    const { resultSet, error, loading, sqlQuery } = this;
+    const { $scopedSlots, resultSet, error, loading, sqlQuery } = this;
+    const empty = createElement('div', {});
+    let slot = this.$slots.empty ? this.$slots.empty : empty;
+    let controls = createElement('div', {});
+    const onlyDefault = !('empty' in this.$slots) && !('error' in this.$scopedSlots);
 
-    if (!loading && resultSet) {
+    if ($scopedSlots.builder && this.builderProps.measures) {
+      controls = $scopedSlots.builder({ ...this.builderProps });
+    }
+
+    if ((!loading && resultSet && !error) || onlyDefault) {
       const slotProps = {
-        resultSet: this.queries ? (resultSet || {}) : resultSet,
-        error,
-        isLoading: loading,
+        resultSet,
         sqlQuery,
-        ...this.builderProps,
+        query: this.builderProps.query,
       };
 
-      return createElement(
-        'div',
-        this.$scopedSlots.default(slotProps),
-      );
-    } else {
-
-      return createElement(
-        'div',
-        this.$scopedSlots.default({
+      if (onlyDefault) {
+        Object.assign(slotProps, {
           loading,
           error,
-          sqlQuery,
           ...this.builderProps,
-        }),
-      );
+        });
+      }
+
+      slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
+    } else if (error) {
+      slot = $scopedSlots.error ? $scopedSlots.error({ error, sqlQuery }) : slot;
     }
+
+    return createElement(
+      'div',
+      {},
+      [
+        controls,
+        slot,
+      ],
+    );
   },
   methods: {
     async load(query) {
       try {
         this.loading = true;
+        this.error = undefined;
 
-        if (query && Object.keys(query).length) {
+        if (query && Object.keys(query).length > 0) {
           if (this.loadSql === 'only') {
             this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
           } else if (this.loadSql) {
@@ -94,6 +109,7 @@ export default Vue.component('QueryRenderer', {
     },
     async loadQueries(queries) {
       try {
+        this.error = undefined;
         this.loading = true;
 
         const resultPromises = Promise.all(toPairs(queries).map(
@@ -121,4 +137,4 @@ export default Vue.component('QueryRenderer', {
       }
     },
   },
-});
+};

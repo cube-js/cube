@@ -3,25 +3,36 @@
   "version": "0.10.0",
   "description": "Vue.js components for cube.js",
   "author": "Ricardo Tapia",
-  "license": "MIT",
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "test:unit": "vue-cli-service test:unit",
+    "test:unit:watch": "vue-cli-service test:unit --watch --require tests/setup.js"
   },
+  "main": "dist/cubejs-vue.js",
+  "module": "dist/cubejs-vue.esm.js",
+  "files": [
+    "dist",
+    "src"
+  ],
   "dependencies": {
     "core-js": "^2.6.5",
-    "ramda": "^0.26.1",
-    "vue": "^2.6.6"
+    "ramda": "^0.26.1"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.5.0",
     "@vue/cli-plugin-eslint": "^3.5.0",
+    "@vue/cli-plugin-unit-jest": "^3.8.0",
     "@vue/cli-service": "^3.5.0",
+    "@vue/test-utils": "1.0.0-beta.29",
+    "babel-core": "7.0.0-bridge.0",
     "babel-eslint": "^10.0.1",
+    "babel-jest": "^23.6.0",
     "eslint": "^5.8.0",
     "eslint-plugin-vue": "^5.0.0",
-    "vue-template-compiler": "^2.5.21"
+    "vue-template-compiler": "^2.5.21",
+    "vue": "^2.6.6"
   },
   "eslintConfig": {
     "root": true,
@@ -42,17 +53,12 @@
       "autoprefixer": {}
     }
   },
-  "main": "dist/cubejs-vue.js",
-  "module": "dist/cubejs-vue.esm.js",
-  "files": [
-    "dist",
-    "src"
-  ],
   "browserslist": [
     "> 1%",
     "last 2 versions",
     "not ie <= 8"
   ],
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   }
