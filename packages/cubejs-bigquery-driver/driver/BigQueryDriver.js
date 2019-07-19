@@ -134,6 +134,12 @@ class BigQueryDriver extends BaseDriver {
     }
   }
 
+  async tableColumnTypes(table) {
+    const [schema, name] = table.split('.');
+    const [bigQueryTable] = await this.bigquery.dataset(schema).table(name).getMetadata();
+    return bigQueryTable.schema.fields.map(c => ({ name: c.name, type: this.toGenericType(c.type) }));
+  }
+
   async createSchemaIfNotExists(schemaName) {
     await this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }

@@ -324,12 +324,14 @@ class PreAggregationLoader {
       throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadTable()`);
     }
     const table = this.targetTableName(newVersionEntry);
+    this.logger('Downloading external pre-aggregation', { preAggregation: this.preAggregation });
     const tableData = await client.downloadTable(table);
     const columns = await client.tableColumnTypes(table);
     const externalDriver = await this.externalDriverFactory();
     if (!externalDriver.uploadTable) {
       throw new Error(`Can't load external pre-aggregation: destination driver doesn't support uploadTable()`);
     }
+    this.logger('Uploading external pre-aggregation', { preAggregation: this.preAggregation });
     await externalDriver.uploadTable(table, columns, tableData);
     await this.loadCache.reset(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table);
