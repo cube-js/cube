@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.16](https://github.com/statsbotco/cubejs-client/compare/v0.10.15...v0.10.16) (2019-07-20)
+
+
+### Features
+
+* Lean more on vue slots for state ([#148](https://github.com/statsbotco/cubejs-client/issues/148)) ([e8af88d](https://github.com/statsbotco/cubejs-client/commit/e8af88d))
+
+
+
+
+
 # [0.10.0](https://github.com/statsbotco/cubejs-client/compare/v0.9.24...v0.10.0) (2019-06-21)
 
 **Note:** Version bump only for package @cubejs-client/vue

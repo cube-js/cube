@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue",
-  "version": "0.10.0",
+  "version": "0.10.16",
   "description": "Vue.js components for cube.js",
   "author": "Ricardo Tapia",
   "scripts": {
@@ -31,8 +31,8 @@
     "babel-jest": "^23.6.0",
     "eslint": "^5.8.0",
     "eslint-plugin-vue": "^5.0.0",
-    "vue-template-compiler": "^2.5.21",
-    "vue": "^2.6.6"
+    "vue": "^2.6.6",
+    "vue-template-compiler": "^2.5.21"
   },
   "eslintConfig": {
     "root": true,
