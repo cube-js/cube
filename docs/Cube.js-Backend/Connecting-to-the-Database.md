@@ -18,7 +18,7 @@ Cube.js currently provides connectors to the following databases:
 | MS SQL               | mssql           |
 | ClickHouse           | clickhouse      |
 | Snowflake            | snowflake       |
-| Presto               | presto          |
+| Presto               | prestodb          |
 
 _If you'd like to connect to a database which is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver)._
 
