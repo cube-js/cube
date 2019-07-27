@@ -14,6 +14,7 @@
     "chalk": "^2.4.2",
     "commander": "^2.20.0",
     "cross-env": "^5.2.0",
+    "cz-conventional-changelog": "^3.0.2",
     "deepmerge": "^4.0.0",
     "dotenv": "^8.0.0",
     "dotenv-expand": "^5.1.0",
@@ -29,6 +30,11 @@
     "log-symbols": "^3.0.0",
     "prettier": "^1.18.2",
     "simple-git": "^1.123.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
   },
   "husky": {
     "hooks": {

@@ -72,5 +72,8 @@ Temporary Items
 # Keep .gitkeep files
 !/**/.gitkeep
 
+# eslint cache
+.eslintcache
+
 # Super secret stash
 .stash
