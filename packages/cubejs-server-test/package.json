@@ -1,0 +1,38 @@
+{
+  "name": "@cubejs-backend/server-test",
+  "description": "Cube.js test harness for @cubejs-backend/server-core",
+  "author": "Statsbot, Inc.",
+  "version": "0.1.0",
+  "main": "src/index.js",
+  "scripts": {
+    "lint": "cross-env NODE_ENV=development eslint --cache --format=pretty src __tests__",
+    "lint:fix": "npm run --silent lint --fix; exit 0",
+    "test": "node scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "chalk": "^2.4.2",
+    "commander": "^2.20.0",
+    "cross-env": "^5.2.0",
+    "deepmerge": "^4.0.0",
+    "dotenv": "^8.0.0",
+    "dotenv-expand": "^5.1.0",
+    "eslint": "^5.16.0",
+    "eslint-config-airbnb-base": "^13.2.0",
+    "eslint-formatter-pretty": "^2.1.1",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-jest": "^22.14.0",
+    "eslint-plugin-prettier": "^3.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "husky": "^3.0.1",
+    "jest": "^24.8.0",
+    "log-symbols": "^3.0.0",
+    "prettier": "^1.18.2",
+    "simple-git": "^1.123.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "node scripts/gitExecuteLocally.js -e \"npm run lint:fix && CI=1 npm run test\" --root \"../../\""
+    }
+  }
+}
