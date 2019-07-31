@@ -69,7 +69,12 @@ class DevServer {
     app.get('/playground/files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Files Load');
       const files = await this.cubejsServer.repository.dataSchemaFiles();
-      res.json({ files });
+      res.json({
+        files: files.map(f => ({
+          ...f,
+          absPath: path.resolve(path.join(this.cubejsServer.repository.localPath(), f.fileName))
+        }))
+      });
     }));
 
     app.post('/playground/generate-schema', catchErrors(async (req, res) => {

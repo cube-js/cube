@@ -125,11 +125,15 @@ class SchemaPage extends Component {
   }
 
   selectedFileContent() {
+    const file = this.selectedFile();
+    return file && file.content;
+  }
+
+  selectedFile() {
     const {
       files, selectedFile
     } = this.state;
-    const file = files.find(f => f.fileName === selectedFile);
-    return file && file.content;
+    return files.find(f => f.fileName === selectedFile);
   }
 
   renderFilesMenu() {
@@ -228,6 +232,20 @@ class SchemaPage extends Component {
           </Tabs>
         </Sider>
         <Content style={{ minHeight: 280 }}>
+          {
+            selectedFile && (
+              <Alert
+                message={(
+                  <span>
+                    This file is available for edit at&nbsp;
+                    <b>{this.selectedFile().absPath}</b>
+                  </span>
+                )}
+                type="info"
+                style={{ paddingTop: 10, paddingBottom: 11 }}
+              />
+            )
+          }
           {selectedFile
             ? <PrismCode code={this.selectedFileContent()} style={{ padding: 12 }}/>
             : <h2 style={{ padding: 24, textAlign: 'center' }}>Select tables to generate Cube.js schema</h2>
