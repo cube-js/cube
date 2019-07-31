@@ -141,7 +141,7 @@ different depending on your database._
 dimensions: {
   id: {
     sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
-    type: `number`,
+    type: `string`,
     primaryKey: true
   }
 }
