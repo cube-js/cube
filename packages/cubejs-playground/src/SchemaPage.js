@@ -237,7 +237,7 @@ class SchemaPage extends Component {
               <Alert
                 message={(
                   <span>
-                    This file is available for edit at&nbsp;
+                    This file can be edited at&nbsp;
                     <b>{this.selectedFile().absPath}</b>
                   </span>
                 )}
