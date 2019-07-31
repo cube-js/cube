@@ -1,7 +1,5 @@
-const index = require("../src");
-
 describe('index.js', () => {
-  it('should export undefined', () => {
-    expect(index).toBeUndefined();
+  it('placeholder test', () => {
+    expect(true).toBe(true);
   });
 });

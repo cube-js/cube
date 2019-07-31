@@ -23,6 +23,16 @@ module.exports = merge(
           "jest/prefer-to-have-length": "warn",
           "jest/valid-expect": "error"
         }
+      },
+      {
+        files: [
+          "**/*.test.js",
+          "scripts/*.js",
+          "config/*.js"
+        ],
+        rules: {
+          "import/no-extraneous-dependencies": "off",
+        }
       }
     ]
   },

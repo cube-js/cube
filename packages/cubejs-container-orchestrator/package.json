@@ -7,10 +7,12 @@
   "scripts": {
     "lint": "cross-env NODE_ENV=development eslint --cache --format=pretty src __tests__",
     "lint:fix": "npm run --silent lint --fix; exit 0",
+    "e2e": "node scripts/test.js --testPathPattern=__e2e__/.*\\.test\\.js",
     "test": "node scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js"
   },
   "license": "MIT",
   "devDependencies": {
+    "axios": "^0.19.0",
     "chalk": "^2.4.2",
     "commander": "^2.20.0",
     "cross-env": "^5.2.0",
@@ -29,7 +31,8 @@
     "jest": "^24.8.0",
     "log-symbols": "^3.0.0",
     "prettier": "^1.18.2",
-    "simple-git": "^1.123.0"
+    "simple-git": "^1.123.0",
+    "socket.io-client": "^2.2.0"
   },
   "config": {
     "commitizen": {
@@ -40,5 +43,10 @@
     "hooks": {
       "pre-commit": "node scripts/gitExecuteLocally.js -e \"npm run lint:fix && CI=1 npm run test\" --root \"../../\""
     }
+  },
+  "dependencies": {
+    "command-exists": "^1.2.8",
+    "express": "^4.17.1",
+    "socket.io": "^2.2.0"
   }
 }
