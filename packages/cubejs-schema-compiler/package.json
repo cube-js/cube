@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube.js schema compiler",
   "author": "Statsbot, Inc.",
-  "version": "0.10.16",
+  "version": "0.10.17",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -11,13 +11,13 @@
     "lint": "eslint **/*.js"
   },
   "dependencies": {
+    "@hapi/joi": "^14.3.1",
     "babel-generator": "^6.25.0",
     "babel-traverse": "^6.25.0",
     "babel-types": "^6.25.0",
     "babylon": "^6.17.4",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
-    "@hapi/joi": "^14.3.1",
     "moment-range": "^4.0.1",
     "moment-timezone": "^0.5.13",
     "node-dijkstra": "^2.5.0",

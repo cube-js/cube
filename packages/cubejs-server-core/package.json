@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Statsbot, Inc.",
-  "version": "0.10.16",
+  "version": "0.10.17",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -16,9 +16,9 @@
     "playground"
   ],
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.10.15",
+    "@cubejs-backend/api-gateway": "^0.10.17",
     "@cubejs-backend/query-orchestrator": "^0.10.16",
-    "@cubejs-backend/schema-compiler": "^0.10.16",
+    "@cubejs-backend/schema-compiler": "^0.10.17",
     "analytics-node": "^3.4.0-beta.1",
     "codesandbox-import-utils": "^1.3.8",
     "cross-spawn": "^6.0.5",

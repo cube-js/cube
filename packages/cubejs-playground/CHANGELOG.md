@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.17](https://github.com/statsbotco/cubejs-client/compare/v0.10.16...v0.10.17) (2019-07-31)
+
+
+### Features
+
+* **playground:** Show editable files hint ([2dffe6c](https://github.com/statsbotco/cubejs-client/commit/2dffe6c))
+* **playground:** Slack and Docs links ([3270e70](https://github.com/statsbotco/cubejs-client/commit/3270e70))
+
+
+
+
+
 ## [0.10.16](https://github.com/statsbotco/cubejs-client/compare/v0.10.15...v0.10.16) (2019-07-20)
 
 **Note:** Version bump only for package @cubejs-client/playground

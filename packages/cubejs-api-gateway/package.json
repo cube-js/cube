@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Statsbot, Inc.",
-  "version": "0.10.15",
+  "version": "0.10.17",
   "engines": {
     "node": ">=8.11.1"
   },
@@ -11,8 +11,8 @@
     "test": "mocha"
   },
   "dependencies": {
-    "chrono-node": "^1.3.11",
     "@hapi/joi": "^14.0.6",
+    "chrono-node": "^1.3.11",
     "jsonwebtoken": "^8.3.0",
     "moment": "^2.24.0",
     "ramda": "^0.25.0"
