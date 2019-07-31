@@ -21,9 +21,11 @@ function createExitTimer(timeout = 10000) {
   }, timeout);
 }
 
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
+if (process.env.NODE_ENV === 'test') {
+  app.get('/', (req, res) => {
+    res.send('Hello World!');
+  });
+}
 
 io.on('connection', (socket) => {
   if (exitTimer) {
