@@ -40,6 +40,21 @@ it('should start an express server at specified port', async () => {
   expect(data).toBe('Hello World!');
 });
 
+it('should not allow multiple processes to start at the same time given the same port', async () => {
+  // arrange
+  // act
+  const child = spawn('node', [path.resolve(__dirname, '../src/index.js')], {
+    stdio: 'pipe',
+    shell: true,
+    env: containerOrchestratorEnv,
+  });
+  child.stderr.on('data', (data) => {
+    // assert
+    expect(data.toString('utf8')).toMatch('EADDRINUSE :::32125');
+    child.unref();
+  });
+});
+
 it(`should close after ${CUBEJS_TEST_EXIT_TIMEOUT}ms when all socket connections close`, async () => {
   let res;
   try {
