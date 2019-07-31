@@ -50,10 +50,6 @@ class BigqueryQuery extends BaseQuery {
     return new BigqueryFilter(this, filter);
   }
 
-  aliasName(name) {
-    return super.aliasName(name).replace(/\./g, '_');
-  }
-
   dateSeriesSql(timeDimension) {
     return `${timeDimension.dateSeriesAliasName()} AS (${this.seriesSql(timeDimension)})`;
   }
