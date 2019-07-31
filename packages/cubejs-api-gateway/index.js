@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const R = require('ramda');
-const Joi = require('joi');
+const Joi = require('@hapi/joi');
 const moment = require('moment');
 const dateParser = require('./dateParser');
 
