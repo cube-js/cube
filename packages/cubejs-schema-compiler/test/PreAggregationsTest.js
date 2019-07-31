@@ -1,3 +1,4 @@
+/* eslint-disable quote-props */
 const R = require('ramda');
 
 const PostgresQuery = require('../adapter/PostgresQuery');
@@ -221,20 +222,20 @@ describe('PreAggregations', () => {
         res.should.be.deepEqual(
           [
             {
-              "visitors.created_at_date": "2017-01-02T00:00:00.000Z",
-              "visitors.count": "1"
+              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__count": "1"
             },
             {
-              "visitors.created_at_date": "2017-01-04T00:00:00.000Z",
-              "visitors.count": "1"
+              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__count": "1"
             },
             {
-              "visitors.created_at_date": "2017-01-05T00:00:00.000Z",
-              "visitors.count": "1"
+              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__count": "1"
             },
             {
-              "visitors.created_at_date": "2017-01-06T00:00:00.000Z",
-              "visitors.count": "2"
+              "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
+              "visitors__count": "2"
             }
           ]
         );
@@ -272,20 +273,20 @@ describe('PreAggregations', () => {
         res.should.be.deepEqual(
           [
             {
-              "visitors.created_at_date": "2017-01-02T00:00:00.000Z",
-              "visitors.ratio": '0.33333333333333333333'
+              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__ratio": '0.33333333333333333333'
             },
             {
-              "visitors.created_at_date": "2017-01-04T00:00:00.000Z",
-              "visitors.ratio": '0.50000000000000000000'
+              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__ratio": '0.50000000000000000000'
             },
             {
-              "visitors.created_at_date": "2017-01-05T00:00:00.000Z",
-              "visitors.ratio": '1.00000000000000000000'
+              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__ratio": '1.00000000000000000000'
             },
             {
-              "visitors.created_at_date": "2017-01-06T00:00:00.000Z",
-              "visitors.ratio": null
+              "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
+              "visitors__ratio": null
             }
           ]
         );
@@ -322,8 +323,8 @@ describe('PreAggregations', () => {
         res.should.be.deepEqual(
           [
             {
-              "google_visitors.created_at_date": "2017-01-05T00:00:00.000Z",
-              "google_visitors.count": "1"
+              "google_visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "google_visitors__count": "1"
             }
           ]
         );
@@ -386,10 +387,10 @@ describe('PreAggregations', () => {
         console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [
-            { "visitors.checkins_count": "0", "visitors.count": "3" },
-            { "visitors.checkins_count": "1", "visitors.count": "1" },
-            { "visitors.checkins_count": "2", "visitors.count": "1" },
-            { "visitors.checkins_count": "3", "visitors.count": "1" }
+            { "visitors__checkins_count": "0", "visitors__count": "3" },
+            { "visitors__checkins_count": "1", "visitors__count": "1" },
+            { "visitors__checkins_count": "2", "visitors__count": "1" },
+            { "visitors__checkins_count": "3", "visitors__count": "1" }
           ]
         );
       });
@@ -433,8 +434,8 @@ describe('PreAggregations', () => {
         res.should.be.deepEqual(
           [
             {
-              'visitors.created_at_month': '2017-01-01T00:00:00.000Z',
-              'visitors.checkins_total': '6'
+              "visitors__created_at_month": '2017-01-01T00:00:00.000Z',
+              "visitors__checkins_total": '6'
             }
           ]
         );
@@ -479,19 +480,19 @@ describe('PreAggregations', () => {
         res.should.be.deepEqual(
           [
             {
-              "visitors.source": "some",
-              "visitors.created_at_date": "2017-01-02T00:00:00.000Z",
-              "visitors.checkins_total": "3"
+              "visitors__source": "some",
+              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__checkins_total": "3"
             },
             {
-              "visitors.source": "some",
-              "visitors.created_at_date": "2017-01-04T00:00:00.000Z",
-              "visitors.checkins_total": "2"
+              "visitors__source": "some",
+              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__checkins_total": "2"
             },
             {
-              "visitors.source": "google",
-              "visitors.created_at_date": "2017-01-05T00:00:00.000Z",
-              "visitors.checkins_total": "1"
+              "visitors__source": "google",
+              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__checkins_total": "1"
             }
           ]
         );
@@ -535,8 +536,8 @@ describe('PreAggregations', () => {
         res.should.be.deepEqual(
           [
             {
-              "visitors.created_at_date": "2017-01-05T00:00:00.000Z",
-              "visitors.checkins_total": "1"
+              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__checkins_total": "1"
             }
           ]
         );
@@ -574,9 +575,9 @@ describe('PreAggregations', () => {
         console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [
-            { "visitors.source": "some", "visitors.checkins_total": "5" },
-            { "visitors.source": "google", "visitors.checkins_total": "1" },
-            { "visitors.source": null, "visitors.checkins_total": "0" }
+            { "visitors__source": "some", "visitors__checkins_total": "5" },
+            { "visitors__source": "google", "visitors__checkins_total": "1" },
+            { "visitors__source": null, "visitors__checkins_total": "0" }
           ]
         );
       });

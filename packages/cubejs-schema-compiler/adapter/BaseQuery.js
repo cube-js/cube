@@ -1194,7 +1194,7 @@ class BaseQuery {
   }
 
   aliasName(name) {
-    return inflection.underscore(name).replace(/\./g, '_');
+    return inflection.underscore(name).replace(/\./g, '__');
   }
 
   newSubQuery(options) {

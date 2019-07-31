@@ -1,3 +1,4 @@
+/* eslint-disable quote-props */
 /* globals describe, before, after, it */
 const CompileError = require('../compiler/CompileError');
 const PrepareCompiler = require('./PrepareCompiler');
@@ -168,10 +169,10 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors.created_at_date": "2017-01-02T00:00:00.000", "visitors.visitor_count": "1" },
-            { "visitors.created_at_date": "2017-01-04T00:00:00.000", "visitors.visitor_count": "1" },
-            { "visitors.created_at_date": "2017-01-05T00:00:00.000", "visitors.visitor_count": "1" },
-            { "visitors.created_at_date": "2017-01-06T00:00:00.000", "visitors.visitor_count": "2" }
+            { "visitors__created_at_date": "2017-01-02T00:00:00.000", "visitors__visitor_count": "1" },
+            { "visitors__created_at_date": "2017-01-04T00:00:00.000", "visitors__visitor_count": "1" },
+            { "visitors__created_at_date": "2017-01-05T00:00:00.000", "visitors__visitor_count": "1" },
+            { "visitors__created_at_date": "2017-01-06T00:00:00.000", "visitors__visitor_count": "2" }
           ]
         );
       });
@@ -230,8 +231,8 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors.status": "Approved", "visitors.visitor_count": "2" },
-            { "visitors.status": "Canceled", "visitors.visitor_count": "4" }
+            { "visitors__status": "Approved", "visitors__visitor_count": "2" },
+            { "visitors__status": "Canceled", "visitors__visitor_count": "4" }
           ]
         );
       });
@@ -264,21 +265,21 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       })
       `);
       const responses = [
-        [{ 'visitors.created_at': '2017-01-02T16:00:00.000' }],
+        [{ "visitors__created_at": '2017-01-02T16:00:00.000' }],
         [
-          { 'visitors.created_at': '2016-09-06T16:00:00.000' },
-          { 'visitors.created_at': '2017-01-04T16:00:00.000' },
-          { 'visitors.created_at': '2017-01-05T16:00:00.000' },
-          { 'visitors.created_at': '2017-01-06T16:00:00.000' }
+          { "visitors__created_at": '2016-09-06T16:00:00.000' },
+          { "visitors__created_at": '2017-01-04T16:00:00.000' },
+          { "visitors__created_at": '2017-01-05T16:00:00.000' },
+          { "visitors__created_at": '2017-01-06T16:00:00.000' }
         ],
-        [{ 'visitors.created_at': '2017-01-06T16:00:00.000' }],
+        [{ "visitors__created_at": '2017-01-06T16:00:00.000' }],
         [
-          { 'visitors.created_at': '2016-09-06T16:00:00.000' },
-          { 'visitors.created_at': '2017-01-02T16:00:00.000' },
-          { 'visitors.created_at': '2017-01-04T16:00:00.000' },
-          { 'visitors.created_at': '2017-01-05T16:00:00.000' }
+          { "visitors__created_at": '2016-09-06T16:00:00.000' },
+          { "visitors__created_at": '2017-01-02T16:00:00.000' },
+          { "visitors__created_at": '2017-01-04T16:00:00.000' },
+          { "visitors__created_at": '2017-01-05T16:00:00.000' }
         ],
-        [{ 'visitors.created_at': '2017-01-06T16:00:00.000' }]
+        [{ "visitors__created_at": '2017-01-06T16:00:00.000' }]
       ];
       ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
         const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];

@@ -1,3 +1,4 @@
+/* eslint-disable quote-props */
 const CompileError = require('../compiler/CompileError');
 const PostgresQuery = require('../adapter/PostgresQuery');
 const PrepareCompiler = require('./PrepareCompiler');
@@ -155,10 +156,10 @@ describe('DataSchemaCompiler', () => {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors.created_at_date": "2017-01-02T00:00:00.000Z", "visitors.visitor_count": "1" },
-            { "visitors.created_at_date": "2017-01-04T00:00:00.000Z", "visitors.visitor_count": "1" },
-            { "visitors.created_at_date": "2017-01-05T00:00:00.000Z", "visitors.visitor_count": "1" },
-            { "visitors.created_at_date": "2017-01-06T00:00:00.000Z", "visitors.visitor_count": "2" }
+            { "visitors__created_at_date": "2017-01-02T00:00:00.000Z", "visitors__visitor_count": "1" },
+            { "visitors__created_at_date": "2017-01-04T00:00:00.000Z", "visitors__visitor_count": "1" },
+            { "visitors__created_at_date": "2017-01-05T00:00:00.000Z", "visitors__visitor_count": "1" },
+            { "visitors__created_at_date": "2017-01-06T00:00:00.000Z", "visitors__visitor_count": "2" }
           ]
         );
       });
@@ -217,8 +218,8 @@ describe('DataSchemaCompiler', () => {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors.status": "Approved", "visitors.visitor_count": "2" },
-            { "visitors.status": "Canceled", "visitors.visitor_count": "4" }
+            { "visitors__status": "Approved", "visitors__visitor_count": "2" },
+            { "visitors__status": "Canceled", "visitors__visitor_count": "4" }
           ]
         );
       });
@@ -250,21 +251,21 @@ describe('DataSchemaCompiler', () => {
     })
     `);
     const responses = [
-      [{ 'visitors.created_at': '2017-01-03T00:00:00.000Z' }],
+      [{ "visitors__created_at": '2017-01-03T00:00:00.000Z' }],
       [
-        { 'visitors.created_at': '2016-09-07T00:00:00.000Z' },
-        { 'visitors.created_at': '2017-01-05T00:00:00.000Z' },
-        { 'visitors.created_at': '2017-01-06T00:00:00.000Z' },
-        { 'visitors.created_at': '2017-01-07T00:00:00.000Z' }
+        { "visitors__created_at": '2016-09-07T00:00:00.000Z' },
+        { "visitors__created_at": '2017-01-05T00:00:00.000Z' },
+        { "visitors__created_at": '2017-01-06T00:00:00.000Z' },
+        { "visitors__created_at": '2017-01-07T00:00:00.000Z' }
       ],
-      [{ 'visitors.created_at': '2017-01-07T00:00:00.000Z' }],
+      [{ "visitors__created_at": '2017-01-07T00:00:00.000Z' }],
       [
-        { 'visitors.created_at': '2016-09-07T00:00:00.000Z' },
-        { 'visitors.created_at': '2017-01-03T00:00:00.000Z' },
-        { 'visitors.created_at': '2017-01-05T00:00:00.000Z' },
-        { 'visitors.created_at': '2017-01-06T00:00:00.000Z' }
+        { "visitors__created_at": '2016-09-07T00:00:00.000Z' },
+        { "visitors__created_at": '2017-01-03T00:00:00.000Z' },
+        { "visitors__created_at": '2017-01-05T00:00:00.000Z' },
+        { "visitors__created_at": '2017-01-06T00:00:00.000Z' }
       ],
-      [{ 'visitors.created_at': '2017-01-07T00:00:00.000Z' }]
+      [{ "visitors__created_at": '2017-01-07T00:00:00.000Z' }]
     ];
     const result = compiler.compile().then(() => {
       const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {

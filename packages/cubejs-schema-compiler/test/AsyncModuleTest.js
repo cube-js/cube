@@ -1,3 +1,4 @@
+/* eslint-disable quote-props */
 /* globals describe, it */
 const PostgresQuery = require('../adapter/PostgresQuery');
 const PrepareCompiler = require('./PrepareCompiler');
@@ -55,7 +56,7 @@ describe('AsyncModule', () => {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors.visitor_count": "6" }
+            { "visitors__visitor_count": "6" }
           ]
         );
       });
