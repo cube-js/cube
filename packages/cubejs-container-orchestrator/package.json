@@ -41,7 +41,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "node scripts/gitExecuteLocally.js -e \"npm run lint:fix && CI=1 npm run test\" --root \"../../\""
+      "pre-commit": "node scripts/gitExecuteLocally.js -e \"npm run lint:fix && CI=1 npm run test && CI=1 npm run e2e\" --root \"../../\""
     }
   },
   "dependencies": {
