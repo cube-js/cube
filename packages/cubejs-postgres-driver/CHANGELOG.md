@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.19](https://github.com/statsbotco/cubejs-client/compare/v0.10.18...v0.10.19) (2019-08-02)
+
+
+### Bug Fixes
+
+* **postgres-driver:** ERROR: type "string" does not exist ([d472e89](https://github.com/statsbotco/cubejs-client/commit/d472e89)), closes [#176](https://github.com/statsbotco/cubejs-client/issues/176)
+
+
+
+
+
 ## [0.10.16](https://github.com/statsbotco/cubejs-client/compare/v0.10.15...v0.10.16) (2019-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
