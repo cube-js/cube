@@ -1,6 +1,10 @@
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const { Pool } = require('pg');
 
+const GenericTypeToPostgres = {
+  string: 'text'
+};
+
 class PostgresDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -54,6 +58,10 @@ class PostgresDriver extends BaseDriver {
 
   param(paramIndex) {
     return '$' + (paramIndex + 1);
+  }
+
+  fromGenericType(columnType) {
+    return GenericTypeToPostgres[columnType] || super.fromGenericType(columnType);
   }
 }
 
