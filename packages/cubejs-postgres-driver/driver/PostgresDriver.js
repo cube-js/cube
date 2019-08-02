@@ -20,9 +20,8 @@ class PostgresDriver extends BaseDriver {
       ssl: process.env.CUBEJS_DB_SSL ? {} : undefined,
       ...config
     });
-    const self = this;
     this.pool.on('error', (err) => {
-      console.log(`Unexpected error on idle client: ${err.stack || err}`); //TODO
+      console.log(`Unexpected error on idle client: ${err.stack || err}`); // TODO
     });
   }
 
@@ -57,7 +56,7 @@ class PostgresDriver extends BaseDriver {
   }
 
   param(paramIndex) {
-    return '$' + (paramIndex + 1);
+    return `$${paramIndex + 1}`;
   }
 
   fromGenericType(columnType) {
