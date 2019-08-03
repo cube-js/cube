@@ -62,6 +62,7 @@ const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retri
 
 class DashboardSource {
   async load(createApp) {
+    this.loadError = null;
     if (createApp) {
       await fetchWithRetry('/playground/ensure-dashboard-app', undefined, 5);
     }

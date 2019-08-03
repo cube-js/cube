@@ -158,7 +158,7 @@ class ChartContainer extends React.Component {
               loading={addingToDashboard}
               disabled={!!frameworkItem.docsLink}
             >
-              {addingToDashboard ? 'Creating app and installing modules...' : 'Add to Dashboard'}
+              {addingToDashboard ? 'Installing modules. It may take a while. Please check console for progress...' : 'Add to Dashboard'}
             </Button>
           )}
           <Dropdown overlay={frameworkMenu}>

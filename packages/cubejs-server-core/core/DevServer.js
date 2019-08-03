@@ -121,8 +121,8 @@ class DevServer {
       if (!(await fs.pathExists(sourcePath))) {
         res.status(404).json({
           error: await fs.pathExists(dashboardAppPath) ?
-            `Dashboard app corrupted. Please remove '${dashboardAppPath}' directory and recreate it` :
-            `Dashboard app not found in '${dashboardAppPath}' directory`
+            `Dashboard app corrupted. Please remove '${path.resolve(dashboardAppPath)}' directory and recreate it` :
+            `Dashboard app not found in '${path.resolve(dashboardAppPath)}' directory`
         });
         return;
       }
@@ -236,7 +236,8 @@ class DevServer {
       const dashboardPort = this.dashboardAppProcess && await this.dashboardAppProcess.dashboardUrlPromise;
       res.json({
         running: !!dashboardPort,
-        dashboardPort
+        dashboardPort,
+        dashboardAppPath: path.resolve(dashboardAppPath)
       });
     }));
 
