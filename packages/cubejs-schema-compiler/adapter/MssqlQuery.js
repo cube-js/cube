@@ -75,7 +75,7 @@ class MssqlQuery extends BaseQuery {
   }
 
   groupByDimensionLimit() {
-    return '';
+    return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
   }
 
   topLimit() {

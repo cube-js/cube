@@ -26,7 +26,9 @@ class OracleQuery extends BaseQuery {
    * "LIMIT" on Oracle it's illegal
    */
   groupByDimensionLimit() {
-    return this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;
+    const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;
+    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
+    return `${offsetClause}${limitClause}`;
   }
 
   /**

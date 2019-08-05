@@ -32,6 +32,7 @@ class BaseQuery {
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
+    this.offset = this.options.offset;
     this.preAggregations = this.newPreAggregations();
     this.measures = (this.options.measures || []).map(this.newMeasure.bind(this));
     this.dimensions = (this.options.dimensions || []).map(this.newDimension.bind(this));
@@ -812,7 +813,9 @@ class BaseQuery {
   }
 
   groupByDimensionLimit() {
-    return this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
+    return `${limitClause}${offsetClause}`;
   }
 
   topLimit() {
