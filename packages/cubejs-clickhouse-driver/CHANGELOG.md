@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.22](https://github.com/statsbotco/cubejs-client/compare/v0.10.21...v0.10.22) (2019-08-09)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Empty schema when CUBEJS_DB_NAME is provided ([7117e89](https://github.com/statsbotco/cubejs-client/commit/7117e89))
+
+
+
+
+
 ## [0.10.16](https://github.com/statsbotco/cubejs-client/compare/v0.10.15...v0.10.16) (2019-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver
