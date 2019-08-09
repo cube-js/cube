@@ -132,7 +132,7 @@ class ClickHouseDriver extends BaseDriver {
              database as table_schema,
              type as data_type
         FROM system.columns
-       WHERE database = '${this.config.database}'
+       WHERE database = '${this.config.queryOptions.database}'
     `;
   }
 
