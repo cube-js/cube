@@ -4,6 +4,10 @@ const eslintrcbase = require('../../.eslintrc.js');
 module.exports = merge(
   {
     plugins: ["import", "jest", "promise", "prettier"],
+    rules: {
+      'no-var': 0,
+      'no-use-before-define': 0,
+    },
     overrides: [
       {
         files: [
