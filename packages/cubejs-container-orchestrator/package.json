@@ -5,10 +5,13 @@
   "version": "0.1.0",
   "main": "src/index.js",
   "scripts": {
+    "dev": "cross-env NODE_ENV=development node scripts/withEnv.js 'nodemon --inspect=5858 src/index.js'",
     "lint": "cross-env NODE_ENV=development eslint --cache --format=pretty src __tests__",
     "lint:fix": "npm run --silent lint --fix; exit 0",
     "e2e": "node scripts/test.js --testPathPattern=__e2e__/.*\\.test\\.js",
-    "test": "node scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js"
+    "e2e:debug": "node --inspect-brk scripts/test.js --testPathPattern=__e2e__/.*\\.test\\.js --runInBand",
+    "test": "node scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js",
+    "test:debug": "node --inspect-brk scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js"
   },
   "license": "MIT",
   "devDependencies": {
@@ -30,6 +33,7 @@
     "husky": "^3.0.1",
     "jest": "^24.8.0",
     "log-symbols": "^3.0.0",
+    "nodemon": "^1.19.1",
     "prettier": "^1.18.2",
     "simple-git": "^1.123.0",
     "socket.io-client": "^2.2.0"
@@ -47,8 +51,12 @@
   "dependencies": {
     "body-parser": "^1.19.0",
     "command-exists": "^1.2.8",
+    "diskusage": "^1.1.3",
+    "executable": "^4.1.1",
     "express": "^4.17.1",
     "morgan": "^1.9.1",
-    "socket.io": "^2.2.0"
+    "ramda": "^0.26.1",
+    "socket.io": "^2.2.0",
+    "which": "^1.3.1"
   }
 }

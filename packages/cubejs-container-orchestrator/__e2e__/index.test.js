@@ -5,17 +5,13 @@ const io = require('./__fixtures__/socket');
 const getSubprocessEnvironment = require('./__fixtures__/getSubprocessEnvironment');
 
 const ENV_FILTER_REGEXP = /^CUBEJS_/i;
-const CUBEJS_TEST_EXIT_TIMEOUT = 1000;
 let containerOrchestratorEnv;
 let containerOrchestratorProcess;
 let containerOrchestratorUrl;
 let socket;
 
 beforeAll(async () => {
-  containerOrchestratorEnv = getSubprocessEnvironment(ENV_FILTER_REGEXP, {
-    CUBEJS_TEST_PORT: 32125,
-    CUBEJS_TEST_EXIT_TIMEOUT,
-  });
+  containerOrchestratorEnv = getSubprocessEnvironment(ENV_FILTER_REGEXP);
   containerOrchestratorUrl = `http://localhost:${containerOrchestratorEnv.CUBEJS_TEST_PORT}`;
   // I may not need to have a detached version right away.
   // I should probably stash this away and simply use the normal
@@ -55,15 +51,15 @@ it('should not allow multiple processes to start at the same time given the same
   });
 });
 
-it(`should close after ${CUBEJS_TEST_EXIT_TIMEOUT}ms when all socket connections close`, async () => {
+it(`should close after ${process.env.CUBEJS_TEST_EXIT_TIMEOUT}ms when all socket connections close`, async () => {
   let res;
   try {
     // act
     res = await axios.get(containerOrchestratorUrl);
     socket.disconnect();
-    await new Promise((resolve) => setTimeout(
+    await new Promise(resolve => setTimeout(
       resolve,
-      containerOrchestratorEnv.CUBEJS_TEST_EXIT_TIMEOUT + 250
+      parseInt(containerOrchestratorEnv.CUBEJS_TEST_EXIT_TIMEOUT, 10) + 250
     ));
     await axios.get(containerOrchestratorUrl);
   } catch (err) {

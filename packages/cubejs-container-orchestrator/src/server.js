@@ -2,10 +2,12 @@ const express = require('express');
 const http = require('http');
 const util = require('util');
 const socketIO = require('socket.io');
+const { assertStartConditions } = require('./assertStartConditions');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
+const assertStartConditionPromise = assertStartConditions().catch(() => {});
 var sockets;
 var nextSocketId;
 var shutdownTimer;
@@ -43,16 +45,20 @@ process.on("SIGTERM", () => {
   shutdown();
 });
 
-if (!process.env.CUBEJS_TEST_PORT) {
-  console.error("No port specified, exiting");
-  process.exit(1);
-}
+
+
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 
 async function start() {
+  try {
+    await assertStartConditionPromise;
+  } catch (err) {
+    console.error(err);
+    await shutdown();
+  }
   sockets = new Map();
   nextSocketId = 0;
 
@@ -67,7 +73,9 @@ async function start() {
     socket.on("disconnect", () => {
       sockets.delete(socketId);
       if (sockets.size === 0) {
-        shutdownTimer = createShutdownTimer(process.env.CUBEJS_TEST_EXIT_TIMEOUT);
+        shutdownTimer = createShutdownTimer(
+          process.env.CUBEJS_TEST_EXIT_TIMEOUT
+        );
       }
     });
   });
@@ -92,7 +100,7 @@ async function shutdown() {
   }
 }
 
-function createShutdownTimer(timeout = process.env.CUBEJS_TEST_EXIT_TIMEOUT || 10000) {
+function createShutdownTimer(timeout = 10000) {
   if (shutdownTimer) {
     return shutdownTimer;
   }
