@@ -5,7 +5,9 @@
 - [ ] Docs have been added / updated if required
 
 **Issue Reference this PR resolves**
+
 [For example #12]
 
 **Description of Changes Made (if issue reference is not provided)**
+
 [Description goes here]
