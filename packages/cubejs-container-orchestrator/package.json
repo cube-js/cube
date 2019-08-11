@@ -11,7 +11,7 @@
     "e2e": "node scripts/test.js --testPathPattern=__e2e__/.*\\.test\\.js",
     "e2e:debug": "node --inspect-brk scripts/test.js --testPathPattern=__e2e__/.*\\.test\\.js --runInBand",
     "test": "node scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js",
-    "test:debug": "node --inspect-brk scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js"
+    "test:debug": "node --inspect-brk scripts/test.js --testPathPattern=__tests__/.*\\.test\\.js --runInBand"
   },
   "license": "MIT",
   "devDependencies": {
@@ -49,14 +49,18 @@
     }
   },
   "dependencies": {
+    "@hapi/joi": "^15.1.0",
     "body-parser": "^1.19.0",
     "command-exists": "^1.2.8",
     "diskusage": "^1.1.3",
     "executable": "^4.1.1",
     "express": "^4.17.1",
+    "is-uuid": "^1.0.2",
     "morgan": "^1.9.1",
+    "object-hash": "^1.3.1",
     "ramda": "^0.26.1",
     "socket.io": "^2.2.0",
+    "uuid": "^3.3.2",
     "which": "^1.3.1"
   }
 }

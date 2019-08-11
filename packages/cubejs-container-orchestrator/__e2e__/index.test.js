@@ -2,6 +2,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const io = require('./__fixtures__/socket');
+const isUUID = require('is-uuid');
 const getSubprocessEnvironment = require('./__fixtures__/getSubprocessEnvironment');
 
 const ENV_FILTER_REGEXP = /^CUBEJS_/i;
@@ -35,6 +36,13 @@ it('should start an express server at specified port', async () => {
   // assert
   expect(data).toBe('Hello World!');
 });
+
+it('should give the socket a UUIDv4', () => new Promise((resolve) => {
+  socket.emit("get::uuid", uuid => {
+    expect(isUUID.v4(uuid)).toBe(true);
+    resolve();
+  });
+}));
 
 it('should not allow multiple processes to start at the same time given the same port', async () => {
   // arrange

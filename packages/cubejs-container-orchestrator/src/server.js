@@ -2,6 +2,9 @@ const express = require('express');
 const http = require('http');
 const util = require('util');
 const socketIO = require('socket.io');
+const uuidV4 = require('uuid/v4');
+
+// Local modules
 const { assertStartConditions } = require('./assertStartConditions');
 
 const app = express();
@@ -9,7 +12,6 @@ const server = http.createServer(app);
 const io = socketIO(server);
 const assertStartConditionPromise = assertStartConditions().catch(() => {});
 var sockets;
-var nextSocketId;
 var shutdownTimer;
 
 module.exports = {
@@ -56,29 +58,37 @@ async function start() {
     console.error(err);
     await shutdown();
   }
+
+  // ////////////////
+
   sockets = new Map();
-  nextSocketId = 0;
 
   io.on("connection", socket => {
     if (shutdownTimer) {
       clearTimeout(shutdownTimer);
     }
-    const socketId = nextSocketId++;
-    sockets.set(socketId, socket);
+    const socketUUID = uuidV4();
+    sockets.set(socketUUID, socket);
 
     // Remove the socket when it closes
     socket.on("disconnect", () => {
-      sockets.delete(socketId);
+      sockets.delete(socketUUID);
       if (sockets.size === 0) {
         shutdownTimer = createShutdownTimer(
           process.env.CUBEJS_TEST_EXIT_TIMEOUT
         );
       }
     });
+
+    socket.on("get::uuid", (ackFn) => {
+      ackFn(socketUUID);
+    });
   });
 
   server.listen(process.env.CUBEJS_TEST_PORT, () => {
-    console.log(`listening on *:${process.env.CUBEJS_TEST_PORT}`);
+    console.log(
+      `listening on *:${process.env.CUBEJS_TEST_PORT}`
+    );
   });
   server.close = util.promisify(server.close);
 }
