@@ -7,6 +7,8 @@ module.exports = merge(
     rules: {
       'no-var': 0,
       'no-use-before-define': 0,
+      'no-underscore-dangle': 0,
+      'object-curly-newline': 0,
     },
     overrides: [
       {
