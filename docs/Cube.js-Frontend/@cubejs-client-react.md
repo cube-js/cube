@@ -31,6 +31,7 @@ into React app.
 - `cubejsApi`: `CubejsApi` instance to use. Required.
 - `defaultChartType`: default value of chart type. Default: 'line'.
 - `render(renderProps)`: output of this function will be rendered by `QueryBuilder`.
+- `setQuery(query)`: called by `QueryBuilder` when query state changed. Use it when state is maintained outside of `QueryBuilder` component.
 
 ### Render Props
 
