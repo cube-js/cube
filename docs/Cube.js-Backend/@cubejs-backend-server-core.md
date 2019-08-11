@@ -51,6 +51,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   contextToAppId: Function,
   repositoryFactory: Function,
   checkAuthMiddleware: Function,
+  queryTransformer: Function,
   telemetry: Boolean,
   orchestratorOptions: {
     redisPrefix: String,
@@ -190,6 +191,29 @@ Also, you can use `checkAuthMiddleware` to disable built-in security. See an exa
 CubejsServerCore.create({
   checkAuthMiddleware: (req, res, next) => {
     return next && next();
+  }
+});
+```
+
+### queryTransformer
+
+This is a security hook to check your query just before it gets processed.
+You can use this very generic API to implement any type of custom security checks your app needs and transform input query accordingly.
+
+For example you can use `queryTransformer` to add row level security filter where needed.
+
+```javascript
+CubejsServerCore.create({
+  queryTransformer: (query, { authInfo }) => {
+    const user = authInfo.u;
+    if (user.filterByRegion) {
+      query.filters.push({
+        dimension: 'Regions.id',
+        operator: 'equals',
+        values: [user.regionId]
+      })
+    }
+    return query;
   }
 });
 ```
