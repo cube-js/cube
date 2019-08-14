@@ -24,6 +24,7 @@ Query has the following properties:
 - `segments`: An array of segments. Segment is a named filter, created in the Data Schema.
 - `limit`: A row limit for your query. The default value is `10000`. The
     maximum allowed limit is `50000`.
+- `offset`: Number of first rows to be skipped for your query. The default value is `0`.
 - `order`: An object, where keys are measures or dimensions to order by and
     their corresponding values are either `asc` or `desc`. The order of the
     fields to order is based on the order of the keys in the object.
@@ -45,6 +46,7 @@ Query has the following properties:
     granularity: 'month'
   }],
   limit: 100,
+  offset: 50,
   order: {
     'Stories.time': 'asc',
     'Stories.count': 'desc'
