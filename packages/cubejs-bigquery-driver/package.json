@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.10.16",
+  "version": "0.10.23",
   "engines": {
     "node": ">=8.11.1"
   },
