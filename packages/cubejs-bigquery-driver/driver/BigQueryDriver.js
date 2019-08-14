@@ -176,6 +176,16 @@ class BigQueryDriver extends BaseDriver {
       await pause(5000);
     }
   }
+
+  quoteIdentifier(identifier) {
+    const nestedFields = identifier.split('.');
+    return nestedFields.map(name => {
+      if (name.match(/^[a-z0-9_]+$/)) {
+        return name;
+      }
+      return `\`${identifier}\``;
+    }).join('.');
+  }
 }
 
 module.exports = BigQueryDriver;

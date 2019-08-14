@@ -10,10 +10,14 @@ class ScaffoldingTemplate {
   }
 
   escapeName(name) {
-    if (name.match(/^[a-z0-9_]+$/)) {
+    if (this.eligibleIdentifier(name)) {
       return name;
     }
     return this.driver.quoteIdentifier(name);
+  }
+
+  eligibleIdentifier(name) {
+    return !!name.match(/^[a-z0-9_]+$/);
   }
 
   generateFilesByTableNames(tableNames) {
@@ -57,7 +61,7 @@ class ScaffoldingTemplate {
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       measures: tableSchema.measures.map(m => ({
         [this.memberName(m)]: {
-          sql: `${this.escapeName(m.name) !== m.name ? '${CUBE}.' : ''}${this.escapeName(m.name)}`,
+          sql: this.sqlForMember(m),
           type: m.types[0],
           title: this.memberTitle(m)
         }
@@ -69,13 +73,18 @@ class ScaffoldingTemplate {
       }),
       dimensions: tableSchema.dimensions.map(m => ({
         [this.memberName(m)]: {
-          sql: `${this.escapeName(m.name) !== m.name ? '${CUBE}.' : ''}${this.escapeName(m.name)}`,
+          sql: this.sqlForMember(m),
           type: m.types[0],
           title: this.memberTitle(m),
           primaryKey: m.isPrimaryKey ? true : undefined
         }
       })).reduce((a, b) => ({ ...a, ...b }), {})
-    }
+    };
+  }
+
+  sqlForMember(m) {
+    // eslint-disable-next-line no-template-curly-in-string
+    return `${this.escapeName(m.name) !== m.name || !this.eligibleIdentifier(m.name) ? '${CUBE}.' : ''}${this.escapeName(m.name)}`;
   }
 
   memberTitle(m) {

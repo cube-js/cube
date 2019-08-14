@@ -1,3 +1,5 @@
+/* eslint-disable quote-props */
+/* globals it,describe */
 const ScaffoldingSchema = require('../scaffolding/ScaffoldingSchema');
 const ScaffoldingTemplate = require('../scaffolding/ScaffoldingTemplate');
 require('should');
@@ -8,6 +10,18 @@ const driver = {
 
 const mySqlDriver = {
   quoteIdentifier: (name) => `\`${name}\``
+};
+
+const bigQueryDriver = {
+  quoteIdentifier(identifier) {
+    const nestedFields = identifier.split('.');
+    return nestedFields.map(name => {
+      if (name.match(/^[a-z0-9_]+$/)) {
+        return name;
+      }
+      return `\`${identifier}\``;
+    }).join('.');
+  }
 };
 
 describe('ScaffoldingSchema', () => {
@@ -458,6 +472,57 @@ describe('ScaffoldingSchema', () => {
     somedimension: {
       sql: \`\${CUBE}.\\\`someDimension\\\`\`,
       type: \`string\`
+    }
+  }
+});
+`
+      }
+    ]);
+  });
+
+  it('big query nested fields', () => {
+    const template = new ScaffoldingTemplate({
+      public: {
+        orders: [{
+          "name": "id",
+          "type": "integer",
+          "attributes": []
+        }, {
+          "name": "some.dimension.inside",
+          "nestedName": ['some', 'dimension', 'inside'],
+          "type": "string",
+          "attributes": []
+        }]
+      }
+    }, bigQueryDriver);
+    template.generateFilesByTableNames(['public.orders']).should.be.deepEqual([
+      {
+        fileName: 'Orders.js',
+        content: `cube(\`Orders\`, {
+  sql: \`SELECT * FROM public.orders\`,
+  
+  joins: {
+    
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`,
+      drillMembers: [id, someDimensionInside]
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    someDimensionInside: {
+      sql: \`\${CUBE}.some.dimension.inside\`,
+      type: \`string\`,
+      title: \`Some.dimension.inside\`
     }
   }
 });
