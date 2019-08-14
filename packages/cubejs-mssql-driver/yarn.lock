@@ -2,14 +2,13 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/query-orchestrator@^0.7.0":
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.7.0.tgz#129e51aed151780acc145376090c250a4cf9b742"
-  integrity sha512-jDrctw2k49i9AjsWUkvK15H2n8u0kqr9T+rjAqbm865xlqCPo4jbXLsqBZspiBXPZCvxKQEc1fef/h9mDAqKyA==
+"@cubejs-backend/query-orchestrator@^0.10.16":
+  version "0.10.16"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.10.16.tgz#207e1bc69f8f7e3aed3db970fd450528f08e079b"
+  integrity sha512-g+SWhZVQF4ux/HJeRZQ0+lRm8+Iy0Ink19oFqDiLrv1AhDAZ66VpAUM/NXMb5AbRdHH76yB2rvb2ZdT7PfOtIg==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
-    util-promisifyall "^1.0.4"
 
 "@types/node@^8.0.47":
   version "8.10.45"
@@ -551,11 +550,6 @@ util-deprecate@^1.0.1, util-deprecate@~1.0.1:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
   integrity sha1-RQ1Nyfpw3nMnYvvS1KKJgUGaDM8=
-
-util-promisifyall@^1.0.4:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/util-promisifyall/-/util-promisifyall-1.0.6.tgz#03439a5a76461e1f71f76954d945cffc8bd6aad8"
-  integrity sha512-l+o62sbaqStC1xt7oEhlafC4jWBgkOjBXvlPwxkvOYmNqpY8dNXuKdOa+VHjkYz2Fw98e0HvJtNKUg0+6hfP2w==
 
 uuid@^3.1.0, uuid@^3.3.2:
   version "3.3.2"
