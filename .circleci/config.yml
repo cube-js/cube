@@ -3,6 +3,9 @@ jobs:
   install_deps:
     docker:
       - image: circleci/node:10.15
+        environment:
+          TEST_PG_USER: root
+          TEST_CLICKHOUSE_HOST: localhost
 
     working_directory: ~/repo
 
