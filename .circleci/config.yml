@@ -65,5 +65,5 @@ workflows:
     jobs:
       - install_deps
       - test:
-        requires:
-           - install_deps
+          requires:
+             - install_deps
