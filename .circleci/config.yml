@@ -21,7 +21,7 @@ jobs:
           POSTGRES_USER: root
           POSTGRES_DB: model_test
 
-      -image: yandex/clickhouse-server
+      - image: yandex/clickhouse-server
 
 
     working_directory: ~/repo
