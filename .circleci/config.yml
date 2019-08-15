@@ -1,10 +1,33 @@
-# Javascript Node CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-javascript/ for more details
-#
 version: 2
 jobs:
-  build:
+  install_deps:
+    docker:
+      - image: circleci/node:10.15
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            # when lock file changes, use increasingly general patterns to restore cache
+            - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+            - yarn-packages-v1-{{ .Branch }}-
+            - yarn-packages-v1-
+
+      - run: yarn install
+      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
+
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+
+      # run tests!
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
+
+  test:
     docker:
       # specify the version you desire here
       - image: circleci/node:10.15
@@ -27,24 +50,20 @@ jobs:
     working_directory: ~/repo
 
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
-
-      # Download and cache dependencies
       - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "package.json" }}
-            # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
+        keys:
+          # when lock file changes, use increasingly general patterns to restore cache
+          - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+          - yarn-packages-v1-{{ .Branch }}-
+          - yarn-packages-v1-
 
-      - run: yarn install
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
-
-      - save_cache:
-          paths:
-            - node_modules
-          key: v1-dependencies-{{ checksum "package.json" }}
-
-      # run tests!
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - install_deps
+      - test:
+        requires:
+           - install_deps
