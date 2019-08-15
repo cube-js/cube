@@ -60,9 +60,9 @@ jobs:
 
 workflows:
   version: 2
-  build_and_test:
+  test:
     jobs:
       - test
-      - lint:
-          requires:
-             - test
+  lint:
+    jobs:
+      - lint
