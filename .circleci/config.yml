@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  install_deps:
+  test:
     docker:
       - image: circleci/node:10.15
         environment:
@@ -20,7 +20,6 @@ jobs:
 
       - restore_cache:
           keys:
-            # when lock file changes, use increasingly general patterns to restore cache
             - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
             - yarn-packages-v1-{{ .Branch }}-
             - yarn-packages-v1-
@@ -33,39 +32,36 @@ jobs:
             - ~/.cache/yarn
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
-      # run tests!
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
 
-  test:
+  lint:
     docker:
       - image: circleci/node:10.15
-        environment:
-          TEST_PG_USER: root
-          TEST_CLICKHOUSE_HOST: localhost
-      - image: circleci/redis:5.0.5
-      - image: circleci/postgres:9.6.8
-        environment:
-          POSTGRES_USER: root
-          POSTGRES_DB: model_test
-      - image: yandex/clickhouse-server
 
     working_directory: ~/repo
 
     steps:
       - restore_cache:
-        keys:
-          # when lock file changes, use increasingly general patterns to restore cache
-          - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
-          - yarn-packages-v1-{{ .Branch }}-
-          - yarn-packages-v1-
+          keys:
+            - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+            - yarn-packages-v1-{{ .Branch }}-
+            - yarn-packages-v1-
 
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
+      - run: yarn install
+      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
+
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground lint
 
 workflows:
   version: 2
   build_and_test:
     jobs:
-      - install_deps
-      - test:
+      - test
+      - lint:
           requires:
-             - install_deps
+             - test

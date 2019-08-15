@@ -7,8 +7,7 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "mocha",
-    "lint": "eslint **/*.js"
+    "test": "mocha"
   },
   "dependencies": {
     "@hapi/joi": "^14.3.1",
