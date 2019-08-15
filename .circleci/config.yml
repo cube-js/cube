@@ -41,6 +41,7 @@ jobs:
     working_directory: ~/repo
 
     steps:
+      - checkout
       - restore_cache:
           keys:
             - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
