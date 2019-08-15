@@ -20,13 +20,15 @@ describe('ClickHouseDriver', () => {
   before(async function before() {
     this.timeout(20000);
 
-    container = await new GenericContainer("yandex/clickhouse-server")
-      .withExposedPorts(8123)
-      .start();
+    if (!process.env.TEST_CLICKHOUSE_HOST) {
+      container = await new GenericContainer("yandex/clickhouse-server")
+        .withExposedPorts(8123)
+        .start();
+    }
 
     config = {
       host: 'localhost',
-      port: container.getMappedPort(8123),
+      port: process.env.TEST_CLICKHOUSE_HOST ? 8123 : container.getMappedPort(8123),
     };
   });
 
