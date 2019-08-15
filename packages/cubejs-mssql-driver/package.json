@@ -7,9 +7,6 @@
     "node": ">=8.11.1"
   },
   "main": "driver/MSSqlDriver.js",
-  "scripts": {
-    "test": "mocha"
-  },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.10.16",
     "mssql": "^5.0.5"

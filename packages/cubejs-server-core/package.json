@@ -6,9 +6,6 @@
   "engines": {
     "node": ">=8.11.1"
   },
-  "scripts": {
-    "test": "mocha"
-  },
   "main": "core/index.js",
   "types": "core/index.d.ts",
   "files": [

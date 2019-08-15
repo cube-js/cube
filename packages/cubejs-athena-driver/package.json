@@ -7,9 +7,6 @@
     "node": ">=8.11.1"
   },
   "main": "driver/AthenaDriver.js",
-  "scripts": {
-    "test": "mocha"
-  },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.10.16",
     "aws-sdk": "^2.403.0",

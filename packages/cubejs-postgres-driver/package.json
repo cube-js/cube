@@ -7,9 +7,6 @@
     "node": ">=8.11.1"
   },
   "main": "driver/PostgresDriver.js",
-  "scripts": {
-    "test": "mocha"
-  },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.10.16",
     "pg": "^7.8.0"

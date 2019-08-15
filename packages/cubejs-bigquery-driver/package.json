@@ -7,9 +7,6 @@
     "node": ">=8.11.1"
   },
   "main": "driver/BigQueryDriver.js",
-  "scripts": {
-    "test": "mocha"
-  },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.10.16",
     "@google-cloud/bigquery": "^4.1.4",
