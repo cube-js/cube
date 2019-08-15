@@ -29,7 +29,7 @@ jobs:
             - v1-dependencies-
 
       - run: yarn install
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver yarn
+      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
 
       - save_cache:
           paths:
@@ -37,4 +37,4 @@ jobs:
           key: v1-dependencies-{{ checksum "package.json" }}
 
       # run tests!
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
