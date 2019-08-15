@@ -37,4 +37,4 @@ jobs:
           key: v1-dependencies-{{ checksum "package.json" }}
 
       # run tests!
-      - run: yarn lerna run test
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test
