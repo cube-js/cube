@@ -5,7 +5,8 @@ const db = pgp({
   host: 'localhost',
   port: 5432,
   database: 'model_test',
-  poolSize: 1
+  poolSize: 1,
+  user: process.env.TEST_PG_USER
 });
 
 exports.gutterDataSet = function (tx) {

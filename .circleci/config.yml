@@ -8,6 +8,9 @@ jobs:
     docker:
       # specify the version you desire here
       - image: circleci/node:10.15
+        environment:
+          TEST_PG_USER: root
+          TEST_CLICKHOUSE_HOST: localhost
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images

@@ -63,7 +63,7 @@ exports.testQuery = (queryAndParams, prepareDataSet) => exports.testQueries([que
   .then(res => res[0]);
 
 exports.testQueries = async (queries, prepareDataSet) => {
-  if (!container) {
+  if (!container && !process.env.TEST_CLICKHOUSE_HOST) {
     container = await new GenericContainer("yandex/clickhouse-server")
       .withExposedPorts(8123)
       .start();
@@ -71,7 +71,7 @@ exports.testQueries = async (queries, prepareDataSet) => {
 
   const clickHouse = new ClickHouse({
     host: 'localhost',
-    port: container.getMappedPort(8123),
+    port: process.env.TEST_CLICKHOUSE_HOST ? 8123 : container.getMappedPort(8123),
   });
 
   clickHouse.sessionId = uuidv4(); // needed for tests to use temporary tables
