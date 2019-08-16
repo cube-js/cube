@@ -13,7 +13,8 @@ jobs:
         environment:
           POSTGRES_USER: root
           POSTGRES_DB: model_test
-      - image: yandex/clickhouse-server:2017-latest
+      - image: yandex/clickhouse-server
+      - image: mcr.microsoft.com/mssql/server:2017-latest
         environment:
           ACCEPT_EULA: Y
           SA_PASSWORD: Test1test
