@@ -4,6 +4,7 @@
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
+[![CircleCI](https://circleci.com/gh/cube-js/cube.js.svg?style=shield)](https://circleci.com/gh/cube-js/cube.js)
 
 __Cube.js is an open source modular framework to build analytical web applications__. It is primarily used to build internal business intelligence tools or to add customer-facing analytics to an existing application.
 
