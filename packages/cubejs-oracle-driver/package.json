@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/oracle-driver",
   "description": "Cube.js oracle database driver",
   "author": "Trikoz I.",
-  "version": "0.10.16",
+  "version": "0.10.24",
   "engines": {
     "node": ">=8.11.1"
   },
