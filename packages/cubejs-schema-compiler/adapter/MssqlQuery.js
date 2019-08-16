@@ -1,19 +1,19 @@
 const moment = require('moment-timezone');
 const R = require('ramda');
 
-var abbrs = {
-  EST : 'Eastern Standard Time',
-  EDT : 'Eastern Standard Time',
-  CST : 'Central Standard Time',
-  CDT : 'Central Standard Time',
-  MST : 'Mountain Standard Time',
-  MDT : 'Mountain Standard Time',
-  PST : 'Pacific Standard Time',
-  PDT : 'Pacific Standard Time',
+const abbrs = {
+  EST: 'Eastern Standard Time',
+  EDT: 'Eastern Standard Time',
+  CST: 'Central Standard Time',
+  CDT: 'Central Standard Time',
+  MST: 'Mountain Standard Time',
+  MDT: 'Mountain Standard Time',
+  PST: 'Pacific Standard Time',
+  PDT: 'Pacific Standard Time',
 };
 
 moment.fn.zoneName = function () {
-  var abbr = this.zoneAbbr();
+  const abbr = this.zoneAbbr();
   return abbrs[abbr] || abbr;
 };
 
@@ -39,9 +39,7 @@ const GRANULARITY_TO_INTERVAL = {
 class MssqlFilter extends BaseFilter {
   // noinspection JSMethodCanBeStatic
   escapeWildcardChars(param) {
-    return typeof param === 'string'
-      ? param.replace(/([_%])/gi, '[$1]')
-      : param;
+    return typeof param === 'string' ? param.replace(/([_%])/gi, '[$1]') : param;
   }
 
   likeIgnoreCase(column, not) {
@@ -84,8 +82,18 @@ class MssqlQuery extends BaseQuery {
 
   groupByClause() {
     const dimensionsForSelect = this.dimensionsForSelect();
-    const dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())).filter(s => !!s);
+    const dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql()))
+      .filter(s => !!s);
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
+  }
+
+  nowTimestampSql() {
+    return `CURRENT_TIMESTAMP`;
+  }
+
+  preAggregationLoadSql(cube, preAggregation, tableName) {
+    const sqlAndParams = this.preAggregationSql(cube, preAggregation);
+    return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
   }
 }
 
