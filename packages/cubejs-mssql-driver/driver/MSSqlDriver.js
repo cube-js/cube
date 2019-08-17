@@ -60,6 +60,18 @@ class MSSqlDriver extends BaseDriver {
   param(paramIndex) {
     return `@_${paramIndex + 1}`;
   }
+
+  createSchemaIfNotExists(schemaName) {
+    return this.query(
+      `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
+      [schemaName]
+    ).then((schemas) => {
+      if (schemas.length === 0) {
+        return this.query(`CREATE SCHEMA ${schemaName}`);
+      }
+      return null;
+    });
+  }
 }
 
 module.exports = MSSqlDriver;
