@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.26](https://github.com/statsbotco/cubejs-client/compare/v0.10.25...v0.10.26) (2019-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
 ## [0.10.24](https://github.com/statsbotco/cubejs-client/compare/v0.10.23...v0.10.24) (2019-08-16)
 
 **Note:** Version bump only for package @cubejs-backend/server
