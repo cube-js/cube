@@ -225,6 +225,7 @@ CubejsServerCore.create({
 ### preAggregationsSchema
 
 Schema name to use for storing pre-aggregations.
+For some drivers like MySQL it's name for pre-aggregation database as there's no database schema concept there.
 Either `String` or `Function` could be passed.
 Providing a `Function` allows to dynamically set the pre-aggregation schema name depending on the user's context.
 
