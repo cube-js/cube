@@ -40,18 +40,19 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
 
 ```javascript
 {
-  dbType: String | Function,
-  externalDbType: String | Function,
+  dbType: String | (context) => String,
+  externalDbType: String | (context) => String,
   schemaPath: String,
   basePath: String,
   devServer: Boolean,
-  logger: Function,
-  driverFactory: Function,
-  externalDriverFactory: Function,
-  contextToAppId: Function,
-  repositoryFactory: Function,
-  checkAuthMiddleware: Function,
-  queryTransformer: Function,
+  logger: (msg, params) => any,
+  driverFactory: (context) => BaseDriver,
+  externalDriverFactory: (context) => BaseDriver,
+  contextToAppId: (context) => String,
+  repositoryFactory: (context) => String,
+  checkAuthMiddleware: (req, res, next) => any,
+  queryTransformer: (query, context) => Object,
+  preAggregationsSchema: String | (context) => String,
   telemetry: Boolean,
   orchestratorOptions: {
     redisPrefix: String,
