@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.27](https://github.com/statsbotco/cubejs-client/compare/v0.10.26...v0.10.27) (2019-08-18)
+
+
+### Features
+
+* Make `preAggregationsSchema` an option of CubejsServerCore - missed option propagation ([60d5704](https://github.com/statsbotco/cubejs-client/commit/60d5704)), closes [#96](https://github.com/statsbotco/cubejs-client/issues/96)
+
+
+
+
+
 ## [0.10.26](https://github.com/statsbotco/cubejs-client/compare/v0.10.25...v0.10.26) (2019-08-18)
 
 
