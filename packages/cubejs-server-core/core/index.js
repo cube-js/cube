@@ -256,7 +256,8 @@ class CubejsServerCore {
       schemaVersion: options.schemaVersion || this.options.schemaVersion,
       devServer: this.options.devServer,
       logger: this.logger,
-      externalDbType: options.externalDbType
+      externalDbType: options.externalDbType,
+      preAggregationsSchema: options.preAggregationsSchema
     });
   }
 

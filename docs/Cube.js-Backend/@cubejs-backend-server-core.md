@@ -218,7 +218,7 @@ CubejsServerCore.create({
 });
 ```
 
-### preAggregationSchema
+### preAggregationsSchema
 
 Schema name to use for storing pre-aggregations.
 Either `String` or `Function` could be passed.
@@ -226,7 +226,7 @@ Providing a `Function` allows to dynamically set the pre-aggregation schema name
 
 ```javascript
 CubejsServerCore.create({
-  preAggregationSchema: ({ authInfo }) => `pre_aggregations_${authInfo.tenantId}`
+  preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.tenantId}`
 });
 ```
 

@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/api-gateway@^0.10.21":
-  version "0.10.21"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.10.21.tgz#0e1c1eb4ee57e86e839d53bef78b423976e72cdf"
-  integrity sha512-AMQdA9FgeZBB5/xqvYmmHSAz4K8Xd2IoZqdtQgaFquDQSU5gWm2D6x9Crw39XK6uhqrAXaIeSl1HZFp1JDtLxw==
+"@cubejs-backend/api-gateway@^0.10.24":
+  version "0.10.24"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.10.24.tgz#99f0f1f26cbd1237144f26dc134711fbbbdbbb67"
+  integrity sha512-KuYJ/hv18EfiGkJKm/vweYGKLTcKiWlZe8I3FDfb0309fin/MeNCDqK6LmlNTgLWkizZtbRCmbbseuNYnHFiHw==
   dependencies:
     "@hapi/joi" "^14.0.6"
     chrono-node "^1.3.11"
@@ -21,10 +21,10 @@
     ramda "^0.24.1"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.10.23":
-  version "0.10.23"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.10.23.tgz#55c1558c8442c163b35e1e8839baf67662a4f457"
-  integrity sha512-MowbtC9W24kAmfIRMYIEeREkPmN0vckWtRIzsrfO5bxLnCCM/RI3QlwDH9pLWJYt5rvTNCj85q1mlB1tQxrD2Q==
+"@cubejs-backend/schema-compiler@^0.10.24":
+  version "0.10.24"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.10.24.tgz#938187db523e571ba17f1e17971454301923b101"
+  integrity sha512-LP7Np9wsmHixx+NthQNL1eoqAqd4WscRap2mmKB4/YRkf2KoGsEUPIYooDlo9jjZy84sW/fMeZkZ72VM/HBZCg==
   dependencies:
     "@hapi/joi" "^14.3.1"
     babel-generator "^6.25.0"
