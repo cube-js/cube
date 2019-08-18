@@ -40,19 +40,19 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
 
 ```javascript
 {
-  dbType: String | (context) => String,
-  externalDbType: String | (context) => String,
+  dbType: String | (context: RequestContext) => String,
+  externalDbType: String | (context: RequestContext) => String,
   schemaPath: String,
   basePath: String,
   devServer: Boolean,
-  logger: (msg, params) => any,
-  driverFactory: (context) => BaseDriver,
-  externalDriverFactory: (context) => BaseDriver,
-  contextToAppId: (context) => String,
-  repositoryFactory: (context) => String,
-  checkAuthMiddleware: (req, res, next) => any,
-  queryTransformer: (query, context) => Object,
-  preAggregationsSchema: String | (context) => String,
+  logger: (msg: String, params: Object) => any,
+  driverFactory: (context: RequestContext) => BaseDriver,
+  externalDriverFactory: (context: RequestContext) => BaseDriver,
+  contextToAppId: (context: RequestContext) => String,
+  repositoryFactory: (context: RequestContext) => String,
+  checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
+  queryTransformer: (query: Object, context: RequestContext) => Object,
+  preAggregationsSchema: String | (context: RequestContext) => String,
   telemetry: Boolean,
   orchestratorOptions: {
     redisPrefix: String,
@@ -66,13 +66,16 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   }
 }
 
-// QueueOptions
-{
+QueueOptions {
   concurrency: number
   continueWaitTimeout: number,
   executionTimeout: number,
   orphanedTimeout: number,
   heartBeatInterval: number
+}
+
+RequestContext {
+  authInfo: Object
 }
 ```
 
@@ -279,7 +282,7 @@ CubejsServerCore.create({
 });
 ```
 
-#### QueueOptions
+## QueueOptions
 
 Timeout and interval options' values are in seconds.
 
@@ -291,3 +294,11 @@ Timeout and interval options' values are in seconds.
 | orphanedTimeout | Query will be marked for cancellation if not requested during this period. | `120` |
 | heartBeatInterval | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled. | `30` |
 
+## RequestContext
+
+`RequestContext` object is filled by context data on a HTTP request level.
+
+### authInfo
+
+Defined as `req.authInfo` which should be set by [checkAuthMiddleware](#checkAuthMiddleware).
+Default implementation of [checkAuthMiddleware](#checkAuthMiddleware) uses [JWT Security Token](security) payload and sets it to `req.authInfo`.

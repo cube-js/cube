@@ -5,22 +5,49 @@ category: Cube.js Backend
 menuOrder: 5
 ---
 
-Cube.js supports multitenancy out of the box, both on database and data schema levels. Multiple drivers are also supported, meaning that you can have one customer’s data in MongoDB and others in Postgres with one Cube.js instance.
+Cube.js supports multitenancy out of the box, both on database and data schema levels.
+Multiple drivers are also supported, meaning that you can have one customer’s data in MongoDB and others in Postgres with one Cube.js instance.
 
-There are 4 [configuration options](@cubejs-backend-server-core#options-reference) you can leverage to make your multitenancy setup. You
+There are 7 [configuration options](@cubejs-backend-server-core#options-reference) you can leverage to make your multitenancy setup. You
 can use all of them or just a couple, depending on your specific case. The
 options are:
 
 - `contextToAppId`
 - `dbType`
+- `externalDbType`
 - `driverFactory`
 - `repositoryFactory`
+- `preAggregationsSchema`
+- `queryTransformer`
 
 All of the above options are functions, which you provide on Cube.js server instance creation. The
 functions accept one argument - context object, which has a nested object -
-`authInfo`, which acts as a container, where you can provide all the necessary data to identify user, organization, app, etc. You put data into `authInfo` when creating a Cube.js API Token.
+`authInfo`, which acts as a container, where you can provide all the necessary data to identify user, organization, app, etc.
+You put data into `authInfo` when creating a Cube.js API Token.
 
-## Example
+There're several multitenancy setup scenarios that can be achieved by using combinations of these configuration options.
+
+## Same DB Instance with per Tenant Row Level Security
+
+Per tenant row level security can be achieved by providing [queryTransformer](@cubejs-backend-server-core#query-transformer) which adds tenant identifier filter to the original query.
+
+```javascript
+CubejsServerCore.create({
+  queryTransformer: (query, { authInfo }) => {
+    const user = authInfo.u;
+    if (user.id) {
+      query.filters.push({
+        dimension: 'Users.id',
+        operator: 'equals',
+        values: [user.id]
+      })
+    }
+    return query;
+  }
+});
+```
+
+## Multiple DB Instances with Same Schema
 
 Let's consider the following example:
 
@@ -67,6 +94,21 @@ new CubejsServer({
     })
 });
 ```
+
+## Same DB Instance with per Tenant Pre-Aggregations
+
+To support per tenant pre-aggregation of data within same database instance you should provide `preAggregationsSchema` option.
+
+```javascript
+const PostgresDriver = require("@cubejs-backend/postgres-driver");
+
+new CubejsServer({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.userId}`,
+  preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`
+});
+```
+
+## Multiple Schema and Drivers
 
 What if for application with ID 3 data is stored not in Postgres, but in MongoDB?
 
