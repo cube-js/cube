@@ -151,7 +151,7 @@ class BaseDriver {
   }
 
   toGenericType(columnType) {
-    return DbTypeToGenericType[columnType] || columnType;
+    return DbTypeToGenericType[columnType.toLowerCase()] || columnType;
   }
 
   fromGenericType(columnType) {
