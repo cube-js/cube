@@ -9,6 +9,7 @@ class CompilerApi {
     this.options = options || {};
     this.allowNodeRequire = options.allowNodeRequire == null ? true : options.allowNodeRequire;
     this.logger = this.options.logger;
+    this.preAggregationsSchema = this.options.preAggregationsSchema;
   }
 
   async getCompilers() {
@@ -37,7 +38,8 @@ class CompilerApi {
       await this.getCompilers(),
       this.dbType, {
         ...query,
-        externalDbType: this.options.externalDbType
+        externalDbType: this.options.externalDbType,
+        preAggregationsSchema: this.preAggregationsSchema
       }
     );
     return (await this.getCompilers()).compiler.withQuery(sqlGenerator, () => ({

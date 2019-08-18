@@ -79,6 +79,8 @@ class CubejsServerCore {
     this.contextToExternalDbType = typeof options.externalDbType === 'function' ?
       options.externalDbType :
       () => options.externalDbType;
+    this.preAggregationsSchema =
+      typeof options.preAggregationsSchema === 'function' ? options.preAggregationsSchema : () => options.preAggregationsSchema;
     this.appIdToCompilerApi = {};
     this.appIdToOrchestratorApi = {};
     this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
@@ -207,7 +209,8 @@ class CubejsServerCore {
         this.repositoryFactory(context), {
           dbType: this.contextToDbType(context),
           externalDbType: this.contextToExternalDbType(context),
-          schemaVersion: this.options.schemaVersion && (() => this.options.schemaVersion(context))
+          schemaVersion: this.options.schemaVersion && (() => this.options.schemaVersion(context)),
+          preAggregationsSchema: this.preAggregationsSchema(context)
         }
       );
     }
