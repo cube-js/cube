@@ -57,7 +57,7 @@ class PrestoDriver extends BaseDriver {
           resolve(fullData);
         },
         error: error => {
-          reject(error.message || JSON.stringify(error));
+          reject(new Error(`${error.message}\n${error.error}`));
         }
       });
     });
