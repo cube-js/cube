@@ -40,6 +40,7 @@ class DevServer {
       try {
         await handler(req, res, next);
       } catch (e) {
+        console.error((e.stack || e).toString());
         this.cubejsServer.event('Dev Server Error', { error: (e.stack || e).toString() });
         res.status(500).json({ error: (e.stack || e).toString() });
       }
