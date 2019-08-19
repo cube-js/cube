@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.28](https://github.com/statsbotco/cubejs-client/compare/v0.10.27...v0.10.28) (2019-08-19)
+
+
+### Bug Fixes
+
+* Presto error messages aren't showed correctly ([5f41afe](https://github.com/statsbotco/cubejs-client/commit/5f41afe))
+
+
+
+
+
 ## [0.10.24](https://github.com/statsbotco/cubejs-client/compare/v0.10.23...v0.10.24) (2019-08-16)
 
 **Note:** Version bump only for package @cubejs-backend/prestodb-driver

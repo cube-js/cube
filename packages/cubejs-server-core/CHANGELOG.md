@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.28](https://github.com/statsbotco/cubejs-client/compare/v0.10.27...v0.10.28) (2019-08-19)
+
+
+### Bug Fixes
+
+* Show dev server errors in console ([e8c3af9](https://github.com/statsbotco/cubejs-client/commit/e8c3af9))
+
+
+
+
+
 ## [0.10.27](https://github.com/statsbotco/cubejs-client/compare/v0.10.26...v0.10.27) (2019-08-18)
 
 

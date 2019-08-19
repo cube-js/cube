@@ -2,13 +2,13 @@
   "name": "@cubejs-backend/athena-driver",
   "description": "Cube.js Athena database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.10.24",
+  "version": "0.10.28",
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "driver/AthenaDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.10.16",
+    "@cubejs-backend/query-orchestrator": "^0.10.28",
     "aws-sdk": "^2.403.0",
     "sqlstring": "^2.3.1"
   },

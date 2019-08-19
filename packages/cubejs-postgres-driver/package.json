@@ -2,13 +2,13 @@
   "name": "@cubejs-backend/postgres-driver",
   "description": "Cube.js Postgres database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.10.24",
+  "version": "0.10.28",
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "driver/PostgresDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.10.16",
+    "@cubejs-backend/query-orchestrator": "^0.10.28",
     "pg": "^7.8.0"
   },
   "license": "Apache-2.0"

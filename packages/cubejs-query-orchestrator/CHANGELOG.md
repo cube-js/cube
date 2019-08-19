@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.28](https://github.com/statsbotco/cubejs-client/compare/v0.10.27...v0.10.28) (2019-08-19)
+
+
+### Bug Fixes
+
+* BigQuery to Postgres external rollup doesn't work ([feccdb5](https://github.com/statsbotco/cubejs-client/commit/feccdb5)), closes [#178](https://github.com/statsbotco/cubejs-client/issues/178)
+
+
+
+
+
 ## [0.10.16](https://github.com/statsbotco/cubejs-client/compare/v0.10.15...v0.10.16) (2019-07-20)
 
 
