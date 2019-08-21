@@ -862,6 +862,10 @@ class BaseQuery {
     return sql;
   }
 
+  wrapSegmentForDimensionSelect(sql) {
+    return sql;
+  }
+
   pushCubeNameForCollectionIfNecessary(cubeName) {
     if ((this.evaluateSymbolContext || {}).cubeNames && cubeName) {
       this.evaluateSymbolContext.cubeNames.push(cubeName);

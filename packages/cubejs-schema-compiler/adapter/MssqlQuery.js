@@ -95,6 +95,10 @@ class MssqlQuery extends BaseQuery {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
   }
+
+  wrapSegmentForDimensionSelect(sql) {
+    return `CAST((CASE WHEN ${sql} THEN 1 ELSE 0 END) AS BIT)`;
+  }
 }
 
 module.exports = MssqlQuery;

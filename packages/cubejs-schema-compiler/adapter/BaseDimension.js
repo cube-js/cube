@@ -13,6 +13,9 @@ class BaseDimension {
   }
 
   dimensionSql() {
+    if (this.query.cubeEvaluator.isSegment(this.dimension)) {
+      return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
+    }
     return this.query.dimensionSql(this);
   }
 
