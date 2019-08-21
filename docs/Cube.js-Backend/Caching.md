@@ -28,7 +28,7 @@ Cube.js takes great care to prevent unnecessary queries from hitting your databa
 
 So, Cube.js defines a `refreshKey` for each cube. [refreshKeys](cube#parameters-refresh-key) can be evaluated by Cube.js to assess if cube data has changed.
 
-__Note__: Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#force-query-renewal) section.
+__Note__: Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
 
 When a query's result needs to be refreshed, Cube.js will re-execute the query in the background and repopulate the cache. This means that cached results may still be served to users requesting them while this query is being re-run. The cache entry will be refreshed in the background if one of the two following conditions is met:
 
