@@ -11,7 +11,7 @@ const GRANULARITY_TO_INTERVAL = {
 
 class PrestodbFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(?) ,'%')`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(?) ,'%') ESCAPE '\\'`;
   }
 
   castParameter() {

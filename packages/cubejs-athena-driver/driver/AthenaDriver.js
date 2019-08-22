@@ -2,7 +2,6 @@ const AWS = require('aws-sdk');
 const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const SqlString = require('sqlstring');
-const crypto = require('crypto');
 
 const applyParams = (query, params) => {
   return SqlString.format(query, params);
@@ -32,11 +31,17 @@ class AthenaDriver extends BaseDriver {
   sleep(ms) {
     return new Promise((resolve) => {
       setTimeout(() => resolve(), ms);
-    })
+    });
   }
 
   async query(query, values) {
-    const queryString = applyParams(query, values);
+    const queryString = applyParams(
+      query,
+      values.map(s => (typeof s === 'string' ? {
+        toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1')
+      } : s))
+    );
+    console.log(queryString);
     const { QueryExecutionId } = await this.athena.startQueryExecutionAsync({
       QueryString: queryString,
       ResultConfiguration: {
