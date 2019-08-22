@@ -28,14 +28,16 @@ specifying the project name and your database using `-d` flag. Available options
 
 * `postgres`
 * `mysql`
-* `mongobi`
-* `athena`
-* `redshift`
-* `bigquery`
 * `mssql`
+* `athena`
+* `mongobi`
+* `bigquery`
+* `redshift`
 * `clickhouse`
+* `hive`
 * `snowflake`
-* `presto`
+* `prestodb`
+* `oracle`
 
 For example,
 
