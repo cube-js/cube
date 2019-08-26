@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.30](https://github.com/statsbotco/cubejs-client/compare/v0.10.29...v0.10.30) (2019-08-26)
+
+
+### Bug Fixes
+
+* Athena doesn't support `_` in contains filter ([d330be4](https://github.com/statsbotco/cubejs-client/commit/d330be4))
+* Athena doesn't support `'` in contains filter ([40a36d5](https://github.com/statsbotco/cubejs-client/commit/40a36d5))
+
+
+
+
+
 ## [0.10.28](https://github.com/statsbotco/cubejs-client/compare/v0.10.27...v0.10.28) (2019-08-19)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube.js schema compiler",
   "author": "Statsbot, Inc.",
-  "version": "0.10.29",
+  "version": "0.10.30",
   "engines": {
     "node": ">=8.11.1"
   },
