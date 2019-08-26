@@ -121,6 +121,8 @@ $ heroku config:set REDIS_URL:<YOUR-REDIS-URL>
 
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis server.
 
+Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
+
 ### Create Heroku Procfile
 
 ```bash
