@@ -9,6 +9,7 @@ When running Cube.js Backend in production make sure `NODE_ENV` is set to `produ
 Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. It uses it for query caching
 and queue. Set `REDIS_URL` environment variable to provide Cube.js with Redis
 connection. Make sure, your Redis allows at least 15 concurrent connections.
+Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
 
 Below you can find guides for popular deployment environments:
 
@@ -120,8 +121,6 @@ $ heroku config:set REDIS_URL:<YOUR-REDIS-URL>
 ```
 
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis server.
-
-Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
 
 ### Create Heroku Procfile
 
