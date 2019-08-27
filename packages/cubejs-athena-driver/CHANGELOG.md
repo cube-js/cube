@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.31](https://github.com/statsbotco/cubejs-client/compare/v0.10.30...v0.10.31) (2019-08-27)
+
+
+### Bug Fixes
+
+* **athena-driver:** TypeError: Cannot read property 'map' of undefined ([478c6c6](https://github.com/statsbotco/cubejs-client/commit/478c6c6))
+
+
+
+
+
 ## [0.10.30](https://github.com/statsbotco/cubejs-client/compare/v0.10.29...v0.10.30) (2019-08-26)
 
 
