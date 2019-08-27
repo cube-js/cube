@@ -37,7 +37,7 @@ class AthenaDriver extends BaseDriver {
   async query(query, values) {
     const queryString = applyParams(
       query,
-      values.map(s => (typeof s === 'string' ? {
+      (values || []).map(s => (typeof s === 'string' ? {
         toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
       } : s))
     );
