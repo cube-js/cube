@@ -137,6 +137,8 @@ API from Cube.js Backend.
 - `isQueryPresent` - Bool indicating whether is query ready to be displayed or
     not.
 - `query` - current query, based on selected members.
+- `setLimit`, `removeLimit` - functions to control the number of results returned
+- `setOffset`, `removeOffset` - functions to control the number of rows skipped before results returned. Use with limit to control pagination
 
 ### Example
 [Open in CodeSandbox](https://codesandbox.io/s/3rlxjkv2p)
