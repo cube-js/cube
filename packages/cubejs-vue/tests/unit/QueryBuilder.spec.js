@@ -297,12 +297,12 @@ describe('QueryBuilder.vue', () => {
 
       expect(wrapper.vm.filters.length).toBe(0);
       wrapper.vm.addMember('filters', {
-        dimension: 'Orders.status',
+        member: 'Orders.status',
         operator: 'equals',
         values: ['valid']
       });
       expect(wrapper.vm.filters.length).toBe(1);
-      expect(wrapper.vm.filters[0].dimension.name).toBe('Orders.status');
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
     });
 
     it('updates filters', async () => {
@@ -312,13 +312,13 @@ describe('QueryBuilder.vue', () => {
         .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
-        dimension: 'Orders.status',
+        member: 'Orders.status',
         operator: 'equals',
         values: ['invalid'],
       };
 
       const newFilter = {
-        dimension: 'Orders.status',
+        member: 'Orders.status',
         operator: 'equals',
         values: ['valid'],
       };
@@ -335,11 +335,11 @@ describe('QueryBuilder.vue', () => {
       await flushPromises();
 
       expect(wrapper.vm.filters.length).toBe(1);
-      expect(wrapper.vm.filters[0].dimension.name).toBe('Orders.status');
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
       expect(wrapper.vm.filters[0].values).toContain('invalid');
       wrapper.vm.updateMember('filters', 'Orders.status', newFilter);
       expect(wrapper.vm.filters.length).toBe(1);
-      expect(wrapper.vm.filters[0].dimension.name).toBe('Orders.status');
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
       expect(wrapper.vm.filters[0].values).toContain('valid');
     });
 
@@ -350,7 +350,7 @@ describe('QueryBuilder.vue', () => {
         .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
-        dimension: 'Orders.status',
+        member: 'Orders.status',
         operator: 'equals',
         values: ['invalid'],
       };
@@ -367,7 +367,7 @@ describe('QueryBuilder.vue', () => {
       await flushPromises();
 
       expect(wrapper.vm.filters.length).toBe(1);
-      expect(wrapper.vm.filters[0].dimension.name).toBe('Orders.status');
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
       expect(wrapper.vm.filters[0].values).toContain('invalid');
       wrapper.vm.removeMember('filters', 'Orders.status');
       expect(wrapper.vm.filters.length).toBe(0);
@@ -380,13 +380,13 @@ describe('QueryBuilder.vue', () => {
         .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
-        dimension: 'Orders.status',
+        member: 'Orders.status',
         operator: 'equals',
         values: ['invalid'],
       };
 
       const newFilter = {
-        dimension: 'Orders.status',
+        member: 'Orders.status',
         operator: 'equals',
         values: ['valid'],
       };
@@ -403,12 +403,94 @@ describe('QueryBuilder.vue', () => {
       await flushPromises();
 
       expect(wrapper.vm.filters.length).toBe(1);
-      expect(wrapper.vm.filters[0].dimension.name).toBe('Orders.status');
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
       expect(wrapper.vm.filters[0].values).toContain('invalid');
       wrapper.vm.setMembers('filters', [newFilter]);
       expect(wrapper.vm.filters.length).toBe(1);
-      expect(wrapper.vm.filters[0].dimension.name).toBe('Orders.status');
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
       expect(wrapper.vm.filters[0].values).toContain('valid');
+    });    
+
+    it('sets filters when using measure', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        member: 'Orders.number',
+        operator: 'gt',
+        values: ['1'],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.filters.length).toBe(1);
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.number');
+      expect(wrapper.vm.filters[0].values).toContain('1');
+    });
+
+    it('sets limit', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        member: 'Orders.status',
+        operator: 'equals',
+        values: ['invalid'],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+            limit: 10
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.limit).toBe(10);
+    });   
+
+    it('sets offset', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        member: 'Orders.status',
+        operator: 'equals',
+        values: ['invalid'],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+            offset: 10
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.offset).toBe(10);
     });
   });
 });
