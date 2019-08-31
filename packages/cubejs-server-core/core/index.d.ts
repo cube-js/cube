@@ -15,6 +15,7 @@ declare module '@cubejs-backend/server-core' {
     externalDriverFactory?: DriverFactory;
     logger?: (msg: string, params: any) => void;
     orchestratorOptions?: any;
+    preAggregationsSchema?: string | (() => string)
     repositoryFactory?: any;
     schemaPath?: string;
   }
