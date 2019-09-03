@@ -2,7 +2,8 @@ const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver
 const { Pool } = require('pg');
 
 const GenericTypeToPostgres = {
-  string: 'text'
+  string: 'text',
+  datetime: 'timestamp'
 };
 
 class PostgresDriver extends BaseDriver {
@@ -51,6 +52,26 @@ class PostgresDriver extends BaseDriver {
     }
   }
 
+  async uploadTable(table, columns, tableData) {
+    if (!tableData.rows) {
+      throw new Error(`${this.constructor} driver supports only rows upload`);
+    }
+    await this.createTable(table, columns);
+    try {
+      const q = `INSERT INTO ${table}
+      (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
+      SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${this.toGenericType(c.type)}[]`).join(', ')})`;
+      console.log(q);
+      await this.query(
+        q,
+        columns.map(c => tableData.rows.map(r => r[c.name]))
+      );
+    } catch (e) {
+      await this.dropTable(table);
+      throw e;
+    }
+  }
+
   release() {
     return this.pool.end();
   }
@@ -60,7 +81,7 @@ class PostgresDriver extends BaseDriver {
   }
 
   fromGenericType(columnType) {
-    return GenericTypeToPostgres[columnType] || super.fromGenericType(columnType);
+    return GenericTypeToPostgres[columnType.toLocaleLowerCase()] || super.fromGenericType(columnType);
   }
 }
 
