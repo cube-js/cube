@@ -3,7 +3,8 @@ const { Pool } = require('pg');
 
 const GenericTypeToPostgres = {
   string: 'text',
-  datetime: 'timestamp'
+  datetime: 'timestamp',
+  integer: 'int'
 };
 
 class PostgresDriver extends BaseDriver {
@@ -81,7 +82,7 @@ class PostgresDriver extends BaseDriver {
   }
 
   fromGenericType(columnType) {
-    return GenericTypeToPostgres[columnType.toLocaleLowerCase()] || super.fromGenericType(columnType.toLocaleLowerCase());
+    return GenericTypeToPostgres[columnType] || super.fromGenericType(columnType);
   }
 }
 
