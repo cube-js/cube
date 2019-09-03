@@ -81,7 +81,7 @@ class PostgresDriver extends BaseDriver {
   }
 
   fromGenericType(columnType) {
-    return GenericTypeToPostgres[columnType.toLocaleLowerCase()] || super.fromGenericType(columnType);
+    return GenericTypeToPostgres[columnType.toLocaleLowerCase()] || super.fromGenericType(columnType.toLocaleLowerCase());
   }
 }
 
