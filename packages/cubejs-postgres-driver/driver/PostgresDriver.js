@@ -60,7 +60,7 @@ class PostgresDriver extends BaseDriver {
       await this.query(
         `INSERT INTO ${table}
       (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
-      SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${this.toGenericType(c.type)}[]`).join(', ')})`,
+      SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${c.type}[]`).join(', ')})`,
         columns.map(c => tableData.rows.map(r => r[c.name]))
       );
     } catch (e) {
