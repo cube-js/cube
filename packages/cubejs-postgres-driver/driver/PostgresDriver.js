@@ -57,12 +57,10 @@ class PostgresDriver extends BaseDriver {
     }
     await this.createTable(table, columns);
     try {
-      const q = `INSERT INTO ${table}
-      (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
-      SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${this.toGenericType(c.type)}[]`).join(', ')})`;
-      console.log(q);
       await this.query(
-        q,
+        `INSERT INTO ${table}
+      (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
+      SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${this.toGenericType(c.type)}[]`).join(', ')})`,
         columns.map(c => tableData.rows.map(r => r[c.name]))
       );
     } catch (e) {
