@@ -297,7 +297,7 @@ describe('QueryBuilder.vue', () => {
 
       expect(wrapper.vm.filters.length).toBe(0);
       wrapper.vm.addMember('filters', {
-        member: 'Orders.status',
+        dimension: 'Orders.status',
         operator: 'equals',
         values: ['valid']
       });
@@ -312,13 +312,13 @@ describe('QueryBuilder.vue', () => {
         .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
-        member: 'Orders.status',
+        dimension: 'Orders.status',
         operator: 'equals',
         values: ['invalid'],
       };
 
       const newFilter = {
-        member: 'Orders.status',
+        dimension: 'Orders.status',
         operator: 'equals',
         values: ['valid'],
       };
@@ -350,7 +350,7 @@ describe('QueryBuilder.vue', () => {
         .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
-        member: 'Orders.status',
+        dimension: 'Orders.status',
         operator: 'equals',
         values: ['invalid'],
       };
@@ -380,13 +380,13 @@ describe('QueryBuilder.vue', () => {
         .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
-        member: 'Orders.status',
+        dimension: 'Orders.status',
         operator: 'equals',
         values: ['invalid'],
       };
 
       const newFilter = {
-        member: 'Orders.status',
+        dimension: 'Orders.status',
         operator: 'equals',
         values: ['valid'],
       };

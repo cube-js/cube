@@ -56,8 +56,9 @@ export default {
     }));
     this.filters = (filters || []).map((m, i) => ({
       ...m,
-      member: this.meta.resolveMember(m.member, ['dimensions', 'measures']),
-      operators: this.meta.filterOperatorsForMember(m.member, ['dimensions', 'measures']),
+      // using 'dimension' is deprecated, 'member' should be specified instead
+      member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+      operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
       index: i
     }));
 
@@ -236,7 +237,7 @@ export default {
         }
       } else if (element === 'filters') {
         const filterMember = {
-          ...this.meta.resolveMember(member.member, ['dimensions', 'measures']),
+          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
         };
 
         mem = {
@@ -291,7 +292,7 @@ export default {
       } else if (element === 'filters') {
         index = this[element].findIndex(x => x.dimension === old);
         const filterMember = {
-          ...this.meta.resolveMember(member.member, ['dimensions', 'measures']),
+          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
         };
 
         mem = {
@@ -331,7 +332,7 @@ export default {
           }
         } else if (element === 'filters') {
           const member = {
-            ...this.meta.resolveMember(m.member, ['dimensions', 'measures']),
+            ...this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
           };
 
           mem = {
