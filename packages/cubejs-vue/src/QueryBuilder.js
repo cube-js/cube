@@ -27,6 +27,8 @@ export default {
       availableDimensions: [],
       availableTimeDimensions: [],
       availableSegments: [],
+      limit: null,
+      offset: null,
     };
 
     data.granularities = [
@@ -42,7 +44,7 @@ export default {
   async mounted() {
     this.meta = await this.cubejsApi.meta();
 
-    const { measures, dimensions, segments, timeDimensions, filters } = this.query;
+    const { measures, dimensions, segments, timeDimensions, filters, limit, offset } = this.query;
 
     this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
     this.dimensions = (dimensions || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') }));
@@ -54,8 +56,9 @@ export default {
     }));
     this.filters = (filters || []).map((m, i) => ({
       ...m,
-      dimension: this.meta.resolveMember(m.dimension, ['dimensions', 'measures']),
-      operators: this.meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
+      // using 'dimension' is deprecated, 'member' should be specified instead
+      member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+      operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
       index: i
     }));
 
@@ -64,6 +67,8 @@ export default {
     this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || [])
       .filter(m => m.type === 'time');
     this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
+    this.limit = (limit || null);
+    this.offset = (offset || null);
   },
   render(createElement) {
     const {
@@ -82,6 +87,12 @@ export default {
       availableTimeDimensions,
       availableDimensions,
       availableMeasures,
+      limit,
+      offset,
+      setLimit,
+      removeLimit,
+      setOffset,
+      removeOffset,
     } = this;
 
     let builderProps = {};
@@ -102,6 +113,12 @@ export default {
         availableDimensions,
         availableMeasures,
         updateChartType: this.updateChart,
+        limit,
+        offset,
+        setLimit,
+        removeLimit,
+        setOffset,
+        removeOffset,
       };
 
       QUERY_ELEMENTS.forEach((e) => {
@@ -147,9 +164,14 @@ export default {
     validatedQuery() {
       const validatedQuery = {};
       let toQuery = member => member.name;
-      // TODO: implement order, limit, timezone, renewQuery
+      // TODO: implement order, timezone, renewQuery
 
+      let hasElements = false;
       QUERY_ELEMENTS.forEach((e) => {
+        if (!this[e]) {
+          return;
+        }
+
         if (e === 'timeDimensions') {
           toQuery = (member) => ({
             dimension: member.dimension.name,
@@ -158,7 +180,7 @@ export default {
           });
         } else if (e === 'filters') {
           toQuery = (member) => ({
-            dimension: member.dimension.name,
+            member: member.member.name,
             operator: member.operator,
             values: member.values,
           });
@@ -166,12 +188,27 @@ export default {
 
         if (this[e].length > 0) {
           validatedQuery[e] = this[e].map(x => toQuery(x));
+
+          hasElements = true;
         }
       });
       // TODO: implement default heuristics
 
       if (validatedQuery.filters) {
         validatedQuery.filters = validatedQuery.filters.filter(f => f.operator);
+      }
+
+      // only set limit and offset if there are elements otherwise an invalid request with just limit/offset
+      // gets sent when the component is first mounted, but before the actual query is constructed.
+      if (hasElements) {
+        if (this.limit) {
+          validatedQuery.limit = this.limit;
+        }
+
+        if (this.offset) {
+          validatedQuery.offset = this.offset;
+        }
+        // add order
       }
 
       return validatedQuery;
@@ -199,13 +236,13 @@ export default {
           };
         }
       } else if (element === 'filters') {
-        const dimension = {
-          ...this.meta.resolveMember(member.dimension, 'dimensions'),
+        const filterMember = {
+          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
         };
 
         mem = {
           ...member,
-          dimension,
+          member: filterMember,
         };
       } else {
         mem = this[`available${name}`].find(m => m.name === member);
@@ -254,13 +291,13 @@ export default {
         }
       } else if (element === 'filters') {
         index = this[element].findIndex(x => x.dimension === old);
-        const dimension = {
-          ...this.meta.resolveMember(member.dimension, 'dimensions'),
+        const filterMember = {
+          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
         };
 
         mem = {
           ...member,
-          dimension,
+          member: filterMember,
         };
       } else {
         index = this[element].findIndex(x => x.name === old);
@@ -294,13 +331,13 @@ export default {
             };
           }
         } else if (element === 'filters') {
-          const dimension = {
-            ...this.meta.resolveMember(m.dimension, 'dimensions'),
+          const member = {
+            ...this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
           };
 
           mem = {
             ...m,
-            dimension,
+            member,
           };
         } else {
           mem = this[`available${name}`].find(x => x.name === m);
@@ -310,6 +347,18 @@ export default {
       });
 
       this[element] = elements;
+    },
+    setLimit(limit) {
+      this.limit = limit;
+    },
+    removeLimit() {
+      this.limit = null;
+    },
+    setOffset(offset) {
+      this.offset = offset;
+    },
+    removeOffset() {
+      this.offset = null;
     },
     updateChart(chartType) {
       this.chartType = chartType;
