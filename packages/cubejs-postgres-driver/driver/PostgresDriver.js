@@ -51,6 +51,24 @@ class PostgresDriver extends BaseDriver {
     }
   }
 
+  async uploadTable(table, columns, tableData) {
+    if (!tableData.rows) {
+      throw new Error(`${this.constructor} driver supports only rows upload`);
+    }
+    await this.createTable(table, columns);
+    try {
+      await this.query(
+        `INSERT INTO ${table}
+      (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
+      SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${this.fromGenericType(c.type)}[]`).join(', ')})`,
+        columns.map(c => tableData.rows.map(r => r[c.name]))
+      );
+    } catch (e) {
+      await this.dropTable(table);
+      throw e;
+    }
+  }
+
   release() {
     return this.pool.end();
   }
