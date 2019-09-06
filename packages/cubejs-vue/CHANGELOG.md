@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.32](https://github.com/statsbotco/cubejs-client/compare/v0.10.31...v0.10.32) (2019-09-06)
+
+
+### Features
+
+* vue limit, offset and measure filters support ([#194](https://github.com/statsbotco/cubejs-client/issues/194)) ([33f365a](https://github.com/statsbotco/cubejs-client/commit/33f365a)), closes [#188](https://github.com/statsbotco/cubejs-client/issues/188)
+
+
+
+
+
 ## [0.10.24](https://github.com/statsbotco/cubejs-client/compare/v0.10.23...v0.10.24) (2019-08-16)
 
 **Note:** Version bump only for package @cubejs-client/vue

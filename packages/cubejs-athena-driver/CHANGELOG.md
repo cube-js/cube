@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.32](https://github.com/statsbotco/cubejs-client/compare/v0.10.31...v0.10.32) (2019-09-06)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
 ## [0.10.31](https://github.com/statsbotco/cubejs-client/compare/v0.10.30...v0.10.31) (2019-08-27)
 
 
