@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.34](https://github.com/statsbotco/cubejs-client/compare/v0.10.33...v0.10.34) (2019-09-06)
+
+
+### Bug Fixes
+
+* Athena timezone conversion issue for non-UTC server ([7085d2f](https://github.com/statsbotco/cubejs-client/commit/7085d2f))
+
+
+
+
+
 ## [0.10.24](https://github.com/statsbotco/cubejs-client/compare/v0.10.23...v0.10.24) (2019-08-16)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
