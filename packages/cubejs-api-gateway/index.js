@@ -63,7 +63,7 @@ const prepareAliasToMemberNameMap = (metaConfig, sqlQuery, query) => {
 
 const transformValue = (value, type) => {
   if (value && type === 'time') {
-    return moment(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+    return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
   return value && value.value ? value.value : value; // TODO move to sql adapter
 };
