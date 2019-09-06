@@ -10,6 +10,9 @@ Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure stor
 and queue. Set `REDIS_URL` environment variable to provide Cube.js with Redis
 connection. Make sure, your Redis allows at least 15 concurrent connections.
 Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
+If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
+
+> *NOTE:* Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
 
 Below you can find guides for popular deployment environments:
 
