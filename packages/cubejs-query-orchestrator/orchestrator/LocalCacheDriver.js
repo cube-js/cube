@@ -1,6 +1,8 @@
+const store = {};
+
 class LocalCacheDriver {
   constructor() {
-    this.store = {};
+    this.store = store;
   }
 
   async get(key) {

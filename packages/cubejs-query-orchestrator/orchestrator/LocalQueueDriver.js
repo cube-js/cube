@@ -170,16 +170,23 @@ class LocalQueueDriverConnection {
   }
 }
 
+const results = {};
+const resultPromises = {};
+const queryDef = {};
+const toProcess = {};
+const recent = {};
+const active = {};
+
 class LocalQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
     this.options = options;
-    this.results = {};
-    this.resultPromises = {};
-    this.queryDef = {};
-    this.toProcess = {};
-    this.recent = {};
-    this.active = {};
+    this.results = results;
+    this.resultPromises = resultPromises;
+    this.queryDef = queryDef;
+    this.toProcess = toProcess;
+    this.recent = recent;
+    this.active = active;
   }
 
   createConnection() {
