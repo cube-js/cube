@@ -119,7 +119,6 @@ class QueryCache {
         (client, q) => client.query(q.query, q.values),
         {
           logger: this.logger,
-          concurrency: 6,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           ...this.options.externalQueueOptions
         }
