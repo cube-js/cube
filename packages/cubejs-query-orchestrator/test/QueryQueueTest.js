@@ -111,4 +111,4 @@ const QueryQueueTest = (name, options) => {
 };
 
 QueryQueueTest('Local');
-QueryQueueTest('Redis', { createRedisClient: () => redis.createClient() });
+QueryQueueTest('Redis', { cacheAndQueueDriver: 'redis' });

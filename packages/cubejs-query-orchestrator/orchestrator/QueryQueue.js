@@ -53,7 +53,9 @@ class QueryQueue {
       );
 
       if (added > 0) {
-        this.logger('Added to queue', { priority, queueSize, queryKey });
+        this.logger('Added to queue', {
+          priority, queueSize, queryKey, queuePrefix: this.redisQueuePrefix
+        });
       }
 
       await this.reconcileQueue(redisClient);
@@ -89,7 +91,7 @@ class QueryQueue {
     await Promise.all(toCancel.map(async queryKey => {
       const [query] = await redisClient.getQueryAndRemove(queryKey);
       if (query) {
-        this.logger('Removing orphaned query', { queryKey: query.queryKey });
+        this.logger('Removing orphaned query', { queryKey: query.queryKey, queuePrefix: this.redisQueuePrefix });
         await this.sendCancelMessageFn(query);
       }
     }));
@@ -168,7 +170,11 @@ class QueryQueue {
         if (query) {
           let executionResult;
           const startQueryTime = (new Date()).getTime();
-          this.logger('Performing query', { queueSize, queryKey: query.queryKey });
+          this.logger('Performing query', {
+            queueSize,
+            queryKey: query.queryKey,
+            queuePrefix: this.redisQueuePrefix
+          });
           await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime });
 
           const heartBeatTimer = setInterval(
@@ -184,23 +190,39 @@ class QueryQueue {
                     try {
                       return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler });
                     } catch (e) {
-                      this.logger(`Error while query update`, { queryKey, error: e.stack || e });
+                      this.logger(`Error while query update`, {
+                        queryKey,
+                        error: e.stack || e,
+                        queuePrefix: this.redisQueuePrefix
+                      });
                     }
                     return null;
                   }
                 )
               )
             };
-            this.logger('Performing query completed', { queueSize, duration: ((new Date()).getTime() - startQueryTime), queryKey: query.queryKey });
+            this.logger('Performing query completed', {
+              queueSize,
+              duration: ((new Date()).getTime() - startQueryTime),
+              queryKey: query.queryKey,
+              queuePrefix: this.redisQueuePrefix
+            });
           } catch (e) {
             executionResult = {
               error: (e.message || e).toString() // TODO error handling
             };
-            this.logger('Error while querying', { queryKey: query.queryKey, error: (e.stack || e).toString() });
+            this.logger('Error while querying', {
+              queryKey: query.queryKey,
+              error: (e.stack || e).toString(),
+              queuePrefix: this.redisQueuePrefix
+            });
             if (e instanceof TimeoutError) {
               query = await redisClient.getQueryDef(queryKey);
               if (query) {
-                this.logger('Cancelling query due to timeout', { queryKey: query.queryKey });
+                this.logger('Cancelling query due to timeout', {
+                  queryKey: query.queryKey,
+                  queuePrefix: this.redisQueuePrefix
+                });
                 await this.sendCancelMessageFn(query);
               }
             }
@@ -210,7 +232,7 @@ class QueryQueue {
 
           await redisClient.setResultAndRemoveQuery(queryKey, executionResult);
         } else {
-          this.logger('Query cancelled in-flight', { queueSize, queryKey });
+          this.logger('Query cancelled in-flight', { queueSize, queryKey, queuePrefix: this.redisQueuePrefix });
           await redisClient.removeQuery(queryKey);
         }
 
@@ -229,7 +251,11 @@ class QueryQueue {
       }
       await this.cancelHandlers[queryHandler](query);
     } catch (e) {
-      this.logger(`Error while cancel`, { queryKey: query.queryKey, error: e.stack || e });
+      this.logger(`Error while cancel`, {
+        queryKey: query.queryKey,
+        error: e.stack || e,
+        queuePrefix: this.redisQueuePrefix
+      });
     }
   }
 

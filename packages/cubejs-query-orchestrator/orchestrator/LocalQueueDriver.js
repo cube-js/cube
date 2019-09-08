@@ -181,12 +181,18 @@ class LocalQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
     this.options = options;
-    this.results = results;
-    this.resultPromises = resultPromises;
-    this.queryDef = queryDef;
-    this.toProcess = toProcess;
-    this.recent = recent;
-    this.active = active;
+    results[options.redisQueuePrefix] = results[options.redisQueuePrefix] || {};
+    resultPromises[options.redisQueuePrefix] = resultPromises[options.redisQueuePrefix] || {};
+    queryDef[options.redisQueuePrefix] = queryDef[options.redisQueuePrefix] || {};
+    toProcess[options.redisQueuePrefix] = toProcess[options.redisQueuePrefix] || {};
+    recent[options.redisQueuePrefix] = recent[options.redisQueuePrefix] || {};
+    active[options.redisQueuePrefix] = active[options.redisQueuePrefix] || {};
+    this.results = results[options.redisQueuePrefix];
+    this.resultPromises = resultPromises[options.redisQueuePrefix];
+    this.queryDef = queryDef[options.redisQueuePrefix];
+    this.toProcess = toProcess[options.redisQueuePrefix];
+    this.recent = recent[options.redisQueuePrefix];
+    this.active = active[options.redisQueuePrefix];
   }
 
   createConnection() {
