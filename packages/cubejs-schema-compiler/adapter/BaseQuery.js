@@ -177,14 +177,14 @@ class BaseQuery {
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
       }
+      return R.all((p) => p.external, this.preAggregations.preAggregationsDescription());
     }
     return false;
   }
 
   buildSqlAndParams() {
     if (!this.options.preAggregationQuery && this.externalQueryClass) {
-      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
-      if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
+      if (this.externalPreAggregationQuery()) { // TODO performance
         const ExternalQuery = this.externalQueryClass;
         return new ExternalQuery(this.compilers, {
           ...this.options,
