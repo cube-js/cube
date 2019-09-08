@@ -133,6 +133,35 @@ class MySqlDriver extends BaseDriver {
     }
     return super.toColumnValue(value, genericType);
   }
+
+  async uploadTable(table, columns, tableData) {
+    if (!tableData.rows) {
+      throw new Error(`${this.constructor} driver supports only rows upload`);
+    }
+    await this.createTable(table, columns);
+    try {
+      const batchSize = 100; // TODO make dynamic?
+      for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
+        const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
+        const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);
+        const valueParamPlaceholders =
+          indexArray.map(i => `(${columns.map((c, paramIndex) => this.param(paramIndex + i * columns.length)).join(', ')})`).join(', ');
+        const params = indexArray.map(i => columns
+          .map(c => this.toColumnValue(tableData.rows[i + j * batchSize][c.name], c.type)))
+          .reduce((a, b) => a.concat(b), []);
+
+        await this.query(
+          `INSERT INTO ${table}
+        (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
+        VALUES ${valueParamPlaceholders}`,
+          params
+        );
+      }
+    } catch (e) {
+      await this.dropTable(table);
+      throw e;
+    }
+  }
 }
 
 module.exports = MySqlDriver;
