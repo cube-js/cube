@@ -326,7 +326,9 @@ var QueryBuilder = {
       availableMeasures: [],
       availableDimensions: [],
       availableTimeDimensions: [],
-      availableSegments: []
+      availableSegments: [],
+      limit: null,
+      offset: null
     };
     data.granularities = [{
       name: 'hour',
@@ -352,7 +354,7 @@ var QueryBuilder = {
     _regeneratorRuntime.mark(function _callee() {
       var _this = this;
 
-      var _this$query, measures, dimensions, segments, timeDimensions, filters;
+      var _this$query, measures, dimensions, segments, timeDimensions, filters, limit, offset;
 
       return _regeneratorRuntime.wrap(function _callee$(_context) {
         while (1) {
@@ -363,7 +365,7 @@ var QueryBuilder = {
 
             case 2:
               this.meta = _context.sent;
-              _this$query = this.query, measures = _this$query.measures, dimensions = _this$query.dimensions, segments = _this$query.segments, timeDimensions = _this$query.timeDimensions, filters = _this$query.filters;
+              _this$query = this.query, measures = _this$query.measures, dimensions = _this$query.dimensions, segments = _this$query.segments, timeDimensions = _this$query.timeDimensions, filters = _this$query.filters, limit = _this$query.limit, offset = _this$query.offset;
               this.measures = (measures || []).map(function (m, i) {
                 return _objectSpread({
                   index: i
@@ -389,8 +391,9 @@ var QueryBuilder = {
               });
               this.filters = (filters || []).map(function (m, i) {
                 return _objectSpread({}, m, {
-                  dimension: _this.meta.resolveMember(m.dimension, ['dimensions', 'measures']),
-                  operators: _this.meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
+                  // using 'dimension' is deprecated, 'member' should be specified instead
+                  member: _this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+                  operators: _this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
                   index: i
                 });
               });
@@ -400,8 +403,10 @@ var QueryBuilder = {
                 return m.type === 'time';
               });
               this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
+              this.limit = limit || null;
+              this.offset = offset || null;
 
-            case 13:
+            case 15:
             case "end":
               return _context.stop();
           }
@@ -430,7 +435,13 @@ var QueryBuilder = {
         availableSegments = this.availableSegments,
         availableTimeDimensions = this.availableTimeDimensions,
         availableDimensions = this.availableDimensions,
-        availableMeasures = this.availableMeasures;
+        availableMeasures = this.availableMeasures,
+        limit = this.limit,
+        offset = this.offset,
+        setLimit = this.setLimit,
+        removeLimit = this.removeLimit,
+        setOffset = this.setOffset,
+        removeOffset = this.removeOffset;
     var builderProps = {};
 
     if (meta) {
@@ -448,7 +459,13 @@ var QueryBuilder = {
         availableTimeDimensions: availableTimeDimensions,
         availableDimensions: availableDimensions,
         availableMeasures: availableMeasures,
-        updateChartType: this.updateChart
+        updateChartType: this.updateChart,
+        limit: limit,
+        offset: offset,
+        setLimit: setLimit,
+        removeLimit: removeLimit,
+        setOffset: setOffset,
+        removeOffset: removeOffset
       };
       QUERY_ELEMENTS.forEach(function (e) {
         var name = e.charAt(0).toUpperCase() + e.slice(1);
@@ -498,10 +515,15 @@ var QueryBuilder = {
 
       var toQuery = function toQuery(member) {
         return member.name;
-      }; // TODO: implement order, limit, timezone, renewQuery
+      }; // TODO: implement order, timezone, renewQuery
 
 
+      var hasElements = false;
       QUERY_ELEMENTS.forEach(function (e) {
+        if (!_this3[e]) {
+          return;
+        }
+
         if (e === 'timeDimensions') {
           toQuery = function toQuery(member) {
             return {
@@ -513,7 +535,7 @@ var QueryBuilder = {
         } else if (e === 'filters') {
           toQuery = function toQuery(member) {
             return {
-              dimension: member.dimension.name,
+              member: member.member.name,
               operator: member.operator,
               values: member.values
             };
@@ -524,6 +546,7 @@ var QueryBuilder = {
           validatedQuery[e] = _this3[e].map(function (x) {
             return toQuery(x);
           });
+          hasElements = true;
         }
       }); // TODO: implement default heuristics
 
@@ -531,6 +554,19 @@ var QueryBuilder = {
         validatedQuery.filters = validatedQuery.filters.filter(function (f) {
           return f.operator;
         });
+      } // only set limit and offset if there are elements otherwise an invalid request with just limit/offset
+      // gets sent when the component is first mounted, but before the actual query is constructed.
+
+
+      if (hasElements) {
+        if (this.limit) {
+          validatedQuery.limit = this.limit;
+        }
+
+        if (this.offset) {
+          validatedQuery.offset = this.offset;
+        } // add order
+
       }
 
       return validatedQuery;
@@ -559,10 +595,10 @@ var QueryBuilder = {
           });
         }
       } else if (element === 'filters') {
-        var _dimension = _objectSpread({}, this.meta.resolveMember(member.dimension, 'dimensions'));
+        var filterMember = _objectSpread({}, this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']));
 
         mem = _objectSpread({}, member, {
-          dimension: _dimension
+          member: filterMember
         });
       } else {
         mem = this["available".concat(name)].find(function (m) {
@@ -627,10 +663,10 @@ var QueryBuilder = {
           return x.dimension === old;
         });
 
-        var _dimension2 = _objectSpread({}, this.meta.resolveMember(member.dimension, 'dimensions'));
+        var filterMember = _objectSpread({}, this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']));
 
         mem = _objectSpread({}, member, {
-          dimension: _dimension2
+          member: filterMember
         });
       } else {
         index = this[element].findIndex(function (x) {
@@ -670,10 +706,10 @@ var QueryBuilder = {
             });
           }
         } else if (element === 'filters') {
-          var _dimension3 = _objectSpread({}, _this4.meta.resolveMember(m.dimension, 'dimensions'));
+          var member = _objectSpread({}, _this4.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
 
           mem = _objectSpread({}, m, {
-            dimension: _dimension3
+            member: member
           });
         } else {
           mem = _this4["available".concat(name)].find(function (x) {
@@ -686,6 +722,18 @@ var QueryBuilder = {
         }
       });
       this[element] = elements;
+    },
+    setLimit: function setLimit(limit) {
+      this.limit = limit;
+    },
+    removeLimit: function removeLimit() {
+      this.limit = null;
+    },
+    setOffset: function setOffset(offset) {
+      this.offset = offset;
+    },
+    removeOffset: function removeOffset() {
+      this.offset = null;
     },
     updateChart: function updateChart(chartType) {
       this.chartType = chartType;

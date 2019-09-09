@@ -43,7 +43,7 @@
 	  return store[key] || (store[key] = value !== undefined ? value : {});
 	})('versions', []).push({
 	  version: _core.version,
-	  mode: _library ? 'pure' : 'global',
+	  mode: 'global',
 	  copyright: '© 2019 Denis Pushkarev (zloirock.ru)'
 	});
 	});
@@ -614,7 +614,7 @@
 
 	var defineProperty = _objectDp.f;
 	var _wksDefine = function (name) {
-	  var $Symbol = _core.Symbol || (_core.Symbol = _library ? {} : _global.Symbol || {});
+	  var $Symbol = _core.Symbol || (_core.Symbol = _global.Symbol || {});
 	  if (name.charAt(0) != '_' && !(name in $Symbol)) defineProperty($Symbol, name, { value: _wksExt.f(name) });
 	};
 
@@ -3950,7 +3950,7 @@
 
 	function getPromiseCtor(promiseCtor) {
 	  if (!promiseCtor) {
-	    promiseCtor = Promise;
+	    promiseCtor = config.Promise || Promise;
 	  }
 
 	  if (!promiseCtor) {
@@ -10794,7 +10794,7 @@
 	 *
 	 * Use an `InjectionToken` whenever the type you are injecting is not reified (does not have a
 	 * runtime representation) such as when injecting an interface, callable type, array or
-	 * parametrized type.
+	 * parameterized type.
 	 *
 	 * `InjectionToken` is parameterized on `T` which is the type of object which will be returned by
 	 * the `Injector`. This provides additional level of type safety.
@@ -10851,15 +10851,16 @@
 	 * Use of this source code is governed by an MIT-style license that can be
 	 * found in the LICENSE file at https://angular.io/license
 	 */ /**
-	 * This token can be used to create a virtual provider that will populate the
-	 * `entryComponents` fields of components and ng modules based on its `useValue`.
+	 * A DI token that you can use to create a virtual [provider](guide/glossary#provider)
+	 * that will populate the `entryComponents` field of components and NgModules
+	 * based on its `useValue` property value.
 	 * All components that are referenced in the `useValue` value (either directly
-	 * or in a nested array or map) will be added to the `entryComponents` property.
+	 * or in a nested array or map) are added to the `entryComponents` property.
 	 *
 	 * @usageNotes
-	 * ### Example
+	 *
 	 * The following example shows how the router can populate the `entryComponents`
-	 * field of an NgModule based on the router configuration which refers
+	 * field of an NgModule based on a router configuration that refers
 	 * to components.
 	 *
 	 * ```typescript
@@ -10936,6 +10937,7 @@
 	     * Use the `CheckOnce` strategy, meaning that automatic change detection is deactivated
 	     * until reactivated by setting the strategy to `Default` (`CheckAlways`).
 	     * Change detection can still be explicitly invoked.
+	     * This strategy applies to all child directives and cannot be overridden.
 	     */ChangeDetectionStrategy[ChangeDetectionStrategy["OnPush"]=0]="OnPush";/**
 	     * Use the default `CheckAlways` strategy, in which change detection is automatic until
 	     * explicitly deactivated.
@@ -12679,7 +12681,7 @@
 	 * @publicApi
 	 */var Version=/** @class */function(){function Version(full){this.full=full;this.major=full.split('.')[0];this.minor=full.split('.')[1];this.patch=full.split('.').slice(2).join('.');}return Version;}();/**
 	 * @publicApi
-	 */var VERSION=new Version('7.2.0');/**
+	 */var VERSION=new Version('7.2.14');/**
 	 * @license
 	 * Copyright Google Inc. All Rights Reserved.
 	 *
@@ -12762,7 +12764,12 @@
 	// NB: Sanitization does not allow <form> elements or other active elements (<button> etc). Those
 	// can be sanitized, but they increase security surface area without a legitimate use case, so they
 	// are left out here.
-	var VALID_ATTRS=merge$1$1(URI_ATTRS,SRCSET_ATTRS,HTML_ATTRS);var Plural;(function(Plural){Plural[Plural["Zero"]=0]="Zero";Plural[Plural["One"]=1]="One";Plural[Plural["Two"]=2]="Two";Plural[Plural["Few"]=3]="Few";Plural[Plural["Many"]=4]="Many";Plural[Plural["Other"]=5]="Other";})(Plural||(Plural={}));/**
+	var VALID_ATTRS=merge$1$1(URI_ATTRS,SRCSET_ATTRS,HTML_ATTRS);// Elements whose content should not be traversed/preserved, if the elements themselves are invalid.
+	//
+	// Typically, `<invalid>Some content</invalid>` would traverse (and in this case preserve)
+	// `Some content`, but strip `invalid-element` opening/closing tags. For some elements, though, we
+	// don't want to preserve the content, if the elements themselves are going to be removed.
+	var SKIP_TRAVERSING_CONTENT_IF_INVALID_ELEMENTS=tagSet('script,style,template');var Plural;(function(Plural){Plural[Plural["Zero"]=0]="Zero";Plural[Plural["One"]=1]="One";Plural[Plural["Two"]=2]="Two";Plural[Plural["Few"]=3]="Few";Plural[Plural["Many"]=4]="Many";Plural[Plural["Other"]=5]="Other";})(Plural||(Plural={}));/**
 	 * @license
 	 * Copyright Google Inc. All Rights Reserved.
 	 *
@@ -12990,7 +12997,7 @@
 	 * @Annotation
 	 * @publicApi
 	 */var Pipe=makeDecorator('Pipe',function(p){return _assign({pure:true},p);},undefined,undefined,function(type,meta){return SWITCH_COMPILE_PIPE(type,meta);});var initializeBaseDef=function initializeBaseDef(target){var constructor=target.constructor;var inheritedBaseDef=constructor.ngBaseDef;var baseDef=constructor.ngBaseDef={inputs:{},outputs:{},declaredInputs:{}};if(inheritedBaseDef){fillProperties(baseDef.inputs,inheritedBaseDef.inputs);fillProperties(baseDef.outputs,inheritedBaseDef.outputs);fillProperties(baseDef.declaredInputs,inheritedBaseDef.declaredInputs);}};/**
-	 * Does the work of creating the `ngBaseDef` property for the @Input and @Output decorators.
+	 * Does the work of creating the `ngBaseDef` property for the `Input` and `Output` decorators.
 	 * @param key "inputs" or "outputs"
 	 */var updateBaseDefFromIOProp=function updateBaseDefFromIOProp(getProp){return function(target,name){var args=[];for(var _i=2;_i<arguments.length;_i++){args[_i-2]=arguments[_i];}var constructor=target.constructor;if(!constructor.hasOwnProperty(NG_BASE_DEF)){initializeBaseDef(target);}var baseDef=constructor.ngBaseDef;var defProp=getProp(baseDef);defProp[name]=args[0];};};/**
 	 * @Annotation
@@ -13885,6 +13892,94 @@
 	throw e;});}return result;}catch(e){ngZone.runOutsideAngular(function(){return errorHandler.handleError(e);});// rethrow as the exception handler might not do it
 	throw e;}}function optionsReducer(dst,objs){if(Array.isArray(objs)){dst=objs.reduce(optionsReducer,dst);}else{dst=_assign({},dst,objs);}return dst;}/**
 	 * A reference to an Angular application running on a page.
+	 *
+	 * @usageNotes
+	 *
+	 * {@a is-stable-examples}
+	 * ### isStable examples and caveats
+	 *
+	 * Note two important points about `isStable`, demonstrated in the examples below:
+	 * - the application will never be stable if you start any kind
+	 * of recurrent asynchronous task when the application starts
+	 * (for example for a polling process, started with a `setInterval`, a `setTimeout`
+	 * or using RxJS operators like `interval`);
+	 * - the `isStable` Observable runs outside of the Angular zone.
+	 *
+	 * Let's imagine that you start a recurrent task
+	 * (here incrementing a counter, using RxJS `interval`),
+	 * and at the same time subscribe to `isStable`.
+	 *
+	 * ```
+	 * constructor(appRef: ApplicationRef) {
+	 *   appRef.isStable.pipe(
+	 *      filter(stable => stable)
+	 *   ).subscribe(() => console.log('App is stable now');
+	 *   interval(1000).subscribe(counter => console.log(counter));
+	 * }
+	 * ```
+	 * In this example, `isStable` will never emit `true`,
+	 * and the trace "App is stable now" will never get logged.
+	 *
+	 * If you want to execute something when the app is stable,
+	 * you have to wait for the application to be stable
+	 * before starting your polling process.
+	 *
+	 * ```
+	 * constructor(appRef: ApplicationRef) {
+	 *   appRef.isStable.pipe(
+	 *     first(stable => stable),
+	 *     tap(stable => console.log('App is stable now')),
+	 *     switchMap(() => interval(1000))
+	 *   ).subscribe(counter => console.log(counter));
+	 * }
+	 * ```
+	 * In this example, the trace "App is stable now" will be logged
+	 * and then the counter starts incrementing every second.
+	 *
+	 * Note also that this Observable runs outside of the Angular zone,
+	 * which means that the code in the subscription
+	 * to this Observable will not trigger the change detection.
+	 *
+	 * Let's imagine that instead of logging the counter value,
+	 * you update a field of your component
+	 * and display it in its template.
+	 *
+	 * ```
+	 * constructor(appRef: ApplicationRef) {
+	 *   appRef.isStable.pipe(
+	 *     first(stable => stable),
+	 *     switchMap(() => interval(1000))
+	 *   ).subscribe(counter => this.value = counter);
+	 * }
+	 * ```
+	 * As the `isStable` Observable runs outside the zone,
+	 * the `value` field will be updated properly,
+	 * but the template will not be refreshed!
+	 *
+	 * You'll have to manually trigger the change detection to update the template.
+	 *
+	 * ```
+	 * constructor(appRef: ApplicationRef, cd: ChangeDetectorRef) {
+	 *   appRef.isStable.pipe(
+	 *     first(stable => stable),
+	 *     switchMap(() => interval(1000))
+	 *   ).subscribe(counter => {
+	 *     this.value = counter;
+	 *     cd.detectChanges();
+	 *   });
+	 * }
+	 * ```
+	 *
+	 * Or make the subscription callback run inside the zone.
+	 *
+	 * ```
+	 * constructor(appRef: ApplicationRef, zone: NgZone) {
+	 *   appRef.isStable.pipe(
+	 *     first(stable => stable),
+	 *     switchMap(() => interval(1000))
+	 *   ).subscribe(counter => zone.run(() => this.value = counter));
+	 * }
+	 * ```
 	 *
 	 * @publicApi
 	 */var ApplicationRef=/** @class */function(){/** @internal */function ApplicationRef(_zone,_console,_injector,_exceptionHandler,_componentFactoryResolver,_initStatus){var _this=this;this._zone=_zone;this._console=_console;this._injector=_injector;this._exceptionHandler=_exceptionHandler;this._componentFactoryResolver=_componentFactoryResolver;this._initStatus=_initStatus;this._bootstrapListeners=[];this._views=[];this._runningTick=false;this._enforceNoNewChanges=false;this._stable=true;/**
