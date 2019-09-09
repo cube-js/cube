@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.35](https://github.com/statsbotco/cubejs-client/compare/v0.10.34...v0.10.35) (2019-09-09)
+
+
+### Bug Fixes
+
+* LocalQueueDriver key interference for multitenant deployment ([aa860e4](https://github.com/statsbotco/cubejs-client/commit/aa860e4))
+
+
+### Features
+
+* Serve pre-aggregated data right from external database without hitting main one if pre-aggregation is available ([931fb7c](https://github.com/statsbotco/cubejs-client/commit/931fb7c))
+
+
+
+
+
 ## [0.10.33](https://github.com/statsbotco/cubejs-client/compare/v0.10.32...v0.10.33) (2019-09-06)
 
 

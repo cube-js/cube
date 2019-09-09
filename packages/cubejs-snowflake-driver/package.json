@@ -2,13 +2,13 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.10.33",
+  "version": "0.10.35",
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "driver/SnowflakeDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.10.33",
+    "@cubejs-backend/query-orchestrator": "^0.10.35",
     "snowflake-sdk": "^1.1.15"
   },
   "license": "Apache-2.0",

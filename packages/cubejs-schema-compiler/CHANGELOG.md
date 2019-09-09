@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.35](https://github.com/statsbotco/cubejs-client/compare/v0.10.34...v0.10.35) (2019-09-09)
+
+
+### Features
+
+* `originalSql` external pre-aggregations support ([0db2282](https://github.com/statsbotco/cubejs-client/commit/0db2282))
+
+
+
+
+
 ## [0.10.30](https://github.com/statsbotco/cubejs-client/compare/v0.10.29...v0.10.30) (2019-08-26)
 
 

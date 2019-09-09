@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.35](https://github.com/statsbotco/cubejs-client/compare/v0.10.34...v0.10.35) (2019-09-09)
+
+
+### Features
+
+* **mysql-driver:** Faster external pre-aggregations upload ([b6e3ee6](https://github.com/statsbotco/cubejs-client/commit/b6e3ee6))
+
+
+
+
+
 ## [0.10.33](https://github.com/statsbotco/cubejs-client/compare/v0.10.32...v0.10.33) (2019-09-06)
 
 **Note:** Version bump only for package @cubejs-backend/mysql-driver
