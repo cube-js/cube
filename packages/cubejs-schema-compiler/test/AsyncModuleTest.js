@@ -62,4 +62,53 @@ describe('AsyncModule', () => {
       });
     });
   });
+
+  it('import local node module', () => {
+    const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
+    import { foo } from '../test/TestHelperForImport.js';
+    
+    cube(foo(), {
+      sql: \`
+      select * from visitors
+      \`,
+
+      measures: {
+        visitor_count: {
+          type: 'count',
+          sql: 'id'
+        },
+        visitor_revenue: {
+          type: 'sum',
+          sql: 'amount'
+        }
+      },
+
+      dimensions: {
+        source: {
+          type: 'string',
+          sql: 'source'
+        },
+        created_at: {
+          type: 'time',
+          sql: 'created_at'
+        }
+      }
+    })
+    `, { allowNodeRequire: true });
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['bar.visitor_count'],
+        timezone: 'America/Los_Angeles'
+      });
+
+      console.log(query.buildSqlAndParams());
+      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+        res.should.be.deepEqual(
+          [
+            { "bar__visitor_count": "6" }
+          ]
+        );
+      });
+    });
+  });
 });
