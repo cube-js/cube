@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.40](https://github.com/statsbotco/cubejs-client/compare/v0.10.39...v0.10.40) (2019-09-09)
+
+
+### Bug Fixes
+
+* missed Vue.js build ([1cf22d5](https://github.com/statsbotco/cubejs-client/commit/1cf22d5))
+
+
+
+
+
 ## [0.10.32](https://github.com/statsbotco/cubejs-client/compare/v0.10.31...v0.10.32) (2019-09-06)
 
 
