@@ -122,6 +122,10 @@ class PreAggregationLoadCache {
     return this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
   }
 
+  hasKeyQueryResult(keyQuery) {
+    return !!this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
+  }
+
   async getQueryStage(stageQueryKey) {
     const queue = this.preAggregations.getQueue();
     if (!this.queryStageState) {
@@ -164,6 +168,30 @@ class PreAggregationLoader {
   }
 
   async loadPreAggregation() {
+    const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
+      .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
+    if (notLoadedKey && !this.waitForRenew) {
+      const structureVersion = version(this.preAggregation.loadSql);
+      const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation);
+      const versionEntryByStructureVersion = versionEntries.find(
+        v => v.table_name === this.preAggregation.tableName && v.structure_version === structureVersion
+      );
+      if (versionEntryByStructureVersion) {
+        this.loadPreAggregationWithKeys().catch(e => {
+          if (!(e instanceof ContinueWaitError)) {
+            this.logger('Error loading pre-aggregation', { error: (e.stack || e), preAggregation: this.preAggregation });
+          }
+        });
+        return this.targetTableName(versionEntryByStructureVersion);
+      } else {
+        return this.loadPreAggregationWithKeys();
+      }
+    } else {
+      return this.loadPreAggregationWithKeys();
+    }
+  }
+
+  async loadPreAggregationWithKeys() {
     const invalidationKeys = await Promise.all(
       (this.preAggregation.invalidateKeyQueries || [])
         .map(keyQuery => this.loadCache.keyQueryResult(keyQuery))
@@ -182,6 +210,7 @@ class PreAggregationLoader {
       return this.targetTableName(versionEntryByContentVersion);
     }
 
+    // TODO this check can be redundant due to structure version is already checked in loadPreAggregation()
     if (
       !this.waitForRenew &&
       await this.loadCache.getQueryStage(PreAggregations.preAggregationQueryCacheKey(this.preAggregation))
