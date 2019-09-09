@@ -247,10 +247,16 @@ class DataSchemaCompiler {
       path.resolve('node_modules', modulePath);
 
     if (absPath.indexOf(nodeModulesPath) !== 0) {
+      if (this.allowNodeRequire) {
+        return null;
+      }
       throw new UserError(`'${modulePath}' restricted`);
     }
     const packagePath = absPath.replace(nodeModulesPath, '').split('/').filter(s => !!s)[0];
     if (!packagePath) {
+      if (this.allowNodeRequire) {
+        return null;
+      }
       throw new UserError(`'${modulePath}' is incorrect`);
     }
     if (!this.isWhiteListedPackage(packagePath)) {
@@ -267,6 +273,9 @@ class DataSchemaCompiler {
     }
     absPath = path.extname(absPath) !== '.js' ? absPath + '.js' : absPath;
     if (!fs.existsSync(absPath)) {
+      if (this.allowNodeRequire) {
+        return null;
+      }
       throw new UserError(`Path '${absPath.replace(nodeModulesPath + '/', '')}' not found`);
     }
     return this.readModuleFile(absPath, errorsReport);
