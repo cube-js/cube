@@ -177,7 +177,8 @@ class BaseQuery {
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
       }
-      return R.all((p) => p.external, this.preAggregations.preAggregationsDescription());
+      const preAggregationsDescription = this.preAggregations.preAggregationsDescription();
+      return preAggregationsDescription.length && R.all((p) => p.external, preAggregationsDescription);
     }
     return false;
   }
