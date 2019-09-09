@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.38](https://github.com/statsbotco/cubejs-client/compare/v0.10.37...v0.10.38) (2019-09-09)
+
+
+### Bug Fixes
+
+* Requiring local node files is restricted ([ba3c390](https://github.com/statsbotco/cubejs-client/commit/ba3c390))
+
+
+
+
+
 ## [0.10.36](https://github.com/statsbotco/cubejs-client/compare/v0.10.35...v0.10.36) (2019-09-09)
 
 
