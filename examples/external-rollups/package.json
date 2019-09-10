@@ -1,0 +1,14 @@
+{
+  "name": "cubejs-external-rollups",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-dev-server",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/bigquery-driver": "^0.10.35",
+    "@cubejs-backend/mysql-driver": "^0.10.35",
+    "@cubejs-backend/server": "^0.10.36"
+  }
+}
