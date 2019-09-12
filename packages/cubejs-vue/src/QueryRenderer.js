@@ -36,7 +36,7 @@ export default {
     const { query, queries } = this;
 
     if (query) {
-      await this.load(query);
+      await this.load();
     }
 
     if (queries) {
@@ -58,7 +58,7 @@ export default {
       const slotProps = {
         resultSet,
         sqlQuery,
-        query: this.builderProps.query,
+        query: this.builderProps.query || this.query,
       };
 
       if (onlyDefault) {
@@ -84,7 +84,8 @@ export default {
     );
   },
   methods: {
-    async load(query) {
+    async load() {
+      const { query } = this;
       try {
         this.loading = true;
         this.error = undefined;
@@ -107,7 +108,8 @@ export default {
         this.loading = false;
       }
     },
-    async loadQueries(queries) {
+    async loadQueries() {
+      const { queries } = this;
       try {
         this.error = undefined;
         this.loading = true;
@@ -126,15 +128,21 @@ export default {
     },
   },
   watch: {
-    query(val) {
-      if (val) {
-        this.load(val);
-      }
+    query: {
+      handler(val) {
+        if (val) {
+          this.load();
+        }
+      },
+      deep: true,
     },
-    queries(val) {
-      if (val) {
-        this.loadQueries(val);
-      }
+    queries: {
+      handler(val) {
+        if (val) {
+          this.loadQueries();
+        }
+      },
+      deep: true,
     },
   },
 };

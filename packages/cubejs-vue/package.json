@@ -7,6 +7,7 @@
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint",
+    "test": "vue-cli-service test:unit",
     "test:unit": "vue-cli-service test:unit",
     "test:unit:watch": "vue-cli-service test:unit --watch --require tests/setup.js"
   },
@@ -17,7 +18,7 @@
     "src"
   ],
   "dependencies": {
-    "core-js": "^2.6.5",
+    "core-js": "^2.6.9",
     "ramda": "^0.26.1"
   },
   "devDependencies": {

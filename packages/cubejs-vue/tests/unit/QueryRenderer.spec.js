@@ -1,8 +1,8 @@
-import { shallowMount } from '@vue/test-utils';
+import { shallowMount, mount } from '@vue/test-utils';
 import CubejsApi from '@cubejs-client/core';
 import flushPromises from 'flush-promises';
 import QueryRenderer from '../../src/QueryRenderer';
-import fetchMock, { load } from './__mocks__/responses';
+import fetchMock, { load, single } from './__mocks__/responses';
 
 describe('QueryRenderer.vue', () => {
   describe('Loads single query from api', () => {
@@ -66,6 +66,59 @@ describe('QueryRenderer.vue', () => {
 
       expect(wrapper.text()).toContain('Result set is loaded');
       expect(cube.request.mock.calls.length).toBe(1);
+    });
+
+    it('Rerender on query nested property change', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request').mockImplementation(fetchMock(single));
+
+      const parent = mount({
+        components: {
+          QueryRenderer,
+        },
+        template: `
+          <div>
+            <query-renderer :cubejs-api="cubejsApi" :query="query" v-slot="{ query }">
+              <span class="query">{{query}}</span>
+            </query-renderer>
+          </div>
+        `,
+        data() {
+          return {
+            cubejsApi: cube ,
+            query: {
+              measures: ['Stories.count'],
+              dimensions: [],
+              filters: [],
+              segments: [],
+              timeDimensions: [],
+            },
+          };
+        },
+      });
+
+      await flushPromises();
+
+      expect(cube.request.mock.calls.length).toBe(1);
+      expect(parent.find('.query').element.textContent).toContain('Stories.count');
+
+      parent.vm.query.measures = ['Users.count'];
+      await flushPromises();
+
+      expect(cube.request.mock.calls.length).toBe(2);
+      expect(parent.find('.query').element.textContent).toContain('Users.count');
+
+      parent.vm.query.measures.push('Users.count');
+      await flushPromises();
+
+      expect(cube.request.mock.calls.length).toBe(3);
+      expect(parent.find('.query').element.textContent).toContain('Users.count');
+
+      parent.vm.query.timeDimensions.push({ dimension: 'Users.count', dateRange: 'last 6 days', granularity: 'week' });
+      await flushPromises();
+
+      expect(cube.request.mock.calls.length).toBe(4);
+      expect(parent.find('.query').element.textContent).toContain('week');
     });
   });
 });
