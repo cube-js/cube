@@ -17,7 +17,7 @@
     "src"
   ],
   "dependencies": {
-    "core-js": "^2.6.5",
+    "core-js": "^2.6.9",
     "ramda": "^0.26.1"
   },
   "devDependencies": {

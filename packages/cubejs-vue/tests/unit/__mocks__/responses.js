@@ -697,6 +697,39 @@ export const load = {
   }
 };
 
+export const single = {
+  "query": {
+    "measures": [
+      "Users.count"
+    ],
+    "dimensions": [],
+    "timezone": "UTC",
+    "timeDimensions": []
+  },
+  "data": [
+    {
+      "Users.city": "Mülheim",
+      "Users.count": "4"
+    },
+    {
+      "Users.city": "Metairie",
+      "Users.count": "4"
+    },
+  ],
+  "annotation": {
+    "measures": {
+      "Users.count": {
+        "title": "Users Count",
+        "shortTitle": "Count",
+        "type": "number"
+      }
+    },
+    "dimensions": {},
+    "segments": {},
+    "timeDimensions": {}
+  }
+};
+
 export const sql = {};
 
 export default (body = {}, status = 200) => () => Promise.resolve({
