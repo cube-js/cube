@@ -115,7 +115,7 @@ ordersCompletedCount: {
 ```
 
 ### rollingWindow
-If you want to calculate some metric within a window, for example a week or a month, you should use a `rollingWindow` parameter. The `trailing` and `leading` parameters define window size.
+If you want to calculate some metric within a window, for example a week or a month, you should use a `rollingWindow` parameter. The `trailing` and `leading` parameters define window size. Note that `rollingWindow` only works on a dimension defined with `timeDimension`.
 
 These parameters have a format defined as `(-?\d+) (minute|hour|day|week|month|year)`. The `trailing` and `leading` parameters can also be set to an `unbounded` value, which means infinite size for the corresponding window part. You can define `trailing` and `leading` parameters using negative integers.
 
@@ -128,6 +128,17 @@ rollingCountMonth: {
     type: `count`,
     rollingWindow: {
       trailing: `1 month`
+    }
+  }
+```
+
+Here's an example of an `unbounded` window that's used for cumulative counts:
+
+```javascript
+cumulativeCount: {
+    type: `count`,
+    rollingWindow: {
+      trailing: `unbounded`
     }
   }
 ```
