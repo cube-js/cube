@@ -136,10 +136,13 @@ export default {
       },
       deep: true,
     },
-    queries(val) {
-      if (val) {
-        this.loadQueries();
-      }
+    queries: {
+      handler(val) {
+        if (val) {
+          this.loadQueries();
+        }
+      },
+      deep: true,
     },
   },
 };
