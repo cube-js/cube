@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue",
-  "version": "0.10.40",
+  "version": "0.10.41",
   "description": "Vue.js components for cube.js",
   "author": "Ricardo Tapia",
   "scripts": {

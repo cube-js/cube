@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.41](https://github.com/statsbotco/cubejs-client/compare/v0.10.40...v0.10.41) (2019-09-13)
+
+
+### Bug Fixes
+
+* support for deep nested watchers on 'QueryRenderer' ([#207](https://github.com/statsbotco/cubejs-client/issues/207)) ([8d3a500](https://github.com/statsbotco/cubejs-client/commit/8d3a500))
+
+
+
+
+
 ## [0.10.40](https://github.com/statsbotco/cubejs-client/compare/v0.10.39...v0.10.40) (2019-09-09)
 
 

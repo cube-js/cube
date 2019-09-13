@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.41](https://github.com/statsbotco/cubejs-client/compare/v0.10.40...v0.10.41) (2019-09-13)
+
+
+### Features
+
+* Provide date filter with hourly granularity ([e423d82](https://github.com/statsbotco/cubejs-client/commit/e423d82)), closes [#179](https://github.com/statsbotco/cubejs-client/issues/179)
+
+
+
+
+
 ## [0.10.39](https://github.com/statsbotco/cubejs-client/compare/v0.10.38...v0.10.39) (2019-09-09)
 
 
