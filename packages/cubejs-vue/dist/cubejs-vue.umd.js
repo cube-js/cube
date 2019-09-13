@@ -7326,7 +7326,7 @@
                 }
 
                 _context.next = 4;
-                return this.load(query);
+                return this.load();
 
               case 4:
                 if (!queries) {
@@ -7368,7 +7368,7 @@
         var slotProps = {
           resultSet: resultSet,
           sqlQuery: sqlQuery,
-          query: this.builderProps.query
+          query: this.builderProps.query || this.query
         };
 
         if (onlyDefault) {
@@ -7392,107 +7392,110 @@
       load: function () {
         var _load = _asyncToGenerator(
         /*#__PURE__*/
-        regeneratorRuntime.mark(function _callee2(query) {
+        regeneratorRuntime.mark(function _callee2() {
+          var query;
           return regeneratorRuntime.wrap(function _callee2$(_context2) {
             while (1) {
               switch (_context2.prev = _context2.next) {
                 case 0:
-                  _context2.prev = 0;
+                  query = this.query;
+                  _context2.prev = 1;
                   this.loading = true;
                   this.error = undefined;
 
                   if (!(query && Object.keys(query).length > 0)) {
-                    _context2.next = 22;
+                    _context2.next = 23;
                     break;
                   }
 
                   if (!(this.loadSql === 'only')) {
-                    _context2.next = 10;
+                    _context2.next = 11;
                     break;
                   }
 
-                  _context2.next = 7;
+                  _context2.next = 8;
                   return this.cubejsApi.sql(query, {
                     mutexObj: this.mutexObj,
                     mutexKey: 'sql'
                   });
 
-                case 7:
+                case 8:
                   this.sqlQuery = _context2.sent;
-                  _context2.next = 22;
+                  _context2.next = 23;
                   break;
 
-                case 10:
+                case 11:
                   if (!this.loadSql) {
-                    _context2.next = 19;
+                    _context2.next = 20;
                     break;
                   }
 
-                  _context2.next = 13;
+                  _context2.next = 14;
                   return this.cubejsApi.sql(query, {
                     mutexObj: this.mutexObj,
                     mutexKey: 'sql'
                   });
 
-                case 13:
+                case 14:
                   this.sqlQuery = _context2.sent;
-                  _context2.next = 16;
+                  _context2.next = 17;
                   return this.cubejsApi.load(query, {
                     mutexObj: this.mutexObj,
                     mutexKey: 'query'
                   });
 
-                case 16:
+                case 17:
                   this.resultSet = _context2.sent;
-                  _context2.next = 22;
+                  _context2.next = 23;
                   break;
 
-                case 19:
-                  _context2.next = 21;
+                case 20:
+                  _context2.next = 22;
                   return this.cubejsApi.load(query, {
                     mutexObj: this.mutexObj,
                     mutexKey: 'query'
                   });
-
-                case 21:
-                  this.resultSet = _context2.sent;
 
                 case 22:
+                  this.resultSet = _context2.sent;
+
+                case 23:
                   this.loading = false;
-                  _context2.next = 30;
+                  _context2.next = 31;
                   break;
 
-                case 25:
-                  _context2.prev = 25;
-                  _context2.t0 = _context2["catch"](0);
+                case 26:
+                  _context2.prev = 26;
+                  _context2.t0 = _context2["catch"](1);
                   this.error = _context2.t0;
                   this.resultSet = undefined;
                   this.loading = false;
 
-                case 30:
+                case 31:
                 case "end":
                   return _context2.stop();
               }
             }
-          }, _callee2, this, [[0, 25]]);
+          }, _callee2, this, [[1, 26]]);
         }));
 
-        return function load(_x) {
+        return function load() {
           return _load.apply(this, arguments);
         };
       }(),
       loadQueries: function () {
         var _loadQueries = _asyncToGenerator(
         /*#__PURE__*/
-        regeneratorRuntime.mark(function _callee3(queries) {
+        regeneratorRuntime.mark(function _callee3() {
           var _this = this;
 
-          var resultPromises;
+          var queries, resultPromises;
           return regeneratorRuntime.wrap(function _callee3$(_context3) {
             while (1) {
               switch (_context3.prev = _context3.next) {
                 case 0:
-                  _context3.prev = 0;
+                  queries = this.queries;
+                  _context3.prev = 1;
                   this.error = undefined;
                   this.loading = true;
                   resultPromises = Promise.all(toPairs(queries).map(function (_ref) {
@@ -7508,45 +7511,51 @@
                     });
                   }));
                   _context3.t0 = fromPairs;
-                  _context3.next = 7;
+                  _context3.next = 8;
                   return resultPromises;
 
-                case 7:
+                case 8:
                   _context3.t1 = _context3.sent;
                   this.resultSet = (0, _context3.t0)(_context3.t1);
                   this.loading = false;
-                  _context3.next = 16;
+                  _context3.next = 17;
                   break;
 
-                case 12:
-                  _context3.prev = 12;
-                  _context3.t2 = _context3["catch"](0);
+                case 13:
+                  _context3.prev = 13;
+                  _context3.t2 = _context3["catch"](1);
                   this.error = _context3.t2;
                   this.loading = false;
 
-                case 16:
+                case 17:
                 case "end":
                   return _context3.stop();
               }
             }
-          }, _callee3, this, [[0, 12]]);
+          }, _callee3, this, [[1, 13]]);
         }));
 
-        return function loadQueries(_x2) {
+        return function loadQueries() {
           return _loadQueries.apply(this, arguments);
         };
       }()
     },
     watch: {
-      query: function query(val) {
-        if (val) {
-          this.load(val);
-        }
+      query: {
+        handler: function handler(val) {
+          if (val) {
+            this.load();
+          }
+        },
+        deep: true
       },
-      queries: function queries(val) {
-        if (val) {
-          this.loadQueries(val);
-        }
+      queries: {
+        handler: function handler(val) {
+          if (val) {
+            this.loadQueries();
+          }
+        },
+        deep: true
       }
     }
   };
