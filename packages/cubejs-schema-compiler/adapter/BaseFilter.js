@@ -195,7 +195,10 @@ class BaseFilter extends BaseDimension {
   }
 
   formatFromDate(date) {
-    return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 00:00:00');
+    if (!date || date.match(/^\d\d\d\d-\d\d-\d\d$/)) {
+      return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 00:00:00');
+    }
+    return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
   inDbTimeZoneDateFrom(date) {
@@ -203,7 +206,10 @@ class BaseFilter extends BaseDimension {
   }
 
   formatToDate(date) {
-    return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 23:59:59');
+    if (!date || date.match(/^\d\d\d\d-\d\d-\d\d$/)) {
+      return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 23:59:59');
+    }
+    return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
   inDbTimeZoneDateTo(date) {

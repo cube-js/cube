@@ -1,3 +1,4 @@
+/* eslint-disable quote-props */
 const CompileError = require('../compiler/CompileError');
 const UserError = require('../compiler/UserError');
 const PostgresQuery = require('../adapter/PostgresQuery');
@@ -8,7 +9,7 @@ require('should');
 const prepareCompiler = PrepareCompiler.prepareCompiler;
 const dbRunner = require('./DbRunner');
 
-describe('JoinGraph', () => {
+describe('SQL Generation', () => {
   const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
@@ -1305,6 +1306,28 @@ describe('JoinGraph', () => {
       {
         "visitors__created_at_year": "2017-01-01T00:00:00.000Z",
         "visitors__visitor_count": "5"
+      }
+    ])
+  );
+
+  it('time date ranges', () =>
+    runQueryTest({
+      measures: [
+        'visitors.visitor_count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'date',
+        dateRange: ['2017-01-02T15:00:00', '2017-01-02T17:00:00']
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      {
+        "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+        "visitors__visitor_count": "1"
       }
     ])
   );
