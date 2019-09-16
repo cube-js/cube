@@ -5,14 +5,17 @@
   "main": "dist/cubejs-client-ngx.js",
   "license": "MIT",
   "dependencies": {
-    "@angular/core": "^6.1.0 || ^7.0.0",
-    "@cubejs-client/core": "^0.7.6",
+    "@cubejs-client/core": "^0.10.16"
+  },
+  "peerDependencies": {
+    "@angular/core": "^6.1.0 || ^7.0.0 || ^8.0.0",
     "rxjs": "^6.0.0"
   },
   "scripts": {
     "build": "ng-packagr -p package.json"
   },
   "devDependencies": {
+    "@angular/core": "^8.2.5",
     "@angular/compiler": "^7.2.14",
     "@angular/compiler-cli": "^7.2.14",
     "ng-packagr": "^5.1.0",

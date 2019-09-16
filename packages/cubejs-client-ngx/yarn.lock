@@ -26,10 +26,10 @@
   dependencies:
     tslib "^1.9.0"
 
-"@angular/core@^6.1.0 || ^7.0.0":
-  version "7.2.14"
-  resolved "https://registry.yarnpkg.com/@angular/core/-/core-7.2.14.tgz#b78c936d284223c1c5a4c4b02cd0d5fd6d03ec91"
-  integrity sha512-XeZZJCyBKSKo0E/7Ef0SfJejmn+E7uBXa5cR1QapafS0Hnrq/hZu/NI039IDU/51NoycMDH2vTV19SmKu9Mkow==
+"@angular/core@^8.2.5":
+  version "8.2.6"
+  resolved "https://registry.yarnpkg.com/@angular/core/-/core-8.2.6.tgz#26f4b4b2beb766964ea2b76183f69c443860849a"
+  integrity sha512-l+BrvPGwtPUh/rQyB9mjtonMsFEAoRHgDYWeQu/QukIZbItNdFqrhewn2zQ8Skx75BpwFLAVIVXp9ioDyvP2eQ==
   dependencies:
     tslib "^1.9.0"
 
@@ -40,10 +40,10 @@
   dependencies:
     regenerator-runtime "^0.13.2"
 
-"@cubejs-client/core@^0.7.6":
-  version "0.7.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.7.10.tgz#81fa1a9c84d7e791f28e79c2cf19760fc3c6d18f"
-  integrity sha512-8gbHdqg3a/85XrlOK8nxZcgSLLIOOklSoXpP1iGh4AEQSPTiZB6zodC2rlo+5ZJFZCBvjDqayZuwLcYEcZXlAA==
+"@cubejs-client/core@^0.10.16":
+  version "0.10.16"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.10.16.tgz#460759462c51426b7766bdb12123f4b703b20c80"
+  integrity sha512-Xf1EQJeBksl9ElrX8GhsyhCloULpfo36Z+LqAc4t8g1XwDX7cbF8UXmWrcq5GTbg3aNRevXZCem6X0nPJ2xwkg==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
