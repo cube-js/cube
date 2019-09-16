@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.10.40",
+  "version": "0.10.42",
   "description": "Cube.js client for Angular",
   "main": "dist/cubejs-client-ngx.js",
   "license": "MIT",
@@ -15,9 +15,9 @@
     "build": "ng-packagr -p package.json"
   },
   "devDependencies": {
-    "@angular/core": "^8.2.5",
     "@angular/compiler": "^7.2.14",
     "@angular/compiler-cli": "^7.2.14",
+    "@angular/core": "^8.2.5",
     "ng-packagr": "^5.1.0",
     "typescript": "^3.1.1"
   },

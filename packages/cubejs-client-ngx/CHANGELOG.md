@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.42](https://github.com/statsbotco/cubejs-client/compare/v0.10.41...v0.10.42) (2019-09-16)
+
+
+### Bug Fixes
+
+* **client-ngx:** Function calls are not supported in decorators but 'ɵangular_packages_core_core_a' was called. ([65871f9](https://github.com/statsbotco/cubejs-client/commit/65871f9))
+
+
+
+
+
 ## [0.10.40](https://github.com/statsbotco/cubejs-client/compare/v0.10.39...v0.10.40) (2019-09-09)
 
 
