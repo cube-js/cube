@@ -47,7 +47,7 @@ const stackedChartData = (resultSet) => {
         color: resultSet.axisValuesString(yValues, ', '),
         measure: m && Number.parseFloat(m)
       }))
-  ).reduce((a, b) => a.concat(b));
+  ).reduce((a, b) => a.concat(b), []);
 
   return data;
 }
