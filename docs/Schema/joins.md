@@ -21,7 +21,7 @@ joins: {
 ```
 
 All joins are generated as `LEFT JOIN` and cube which defines a join serves as a main table and cube inside `joins` definition is one which goes to `LEFT JOIN` clause. 
-Learn more about direction of joins (here)[direction-of-joins].
+Learn more about direction of joins [here](direction-of-joins).
 
 ## Parameters
 
