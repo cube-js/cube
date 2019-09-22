@@ -102,3 +102,53 @@ Returns the array of series objects, containing `key` and `title` parameters.
    { "key":"Stories.count", "title": "Stories Count" }
 ]
 ```
+
+### tablePivot
+Returns normalized query result data prepared for visualization in the table format.
+
+For example
+
+```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.tablePivot() will return
+[
+    { "Stories.time": "2015-01-01T00:00:00", "Stories.count": 27120 },
+    { "Stories.time": "2015-02-01T00:00:00", "Stories.count": 25861 },
+    { "Stories.time": "2015-03-01T00:00:00", "Stories.count": 29661 },
+    //...
+]
+```
+
+
+### tableColumns
+Returns array of column definitions for `tablePivot`. 
+
+For example
+
+```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.tableColumns() will return
+[
+    { key: "Stories.time", title: "Stories Time" },
+    { key: "Stories.count", title: "Stories Count" },
+    //...
+]
+```
