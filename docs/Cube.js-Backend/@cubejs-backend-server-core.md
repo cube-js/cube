@@ -53,6 +53,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
+  schemaVersion: (context: RequestContext) => String,
   telemetry: Boolean,
   orchestratorOptions: {
     redisPrefix: String,
@@ -236,6 +237,18 @@ CubejsServerCore.create({
 ```
 
 It is usually used in [Multitenancy Setup](multitenancy-setup).
+
+### schemaVersion
+
+Schema version can be used to tell Cube.js it should be recompiled in case schema code depends on dynamic definitions fetched from some external database or API.
+
+```javascript
+const tenantIdToDbVersion = {};
+
+CubejsServerCore.create({
+  schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId]
+});
+```
 
 ### telemetry
 
