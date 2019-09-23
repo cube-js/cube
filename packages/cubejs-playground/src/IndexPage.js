@@ -14,7 +14,7 @@ class IndexPage extends Component {
   }
 
   async loadFiles() {
-    const res = await fetch('/playground/files');
+    const res = await fetch('playground/files');
     const result = await res.json();
     this.setState({
       files: result.files

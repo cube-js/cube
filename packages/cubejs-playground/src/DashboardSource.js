@@ -64,9 +64,9 @@ class DashboardSource {
   async load(createApp) {
     this.loadError = null;
     if (createApp) {
-      await fetchWithRetry('/playground/ensure-dashboard-app', undefined, 5);
+      await fetchWithRetry('playground/ensure-dashboard-app', undefined, 5);
     }
-    const res = await fetchWithRetry('/playground/dashboard-app-files', undefined, 5);
+    const res = await fetchWithRetry('playground/dashboard-app-files', undefined, 5);
     const result = await res.json();
     if (result.error) {
       this.loadError = result.error;
@@ -80,7 +80,7 @@ class DashboardSource {
     const updateIndexCss = this.appLayoutAdded ? [
       { ...this.indexCssFile, content: this.indexCssFile.content + indexCss }
     ] : [];
-    await fetchWithRetry('/playground/dashboard-app-files', {
+    await fetchWithRetry('playground/dashboard-app-files', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -99,7 +99,7 @@ class DashboardSource {
         const dependency = importName[0].indexOf('@') === 0 ? [importName[0], importName[1]].join('/') : importName[0];
         return { [dependency]: 'latest' };
       }).reduce((a, b) => ({ ...a, ...b }));
-    await fetchWithRetry('/playground/ensure-dependencies', {
+    await fetchWithRetry('playground/ensure-dependencies', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

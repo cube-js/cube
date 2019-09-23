@@ -74,7 +74,7 @@ class SchemaPage extends Component {
   async loadDBSchema() {
     this.setState({ schemaLoading: true });
     try {
-      const res = await fetch('/playground/db-schema');
+      const res = await fetch('playground/db-schema');
       const result = await res.json();
       this.setState({
         tablesSchema: result.tablesSchema
@@ -87,7 +87,7 @@ class SchemaPage extends Component {
   }
 
   async loadFiles() {
-    const res = await fetch('/playground/files');
+    const res = await fetch('playground/files');
     const result = await res.json();
     this.setState({
       files: result.files
@@ -98,7 +98,7 @@ class SchemaPage extends Component {
     const { checkedKeys } = this.state;
     const { history } = this.props;
     playgroundAction('Generate Schema');
-    const res = await fetch('/playground/generate-schema', {
+    const res = await fetch('playground/generate-schema', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

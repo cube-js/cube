@@ -14,7 +14,7 @@ class ExplorePage extends Component {
   }
 
   async componentDidMount() {
-    const res = await fetch('/playground/context');
+    const res = await fetch('playground/context');
     const result = await res.json();
     this.setState({
       cubejsToken: result.cubejsToken,

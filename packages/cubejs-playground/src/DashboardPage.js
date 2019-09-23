@@ -27,7 +27,7 @@ class DashboardPage extends Component {
       appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardAppCode(),
       loadError: this.dashboardSource.loadError
     });
-    const dashboardStatus = await (await fetch('/playground/dashboard-app-status')).json();
+    const dashboardStatus = await (await fetch('playground/dashboard-app-status')).json();
     this.setState({
       dashboardRunning: dashboardStatus.running,
       dashboardPort: dashboardStatus.dashboardPort,
@@ -39,7 +39,7 @@ class DashboardPage extends Component {
     this.setState({
       dashboardStarting: true
     });
-    await fetch('/playground/start-dashboard-app');
+    await fetch('playground/start-dashboard-app');
     await this.loadDashboard();
   }
 
