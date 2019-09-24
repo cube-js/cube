@@ -50,13 +50,13 @@ class ChartSnippet extends SourceSnippet {
     let appClass = null;
     traverse(targetSource.ast, {
       VariableDeclaration: (path) => {
-        if (path.get('declarations')[0].get('id').node.name === 'App') {
+        if (path.get('declarations')[0].get('id').node.name === 'DashboardPage') {
           appClass = path;
         }
       }
     });
     if (!appClass) {
-      throw new Error(`App class not found. Can't parse dashboard app.  Please delete dashboard-app directory and try to create it again.`);
+      throw new Error(`DashboardPage class not found. Can't parse dashboard app.  Please delete dashboard-app directory and try to create it again.`);
     }
     return appClass;
   }

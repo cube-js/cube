@@ -1,3 +1,4 @@
+/* globals window */
 import traverse from "@babel/traverse";
 import fetch from './playgroundFetch';
 import AppSnippet from './source/AppSnippet';
@@ -5,6 +6,9 @@ import TargetSource from './source/TargetSource';
 import ChartSnippet from "./source/ChartSnippet";
 import ScaffoldingSources from "./codegen/ScaffoldingSources";
 import MergeScaffolding from "./source/MergeScaffolding";
+import IndexSnippet from "./source/IndexSnippet";
+import ExploreSnippet from "./source/ExploreSnippet";
+import ChartRendererSnippet from "./source/ChartRendererSnippet";
 
 const indexCss = `
 body {
@@ -22,6 +26,8 @@ class DashboardSource {
     }
     const res = await fetchWithRetry('/playground/dashboard-app-files', undefined, 5);
     const result = await res.json();
+    this.playgroundContext = await this.loadContext();
+    this.fileToTargetSource = {};
     if (result.error) {
       this.loadError = result.error;
     } else {
@@ -29,6 +35,15 @@ class DashboardSource {
       this.filesToPersist = [];
       this.parse(result.fileContents);
     }
+  }
+
+  async loadContext() {
+    const res = await fetch('/playground/context');
+    const result = await res.json();
+    return {
+      cubejsToken: result.cubejsToken,
+      apiUrl: result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, '')
+    };
   }
 
   async persistFiles(files) {
@@ -47,11 +62,19 @@ class DashboardSource {
     const updateIndexCss = this.appLayoutAdded ? [
       { ...this.indexCssFile, content: this.indexCssFile.content + indexCss }
     ] : [];
-    await this.persistFiles(this.filesToPersist.concat([
-      { ...this.appFile, content: this.appTargetSource.formattedCode() }
-    ]).concat(updateIndexCss));
+    const toPersist = this.filesToPersist.concat(
+      Object.keys(this.fileToTargetSource).map(fileName => ({
+        fileName, content: this.fileToTargetSource[fileName].formattedCode()
+      }))
+    ).concat(updateIndexCss);
+    await this.persistFiles(toPersist);
     this.appLayoutAdded = false;
-    const dependencies = this.appTargetSource.imports
+    const allImports = toPersist
+      .filter(f => f.fileName.match(/\.js$/))
+      .map(f => new TargetSource(f.fileName, f.content).imports)
+      .reduce((a, b) => a.concat(b));
+    console.log(allImports);
+    const dependencies = allImports
       .filter(i => i.get('source').node.value.indexOf('.') !== 0)
       .map(i => {
         const importName = i.get('source').node.value.split('/');
@@ -75,7 +98,7 @@ class DashboardSource {
       throw new Error(`src/App.js file not found. Can't parse dashboard app. Please delete dashboard-app directory and try to create it again.`);
     }
     this.indexCssFile = sourceFiles.find(f => f.fileName.indexOf('src/index.css') !== -1);
-    this.appTargetSource = new TargetSource(this.appFile.fileName, this.appFile.content);
+    this.appTargetSource = this.targetSourceByFile('/src/App.js');
   }
 
   ensureDashboardIsInApp() {
@@ -100,8 +123,11 @@ class DashboardSource {
     });
     if (!dashboardAdded && headerElement) {
       this.appLayoutAdded = true;
-      const appSnippet = new AppSnippet();
+      const appSnippet = new AppSnippet(this.playgroundContext);
       appSnippet.mergeTo(this.appTargetSource);
+      this.mergeSnippetToFile(new IndexSnippet(), '/src/index.js');
+      this.mergeSnippetToFile(new ExploreSnippet(), '/src/ExplorePage.js');
+      this.mergeSnippetToFile(new ChartRendererSnippet(), '/src/ChartRenderer.js');
     }
     if (!this.sourceFiles.find(f => f.fileName === '/src/QueryBuilder/ExploreQueryBuilder.js')) {
       const queryBuilderFileNames = Object.keys(ScaffoldingSources)
@@ -116,6 +142,22 @@ class DashboardSource {
     }
   }
 
+  targetSourceByFile(fileName) {
+    let file = this.sourceFiles.find(f => f.fileName === fileName);
+    if (!file) {
+      file = { fileName, content: ScaffoldingSources[MergeScaffolding.scaffoldingSourceName(fileName)] };
+    }
+    if (!this.fileToTargetSource[fileName]) {
+      this.fileToTargetSource[fileName] = new TargetSource(file.fileName, file.content);
+    }
+    return this.fileToTargetSource[fileName];
+  }
+
+  mergeSnippetToFile(snippet, fileName) {
+    const targetSource = this.targetSourceByFile(fileName);
+    snippet.mergeTo(targetSource);
+  }
+
   async addChart(chartCode) {
     await this.load(true);
     if (this.loadError) {
@@ -123,7 +165,7 @@ class DashboardSource {
     }
     this.ensureDashboardIsInApp();
     const chartSnippet = new ChartSnippet(chartCode);
-    chartSnippet.mergeTo(this.appTargetSource);
+    this.mergeSnippetToFile(chartSnippet, '/src/DashboardPage.js');
     await this.persist();
   }
 

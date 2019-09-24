@@ -3,8 +3,10 @@ import SourceSnippet from './SourceSnippet';
 import ScaffoldingSources from '../codegen/ScaffoldingSources';
 
 class AppSnippet extends SourceSnippet {
-  constructor() {
+  constructor(playgroundContext) {
     super(ScaffoldingSources['react/App.js']);
+    this.apiUrl = playgroundContext.apiUrl;
+    this.cubejsToken = playgroundContext.cubejsToken;
   }
 
   findDefinitions() {

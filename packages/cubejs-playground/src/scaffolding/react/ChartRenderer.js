@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { QueryRenderer } from '@cubejs-client/react';
+import { Spin } from 'antd';
 
 const TypeToChartComponent = {};
 

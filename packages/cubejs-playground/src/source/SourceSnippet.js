@@ -4,6 +4,9 @@ import * as t from "@babel/types";
 
 class SourceSnippet {
   constructor(source) {
+    if (!source) {
+      throw new Error('Empty source is provided');
+    }
     this.ast = parse(source, {
       sourceType: 'module',
       plugins: [
@@ -58,6 +61,11 @@ class SourceSnippet {
       );
       if (!existingDefinition) {
         this.insertAnchor(targetSource).insertBefore(t.variableDeclaration('const', [declaration.node]));
+      } else if (
+        existingDefinition.get('init').node.type === 'Identifier'
+        && existingDefinition.get('init').node.name === 'undefined'
+      ) {
+        existingDefinition.replaceWith(t.variableDeclaration('const', [declaration.node]));
       }
     });
   }

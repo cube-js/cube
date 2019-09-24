@@ -1,23 +1,46 @@
-import {
-  Row, Col, Card, Layout
-} from 'antd';
-import 'antd/dist/antd.css';
-import './index.css';
+import React, { Component } from "react";
+import { Link } from "react-router-dom";
+import { withRouter } from "react-router";
+import "antd/dist/antd.css";
+import "./index.css";
+import { Layout, Menu } from "antd";
 
-const AppLayout = ({ children }) => (
-  <Layout>
-    <Layout.Header>
-      <div style={{ float: 'left' }}>
+const AppLayout = ({ location, children }) => (
+  <Layout style={{ height: '100%' }}>
+    <Layout.Header style={{ padding: '0 32px' }}>
+      <div
+        style={{
+          float: "left"
+        }}
+      >
         <h2
           style={{
             color: "#fff",
             margin: 0,
-            marginRight: '1em'
+            marginRight: "1em",
+            display: 'inline',
+            width: 100,
+            lineHeight: "54px"
           }}
         >
           My Dashboard
         </h2>
       </div>
+      <Menu
+        theme="dark"
+        mode="horizontal"
+        selectedKeys={[location.pathname]}
+        style={{
+          lineHeight: "64px"
+        }}
+      >
+        <Menu.Item key="/explore">
+          <Link to="/explore">Explore</Link>
+        </Menu.Item>
+        <Menu.Item key="/">
+          <Link to="/">Dashboard</Link>
+        </Menu.Item>
+      </Menu>
     </Layout.Header>
     <Layout.Content
       style={{
@@ -30,20 +53,14 @@ const AppLayout = ({ children }) => (
   </Layout>
 );
 
-const Dashboard = ({ children }) => (
-  <Row type="flex" justify="space-around" align="top" gutter={24}>{children}</Row>
-);
+const cubejsApi = undefined;
 
-const DashboardItem = ({ children, title }) => (
-  <Col span={24} lg={12}>
-    <Card title={title} style={{ marginBottom: '24px' }}>
-      {children}
-    </Card>
-  </Col>
-);
-
-const App = () => (
-  <AppLayout>
-    <Dashboard />
+const App = withRouter(({ location, children }) => (
+  <AppLayout location={location}>
+    {children.map(c => React.cloneElement(c, {
+      cubejsApi
+    }))}
   </AppLayout>
-);
+));
+
+export default App;
