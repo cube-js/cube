@@ -33,8 +33,7 @@ class CubejsServer {
         if (process.env.CUBEJS_ENABLE_TLS === "true") {
           this.redirector = http.createServer((req, res) => {
             res.writeHead(301, {
-              // FIXME: Does this work if the port is not 443?
-              Location: `https://${req.headers.host}${req.url}`
+              Location: `https://${req.headers.host}:${TLS_PORT}${req.url}`
             });
             res.end();
           });
