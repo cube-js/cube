@@ -98,7 +98,7 @@ class DashboardPage extends Component {
     }
     const devServerUrl = `http://${window.location.hostname}:${dashboardPort}`;
     return (
-      <div style={{ height: '100%', width: '100%' }}>
+      <div style={{ height: '100%', width: '100%', padding: "15px 30px 30px 30px", background: "#fff" }}>
         <Alert
           message={(
             <span>
@@ -114,6 +114,7 @@ class DashboardPage extends Component {
           )}
           type="info"
           closable
+          style={{ marginBottom: 15 }}
         />
         <iframe
           src={devServerUrl}
