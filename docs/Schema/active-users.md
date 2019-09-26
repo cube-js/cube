@@ -45,7 +45,7 @@ cube(`ActiveUsers`, {
       }
     },
 
-    dailyActiveuUsers: {
+    dailyActiveUsers: {
       sql: `user_id`,
       type: `countDistinct`,
       rollingWindow: {
@@ -66,14 +66,14 @@ cube(`ActiveUsers`, {
 
 Going further, we can build other metrics on top of these basic metrics. 
 For example, <b>the DAU to MAU ratio</b> is one of the most popular metrics used to <b>measure the stickiness of the product</b>. 
-We can easily add it, using already defined `dailyActiveuUsers` and `monthlyActiveUsers`.
+We can easily add it, using already defined `dailyActiveUsers` and `monthlyActiveUsers`.
 
 ```javascript
 cube(`ActiveUsers`, {
   measures: {
     dauToMau: {
       title: `DAU to MAU`,
-      sql: `100.000 * ${dailyActiveuUsers} / NULLIF(${monthlyActiveUsers}, 0)`,
+      sql: `100.000 * ${dailyActiveUsers} / NULLIF(${monthlyActiveUsers}, 0)`,
       type: `number`,
       format: `percent`
     }
