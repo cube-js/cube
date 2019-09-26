@@ -39,7 +39,7 @@ class IndexSnippet extends SourceSnippet {
         throw new Error(`Router element is not found`);
       }
 
-      const targetPath = this.insertAnchor(targetSource);
+      const targetPath = this.findAppOrRouter(targetSource);
       targetPath.replaceWith(routerElement.parentPath);
     }
   }
@@ -52,7 +52,7 @@ class IndexSnippet extends SourceSnippet {
     cubejsToken.get('init').replaceWith(t.stringLiteral(this.cubejsToken));
   }
 
-  insertAnchor(targetSource) {
+  findAppOrRouter(targetSource) {
     let appElement = null;
     traverse(targetSource.ast, {
       JSXOpeningElement: (path) => {
@@ -64,7 +64,11 @@ class IndexSnippet extends SourceSnippet {
     if (!appElement) {
       throw new Error(`App class not found. Can't parse dashboard app.  Please delete dashboard-app directory and try to create it again.`);
     }
-    return appElement.parentPath.parentPath.parentPath;
+    return appElement.parentPath;
+  }
+
+  insertAnchor(targetSource) {
+    return this.findAppOrRouter(targetSource).parentPath.parentPath;
   }
 }
 

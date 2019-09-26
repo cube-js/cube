@@ -1,5 +1,7 @@
 import React from "react";
-import { Row, Col, Card, Spin } from "antd";
+import {
+  Row, Col, Card, Spin
+} from "antd";
 import { useQuery } from '@apollo/react-hooks';
 import { GET_DASHBOARD_QUERY } from "./DashboardStore";
 import ChartRenderer from "./ChartRenderer";

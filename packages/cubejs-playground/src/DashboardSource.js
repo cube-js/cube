@@ -10,6 +10,7 @@ import IndexSnippet from "./source/IndexSnippet";
 import ExploreSnippet from "./source/ExploreSnippet";
 import ChartRendererSnippet from "./source/ChartRendererSnippet";
 import DashboardStoreSnippet from "./source/DashboardStoreSnippet";
+import SourceSnippet from "./source/SourceSnippet";
 
 const indexCss = `
 body {
@@ -35,6 +36,10 @@ class DashboardSource {
       this.sourceFiles = result.fileContents;
       this.filesToPersist = [];
       this.parse(result.fileContents);
+    }
+    if (createApp) {
+      this.ensureDashboardIsInApp();
+      await this.persist();
     }
   }
 
@@ -80,6 +85,12 @@ class DashboardSource {
       .map(i => {
         const importName = i.get('source').node.value.split('/');
         const dependency = importName[0].indexOf('@') === 0 ? [importName[0], importName[1]].join('/') : importName[0];
+        if (dependency === 'graphql-tag') {
+          return {
+            graphql: 'latest',
+            [dependency]: 'latest'
+          };
+        }
         return { [dependency]: 'latest' };
       }).reduce((a, b) => ({ ...a, ...b }));
     await fetchWithRetry('/playground/ensure-dependencies', {
@@ -130,6 +141,7 @@ class DashboardSource {
       this.mergeSnippetToFile(new ExploreSnippet(), '/src/ExplorePage.js');
       this.mergeSnippetToFile(new ChartRendererSnippet(), '/src/ChartRenderer.js');
       this.mergeSnippetToFile(new DashboardStoreSnippet(), '/src/DashboardStore.js');
+      this.mergeSnippetToFile(new SourceSnippet(ScaffoldingSources['react/DashboardPage.js']), '/src/DashboardPage.js');
     }
     if (!this.sourceFiles.find(f => f.fileName === '/src/QueryBuilder/ExploreQueryBuilder.js')) {
       const queryBuilderFileNames = Object.keys(ScaffoldingSources)
