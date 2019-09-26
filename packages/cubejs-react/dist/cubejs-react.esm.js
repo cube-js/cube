@@ -251,10 +251,10 @@ function (_React$Component) {
     _classCallCheck(this, QueryBuilder);
 
     _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props));
-    _this.state = {
+    _this.state = _objectSpread({
       query: props.query,
       chartType: 'line'
-    };
+    }, props.vizState);
     return _this;
   }
 

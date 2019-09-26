@@ -8,7 +8,8 @@ export default class QueryBuilder extends React.Component {
     super(props);
     this.state = {
       query: props.query,
-      chartType: 'line'
+      chartType: 'line',
+      ...props.vizState
     };
   }
 

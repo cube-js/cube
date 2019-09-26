@@ -7751,10 +7751,10 @@
 	    _classCallCheck(this, QueryBuilder);
 
 	    _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props$$1));
-	    _this.state = {
+	    _this.state = _objectSpread({
 	      query: props$$1.query,
 	      chartType: 'line'
-	    };
+	    }, props$$1.vizState);
 	    return _this;
 	  }
 

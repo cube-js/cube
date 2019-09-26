@@ -1,37 +1,75 @@
 import React, { useState } from "react";
-import {
-  Button
-} from 'antd';
+import { Button, Spin } from "antd";
 import ExploreQueryBuilder from "./QueryBuilder/ExploreQueryBuilder";
-import { useMutation } from '@apollo/react-hooks';
-import { GET_DASHBOARD_QUERY, ADD_DASHBOARD_ITEM } from './DashboardStore';
+import { useMutation, useQuery } from "@apollo/react-hooks";
+import { withRouter } from 'react-router-dom';
+import {
+  GET_DASHBOARD_QUERY,
+  ADD_DASHBOARD_ITEM,
+  UPDATE_DASHBOARD_ITEM,
+  GET_DASHBOARD_ITEM_QUERY
+} from "./DashboardStore";
 
-const ExplorePage = ({ cubejsApi }) => {
-  const [addDashboardItem, { data }] = useMutation(ADD_DASHBOARD_ITEM, {
-    refetchQueries: [{ query: GET_DASHBOARD_QUERY }]
+const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
+  const [addDashboardItem] = useMutation(ADD_DASHBOARD_ITEM, {
+    refetchQueries: [
+      {
+        query: GET_DASHBOARD_QUERY
+      }
+    ]
   });
-  const [vizState, setVizState] = useState({});
+
+  const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
+    refetchQueries: [
+      {
+        query: GET_DASHBOARD_QUERY
+      }
+    ]
+  });
+
+  const [addingToDashboard, setAddingToDashboard] = useState(false);
+
+  const params = new URLSearchParams(location.search);
+  const itemId = parseInt(params.get('itemId'), 10);
+
+  const { loading, error, data } = useQuery(GET_DASHBOARD_ITEM_QUERY, { variables: { id: itemId } });
+
+  const [vizState, setVizState] = useState(null);
+
+  const finalVizState = vizState || itemId && data && data.dashboard.items[0].vizState || {};
+
+  const addToDashboardButton = (
+    <Button
+      icon={itemId ? 'save' : 'plus'}
+      size="small"
+      loading={addingToDashboard}
+      onClick={async () => {
+        setAddingToDashboard(true);
+        try {
+          await (itemId ? updateDashboardItem :  addDashboardItem)({
+            variables: {
+              id: itemId,
+              vizState: finalVizState
+            }
+          });
+          history.push('/');
+        } finally {
+          setAddingToDashboard(false);
+        }
+      }}
+    >
+      {itemId ? 'Update' : 'Add to Dashboard'}
+    </Button>
+  );
 
   return (
     <ExploreQueryBuilder
       cubejsApi={cubejsApi}
-      vizState={vizState}
+      vizState={finalVizState}
       setVizState={setVizState}
-      chartExtra={
-        <Button
-          icon="plus"
-          size="small"
-          onClick={() => addDashboardItem({
-            variables: {
-              vizState
-            }
-          })}
-        >
-          Add to Dashboard
-        </Button>
-      }
+      chartExtra={addToDashboardButton}
     />
-  )
-};
+  );
+});
 
 export default ExplorePage;
