@@ -7,7 +7,11 @@ class SourceSnippet {
     if (!source) {
       throw new Error('Empty source is provided');
     }
-    this.ast = parse(source, {
+    this.ast = SourceSnippet.parse(source);
+  }
+
+  static parse(source) {
+    return parse(source, {
       sourceType: 'module',
       plugins: [
         "jsx"
@@ -61,19 +65,18 @@ class SourceSnippet {
       );
       if (!existingDefinition) {
         this.insertAnchor(targetSource).insertBefore(t.variableDeclaration('const', [declaration.node]));
-      } else if (
-        existingDefinition.get('init').node.type === 'Identifier'
-        && existingDefinition.get('init').node.name === 'undefined'
-      ) {
-        existingDefinition.replaceWith(t.variableDeclaration('const', [declaration.node]));
       }
     });
   }
 
   findImports() {
+    return SourceSnippet.importsByAst(this.ast);
+  }
+
+  static importsByAst(ast) {
     const chartImports = [];
 
-    traverse(this.ast, {
+    traverse(ast, {
       ImportDeclaration: (path) => {
         chartImports.push(path);
       }
@@ -83,9 +86,13 @@ class SourceSnippet {
   }
 
   findDefinitions() {
+    return SourceSnippet.definitionsByAst(this.ast);
+  }
+
+  static definitionsByAst(ast) {
     const definitions = [];
 
-    traverse(this.ast, {
+    traverse(ast, {
       VariableDeclaration: (path) => {
         if (path.parent.type === 'Program') {
           definitions.push(path);
@@ -101,6 +108,8 @@ class SourceSnippet {
     const definitions = this.findDefinitions();
     chartImports.forEach(i => this.mergeImport(targetSource, i));
     definitions.forEach(d => this.mergeDefinition(targetSource, d));
+    targetSource.findAllImports();
+    targetSource.findAllDefinitions();
   }
 }
 

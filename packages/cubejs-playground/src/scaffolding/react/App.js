@@ -1,13 +1,23 @@
-import React, { Component } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { withRouter } from "react-router";
+import { ApolloProvider } from '@apollo/react-hooks';
 import "antd/dist/antd.css";
 import "./index.css";
 import { Layout, Menu } from "antd";
+import { client } from "./DashboardStore";
 
 const AppLayout = ({ location, children }) => (
-  <Layout style={{ height: '100%' }}>
-    <Layout.Header style={{ padding: '0 32px' }}>
+  <Layout
+    style={{
+      height: "100%"
+    }}
+  >
+    <Layout.Header
+      style={{
+        padding: "0 32px"
+      }}
+    >
       <div
         style={{
           float: "left"
@@ -18,7 +28,7 @@ const AppLayout = ({ location, children }) => (
             color: "#fff",
             margin: 0,
             marginRight: "1em",
-            display: 'inline',
+            display: "inline",
             width: 100,
             lineHeight: "54px"
           }}
@@ -42,25 +52,16 @@ const AppLayout = ({ location, children }) => (
         </Menu.Item>
       </Menu>
     </Layout.Header>
-    <Layout.Content
-      style={{
-        padding: "0 25px 25px 25px",
-        margin: "25px"
-      }}
-    >
-      {children}
-    </Layout.Content>
+    <Layout.Content>{children}</Layout.Content>
   </Layout>
 );
 
-const cubejsApi = undefined;
-
 const App = withRouter(({ location, children }) => (
-  <AppLayout location={location}>
-    {children.map(c => React.cloneElement(c, {
-      cubejsApi
-    }))}
-  </AppLayout>
+  <ApolloProvider client={client}>
+    <AppLayout location={location}>
+      {children}
+    </AppLayout>
+  </ApolloProvider>
 ));
 
 export default App;

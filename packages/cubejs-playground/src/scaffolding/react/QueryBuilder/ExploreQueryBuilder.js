@@ -11,7 +11,7 @@ import TimeGroup from './TimeGroup';
 import SelectChartType from './SelectChartType';
 
 const ExploreQueryBuilder = ({
-  vizState, cubejsApi, setVizState
+  vizState, cubejsApi, setVizState, chartExtra
 }) => (
   <QueryBuilder
     vizState={vizState}
@@ -83,10 +83,15 @@ const ExploreQueryBuilder = ({
       <Row type="flex" justify="space-around" align="top" gutter={24} key="2">
         <Col span={24}>
           {isQueryPresent ? (
-            <ChartRenderer
-              dashboardItem={{ query: validatedQuery, chartType }}
-              cubejsApi={cubejsApi}
-            />
+            <Card
+              style={{ minHeight: 420 }}
+              extra={chartExtra}
+            >
+              <ChartRenderer
+                vizState={{ query: validatedQuery, chartType }}
+                cubejsApi={cubejsApi}
+              />
+            </Card>
           ) : <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>}
         </Col>
       </Row>
@@ -98,12 +103,14 @@ ExploreQueryBuilder.propTypes = {
   vizState: PropTypes.object,
   setVizState: PropTypes.func,
   cubejsApi: PropTypes.object,
+  chartExtra: PropTypes.object
 };
 
 ExploreQueryBuilder.defaultProps = {
   vizState: {},
   setVizState: null,
-  cubejsApi: null
+  cubejsApi: null,
+  chartExtra: null
 };
 
 export default ExploreQueryBuilder;

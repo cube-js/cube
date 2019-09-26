@@ -1,9 +1,20 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { HashRouter as Router, Route } from 'react-router-dom';
+import cubejs from '@cubejs-client/core';
 import ExplorePage from './ExplorePage';
 import DashboardPage from './DashboardPage';
 import App from './App';
+
+// change to your actual endpoint
+const API_URL = undefined;
+// should be refreshed by your backend API endpoint. More info: https://cube.dev/docs/security
+const CUBEJS_TOKEN = undefined;
+
+const cubejsApi = cubejs(
+  CUBEJS_TOKEN,
+  { apiUrl: `${API_URL}/cubejs-api/v1` }
+);
 
 ReactDOM.render(
   <Router>
@@ -12,12 +23,12 @@ ReactDOM.render(
         key="index"
         exact
         path="/"
-        component={DashboardPage}
+        render={(props) => <DashboardPage {...props} cubejsApi={cubejsApi}/>}
       />
       <Route
         key="explore"
         path="/explore"
-        component={ExplorePage}
+        render={(props) => <ExplorePage {...props} cubejsApi={cubejsApi}/>}
       />
     </App>
   </Router>,

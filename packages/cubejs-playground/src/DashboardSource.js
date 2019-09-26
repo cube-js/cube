@@ -9,6 +9,7 @@ import MergeScaffolding from "./source/MergeScaffolding";
 import IndexSnippet from "./source/IndexSnippet";
 import ExploreSnippet from "./source/ExploreSnippet";
 import ChartRendererSnippet from "./source/ChartRendererSnippet";
+import DashboardStoreSnippet from "./source/DashboardStoreSnippet";
 
 const indexCss = `
 body {
@@ -123,11 +124,12 @@ class DashboardSource {
     });
     if (!dashboardAdded && headerElement) {
       this.appLayoutAdded = true;
-      const appSnippet = new AppSnippet(this.playgroundContext);
+      const appSnippet = new AppSnippet();
       appSnippet.mergeTo(this.appTargetSource);
-      this.mergeSnippetToFile(new IndexSnippet(), '/src/index.js');
+      this.mergeSnippetToFile(new IndexSnippet(this.playgroundContext), '/src/index.js');
       this.mergeSnippetToFile(new ExploreSnippet(), '/src/ExplorePage.js');
       this.mergeSnippetToFile(new ChartRendererSnippet(), '/src/ChartRenderer.js');
+      this.mergeSnippetToFile(new DashboardStoreSnippet(), '/src/DashboardStore.js');
     }
     if (!this.sourceFiles.find(f => f.fileName === '/src/QueryBuilder/ExploreQueryBuilder.js')) {
       const queryBuilderFileNames = Object.keys(ScaffoldingSources)

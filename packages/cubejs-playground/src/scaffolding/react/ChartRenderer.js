@@ -11,25 +11,24 @@ const renderChart = (Component) => ({ resultSet, error }) => (
   || (<Spin />)
 );
 
-const ChartRenderer = ({ dashboardItem, cubejsApi }) => (
-  dashboardItem && (
-    <QueryRenderer
-      query={dashboardItem.query}
-      cubejsApi={cubejsApi}
-      render={
-        TypeToChartComponent[dashboardItem.chartType] && renderChart(TypeToChartComponent[dashboardItem.chartType])
-      }
-    />
-  )
+const ChartRenderer = ({ vizState, cubejsApi }) => vizState && (
+  <QueryRenderer
+    query={vizState.query}
+    cubejsApi={cubejsApi}
+    render={
+      TypeToChartComponent[vizState.chartType] &&
+      renderChart(TypeToChartComponent[vizState.chartType])
+    }
+  />
 );
 
 ChartRenderer.propTypes = {
-  dashboardItem: PropTypes.object,
+  vizState: PropTypes.object,
   cubejsApi: PropTypes.object.isRequired
 };
 
 ChartRenderer.defaultProps = {
-  dashboardItem: null
+  vizState: null
 };
 
 

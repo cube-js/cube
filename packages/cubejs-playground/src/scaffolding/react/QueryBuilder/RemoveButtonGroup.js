@@ -1,15 +1,17 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Button } from 'antd';
+import { Button, Icon } from 'antd';
 
 const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group style={{ marginRight: 8 }} {...props}>
     {children}
     <Button
       type="danger"
-      icon="close"
+      ghost
       onClick={onRemoveClick}
-    />
+    >
+      <Icon type="close" />
+    </Button>
   </Button.Group>
 );
 
