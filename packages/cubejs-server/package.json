@@ -29,7 +29,6 @@
     "node-machine-id": "^1.1.10"
   },
   "devDependencies": {
-    "dotenv-expand": "^5.1.0",
     "eslint": "^4.14.0",
     "eslint-plugin-node": "^5.2.1",
     "jest": "^24.9.0",
