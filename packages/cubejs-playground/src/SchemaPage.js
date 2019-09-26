@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import * as PropTypes from 'prop-types';
 import cubejs from '@cubejs-client/core';
 import {
-  Layout, Menu, Button, Tree, Tabs, Dropdown, Spin, Alert, Modal
+  Layout, Menu, Button, Tree, Tabs, Dropdown, Spin, Alert, Modal, Empty
 } from 'antd';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
@@ -208,7 +208,7 @@ class SchemaPage extends Component {
 
     return (
       <Layout style={{ height: '100%' }}>
-        <Sider width={300} style={{ background: '#fff' }} className="schema-sidebar">
+        <Sider width={300} style={{ background: '#fff', borderRight: '1px solid #eee' }} className="schema-sidebar">
           <Tabs
             activeKey={activeTab}
             onChange={(tab) => this.setState({ activeTab: tab })}
@@ -248,7 +248,7 @@ class SchemaPage extends Component {
           }
           {selectedFile
             ? <PrismCode code={this.selectedFileContent()} style={{ padding: 12 }}/>
-            : <h2 style={{ padding: 24, textAlign: 'center' }}>Select tables to generate Cube.js schema</h2>
+            : <Empty style={{ marginTop: 50 }} description="Select tables to generate Cube.js schema" />
           }
 
         </Content>
