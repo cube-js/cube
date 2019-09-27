@@ -131,7 +131,8 @@ class DashboardPage extends Component {
               Dev server is running at&nbsp;
               <a href={devServerUrl} target="_blank" rel="noopener noreferrer">{devServerUrl}</a>
               .
-              Learn more how to customize and deploy it at <a href="https://cube.dev/docs/dashboard-app">Cube.js docs</a>.
+              Learn more how to customize and deploy it at <a href="https://cube.dev/docs/dashboard-app">Cube.js&nbsp;docs</a>.&nbsp;
+              <a onClick={() => window.location.reload()} style={{ cursor: 'pointer' }}>Refresh page</a> if it is empty.
             </span>
           )}
           type="info"
