@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Card, Spin, Button, Menu, Dropdown, Alert, Modal
 } from "antd";
@@ -9,35 +9,33 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import {
   GET_DASHBOARD_QUERY,
+  GET_DASHBOARD_ITEM_QUERY,
   REMOVE_DASHBOARD_ITEM,
   UPDATE_DASHBOARD_ITEM
 } from "./DashboardStore";
 import ChartRenderer from "./ChartRenderer";
+
 const ReactGridLayout = WidthProvider(RGL);
 
-const defaultLayout = i => ({ ...i.layout, minW: 4, minH: 8 });
+const defaultLayout = i => ({
+  x: i.layout.x || 0,
+  y: i.layout.y || 0,
+  w: i.layout.w || 4,
+  h: i.layout.h || 8,
+  minW: 4,
+  minH: 8
+});
 
 const Dashboard = ({ children, dashboardItems }) => {
   const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
     refetchQueries: [
-      {
-        query: GET_DASHBOARD_QUERY
-      }
+      { query: GET_DASHBOARD_QUERY },
+      { query: GET_DASHBOARD_ITEM_QUERY }
     ]
   });
-  const [layout, setLayout] = useState(
-    dashboardItems.map(i => ({
-      i: i.id.toString(),
-      ...defaultLayout(i)
-    }))
-  );
 
   const onLayoutChange = newLayout => {
     newLayout.forEach(l => {
-      if (!l.w || !l.h || l.w < 4 || l.h < 4) {
-        return;
-      }
-
       const item = dashboardItems.find(i => i.id.toString() === l.i);
       const toUpdate = {
         x: l.x,
@@ -55,14 +53,12 @@ const Dashboard = ({ children, dashboardItems }) => {
         });
       }
     });
-    setLayout(newLayout);
   };
 
   return (
     <ReactGridLayout
       cols={12}
       rowHeight={50}
-      layout={layout}
       onLayoutChange={onLayoutChange}
     >
       {children}
@@ -71,11 +67,10 @@ const Dashboard = ({ children, dashboardItems }) => {
 };
 
 const DashboardItemDropdown = ({ itemId }) => {
-  const [removeDashboardItem, { data }] = useMutation(REMOVE_DASHBOARD_ITEM, {
+  const [removeDashboardItem] = useMutation(REMOVE_DASHBOARD_ITEM, {
     refetchQueries: [
-      {
-        query: GET_DASHBOARD_QUERY
-      }
+      { query: GET_DASHBOARD_QUERY },
+      { query: GET_DASHBOARD_ITEM_QUERY }
     ]
   });
   const dashboardItemDropdownMenu = (
@@ -84,21 +79,19 @@ const DashboardItemDropdown = ({ itemId }) => {
         <Link to={`/explore?itemId=${itemId}`}>Edit</Link>
       </Menu.Item>
       <Menu.Item
-        onClick={() =>
-          Modal.confirm({
-            title: 'Are you sure you want to delete this item?',
-            okText: 'Yes',
-            okType: 'danger',
-            cancelText: 'No',
-            onOk() {
-              removeDashboardItem({
-                variables: {
-                  id: itemId
-                }
-              });
-            }
-          })
-        }
+        onClick={() => Modal.confirm({
+          title: 'Are you sure you want to delete this item?',
+          okText: 'Yes',
+          okType: 'danger',
+          cancelText: 'No',
+          onOk() {
+            removeDashboardItem({
+              variables: {
+                id: itemId
+              }
+            });
+          }
+        })}
       >
         Delete
       </Menu.Item>

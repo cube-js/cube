@@ -13,16 +13,14 @@ import {
 const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
   const [addDashboardItem] = useMutation(ADD_DASHBOARD_ITEM, {
     refetchQueries: [
-      {
-        query: GET_DASHBOARD_QUERY
-      }
+      { query: GET_DASHBOARD_QUERY },
+      { query: GET_DASHBOARD_ITEM_QUERY }
     ]
   });
   const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
     refetchQueries: [
-      {
-        query: GET_DASHBOARD_QUERY
-      }
+      { query: GET_DASHBOARD_QUERY },
+      { query: GET_DASHBOARD_ITEM_QUERY }
     ]
   });
   const [addingToDashboard, setAddingToDashboard] = useState(false);

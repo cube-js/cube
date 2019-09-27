@@ -6,18 +6,20 @@ import gql from "graphql-tag";
 const cache = new InMemoryCache();
 const defaultDashboardItems = [];
 
-const getDashboardItems = () =>
-  JSON.parse(window.localStorage.getItem("dashboardItems")) ||
-  defaultDashboardItems;
+const getDashboardItems = () => JSON.parse(window.localStorage.getItem("dashboardItems"))
+  || defaultDashboardItems;
 
-const setDashboardItems = items =>
-  window.localStorage.setItem("dashboardItems", JSON.stringify(items));
+const setDashboardItems = items => window.localStorage.setItem("dashboardItems", JSON.stringify(items));
 
-const toApolloItem = (i, index) => ({
+const nextId = () => {
+  const currentId = parseInt(window.localStorage.getItem("dashboardIdCounter"), 10) || 1;
+  window.localStorage.setItem("dashboardIdCounter", currentId + 1);
+  return currentId;
+};
+
+const toApolloItem = (i) => ({
   ...i,
-  id: index + 1,
-  __typename: "DashboardItem",
-  vizState: { ...i.vizState, __typename: "VizState" }
+  __typename: "DashboardItem"
 });
 
 export const client = new ApolloClient({
@@ -38,16 +40,12 @@ export const client = new ApolloClient({
         const dashboardItems = getDashboardItems();
         item = {
           ...item,
-          layout: {
-            x: 0,
-            y: 0,
-            w: 4,
-            h: 8
-          }
+          id: nextId(),
+          layout: {}
         };
         dashboardItems.push(item);
         setDashboardItems(dashboardItems);
-        return toApolloItem(item, dashboardItems.length - 1);
+        return toApolloItem(item);
       },
       updateDashboardItem: (_, { id, ...item }) => {
         const dashboardItems = getDashboardItems();
@@ -57,16 +55,17 @@ export const client = new ApolloClient({
             [k]: item[k]
           }))
           .reduce((a, b) => ({ ...a, ...b }), {});
-        dashboardItems[id - 1] = { ...dashboardItems[id - 1], ...item };
-        console.log(dashboardItems);
+        const index = dashboardItems.findIndex(i => i.id === id);
+        dashboardItems[index] = { ...dashboardItems[index], ...item };
         setDashboardItems(dashboardItems);
-        return toApolloItem(dashboardItems[id - 1], id - 1);
+        return toApolloItem(dashboardItems[index]);
       },
       removeDashboardItem: (_, { id }) => {
         const dashboardItems = getDashboardItems();
-        const [removedItem] = dashboardItems.splice(id - 1, 1);
+        const index = dashboardItems.findIndex(i => i.id === id);
+        const [removedItem] = dashboardItems.splice(index, 1);
         setDashboardItems(dashboardItems);
-        return toApolloItem(removedItem, id - 1);
+        return toApolloItem(removedItem);
       }
     },
     Dashboard: {
@@ -74,7 +73,7 @@ export const client = new ApolloClient({
         const { id } = variables || {};
         const dashboardItems = getDashboardItems();
         return dashboardItems
-          .filter((i, index) => (id ? index === id - 1 : true))
+          .filter((i) => (id ? i.id === id : true))
           .map(toApolloItem);
       }
     }
