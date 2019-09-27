@@ -19,7 +19,7 @@ _Currently Dashboard App is generated based on [React](https://reactjs.org/) JS 
 
 ## Overview
 
-Dashboard App is generated in the `dashboard-app` folder within your project folder. To start the app you either navigate to the "Dashboard App" tab in the playground and click "Start dashboard app" or run `$ npm run start` in `your-project-folder/dashboard-app` folder. Dashboard App runs on `3050` port. You can access it directly by going to [http://localhost:3050](http://localhost:3050) or inside the playground under the "Dashboard App" tab.
+Dashboard App is generated in the `dashboard-app` folder within your project folder. To start the app you either navigate to the "Dashboard App" tab in the playground and click "Start dashboard app" or run `$ npm run start` in `your-project-folder/dashboard-app` folder. Dashboard App runs on `3000` port. You can access it directly by going to [http://localhost:3050](http://localhost:3050) or inside the playground under the "Dashboard App" tab.
 
 Dashboard App uses Cube.js backend to power the query builder and the dashboard. It also uses Apollo GraphQL with local storage to save meta data such as dashboard items titles and locations on the dashboard. You can easily switch from local storage to your own or hosted GraphQL backend.
 
