@@ -40,7 +40,7 @@ class ExplorePage extends Component {
     return this.cubejsApi() && (
       <PlaygroundQueryBuilder
         query={query}
-        setQuery={(q) => history.push(`/explore?query=${JSON.stringify((q))}`)}
+        setQuery={(q) => history.push(`/build?query=${JSON.stringify((q))}`)}
         cubejsApi={this.cubejsApi()}
         apiUrl={apiUrl}
         cubejsToken={cubejsToken}

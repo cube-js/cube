@@ -78,7 +78,7 @@ class App extends Component {
             mode="horizontal"
             selectedKeys={[location.pathname]}
           >
-            <Menu.Item key="/explore"><Link to="/explore">Explore</Link></Menu.Item>
+            <Menu.Item key="/build"><Link to="/build">Build</Link></Menu.Item>
             <Menu.Item key="/dashboard"><Link to="/dashboard">Dashboard App</Link></Menu.Item>
             <Menu.Item key="/schema"><Link to="/schema">Schema</Link></Menu.Item>
             <Menu.Item

@@ -27,7 +27,7 @@ class IndexPage extends Component {
     }
     return <Redirect to={
       !this.state.files.length || this.state.files.length === 1 && this.state.files[0].fileName === 'Orders.js' ?
-        '/schema' : '/explore'
+        '/schema' : '/build'
     } />;
   }
 }

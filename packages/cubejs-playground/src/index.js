@@ -24,8 +24,8 @@ ReactDOM.render(
         component={IndexPage}
       />
       <Route
-        key="explore"
-        path="/explore"
+        key="build"
+        path="/build"
         component={ExplorePage}
       />
       <Route

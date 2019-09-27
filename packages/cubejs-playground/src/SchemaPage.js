@@ -112,11 +112,11 @@ class SchemaPage extends Component {
       Modal.success({
         title: 'Schema files successfully generated!',
         content: 'You can start building the charts',
-        okText: 'Explore',
+        okText: 'Build',
         cancelText: 'Close',
         okCancel: true,
         onOk() {
-          history.push('/explore');
+          history.push('/build');
         }
       });
     } else {
