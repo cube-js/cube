@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.45](https://github.com/statsbotco/cubejs-client/compare/v0.10.44...v0.10.45) (2019-09-27)
+
+
+### Bug Fixes
+
+* TypeError: "listener" argument must be a function ([5cfc61e](https://github.com/statsbotco/cubejs-client/commit/5cfc61e))
+
+
+
+
+
 ## [0.10.44](https://github.com/statsbotco/cubejs-client/compare/v0.10.43...v0.10.44) (2019-09-27)
 
 
