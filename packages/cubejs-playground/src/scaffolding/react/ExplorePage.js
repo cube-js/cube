@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Button, Spin } from "antd";
-import ExploreQueryBuilder from "./QueryBuilder/ExploreQueryBuilder";
+import { Button } from "antd";
 import { useMutation, useQuery } from "@apollo/react-hooks";
 import { withRouter } from 'react-router-dom';
+import ExploreQueryBuilder from "./QueryBuilder/ExploreQueryBuilder";
 import {
   GET_DASHBOARD_QUERY,
   ADD_DASHBOARD_ITEM,
@@ -46,7 +46,7 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
       onClick={async () => {
         setAddingToDashboard(true);
         try {
-          await (itemId ? updateDashboardItem :  addDashboardItem)({
+          await (itemId ? updateDashboardItem : addDashboardItem)({
             variables: {
               id: itemId,
               vizState: finalVizState

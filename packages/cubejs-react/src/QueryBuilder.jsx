@@ -147,7 +147,8 @@ export default class QueryBuilder extends React.Component {
       setQuery(finalState.query);
     }
     if (setVizState) {
-      setVizState(finalState);
+      const { meta, ...toSet } = finalState;
+      setVizState(toSet);
     }
   }
 

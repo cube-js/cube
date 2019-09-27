@@ -6,10 +6,12 @@ import gql from "graphql-tag";
 const cache = new InMemoryCache();
 const defaultDashboardItems = [];
 
-const getDashboardItems = () => JSON.parse(window.localStorage.getItem("dashboardItems"))
-  || defaultDashboardItems;
+const getDashboardItems = () =>
+  JSON.parse(window.localStorage.getItem("dashboardItems")) ||
+  defaultDashboardItems;
 
-const setDashboardItems = items => window.localStorage.setItem("dashboardItems", JSON.stringify(items));
+const setDashboardItems = items =>
+  window.localStorage.setItem("dashboardItems", JSON.stringify(items));
 
 const toApolloItem = (i, index) => ({
   ...i,
@@ -32,19 +34,28 @@ export const client = new ApolloClient({
       }
     },
     Mutation: {
-      addDashboardItem: (_, item, { cache }) => {
+      addDashboardItem: (_, item) => {
         const dashboardItems = getDashboardItems();
-        item = { ...item, layout: {} };
+        item = {
+          ...item,
+          layout: { x: 0, y: 0, w: 4, h: 8 }
+        };
         dashboardItems.push(item);
         setDashboardItems(dashboardItems);
         return toApolloItem(item, dashboardItems.length - 1);
       },
-      updateDashboardItem: (_, { id, ...item }, { cache }) => {
+      updateDashboardItem: (_, { id, ...item }) => {
         const dashboardItems = getDashboardItems();
-        dashboardItems[id - 1] = { ...dashboardItems[id - 1], ...item };
-        setDashboardItems(dashboardItems);
+        item = Object.keys(item)
+          .filter(k => !!item[k])
+          .map(k => ({ [k]: item[k] }))
+          .reduce((a, b) => ({ ...a, ...b }), {});
+        dashboardItems[id - 1] = {
+          ...dashboardItems[id - 1],
+          ...item
+        };
         console.log(dashboardItems);
-        console.log(toApolloItem(dashboardItems[id - 1], id - 1));
+        setDashboardItems(dashboardItems);
         return toApolloItem(dashboardItems[id - 1], id - 1);
       },
       removeDashboardItem: (_, { id }) => {
@@ -64,7 +75,6 @@ export const client = new ApolloClient({
     }
   }
 });
-
 export const GET_DASHBOARD_QUERY = gql`
   query GetDashboard {
     dashboard @client {
@@ -74,10 +84,7 @@ export const GET_DASHBOARD_QUERY = gql`
       items {
         id
         layout
-        vizState {
-          chartType,
-          query
-        }
+        vizState
       }
     }
   }
@@ -89,10 +96,7 @@ export const GET_DASHBOARD_ITEM_QUERY = gql`
       items(id: $id) {
         id
         layout
-        vizState {
-          chartType,
-          query
-        }
+        vizState
       }
     }
   }
@@ -109,8 +113,8 @@ export const ADD_DASHBOARD_ITEM = gql`
 `;
 
 export const UPDATE_DASHBOARD_ITEM = gql`
-  mutation UpdateDashboardItem($id: Object!, $vizState: Object) {
-    updateDashboardItem(id: $id, vizState: $vizState) @client {
+  mutation UpdateDashboardItem($id: Object!, $vizState: Object, $layout: Object) {
+    updateDashboardItem(id: $id, vizState: $vizState, layout: $layout) @client {
       id
       layout
       vizState

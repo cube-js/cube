@@ -464,7 +464,11 @@ function (_React$Component) {
       }
 
       if (setVizState) {
-        setVizState(finalState);
+        var _finalState = finalState,
+            meta = _finalState.meta,
+            toSet = _objectWithoutProperties(_finalState, ["meta"]);
+
+        setVizState(toSet);
       }
     }
   }, {
