@@ -78,7 +78,6 @@ class DashboardSource {
       .filter(f => f.fileName.match(/\.js$/))
       .map(f => new TargetSource(f.fileName, f.content).imports)
       .reduce((a, b) => a.concat(b));
-    console.log(allImports);
     const dependencies = allImports
       .filter(i => i.get('source').node.value.indexOf('.') !== 0)
       .map(i => {
