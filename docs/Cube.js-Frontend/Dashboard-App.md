@@ -25,11 +25,11 @@ Dashboard App is generated in the `dashboard-app` folder within your project fol
 
 ## Deployment
 
+`npm run build` creates a build directory with a production build of your dashboard app. There a lot of options to deploy your static applications. You can serve it with your favorite HTTP server ot just select one of the popular cloud providers. Below you can find quick guides for [Netlify](https://www.netlify.com/) and [ZEIT Now](https://zeit.co/). Also, you can refer to the [create-react-app deployment](https://create-react-app.dev/docs/deployment) guide for additional deployment options.
+
 ### Netlify 
 
-Since Dashboard App is based on the `create-react-app` it is extremely easy to deploy to Netlify.
-
-First install Netlify CLI:
+Install Netlify CLI:
 
 ```bash
 $ npm install netlify-cli -g
@@ -43,4 +43,19 @@ $ npm run build
 $ netlify deploy
 ```
 
-Next follow command line prompts and choose yes for new project and ./build as your deploy folder.
+Next follow command line prompts and choose yes for new project and `build` as your deploy folder.
+
+### ZEIT
+
+Install ZEIT Now CLI:
+
+```bash
+$ npm install now -g
+```
+
+Run `now` command in the root directory of the app.
+
+```bash
+$ cd my-cubejs-app/dashboard-app
+$ now
+```
