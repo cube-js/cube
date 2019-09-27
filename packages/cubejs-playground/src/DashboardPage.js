@@ -13,7 +13,7 @@ const Frame = ({ children }) => (
 
 const Hint = () => (
   <p style={{width: 450, margin: "20px auto"}}>
-    Dashboard App is a convenient way setup and deploy frontend app to work with Cube.js backend. You can learn more about it the <a href="https://cube.dev/docs" target="_blankl">Cube.js docs</a>.
+    Dashboard App is a convenient way to setup and deploy frontend app to work with Cube.js backend. You can learn more about it the <a href="https://cube.dev/docs" target="_blankl">Cube.js docs</a>.
   </p>
 );
 
@@ -98,7 +98,7 @@ class DashboardPage extends Component {
             Dashboard App is not running
           </h2>
           <h3>
-            Please start dashboard app or run it manually using <code>$ npm run start</code><br /> in&nbsp;
+            Please start dashboard app or run it manually using <code class="inline-code">$ npm run start</code><br /> in&nbsp;
             <b>{dashboardAppPath}</b>
             &nbsp;directory.
           </h3>
