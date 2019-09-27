@@ -119,6 +119,10 @@ class DevServer {
         await this.createReactAppInit;
       }
 
+      if (this.curNpmInstall) {
+        await this.curNpmInstall;
+      }
+
       if (!(await fs.pathExists(sourcePath))) {
         res.status(404).json({
           error: await fs.pathExists(dashboardAppPath) ?

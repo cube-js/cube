@@ -37,8 +37,7 @@ class DashboardSource {
       this.filesToPersist = [];
       this.parse(result.fileContents);
     }
-    if (createApp) {
-      this.ensureDashboardIsInApp();
+    if (this.ensureDashboardIsInApp()) {
       await this.persist();
     }
   }
@@ -133,6 +132,7 @@ class DashboardSource {
         }
       }
     });
+    let merged = false;
     if (!dashboardAdded && headerElement) {
       this.appLayoutAdded = true;
       const appSnippet = new AppSnippet();
@@ -142,6 +142,7 @@ class DashboardSource {
       this.mergeSnippetToFile(new ChartRendererSnippet(), '/src/ChartRenderer.js');
       this.mergeSnippetToFile(new DashboardStoreSnippet(), '/src/DashboardStore.js');
       this.mergeSnippetToFile(new SourceSnippet(ScaffoldingSources['react/DashboardPage.js']), '/src/DashboardPage.js');
+      merged = true;
     }
     if (!this.sourceFiles.find(f => f.fileName === '/src/QueryBuilder/ExploreQueryBuilder.js')) {
       const queryBuilderFileNames = Object.keys(ScaffoldingSources)
@@ -153,7 +154,9 @@ class DashboardSource {
           f, this.sourceFiles.find(sourceFile => sourceFile.fileName === sourceFile)
         ).formattedMergeResult()
       })));
+      merged = true;
     }
+    return merged;
   }
 
   targetSourceByFile(fileName) {
