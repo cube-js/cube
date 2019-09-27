@@ -1,0 +1,10 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CubeServer listen given that CUBEJS_ENABLE_TLS is true, should create an http server listening to PORT to redirect to https 1`] = `
+"(req, res) => {
+            res.writeHead(301, {
+              Location: \`https://\${req.headers.host}:\${TLS_PORT}\${req.url}\`
+            });
+            res.end();
+          }"
+`;

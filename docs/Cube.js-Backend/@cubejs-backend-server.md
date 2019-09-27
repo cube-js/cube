@@ -29,3 +29,13 @@ server.listen().then(({ port }) => {
   console.log(`🚀 Cube.js server is listening on ${port}`);
 });
 ```
+
+### this.listen([options])
+
+Instantiates the Express.js App to listen to the specified `PORT`. Returns a promise that resolves with the following members:
+
+* `port {number}` The port at which CubejsServer is listening for insecure connections for redirection to HTTPS, as specified by the environment variable `PORT`. Defaults to 4000.
+* `app {Express.Application}` The express App powering CubejsServer
+* `server {http.Server}` The `http` Server instance. If TLS is enabled, returns a `https.Server` instance instead.
+
+Cube.js can also support TLS encryption. See the [Security page on how to enable tls](security#enabling-tls) for more information.

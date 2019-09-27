@@ -22,6 +22,8 @@ Cube.js Javascript client accepts auth token as a first argument to [cubejs(auth
 **In the development environment the token is not required for authorization**, but
 you can still use it to [pass a security context](security#security-context).
 
+Cube.js also supports Transport Layer Encryption (TLS) using Node.js native packages. For more information, see [Enabling TLS](security#enabling-tls).
+
 ## Generating Token
 
 Auth token is generated based on your API secret. Cube.js CLI generates API Secret on app creation and saves it in `.env` file as `CUBEJS_API_SECRET` variable.
@@ -115,3 +117,86 @@ SELECT
   ) AS orders
 LIMIT 10000
 ```
+
+## Enabling TLS
+
+Cube.js server package supports transport layer encryption.
+
+By setting the environment variable `CUBEJS_ENABLE_TLS` to true (`CUBEJS_ENABLE_TLS=true`), `@cubejs-backend/server` expects an argument to its `listen` function specifying the tls encryption options. The `tlsOption` object must match Node.js' [`https.createServer([options][, requestListener])` option object](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener).
+
+This enables you to specify your TLS security directly within the Node process without having to rely on external deployment tools to manage your certificates.
+
+```javascript
+const fs = require("fs-extra");
+const CubejsServer = require("@cubejs-backend/server");
+const cubejsOptions = require("./cubejsOptions");
+
+var tlsOptions = {
+  key: fs.readFileSync(process.env.CUBEJS_TLS_PRIVATE_KEY_FILE),
+  cert: fs.readFileSync(process.env.CUBEJS_TLS_PRIVATE_FULLCHAIN_FILE),
+};
+
+const cubejsServer = cubejsOptions
+  ? new CubejsServer(cubejsOptions)
+  : new CubejsServer();
+
+cubejsServer.listen(tlsOptions).then(({ tlsPort }) => {
+  console.log(`🚀 Cube.js server is listening securely on ${tlsPort}`);
+});
+```
+
+Notice that the response from the resolution of `listen`'s promise returns more than just the `port` and the express `app` as it would normally do without `CUBEJS_ENABLE_TLS` enabled. When `CUBEJS_ENABLE_TLS` is enabled, `cubejsServer.listen` will resolve with the following:
+
+* `port {number}` The port at which CubejsServer is listening for insecure connections for redirection to HTTPS, as specified by the environment variable `PORT`. Defaults to 4000.
+* `tlsPort {number}` The port at which TLS is enabled, as specified by the environment variable `TLS_PORT`. Defaults to 4433.
+* `app {Express.Application}` The express App powering CubejsServer
+* `server {https.Server}` The `https` Server instance.
+
+The `server` object is especially useful if you want to use self-signed, self-renewed certificates.
+
+### Self-signed, self-renewed certificates
+
+Self-signed, self-renewed certificates are useful when dealing with internal data transit, like when answering requests from private server instance to another private server instance without being able to use an external DNS CA to sign the private certificates. _Example:_ EC2 to EC2 instance communications within the private subnet of a VPC.
+
+Here is an example of how to do leverage `server` to have self-signed, self-renewed encryption:
+
+```js
+const CubejsServer = require("@cubejs-backend/server");
+const cubejsOptions = require("./cubejsOptions");
+const {
+  createCertificate,
+  scheduleCertificateRenewal,
+} = require("./certificate");
+
+async function main() {
+  const cubejsServer = cubejsOptions
+    ? new CubejsServer(cubejsOptions)
+    : new CubejsServer();
+
+  const certOptions = { days: 2, selfSigned: true };
+  const tlsOptions = await createCertificate(certOptions);
+
+  const ({ tlsPort, server }) = await cubejsServer.listen(tlsOptions);
+  
+  console.log(`🚀 Cube.js server is listening securely on ${tlsPort}`);
+  
+  scheduleCertificateRenewal(server, certOptions, (err, result) => {
+    if (err !== null) {
+      console.error(
+        `🚨 Certificate renewal failed with error "${error.message}"`
+      );
+      // take some action here to notify the DevOps
+      return;
+    }
+    console.log(`🔐 Certificate renewal successful`);
+  });
+}
+
+main();
+```
+
+To generate your self-signed certificates, look into [`pem`](https://www.npmjs.com/package/pem) and [`node-forge`](https://www.npmjs.com/package/node-forge).
+
+### 🚨 Node Support for Self Renewal of Secure Context
+
+Certificate Renewal using [`server.setSecureContext(options)`](https://nodejs.org/api/tls.html#tls_server_setsecurecontext_options) is only available as of Node.js v11.x
