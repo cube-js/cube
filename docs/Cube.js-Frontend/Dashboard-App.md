@@ -42,3 +42,5 @@ $ cd my-cubejs-app/dashboard-app
 $ npm run build
 $ netlify deploy
 ```
+
+Next follow command line prompts and choose yes for new project and ./build as your deploy folder.
