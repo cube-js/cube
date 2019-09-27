@@ -177,12 +177,18 @@ class DevServer {
           this.cubejsServer.event('Dev Server Dashboard Npm Install');
           await executeCommand(
             'npm',
+            ['install'],
+            { cwd: path.resolve(dashboardAppPath) }
+          );
+          const cubeDependencies = toInstall.filter(p => p.match(/^@cubejs/));
+          await executeCommand(
+            'npm',
             ['install', '--save'].concat(toInstall),
             { cwd: path.resolve(dashboardAppPath) }
           );
           await executeCommand(
             'npm',
-            ['install'],
+            ['update'].concat(cubeDependencies),
             { cwd: path.resolve(dashboardAppPath) }
           );
           this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
