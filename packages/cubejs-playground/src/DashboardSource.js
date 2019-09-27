@@ -37,7 +37,7 @@ class DashboardSource {
       this.filesToPersist = [];
       this.parse(result.fileContents);
     }
-    if (this.ensureDashboardIsInApp()) {
+    if (!result.error && this.ensureDashboardIsInApp()) {
       await this.persist();
     }
   }

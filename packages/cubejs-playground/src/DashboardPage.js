@@ -45,6 +45,9 @@ class DashboardPage extends Component {
       dashboardPort: dashboardStatus.dashboardPort,
       dashboardAppPath: dashboardStatus.dashboardAppPath
     });
+    if (createApp) {
+      await this.startDashboardApp();
+    }
   }
 
   async startDashboardApp() {
