@@ -14,7 +14,7 @@ running, while keeping it fully customizable. Since it is just a frontend app it
 is easy to embed into an existing architecture or deploy to any static website hosting.
 
 _Currently Dashboard App is generated based on [React](https://reactjs.org/) JS library and [Ant Design](https://ant.design/) UI framework. If you'd like to see more options with
- different JS and CSS frameworks please [open a Github issue](https://github.com/cube-js/cube.js/issues/new?assignees=&labels=&template=feature_request.md&title=) or [ping us in
+ different JS and CSS frameworks please [open a Github issue](https://github.com/cube-js/cube.js/issues/new) or [ping us in
  Slack.](https://slack.cube.dev)_
 
 ## Overview
