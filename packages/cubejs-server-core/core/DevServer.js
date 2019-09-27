@@ -208,7 +208,7 @@ class DevServer {
       res.json({ toInstall });
     }));
 
-    const dashboardAppPort = this.cubejsServer.options.dashboardAppPort || 3050;
+    const dashboardAppPort = this.cubejsServer.options.dashboardAppPort || 3000;
 
     app.get('/playground/start-dashboard-app', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Start Dashboard App');

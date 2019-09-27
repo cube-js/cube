@@ -36,7 +36,7 @@
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
-    "start": "node generateScaffolding.js && react-app-rewired start",
+    "start": "node generateScaffolding.js && PORT=3080 react-app-rewired start",
     "build": "node generateScaffolding.js && react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
     "test": "node generateScaffolding.js && react-app-rewired test",
     "eject": "node generateScaffolding.js && react-scripts eject"
