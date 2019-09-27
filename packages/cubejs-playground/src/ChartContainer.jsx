@@ -13,7 +13,7 @@ import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
 
-const frameworks = [{
+export const frameworks = [{
   id: 'vanilla',
   title: 'Vanilla JavaScript',
   docsLink: 'https://cube.dev/docs/@cubejs-client-core'
@@ -102,8 +102,6 @@ class ChartContainer extends React.Component {
     }
 
     const parameters = getParameters(this.codeSandboxDefinition(codeSandboxSource, dependencies));
-
-    console.log(chartLibraries);
 
     const chartLibrariesMenu = (
       <Menu

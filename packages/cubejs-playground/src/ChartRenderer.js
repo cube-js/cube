@@ -68,10 +68,12 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(<ChartRenderer />, rootElement);
 `;
 
-export const selectChartLibrary = (chartType, chartLibrary) => {
-  return ['table', 'number'].indexOf(chartType) !== -1
-    ? tablesLibrary : libraryToTemplate[chartLibrary].library;
-};
+export const selectChartLibrary = (chartType, chartLibrary) => (
+  ['table', 'number'].indexOf(chartType) !== -1 ? tablesLibrary : libraryToTemplate[chartLibrary].library
+);
+
+export const chartLibraries = Object.keys(libraryToTemplate)
+  .map(k => ({ value: k, title: libraryToTemplate[k].title }));
 
 export const ChartRenderer = (props) => {
   const {
@@ -121,7 +123,7 @@ export const ChartRenderer = (props) => {
             dashboardSource={dashboardSource}
             chartLibrary={chartLibrary}
             setChartLibrary={setChartLibrary}
-            chartLibraries={Object.keys(libraryToTemplate).map(k => ({ value: k, title: libraryToTemplate[k].title }))}
+            chartLibraries={chartLibraries}
             cubejsApi={cubejsApi}
             render={() => (jsCompilingError ? (
               <Alert

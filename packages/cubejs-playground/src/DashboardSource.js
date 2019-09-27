@@ -3,7 +3,6 @@ import traverse from "@babel/traverse";
 import fetch from './playgroundFetch';
 import AppSnippet from './source/AppSnippet';
 import TargetSource from './source/TargetSource';
-import ChartSnippet from "./source/ChartSnippet";
 import ScaffoldingSources from "./codegen/ScaffoldingSources";
 import MergeScaffolding from "./source/MergeScaffolding";
 import IndexSnippet from "./source/IndexSnippet";
@@ -21,7 +20,7 @@ body {
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
 class DashboardSource {
-  async load(createApp) {
+  async load(createApp, { chartLibrary }) {
     this.loadError = null;
     if (createApp) {
       await fetchWithRetry('/playground/ensure-dashboard-app', undefined, 5);
@@ -37,7 +36,7 @@ class DashboardSource {
       this.filesToPersist = [];
       this.parse(result.fileContents);
     }
-    if (!result.error && this.ensureDashboardIsInApp()) {
+    if (!result.error && this.ensureDashboardIsInApp({ chartLibrary })) {
       await this.persist();
     }
   }
@@ -83,13 +82,7 @@ class DashboardSource {
       .map(i => {
         const importName = i.get('source').node.value.split('/');
         const dependency = importName[0].indexOf('@') === 0 ? [importName[0], importName[1]].join('/') : importName[0];
-        if (dependency === 'graphql-tag') {
-          return {
-            graphql: 'latest',
-            [dependency]: 'latest'
-          };
-        }
-        return { [dependency]: 'latest' };
+        return this.withPeerDependencies(dependency);
       }).reduce((a, b) => ({ ...a, ...b }));
     await fetchWithRetry('/playground/ensure-dependencies', {
       method: 'POST',
@@ -102,6 +95,26 @@ class DashboardSource {
     }, 5);
   }
 
+  // TODO move to dev server
+  withPeerDependencies(dependency) {
+    let result = {
+      [dependency]: 'latest'
+    };
+    if (dependency === 'graphql-tag') {
+      result = {
+        ...result,
+        graphql: 'latest'
+      };
+    }
+    if (dependency === 'react-chartjs-2') {
+      result = {
+        ...result,
+        'chart.js': 'latest'
+      };
+    }
+    return result;
+  }
+
   parse(sourceFiles) {
     this.appFile = sourceFiles.find(f => f.fileName.indexOf('src/App.js') !== -1);
     if (!this.appFile) {
@@ -111,7 +124,7 @@ class DashboardSource {
     this.appTargetSource = this.targetSourceByFile('/src/App.js');
   }
 
-  ensureDashboardIsInApp() {
+  ensureDashboardIsInApp({ chartLibrary }) {
     let dashboardAdded = false;
     let headerElement = null;
     traverse(this.appTargetSource.ast, {
@@ -138,7 +151,7 @@ class DashboardSource {
       appSnippet.mergeTo(this.appTargetSource);
       this.mergeSnippetToFile(new IndexSnippet(this.playgroundContext), '/src/index.js');
       this.mergeSnippetToFile(new ExploreSnippet(), '/src/ExplorePage.js');
-      this.mergeSnippetToFile(new ChartRendererSnippet(), '/src/ChartRenderer.js');
+      this.mergeSnippetToFile(new ChartRendererSnippet(chartLibrary), '/src/ChartRenderer.js');
       this.mergeSnippetToFile(new DashboardStoreSnippet(), '/src/DashboardStore.js');
       this.mergeSnippetToFile(new SourceSnippet(ScaffoldingSources['react/DashboardPage.js']), '/src/DashboardPage.js');
       merged = true;
@@ -174,6 +187,7 @@ class DashboardSource {
     snippet.mergeTo(targetSource);
   }
 
+  /*
   async addChart(chartCode) {
     await this.load(true);
     if (this.loadError) {
@@ -184,6 +198,7 @@ class DashboardSource {
     this.mergeSnippetToFile(chartSnippet, '/src/DashboardPage.js');
     await this.persist();
   }
+  */
 
   dashboardAppCode() {
     return this.appTargetSource.code();
