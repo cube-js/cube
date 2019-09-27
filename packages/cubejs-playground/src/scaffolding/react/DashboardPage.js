@@ -56,11 +56,7 @@ const Dashboard = ({ children, dashboardItems }) => {
   };
 
   return (
-    <ReactGridLayout
-      cols={12}
-      rowHeight={50}
-      onLayoutChange={onLayoutChange}
-    >
+    <ReactGridLayout cols={12} rowHeight={50} onLayoutChange={onLayoutChange}>
       {children}
     </ReactGridLayout>
   );
@@ -146,10 +142,17 @@ const DashboardPage = ({ cubejsApi }) => {
     </div>
   );
 
-  return (
+  return !data || data.dashboard.items.length ? (
     <Dashboard dashboardItems={data && data.dashboard.items}>
       {data && data.dashboard.items.map(dashboardItem)}
     </Dashboard>
+  ) : (
+    <div style={{ textAlign: 'center', padding: 12 }}>
+      <h2>There are no charts on this dashboard</h2>
+      <Link to="/explore">
+        <Button type="primary" size="large" icon="plus">Add chart</Button>
+      </Link>
+    </div>
   );
 };
 
