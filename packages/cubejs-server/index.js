@@ -1,3 +1,4 @@
+/* eslint-disable global-require */
 require('dotenv').config();
 const CubejsServerCore = require('@cubejs-backend/server-core');
 
@@ -38,7 +39,7 @@ class CubejsServer {
             res.end();
           });
           this.redirector.listen(PORT);
-          this.server = https.createServer(options, app);
+          this.server = Object.keys(options).length ? https.createServer(options, app) : https.createServer(app);
           this.server.listen(TLS_PORT, err => {
             if (err) {
               this.server = null;
@@ -48,10 +49,12 @@ class CubejsServer {
             }
             this.redirector.close = util.promisify(this.redirector.close);
             this.server.close = util.promisify(this.server.close);
-            resolve({ app, port: PORT, tlsPort: TLS_PORT, server: this.server });
+            resolve({
+              app, port: PORT, tlsPort: TLS_PORT, server: this.server
+            });
           });
         } else {
-          this.server = http.createServer(options, app);
+          this.server = Object.keys(options).length ? http.createServer(options, app) : http.createServer(app);
           this.server.listen(PORT, err => {
             if (err) {
               this.server = null;
@@ -64,10 +67,11 @@ class CubejsServer {
         }
       });
     } catch (e) {
-      this.core.event &&
-        (await this.core.event("Dev Server Fatal Error", {
+      if (this.core.event) {
+        await this.core.event("Dev Server Fatal Error", {
           error: (e.stack || e.message || e).toString()
-        }));
+        });
+      }
       throw e;
     }
   }
@@ -84,10 +88,11 @@ class CubejsServer {
         this.redirector = null;
       }
     } catch (e) {
-      this.core.event &&
-        (await this.core.event("Dev Server Fatal Error", {
+      if (this.core.event) {
+        await this.core.event("Dev Server Fatal Error", {
           error: (e.stack || e.message || e).toString()
-        }));
+        });
+      }
       throw e;
     }
   }
