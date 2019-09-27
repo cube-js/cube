@@ -1,5 +1,6 @@
 const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
+const { addLessLoader } = require('customize-cra');
 
 module.exports = function override(config, env) {
   config.optimization = {
@@ -41,5 +42,8 @@ module.exports = function override(config, env) {
   if (env === 'production') {
     config.devtool = false;
   }
+  config = addLessLoader({
+    javascriptEnabled: true
+  })(config);
   return config;
 };

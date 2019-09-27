@@ -145,7 +145,8 @@ class ChartContainer extends React.Component {
       <form action="https://codesandbox.io/api/v1/sandboxes/define" method="POST" target="_blank">
         <input type="hidden" name="parameters" value={parameters} />
         <Button.Group>
-          {dashboardSource && (
+          {/* TODO: implement add to static dashboard */}
+          {/*{dashboardSource && (
             <Button
               onClick={async () => {
                 playgroundAction('Add to Dashboard');
@@ -160,7 +161,7 @@ class ChartContainer extends React.Component {
             >
               {addingToDashboard ? 'Installing modules. It may take a while. Please check console for progress...' : 'Add to Dashboard'}
             </Button>
-          )}
+          )}*/}
           <Dropdown overlay={frameworkMenu}>
             <Button size="small">
               {frameworkItem && frameworkItem.title}

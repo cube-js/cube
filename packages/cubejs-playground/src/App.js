@@ -2,7 +2,7 @@
 import React, { Component } from 'react';
 import { Link } from "react-router-dom";
 import * as PropTypes from 'prop-types';
-import "antd/dist/antd.css";
+import "./index.less";
 import "./index.css";
 import {
   Layout, Menu, Alert, notification, Icon
@@ -71,16 +71,15 @@ class App extends Component {
       <Layout style={{ height: '100%' }}>
         <Header style={{ padding: '0 32px' }}>
           <div style={{ float: 'left' }}>
-            <img src="./cubejs-logo.svg" style={{ display: 'inline', width: 50 }} alt="" />
+            <img src="./cubejs-playground-logo.svg" style={{ display: 'inline', height: 43, marginRight: 15 }} alt="" />
           </div>
           <Menu
-            theme="dark"
+            theme="light"
             mode="horizontal"
             selectedKeys={[location.pathname]}
-            style={{ lineHeight: '64px' }}
           >
             <Menu.Item key="/explore"><Link to="/explore">Explore</Link></Menu.Item>
-            <Menu.Item key="/dashboard"><Link to="/dashboard">Dashboard</Link></Menu.Item>
+            <Menu.Item key="/dashboard"><Link to="/dashboard">Dashboard App</Link></Menu.Item>
             <Menu.Item key="/schema"><Link to="/schema">Schema</Link></Menu.Item>
             <Menu.Item
               key="docs"

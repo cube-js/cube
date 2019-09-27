@@ -251,10 +251,10 @@ function (_React$Component) {
     _classCallCheck(this, QueryBuilder);
 
     _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props));
-    _this.state = {
+    _this.state = _objectSpread({
       query: props.query,
       chartType: 'line'
-    };
+    }, props.vizState);
     return _this;
   }
 
@@ -294,13 +294,20 @@ function (_React$Component) {
   }, {
     key: "componentDidUpdate",
     value: function componentDidUpdate(prevProps) {
-      var query = this.props.query;
+      var _this$props = this.props,
+          query = _this$props.query,
+          vizState = _this$props.vizState;
 
       if (!equals(prevProps.query, query)) {
         // eslint-disable-next-line react/no-did-update-set-state
         this.setState({
           query: query
         });
+      }
+
+      if (!equals(prevProps.vizState, vizState)) {
+        // eslint-disable-next-line react/no-did-update-set-state
+        this.setState(vizState);
       }
     }
   }, {
@@ -445,13 +452,23 @@ function (_React$Component) {
   }, {
     key: "updateVizState",
     value: function updateVizState(state) {
-      var setQuery = this.props.setQuery;
+      var _this$props2 = this.props,
+          setQuery = _this$props2.setQuery,
+          setVizState = _this$props2.setVizState;
       var finalState = this.applyStateChangeHeuristics(state);
       this.setState(finalState);
       finalState = _objectSpread({}, this.state, finalState);
 
       if (setQuery) {
         setQuery(finalState.query);
+      }
+
+      if (setVizState) {
+        var _finalState = finalState,
+            meta = _finalState.meta,
+            toSet = _objectWithoutProperties(_finalState, ["meta"]);
+
+        setVizState(toSet);
       }
     }
   }, {
@@ -574,9 +591,9 @@ function (_React$Component) {
   }, {
     key: "applyStateChangeHeuristics",
     value: function applyStateChangeHeuristics(newState) {
-      var _this$props = this.props,
-          stateChangeHeuristics = _this$props.stateChangeHeuristics,
-          disableHeuristics = _this$props.disableHeuristics;
+      var _this$props3 = this.props,
+          stateChangeHeuristics = _this$props3.stateChangeHeuristics,
+          disableHeuristics = _this$props3.disableHeuristics;
 
       if (disableHeuristics) {
         return newState;
@@ -589,20 +606,30 @@ function (_React$Component) {
     value: function render() {
       var _this3 = this;
 
-      var _this$props2 = this.props,
-          cubejsApi = _this$props2.cubejsApi,
-          _render = _this$props2.render;
-      return React.createElement(QueryRenderer, {
-        query: this.validatedQuery(),
-        cubejsApi: cubejsApi,
-        render: function render(queryRendererProps) {
-          if (_render) {
-            return _render(_this3.prepareRenderProps(queryRendererProps));
-          }
+      var _this$props4 = this.props,
+          cubejsApi = _this$props4.cubejsApi,
+          _render = _this$props4.render,
+          wrapWithQueryRenderer = _this$props4.wrapWithQueryRenderer;
 
-          return null;
+      if (wrapWithQueryRenderer) {
+        return React.createElement(QueryRenderer, {
+          query: this.validatedQuery(),
+          cubejsApi: cubejsApi,
+          render: function render(queryRendererProps) {
+            if (_render) {
+              return _render(_this3.prepareRenderProps(queryRendererProps));
+            }
+
+            return null;
+          }
+        });
+      } else {
+        if (_render) {
+          return _render(this.prepareRenderProps());
         }
-      });
+
+        return null;
+      }
     }
   }]);
 
@@ -612,16 +639,22 @@ QueryBuilder.propTypes = {
   render: func,
   stateChangeHeuristics: func,
   setQuery: func,
+  setVizState: func,
   cubejsApi: object.isRequired,
   disableHeuristics: bool,
-  query: object
+  wrapWithQueryRenderer: bool,
+  query: object,
+  vizState: object
 };
 QueryBuilder.defaultProps = {
   query: {},
   setQuery: null,
+  setVizState: null,
   stateChangeHeuristics: null,
   disableHeuristics: false,
-  render: null
+  render: null,
+  wrapWithQueryRenderer: true,
+  vizState: {}
 };
 
 export { QueryRenderer, QueryRendererWithTotals, QueryBuilder };

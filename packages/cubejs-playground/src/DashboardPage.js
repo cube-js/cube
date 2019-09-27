@@ -5,6 +5,18 @@ import { Link } from "react-router-dom";
 import DashboardSource from "./DashboardSource";
 import fetch from './playgroundFetch';
 
+const Frame = ({ children }) => (
+  <div style={{ textAlign: 'center', marginTop: 50 }}>
+    { children }
+  </div>
+);
+
+const Hint = () => (
+  <p style={{width: 450, margin: "20px auto"}}>
+    Dashboard App is a convenient way to setup and deploy frontend app to work with Cube.js backend. You can learn more about it the <a href="https://cube.dev/docs/dashboard-app" target="_blankl">Cube.js docs</a>.
+  </p>
+);
+
 class DashboardPage extends Component {
   constructor(props) {
     super(props);
@@ -33,6 +45,9 @@ class DashboardPage extends Component {
       dashboardPort: dashboardStatus.dashboardPort,
       dashboardAppPath: dashboardStatus.dashboardAppPath
     });
+    if (createApp) {
+      await this.startDashboardApp();
+    }
   }
 
   async startDashboardApp() {
@@ -49,11 +64,11 @@ class DashboardPage extends Component {
     } = this.state;
     if (loadError) {
       return (
-        <div style={{ textAlign: 'center' }}>
+        <Frame>
           <h2>
             {loadError}
           </h2>
-          <p style={{ textAlign: 'center' }}>
+          <p style={{marginTop: 25}}>
             <Button
               type="primary"
               size="large"
@@ -62,28 +77,35 @@ class DashboardPage extends Component {
               Create dashboard app template in your project directory
             </Button>
           </p>
-        </div>
+          <Hint />
+        </Frame>
       );
     }
     if (!appCode) {
       return (
-        <h2 style={{ textAlign: 'center' }}>
-          <Spin />
-          &nbsp;Creating dashboard react-app. It may take several minutes. Please check console for progress...
-        </h2>
+        <Frame>
+          <h2>
+            &nbsp;Creating Dashboard App
+          </h2>
+          <p>
+            <Spin tip="It may take several minutes. Please check console for progress..." />
+          </p>
+          <Hint />
+        </Frame>
       );
     }
     if (!dashboardRunning) {
       return (
-        <div style={{ textAlign: 'center' }}>
+        <Frame>
           <h2>
-            Dashboard App is not running.
-            <br/>
-            Please start dashboard app or run it manually using `$ npm run start` in&nbsp;
+            Dashboard App is not running
+          </h2>
+          <h3>
+            Please start dashboard app or run it manually using <code class="inline-code">$ npm run start</code><br /> in&nbsp;
             <b>{dashboardAppPath}</b>
             &nbsp;directory.
-          </h2>
-          <p style={{ textAlign: 'center' }}>
+          </h3>
+          <p style={{ marginTop: 25 }}>
             <Button
               type="primary"
               size="large"
@@ -93,12 +115,13 @@ class DashboardPage extends Component {
               {dashboardStarting ? 'Dashboard app is starting. It may take a while. Please check console for progress...' : 'Start dashboard app'}
             </Button>
           </p>
-        </div>
+          <Hint />
+        </Frame>
       );
     }
     const devServerUrl = `http://${window.location.hostname}:${dashboardPort}`;
     return (
-      <div style={{ height: '100%', width: '100%' }}>
+      <div style={{ height: '100%', width: '100%', padding: "15px 30px 30px 30px", background: "#fff" }}>
         <Alert
           message={(
             <span>
@@ -107,13 +130,13 @@ class DashboardPage extends Component {
               .
               Dev server is running at&nbsp;
               <a href={devServerUrl} target="_blank" rel="noopener noreferrer">{devServerUrl}</a>
-              . Add charts to dashboard using&nbsp;
-              <Link to="/explore">Explore</Link>
               .
+              Learn more how to customize and deploy it at <a href="https://cube.dev/docs/dashboard-app">Cube.js docs</a>.
             </span>
           )}
           type="info"
           closable
+          style={{ marginBottom: 15 }}
         />
         <iframe
           src={devServerUrl}

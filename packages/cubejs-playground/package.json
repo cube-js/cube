@@ -15,7 +15,10 @@
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
+    "customize-cra": "^0.7.0",
     "history": "^4.9.0",
+    "less": "^3.10.3",
+    "less-loader": "^5.0.0",
     "moment": "^2.24.0",
     "prettier": "^1.16.4",
     "prismjs": "^1.15.0",
@@ -33,10 +36,10 @@
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
-    "start": "react-app-rewired start",
-    "build": "react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
-    "test": "react-app-rewired test",
-    "eject": "react-scripts eject"
+    "start": "node generateScaffolding.js && react-app-rewired start",
+    "build": "node generateScaffolding.js && react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
+    "test": "node generateScaffolding.js && react-app-rewired test",
+    "eject": "node generateScaffolding.js && react-scripts eject"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -60,7 +63,9 @@
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.12.4",
+    "fs-extra": "^8.1.0",
     "react-app-rewired": "^2.1.0",
+    "recursive-readdir": "^2.2.2",
     "terser-webpack-plugin": "^1.2.3"
   }
 }

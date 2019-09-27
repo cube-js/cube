@@ -8,7 +8,8 @@ export default class QueryBuilder extends React.Component {
     super(props);
     this.state = {
       query: props.query,
-      chartType: 'line'
+      chartType: 'line',
+      ...props.vizState
     };
   }
 
@@ -19,10 +20,14 @@ export default class QueryBuilder extends React.Component {
   }
 
   componentDidUpdate(prevProps) {
-    const { query } = this.props;
+    const { query, vizState } = this.props;
     if (!equals(prevProps.query, query)) {
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState({ query });
+    }
+    if (!equals(prevProps.vizState, vizState)) {
+      // eslint-disable-next-line react/no-did-update-set-state
+      this.setState(vizState);
     }
   }
 
@@ -134,12 +139,16 @@ export default class QueryBuilder extends React.Component {
   }
 
   updateVizState(state) {
-    const { setQuery } = this.props;
+    const { setQuery, setVizState } = this.props;
     let finalState = this.applyStateChangeHeuristics(state);
     this.setState(finalState);
     finalState = { ...this.state, ...finalState };
     if (setQuery) {
       setQuery(finalState.query);
+    }
+    if (setVizState) {
+      const { meta, ...toSet } = finalState;
+      setVizState(toSet);
     }
   }
 
@@ -295,19 +304,26 @@ export default class QueryBuilder extends React.Component {
   }
 
   render() {
-    const { cubejsApi, render } = this.props;
-    return (
-      <QueryRenderer
-        query={this.validatedQuery()}
-        cubejsApi={cubejsApi}
-        render={(queryRendererProps) => {
-          if (render) {
-            return render(this.prepareRenderProps(queryRendererProps));
-          }
-          return null;
-        }}
-      />
-    );
+    const { cubejsApi, render, wrapWithQueryRenderer } = this.props;
+    if (wrapWithQueryRenderer) {
+      return (
+        <QueryRenderer
+          query={this.validatedQuery()}
+          cubejsApi={cubejsApi}
+          render={(queryRendererProps) => {
+            if (render) {
+              return render(this.prepareRenderProps(queryRendererProps));
+            }
+            return null;
+          }}
+        />
+      );
+    } else {
+      if (render) {
+        return render(this.prepareRenderProps());
+      }
+      return null;
+    }
   }
 }
 
@@ -315,15 +331,21 @@ QueryBuilder.propTypes = {
   render: PropTypes.func,
   stateChangeHeuristics: PropTypes.func,
   setQuery: PropTypes.func,
+  setVizState: PropTypes.func,
   cubejsApi: PropTypes.object.isRequired,
   disableHeuristics: PropTypes.bool,
-  query: PropTypes.object
+  wrapWithQueryRenderer: PropTypes.bool,
+  query: PropTypes.object,
+  vizState: PropTypes.object
 };
 
 QueryBuilder.defaultProps = {
   query: {},
   setQuery: null,
+  setVizState: null,
   stateChangeHeuristics: null,
   disableHeuristics: false,
-  render: null
+  render: null,
+  wrapWithQueryRenderer: true,
+  vizState: {}
 };

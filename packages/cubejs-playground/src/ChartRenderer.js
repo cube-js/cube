@@ -68,6 +68,11 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(<ChartRenderer />, rootElement);
 `;
 
+export const selectChartLibrary = (chartType, chartLibrary) => {
+  return ['table', 'number'].indexOf(chartType) !== -1
+    ? tablesLibrary : libraryToTemplate[chartLibrary].library;
+};
+
 export const ChartRenderer = (props) => {
   const {
     query,
@@ -84,8 +89,7 @@ export const ChartRenderer = (props) => {
   const [chartLibrary, setChartLibrary] = useState('bizcharts');
 
   sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
-  const selectedChartLibrary = ['table', 'number'].indexOf(chartType) !== -1
-    ? tablesLibrary : libraryToTemplate[chartLibrary].library;
+  const selectedChartLibrary = selectChartLibrary(chartType, chartLibrary);
   const source = sourceCodeFn({
     ...props,
     chartLibrary: selectedChartLibrary

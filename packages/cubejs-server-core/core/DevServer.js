@@ -119,6 +119,10 @@ class DevServer {
         await this.createReactAppInit;
       }
 
+      if (this.curNpmInstall) {
+        await this.curNpmInstall;
+      }
+
       if (!(await fs.pathExists(sourcePath))) {
         res.status(404).json({
           error: await fs.pathExists(dashboardAppPath) ?
@@ -155,7 +159,7 @@ class DevServer {
       this.cubejsServer.event('Dev Server App File Write');
       const { files } = req.body;
       await Promise.all(
-        files.map(file => fs.writeFile(
+        files.map(file => fs.outputFile(
           path.join(...[dashboardAppPath].concat(file.fileName.split('/'))),
           file.content
         ))
