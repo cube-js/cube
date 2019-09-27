@@ -38,7 +38,12 @@ export const client = new ApolloClient({
         const dashboardItems = getDashboardItems();
         item = {
           ...item,
-          layout: { x: 0, y: 0, w: 4, h: 8 }
+          layout: {
+            x: 0,
+            y: 0,
+            w: 4,
+            h: 8
+          }
         };
         dashboardItems.push(item);
         setDashboardItems(dashboardItems);
@@ -48,12 +53,11 @@ export const client = new ApolloClient({
         const dashboardItems = getDashboardItems();
         item = Object.keys(item)
           .filter(k => !!item[k])
-          .map(k => ({ [k]: item[k] }))
+          .map(k => ({
+            [k]: item[k]
+          }))
           .reduce((a, b) => ({ ...a, ...b }), {});
-        dashboardItems[id - 1] = {
-          ...dashboardItems[id - 1],
-          ...item
-        };
+        dashboardItems[id - 1] = { ...dashboardItems[id - 1], ...item };
         console.log(dashboardItems);
         setDashboardItems(dashboardItems);
         return toApolloItem(dashboardItems[id - 1], id - 1);
@@ -69,7 +73,8 @@ export const client = new ApolloClient({
       items(dashboard, variables) {
         const { id } = variables || {};
         const dashboardItems = getDashboardItems();
-        return dashboardItems.filter((i, index) => (id ? index === id - 1 : true))
+        return dashboardItems
+          .filter((i, index) => (id ? index === id - 1 : true))
           .map(toApolloItem);
       }
     }
@@ -85,11 +90,11 @@ export const GET_DASHBOARD_QUERY = gql`
         id
         layout
         vizState
+        title
       }
     }
   }
 `;
-
 export const GET_DASHBOARD_ITEM_QUERY = gql`
   query GetDashboardItem($id: Object!) {
     dashboard @client {
@@ -97,37 +102,38 @@ export const GET_DASHBOARD_ITEM_QUERY = gql`
         id
         layout
         vizState
+        title
       }
     }
   }
 `;
-
 export const ADD_DASHBOARD_ITEM = gql`
-  mutation AddDashboardItem($vizState: Object!) {
-    addDashboardItem(vizState: $vizState) @client {
+  mutation AddDashboardItem($vizState: Object!, $title: String!) {
+    addDashboardItem(vizState: $vizState, title: $title) @client {
       id
       layout
       vizState
+      title
     }
   }
 `;
-
 export const UPDATE_DASHBOARD_ITEM = gql`
-  mutation UpdateDashboardItem($id: Object!, $vizState: Object, $layout: Object) {
-    updateDashboardItem(id: $id, vizState: $vizState, layout: $layout) @client {
+  mutation UpdateDashboardItem($id: Object!, $title: String, $vizState: Object, $layout: Object) {
+    updateDashboardItem(id: $id, vizState: $vizState, layout: $layout, title: $title) @client {
       id
       layout
       vizState
+      title
     }
   }
 `;
-
 export const REMOVE_DASHBOARD_ITEM = gql`
   mutation AddDashboardItem($id: Object!) {
     removeDashboardItem(id: $id) @client {
       id
       layout
       vizState
+      title
     }
   }
 `;

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Button } from "antd";
+import { Button, Modal, Input } from "antd";
 import { useMutation, useQuery } from "@apollo/react-hooks";
-import { withRouter } from 'react-router-dom';
+import { withRouter } from "react-router-dom";
 import ExploreQueryBuilder from "./QueryBuilder/ExploreQueryBuilder";
 import {
   GET_DASHBOARD_QUERY,
@@ -18,7 +18,6 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
       }
     ]
   });
-
   const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
     refetchQueries: [
       {
@@ -26,50 +25,72 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
       }
     ]
   });
-
   const [addingToDashboard, setAddingToDashboard] = useState(false);
-
   const params = new URLSearchParams(location.search);
-  const itemId = parseInt(params.get('itemId'), 10);
+  const itemId = parseInt(params.get("itemId"), 10);
+  const { loading, error, data } = useQuery(GET_DASHBOARD_ITEM_QUERY, {
+    variables: {
+      id: itemId
+    }
+  });
 
-  const { loading, error, data } = useQuery(GET_DASHBOARD_ITEM_QUERY, { variables: { id: itemId } });
 
   const [vizState, setVizState] = useState(null);
+  const finalVizState = vizState || (itemId && data && data.dashboard.items[0].vizState) || {};
 
-  const finalVizState = vizState || itemId && data && data.dashboard.items[0].vizState || {};
+  const [titleModalVisible, setTitleModalVisible] = useState(false);
 
-  const addToDashboardButton = (
-    <Button
-      icon={itemId ? 'save' : 'plus'}
-      size="small"
-      loading={addingToDashboard}
-      onClick={async () => {
+  const [title, setTitle] = useState(null);
+  const finalTitle = title || (itemId && data && data.dashboard.items[0].title) || 'New Chart';
+
+  const titleModal = (
+    <Modal
+      key="modal"
+      title="Save Chart"
+      visible={titleModalVisible}
+      onOk={async () => {
+        setTitleModalVisible(false);
         setAddingToDashboard(true);
+
         try {
           await (itemId ? updateDashboardItem : addDashboardItem)({
             variables: {
               id: itemId,
-              vizState: finalVizState
+              vizState: finalVizState,
+              title: finalTitle
             }
           });
-          history.push('/');
+          history.push("/");
         } finally {
           setAddingToDashboard(false);
         }
       }}
+      onCancel={() => setTitleModalVisible(false)}
     >
-      {itemId ? 'Update' : 'Add to Dashboard'}
-    </Button>
+      <Input placeholder="Dashboard Item Name" value={finalTitle} onChange={(e) => setTitle(e.target.value)} />
+    </Modal>
   );
 
+  const addToDashboardButton = (
+    <Button
+      key="button"
+      icon={itemId ? "save" : "plus"}
+      size="small"
+      loading={addingToDashboard}
+      onClick={() => setTitleModalVisible(true)}
+    >
+      {itemId ? "Update" : "Add to Dashboard"}
+    </Button>
+  );
   return (
     <ExploreQueryBuilder
       cubejsApi={cubejsApi}
       vizState={finalVizState}
       setVizState={setVizState}
-      chartExtra={addToDashboardButton}
+      chartExtra={
+        [addToDashboardButton, titleModal]
+      }
     />
   );
 });
-
 export default ExplorePage;
