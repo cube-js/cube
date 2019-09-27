@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.44](https://github.com/statsbotco/cubejs-client/compare/v0.10.43...v0.10.44) (2019-09-27)
+
+
+### Bug Fixes
+
+* npm installs old dependencies on dashboard creation ([a7d519c](https://github.com/statsbotco/cubejs-client/commit/a7d519c))
+* **playground:** use default 3000 port for dashboard app as it's more appropriate ([ec4f3f4](https://github.com/statsbotco/cubejs-client/commit/ec4f3f4))
+
+
+
+
+
 ## [0.10.43](https://github.com/statsbotco/cubejs-client/compare/v0.10.42...v0.10.43) (2019-09-27)
 
 

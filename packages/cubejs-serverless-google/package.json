@@ -2,13 +2,13 @@
   "name": "@cubejs-backend/serverless-google",
   "description": "Cube.js Serverless Google support",
   "author": "Statsbot, Inc.",
-  "version": "0.10.43",
+  "version": "0.10.44",
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/serverless": "^0.10.43",
+    "@cubejs-backend/serverless": "^0.10.44",
     "@google-cloud/pubsub": "^0.28.1"
   },
   "devDependencies": {
