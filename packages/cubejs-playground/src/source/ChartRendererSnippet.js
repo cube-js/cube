@@ -5,7 +5,7 @@ import ChartTypeSnippet from "./ChartTypeSnippet";
 
 class ChartRendererSnippet extends SourceSnippet {
   constructor(chartLibrary) {
-    super(ScaffoldingSources['react/ChartRenderer.js']);
+    super(ScaffoldingSources['react/components/ChartRenderer.js']);
     this.chartLibrary = chartLibrary;
   }
 

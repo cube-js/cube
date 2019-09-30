@@ -147,25 +147,22 @@ class DashboardSource {
     let merged = false;
     if (!dashboardAdded && headerElement) {
       this.appLayoutAdded = true;
-      const appSnippet = new AppSnippet();
-      appSnippet.mergeTo(this.appTargetSource);
-      this.mergeSnippetToFile(new IndexSnippet(this.playgroundContext), '/src/index.js');
-      this.mergeSnippetToFile(new ExploreSnippet(), '/src/ExplorePage.js');
-      this.mergeSnippetToFile(new ChartRendererSnippet(chartLibrary), '/src/ChartRenderer.js');
-      this.mergeSnippetToFile(new DashboardStoreSnippet(), '/src/DashboardStore.js');
-      this.mergeSnippetToFile(new SourceSnippet(ScaffoldingSources['react/DashboardPage.js']), '/src/DashboardPage.js');
-      merged = true;
-    }
-    if (!this.sourceFiles.find(f => f.fileName === '/src/QueryBuilder/ExploreQueryBuilder.js')) {
-      const queryBuilderFileNames = Object.keys(ScaffoldingSources)
-        .filter(fileName => fileName.indexOf('react/QueryBuilder/') === 0)
-        .map(MergeScaffolding.targetSourceName);
-      this.filesToPersist = this.filesToPersist.concat(queryBuilderFileNames.map(f => ({
-        fileName: f,
-        content: new MergeScaffolding(
-          f, this.sourceFiles.find(sourceFile => sourceFile.fileName === sourceFile)
-        ).formattedMergeResult()
-      })));
+      const scaffoldingFileToSnippet = {
+        'react/App.js': new AppSnippet(),
+        'react/index.js': new IndexSnippet(this.playgroundContext),
+        'react/pages/ExplorePage.js': new ExploreSnippet(),
+        'react/components/ChartRenderer.js': new ChartRendererSnippet(chartLibrary)
+      };
+
+      const scaffoldingFileNames = Object.keys(ScaffoldingSources)
+        .filter(fileName => fileName.indexOf('react/') === 0);
+
+      scaffoldingFileNames.forEach(scaffoldingFile => {
+        this.mergeSnippetToFile(
+          scaffoldingFileToSnippet[scaffoldingFile] || new SourceSnippet(ScaffoldingSources[scaffoldingFile]),
+          MergeScaffolding.targetSourceName(scaffoldingFile)
+        );
+      });
       merged = true;
     }
     return merged;

@@ -175,6 +175,12 @@ class DevServer {
         const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
         if (toInstall.length) {
           this.cubejsServer.event('Dev Server Dashboard Npm Install');
+          // TODO downgrade react-scripts version because of https://github.com/facebook/create-react-app/issues/7753
+          await executeCommand(
+            'npm',
+            ['install', '--save-exact'].concat('react-scripts@3.0.1'),
+            { cwd: path.resolve(dashboardAppPath) }
+          );
           await executeCommand(
             'npm',
             ['install'],

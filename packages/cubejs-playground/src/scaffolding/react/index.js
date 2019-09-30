@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { HashRouter as Router, Route } from 'react-router-dom';
 import cubejs from '@cubejs-client/core';
-import ExplorePage from './ExplorePage';
-import DashboardPage from './DashboardPage';
+import ExplorePage from './pages/ExplorePage';
+import DashboardPage from './pages/DashboardPage';
 import App from './App';
 
 // change to your actual endpoint

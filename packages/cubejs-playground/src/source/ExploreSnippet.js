@@ -4,7 +4,7 @@ import ScaffoldingSources from '../codegen/ScaffoldingSources';
 
 class ExploreSnippet extends SourceSnippet {
   constructor() {
-    super(ScaffoldingSources['react/ExplorePage.js']);
+    super(ScaffoldingSources['react/pages/ExplorePage.js']);
   }
 }
 

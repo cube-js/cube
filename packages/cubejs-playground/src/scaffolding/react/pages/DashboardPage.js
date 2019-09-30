@@ -8,14 +8,21 @@ import RGL, { WidthProvider } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import {
-  GET_DASHBOARD_QUERY,
-  GET_DASHBOARD_ITEM_QUERY,
-  REMOVE_DASHBOARD_ITEM,
-  UPDATE_DASHBOARD_ITEM
-} from "./DashboardStore";
-import ChartRenderer from "./ChartRenderer";
+  GET_DASHBOARD_ITEMS
+} from "../graphql/queries";
+import {
+  UPDATE_DASHBOARD_ITEM,
+  DELETE_DASHBOARD_ITEM
+} from "../graphql/mutations";
+import ChartRenderer from "../components/ChartRenderer";
 
 const ReactGridLayout = WidthProvider(RGL);
+
+const deserializeItem = i => ({
+  ...i,
+  layout: JSON.parse(i.layout) || {},
+  vizState: JSON.parse(i.vizState)
+});
 
 const defaultLayout = i => ({
   x: i.layout.x || 0,
@@ -29,26 +36,27 @@ const defaultLayout = i => ({
 const Dashboard = ({ children, dashboardItems }) => {
   const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
     refetchQueries: [
-      { query: GET_DASHBOARD_QUERY },
-      { query: GET_DASHBOARD_ITEM_QUERY }
+      {
+        query: GET_DASHBOARD_ITEMS
+      }
     ]
   });
 
   const onLayoutChange = newLayout => {
     newLayout.forEach(l => {
       const item = dashboardItems.find(i => i.id.toString() === l.i);
-      const toUpdate = {
+      const toUpdate = JSON.stringify({
         x: l.x,
         y: l.y,
         w: l.w,
         h: l.h
-      };
+      });
 
-      if (item && JSON.stringify(toUpdate) !== JSON.stringify(item.layout)) {
+      if (item && toUpdate !== item.layout) {
         updateDashboardItem({
           variables: {
             id: item.id,
-            layout: toUpdate
+            input: { layout: toUpdate }
           }
         });
       }
@@ -63,10 +71,11 @@ const Dashboard = ({ children, dashboardItems }) => {
 };
 
 const DashboardItemDropdown = ({ itemId }) => {
-  const [removeDashboardItem] = useMutation(REMOVE_DASHBOARD_ITEM, {
+  const [removeDashboardItem] = useMutation(DELETE_DASHBOARD_ITEM, {
     refetchQueries: [
-      { query: GET_DASHBOARD_QUERY },
-      { query: GET_DASHBOARD_ITEM_QUERY }
+      {
+        query: GET_DASHBOARD_ITEMS
+      }
     ]
   });
   const dashboardItemDropdownMenu = (
@@ -75,19 +84,22 @@ const DashboardItemDropdown = ({ itemId }) => {
         <Link to={`/explore?itemId=${itemId}`}>Edit</Link>
       </Menu.Item>
       <Menu.Item
-        onClick={() => Modal.confirm({
-          title: 'Are you sure you want to delete this item?',
-          okText: 'Yes',
-          okType: 'danger',
-          cancelText: 'No',
-          onOk() {
-            removeDashboardItem({
-              variables: {
-                id: itemId
-              }
-            });
-          }
-        })}
+        onClick={() =>
+          Modal.confirm({
+            title: "Are you sure you want to delete this item?",
+            okText: "Yes",
+            okType: "danger",
+            cancelText: "No",
+
+            onOk() {
+              removeDashboardItem({
+                variables: {
+                  id: itemId
+                }
+              });
+            }
+          })
+        }
       >
         Delete
       </Menu.Item>
@@ -118,7 +130,7 @@ const DashboardItem = ({ itemId, children, title }) => (
 );
 
 const DashboardPage = ({ cubejsApi }) => {
-  const { loading, error, data } = useQuery(GET_DASHBOARD_QUERY);
+  const { loading, error, data } = useQuery(GET_DASHBOARD_ITEMS);
 
   if (loading) {
     return <Spin />;
@@ -136,21 +148,28 @@ const DashboardPage = ({ cubejsApi }) => {
 
   const dashboardItem = item => (
     <div key={item.id} data-grid={defaultLayout(item)}>
-      <DashboardItem key={item.id} itemId={item.id} title={item.title}>
+      <DashboardItem key={item.id} itemId={item.id} title={item.name}>
         <ChartRenderer vizState={item.vizState} cubejsApi={cubejsApi} />
       </DashboardItem>
     </div>
   );
 
-  return !data || data.dashboard.items.length ? (
-    <Dashboard dashboardItems={data && data.dashboard.items}>
-      {data && data.dashboard.items.map(dashboardItem)}
+  return !data || data.dashboardItems.length ? (
+    <Dashboard dashboardItems={data && data.dashboardItems}>
+      {data && data.dashboardItems.map(deserializeItem).map(dashboardItem)}
     </Dashboard>
   ) : (
-    <div style={{ textAlign: 'center', padding: 12 }}>
+    <div
+      style={{
+        textAlign: "center",
+        padding: 12
+      }}
+    >
       <h2>There are no charts on this dashboard</h2>
       <Link to="/explore">
-        <Button type="primary" size="large" icon="plus">Add chart</Button>
+        <Button type="primary" size="large" icon="plus">
+          Add chart
+        </Button>
       </Link>
     </div>
   );

@@ -1,45 +1,61 @@
 import React, { useState } from "react";
-import { Button, Modal, Input } from "antd";
+import {
+  Button, Modal, Input, Alert, Spin
+} from "antd";
 import { useMutation, useQuery } from "@apollo/react-hooks";
 import { withRouter } from "react-router-dom";
-import ExploreQueryBuilder from "./QueryBuilder/ExploreQueryBuilder";
+import ExploreQueryBuilder from "../components/QueryBuilder/ExploreQueryBuilder";
 import {
-  GET_DASHBOARD_QUERY,
-  ADD_DASHBOARD_ITEM,
-  UPDATE_DASHBOARD_ITEM,
-  GET_DASHBOARD_ITEM_QUERY
-} from "./DashboardStore";
+  GET_DASHBOARD_ITEMS,
+  GET_DASHBOARD_ITEM
+} from "../graphql/queries";
+import {
+  CREATE_DASHBOARD_ITEM,
+  UPDATE_DASHBOARD_ITEM
+} from "../graphql/mutations";
 
 const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
-  const [addDashboardItem] = useMutation(ADD_DASHBOARD_ITEM, {
+  const [addDashboardItem] = useMutation(CREATE_DASHBOARD_ITEM, {
     refetchQueries: [
-      { query: GET_DASHBOARD_QUERY },
-      { query: GET_DASHBOARD_ITEM_QUERY }
+      {
+        query: GET_DASHBOARD_ITEMS
+      }
     ]
   });
   const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
     refetchQueries: [
-      { query: GET_DASHBOARD_QUERY },
-      { query: GET_DASHBOARD_ITEM_QUERY }
+      {
+        query: GET_DASHBOARD_ITEMS
+      }
     ]
   });
   const [addingToDashboard, setAddingToDashboard] = useState(false);
   const params = new URLSearchParams(location.search);
-  const itemId = parseInt(params.get("itemId"), 10);
-  const { loading, error, data } = useQuery(GET_DASHBOARD_ITEM_QUERY, {
+  const itemId = params.get("itemId");
+  const { loading, error, data } = useQuery(GET_DASHBOARD_ITEM, {
     variables: {
       id: itemId
-    }
+    },
+    skip: !itemId
   });
 
-
   const [vizState, setVizState] = useState(null);
-  const finalVizState = vizState || (itemId && data && data.dashboard.items[0].vizState) || {};
-
+  const finalVizState =
+    vizState ||
+    (itemId && !loading && data && JSON.parse(data.dashboardItem.vizState)) ||
+    {};
   const [titleModalVisible, setTitleModalVisible] = useState(false);
-
   const [title, setTitle] = useState(null);
-  const finalTitle = title || (itemId && data && data.dashboard.items[0].title) || 'New Chart';
+  const finalTitle =
+    title || (itemId && !loading && data && data.dashboardItem.name) || "New Chart";
+
+  if (loading) {
+    return <Spin />;
+  }
+
+  if (error) {
+    return <Alert type="error" message={error.toString()} />;
+  }
 
   const titleModal = (
     <Modal
@@ -54,8 +70,10 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
           await (itemId ? updateDashboardItem : addDashboardItem)({
             variables: {
               id: itemId,
-              vizState: finalVizState,
-              title: finalTitle
+              input: {
+                vizState: JSON.stringify(finalVizState),
+                name: finalTitle
+              }
             }
           });
           history.push("/");
@@ -65,10 +83,13 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
       }}
       onCancel={() => setTitleModalVisible(false)}
     >
-      <Input placeholder="Dashboard Item Name" value={finalTitle} onChange={(e) => setTitle(e.target.value)} />
+      <Input
+        placeholder="Dashboard Item Name"
+        value={finalTitle}
+        onChange={e => setTitle(e.target.value)}
+      />
     </Modal>
   );
-
   const addToDashboardButton = (
     <Button
       key="button"
@@ -85,9 +106,7 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
       cubejsApi={cubejsApi}
       vizState={finalVizState}
       setVizState={setVizState}
-      chartExtra={
-        [addToDashboardButton, titleModal]
-      }
+      chartExtra={[addToDashboardButton, titleModal]}
     />
   );
 });

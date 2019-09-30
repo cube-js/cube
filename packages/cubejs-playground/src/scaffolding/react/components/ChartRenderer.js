@@ -16,8 +16,8 @@ const ChartRenderer = ({ vizState, cubejsApi }) => vizState && (
     query={vizState.query}
     cubejsApi={cubejsApi}
     render={
-      TypeToChartComponent[vizState.chartType] &&
-      renderChart(TypeToChartComponent[vizState.chartType])
+      TypeToChartComponent[vizState.chartType]
+      && renderChart(TypeToChartComponent[vizState.chartType])
     }
   />
 );
