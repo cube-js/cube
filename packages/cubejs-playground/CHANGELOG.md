@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.46](https://github.com/statsbotco/cubejs-client/compare/v0.10.45...v0.10.46) (2019-09-30)
+
+
+### Features
+
+* Restructure Dashboard scaffolding to make it more user friendly and reliable ([78ba3bc](https://github.com/statsbotco/cubejs-client/commit/78ba3bc))
+
+
+
+
+
 ## [0.10.44](https://github.com/statsbotco/cubejs-client/compare/v0.10.43...v0.10.44) (2019-09-27)
 
 
