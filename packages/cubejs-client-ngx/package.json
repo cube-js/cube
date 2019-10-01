@@ -4,7 +4,7 @@
   "description": "Cube.js client for Angular",
   "main": "dist/bundles/cubejs-client-ngx.umd.js",
   "files": [
-    "dist",
+    "dist/**/*",
     "README.md",
     "LICENSE"
   ],
