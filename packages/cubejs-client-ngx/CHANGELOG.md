@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.50](https://github.com/statsbotco/cubejs-client/compare/v0.10.49...v0.10.50) (2019-10-01)
+
+
+### Bug Fixes
+
+* **client-ngx:** client.ts is missing from the TypeScript compilation. Fix files ([ae5c2df](https://github.com/statsbotco/cubejs-client/commit/ae5c2df))
+
+
+
+
+
 ## [0.10.49](https://github.com/statsbotco/cubejs-client/compare/v0.10.48...v0.10.49) (2019-10-01)
 
 
