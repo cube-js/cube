@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.10.51",
+  "version": "0.10.52",
   "description": "Cube.js client for Angular",
   "main": "dist/bundles/cubejs-client-ngx.umd.js",
   "files": [
