@@ -16,7 +16,7 @@
     "rxjs": "^6.0.0"
   },
   "scripts": {
-    "build": "ng build"
+    "build": "ng build && rm dist/package.json"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.803.6",
