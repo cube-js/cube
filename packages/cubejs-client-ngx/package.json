@@ -2,7 +2,12 @@
   "name": "@cubejs-client/ngx",
   "version": "0.10.43",
   "description": "Cube.js client for Angular",
-  "main": "dist/cubejs-client-ngx.js",
+  "main": "dist/cubejs-client-ngx.umd.js",
+  "module": "dist/cubejs-client-ngx.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "license": "MIT",
   "dependencies": {
     "@cubejs-client/core": "^0.10.16"
