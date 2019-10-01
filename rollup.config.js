@@ -1,12 +1,8 @@
 import babel from "rollup-plugin-babel";
-import babelrc from "babelrc-rollup";
 import resolve from "rollup-plugin-node-resolve";
 import commonjs from "rollup-plugin-commonjs";
 import replace from "rollup-plugin-replace";
-import pkg from "./package.json";
-import uglify from "rollup-plugin-uglify";
 import alias from 'rollup-plugin-alias';
-import typescript from 'rollup-plugin-typescript';
 
 const bundle = (name, globalName, baseConfig) => {
   baseConfig = {
@@ -154,14 +150,4 @@ export default bundle('cubejs-client-core', 'cubejs', {
   globals: {
     vue: 'Vue',
   },
-})).concat(bundle('cubejs-client-ngx', 'cubejsngx', {
-  input: "packages/cubejs-client-ngx/index.ts",
-  external: [
-  ],
-  plugins: [
-    typescript({
-      tsconfig: 'packages/cubejs-client-ngx/tsconfig.json',
-      typescript: require('typescript')
-    })
-  ]
 }));

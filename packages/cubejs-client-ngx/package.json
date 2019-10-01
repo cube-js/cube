@@ -2,30 +2,44 @@
   "name": "@cubejs-client/ngx",
   "version": "0.10.48",
   "description": "Cube.js client for Angular",
-  "main": "dist/cubejs-client-ngx.js",
+  "main": "dist/bundles/cubejs-client-ngx.umd.js",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "license": "MIT",
   "dependencies": {
-    "@cubejs-client/core": "^0.10.16"
+    "@cubejs-client/core": "^0.10.16",
+    "tslib": "^1.9.0"
   },
   "peerDependencies": {
     "@angular/core": "^6.1.0 || ^7.0.0 || ^8.0.0",
     "rxjs": "^6.0.0"
   },
   "scripts": {
-    "build": "ng-packagr -p package.json"
+    "build": "ng build"
   },
   "devDependencies": {
+    "@angular-devkit/build-angular": "^0.803.6",
+    "@angular-devkit/build-ng-packagr": "^0.803.6",
     "@angular/compiler": "^7.2.14",
     "@angular/compiler-cli": "^7.2.14",
     "@angular/core": "^8.2.5",
     "ng-packagr": "^5.1.0",
-    "typescript": "^3.1.1"
+    "tsickle": "^0.37.0",
+    "typescript": "3.1.1"
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "module": "dist/fesm5/cubejs-client-ngx.js",
+  "es2015": "dist/fesm2015/cubejs-client-ngx.js",
+  "esm5": "dist/esm5/cubejs-client-ngx.js",
+  "esm2015": "dist/esm2015/cubejs-client-ngx.js",
+  "fesm5": "dist/fesm5/cubejs-client-ngx.js",
+  "fesm2015": "dist/fesm2015/cubejs-client-ngx.js",
+  "typings": "dist/cubejs-client-ngx.d.ts",
+  "metadata": "dist/cubejs-client-ngx.metadata.json",
+  "sideEffects": false
 }
