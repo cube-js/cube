@@ -4,9 +4,7 @@
   "description": "Cube.js client for Angular",
   "main": "dist/bundles/cubejs-client-ngx.umd.js",
   "files": [
-    "dist/**/*",
-    "README.md",
-    "LICENSE"
+    "dist"
   ],
   "license": "MIT",
   "dependencies": {
