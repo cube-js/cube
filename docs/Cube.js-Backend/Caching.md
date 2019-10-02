@@ -69,6 +69,13 @@ The `renewQuery` option applies to the `refreshKey` caching system mentioned abo
 
 For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately. For these situtations, you can mostly disable the `refreshKey` cache by setting the [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) to something very low, like `1`. This means Cube.js will always check the data freshness before executing a query, and notice any changed data underneath.
 
+### Keeping Cache Up-to-Date
+
+Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
+In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
+For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
+Please note `renewQuery` also triggers pre-aggregations refresh as well.
+
 ## Pre-Aggregations
 
 The **pre-aggregation** engine builds a layer of aggregated data in your database during the runtime and maintains it to be up-to-date.
