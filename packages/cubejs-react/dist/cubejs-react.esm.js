@@ -5,9 +5,9 @@ import 'core-js/modules/web.dom.iterable';
 import 'core-js/modules/es6.array.iterator';
 import 'core-js/modules/es6.string.iterator';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
-import _createClass from '@babel/runtime/helpers/createClass';
 import _possibleConstructorReturn from '@babel/runtime/helpers/possibleConstructorReturn';
 import _getPrototypeOf from '@babel/runtime/helpers/getPrototypeOf';
+import _createClass from '@babel/runtime/helpers/createClass';
 import _inherits from '@babel/runtime/helpers/inherits';
 import React from 'react';
 import { func, object, any, bool } from 'prop-types';
@@ -26,6 +26,13 @@ var QueryRenderer =
 /*#__PURE__*/
 function (_React$Component) {
   _inherits(QueryRenderer, _React$Component);
+
+  _createClass(QueryRenderer, null, [{
+    key: "isQueryPresent",
+    value: function isQueryPresent(query) {
+      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
+    }
+  }]);
 
   function QueryRenderer(props) {
     var _this;
@@ -69,11 +76,6 @@ function (_React$Component) {
       }
     }
   }, {
-    key: "isQueryPresent",
-    value: function isQueryPresent(query) {
-      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
-    }
-  }, {
     key: "load",
     value: function load(query) {
       var _this2 = this;
@@ -88,7 +90,7 @@ function (_React$Component) {
           loadSql = _this$props3.loadSql,
           cubejsApi = _this$props3.cubejsApi;
 
-      if (query && this.isQueryPresent(query)) {
+      if (query && QueryRenderer.isQueryPresent(query)) {
         if (loadSql === 'only') {
           cubejsApi.sql(query, {
             mutexObj: this.mutexObj,
@@ -156,6 +158,7 @@ function (_React$Component) {
     value: function loadQueries(queries) {
       var _this3 = this;
 
+      var cubejsApi = this.props.cubejsApi;
       this.setState({
         isLoading: true,
         resultSet: null,
@@ -166,7 +169,7 @@ function (_React$Component) {
             name = _ref4[0],
             query = _ref4[1];
 
-        return _this3.props.cubejsApi.load(query, {
+        return cubejsApi.load(query, {
           mutexObj: _this3.mutexObj,
           mutexKey: name
         }).then(function (r) {
@@ -190,17 +193,24 @@ function (_React$Component) {
   }, {
     key: "render",
     value: function render() {
+      var _this$state = this.state,
+          error = _this$state.error,
+          queries = _this$state.queries,
+          resultSet = _this$state.resultSet,
+          isLoading = _this$state.isLoading,
+          sqlQuery = _this$state.sqlQuery;
+      var render = this.props.render;
       var loadState = {
-        error: this.state.error,
-        resultSet: this.props.queries ? this.state.resultSet || {} : this.state.resultSet,
+        error: error,
+        resultSet: queries ? resultSet || {} : resultSet,
         loadingState: {
-          isLoading: this.state.isLoading
+          isLoading: isLoading
         },
-        sqlQuery: this.state.sqlQuery
+        sqlQuery: sqlQuery
       };
 
-      if (this.props.render) {
-        return this.props.render(loadState);
+      if (render) {
+        return render(loadState);
       }
 
       return null;
@@ -211,17 +221,19 @@ function (_React$Component) {
 }(React.Component);
 QueryRenderer.propTypes = {
   render: func,
-  afterRender: func,
   cubejsApi: object.isRequired,
   query: object,
   queries: object,
   loadSql: any
 };
 QueryRenderer.defaultProps = {
-  query: {}
+  query: null,
+  render: null,
+  queries: null,
+  loadSql: null
 };
 
-var QueryRendererWithTotals = (function (_ref) {
+var QueryRendererWithTotals = function QueryRendererWithTotals(_ref) {
   var query = _ref.query,
       restProps = _objectWithoutProperties(_ref, ["query"]);
 
@@ -238,7 +250,21 @@ var QueryRendererWithTotals = (function (_ref) {
       main: query
     }
   }, restProps));
-});
+};
+
+QueryRendererWithTotals.propTypes = {
+  render: func,
+  cubejsApi: object.isRequired,
+  query: object,
+  queries: object,
+  loadSql: any
+};
+QueryRendererWithTotals.defaultProps = {
+  query: null,
+  render: null,
+  queries: null,
+  loadSql: null
+};
 
 var QueryBuilder =
 /*#__PURE__*/
@@ -314,7 +340,7 @@ function (_React$Component) {
     key: "isQueryPresent",
     value: function isQueryPresent() {
       var query = this.state.query;
-      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
+      return QueryRenderer.isQueryPresent(query);
     }
   }, {
     key: "prepareRenderProps",

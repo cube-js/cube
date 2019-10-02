@@ -3,6 +3,12 @@ import * as PropTypes from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 
 export default class QueryRenderer extends React.Component {
+  static isQueryPresent(query) {
+    return query.measures && query.measures.length
+      || query.dimensions && query.dimensions.length
+      || query.timeDimensions && query.timeDimensions.length;
+  }
+
   constructor(props) {
     super(props);
     this.state = {};
@@ -30,18 +36,12 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  isQueryPresent(query) {
-    return query.measures && query.measures.length
-      || query.dimensions && query.dimensions.length
-      || query.timeDimensions && query.timeDimensions.length;
-  }
-
   load(query) {
     this.setState({
       isLoading: true, resultSet: null, error: null, sqlQuery: null
     });
     const { loadSql, cubejsApi } = this.props;
-    if (query && this.isQueryPresent(query)) {
+    if (query && QueryRenderer.isQueryPresent(query)) {
       if (loadSql === 'only') {
         cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
           .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))
@@ -63,11 +63,11 @@ export default class QueryRenderer extends React.Component {
   }
 
   loadQueries(queries) {
+    const { cubejsApi } = this.props;
     this.setState({ isLoading: true, resultSet: null, error: null });
 
     const resultPromises = Promise.all(toPairs(queries).map(
-      ([name, query]) =>
-        this.props.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
+      ([name, query]) => cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
     ));
 
     resultPromises
@@ -76,18 +76,22 @@ export default class QueryRenderer extends React.Component {
         error: null,
         isLoading: false
       }))
-      .catch(error => this.setState({ resultSet: null, error, isLoading: false }))
+      .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
   }
 
   render() {
+    const {
+      error, queries, resultSet, isLoading, sqlQuery
+    } = this.state;
+    const { render } = this.props;
     const loadState = {
-      error: this.state.error,
-      resultSet: this.props.queries ? (this.state.resultSet || {}) : this.state.resultSet,
-      loadingState: { isLoading: this.state.isLoading },
-      sqlQuery: this.state.sqlQuery
+      error,
+      resultSet: queries ? (resultSet || {}) : resultSet,
+      loadingState: { isLoading },
+      sqlQuery
     };
-    if (this.props.render) {
-      return this.props.render(loadState);
+    if (render) {
+      return render(loadState);
     }
     return null;
   }
@@ -95,7 +99,6 @@ export default class QueryRenderer extends React.Component {
 
 QueryRenderer.propTypes = {
   render: PropTypes.func,
-  afterRender: PropTypes.func,
   cubejsApi: PropTypes.object.isRequired,
   query: PropTypes.object,
   queries: PropTypes.object,
@@ -103,5 +106,8 @@ QueryRenderer.propTypes = {
 };
 
 QueryRenderer.defaultProps = {
-  query: {}
+  query: null,
+  render: null,
+  queries: null,
+  loadSql: null
 };

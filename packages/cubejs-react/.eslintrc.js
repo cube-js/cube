@@ -12,6 +12,7 @@ module.exports = {
     "react/jsx-filename-extension": 0,
     "react/react-in-jsx-scope": 0, // remove when import React is ready
     "import/no-unresolved": 0,
+    "react/jsx-props-no-spreading": 0,
     "comma-dangle": 0,
     "no-console": 0,
     "arrow-parens": 0,
