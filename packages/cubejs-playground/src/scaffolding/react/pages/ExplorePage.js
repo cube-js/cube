@@ -46,8 +46,8 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
     {};
   const [titleModalVisible, setTitleModalVisible] = useState(false);
   const [title, setTitle] = useState(null);
-  const finalTitle =
-    title || (itemId && !loading && data && data.dashboardItem.name) || "New Chart";
+  const finalTitle = title != null ? title
+    : (itemId && !loading && data && data.dashboardItem.name) || "New Chart";
 
   if (loading) {
     return <Spin />;
