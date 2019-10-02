@@ -62,6 +62,7 @@ class DashboardPage extends Component {
         dashboardStarting: false,
         loadError: <pre>{e.toString()}</pre>
       });
+      throw e;
     }
   }
 
