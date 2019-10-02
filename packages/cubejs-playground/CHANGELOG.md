@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.53](https://github.com/statsbotco/cubejs-client/compare/v0.10.52...v0.10.53) (2019-10-02)
+
+
+### Bug Fixes
+
+* **playground:** antd styles are added as part of table scaffolding ([8a39c9d](https://github.com/statsbotco/cubejs-client/commit/8a39c9d))
+* **playground:** Can't delete dashboard item name in dashboard app ([0cf546f](https://github.com/statsbotco/cubejs-client/commit/0cf546f))
+* **playground:** Recharts extra code ([950541c](https://github.com/statsbotco/cubejs-client/commit/950541c))
+
+
+### Features
+
+* **playground:** Make dashboard loading errors permanent ([155380d](https://github.com/statsbotco/cubejs-client/commit/155380d))
+* **playground:** Recharts code generation support ([c8c8230](https://github.com/statsbotco/cubejs-client/commit/c8c8230))
+
+
+
+
+
 ## [0.10.46](https://github.com/statsbotco/cubejs-client/compare/v0.10.45...v0.10.46) (2019-09-30)
 
 
