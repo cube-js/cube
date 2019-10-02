@@ -63,7 +63,8 @@ export default ChartRenderer;
 `;
 };
 
-const withDomRender = (source) => `import ReactDOM from 'react-dom';
+const forCodeSandBox = (source) => `import ReactDOM from 'react-dom';
+import "antd/dist/antd.css";
 ${source}
 
 const rootElement = document.getElementById("root");
@@ -120,7 +121,7 @@ export const ChartRenderer = (props) => {
             error={error}
             sqlQuery={sqlQuery}
             codeExample={source}
-            codeSandboxSource={withDomRender(source)}
+            codeSandboxSource={forCodeSandBox(source)}
             dependencies={dependencies}
             dashboardSource={dashboardSource}
             chartLibrary={chartLibrary}

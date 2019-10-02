@@ -1,5 +1,4 @@
 import * as reactChartjs from 'react-chartjs-2';
-import moment from 'moment';
 
 const chartTypeToTemplate = {
   line: `
@@ -66,7 +65,6 @@ const chartTypeToTemplate = {
 
 export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
   `import { Line, Bar, Pie } from 'react-chartjs-2';
-import moment from 'moment';
 
 const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
 
@@ -75,6 +73,5 @@ const ${renderFnName} = ({ resultSet }) => {${chartTypeToTemplate[chartType]}
 );
 
 export const imports = {
-  'react-chartjs-2': reactChartjs,
-  moment
+  'react-chartjs-2': reactChartjs
 };

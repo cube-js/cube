@@ -1,5 +1,4 @@
 import * as bizcharts from 'bizcharts';
-import moment from 'moment';
 
 const chartTypeToTemplate = {
   line: `
@@ -36,8 +35,6 @@ const chartTypeToTemplate = {
 
 export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
   `import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
-import { Row, Col, Statistic, Table } from 'antd';
-import moment from 'moment';
 
 const stackedChartData = (resultSet) => {
   const data = resultSet.pivot().map(
@@ -57,6 +54,5 @@ const ${renderFnName} = ({ resultSet }) => (${chartTypeToTemplate[chartType]}
 );
 
 export const imports = {
-  bizcharts,
-  moment
+  bizcharts
 };

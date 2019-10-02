@@ -22,7 +22,6 @@ const chartTypeToTemplate = {
 
 export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
   `import { Row, Col, Statistic, Table } from 'antd';
-import "antd/dist/antd.css";
 
 const ${renderFnName} = ({ resultSet }) => (${chartTypeToTemplate[chartType]}
 );`
