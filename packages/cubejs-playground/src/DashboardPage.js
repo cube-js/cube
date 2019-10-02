@@ -41,20 +41,27 @@ class DashboardPage extends Component {
       appCode: null,
       loadError: null
     });
-    await this.dashboardSource.load(createApp, { chartLibrary });
-    this.setState({
-      dashboardStarting: false,
-      appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardAppCode(),
-      loadError: this.dashboardSource.loadError
-    });
-    const dashboardStatus = await (await fetch('/playground/dashboard-app-status')).json();
-    this.setState({
-      dashboardRunning: dashboardStatus.running,
-      dashboardPort: dashboardStatus.dashboardPort,
-      dashboardAppPath: dashboardStatus.dashboardAppPath
-    });
-    if (createApp) {
-      await this.startDashboardApp();
+    try {
+      await this.dashboardSource.load(createApp, { chartLibrary });
+      this.setState({
+        dashboardStarting: false,
+        appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardAppCode(),
+        loadError: this.dashboardSource.loadError
+      });
+      const dashboardStatus = await (await fetch('/playground/dashboard-app-status')).json();
+      this.setState({
+        dashboardRunning: dashboardStatus.running,
+        dashboardPort: dashboardStatus.dashboardPort,
+        dashboardAppPath: dashboardStatus.dashboardAppPath
+      });
+      if (createApp) {
+        await this.startDashboardApp();
+      }
+    } catch (e) {
+      this.setState({
+        dashboardStarting: false,
+        loadError: <pre>{e.toString()}</pre>
+      });
     }
   }
 
