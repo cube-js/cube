@@ -12,11 +12,13 @@ import { Alert } from 'antd';
 
 import ChartContainer from './ChartContainer';
 import * as bizChartLibrary from './libraries/bizChart';
+import * as rechartsLibrary from './libraries/recharts';
 import * as chartjsLibrary from './libraries/chartjs';
 import * as tablesLibrary from './libraries/tables';
 
 export const libraryToTemplate = {
   bizcharts: { library: bizChartLibrary, title: 'Bizcharts' },
+  recharts: { library: rechartsLibrary, title: 'Recharts' },
   chartjs: { library: chartjsLibrary, title: 'Chart.js' }
 };
 

@@ -28,10 +28,11 @@
     "react-chartjs-2": "^2.7.4",
     "react-dom": "^16.8.3",
     "react-is": "^16.8.4",
-    "react-router": "^4.4.0",
-    "react-router-dom": "^4.4.0",
+    "react-router": "^5.1.2",
+    "react-router-dom": "^5.1.2",
     "react-scripts": "2.1.5",
     "react-source-render": "^2.0.0-beta.6",
+    "recharts": "^1.7.1",
     "sql-formatter": "^2.3.2",
     "whatwg-fetch": "^3.0.0"
   },
