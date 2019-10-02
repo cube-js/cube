@@ -7,7 +7,7 @@ const chartTypeToTemplate = {
         return (<Line
           stackId="a"
           dataKey={series.key}
-          name={series.title.split(",")[0]}
+          name={series.title}
           stroke={colors[i]}
         />)
       })}
@@ -18,7 +18,7 @@ const chartTypeToTemplate = {
       return (<Bar
         stackId="a"
         dataKey={series.key}
-        name={series.title.split(",")[0]}
+        name={series.title}
         fill={colors[i]}
       />)
     })}
@@ -29,7 +29,7 @@ const chartTypeToTemplate = {
         return (<Area
           stackId="a"
           dataKey={series.key}
-          name={series.title.split(",")[0]}
+          name={series.title}
           stroke={colors[i]}
           fill={colors[i]}
         />)
