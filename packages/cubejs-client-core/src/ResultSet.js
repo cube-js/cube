@@ -74,6 +74,10 @@ export default class ResultSet {
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
     }
+    if (!(query.measures || []).length) {
+      pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
+      pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
+    }
     if (pivotConfig.fillMissingDates == null) {
       pivotConfig.fillMissingDates = true;
     }

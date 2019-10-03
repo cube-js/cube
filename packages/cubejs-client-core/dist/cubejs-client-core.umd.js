@@ -14490,6 +14490,15 @@
 	        pivotConfig.y = pivotConfig.y.concat(['measures']);
 	      }
 
+	      if (!(query.measures || []).length) {
+	        pivotConfig.x = pivotConfig.x.filter(function (d) {
+	          return d !== 'measures';
+	        });
+	        pivotConfig.y = pivotConfig.y.filter(function (d) {
+	          return d !== 'measures';
+	        });
+	      }
+
 	      if (pivotConfig.fillMissingDates == null) {
 	        pivotConfig.fillMissingDates = true;
 	      }
