@@ -80,9 +80,9 @@ export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
 const CartesianChart = ({ resultSet, children, ChartComponent }) => (
   <ResponsiveContainer width="100%" height={400}>
     <ChartComponent data={resultSet.chartPivot()}>
-      <XAxis axisLine={false} tickLine={false} dataKey="x" />
-      <YAxis axisLine={false} tickLine={false} />
-      <CartesianGrid vertical={false} />
+      <XAxis dataKey="x" />
+      <YAxis />
+      <CartesianGrid />
       { children }
       <Legend />
       <Tooltip />
