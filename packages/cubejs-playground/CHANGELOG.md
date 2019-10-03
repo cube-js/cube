@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.55](https://github.com/statsbotco/cubejs-client/compare/v0.10.54...v0.10.55) (2019-10-03)
+
+
+### Bug Fixes
+
+* **playground:** Dashboard item name edit performance issues ([73df3c7](https://github.com/statsbotco/cubejs-client/commit/73df3c7))
+* **playground:** PropTypes validations ([3d5faa1](https://github.com/statsbotco/cubejs-client/commit/3d5faa1))
+* **playground:** Recharts fixes ([bce0313](https://github.com/statsbotco/cubejs-client/commit/bce0313))
+
+
+
+
+
 ## [0.10.53](https://github.com/statsbotco/cubejs-client/compare/v0.10.52...v0.10.53) (2019-10-02)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.10.52",
+  "version": "0.10.55",
   "description": "Cube.js client for Angular",
   "main": "dist/bundles/cubejs-client-ngx.umd.js",
   "files": [
@@ -8,7 +8,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@cubejs-client/core": "^0.10.16",
+    "@cubejs-client/core": "^0.10.55",
     "tslib": "^1.9.0"
   },
   "peerDependencies": {
