@@ -36,7 +36,7 @@ const chartTypeToTemplate = {
       })}
   </CartesianChart>`,
   pie: `
-  <ResponsiveContainer width="100%" height={350}>
+  <ResponsiveContainer width="100%" height={400}>
     <PieChart>
       <Pie
         isAnimationActive={false}
@@ -78,9 +78,9 @@ export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
 } from "recharts";
 
 const CartesianChart = ({ resultSet, children, ChartComponent }) => (
-  <ResponsiveContainer width="100%" height={350}>
-    <ChartComponent margin={{ left: -10 }} data={resultSet.chartPivot()}>
-      <XAxis axisLine={false} tickLine={false} dataKey="x" minTickGap={20} />
+  <ResponsiveContainer width="100%" height={400}>
+    <ChartComponent data={resultSet.chartPivot()}>
+      <XAxis axisLine={false} tickLine={false} dataKey="x" />
       <YAxis axisLine={false} tickLine={false} />
       <CartesianGrid vertical={false} />
       { children }
