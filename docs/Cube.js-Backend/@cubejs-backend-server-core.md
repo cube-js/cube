@@ -187,6 +187,8 @@ CubejsServerCore.create({
 ### checkAuthMiddleware
 
 This is an [Express Middleware](https://expressjs.com/en/guide/using-middleware.html) for authentication.
+Default implementation parses [JSON Web Tokens (JWT)](https://jwt.io/) in `Authorization` and sets payload to `req.authInfo` if it's verified.
+More info on how to generate such tokens is [here](security#security-context).
 
 You can set `req.authInfo = { u: { ...userContextObj } }` inside the middleware if you want to customize [USER_CONTEXT](cube#context-variables-user-context).
 
