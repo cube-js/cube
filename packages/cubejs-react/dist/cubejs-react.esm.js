@@ -22,6 +22,10 @@ import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
 
+var _isQueryPresent = (function (query) {
+  return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
+});
+
 var QueryRenderer =
 /*#__PURE__*/
 function (_React$Component) {
@@ -30,7 +34,7 @@ function (_React$Component) {
   _createClass(QueryRenderer, null, [{
     key: "isQueryPresent",
     value: function isQueryPresent(query) {
-      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
+      return _isQueryPresent(query);
     }
   }]);
 
@@ -683,4 +687,4 @@ QueryBuilder.defaultProps = {
   vizState: {}
 };
 
-export { QueryRenderer, QueryRendererWithTotals, QueryBuilder };
+export { QueryRenderer, QueryRendererWithTotals, QueryBuilder, _isQueryPresent as isQueryPresent };

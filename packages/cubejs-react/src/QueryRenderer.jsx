@@ -1,12 +1,11 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
+import isQueryPresent from './isQueryPresent';
 
 export default class QueryRenderer extends React.Component {
   static isQueryPresent(query) {
-    return query.measures && query.measures.length
-      || query.dimensions && query.dimensions.length
-      || query.timeDimensions && query.timeDimensions.length;
+    return isQueryPresent(query);
   }
 
   constructor(props) {

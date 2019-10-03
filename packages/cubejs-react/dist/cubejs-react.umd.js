@@ -6792,6 +6792,10 @@
 	/*#__PURE__*/
 	chain(_identity);
 
+	var _isQueryPresent = (function (query) {
+	  return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
+	});
+
 	var QueryRenderer =
 	/*#__PURE__*/
 	function (_React$Component) {
@@ -6800,7 +6804,7 @@
 	  _createClass(QueryRenderer, null, [{
 	    key: "isQueryPresent",
 	    value: function isQueryPresent(query) {
-	      return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
+	      return _isQueryPresent(query);
 	    }
 	  }]);
 
@@ -8186,6 +8190,7 @@
 	exports.QueryRenderer = QueryRenderer;
 	exports.QueryRendererWithTotals = QueryRendererWithTotals;
 	exports.QueryBuilder = QueryBuilder;
+	exports.isQueryPresent = _isQueryPresent;
 
 	Object.defineProperty(exports, '__esModule', { value: true });
 
