@@ -3,37 +3,40 @@ import * as recharts from 'recharts';
 const chartTypeToTemplate = {
   line: `
   <CartesianChart resultSet={resultSet} ChartComponent={LineChart}>
-      {resultSet.seriesNames().map((series, i) => {
-        return (<Line
+      {resultSet.seriesNames().map((series, i) => (
+        <Line
+          key={series.key}
           stackId="a"
           dataKey={series.key}
           name={series.title}
           stroke={colors[i]}
-        />)
-      })}
+        />
+      ))}
   </CartesianChart>`,
   bar: `
   <CartesianChart resultSet={resultSet} ChartComponent={BarChart}>
-    {resultSet.seriesNames().map((series, i) => {
-      return (<Bar
+    {resultSet.seriesNames().map((series, i) => (
+      <Bar
+        key={series.key}
         stackId="a"
         dataKey={series.key}
         name={series.title}
         fill={colors[i]}
-      />)
-    })}
+      />
+    ))}
   </CartesianChart>`,
   area: `
   <CartesianChart resultSet={resultSet} ChartComponent={AreaChart}>
-      {resultSet.seriesNames().map((series, i) => {
-        return (<Area
+      {resultSet.seriesNames().map((series, i) => (
+        <Area
+          key={series.key}  
           stackId="a"
           dataKey={series.key}
           name={series.title}
           stroke={colors[i]}
           fill={colors[i]}
-        />)
-      })}
+        />
+      ))}
   </CartesianChart>`,
   pie: `
   <ResponsiveContainer width="100%" height={400}>
