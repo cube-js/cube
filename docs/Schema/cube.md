@@ -44,8 +44,8 @@ cube(`Users`, {
 
 ## Naming
 
-There are certain rules to follow for cube and cube member names. 
-You can use only `0-9`, `_`, and letter characters when naming a measure.
+There are certain rules to follow for a cube and cube member names. 
+You can use only `0-9`, `_`, and letter characters when naming a cube or a cube member.
 Names should always start with a letter.
 
 As a convention cube names start with upper case letters and member names with lower case letters.
