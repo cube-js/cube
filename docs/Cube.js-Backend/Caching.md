@@ -39,9 +39,10 @@ When a query's result needs to be refreshed, Cube.js will re-execute the query i
 
 In order for Cube.js to properly expire cache entries and refresh in the background, Cube.js needs a value to track through time. There's a built in default `refreshKey` query strategy that works the following way:
 
-1. Check the `max` of time dimensions with `updated` in the name, if none exist…
-2. Check the `max` of any existing time dimension, if none exist…
-3. Check the count of rows for this cube.
+1. Check used pre-aggregations for query and use [pre-aggregations refreshKey](pre-aggregations#refresh-key), if none pre-aggregations are used…
+2. Check the `max` of time dimensions with `updated` in the name, if none exist…
+3. Check the `max` of any existing time dimension, if none exist…
+4. Check the row count for this cube.
 
 You can set up a custom refresh check SQL by changing [refreshKey](cube#parameters-refresh-key) property on the cube level though. There are situations where the default strategy doesn't work, like:
 
@@ -51,7 +52,7 @@ You can set up a custom refresh check SQL by changing [refreshKey](cube#paramete
 
 In these instances, Cube.js needs a query crafted to detect updates to the rows that power the cubes. Often, a `MAX(updated_at_timestamp)` for OLTP data will accomplish this, or examining a metadata table for whatever system is managing the data to see when it last ran.
 
-Note that the result of `refreshKey` query itself is cached for 2 minutes by default. You can change it by passing [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) option when configuring Cube.js Server. This cache is useful so that Cube.js can build query result cache keys without issuing database queries and respond to cached requests very quickly.
+Note that the result of `refreshKey` query itself is cached for 2 minutes by default. You can change it by passing [refreshKeyRenewalThreshold](@cubejs-backend-server-core#options-reference-orchestrator-options) option when configuring Cube.js Server. This cache is useful so that Cube.js can build query result cache keys without issuing database queries and respond to cached requests very quickly.
 
 ### Force Query Renewal
 
