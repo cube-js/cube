@@ -42,6 +42,15 @@ cube(`Users`, {
 });
 ```
 
+## Naming
+
+There are certain rules to follow for cube and cube member names. 
+You can use only `0-9`, `_`, and letter characters when naming a measure.
+Names should always start with a letter.
+
+As a convention cube names start with upper case letters and member names with lower case letters.
+As in case of JavaScript camel case is used for multi-word cube and member names.
+
 ## Parameters
 
 ### sql
