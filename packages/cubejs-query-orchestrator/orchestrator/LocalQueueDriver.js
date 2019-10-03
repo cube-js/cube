@@ -34,7 +34,7 @@ class LocalQueueDriverConnection {
 
     const res = await Promise.race([
       this.getResultPromise(resultListKey),
-      timeoutPromise(continueWaitTimeout || this.continueWaitTimeout * 1000),
+      timeoutPromise((this.continueWaitTimeout || continueWaitTimeout) * 1000),
     ]);
     if (res) {
       delete this.resultPromises[resultListKey];
