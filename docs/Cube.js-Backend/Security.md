@@ -5,9 +5,10 @@ category: Cube.js Backend
 menuOrder: 4
 ---
 
-Cube.js uses [JSON Web Tokens (JWT)](https://jwt.io/) for requests' authorization and also for passing
+Cube.js uses [JSON Web Tokens (JWT)](https://jwt.io/) which passed in `Authorization` header for requests' authorization and also for passing
 additional user context, which could be used in the [USER_CONTEXT](cube#context-variables-user-context) object in the Data
 Schema.
+`Authorization` header is parsed and set to [authInfo](@cubejs-backend-server-core#authinfo) variable which is also can be used for [Multitenancy](multitenancy-setup).
 
 Cube.js tokens are designed to work in micro services environment.
 Typical use case would be:
@@ -122,7 +123,7 @@ LIMIT 10000
 
 Cube.js server package supports transport layer encryption.
 
-By setting the environment variable `CUBEJS_ENABLE_TLS` to true (`CUBEJS_ENABLE_TLS=true`), `@cubejs-backend/server` expects an argument to its `listen` function specifying the tls encryption options. The `tlsOption` object must match Node.js' [`https.createServer([options][, requestListener])` option object](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener).
+By setting the environment variable `CUBEJS_ENABLE_TLS` to true (`CUBEJS_ENABLE_TLS=true`), `@cubejs-backend/server` expects an argument to its `listen` function specifying the tls encryption options. The `tlsOption` object must match Node.js' [https.createServer([options][, requestListener])](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener) option object.
 
 This enables you to specify your TLS security directly within the Node process without having to rely on external deployment tools to manage your certificates.
 
@@ -195,8 +196,8 @@ async function main() {
 main();
 ```
 
-To generate your self-signed certificates, look into [`pem`](https://www.npmjs.com/package/pem) and [`node-forge`](https://www.npmjs.com/package/node-forge).
+To generate your self-signed certificates, look into [pem](https://www.npmjs.com/package/pem) and [node-forge](https://www.npmjs.com/package/node-forge).
 
-### 🚨 Node Support for Self Renewal of Secure Context
+### Node Support for Self Renewal of Secure Context
 
-Certificate Renewal using [`server.setSecureContext(options)`](https://nodejs.org/api/tls.html#tls_server_setsecurecontext_options) is only available as of Node.js v11.x
+Certificate Renewal using [server.setSecureContext(options)](https://nodejs.org/api/tls.html#tls_server_setsecurecontext_options) is only available as of Node.js v11.x
