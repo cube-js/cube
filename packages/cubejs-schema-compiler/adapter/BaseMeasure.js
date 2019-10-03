@@ -88,7 +88,7 @@ class BaseMeasure {
     const rollingWindow = this.measureDefinition().rollingWindow;
     if (rollingWindow) {
       return this.query.rollingWindowDateJoinCondition(
-        rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset
+        rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset, this.cube().name
       );
     }
     return null;
@@ -110,7 +110,7 @@ class BaseMeasure {
   }
 
   granularityFromInterval(interval) {
-    if (!interval) {
+    if (!interval || typeof interval === 'object') {
       return undefined;
     }
     if (interval.match(/day/)) {

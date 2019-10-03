@@ -5,7 +5,9 @@ const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s+|\(?(\w
 const CONTEXT_SYMBOLS = {
   USER_CONTEXT: 'userContext',
   FILTER_PARAMS: 'filterParams',
-  SQL_UTILS: 'sqlUtils'
+  SQL_UTILS: 'sqlUtils',
+  START_DATE: 'startDate',
+  END_DATE: 'endDate'
 };
 
 const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
@@ -114,7 +116,9 @@ class CubeSymbols {
     if (CONTEXT_SYMBOLS[name]) {
       // always resolves if contextSymbols aren't passed for transpile step
       const symbol = contextSymbols && contextSymbols[CONTEXT_SYMBOLS[name]] || {};
-      symbol._objectWithResolvedProperties = true;
+      if (typeof symbol === 'object') {
+        symbol._objectWithResolvedProperties = true;
+      }
       return symbol;
     }
     let cube = this.isCurrentCube(name) && this.symbols[cubeName] || this.symbols[name];

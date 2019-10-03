@@ -5,7 +5,11 @@ const identifier = Joi.string().regex(/^[_a-zA-Z][_a-zA-Z0-9]*$/, 'identifier');
 const timeInterval =
   Joi.alternatives([
     Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
-    Joi.any().valid('unbounded')
+    Joi.any().valid('unbounded'),
+    Joi.object().keys({
+      sql: Joi.func().required(),
+      inclusive: Joi.boolean()
+    })
   ]);
 
 const BaseDimensionWithoutSubQuery = {

@@ -207,19 +207,40 @@ class BaseQuery {
     );
   }
 
-  rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
+  rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset, cubeName) {
     offset = offset || 'end';
     return this.timeDimensions.map(d =>
       [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
         // dateFrom based window
         const conditions = [];
-        if (trailingInterval !== 'unbounded') {
+        if (trailingInterval && trailingInterval.sql) {
+          const fn = () => this.evaluateSql(cubeName, trailingInterval.sql);
+          const context = {
+            startDate: dateFrom,
+            endDate: dateTo
+          }
+          const evaluated = this.evaluateSymbolSqlWithContext(fn, context);
+          // Unless explicitly defined, the trailing start is inclusive by default
+          const sign = trailingInterval.inclusive === undefined || trailingInterval.inclusive ? '>=' : '>';
+          conditions.push(`${dateField} ${sign} ${evaluated}`);
+        } else if (trailingInterval !== 'unbounded') {
           const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
           const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
           const sign = offset === 'start' ? '>=' : '>';
           conditions.push(`${dateField} ${sign} ${trailingStart}`);
         }
-        if (leadingInterval !== 'unbounded') {
+
+        if (leadingInterval && leadingInterval.sql) {
+          const fn = () => this.evaluateSql(cubeName, leadingInterval.sql);
+          const context = {
+            startDate: dateFrom,
+            endDate: dateTo
+          }
+          const evaluated = this.evaluateSymbolSqlWithContext(fn, context);
+          // Unless explicitly defined, the leading end is not inclusive by default
+          const sign = leadingInterval.inclusive ? '<=' : '<';
+          conditions.push(`${dateField} ${sign} ${evaluated}`)
+        } else if (leadingInterval !== 'unbounded') {
           const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
           const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
           const sign = offset === 'end' ? '<=' : '<';
@@ -977,7 +998,7 @@ class BaseQuery {
           cubeName,
           name
         );
-      if (resolvedSymbol._objectWithResolvedProperties) {
+      if (typeof resolvedSymbol !== 'object' || resolvedSymbol._objectWithResolvedProperties) {
         return resolvedSymbol;
       }
       return self.evaluateSymbolSql(nextCubeName, name, resolvedSymbol);
@@ -1167,6 +1188,9 @@ class BaseQuery {
   }
 
   evaluateFiltersArray(filtersArray, cubeName) {
+    console.log('evaluate sql', {
+      cubeName, filtersArray
+    })
     return filtersArray.map(f => this.evaluateSql(cubeName, f.sql))
       .map(s => `(${s})`).join(' AND ');
   }
@@ -1334,7 +1358,9 @@ class BaseQuery {
       sqlUtils: {
         convertTz: this.convertTz.bind(this)
       }
-    }, R.map(
+    },
+    this.safeEvaluateSymbolContext(),
+    R.map(
       (symbols) => this.contextSymbolsProxy(symbols),
       this.contextSymbols
     ));
