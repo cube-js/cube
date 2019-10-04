@@ -42,6 +42,15 @@ cube(`Users`, {
 });
 ```
 
+## Naming
+
+There are certain rules to follow for a cube and cube member names. 
+You can use only `0-9`, `_`, and letter characters when naming a cube or a cube member.
+Names should always start with a letter.
+
+As a convention cube names start with upper case letters and member names with lower case letters.
+As in case of JavaScript camel case is used for multi-word cube and member names.
+
 ## Parameters
 
 ### sql
@@ -127,9 +136,10 @@ Cube.js caching layer uses `refreshKey` queries to get the current version of co
 If a query result changes, Cube.js will invalidate all queries that rely on that cube.
 If the `refreshKey` is not set, Cube.js will use the default strategy:
 
-1. Check the `max` of time dimensions with `updated` in the name, if none exist…
-2. Check the `max` of any existing time dimension, if none exist…
-3. Check the row count for this cube.
+1. Check used pre-aggregations for query and use [pre-aggregations refreshKey](pre-aggregations#refresh-key), if none pre-aggregations are used…
+2. Check the `max` of time dimensions with `updated` in the name, if none exist…
+3. Check the `max` of any existing time dimension, if none exist…
+4. Check the row count for this cube.
 
 The result of the `refreshKey` query itself is cached for 2 minutes by default. You can
 change it by passing the [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) option when configuring the Cube.js Server.
