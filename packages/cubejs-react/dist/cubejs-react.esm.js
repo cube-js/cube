@@ -65,11 +65,22 @@ function (_React$Component) {
       }
     }
   }, {
-    key: "componentDidUpdate",
-    value: function componentDidUpdate(prevProps) {
+    key: "shouldComponentUpdate",
+    value: function shouldComponentUpdate(nextProps, nextState) {
       var _this$props2 = this.props,
           query = _this$props2.query,
-          queries = _this$props2.queries;
+          queries = _this$props2.queries,
+          render = _this$props2.render,
+          cubejsApi = _this$props2.cubejsApi,
+          loadSql = _this$props2.loadSql;
+      return !equals(nextProps.query, query) || !equals(nextProps.queries, queries) || (nextProps.render == null || render == null) && nextProps.render !== render || nextProps.cubejsApi !== cubejsApi || nextProps.loadSql !== loadSql || !equals(nextState, this.state);
+    }
+  }, {
+    key: "componentDidUpdate",
+    value: function componentDidUpdate(prevProps) {
+      var _this$props3 = this.props,
+          query = _this$props3.query,
+          queries = _this$props3.queries;
 
       if (!equals(prevProps.query, query)) {
         this.load(query);
@@ -90,9 +101,9 @@ function (_React$Component) {
         error: null,
         sqlQuery: null
       });
-      var _this$props3 = this.props,
-          loadSql = _this$props3.loadSql,
-          cubejsApi = _this$props3.cubejsApi;
+      var _this$props4 = this.props,
+          loadSql = _this$props4.loadSql,
+          cubejsApi = _this$props4.cubejsApi;
 
       if (query && QueryRenderer.isQueryPresent(query)) {
         if (loadSql === 'only') {

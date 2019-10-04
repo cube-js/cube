@@ -103,7 +103,7 @@ ExploreQueryBuilder.propTypes = {
   vizState: PropTypes.object,
   setVizState: PropTypes.func,
   cubejsApi: PropTypes.object,
-  chartExtra: PropTypes.object
+  chartExtra: PropTypes.array
 };
 
 ExploreQueryBuilder.defaultProps = {

@@ -24,6 +24,18 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
+  shouldComponentUpdate(nextProps, nextState) {
+    const {
+      query, queries, render, cubejsApi, loadSql
+    } = this.props;
+    return !equals(nextProps.query, query)
+      || !equals(nextProps.queries, queries)
+      || ((nextProps.render == null || render == null) && nextProps.render !== render)
+      || nextProps.cubejsApi !== cubejsApi
+      || nextProps.loadSql !== loadSql
+      || !equals(nextState, this.state);
+  }
+
   componentDidUpdate(prevProps) {
     const { query, queries } = this.props;
     if (!equals(prevProps.query, query)) {
