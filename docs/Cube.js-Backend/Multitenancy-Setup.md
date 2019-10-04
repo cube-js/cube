@@ -33,6 +33,7 @@ There're several multitenancy setup scenarios that can be achieved by using comb
 
 Per tenant row level security can be achieved by providing [queryTransformer](@cubejs-backend-server-core#query-transformer) which adds tenant identifier filter to the original query.
 
+**index.js:**
 ```javascript
 const CubejsServer = require('@cubejs-backend/server');
 
@@ -66,6 +67,7 @@ To make it work with Cube.js,
 first we need to pass the `appId` and `userId` as context to every query. We
 should include that into our token generation code.
 
+**index.js:**
 ```javascript
 const jwt = require('jsonwebtoken');
 const CUBE_API_SECRET='secret';
@@ -81,7 +83,7 @@ Now, we can access them as `authInfo` object inside the context object. Let's
 first use `contextToAppId` to create a dynamic Cube.js App ID for every combination of
 `appId` and `userId`. Cube.js App ID is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
 
-
+**index.js:**
 ```javascript
 const CubejsServer = require('@cubejs-backend/server');
 
@@ -97,6 +99,7 @@ server.listen().then(({ port }) => {
 Next, we can use `driverFactory` to dynamically select database, based on
 `appId` and `userId`.
 
+**index.js:**
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const CubejsServer = require('@cubejs-backend/server');
@@ -118,6 +121,7 @@ server.listen().then(({ port }) => {
 
 To support per tenant pre-aggregation of data within same database instance you should provide `preAggregationsSchema` option.
 
+**index.js:**
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const CubejsServer = require('@cubejs-backend/server');
@@ -140,6 +144,7 @@ We can instruct Cube.js to connect to MongoDB in that case, instead of
 Postgres. For that purpose we'll use `dbType` option to dynamically set database
 type. We also need to modify our `driverFactory` option.
 
+**index.js:**
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
@@ -178,6 +183,7 @@ use `repositoryFactory` option to dynamically set a repository with schema files
 
 Below you can find final setup with `repositoryFactory` option.
 
+**index.js:**
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
@@ -219,6 +225,7 @@ If you are deploying Cube.js to AWS Lambda with [serverless template](deployment
 
 Add the following code to your `cube.js` file for the serverless multitenancy setup.
 
+**cube.js:**
 ```javascript
 const AWSHandlers = require('@cubejs-backend/serverless-aws');
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
