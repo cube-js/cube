@@ -231,7 +231,7 @@ export default () => {
 |[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](./examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js|
 |[Event Analytics](https://d1ygcqhosay4lt.cloudfront.net/)|[event-analytics](https://github.com/cube-js/cube.js/tree/master/examples/event-analytics)|Mixpanel like Event Analytics App built with Cube.js and Snowplow|
 |[Node Express Dashboard](https://express-analytics-dashboard.herokuapp.com)|[node-express-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/express-analytics-dashboard)|Analytics Dashboard with Node, Express, and Cube.js|
-|[Cube.js External Rollups Demo](https://cubejs-external-rollups.herokuapp.com/)|[external-rollups](https://github.com/cube-js/cube.js/tree/master/examples/external-rollups)|Compare performance of direct BigQuery querying vs MySQL cached version for the same data|
+|[External Rollups](https://cubejs-external-rollups.herokuapp.com/)|[external-rollups](https://github.com/cube-js/cube.js/tree/master/examples/external-rollups)|Compare performance of direct BigQuery querying vs MySQL cached version for the same data|
 
 ## Tutorials
 
