@@ -6842,8 +6842,14 @@
 	          queries = _this$props2.queries,
 	          render = _this$props2.render,
 	          cubejsApi = _this$props2.cubejsApi,
-	          loadSql = _this$props2.loadSql;
-	      return !equals(nextProps.query, query) || !equals(nextProps.queries, queries) || (nextProps.render == null || render == null) && nextProps.render !== render || nextProps.cubejsApi !== cubejsApi || nextProps.loadSql !== loadSql || !equals(nextState, this.state);
+	          loadSql = _this$props2.loadSql,
+	          updateOnlyOnStateChange = _this$props2.updateOnlyOnStateChange;
+
+	      if (!updateOnlyOnStateChange) {
+	        return true;
+	      }
+
+	      return !equals(nextProps.query, query) || !equals(nextProps.queries, queries) || (nextProps.render == null || render == null) && nextProps.render !== render || nextProps.cubejsApi !== cubejsApi || nextProps.loadSql !== loadSql || !equals(nextState, this.state) || nextProps.updateOnlyOnStateChange !== updateOnlyOnStateChange;
 	    }
 	  }, {
 	    key: "componentDidUpdate",
@@ -7009,13 +7015,15 @@
 	  cubejsApi: PropTypes.object.isRequired,
 	  query: PropTypes.object,
 	  queries: PropTypes.object,
-	  loadSql: PropTypes.any
+	  loadSql: PropTypes.any,
+	  updateOnlyOnStateChange: PropTypes.bool
 	};
 	QueryRenderer.defaultProps = {
 	  query: null,
 	  render: null,
 	  queries: null,
-	  loadSql: null
+	  loadSql: null,
+	  updateOnlyOnStateChange: false
 	};
 
 	var QueryRendererWithTotals = function QueryRendererWithTotals(_ref) {

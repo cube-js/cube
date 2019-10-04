@@ -26,14 +26,18 @@ export default class QueryRenderer extends React.Component {
 
   shouldComponentUpdate(nextProps, nextState) {
     const {
-      query, queries, render, cubejsApi, loadSql
+      query, queries, render, cubejsApi, loadSql, updateOnlyOnStateChange
     } = this.props;
+    if (!updateOnlyOnStateChange) {
+      return true;
+    }
     return !equals(nextProps.query, query)
       || !equals(nextProps.queries, queries)
       || ((nextProps.render == null || render == null) && nextProps.render !== render)
       || nextProps.cubejsApi !== cubejsApi
       || nextProps.loadSql !== loadSql
-      || !equals(nextState, this.state);
+      || !equals(nextState, this.state)
+      || nextProps.updateOnlyOnStateChange !== updateOnlyOnStateChange;
   }
 
   componentDidUpdate(prevProps) {
@@ -113,12 +117,14 @@ QueryRenderer.propTypes = {
   cubejsApi: PropTypes.object.isRequired,
   query: PropTypes.object,
   queries: PropTypes.object,
-  loadSql: PropTypes.any
+  loadSql: PropTypes.any,
+  updateOnlyOnStateChange: PropTypes.bool
 };
 
 QueryRenderer.defaultProps = {
   query: null,
   render: null,
   queries: null,
-  loadSql: null
+  loadSql: null,
+  updateOnlyOnStateChange: false
 };

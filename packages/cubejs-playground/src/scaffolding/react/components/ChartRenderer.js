@@ -13,6 +13,7 @@ const renderChart = (Component) => ({ resultSet, error }) => (
 
 const ChartRenderer = ({ vizState, cubejsApi }) => vizState && (
   <QueryRenderer
+    updateOnlyOnStateChange
     query={vizState.query}
     cubejsApi={cubejsApi}
     render={

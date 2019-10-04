@@ -78,8 +78,14 @@ function (_React$Component) {
           queries = _this$props2.queries,
           render = _this$props2.render,
           cubejsApi = _this$props2.cubejsApi,
-          loadSql = _this$props2.loadSql;
-      return !ramda.equals(nextProps.query, query) || !ramda.equals(nextProps.queries, queries) || (nextProps.render == null || render == null) && nextProps.render !== render || nextProps.cubejsApi !== cubejsApi || nextProps.loadSql !== loadSql || !ramda.equals(nextState, this.state);
+          loadSql = _this$props2.loadSql,
+          updateOnlyOnStateChange = _this$props2.updateOnlyOnStateChange;
+
+      if (!updateOnlyOnStateChange) {
+        return true;
+      }
+
+      return !ramda.equals(nextProps.query, query) || !ramda.equals(nextProps.queries, queries) || (nextProps.render == null || render == null) && nextProps.render !== render || nextProps.cubejsApi !== cubejsApi || nextProps.loadSql !== loadSql || !ramda.equals(nextState, this.state) || nextProps.updateOnlyOnStateChange !== updateOnlyOnStateChange;
     }
   }, {
     key: "componentDidUpdate",
@@ -245,13 +251,15 @@ QueryRenderer.propTypes = {
   cubejsApi: PropTypes.object.isRequired,
   query: PropTypes.object,
   queries: PropTypes.object,
-  loadSql: PropTypes.any
+  loadSql: PropTypes.any,
+  updateOnlyOnStateChange: PropTypes.bool
 };
 QueryRenderer.defaultProps = {
   query: null,
   render: null,
   queries: null,
-  loadSql: null
+  loadSql: null,
+  updateOnlyOnStateChange: false
 };
 
 var QueryRendererWithTotals = function QueryRendererWithTotals(_ref) {
