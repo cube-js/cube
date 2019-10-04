@@ -87,7 +87,7 @@ describe('ResultSet', () => {
 
       expect(resultSet.normalizePivotConfig({ y: ['Foo.bar'] })).toEqual({
         x: ['Foo.createdAt'],
-        y: ['Foo.bar', 'measures'],
+        y: ['Foo.bar'],
         fillMissingDates: true
       });
     });
