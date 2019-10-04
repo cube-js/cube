@@ -28,13 +28,13 @@ class LocalQueueDriverConnection {
     return this.resultPromises[resultListKey];
   }
 
-  async getResultBlocking(queryKey, continueWaitTimeout) {
+  async getResultBlocking(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
     const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
     const res = await Promise.race([
       this.getResultPromise(resultListKey),
-      timeoutPromise(continueWaitTimeout || this.continueWaitTimeout * 1000),
+      timeoutPromise(this.continueWaitTimeout * 1000),
     ]);
     if (res) {
       delete this.resultPromises[resultListKey];
@@ -45,7 +45,7 @@ class LocalQueueDriverConnection {
   async getResult(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
     if (this.resultPromises[resultListKey]) {
-      return this.getResultBlocking(queryKey, 5);
+      return this.getResultBlocking(queryKey);
     }
     return null;
   }
