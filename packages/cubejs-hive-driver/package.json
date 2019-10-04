@@ -2,13 +2,13 @@
   "name": "@cubejs-backend/hive-driver",
   "description": "Cube.js Hive database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.10.35",
+  "version": "0.10.58",
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "driver/HiveDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.10.35",
+    "@cubejs-backend/query-orchestrator": "^0.10.58",
     "generic-pool": "^3.6.0",
     "jshs2": "^0.4.4",
     "sasl-plain": "^0.1.0",

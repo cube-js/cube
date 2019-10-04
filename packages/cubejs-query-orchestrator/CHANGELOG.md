@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.58](https://github.com/statsbotco/cubejs-client/compare/v0.10.57...v0.10.58) (2019-10-04)
+
+
+### Bug Fixes
+
+* `continueWaitTimout` option is ignored in LocalQueueDriver ([#224](https://github.com/statsbotco/cubejs-client/issues/224)) ([4f72a52](https://github.com/statsbotco/cubejs-client/commit/4f72a52))
+
+
+
+
+
 ## [0.10.35](https://github.com/statsbotco/cubejs-client/compare/v0.10.34...v0.10.35) (2019-09-09)
 
 
