@@ -67,7 +67,6 @@ To make it work with Cube.js,
 first we need to pass the `appId` and `userId` as context to every query. We
 should include that into our token generation code.
 
-**index.js:**
 ```javascript
 const jwt = require('jsonwebtoken');
 const CUBE_API_SECRET='secret';
