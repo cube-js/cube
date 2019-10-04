@@ -33,7 +33,7 @@ class BaseDriver {
               COLUMNS.TABLE_SCHEMA as ${this.quoteIdentifier('table_schema')},
               COLUMNS.DATA_TYPE as ${this.quoteIdentifier('data_type')}
       FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE COLUMNS.TABLE_SCHEMA NOT IN ('information_schema', 'performance_schema', 'sys')
+      WHERE COLUMNS.TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
    `;
   }
 
