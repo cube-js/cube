@@ -63,7 +63,7 @@ class MSSqlDriver extends BaseDriver {
 
   createSchemaIfNotExists(schemaName) {
     return this.query(
-      `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
+      `SELECT schema_name FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = ${this.param(0)}`,
       [schemaName]
     ).then((schemas) => {
       if (schemas.length === 0) {
