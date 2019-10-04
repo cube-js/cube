@@ -34,7 +34,9 @@ There're several multitenancy setup scenarios that can be achieved by using comb
 Per tenant row level security can be achieved by providing [queryTransformer](@cubejs-backend-server-core#query-transformer) which adds tenant identifier filter to the original query.
 
 ```javascript
-CubejsServerCore.create({
+const CubejsServer = require('@cubejs-backend/server');
+
+const server = new CubejsServer({
   queryTransformer: (query, { authInfo }) => {
     const user = authInfo.u;
     if (user.id) {
@@ -46,6 +48,10 @@ CubejsServerCore.create({
     }
     return query;
   }
+});
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
 });
 ```
 
@@ -77,9 +83,15 @@ first use `contextToAppId` to create a dynamic Cube.js App ID for every combinat
 
 
 ```javascript
-new CubejsServer({
+const CubejsServer = require('@cubejs-backend/server');
+
+const server = new CubejsServer({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`
-})
+});
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+});
 ```
 
 Next, we can use `driverFactory` to dynamically select database, based on
@@ -87,13 +99,18 @@ Next, we can use `driverFactory` to dynamically select database, based on
 
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const CubejsServer = require('@cubejs-backend/server');
 
-new CubejsServer({
+const server = new CubejsServer({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
   driverFactory: ({ authInfo }) =>
     new PostgresDriver({
       database: `my_app_${authInfo.appId}_${authInfo.userId}`
     })
+});
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
 });
 ```
 
@@ -103,10 +120,15 @@ To support per tenant pre-aggregation of data within same database instance you 
 
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const CubejsServer = require('@cubejs-backend/server');
 
-new CubejsServer({
+const server = new CubejsServer({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.userId}`,
   preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`
+});
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
 });
 ```
 
@@ -121,8 +143,9 @@ type. We also need to modify our `driverFactory` option.
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
+const CubejsServer = require('@cubejs-backend/server');
 
-new CubejsServer({
+const server = new CubejsServer({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
   dbType: ({ authInfo }) => {
     if (authInfo.appId === 3) {
@@ -144,6 +167,10 @@ new CubejsServer({
     }
   }
 });
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+});
 ```
 
 Lastly, we want to have separate data schemas for every application. In this case we can
@@ -155,8 +182,9 @@ Below you can find final setup with `repositoryFactory` option.
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
+const CubejsServer = require('@cubejs-backend/server');
 
-new CubejsServer({
+const server = new CubejsServer({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
   dbType: ({ authInfo }) => {
     if (authInfo.appId === 3) {
@@ -178,6 +206,10 @@ new CubejsServer({
     }
   },
   repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
+});
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
 });
 ```
 
