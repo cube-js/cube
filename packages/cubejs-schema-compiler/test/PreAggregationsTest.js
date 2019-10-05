@@ -9,7 +9,13 @@ require('should');
 const prepareCompiler = PrepareCompiler.prepareCompiler;
 const dbRunner = require('./DbRunner');
 
-describe('PreAggregations', () => {
+describe('PreAggregations', function test() {
+  this.timeout(20000);
+
+  after(async () => {
+    await dbRunner.tearDown();
+  });
+
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     cube(\`visitors\`, {
       sql: \`

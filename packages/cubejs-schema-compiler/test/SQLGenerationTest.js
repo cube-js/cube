@@ -1,15 +1,20 @@
 /* eslint-disable quote-props */
-const CompileError = require('../compiler/CompileError');
 const UserError = require('../compiler/UserError');
 const PostgresQuery = require('../adapter/PostgresQuery');
 const BigqueryQuery = require('../adapter/BigqueryQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 
-const prepareCompiler = PrepareCompiler.prepareCompiler;
+const { prepareCompiler } = PrepareCompiler;
 const dbRunner = require('./DbRunner');
 
-describe('SQL Generation', () => {
+describe('SQL Generation', function test() {
+  this.timeout(20000);
+
+  after(async () => {
+    await dbRunner.tearDown();
+  });
+
   const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',

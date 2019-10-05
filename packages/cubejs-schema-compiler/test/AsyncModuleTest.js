@@ -1,5 +1,5 @@
 /* eslint-disable quote-props */
-/* globals describe, it */
+/* globals describe, it, after */
 const PostgresQuery = require('../adapter/PostgresQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
@@ -7,7 +7,13 @@ require('should');
 const { prepareCompiler } = PrepareCompiler;
 const dbRunner = require('./DbRunner');
 
-describe('AsyncModule', () => {
+describe('AsyncModule', function test() {
+  this.timeout(20000);
+
+  after(async () => {
+    await dbRunner.tearDown();
+  });
+
   it('gutter', () => {
     const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
     const rp = require('request-promise');

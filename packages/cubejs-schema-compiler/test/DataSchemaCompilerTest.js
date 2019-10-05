@@ -8,7 +8,13 @@ require('should');
 const prepareCompiler = PrepareCompiler.prepareCompiler;
 const dbRunner = require('./DbRunner');
 
-describe('DataSchemaCompiler', () => {
+describe('DataSchemaCompiler', function test() {
+  this.timeout(20000);
+
+  after(async () => {
+    await dbRunner.tearDown();
+  });
+
   it('gutter', () => {
     const { compiler } = prepareCompiler(`
     cube('visitors', {
