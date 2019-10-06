@@ -154,11 +154,7 @@ const DashboardPage = ({ cubejsApi }) => {
     </div>
   );
 
-  return !data || data.dashboardItems.length ? (
-    <Dashboard dashboardItems={data && data.dashboardItems}>
-      {data && data.dashboardItems.map(deserializeItem).map(dashboardItem)}
-    </Dashboard>
-  ) : (
+  const Empty = () => (
     <div
       style={{
         textAlign: "center",
@@ -173,6 +169,12 @@ const DashboardPage = ({ cubejsApi }) => {
       </Link>
     </div>
   );
+
+  return !data || data.dashboardItems.length ? (
+    <Dashboard dashboardItems={data && data.dashboardItems}>
+      {data && data.dashboardItems.map(deserializeItem).map(dashboardItem)}
+    </Dashboard>
+  ) : <Empty />;
 };
 
 export default DashboardPage;
