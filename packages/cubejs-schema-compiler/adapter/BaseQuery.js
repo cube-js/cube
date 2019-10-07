@@ -460,7 +460,7 @@ class BaseQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
     );
-    return `SELECT date_from::timestamptz, date_to::timestamptz FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
+    return `SELECT ${this.dateTimeCast('date_from')}, ${this.dateTimeCast('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
   timeStampParam(timeDimension) {
