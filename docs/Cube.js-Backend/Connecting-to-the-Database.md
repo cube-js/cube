@@ -58,6 +58,10 @@ To use Cube.js with MongoDB you need to install MongoDB Connector for BI. You
 can download it [here](https://www.mongodb.com/download-center/bi-connector). [Learn more about setup for MongoDB
 here.](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
 
+### MongoDB Atlas
+
+Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` can be left blank.
+
 ### AWS Athena
 
 For Athena, you'll need to specify the AWS access and secret keys with the [access necessary to run Athena queries](https://docs.aws.amazon.com/athena/latest/ug/access.html), and the target AWS region and [S3 output location](https://docs.aws.amazon.com/athena/latest/ug/querying.html) where query results are stored.
