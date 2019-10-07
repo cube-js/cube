@@ -3,7 +3,7 @@ const { reduce } = require('ramda');
 const sortByKeys = (unordered) => {
   const ordered = {};
 
-  Object.keys(unordered).sort().forEach(function (key) {
+  Object.keys(unordered).sort().forEach(function(key) {
     ordered[key] = unordered[key];
   });
 
@@ -28,12 +28,12 @@ const DbTypeToGenericType = {
 class BaseDriver {
   informationSchemaQuery() {
     return `
-      SELECT  COLUMNS.COLUMN_NAME as ${this.quoteIdentifier('column_name')},
-              COLUMNS.TABLE_NAME as ${this.quoteIdentifier('table_name')},
-              COLUMNS.TABLE_SCHEMA as ${this.quoteIdentifier('table_schema')},
-              COLUMNS.DATA_TYPE as ${this.quoteIdentifier('data_type')}
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE COLUMNS.TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
    `;
   }
 
@@ -67,18 +67,18 @@ class BaseDriver {
 
   createSchemaIfNotExists(schemaName) {
     return this.query(
-      `SELECT schema_name FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = ${this.param(0)}`,
+      `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
       [schemaName]
     ).then((schemas) => {
-      if (schemas.length === 0) {
-        return this.query("CREATE SCHEMA IF NOT EXISTS " + schemaName);
-      }
-    });
+        if (schemas.length === 0) {
+          return this.query("CREATE SCHEMA IF NOT EXISTS " + schemaName);
+        }
+      });
   }
 
   getTablesQuery(schemaName) {
     return this.query(
-      `SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = ${this.param(0)}`,
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
       [schemaName]
     );
   }
@@ -130,11 +130,11 @@ class BaseDriver {
   async tableColumnTypes(table) {
     const [schema, name] = table.split('.');
     const columns = await this.query(
-      `SELECT COLUMNS.COLUMN_NAME ,
-          COLUMNS.TABLE_NAME ,
-          COLUMNS.TABLE_SCHEMA ,
-          COLUMNS.DATA_TYPE 
-      FROM INFORMATION_SCHEMA.COLUMNS
+      `SELECT columns.column_name,
+             columns.table_name,
+             columns.table_schema,
+             columns.data_type
+      FROM information_schema.columns 
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name, schema]
     );
