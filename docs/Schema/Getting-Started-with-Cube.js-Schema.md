@@ -178,8 +178,8 @@ FROM users
 Same as for other measures, `payingPercentage` can be used with dimensions.
 
 ## 5. Next Steps
-We've answered all our questions in the beginning of the tutorial. But there is a
-lot more Cube.js can do for you. We recommend checking out the [Reference
-documentation](cube), as well as [Guides](subquery) and [Examples](examples).
 
-If you have any questions or need help—[please join our Slack community](https://publicslack.com/slacks/cubejs/invites/new) of amazing developers and contributors.
+1. [Examples](examples)
+2. [Query schema using frontend libraries](query-format).
+3. [REST API](rest-api)
+4. [Schema reference documentation](cube)
