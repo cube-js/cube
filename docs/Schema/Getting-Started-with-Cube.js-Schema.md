@@ -180,6 +180,6 @@ Same as for other measures, `payingPercentage` can be used with dimensions.
 ## 5. Next Steps
 
 1. [Examples](examples)
-2. [Query schema using frontend libraries](query-format).
+2. [Query schema using frontend libraries](query-format)
 3. [REST API](rest-api)
 4. [Schema reference documentation](cube)
