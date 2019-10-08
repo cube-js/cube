@@ -1,3 +1,7 @@
+/**
+ * @module @cubejs-client/core
+ */
+
 import {
   groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
 } from 'ramda';
@@ -19,7 +23,10 @@ const TIME_SERIES = {
     .map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
 };
 
-export default class ResultSet {
+/**
+ * Provides a convenient interface for data manipulation.
+ */
+class ResultSet {
   constructor(loadResponse) {
     this.loadResponse = loadResponse;
   }
@@ -191,6 +198,30 @@ export default class ResultSet {
     return this.chartPivot(pivotConfig);
   }
 
+  /**
+   * Returns normalized query result data in the following format.
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-12-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.chartPivot() will return
+   * [
+   *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
+   *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
+   *   { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
+   *   //...
+   * ]
+   * ```
+   * @param pivotConfig
+   */
   chartPivot(pivotConfig) {
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ', '), // TODO deprecated
@@ -203,6 +234,33 @@ export default class ResultSet {
     }));
   }
 
+  /**
+   * Returns normalized query result data prepared for visualization in the table format.
+   *
+   * For example
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-12-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.tablePivot() will return
+   * [
+   *   { "Stories.time": "2015-01-01T00:00:00", "Stories.count": 27120 },
+   *   { "Stories.time": "2015-02-01T00:00:00", "Stories.count": 25861 },
+   *   { "Stories.time": "2015-03-01T00:00:00", "Stories.count": 29661 },
+   *   //...
+   * ]
+   * ```
+   * @param pivotConfig
+   * @returns {Array} of pivoted rows
+   */
   tablePivot(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const valueToObject =
@@ -221,6 +279,32 @@ export default class ResultSet {
     ));
   }
 
+  /**
+   * Returns array of column definitions for `tablePivot`.
+   *
+   * For example
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-12-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.tableColumns() will return
+   * [
+   *   { key: "Stories.time", title: "Stories Time" },
+   *   { key: "Stories.count", title: "Stories Count" },
+   *   //...
+   * ]
+   * ```
+   * @param pivotConfig
+   * @returns {Array} of columns
+   */
   tableColumns(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const column = field => (
@@ -247,6 +331,28 @@ export default class ResultSet {
     return this.chartPivot(pivotConfig);
   }
 
+  /**
+   * Returns the array of series objects, containing `key` and `title` parameters.
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-12-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.seriesNames() will return
+   * [
+   * { "key":"Stories.count", "title": "Stories Count" }
+   * ]
+   * ```
+   * @param pivotConfig
+   * @returns {Array} of series names
+   */
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(axisValues => ({
@@ -266,3 +372,5 @@ export default class ResultSet {
     return this.loadResponse.data;
   }
 }
+
+export default ResultSet;

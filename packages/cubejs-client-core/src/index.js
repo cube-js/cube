@@ -1,3 +1,11 @@
+/**
+ * Vanilla JavaScript Cube.js client.
+ * @module @cubejs-client/core
+ * @permalink /@cubejs-client-core
+ * @category Cube.js Frontend
+ * @menuOrder 2
+ */
+
 import fetch from 'cross-fetch';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
@@ -13,9 +21,13 @@ const MUTEX_ERROR = 'Mutex has been changed';
 const mutexPromise = (promise) => {
   return new Promise((resolve, reject) => {
     promise.then(r => resolve(r), e => e !== MUTEX_ERROR && reject(e));
-  })
+  });
 };
 
+/**
+ * Main class for accessing Cube.js API
+ * @order -5
+ */
 class CubejsApi {
   constructor(apiToken, options) {
     options = options || {};
@@ -78,6 +90,33 @@ class CubejsApi {
     }
   }
 
+  /**
+   * Fetch data for passed `query`.
+   *
+   * ```js
+   * import cubejs from '@cubejs-client/core';
+   * import Chart from 'chart.js';
+   * import chartjsConfig from './toChartjsData';
+   *
+   * const cubejsApi = cubejs('CUBEJS_TOKEN');
+   *
+   * const resultSet = await cubejsApi.load({
+   *  measures: ['Stories.count'],
+   *  timeDimensions: [{
+   *    dimension: 'Stories.time',
+   *    dateRange: ['2015-01-01', '2015-12-31'],
+   *    granularity: 'month'
+   *   }]
+   * });
+   *
+   * const context = document.getElementById('myChart');
+   * new Chart(context, chartjsConfig(resultSet));
+   * ```
+   * @param query - [Query object](query-format)
+   * @param options
+   * @param callback
+   * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
+   */
   load(query, options, callback) {
     return this.loadMethod(
       () => this.request(`/load?query=${encodeURIComponent(JSON.stringify(query))}`),
@@ -106,6 +145,27 @@ class CubejsApi {
   }
 }
 
+/**
+ * Create instance of `CubejsApi`.
+ * API entry point.
+ *
+ * ```javascript
+ import cubejs from '@cubejs-client/core';
+
+ const cubejsApi = cubejs(
+ 'CUBEJS-API-TOKEN',
+ { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+ );
+ ```
+ * @name cubejs
+ * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
+ * In the development mode, Cube.js Backend will print the API token to the console on on startup.
+ * @param options - options object.
+ * @param options.apiUrl - URL of your Cube.js Backend.
+ * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
+ * @returns {CubejsApi}
+ * @order -10
+ */
 export default (apiToken, options) => {
   return new CubejsApi(apiToken, options);
 };

@@ -6,36 +6,43 @@ subCategory: Reference
 menuOrder: 2
 ---
 
-`@cubejs-client/core` is a Javascript client library to use with
-Cube.js Backend.
+Vanilla JavaScript Cube.js client.
 
 ## cubejs
 
-Create instance of `CubejsApi`.
+> undefined(apiToken, options)
 
-* `apiToken` - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup.
-* `options` - options object.
-   * `apiUrl` - URL of your Cube.js Backend. By default, in the development environment it is http://localhost:4000/cubejs-api/v1.
+Create instance of `CubejsApi`.
+API entry point.
 
 ```javascript
-import cubejs from '@cubejs-client/core';
+ import cubejs from '@cubejs-client/core';
 
-const cubejsApi = cubejs(
-  'CUBEJS-API-TOKEN',
-  { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
-);
-```
+ const cubejsApi = cubejs(
+ 'CUBEJS-API-TOKEN',
+ { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+ );
+ ```
+
+**Parameters:**
+
+- **apiToken** - [API token](security) is used to authorize requests and determine SQL database you're accessing.
+In the development mode, Cube.js Backend will print the API token to the console on on startup.
+- **options** - options object.
+- **options.apiUrl** - URL of your Cube.js Backend.
+By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
+
+**Returns:** [CubejsApi](#CubejsApi)
 
 ## CubejsApi
 
+Main class for accessing Cube.js API
+
 ### load
 
-Fetch data for passed `query`. Returns promise for [ResultSet](#result-set) if `callback` isn't passed.
+> CubejsApi#load(query, options, callback)
 
-* `query` - analytic query. Learn more about it's format below.
-* `options` - options object. Can be omitted.
-    * `progressCallback(ProgressResult)` - pass function to receive real time query execution progress.
-* `callback(err, ResultSet)` - result callback. If not passed `load()` will return promise.
+Fetch data for passed `query`.
 
 ```js
 import cubejs from '@cubejs-client/core';
@@ -45,21 +52,34 @@ import chartjsConfig from './toChartjsData';
 const cubejsApi = cubejs('CUBEJS_TOKEN');
 
 const resultSet = await cubejsApi.load({
-  measures: ['Stories.count'],
-  timeDimensions: [{
-    dimension: 'Stories.time',
-    dateRange: ['2015-01-01', '2015-12-31'],
-    granularity: 'month'
+ measures: ['Stories.count'],
+ timeDimensions: [{
+   dimension: 'Stories.time',
+   dateRange: ['2015-01-01', '2015-12-31'],
+   granularity: 'month'
   }]
-})
+});
+
 const context = document.getElementById('myChart');
 new Chart(context, chartjsConfig(resultSet));
 ```
 
+**Parameters:**
+
+- **query** - [Query object](query-format)
+- **options**
+- **callback**
+
+**Returns:** **Promise** for [ResultSet](ResultSet) if `callback` isn't passed
+
 ## ResultSet
-`ResultSet` provides a convient interface for data munipulation.
+
+Provides a convenient interface for data manipulation.
 
 ### chartPivot
+
+> ResultSet#chartPivot(pivotConfig)
+
 Returns normalized query result data in the following format.
 
 ```js
@@ -75,35 +95,23 @@ Returns normalized query result data in the following format.
 
 // ResultSet.chartPivot() will return
 [
-    { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
-    { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
-    { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
-    //...
+  { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
+  { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
+  { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
+  //...
 ]
 ```
 
-### seriesNames
+**Parameters:**
 
-Returns the array of series objects, containing `key` and `title` parameters.
+- **pivotConfig**
 
-```js
-// For query
-{
-  measures: ['Stories.count'],
-  timeDimensions: [{
-    dimension: 'Stories.time',
-    dateRange: ['2015-01-01', '2015-12-31'],
-    granularity: 'month'
-  }]
-}
 
-// ResultSet.seriesNames() will return
-[
-   { "key":"Stories.count", "title": "Stories Count" }
-]
-```
 
 ### tablePivot
+
+> ResultSet#tablePivot(pivotConfig)
+
 Returns normalized query result data prepared for visualization in the table format.
 
 For example
@@ -121,16 +129,24 @@ For example
 
 // ResultSet.tablePivot() will return
 [
-    { "Stories.time": "2015-01-01T00:00:00", "Stories.count": 27120 },
-    { "Stories.time": "2015-02-01T00:00:00", "Stories.count": 25861 },
-    { "Stories.time": "2015-03-01T00:00:00", "Stories.count": 29661 },
-    //...
+  { "Stories.time": "2015-01-01T00:00:00", "Stories.count": 27120 },
+  { "Stories.time": "2015-02-01T00:00:00", "Stories.count": 25861 },
+  { "Stories.time": "2015-03-01T00:00:00", "Stories.count": 29661 },
+  //...
 ]
 ```
 
+**Parameters:**
+
+- **pivotConfig**
+
+**Returns:** **Array** of pivoted rows
 
 ### tableColumns
-Returns array of column definitions for `tablePivot`. 
+
+> ResultSet#tableColumns(pivotConfig)
+
+Returns array of column definitions for `tablePivot`.
 
 For example
 
@@ -147,8 +163,44 @@ For example
 
 // ResultSet.tableColumns() will return
 [
-    { key: "Stories.time", title: "Stories Time" },
-    { key: "Stories.count", title: "Stories Count" },
-    //...
+  { key: "Stories.time", title: "Stories Time" },
+  { key: "Stories.count", title: "Stories Count" },
+  //...
 ]
 ```
+
+**Parameters:**
+
+- **pivotConfig**
+
+**Returns:** **Array** of columns
+
+### seriesNames
+
+> ResultSet#seriesNames(pivotConfig)
+
+Returns the array of series objects, containing `key` and `title` parameters.
+
+```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.seriesNames() will return
+[
+{ "key":"Stories.count", "title": "Stories Count" }
+]
+```
+
+**Parameters:**
+
+- **pivotConfig**
+
+**Returns:** **Array** of series names
+

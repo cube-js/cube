@@ -1,0 +1,19 @@
+{
+  "name": "docs-gen",
+  "version": "0.0.1",
+  "dependencies": {
+    "@babel/generator": "^7.4.0",
+    "@babel/parser": "^7.4.2",
+    "@babel/preset-env": "^7.3.4",
+    "@babel/preset-react": "^7.0.0",
+    "@babel/standalone": "^7.3.4",
+    "@babel/traverse": "^7.4.0",
+    "@babel/types": "^7.4.0",
+    "fs-extra": "^8.1.0",
+    "jsdoc": "^3.6.3"
+  },
+  "scripts": {
+    "generate": "jsdoc -t template ../packages/cubejs-client-core/src/*.js -d ../docs/Cube.js-Frontend/@cubejs-client-core.md"
+  },
+  "license": "MIT"
+}
