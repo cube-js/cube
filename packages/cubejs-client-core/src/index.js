@@ -126,6 +126,13 @@ class CubejsApi {
     );
   }
 
+  /**
+   * Get generated SQL string for given `query`.
+   * @param query - [Query object](query-format)
+   * @param options
+   * @param callback
+   * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
+   */
   sql(query, options, callback) {
     return this.loadMethod(
       () => this.request(`/sql?query=${JSON.stringify(query)}`),
@@ -135,6 +142,12 @@ class CubejsApi {
     );
   }
 
+  /**
+   * Get meta description of cubes available for querying.
+   * @param options
+   * @param callback
+   * @return {Promise} for {@link Meta} if `callback` isn't passed
+   */
   meta(options, callback) {
     return this.loadMethod(
       () => this.request(`/meta`),

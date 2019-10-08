@@ -72,6 +72,33 @@ new Chart(context, chartjsConfig(resultSet));
 
 **Returns:** `Promise` for [ResultSet](#result-set) if `callback` isn't passed
 
+### sql
+
+`CubejsApi#sql(query, options, callback)`
+
+Get generated SQL string for given `query`.
+
+**Parameters:**
+
+- `query` - [Query object](query-format)
+- `options`
+- `callback`
+
+**Returns:** `Promise` for [SqlQuery](#sql-query) if `callback` isn't passed
+
+### meta
+
+`CubejsApi#meta(options, callback)`
+
+Get meta description of cubes available for querying.
+
+**Parameters:**
+
+- `options`
+- `callback`
+
+**Returns:** `Promise` for [Meta](#meta) if `callback` isn't passed
+
 ## ResultSet
 
 Provides a convenient interface for data manipulation.
