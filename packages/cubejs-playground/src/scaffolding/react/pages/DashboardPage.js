@@ -5,6 +5,7 @@ import { useQuery } from "@apollo/react-hooks";
 import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
 import ChartRenderer from "../components/ChartRenderer";
 import Dashboard from "../components/Dashboard";
+import DashboardItem from "../components/DashboardItem";
 
 const deserializeItem = i => ({
   ...i,

@@ -30,8 +30,8 @@ const Dashboard = ({ children, dashboardItems }) => {
       if (item && toUpdate !== item.layout) {
         updateDashboardItem({
           variables: {
+            id: item.id,
             input: {
-              id: item.id,
               layout: toUpdate
             }
           }
