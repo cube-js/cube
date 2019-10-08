@@ -1,11 +1,14 @@
 const fs = require('fs-extra');
 const inline = require('jsdoc/tag/inline');
+const inflection = require('inflection');
 
 let knownClassNames = [];
 
+const anchorName = (link) => inflection.dasherize(inflection.underscore(link));
+
 const resolveInlineLinks = str => {
   return inline.replaceInlineTags(str, {
-    link: (string, { completeTag, text, tag }) => string.replace(completeTag, `[${text}](${text})`)
+    link: (string, { completeTag, text, tag }) => string.replace(completeTag, `[${text}](#${anchorName(text)})`)
   }).newString;
 };
 
@@ -14,10 +17,10 @@ const renderLinks = (p) => {
     return '*';
   }
   if (p.type && knownClassNames.indexOf(p.type.names.join('#')) !== -1) {
-    return `[${p.type.names.join('#')}](#${p.type.names.join('-')})`;
+    return `[${p.type.names.join('#')}](#${anchorName(p.type.names.join('-'))})`;
   }
   if (p.type) {
-    return `**${p.type.names.join('#')}**`;
+    return `\`${p.type.names.join('#')}\``;
   }
   return p;
 };
@@ -25,8 +28,8 @@ const renderLinks = (p) => {
 const generateFunctionDocletSection = (doclet) => {
   const title = doclet.name;
   const header = `##${doclet.longname.indexOf('#') !== -1 ? '#' : ''} ${title}\n`;
-  const signature = `> ${doclet.meta.code.name}(${doclet.params && doclet.params.filter(p => p.name.indexOf('.') === -1).map(p => p.name).join(', ') || ''})\n`;
-  const params = doclet.params ? `**Parameters:**\n\n${doclet.params.map(p => `- **${p.name}**${p.description ? ` - ${p.description}` : ''}`).join('\n')}\n` : ``;
+  const signature = `\`${doclet.meta.code.name || doclet.name}(${doclet.params && doclet.params.filter(p => p.name.indexOf('.') === -1).map(p => p.name).join(', ') || ''})\`\n`;
+  const params = doclet.params ? `**Parameters:**\n\n${doclet.params.map(p => `- \`${p.name}\`${p.description ? ` - ${p.description}` : ''}`).join('\n')}\n` : ``;
   const returns = doclet.returns ? `**Returns:** ${doclet.returns.map(p => `${p.type ? renderLinks(p) : ''}${p.description ? ` ${resolveInlineLinks(p.description)}` : ''}`)}` : ``;
   return [header, signature, `${doclet.description}\n`, params, returns, '\n'].join('\n');
 };

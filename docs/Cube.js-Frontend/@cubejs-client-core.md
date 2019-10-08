@@ -10,7 +10,7 @@ Vanilla JavaScript Cube.js client.
 
 ## cubejs
 
-> undefined(apiToken, options)
+`cubejs(apiToken, options)`
 
 Create instance of `CubejsApi`.
 API entry point.
@@ -26,13 +26,13 @@ API entry point.
 
 **Parameters:**
 
-- **apiToken** - [API token](security) is used to authorize requests and determine SQL database you're accessing.
+- `apiToken` - [API token](security) is used to authorize requests and determine SQL database you're accessing.
 In the development mode, Cube.js Backend will print the API token to the console on on startup.
-- **options** - options object.
-- **options.apiUrl** - URL of your Cube.js Backend.
+- `options` - options object.
+- `options.apiUrl` - URL of your Cube.js Backend.
 By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
 
-**Returns:** [CubejsApi](#CubejsApi)
+**Returns:** [CubejsApi](#cubejs-api)
 
 ## CubejsApi
 
@@ -40,7 +40,7 @@ Main class for accessing Cube.js API
 
 ### load
 
-> CubejsApi#load(query, options, callback)
+`CubejsApi#load(query, options, callback)`
 
 Fetch data for passed `query`.
 
@@ -66,11 +66,11 @@ new Chart(context, chartjsConfig(resultSet));
 
 **Parameters:**
 
-- **query** - [Query object](query-format)
-- **options**
-- **callback**
+- `query` - [Query object](query-format)
+- `options`
+- `callback`
 
-**Returns:** **Promise** for [ResultSet](ResultSet) if `callback` isn't passed
+**Returns:** `Promise` for [ResultSet](#result-set) if `callback` isn't passed
 
 ## ResultSet
 
@@ -78,7 +78,7 @@ Provides a convenient interface for data manipulation.
 
 ### chartPivot
 
-> ResultSet#chartPivot(pivotConfig)
+`ResultSet#chartPivot(pivotConfig)`
 
 Returns normalized query result data in the following format.
 
@@ -104,13 +104,13 @@ Returns normalized query result data in the following format.
 
 **Parameters:**
 
-- **pivotConfig**
+- `pivotConfig`
 
 
 
 ### tablePivot
 
-> ResultSet#tablePivot(pivotConfig)
+`ResultSet#tablePivot(pivotConfig)`
 
 Returns normalized query result data prepared for visualization in the table format.
 
@@ -138,13 +138,13 @@ For example
 
 **Parameters:**
 
-- **pivotConfig**
+- `pivotConfig`
 
-**Returns:** **Array** of pivoted rows
+**Returns:** `Array` of pivoted rows
 
 ### tableColumns
 
-> ResultSet#tableColumns(pivotConfig)
+`ResultSet#tableColumns(pivotConfig)`
 
 Returns array of column definitions for `tablePivot`.
 
@@ -171,13 +171,13 @@ For example
 
 **Parameters:**
 
-- **pivotConfig**
+- `pivotConfig`
 
-**Returns:** **Array** of columns
+**Returns:** `Array` of columns
 
 ### seriesNames
 
-> ResultSet#seriesNames(pivotConfig)
+`ResultSet#seriesNames(pivotConfig)`
 
 Returns the array of series objects, containing `key` and `title` parameters.
 
@@ -200,7 +200,7 @@ Returns the array of series objects, containing `key` and `title` parameters.
 
 **Parameters:**
 
-- **pivotConfig**
+- `pivotConfig`
 
-**Returns:** **Array** of series names
+**Returns:** `Array` of series names
 
