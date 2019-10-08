@@ -13,10 +13,19 @@ export class CubejsClient {
 
   private apiInstace() {
     if(!this.cubeJsApi) {
-      this.cubeJsApi = cubejs(
-        this.config.token,
-        this.config.options
-      );
+      if (this.config instanceof Observable) {
+        this.config.subscribe((config) => {
+          this.cubeJsApi = cubejs(
+            config.token,
+            config.options
+          )
+        })
+      } else {
+        this.cubeJsApi = cubejs(
+          this.config.token,
+          this.config.options
+        );
+      }
     }
 
     return this.cubeJsApi;
