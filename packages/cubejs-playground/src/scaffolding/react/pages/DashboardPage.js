@@ -4,19 +4,10 @@ import {
 } from "antd";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "@apollo/react-hooks";
-import RGL, { WidthProvider } from "react-grid-layout";
-import "react-grid-layout/css/styles.css";
-import "react-resizable/css/styles.css";
-import {
-  GET_DASHBOARD_ITEMS
-} from "../graphql/queries";
-import {
-  UPDATE_DASHBOARD_ITEM,
-  DELETE_DASHBOARD_ITEM
-} from "../graphql/mutations";
+import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
+import { DELETE_DASHBOARD_ITEM } from "../graphql/mutations";
 import ChartRenderer from "../components/ChartRenderer";
-
-const ReactGridLayout = WidthProvider(RGL);
+import Dashboard from "../components/Dashboard";
 
 const deserializeItem = i => ({
   ...i,
@@ -32,43 +23,6 @@ const defaultLayout = i => ({
   minW: 4,
   minH: 8
 });
-
-const Dashboard = ({ children, dashboardItems }) => {
-  const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
-    refetchQueries: [
-      {
-        query: GET_DASHBOARD_ITEMS
-      }
-    ]
-  });
-
-  const onLayoutChange = newLayout => {
-    newLayout.forEach(l => {
-      const item = dashboardItems.find(i => i.id.toString() === l.i);
-      const toUpdate = JSON.stringify({
-        x: l.x,
-        y: l.y,
-        w: l.w,
-        h: l.h
-      });
-
-      if (item && toUpdate !== item.layout) {
-        updateDashboardItem({
-          variables: {
-            id: item.id,
-            input: { layout: toUpdate }
-          }
-        });
-      }
-    });
-  };
-
-  return (
-    <ReactGridLayout cols={12} rowHeight={50} onLayoutChange={onLayoutChange}>
-      {children}
-    </ReactGridLayout>
-  );
-};
 
 const DashboardItemDropdown = ({ itemId }) => {
   const [removeDashboardItem] = useMutation(DELETE_DASHBOARD_ITEM, {
