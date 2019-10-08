@@ -1,11 +1,8 @@
 import React from "react";
-import {
-  Card, Spin, Button, Menu, Dropdown, Alert, Modal
-} from "antd";
+import { Spin, Button, Alert } from "antd";
 import { Link } from "react-router-dom";
-import { useQuery, useMutation } from "@apollo/react-hooks";
+import { useQuery } from "@apollo/react-hooks";
 import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
-import { DELETE_DASHBOARD_ITEM } from "../graphql/mutations";
 import ChartRenderer from "../components/ChartRenderer";
 import Dashboard from "../components/Dashboard";
 
@@ -23,65 +20,6 @@ const defaultLayout = i => ({
   minW: 4,
   minH: 8
 });
-
-const DashboardItemDropdown = ({ itemId }) => {
-  const [removeDashboardItem] = useMutation(DELETE_DASHBOARD_ITEM, {
-    refetchQueries: [
-      {
-        query: GET_DASHBOARD_ITEMS
-      }
-    ]
-  });
-  const dashboardItemDropdownMenu = (
-    <Menu>
-      <Menu.Item>
-        <Link to={`/explore?itemId=${itemId}`}>Edit</Link>
-      </Menu.Item>
-      <Menu.Item
-        onClick={() =>
-          Modal.confirm({
-            title: "Are you sure you want to delete this item?",
-            okText: "Yes",
-            okType: "danger",
-            cancelText: "No",
-
-            onOk() {
-              removeDashboardItem({
-                variables: {
-                  id: itemId
-                }
-              });
-            }
-          })
-        }
-      >
-        Delete
-      </Menu.Item>
-    </Menu>
-  );
-  return (
-    <Dropdown
-      overlay={dashboardItemDropdownMenu}
-      placement="bottomLeft"
-      trigger={["click"]}
-    >
-      <Button shape="circle" icon="menu" />
-    </Dropdown>
-  );
-};
-
-const DashboardItem = ({ itemId, children, title }) => (
-  <Card
-    title={title}
-    style={{
-      height: "100%",
-      width: "100%"
-    }}
-    extra={<DashboardItemDropdown itemId={itemId} />}
-  >
-    {children}
-  </Card>
-);
 
 const DashboardPage = ({ cubejsApi }) => {
   const { loading, error, data } = useQuery(GET_DASHBOARD_ITEMS);
