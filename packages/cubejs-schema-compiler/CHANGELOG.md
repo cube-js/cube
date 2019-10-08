@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.59](https://github.com/statsbotco/cubejs-client/compare/v0.10.58...v0.10.59) (2019-10-08)
+
+
+### Bug Fixes
+
+* Rolling window returns dates in incorrect time zone for Postgres ([71a3baa](https://github.com/statsbotco/cubejs-client/commit/71a3baa)), closes [#216](https://github.com/statsbotco/cubejs-client/issues/216)
+
+
+
+
+
 ## [0.10.41](https://github.com/statsbotco/cubejs-client/compare/v0.10.40...v0.10.41) (2019-09-13)
 
 
