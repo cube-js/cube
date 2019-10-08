@@ -93,7 +93,12 @@ class CubejsServerCore {
     const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
     const { machineIdSync } = require('node-machine-id');
     const { promisify } = require('util');
-    const anonymousId = machineIdSync();
+    let anonymousId = 'unknown';
+    try {
+      anonymousId = machineIdSync();
+    } catch (e) {
+      // console.error(e);
+    }
     this.anonymousId = anonymousId;
     this.event = async (name, props) => {
       if (!options.telemetry) {
