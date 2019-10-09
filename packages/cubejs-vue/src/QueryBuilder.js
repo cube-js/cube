@@ -28,7 +28,8 @@ export default {
       availableTimeDimensions: [],
       availableSegments: [],
       limit: null,
-      offset: null
+      offset: null,
+      renewQuery: false
     };
 
     data.granularities = [
@@ -64,7 +65,8 @@ export default {
       setLimit,
       removeLimit,
       setOffset,
-      removeOffset
+      removeOffset,
+      renewQuery
     } = this;
 
     let builderProps = {};
@@ -90,7 +92,8 @@ export default {
         setLimit,
         removeLimit,
         setOffset,
-        removeOffset
+        removeOffset,
+        renewQuery
       };
 
       QUERY_ELEMENTS.forEach((e) => {
@@ -136,7 +139,7 @@ export default {
     validatedQuery() {
       const validatedQuery = {};
       let toQuery = member => member.name;
-      // TODO: implement order, timezone, renewQuery
+      // TODO: implement timezone
 
       let hasElements = false;
       QUERY_ELEMENTS.forEach((e) => {
@@ -180,6 +183,10 @@ export default {
         if (this.offset) {
           validatedQuery.offset = this.offset;
         }
+
+        if (this.renewQuery) {
+          validatedQuery.renewQuery = this.renewQuery;
+        }
       }
 
       return validatedQuery;
@@ -213,6 +220,7 @@ export default {
       this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
       this.limit = (limit || null);
       this.offset = (offset || null);
+      this.renewQuery = (renewQuery || false);
     },
     addMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
