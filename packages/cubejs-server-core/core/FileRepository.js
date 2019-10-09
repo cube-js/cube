@@ -11,13 +11,26 @@ class FileRepository {
     return path.join(process.cwd(), this.repositoryPath);
   }
 
+  async getFiles(dir, fileList = []) {
+    const files = await fs.readdir(dir);
+    for (const file of files) {
+      const stat = await fs.stat(path.join(dir, file));
+      if (stat.isDirectory())
+        fileList = await this.getFiles(path.join(dir, file), fileList);
+      else fileList.push(path.join(dir, file));
+    }
+    return fileList;
+  }
+
   async dataSchemaFiles(includeDependencies) {
     const self = this;
-    const files = await fs.readdir(this.localPath());
+    const files = await self.getFiles(self.localPath());
+
     let result = await Promise.all(
-      files.filter((file) => R.endsWith('.js', file))
-        .map(async (file) => {
-          const content = await fs.readFile(path.join(self.localPath(), file), "utf-8");
+      files
+        .filter(file => R.endsWith(".js", file))
+        .map(async file => {
+          const content = await fs.readFile(file, "utf-8");
           return { fileName: file, content };
         })
     );
