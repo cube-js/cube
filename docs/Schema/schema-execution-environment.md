@@ -3,7 +3,7 @@ title: Execution Environment
 permalink: /schema-execution-environment
 scope: cubejs
 category: Reference
-menuOrder: 6
+menuOrder: 9
 subCategory: Reference
 ---
 
