@@ -144,7 +144,7 @@ Each of these properties inside `cube` and `context` definitions are transpiled 
 
 For example:
 
-```
+```javascript
 cube(`Users`, {
   // ...
   
@@ -163,7 +163,7 @@ cube(`Users`, {
 
 is transpiled to:
 
-```
+```javascript
 cube(`Users`, {
   // ...
   
