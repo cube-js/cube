@@ -215,8 +215,8 @@ export default {
       }));
       this.filters = (filters || []).map((m, i) => ({
         ...m,
-        member: this.meta.resolveMember(m.member, ['dimensions', 'measures']),
-        operators: this.meta.filterOperatorsForMember(m.member, ['dimensions', 'measures']),
+        member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+        operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
         index: i
       }));
 
@@ -382,8 +382,8 @@ export default {
 
   watch: {
     query: {
-      handler: async function () {
-        await this.setQueryValues();
+      handler: function () {
+        return this.setQueryValues();
       },
       immediate: true
     }
