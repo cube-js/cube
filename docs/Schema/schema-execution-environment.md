@@ -125,3 +125,57 @@ asyncModule(async () => {
   });
 })
 ```
+
+## Context symbols transpile
+
+Cube.js uses custom transpiler to optimize boilerplate code around referencing cubes and cube members.
+There're reserved property names inside `cube` definition that undergo reference resolve transpiling process:
+
+-`sql` 
+- `measureReferences`
+- `dimensionReferences`
+- `segmentReferences`
+- `timeDimensionReference` 
+- `drillMembers`
+- `drillMemberReferences`
+- `contextMembers`
+
+Each of these properties inside `cube` and `context` definitions are transpiled to functions with resolved arguments.
+
+For example:
+
+```
+cube(`Users`, {
+  // ...
+  
+  measures: {
+    count: {
+      type: `count`
+    },
+    
+    ratio: {
+      sql: `sum(${CUBE}.amount) / ${count}`,
+      type: `number`
+    }
+  }
+});
+```
+
+is transpiled to:
+
+```
+cube(`Users`, {
+  // ...
+  
+  measures: {
+    count: {
+      type: `count`
+    },
+    
+    ratio: {
+      sql: (CUBE, count) => `sum(${CUBE}.amount) / ${count}`,
+      type: `number`
+    }
+  }
+});
+```
