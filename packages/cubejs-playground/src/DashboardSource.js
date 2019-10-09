@@ -12,6 +12,7 @@ import DashboardStoreSnippet from "./source/DashboardStoreSnippet";
 import SourceSnippet from "./source/SourceSnippet";
 
 const indexCss = `
+@import '~antd/dist/antd.css';
 body {
   background-color: #f0f2f5 !important;
 }
@@ -64,7 +65,7 @@ class DashboardSource {
 
   async persist() {
     const updateIndexCss = this.appLayoutAdded ? [
-      { ...this.indexCssFile, content: this.indexCssFile.content + indexCss }
+      { ...this.indexCssFile, content: indexCss }
     ] : [];
     const toPersist = this.filesToPersist.concat(
       Object.keys(this.fileToTargetSource).map(fileName => ({

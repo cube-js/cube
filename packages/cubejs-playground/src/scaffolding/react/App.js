@@ -1,7 +1,5 @@
 import React from "react";
 import { ApolloProvider } from '@apollo/react-hooks';
-import "antd/dist/antd.css";
-import "./index.css";
 import { Layout } from "antd";
 import client from "./graphql/client";
 import Header from "./components/Header";
