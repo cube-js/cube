@@ -62,7 +62,7 @@ If there's a need to generate schema based on values from external API or databa
 
 For example:
 
-```
+```javascript
 const fetch = require('node-fetch');
 const Funnels = require('Funnels');
 
