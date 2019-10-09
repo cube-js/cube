@@ -28,7 +28,7 @@ export default {
       availableTimeDimensions: [],
       availableSegments: [],
       limit: null,
-      offset: null,
+      offset: null
     };
 
     data.granularities = [
@@ -41,35 +41,7 @@ export default {
 
     return data;
   },
-  async mounted() {
-    this.meta = await this.cubejsApi.meta();
 
-    const { measures, dimensions, segments, timeDimensions, filters, limit, offset } = this.query;
-
-    this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
-    this.dimensions = (dimensions || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') }));
-    this.segments = (segments || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'segments') }));
-    this.timeDimensions = (timeDimensions || []).map((m, i) => ({
-      ...m,
-      dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
-      index: i
-    }));
-    this.filters = (filters || []).map((m, i) => ({
-      ...m,
-      // using 'dimension' is deprecated, 'member' should be specified instead
-      member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-      operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
-      index: i
-    }));
-
-    this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
-    this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
-    this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || [])
-      .filter(m => m.type === 'time');
-    this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
-    this.limit = (limit || null);
-    this.offset = (offset || null);
-  },
   render(createElement) {
     const {
       chartType,
@@ -92,7 +64,7 @@ export default {
       setLimit,
       removeLimit,
       setOffset,
-      removeOffset,
+      removeOffset
     } = this;
 
     let builderProps = {};
@@ -118,7 +90,7 @@ export default {
         setLimit,
         removeLimit,
         setOffset,
-        removeOffset,
+        removeOffset
       };
 
       QUERY_ELEMENTS.forEach((e) => {
@@ -208,13 +180,40 @@ export default {
         if (this.offset) {
           validatedQuery.offset = this.offset;
         }
-        // add order
       }
 
       return validatedQuery;
     },
   },
   methods: {
+    async setQueryValues() {
+      this.meta = await this.cubejsApi.meta();
+
+      const { measures, dimensions, segments, timeDimensions, filters, limit, offset, renewQuery, order } = this.query;
+
+      this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
+      this.dimensions = (dimensions || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') }));
+      this.segments = (segments || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'segments') }));
+      this.timeDimensions = (timeDimensions || []).map((m, i) => ({
+        ...m,
+        dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
+        index: i
+      }));
+      this.filters = (filters || []).map((m, i) => ({
+        ...m,
+        member: this.meta.resolveMember(m.member, ['dimensions', 'measures']),
+        operators: this.meta.filterOperatorsForMember(m.member, ['dimensions', 'measures']),
+        index: i
+      }));
+
+      this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
+      this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
+      this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || [])
+        .filter(m => m.type === 'time');
+      this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
+      this.limit = (limit || null);
+      this.offset = (offset || null);
+    },
     addMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
       let mem;
@@ -364,4 +363,13 @@ export default {
       this.chartType = chartType;
     },
   },
+
+  watch: {
+    query: {
+      handler: async function () {
+        await this.setQueryValues();
+      },
+      immediate: true
+    }
+  }
 };
