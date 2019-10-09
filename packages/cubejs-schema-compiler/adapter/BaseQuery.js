@@ -1364,7 +1364,8 @@ class BaseQuery {
               throw new UserError(`Filter for ${column} is required`);
             }
             return methods.filter(column);
-          }
+          },
+          unsafeValue: () => paramValue
         });
         return methods(target)[name] ||
           typeof propValue === 'object' && this.contextSymbolsProxy(propValue) ||
