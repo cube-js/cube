@@ -131,7 +131,7 @@ asyncModule(async () => {
 Cube.js uses custom transpiler to optimize boilerplate code around referencing cubes and cube members.
 There're reserved property names inside `cube` definition that undergo reference resolve transpiling process:
 
--`sql` 
+- `sql` 
 - `measureReferences`
 - `dimensionReferences`
 - `segmentReferences`
