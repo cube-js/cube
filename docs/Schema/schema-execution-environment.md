@@ -39,7 +39,7 @@ Later, you can `import` into the cube, wherever needed:
 ```javascript
 // in Users.js
 import { TEST_USER_IDS } from './constants';
-import usersSql from 'usersSql'
+import usersSql from './usersSql'
 
 cube(`Users`, {
  sql: usersSql(`users`),
