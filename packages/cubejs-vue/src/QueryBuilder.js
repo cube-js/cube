@@ -29,7 +29,8 @@ export default {
       availableSegments: [],
       limit: null,
       offset: null,
-      renewQuery: false
+      renewQuery: false,
+      order: {}
     };
 
     data.granularities = [
@@ -66,7 +67,8 @@ export default {
       removeLimit,
       setOffset,
       removeOffset,
-      renewQuery
+      renewQuery,
+      order
     } = this;
 
     let builderProps = {};
@@ -93,7 +95,8 @@ export default {
         removeLimit,
         setOffset,
         removeOffset,
-        renewQuery
+        renewQuery,
+        order
       };
 
       QUERY_ELEMENTS.forEach((e) => {
@@ -184,6 +187,10 @@ export default {
           validatedQuery.offset = this.offset;
         }
 
+        if (this.order) {
+          validatedQuery.order = this.order;
+        }
+
         if (this.renewQuery) {
           validatedQuery.renewQuery = this.renewQuery;
         }
@@ -221,6 +228,7 @@ export default {
       this.limit = (limit || null);
       this.offset = (offset || null);
       this.renewQuery = (renewQuery || false);
+      this.order = (order || {});
     },
     addMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
