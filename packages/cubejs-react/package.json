@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.10.57",
+  "version": "0.10.61",
   "description": "React components for cube.js",
   "author": "Statsbot, Inc.",
   "dependencies": {
@@ -9,8 +9,8 @@
     "ramda": "^0.25.0"
   },
   "peerDependencies": {
-    "react": "^16.10.2",
-    "prop-types": "^15.6.2"
+    "prop-types": "^15.6.2",
+    "react": "^16.10.2"
   },
   "main": "dist/cubejs-react.js",
   "scripts": {
@@ -29,7 +29,7 @@
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-node": "^10.0.0",
     "eslint-plugin-react": "^7.15.1",
-    "react": "^16.10.2",
-    "prop-types": "^15.6.2"
+    "prop-types": "^15.6.2",
+    "react": "^16.10.2"
   }
 }

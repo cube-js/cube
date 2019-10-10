@@ -2,13 +2,13 @@
   "name": "@cubejs-backend/serverless-aws",
   "description": "Cube.js Serverless AWS support",
   "author": "Statsbot, Inc.",
-  "version": "0.10.59",
+  "version": "0.10.61",
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/serverless": "^0.10.59",
+    "@cubejs-backend/serverless": "^0.10.61",
     "aws-sdk": "^2.404.0"
   },
   "devDependencies": {
