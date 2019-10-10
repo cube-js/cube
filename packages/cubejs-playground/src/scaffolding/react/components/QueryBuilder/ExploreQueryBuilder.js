@@ -17,6 +17,7 @@ const ExploreQueryBuilder = ({
     vizState={vizState}
     setVizState={setVizState}
     cubejsApi={cubejsApi}
+    wrapWithQueryRenderer={false}
     render={({
       validatedQuery, isQueryPresent, chartType, updateChartType,
       measures, availableMeasures, updateMeasures,

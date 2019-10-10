@@ -1,19 +1,15 @@
 import traverse from "@babel/traverse";
 import SourceSnippet from './SourceSnippet';
 import ScaffoldingSources from '../codegen/ScaffoldingSources';
-import * as t from "@babel/types";
 
 class IndexSnippet extends SourceSnippet {
-  constructor({ apiUrl, cubejsToken }) {
+  constructor() {
     super(ScaffoldingSources['react/index.js']);
-    this.apiUrl = apiUrl;
-    this.cubejsToken = cubejsToken;
   }
 
   mergeTo(targetSource) {
     super.mergeTo(targetSource);
     this.replaceRouter(targetSource);
-    this.replaceTokens(targetSource);
   }
 
   replaceRouter(targetSource) {
@@ -42,14 +38,6 @@ class IndexSnippet extends SourceSnippet {
       const targetPath = this.findAppOrRouter(targetSource);
       targetPath.replaceWith(routerElement.parentPath);
     }
-  }
-
-  replaceTokens(targetSource) {
-    const apiUrl = targetSource.definitions.find(d => d.get('id').node.name === 'API_URL');
-    apiUrl.get('init').replaceWith(t.stringLiteral(this.apiUrl));
-
-    const cubejsToken = targetSource.definitions.find(d => d.get('id').node.name === 'CUBEJS_TOKEN');
-    cubejsToken.get('init').replaceWith(t.stringLiteral(this.cubejsToken));
   }
 
   findAppOrRouter(targetSource) {

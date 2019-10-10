@@ -6,7 +6,7 @@ import ExploreQueryBuilder from "../components/QueryBuilder/ExploreQueryBuilder"
 import { GET_DASHBOARD_ITEM } from "../graphql/queries";
 import TitleModal from "../components/TitleModal.js";
 
-const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
+const ExplorePage = withRouter(({ history, location }) => {
   const [addingToDashboard, setAddingToDashboard] = useState(false);
   const params = new URLSearchParams(location.search);
   const itemId = params.get("itemId");
@@ -48,7 +48,6 @@ const ExplorePage = withRouter(({ cubejsApi, history, location }) => {
         finalTitle={finalTitle}
       />
       <ExploreQueryBuilder
-        cubejsApi={cubejsApi}
         vizState={finalVizState}
         setVizState={setVizState}
         chartExtra={[

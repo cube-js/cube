@@ -1,10 +1,13 @@
 import traverse from "@babel/traverse";
 import SourceSnippet from './SourceSnippet';
 import ScaffoldingSources from '../codegen/ScaffoldingSources';
+import * as t from "@babel/types";
 
 class AppSnippet extends SourceSnippet {
-  constructor() {
+  constructor({ apiUrl, cubejsToken }) {
     super(ScaffoldingSources['react/App.js']);
+    this.apiUrl = apiUrl;
+    this.cubejsToken = cubejsToken;
   }
 
   findDefinitions() {
@@ -19,6 +22,7 @@ class AppSnippet extends SourceSnippet {
     const targetPath = this.insertAnchor(targetSource);
 
     targetPath.replaceWith(appPath);
+    this.replaceTokens(targetSource);
   }
 
   insertAnchor(targetSource) {
@@ -34,6 +38,14 @@ class AppSnippet extends SourceSnippet {
       throw new Error(`App class not found. Can't parse dashboard app.  Please delete dashboard-app directory and try to create it again.`);
     }
     return appClass;
+  }
+
+  replaceTokens(targetSource) {
+    const apiUrl = targetSource.definitions.find(d => d.get('id').node.name === 'API_URL');
+    apiUrl.get('init').replaceWith(t.stringLiteral(this.apiUrl));
+
+    const cubejsToken = targetSource.definitions.find(d => d.get('id').node.name === 'CUBEJS_TOKEN');
+    cubejsToken.get('init').replaceWith(t.stringLiteral(this.cubejsToken));
   }
 }
 
