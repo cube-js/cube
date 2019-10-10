@@ -199,10 +199,15 @@ export default {
       return validatedQuery;
     },
   },
-  methods: {
-    async setQueryValues() {
-      this.meta = await this.cubejsApi.meta();
 
+  async mounted() {
+    this.meta = await this.cubejsApi.meta();
+
+    this.copyQueryFromProps();
+  },
+
+  methods: {
+    copyQueryFromProps() {
       const { measures, dimensions, segments, timeDimensions, filters, limit, offset, renewQuery, order } = this.query;
 
       this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
@@ -381,11 +386,15 @@ export default {
   },
 
   watch: {
-    query: {
-      handler: function () {
-        return this.setQueryValues();
-      },
-      immediate: true
+    query() {
+      if (!this.meta) {
+        // this is ok as if meta has not been loaded by the time query prop has changed,
+        // then the promise for loading meta (found in mounted()) will call
+        // copyQueryFromProps and will therefore update anyway.
+        return;
+      }
+
+      this.copyQueryFromProps();
     }
   }
 };

@@ -593,10 +593,6 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.filters.length).toBe(1);
       expect(wrapper.vm.filters[0].member.name).toBe('Orders.number');
       expect(wrapper.vm.filters[0].values).toContain('1');
-
-      wrapper.vm.$nextTick(() => {
-
-      });
     });
   });
 });
