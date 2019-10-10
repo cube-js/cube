@@ -15,7 +15,7 @@ into Vue.js app.
 
 ### Props
 
-- `query`: analytic query. [Learn more about it's format](query-format).
+- `query`: query parameters ([learn more about its format](query-format)).
 - `cubejsApi`: `CubejsApi` instance to use.
 
 ### Slots
@@ -24,19 +24,21 @@ into Vue.js app.
 
 ##### Slot Props
 
-- `resultSet`: A `resultSet` is an object containing data obtained from the query. [ResultSet](@cubejs-client-core#result-set) object provides a convient interface for data munipulation.
+- `resultSet`: A `resultSet` is an object containing data obtained from the query. [ResultSet](@cubejs-client-core#result-set) object provides a convenient interface for data manipulation.
 
 #### Empty Slot
 
-This slot functions as a empty/loading state in which if the query is loading or empty you can show
-something in the meantime
+This slot functions as a empty/loading state in which if the query is loading or empty so you can show
+something in the meantime.
 
 #### Error Slot
 
+This slot will be rendered if any error happens while the query is loading or rendering.
+
 ##### Slot Props
 
-- `error`: will show the details from error.
-- `sqlQuery`: will show tried query
+- `error`: the error.
+- `sqlQuery`: the attempted query.
 
 ### Example
 ```js
@@ -93,11 +95,12 @@ export default {
 ```
 
 ## QueryBuilder
-`<QueryBuilder />` is used to  build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses scoped slot props technique.
+`<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses scoped slot props technique.
 
 ### Props
 
-- `query`: default query.
+- `query`: query parameters ([learn more about its format](query-format)). This property is reactive - if you change the object here,
+the internal query values will be overwritten. This is not two-way. 
 - `cubejsApi`: `CubejsApi` instance to use. Required.
 - `defaultChartType`: default value of chart type. Default: 'line'.
 
@@ -107,38 +110,39 @@ export default {
 
 ##### Slot Props
 
-- `resultSet`: A `resultSet` is an object containing data obtained from the query. [ResultSet](@cubejs-client-core#result-set) object provides a convient interface for data munipulation.
+- `resultSet`: A `resultSet` is an object containing data obtained from the query. [ResultSet](@cubejs-client-core#result-set) object provides a convenient interface for data manipulation.
 
 #### Empty Slot
 
 This slot functions as a empty/loading state in which if the query is loading or empty you can show
-something in the meantime
+something in the meantime.
 
 #### Error Slot
 
+This slot will be rendered if any error happens while the query is loading or rendering.
+
 ##### Slot Props
 
-- `error`: will show the details from error.
-- `sqlQuery`: will show tried query
+- `error`: the error.
+- `sqlQuery`: the attempted query.
 
 #### Builder Slot
 
-- `measures`, `dimensions`, `segments`, `timeDimensions`, `filters` - arrays of
+- `measures`, `dimensions`, `segments`, `timeDimensions`, `filters` - arrays containing the
 selected query builder members.
 - `availableMeasures`, `availableDimensions`, `availableTimeDimensions`,
-`availableSegments` - arrays of available to select members. They are loaded via
+`availableSegments` - arrays containing available members to select. They are loaded via
 API from Cube.js Backend.
-- `addMeasures`, `addDimensions`, `addSegments`, `addTimeDimensions` - function to control the adding of new members to query builder
-- `removeMeasures`, `removeDimensions`, `removeSegments`, `removeTimeDimensions` - function to control the removing of member to query builder
-- `setMeasures`, `setDimensions`, `setSegments`, `setTimeDimensions` - function to control the set of members to query builder
-- `updateMeasures`, `updateDimensions`, `updateSegments`, `updateTimeDimensions` - function to control the update of member to query builder
-- `chartType` - string, containing currently selected chart type.
+- `addMeasures`, `addDimensions`, `addSegments`, `addTimeDimensions` - functions to control the adding of new members to query builder.
+- `removeMeasures`, `removeDimensions`, `removeSegments`, `removeTimeDimensions` - functions to control the removing of members to query builder.
+- `setMeasures`, `setDimensions`, `setSegments`, `setTimeDimensions` - functions to control the setting of members to query builder.
+- `updateMeasures`, `updateDimensions`, `updateSegments`, `updateTimeDimensions` - functions to control the updating of members to query builder.
+- `chartType` - string containing currently selected chart type.
 - `updateChartType` - function-setter for chart type.
-- `isQueryPresent` - Bool indicating whether is query ready to be displayed or
-    not.
+- `isQueryPresent` - bool indicating whether is query ready to be displayed or not.
 - `query` - current query, based on selected members.
-- `setLimit`, `removeLimit` - functions to control the number of results returned
-- `setOffset`, `removeOffset` - functions to control the number of rows skipped before results returned. Use with limit to control pagination
+- `setLimit`, `removeLimit` - functions to control the number of results returned.
+- `setOffset`, `removeOffset` - functions to control the number of rows skipped before results returned. Use with limit to control pagination.
 
 ### Example
 [Open in CodeSandbox](https://codesandbox.io/s/3rlxjkv2p)
