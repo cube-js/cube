@@ -262,7 +262,8 @@ class CubejsServerCore {
       devServer: this.options.devServer,
       logger: this.logger,
       externalDbType: options.externalDbType,
-      preAggregationsSchema: options.preAggregationsSchema
+      preAggregationsSchema: options.preAggregationsSchema,
+      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey
     });
   }
 
