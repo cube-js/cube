@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.62](https://github.com/statsbotco/cubejs-client/compare/v0.10.61...v0.10.62) (2019-10-11)
+
+
+### Features
+
+* **vue:** Add order, renewQuery, and reactivity to Vue component ([#229](https://github.com/statsbotco/cubejs-client/issues/229)). Thanks to @TCBroad ([9293f13](https://github.com/statsbotco/cubejs-client/commit/9293f13))
+
+
+
+
+
 ## [0.10.61](https://github.com/statsbotco/cubejs-client/compare/v0.10.60...v0.10.61) (2019-10-10)
 
 **Note:** Version bump only for package @cubejs-client/vue
