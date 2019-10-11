@@ -13,9 +13,9 @@ import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
 import { toPairs, fromPairs } from 'ramda';
 import 'core-js/modules/es6.array.find-index';
 import 'core-js/modules/es6.array.find';
+import 'core-js/modules/es6.array.filter';
 import 'core-js/modules/es6.function.name';
 import 'core-js/modules/es6.array.for-each';
-import 'core-js/modules/es6.array.filter';
 
 var QueryRenderer = {
   props: {
@@ -331,7 +331,9 @@ var QueryBuilder = {
       availableTimeDimensions: [],
       availableSegments: [],
       limit: null,
-      offset: null
+      offset: null,
+      renewQuery: false,
+      order: {}
     };
     data.granularities = [{
       name: 'hour',
@@ -351,78 +353,8 @@ var QueryBuilder = {
     }];
     return data;
   },
-  mounted: function () {
-    var _mounted = _asyncToGenerator(
-    /*#__PURE__*/
-    _regeneratorRuntime.mark(function _callee() {
-      var _this = this;
-
-      var _this$query, measures, dimensions, segments, timeDimensions, filters, limit, offset;
-
-      return _regeneratorRuntime.wrap(function _callee$(_context) {
-        while (1) {
-          switch (_context.prev = _context.next) {
-            case 0:
-              _context.next = 2;
-              return this.cubejsApi.meta();
-
-            case 2:
-              this.meta = _context.sent;
-              _this$query = this.query, measures = _this$query.measures, dimensions = _this$query.dimensions, segments = _this$query.segments, timeDimensions = _this$query.timeDimensions, filters = _this$query.filters, limit = _this$query.limit, offset = _this$query.offset;
-              this.measures = (measures || []).map(function (m, i) {
-                return _objectSpread({
-                  index: i
-                }, _this.meta.resolveMember(m, 'measures'));
-              });
-              this.dimensions = (dimensions || []).map(function (m, i) {
-                return _objectSpread({
-                  index: i
-                }, _this.meta.resolveMember(m, 'dimensions'));
-              });
-              this.segments = (segments || []).map(function (m, i) {
-                return _objectSpread({
-                  index: i
-                }, _this.meta.resolveMember(m, 'segments'));
-              });
-              this.timeDimensions = (timeDimensions || []).map(function (m, i) {
-                return _objectSpread({}, m, {
-                  dimension: _objectSpread({}, _this.meta.resolveMember(m.dimension, 'dimensions'), {
-                    granularities: _this.granularities
-                  }),
-                  index: i
-                });
-              });
-              this.filters = (filters || []).map(function (m, i) {
-                return _objectSpread({}, m, {
-                  // using 'dimension' is deprecated, 'member' should be specified instead
-                  member: _this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-                  operators: _this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
-                  index: i
-                });
-              });
-              this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
-              this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
-              this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || []).filter(function (m) {
-                return m.type === 'time';
-              });
-              this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
-              this.limit = limit || null;
-              this.offset = offset || null;
-
-            case 15:
-            case "end":
-              return _context.stop();
-          }
-        }
-      }, _callee, this);
-    }));
-
-    return function mounted() {
-      return _mounted.apply(this, arguments);
-    };
-  }(),
   render: function render(createElement) {
-    var _this2 = this;
+    var _this = this;
 
     var chartType = this.chartType,
         cubejsApi = this.cubejsApi,
@@ -444,7 +376,9 @@ var QueryBuilder = {
         setLimit = this.setLimit,
         removeLimit = this.removeLimit,
         setOffset = this.setOffset,
-        removeOffset = this.removeOffset;
+        removeOffset = this.removeOffset,
+        renewQuery = this.renewQuery,
+        order = this.order;
     var builderProps = {};
 
     if (meta) {
@@ -468,25 +402,27 @@ var QueryBuilder = {
         setLimit: setLimit,
         removeLimit: removeLimit,
         setOffset: setOffset,
-        removeOffset: removeOffset
+        removeOffset: removeOffset,
+        renewQuery: renewQuery,
+        order: order
       };
       QUERY_ELEMENTS.forEach(function (e) {
         var name = e.charAt(0).toUpperCase() + e.slice(1);
 
         builderProps["add".concat(name)] = function (member) {
-          _this2.addMember(e, member);
+          _this.addMember(e, member);
         };
 
         builderProps["update".concat(name)] = function (member, updateWith) {
-          _this2.updateMember(e, member, updateWith);
+          _this.updateMember(e, member, updateWith);
         };
 
         builderProps["remove".concat(name)] = function (member) {
-          _this2.removeMember(e, member);
+          _this.removeMember(e, member);
         };
 
         builderProps["set".concat(name)] = function (members) {
-          _this2.setMembers(e, members);
+          _this.setMembers(e, members);
         };
       });
     } // Pass parent slots to child QueryRenderer component
@@ -495,7 +431,7 @@ var QueryBuilder = {
     var children = Object.keys(this.$slots).map(function (slot) {
       return createElement('template', {
         slot: slot
-      }, _this2.$slots[slot]);
+      }, _this.$slots[slot]);
     });
     return createElement(QueryRenderer, {
       props: {
@@ -512,18 +448,18 @@ var QueryBuilder = {
       return Object.keys(query).length > 0;
     },
     validatedQuery: function validatedQuery() {
-      var _this3 = this;
+      var _this2 = this;
 
       var validatedQuery = {};
 
       var toQuery = function toQuery(member) {
         return member.name;
-      }; // TODO: implement order, timezone, renewQuery
+      }; // TODO: implement timezone
 
 
       var hasElements = false;
       QUERY_ELEMENTS.forEach(function (e) {
-        if (!_this3[e]) {
+        if (!_this2[e]) {
           return;
         }
 
@@ -545,8 +481,8 @@ var QueryBuilder = {
           };
         }
 
-        if (_this3[e].length > 0) {
-          validatedQuery[e] = _this3[e].map(function (x) {
+        if (_this2[e].length > 0) {
+          validatedQuery[e] = _this2[e].map(function (x) {
             return toQuery(x);
           });
           hasElements = true;
@@ -568,14 +504,102 @@ var QueryBuilder = {
 
         if (this.offset) {
           validatedQuery.offset = this.offset;
-        } // add order
+        }
 
+        if (this.order) {
+          validatedQuery.order = this.order;
+        }
+
+        if (this.renewQuery) {
+          validatedQuery.renewQuery = this.renewQuery;
+        }
       }
 
       return validatedQuery;
     }
   },
+  mounted: function () {
+    var _mounted = _asyncToGenerator(
+    /*#__PURE__*/
+    _regeneratorRuntime.mark(function _callee() {
+      return _regeneratorRuntime.wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _context.next = 2;
+              return this.cubejsApi.meta();
+
+            case 2:
+              this.meta = _context.sent;
+              this.copyQueryFromProps();
+
+            case 4:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee, this);
+    }));
+
+    return function mounted() {
+      return _mounted.apply(this, arguments);
+    };
+  }(),
   methods: {
+    copyQueryFromProps: function copyQueryFromProps() {
+      var _this3 = this;
+
+      var _this$query = this.query,
+          measures = _this$query.measures,
+          dimensions = _this$query.dimensions,
+          segments = _this$query.segments,
+          timeDimensions = _this$query.timeDimensions,
+          filters = _this$query.filters,
+          limit = _this$query.limit,
+          offset = _this$query.offset,
+          renewQuery = _this$query.renewQuery,
+          order = _this$query.order;
+      this.measures = (measures || []).map(function (m, i) {
+        return _objectSpread({
+          index: i
+        }, _this3.meta.resolveMember(m, 'measures'));
+      });
+      this.dimensions = (dimensions || []).map(function (m, i) {
+        return _objectSpread({
+          index: i
+        }, _this3.meta.resolveMember(m, 'dimensions'));
+      });
+      this.segments = (segments || []).map(function (m, i) {
+        return _objectSpread({
+          index: i
+        }, _this3.meta.resolveMember(m, 'segments'));
+      });
+      this.timeDimensions = (timeDimensions || []).map(function (m, i) {
+        return _objectSpread({}, m, {
+          dimension: _objectSpread({}, _this3.meta.resolveMember(m.dimension, 'dimensions'), {
+            granularities: _this3.granularities
+          }),
+          index: i
+        });
+      });
+      this.filters = (filters || []).map(function (m, i) {
+        return _objectSpread({}, m, {
+          member: _this3.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+          operators: _this3.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
+          index: i
+        });
+      });
+      this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
+      this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
+      this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || []).filter(function (m) {
+        return m.type === 'time';
+      });
+      this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
+      this.limit = limit || null;
+      this.offset = offset || null;
+      this.renewQuery = renewQuery || false;
+      this.order = order || {};
+    },
     addMember: function addMember(element, member) {
       var name = element.charAt(0).toUpperCase() + element.slice(1);
       var mem;
@@ -740,6 +764,18 @@ var QueryBuilder = {
     },
     updateChart: function updateChart(chartType) {
       this.chartType = chartType;
+    }
+  },
+  watch: {
+    query: function query() {
+      if (!this.meta) {
+        // this is ok as if meta has not been loaded by the time query prop has changed,
+        // then the promise for loading meta (found in mounted()) will call
+        // copyQueryFromProps and will therefore update anyway.
+        return;
+      }
+
+      this.copyQueryFromProps();
     }
   }
 };
