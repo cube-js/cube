@@ -32,7 +32,7 @@ Query has the following properties:
 - `renewQuery`: If `renewQuery` is set to `true`, query will always refresh cache and return the latest data from the database. The default value is `false`.
 - `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be added to the query and raw results after filtering and joining will be returned. 
 By default `ungrouped` query requires to pass primary key as a dimension of every cube involved in query for security purpose.
-To disable this behavior please see [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#allow-ungrouped-without-primary-key) server option. 
+To disable this behavior please see [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#options-reference-allow-ungrouped-without-primary-key) server option. 
 
 ```js
 {
