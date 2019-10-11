@@ -50,12 +50,11 @@ class FileRepository {
           const content = await fs.readFile(fileName, "utf-8");
           return [{
             fileName, content, readOnly: true
-          }]
+          }];
         } else {
           return [];
         }
-      })
-    )).reduce((a, b) => a.concat(b), [])
+      }))).reduce((a, b) => a.concat(b), []);
   }
 }
 

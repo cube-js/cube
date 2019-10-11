@@ -12,6 +12,9 @@
     "core",
     "playground"
   ],
+  "scripts": {
+    "lint": "eslint core/**/*.js"
+  },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.10.34",
     "@cubejs-backend/query-orchestrator": "^0.10.58",
@@ -27,7 +30,9 @@
     "serve-static": "^1.13.2"
   },
   "devDependencies": {
-    "eslint": "^4.14.0",
+    "eslint": "^5.16.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
     "mocha": "^5.2.0",
     "should": "^13.2.3"
