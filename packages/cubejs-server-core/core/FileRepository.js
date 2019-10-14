@@ -13,11 +13,12 @@ class FileRepository {
 
   async getFiles(dir, fileList = []) {
     const files = await fs.readdir(path.join(this.localPath(), dir));
+    // eslint-disable-next-line no-restricted-syntax
     for (const file of files) {
       const stat = await fs.stat(path.join(this.localPath(), dir, file));
-      if (stat.isDirectory())
+      if (stat.isDirectory()) {
         fileList = await this.getFiles(path.join(dir, file), fileList);
-      else fileList.push(path.join(dir, file));
+      } else fileList.push(path.join(dir, file));
     }
     return fileList;
   }
