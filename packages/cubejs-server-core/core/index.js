@@ -278,7 +278,7 @@ class CubejsServerCore {
 
   async getDriver() {
     if (!this.driver) {
-      const driver = this.driverFactory();
+      const driver = this.driverFactory({});
       await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }
