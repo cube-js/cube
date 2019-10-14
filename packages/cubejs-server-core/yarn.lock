@@ -18,10 +18,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/api-gateway@^0.10.34":
-  version "0.10.34"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.10.34.tgz#ebec7fbe6412ebfa16e15d815c6332777f05c1f7"
-  integrity sha512-XBvBCw54AR0cEimOc10/RVgPMHYKBpmoug4vtEy1vfnZ0B0mBXlI+R+p7w0ZX2kEAqx0s/J8k/M2+Lsg+UBKRg==
+"@cubejs-backend/api-gateway@^0.10.62":
+  version "0.10.62"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.10.62.tgz#83ad2894f7442e85d4fb00ee173070e53ff60a86"
+  integrity sha512-825CLVww9aOajKAwAE0S8vg4YWykMNZktA/pb9lASLNMmykm7om+gnVcphyIPc2c5W5iADbnH+X1uoqYKhkOQg==
   dependencies:
     "@hapi/joi" "^14.0.6"
     chrono-node "^1.3.11"
@@ -37,10 +37,10 @@
     ramda "^0.24.1"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.10.61":
-  version "0.10.61"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.10.61.tgz#77dd5a52d9c5b429795cb5cbbf5684771014b6dc"
-  integrity sha512-ICvKRvQdZ+g7q1YONHLc9GxdPjrI69s/n4FUkw26+Et+fgq1JG+wt6LnIFOA++ozf2SPdyPXUb+LeTDUfBvQfA==
+"@cubejs-backend/schema-compiler@^0.10.62":
+  version "0.10.62"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.10.62.tgz#942beb89a02c7a22bc85de50d8916928193870d5"
+  integrity sha512-f/2rR6ZEs0y0DrprFcSAzb58bFk69o0QlRnGS9WWFtsmQ3NuboGx4IW9SRTSdba2RPijiOVXfnmduBIDqw8e0w==
   dependencies:
     "@hapi/joi" "^14.3.1"
     babel-generator "^6.25.0"
