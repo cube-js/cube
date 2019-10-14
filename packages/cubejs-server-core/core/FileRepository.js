@@ -12,9 +12,9 @@ class FileRepository {
   }
 
   async getFiles(dir, fileList = []) {
-    const files = await fs.readdir(dir);
+    const files = await fs.readdir(path.join(this.localPath(), dir));
     for (const file of files) {
-      const stat = await fs.stat(path.join(dir, file));
+      const stat = await fs.stat(path.join(this.localPath(), dir, file));
       if (stat.isDirectory())
         fileList = await this.getFiles(path.join(dir, file), fileList);
       else fileList.push(path.join(dir, file));
@@ -24,7 +24,7 @@ class FileRepository {
 
   async dataSchemaFiles(includeDependencies) {
     const self = this;
-    const files = await self.getFiles(self.localPath());
+    const files = await self.getFiles("");
     let result = await Promise.all(
       files
         .filter(file => R.endsWith(".js", file))
