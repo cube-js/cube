@@ -2,21 +2,21 @@
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
+var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
-require('core-js/modules/es6.object.assign');
+var _typeof = _interopDefault(require('@babel/runtime/helpers/typeof'));
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
 require('core-js/modules/es6.promise');
-var fetch = _interopDefault(require('cross-fetch'));
 require('core-js/modules/es6.number.constructor');
 require('core-js/modules/es6.number.parse-float');
-var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 require('core-js/modules/web.dom.iterable');
 require('core-js/modules/es6.array.iterator');
 require('core-js/modules/es6.object.keys');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
+require('core-js/modules/es6.object.assign');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 require('core-js/modules/es6.array.reduce');
 require('core-js/modules/es6.array.index-of');
@@ -32,6 +32,8 @@ var momentRange = _interopDefault(require('moment-range'));
 require('core-js/modules/es6.array.is-array');
 require('core-js/modules/es6.regexp.split');
 require('core-js/modules/es6.function.name');
+var fetch = _interopDefault(require('cross-fetch'));
+require('url-search-params-polyfill');
 
 var moment = momentRange.extendMoment(Moment);
 var TIME_SERIES = {
@@ -735,6 +737,97 @@ function () {
   return ProgressResult;
 }();
 
+var HttpTransport =
+/*#__PURE__*/
+function () {
+  function HttpTransport(_ref) {
+    var authorization = _ref.authorization,
+        apiUrl = _ref.apiUrl;
+
+    _classCallCheck(this, HttpTransport);
+
+    this.authorization = authorization;
+    this.apiUrl = apiUrl;
+  }
+
+  _createClass(HttpTransport, [{
+    key: "request",
+    value: function request(method, params) {
+      var _this = this;
+
+      var searchParams = new URLSearchParams(params);
+
+      var runRequest = function runRequest() {
+        return fetch("".concat(_this.apiUrl).concat(method, "?").concat(searchParams), {
+          headers: {
+            Authorization: _this.authorization,
+            'Content-Type': 'application/json'
+          }
+        });
+      };
+
+      return {
+        subscribe: function () {
+          var _subscribe = _asyncToGenerator(
+          /*#__PURE__*/
+          _regeneratorRuntime.mark(function _callee(callback) {
+            var _this2 = this;
+
+            var result;
+            return _regeneratorRuntime.wrap(function _callee$(_context) {
+              while (1) {
+                switch (_context.prev = _context.next) {
+                  case 0:
+                    _context.next = 2;
+                    return runRequest();
+
+                  case 2:
+                    result = _context.sent;
+                    return _context.abrupt("return", callback(result, function () {
+                      return _this2.subscribe(callback);
+                    }));
+
+                  case 4:
+                  case "end":
+                    return _context.stop();
+                }
+              }
+            }, _callee, this);
+          }));
+
+          return function subscribe(_x) {
+            return _subscribe.apply(this, arguments);
+          };
+        }(),
+        unsubscribe: function () {
+          var _unsubscribe = _asyncToGenerator(
+          /*#__PURE__*/
+          _regeneratorRuntime.mark(function _callee2() {
+            return _regeneratorRuntime.wrap(function _callee2$(_context2) {
+              while (1) {
+                switch (_context2.prev = _context2.next) {
+                  case 0:
+                    return _context2.abrupt("return", null);
+
+                  case 1:
+                  case "end":
+                    return _context2.stop();
+                }
+              }
+            }, _callee2, this);
+          }));
+
+          return function unsubscribe() {
+            return _unsubscribe.apply(this, arguments);
+          };
+        }()
+      };
+    }
+  }]);
+
+  return HttpTransport;
+}();
+
 var API_URL = "https://statsbot.co/cubejs-api/v1";
 var mutexCounter = 0;
 var MUTEX_ERROR = 'Mutex has been changed';
@@ -760,20 +853,24 @@ function () {
   function CubejsApi(apiToken, options) {
     _classCallCheck(this, CubejsApi);
 
+    if (_typeof(apiToken) === 'object') {
+      options = apiToken;
+      apiToken = undefined;
+    }
+
     options = options || {};
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
+    this.transport = options.transport || new HttpTransport({
+      authorization: apiToken,
+      apiUrl: this.apiUrl
+    });
   }
 
   _createClass(CubejsApi, [{
     key: "request",
-    value: function request(url, config) {
-      return fetch("".concat(this.apiUrl).concat(url), Object.assign({
-        headers: {
-          Authorization: this.apiToken,
-          'Content-Type': 'application/json'
-        }
-      }, config || {}));
+    value: function request(method, params) {
+      return this.transport.request(method, params);
     }
   }, {
     key: "loadMethod",
@@ -792,71 +889,30 @@ function () {
         options.mutexObj[mutexKey] = mutexValue;
       }
 
-      var checkMutex = function checkMutex() {
-        if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
-          throw MUTEX_ERROR;
-        }
-      };
+      var requestInstance = request();
 
-      var loadImpl =
+      var checkMutex =
       /*#__PURE__*/
       function () {
         var _ref = _asyncToGenerator(
         /*#__PURE__*/
         _regeneratorRuntime.mark(function _callee() {
-          var response, body;
           return _regeneratorRuntime.wrap(function _callee$(_context) {
             while (1) {
               switch (_context.prev = _context.next) {
                 case 0:
-                  _context.next = 2;
-                  return request();
-
-                case 2:
-                  response = _context.sent;
-
-                  if (!(response.status === 502)) {
-                    _context.next = 6;
+                  if (!(options.mutexObj && options.mutexObj[mutexKey] !== mutexValue)) {
+                    _context.next = 4;
                     break;
                   }
 
-                  checkMutex();
-                  return _context.abrupt("return", loadImpl());
+                  _context.next = 3;
+                  return requestInstance.unsubscribe();
 
-                case 6:
-                  _context.next = 8;
-                  return response.json();
+                case 3:
+                  throw MUTEX_ERROR;
 
-                case 8:
-                  body = _context.sent;
-
-                  if (!(body.error === 'Continue wait')) {
-                    _context.next = 13;
-                    break;
-                  }
-
-                  checkMutex();
-
-                  if (options.progressCallback) {
-                    options.progressCallback(new ProgressResult(body));
-                  }
-
-                  return _context.abrupt("return", loadImpl());
-
-                case 13:
-                  if (!(response.status !== 200)) {
-                    _context.next = 16;
-                    break;
-                  }
-
-                  checkMutex();
-                  throw new Error(body.error);
-
-                case 16:
-                  checkMutex();
-                  return _context.abrupt("return", toResult(body));
-
-                case 18:
+                case 4:
                 case "end":
                   return _context.stop();
               }
@@ -864,19 +920,154 @@ function () {
           }, _callee, this);
         }));
 
-        return function loadImpl() {
+        return function checkMutex() {
           return _ref.apply(this, arguments);
         };
       }();
 
+      var loadImpl =
+      /*#__PURE__*/
+      function () {
+        var _ref2 = _asyncToGenerator(
+        /*#__PURE__*/
+        _regeneratorRuntime.mark(function _callee2(response, next) {
+          var body, error, result;
+          return _regeneratorRuntime.wrap(function _callee2$(_context2) {
+            while (1) {
+              switch (_context2.prev = _context2.next) {
+                case 0:
+                  if (!(response.status === 502)) {
+                    _context2.next = 4;
+                    break;
+                  }
+
+                  _context2.next = 3;
+                  return checkMutex();
+
+                case 3:
+                  return _context2.abrupt("return", next());
+
+                case 4:
+                  _context2.next = 6;
+                  return response.json();
+
+                case 6:
+                  body = _context2.sent;
+
+                  if (!(body.error === 'Continue wait')) {
+                    _context2.next = 12;
+                    break;
+                  }
+
+                  _context2.next = 10;
+                  return checkMutex();
+
+                case 10:
+                  if (options.progressCallback) {
+                    options.progressCallback(new ProgressResult(body));
+                  }
+
+                  return _context2.abrupt("return", next());
+
+                case 12:
+                  if (!(response.status !== 200)) {
+                    _context2.next = 26;
+                    break;
+                  }
+
+                  _context2.next = 15;
+                  return checkMutex();
+
+                case 15:
+                  if (options.subscribe) {
+                    _context2.next = 18;
+                    break;
+                  }
+
+                  _context2.next = 18;
+                  return requestInstance.unsubscribe();
+
+                case 18:
+                  error = new Error(body.error); // TODO error class
+
+                  if (!callback) {
+                    _context2.next = 23;
+                    break;
+                  }
+
+                  callback(error);
+                  _context2.next = 24;
+                  break;
+
+                case 23:
+                  throw error;
+
+                case 24:
+                  if (!options.subscribe) {
+                    _context2.next = 26;
+                    break;
+                  }
+
+                  return _context2.abrupt("return", next());
+
+                case 26:
+                  _context2.next = 28;
+                  return checkMutex();
+
+                case 28:
+                  if (options.subscribe) {
+                    _context2.next = 31;
+                    break;
+                  }
+
+                  _context2.next = 31;
+                  return requestInstance.unsubscribe();
+
+                case 31:
+                  result = toResult(body);
+
+                  if (!callback) {
+                    _context2.next = 36;
+                    break;
+                  }
+
+                  callback(null, result);
+                  _context2.next = 37;
+                  break;
+
+                case 36:
+                  return _context2.abrupt("return", result);
+
+                case 37:
+                  if (!options.subscribe) {
+                    _context2.next = 39;
+                    break;
+                  }
+
+                  return _context2.abrupt("return", next());
+
+                case 39:
+                  return _context2.abrupt("return", null);
+
+                case 40:
+                case "end":
+                  return _context2.stop();
+              }
+            }
+          }, _callee2, this);
+        }));
+
+        return function loadImpl(_x, _x2) {
+          return _ref2.apply(this, arguments);
+        };
+      }();
+
+      var promise = mutexPromise(requestInstance.subscribe(loadImpl));
+
       if (callback) {
-        mutexPromise(loadImpl()).then(function (r) {
-          return callback(null, r);
-        }, function (e) {
-          return callback(e);
-        });
+        return requestInstance; // TODO
       } else {
-        return mutexPromise(loadImpl());
+        return promise;
       }
     }
     /**
@@ -913,7 +1104,9 @@ function () {
       var _this = this;
 
       return this.loadMethod(function () {
-        return _this.request("/load?query=".concat(encodeURIComponent(JSON.stringify(query))));
+        return _this.request("load", {
+          query: query
+        });
       }, function (body) {
         return new ResultSet(body);
       }, options, callback);
@@ -932,7 +1125,9 @@ function () {
       var _this2 = this;
 
       return this.loadMethod(function () {
-        return _this2.request("/sql?query=".concat(JSON.stringify(query)));
+        return _this2.request("sql", {
+          query: query
+        });
       }, function (body) {
         return new SqlQuery(body);
       }, options, callback);
@@ -950,10 +1145,25 @@ function () {
       var _this3 = this;
 
       return this.loadMethod(function () {
-        return _this3.request("/meta");
+        return _this3.request("meta");
       }, function (body) {
         return new Meta(body);
       }, options, callback);
+    }
+  }, {
+    key: "subscribe",
+    value: function subscribe(query, options, callback) {
+      var _this4 = this;
+
+      return this.loadMethod(function () {
+        return _this4.request("subscribe", {
+          query: query
+        });
+      }, function (body) {
+        return new ResultSet(body);
+      }, _objectSpread({}, options, {
+        subscribe: true
+      }), callback);
     }
   }]);
 
