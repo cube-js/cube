@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.61](https://github.com/statsbotco/cubejs-client/compare/v0.10.60...v0.10.61) (2019-10-10)
+
+
+### Bug Fixes
+
+* Override incorrect button color in playground ([6b7d964](https://github.com/statsbotco/cubejs-client/commit/6b7d964))
+* playground scaffolding include antd styles via index.css ([881084e](https://github.com/statsbotco/cubejs-client/commit/881084e))
+* **playground:** Chart type doesn't switch in Dashboard App ([23f604f](https://github.com/statsbotco/cubejs-client/commit/23f604f))
+
+
+### Features
+
+* Scaffolding Updates React ([#228](https://github.com/statsbotco/cubejs-client/issues/228)) ([552fd9c](https://github.com/statsbotco/cubejs-client/commit/552fd9c))
+
+
+
+
+
 ## [0.10.59](https://github.com/statsbotco/cubejs-client/compare/v0.10.58...v0.10.59) (2019-10-08)
 
 **Note:** Version bump only for package @cubejs-client/playground

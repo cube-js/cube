@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.61](https://github.com/statsbotco/cubejs-client/compare/v0.10.60...v0.10.61) (2019-10-10)
+
+
+### Features
+
+* **react:** Introduce `useCubeQuery` react hook and `CubeProvider` cubejsApi context provider ([19b6fac](https://github.com/statsbotco/cubejs-client/commit/19b6fac))
+
+
+
+
+
 ## [0.10.57](https://github.com/statsbotco/cubejs-client/compare/v0.10.56...v0.10.57) (2019-10-04)
 
 

@@ -78,6 +78,27 @@ class BaseQuery {
     }
 
     this.externalQueryClass = this.options.externalQueryClass;
+    this.initUngrouped();
+  }
+
+  initUngrouped() {
+    this.ungrouped = this.options.ungrouped;
+    if (this.ungrouped) {
+      if (!this.options.allowUngroupedWithoutPrimaryKey) {
+        const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
+        const primaryKeyNames = cubes.map(c => this.primaryKeyName(c));
+        const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
+        if (missingPrimaryKeys.length) {
+          throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
+        }
+      }
+      if (this.measures.length) {
+        throw new UserError(`Measures aren't allowed in ungrouped query`);
+      }
+      if (this.measureFilters.length) {
+        throw new UserError(`Measure filters aren't allowed in ungrouped query`);
+      }
+    }
   }
 
   get subQueryDimensions() {
@@ -162,7 +183,7 @@ class BaseQuery {
   }
 
   buildParamAnnotatedSql() {
-    if (!this.options.preAggregationQuery) {
+    if (!this.options.preAggregationQuery && !this.ungrouped) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery) {
         return this.preAggregations.rollupPreAggregation(preAggregationForQuery);
@@ -740,6 +761,9 @@ class BaseQuery {
   }
 
   groupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
     const dimensionColumns = this.dimensionColumns();
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.map((c, i) => `${i + 1}`).join(', ')}` : '';
   }

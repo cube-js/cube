@@ -22,7 +22,7 @@ const defaultLayout = i => ({
   minH: 8
 });
 
-const DashboardPage = ({ cubejsApi }) => {
+const DashboardPage = () => {
   const { loading, error, data } = useQuery(GET_DASHBOARD_ITEMS);
 
   if (loading) {
@@ -42,7 +42,7 @@ const DashboardPage = ({ cubejsApi }) => {
   const dashboardItem = item => (
     <div key={item.id} data-grid={defaultLayout(item)}>
       <DashboardItem key={item.id} itemId={item.id} title={item.name}>
-        <ChartRenderer vizState={item.vizState} cubejsApi={cubejsApi} />
+        <ChartRenderer vizState={item.vizState} />
       </DashboardItem>
     </div>
   );

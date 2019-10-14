@@ -4,7 +4,7 @@
 	(global = global || self, factory(global.cubejsReact = {}, global.React, global.PropTypes));
 }(this, function (exports, React, PropTypes) { 'use strict';
 
-	React = React && React.hasOwnProperty('default') ? React['default'] : React;
+	var React__default = 'default' in React ? React['default'] : React;
 
 	function createCommonjsModule(fn, module) {
 		return module = { exports: {} }, fn(module, module.exports), module.exports;
@@ -6792,9 +6792,11 @@
 	/*#__PURE__*/
 	chain(_identity);
 
-	var _isQueryPresent = (function (query) {
+	var isQueryPresent = (function (query) {
 	  return query.measures && query.measures.length || query.dimensions && query.dimensions.length || query.timeDimensions && query.timeDimensions.length;
 	});
+
+	var CubeContext = React.createContext(null);
 
 	var QueryRenderer =
 	/*#__PURE__*/
@@ -6803,8 +6805,8 @@
 
 	  _createClass(QueryRenderer, null, [{
 	    key: "isQueryPresent",
-	    value: function isQueryPresent(query) {
-	      return _isQueryPresent(query);
+	    value: function isQueryPresent$$1(query) {
+	      return isQueryPresent(query);
 	    }
 	  }]);
 
@@ -6867,6 +6869,12 @@
 	      }
 	    }
 	  }, {
+	    key: "cubejsApi",
+	    value: function cubejsApi() {
+	      // eslint-disable-next-line react/destructuring-assignment
+	      return this.props.cubejsApi || this.context && this.context.cubejsApi;
+	    }
+	  }, {
 	    key: "load",
 	    value: function load(query) {
 	      var _this2 = this;
@@ -6877,9 +6885,8 @@
 	        error: null,
 	        sqlQuery: null
 	      });
-	      var _this$props4 = this.props,
-	          loadSql = _this$props4.loadSql,
-	          cubejsApi = _this$props4.cubejsApi;
+	      var loadSql = this.props.loadSql;
+	      var cubejsApi = this.cubejsApi();
 
 	      if (query && QueryRenderer.isQueryPresent(query)) {
 	        if (loadSql === 'only') {
@@ -6949,7 +6956,7 @@
 	    value: function loadQueries(queries) {
 	      var _this3 = this;
 
-	      var cubejsApi = this.props.cubejsApi;
+	      var cubejsApi = this.cubejsApi();
 	      this.setState({
 	        isLoading: true,
 	        resultSet: null,
@@ -7009,16 +7016,18 @@
 	  }]);
 
 	  return QueryRenderer;
-	}(React.Component);
+	}(React__default.Component);
+	QueryRenderer.contextType = CubeContext;
 	QueryRenderer.propTypes = {
 	  render: PropTypes.func,
-	  cubejsApi: PropTypes.object.isRequired,
+	  cubejsApi: PropTypes.object,
 	  query: PropTypes.object,
 	  queries: PropTypes.object,
 	  loadSql: PropTypes.any,
 	  updateOnlyOnStateChange: PropTypes.bool
 	};
 	QueryRenderer.defaultProps = {
+	  cubejsApi: null,
 	  query: null,
 	  render: null,
 	  queries: null,
@@ -7030,7 +7039,7 @@
 	  var query = _ref.query,
 	      restProps = _objectWithoutProperties(_ref, ["query"]);
 
-	  return React.createElement(QueryRenderer, _extends({
+	  return React__default.createElement(QueryRenderer, _extends({
 	    queries: {
 	      totals: _objectSpread({}, query, {
 	        dimensions: [],
@@ -7813,22 +7822,21 @@
 	      var _componentDidMount = _asyncToGenerator(
 	      /*#__PURE__*/
 	      regeneratorRuntime.mark(function _callee() {
-	        var cubejsApi, meta;
+	        var meta;
 	        return regeneratorRuntime.wrap(function _callee$(_context) {
 	          while (1) {
 	            switch (_context.prev = _context.next) {
 	              case 0:
-	                cubejsApi = this.props.cubejsApi;
-	                _context.next = 3;
-	                return cubejsApi.meta();
+	                _context.next = 2;
+	                return this.cubejsApi().meta();
 
-	              case 3:
+	              case 2:
 	                meta = _context.sent;
 	                this.setState({
 	                  meta: meta
 	                });
 
-	              case 5:
+	              case 4:
 	              case "end":
 	                return _context.stop();
 	            }
@@ -7858,6 +7866,13 @@
 	        // eslint-disable-next-line react/no-did-update-set-state
 	        this.setState(vizState);
 	      }
+	    }
+	  }, {
+	    key: "cubejsApi",
+	    value: function cubejsApi() {
+	      var cubejsApi = this.props.cubejsApi; // eslint-disable-next-line react/destructuring-assignment
+
+	      return cubejsApi || this.context && this.context.cubejsApi;
 	    }
 	  }, {
 	    key: "isQueryPresent",
@@ -8161,7 +8176,7 @@
 	          wrapWithQueryRenderer = _this$props4.wrapWithQueryRenderer;
 
 	      if (wrapWithQueryRenderer) {
-	        return React.createElement(QueryRenderer, {
+	        return React__default.createElement(QueryRenderer, {
 	          query: this.validatedQuery(),
 	          cubejsApi: cubejsApi,
 	          render: function render(queryRendererProps) {
@@ -8183,7 +8198,8 @@
 	  }]);
 
 	  return QueryBuilder;
-	}(React.Component);
+	}(React__default.Component);
+	QueryBuilder.contextType = CubeContext;
 	QueryBuilder.propTypes = {
 	  render: PropTypes.func,
 	  stateChangeHeuristics: PropTypes.func,
@@ -8206,10 +8222,115 @@
 	  vizState: {}
 	};
 
+	var CubeProvider = function CubeProvider(_ref) {
+	  var cubejsApi = _ref.cubejsApi,
+	      children = _ref.children;
+	  return React__default.createElement(CubeContext.Provider, {
+	    value: {
+	      cubejsApi: cubejsApi
+	    }
+	  }, children);
+	};
+
+	CubeProvider.propTypes = {
+	  cubejsApi: PropTypes.object.isRequired,
+	  children: PropTypes.array.isRequired
+	};
+
+	var useCubeQuery = (function (query) {
+	  var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
+	  var _useState = React.useState({}),
+	      _useState2 = _slicedToArray(_useState, 1),
+	      mutexObj = _useState2[0];
+
+	  var _useState3 = React.useState(null),
+	      _useState4 = _slicedToArray(_useState3, 2),
+	      currentQuery = _useState4[0],
+	      setCurrentQuery = _useState4[1];
+
+	  var _useState5 = React.useState(false),
+	      _useState6 = _slicedToArray(_useState5, 2),
+	      isLoading = _useState6[0],
+	      setLoading = _useState6[1];
+
+	  var _useState7 = React.useState(null),
+	      _useState8 = _slicedToArray(_useState7, 2),
+	      resultSet = _useState8[0],
+	      setResultSet = _useState8[1];
+
+	  var _useState9 = React.useState(null),
+	      _useState10 = _slicedToArray(_useState9, 2),
+	      error = _useState10[0],
+	      setError = _useState10[1];
+
+	  var context = React.useContext(CubeContext);
+	  React.useEffect(function () {
+	    function loadQuery() {
+	      return _loadQuery.apply(this, arguments);
+	    }
+
+	    function _loadQuery() {
+	      _loadQuery = _asyncToGenerator(
+	      /*#__PURE__*/
+	      regeneratorRuntime.mark(function _callee() {
+	        return regeneratorRuntime.wrap(function _callee$(_context) {
+	          while (1) {
+	            switch (_context.prev = _context.next) {
+	              case 0:
+	                if (!(query && isQueryPresent(query) && !equals(currentQuery, query))) {
+	                  _context.next = 16;
+	                  break;
+	                }
+
+	                setCurrentQuery(query);
+	                setLoading(true);
+	                _context.prev = 3;
+	                _context.t0 = setResultSet;
+	                _context.next = 7;
+	                return (options.cubejsApi || context && context.cubejsApi).load(query, {
+	                  mutexObj: mutexObj,
+	                  mutexKey: 'query'
+	                });
+
+	              case 7:
+	                _context.t1 = _context.sent;
+	                (0, _context.t0)(_context.t1);
+	                setLoading(false);
+	                _context.next = 16;
+	                break;
+
+	              case 12:
+	                _context.prev = 12;
+	                _context.t2 = _context["catch"](3);
+	                setError(_context.t2);
+	                setLoading(false);
+
+	              case 16:
+	              case "end":
+	                return _context.stop();
+	            }
+	          }
+	        }, _callee, this, [[3, 12]]);
+	      }));
+	      return _loadQuery.apply(this, arguments);
+	    }
+
+	    loadQuery();
+	  }, [query, options.cubejsApi, context]);
+	  return {
+	    isLoading: isLoading,
+	    resultSet: resultSet,
+	    error: error
+	  };
+	});
+
 	exports.QueryRenderer = QueryRenderer;
 	exports.QueryRendererWithTotals = QueryRendererWithTotals;
 	exports.QueryBuilder = QueryBuilder;
-	exports.isQueryPresent = _isQueryPresent;
+	exports.isQueryPresent = isQueryPresent;
+	exports.CubeProvider = CubeProvider;
+	exports.useCubeQuery = useCubeQuery;
 
 	Object.defineProperty(exports, '__esModule', { value: true });
 

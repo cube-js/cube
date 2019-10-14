@@ -55,6 +55,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
   telemetry: Boolean,
+  allowUngroupedWithoutPrimaryKey: Boolean,
   orchestratorOptions: {
     redisPrefix: String,
     queryCacheOptions: {
@@ -251,6 +252,10 @@ CubejsServerCore.create({
   schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId]
 });
 ```
+
+### allowUngroupedWithoutPrimaryKey
+
+Providing `allowUngroupedWithoutPrimaryKey: true` disables primary key inclusion check for `ungrouped` queries. 
 
 ### telemetry
 

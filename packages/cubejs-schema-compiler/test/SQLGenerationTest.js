@@ -1,3 +1,4 @@
+/* globals it, describe, after */
 /* eslint-disable quote-props */
 const UserError = require('../compiler/UserError');
 const PostgresQuery = require('../adapter/PostgresQuery');
@@ -1336,4 +1337,67 @@ describe('SQL Generation', function test() {
       }
     ])
   );
+
+  it('ungrouped', () => runQueryTest({
+    measures: [],
+    dimensions: [
+      'visitors.id'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'date',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles',
+    ungrouped: true
+  }, [{
+    "visitors__id": 6,
+    "visitors__created_at_date": "2016-09-06T00:00:00.000Z"
+  }, {
+    "visitors__id": 1,
+    "visitors__created_at_date": "2017-01-02T00:00:00.000Z"
+  }, {
+    "visitors__id": 2,
+    "visitors__created_at_date": "2017-01-04T00:00:00.000Z"
+  }, {
+    "visitors__id": 3,
+    "visitors__created_at_date": "2017-01-05T00:00:00.000Z"
+  }, {
+    "visitors__id": 4,
+    "visitors__created_at_date": "2017-01-06T00:00:00.000Z"
+  }, {
+    "visitors__id": 5,
+    "visitors__created_at_date": "2017-01-06T00:00:00.000Z"
+  }]));
+
+  it('ungrouped without id', () => runQueryTest({
+    measures: [],
+    dimensions: [],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'date',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles',
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true
+  }, [{
+    "visitors__created_at_date": "2016-09-06T00:00:00.000Z"
+  }, {
+    "visitors__created_at_date": "2017-01-02T00:00:00.000Z"
+  }, {
+    "visitors__created_at_date": "2017-01-04T00:00:00.000Z"
+  }, {
+    "visitors__created_at_date": "2017-01-05T00:00:00.000Z"
+  }, {
+    "visitors__created_at_date": "2017-01-06T00:00:00.000Z"
+  }, {
+    "visitors__created_at_date": "2017-01-06T00:00:00.000Z"
+  }]));
 });

@@ -29,6 +29,8 @@ export default {
       availableSegments: [],
       limit: null,
       offset: null,
+      renewQuery: false,
+      order: {}
     };
 
     data.granularities = [
@@ -41,35 +43,7 @@ export default {
 
     return data;
   },
-  async mounted() {
-    this.meta = await this.cubejsApi.meta();
 
-    const { measures, dimensions, segments, timeDimensions, filters, limit, offset } = this.query;
-
-    this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
-    this.dimensions = (dimensions || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') }));
-    this.segments = (segments || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'segments') }));
-    this.timeDimensions = (timeDimensions || []).map((m, i) => ({
-      ...m,
-      dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
-      index: i
-    }));
-    this.filters = (filters || []).map((m, i) => ({
-      ...m,
-      // using 'dimension' is deprecated, 'member' should be specified instead
-      member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-      operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
-      index: i
-    }));
-
-    this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
-    this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
-    this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || [])
-      .filter(m => m.type === 'time');
-    this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
-    this.limit = (limit || null);
-    this.offset = (offset || null);
-  },
   render(createElement) {
     const {
       chartType,
@@ -93,6 +67,8 @@ export default {
       removeLimit,
       setOffset,
       removeOffset,
+      renewQuery,
+      order
     } = this;
 
     let builderProps = {};
@@ -119,6 +95,8 @@ export default {
         removeLimit,
         setOffset,
         removeOffset,
+        renewQuery,
+        order
       };
 
       QUERY_ELEMENTS.forEach((e) => {
@@ -164,7 +142,7 @@ export default {
     validatedQuery() {
       const validatedQuery = {};
       let toQuery = member => member.name;
-      // TODO: implement order, timezone, renewQuery
+      // TODO: implement timezone
 
       let hasElements = false;
       QUERY_ELEMENTS.forEach((e) => {
@@ -208,13 +186,55 @@ export default {
         if (this.offset) {
           validatedQuery.offset = this.offset;
         }
-        // add order
+
+        if (this.order) {
+          validatedQuery.order = this.order;
+        }
+
+        if (this.renewQuery) {
+          validatedQuery.renewQuery = this.renewQuery;
+        }
       }
 
       return validatedQuery;
     },
   },
+
+  async mounted() {
+    this.meta = await this.cubejsApi.meta();
+
+    this.copyQueryFromProps();
+  },
+
   methods: {
+    copyQueryFromProps() {
+      const { measures, dimensions, segments, timeDimensions, filters, limit, offset, renewQuery, order } = this.query;
+
+      this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
+      this.dimensions = (dimensions || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') }));
+      this.segments = (segments || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'segments') }));
+      this.timeDimensions = (timeDimensions || []).map((m, i) => ({
+        ...m,
+        dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
+        index: i
+      }));
+      this.filters = (filters || []).map((m, i) => ({
+        ...m,
+        member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+        operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
+        index: i
+      }));
+
+      this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
+      this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
+      this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || [])
+        .filter(m => m.type === 'time');
+      this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
+      this.limit = (limit || null);
+      this.offset = (offset || null);
+      this.renewQuery = (renewQuery || false);
+      this.order = (order || {});
+    },
     addMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
       let mem;
@@ -364,4 +384,17 @@ export default {
       this.chartType = chartType;
     },
   },
+
+  watch: {
+    query() {
+      if (!this.meta) {
+        // this is ok as if meta has not been loaded by the time query prop has changed,
+        // then the promise for loading meta (found in mounted()) will call
+        // copyQueryFromProps and will therefore update anyway.
+        return;
+      }
+
+      this.copyQueryFromProps();
+    }
+  }
 };

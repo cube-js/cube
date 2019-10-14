@@ -24,9 +24,9 @@ class DashboardSource {
   async load(createApp, { chartLibrary }) {
     this.loadError = null;
     if (createApp) {
-      await fetchWithRetry('/playground/ensure-dashboard-app', undefined, 5);
+      await fetchWithRetry('/playground/ensure-dashboard-app', undefined, 10);
     }
-    const res = await fetchWithRetry('/playground/dashboard-app-files', undefined, 5);
+    const res = await fetchWithRetry('/playground/dashboard-app-files', undefined, 10);
     const result = await res.json();
     this.playgroundContext = await this.loadContext();
     this.fileToTargetSource = {};
@@ -39,6 +39,9 @@ class DashboardSource {
     }
     if (!result.error && this.ensureDashboardIsInApp({ chartLibrary })) {
       await this.persist();
+    }
+    if (!result.error) {
+      await this.ensureDependencies({});
     }
   }
 
@@ -85,6 +88,10 @@ class DashboardSource {
         const dependency = importName[0].indexOf('@') === 0 ? [importName[0], importName[1]].join('/') : importName[0];
         return this.withPeerDependencies(dependency);
       }).reduce((a, b) => ({ ...a, ...b }));
+    await this.ensureDependencies(dependencies);
+  }
+
+  async ensureDependencies(dependencies) {
     await fetchWithRetry('/playground/ensure-dependencies', {
       method: 'POST',
       headers: {
@@ -93,7 +100,7 @@ class DashboardSource {
       body: JSON.stringify({
         dependencies
       })
-    }, 5);
+    }, 10);
   }
 
   // TODO move to dev server
@@ -149,8 +156,8 @@ class DashboardSource {
     if (!dashboardAdded && headerElement) {
       this.appLayoutAdded = true;
       const scaffoldingFileToSnippet = {
-        'react/App.js': new AppSnippet(),
-        'react/index.js': new IndexSnippet(this.playgroundContext),
+        'react/App.js': new AppSnippet(this.playgroundContext),
+        'react/index.js': new IndexSnippet(),
         'react/pages/ExplorePage.js': new ExploreSnippet(),
         'react/components/ChartRenderer.js': new ChartRendererSnippet(chartLibrary)
       };

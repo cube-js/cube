@@ -57,6 +57,9 @@ var TIME_SERIES = {
     });
   }
 };
+/**
+ * Provides a convenient interface for data manipulation.
+ */
 
 var ResultSet =
 /*#__PURE__*/
@@ -320,6 +323,31 @@ function () {
       // TODO
       return this.chartPivot(pivotConfig);
     }
+    /**
+     * Returns normalized query result data in the following format.
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-12-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.chartPivot() will return
+     * [
+     *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
+     *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
+     *   { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
+     *   //...
+     * ]
+     * ```
+     * @param pivotConfig
+     */
+
   }, {
     key: "chartPivot",
     value: function chartPivot(pivotConfig) {
@@ -343,6 +371,34 @@ function () {
         }, {}));
       });
     }
+    /**
+     * Returns normalized query result data prepared for visualization in the table format.
+     *
+     * For example
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-12-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.tablePivot() will return
+     * [
+     *   { "Stories.time": "2015-01-01T00:00:00", "Stories.count": 27120 },
+     *   { "Stories.time": "2015-02-01T00:00:00", "Stories.count": 25861 },
+     *   { "Stories.time": "2015-03-01T00:00:00", "Stories.count": 29661 },
+     *   //...
+     * ]
+     * ```
+     * @param pivotConfig
+     * @returns {Array} of pivoted rows
+     */
+
   }, {
     key: "tablePivot",
     value: function tablePivot(pivotConfig) {
@@ -370,6 +426,33 @@ function () {
         }, {});
       });
     }
+    /**
+     * Returns array of column definitions for `tablePivot`.
+     *
+     * For example
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-12-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.tableColumns() will return
+     * [
+     *   { key: "Stories.time", title: "Stories Time" },
+     *   { key: "Stories.count", title: "Stories Count" },
+     *   //...
+     * ]
+     * ```
+     * @param pivotConfig
+     * @returns {Array} of columns
+     */
+
   }, {
     key: "tableColumns",
     value: function tableColumns(pivotConfig) {
@@ -404,6 +487,29 @@ function () {
       // TODO
       return this.chartPivot(pivotConfig);
     }
+    /**
+     * Returns the array of series objects, containing `key` and `title` parameters.
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-12-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.seriesNames() will return
+     * [
+     * { "key":"Stories.count", "title": "Stories Count" }
+     * ]
+     * ```
+     * @param pivotConfig
+     * @returns {Array} of series names
+     */
+
   }, {
     key: "seriesNames",
     value: function seriesNames(pivotConfig) {
@@ -638,6 +744,11 @@ var mutexPromise = function mutexPromise(promise) {
     });
   });
 };
+/**
+ * Main class for accessing Cube.js API
+ * @order -5
+ */
+
 
 var CubejsApi =
 /*#__PURE__*/
@@ -764,6 +875,34 @@ function () {
         return mutexPromise(loadImpl());
       }
     }
+    /**
+     * Fetch data for passed `query`.
+     *
+     * ```js
+     * import cubejs from '@cubejs-client/core';
+     * import Chart from 'chart.js';
+     * import chartjsConfig from './toChartjsData';
+     *
+     * const cubejsApi = cubejs('CUBEJS_TOKEN');
+     *
+     * const resultSet = await cubejsApi.load({
+     *  measures: ['Stories.count'],
+     *  timeDimensions: [{
+     *    dimension: 'Stories.time',
+     *    dateRange: ['2015-01-01', '2015-12-31'],
+     *    granularity: 'month'
+     *   }]
+     * });
+     *
+     * const context = document.getElementById('myChart');
+     * new Chart(context, chartjsConfig(resultSet));
+     * ```
+     * @param query - [Query object](query-format)
+     * @param options
+     * @param callback
+     * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
+     */
+
   }, {
     key: "load",
     value: function load(query, options, callback) {
@@ -775,6 +914,14 @@ function () {
         return new ResultSet(body);
       }, options, callback);
     }
+    /**
+     * Get generated SQL string for given `query`.
+     * @param query - [Query object](query-format)
+     * @param options
+     * @param callback
+     * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
+     */
+
   }, {
     key: "sql",
     value: function sql(query, options, callback) {
@@ -786,6 +933,13 @@ function () {
         return new SqlQuery(body);
       }, options, callback);
     }
+    /**
+     * Get meta description of cubes available for querying.
+     * @param options
+     * @param callback
+     * @return {Promise} for {@link Meta} if `callback` isn't passed
+     */
+
   }, {
     key: "meta",
     value: function meta(options, callback) {
@@ -801,6 +955,28 @@ function () {
 
   return CubejsApi;
 }();
+/**
+ * Create instance of `CubejsApi`.
+ * API entry point.
+ *
+ * ```javascript
+ import cubejs from '@cubejs-client/core';
+
+ const cubejsApi = cubejs(
+ 'CUBEJS-API-TOKEN',
+ { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+ );
+ ```
+ * @name cubejs
+ * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
+ * In the development mode, Cube.js Backend will print the API token to the console on on startup.
+ * @param options - options object.
+ * @param options.apiUrl - URL of your Cube.js Backend.
+ * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
+ * @returns {CubejsApi}
+ * @order -10
+ */
+
 
 var index = (function (apiToken, options) {
   return new CubejsApi(apiToken, options);

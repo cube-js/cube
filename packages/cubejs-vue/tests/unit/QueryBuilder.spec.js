@@ -492,5 +492,107 @@ describe('QueryBuilder.vue', () => {
 
       expect(wrapper.vm.offset).toBe(10);
     });
+
+    it('sets renewQuery', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        member: 'Orders.status',
+        operator: 'equals',
+        values: ['invalid'],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+            renewQuery: true
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.renewQuery).toBe(true);
+    });
+
+    it('sets order', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        member: 'Orders.status',
+        operator: 'equals',
+        values: ['invalid'],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+            order: {
+              'Orders.status': 'desc'
+            }
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.order['Orders.status']).toBe('desc');
+    });
+
+    it('is reactive when filter is changed', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        member: 'Orders.status',
+        operator: 'equals',
+        values: ['invalid'],
+      };
+
+      const newFilter = {
+        dimension: 'Orders.number',
+        operator: 'equals',
+        values: ['1'],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter]
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.filters.length).toBe(1);
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
+      expect(wrapper.vm.filters[0].values).toContain('invalid');
+
+      wrapper.setProps({
+        query: {
+          filters: [newFilter]
+        }
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.filters.length).toBe(1);
+      expect(wrapper.vm.filters[0].member.name).toBe('Orders.number');
+      expect(wrapper.vm.filters[0].values).toContain('1');
+    });
   });
 });

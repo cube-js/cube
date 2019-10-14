@@ -2,6 +2,7 @@ import React from 'react';
 import * as PropTypes from 'prop-types';
 import { equals } from 'ramda';
 import QueryRenderer from './QueryRenderer.jsx';
+import CubeContext from './CubeContext';
 
 export default class QueryBuilder extends React.Component {
   constructor(props) {
@@ -14,8 +15,7 @@ export default class QueryBuilder extends React.Component {
   }
 
   async componentDidMount() {
-    const { cubejsApi } = this.props;
-    const meta = await cubejsApi.meta();
+    const meta = await this.cubejsApi().meta();
     this.setState({ meta });
   }
 
@@ -29,6 +29,12 @@ export default class QueryBuilder extends React.Component {
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState(vizState);
     }
+  }
+
+  cubejsApi() {
+    const { cubejsApi } = this.props;
+    // eslint-disable-next-line react/destructuring-assignment
+    return cubejsApi || this.context && this.context.cubejsApi;
   }
 
   isQueryPresent() {
@@ -324,6 +330,8 @@ export default class QueryBuilder extends React.Component {
     }
   }
 }
+
+QueryBuilder.contextType = CubeContext;
 
 QueryBuilder.propTypes = {
   render: PropTypes.func,

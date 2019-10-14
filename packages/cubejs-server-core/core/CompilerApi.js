@@ -10,6 +10,7 @@ class CompilerApi {
     this.allowNodeRequire = options.allowNodeRequire == null ? true : options.allowNodeRequire;
     this.logger = this.options.logger;
     this.preAggregationsSchema = this.options.preAggregationsSchema;
+    this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
   }
 
   async getCompilers() {
@@ -39,7 +40,8 @@ class CompilerApi {
       this.dbType, {
         ...query,
         externalDbType: this.options.externalDbType,
-        preAggregationsSchema: this.preAggregationsSchema
+        preAggregationsSchema: this.preAggregationsSchema,
+        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
       }
     );
     return (await this.getCompilers()).compiler.withQuery(sqlGenerator, () => ({

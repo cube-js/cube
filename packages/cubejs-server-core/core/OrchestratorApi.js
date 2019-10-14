@@ -1,3 +1,4 @@
+/* eslint-disable no-throw-literal */
 const pt = require('promise-timeout');
 const QueryOrchestrator = require('@cubejs-backend/query-orchestrator/orchestrator/QueryOrchestrator');
 const ContinueWaitError = require('@cubejs-backend/query-orchestrator/orchestrator/ContinueWaitError');
@@ -31,8 +32,8 @@ class OrchestratorApi {
         params: query.values
       });
 
-      return { data: data };
-    } catch(err) {
+      return { data };
+    } catch (err) {
       if ((err instanceof pt.TimeoutError || err instanceof ContinueWaitError)) {
         this.logger('Continue wait', {
           duration: ((new Date()).getTime() - startQueryTime),

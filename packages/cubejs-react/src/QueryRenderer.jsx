@@ -2,6 +2,7 @@ import React from 'react';
 import * as PropTypes from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import isQueryPresent from './isQueryPresent';
+import CubeContext from "./CubeContext";
 
 export default class QueryRenderer extends React.Component {
   static isQueryPresent(query) {
@@ -51,11 +52,17 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
+  cubejsApi() {
+    // eslint-disable-next-line react/destructuring-assignment
+    return this.props.cubejsApi || this.context && this.context.cubejsApi;
+  }
+
   load(query) {
     this.setState({
       isLoading: true, resultSet: null, error: null, sqlQuery: null
     });
-    const { loadSql, cubejsApi } = this.props;
+    const { loadSql } = this.props;
+    const cubejsApi = this.cubejsApi();
     if (query && QueryRenderer.isQueryPresent(query)) {
       if (loadSql === 'only') {
         cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
@@ -78,7 +85,7 @@ export default class QueryRenderer extends React.Component {
   }
 
   loadQueries(queries) {
-    const { cubejsApi } = this.props;
+    const cubejsApi = this.cubejsApi();
     this.setState({ isLoading: true, resultSet: null, error: null });
 
     const resultPromises = Promise.all(toPairs(queries).map(
@@ -112,9 +119,11 @@ export default class QueryRenderer extends React.Component {
   }
 }
 
+QueryRenderer.contextType = CubeContext;
+
 QueryRenderer.propTypes = {
   render: PropTypes.func,
-  cubejsApi: PropTypes.object.isRequired,
+  cubejsApi: PropTypes.object,
   query: PropTypes.object,
   queries: PropTypes.object,
   loadSql: PropTypes.any,
@@ -122,6 +131,7 @@ QueryRenderer.propTypes = {
 };
 
 QueryRenderer.defaultProps = {
+  cubejsApi: null,
   query: null,
   render: null,
   queries: null,
