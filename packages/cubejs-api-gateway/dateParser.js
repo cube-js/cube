@@ -23,10 +23,10 @@ module.exports = (dateString) => {
       moment().add(-1, match[2]).endOf(span)
     ];
   } else if (dateString.match(/today/)) {
-    momentRange = [moment(), moment()];
+    momentRange = [moment().startOf('day'), moment().endOf('day')];
   } else if (dateString.match(/yesterday/)) {
     const yesterday = moment().add(-1, 'day');
-    momentRange = [yesterday, yesterday];
+    momentRange = [yesterday.startOf('day'), yesterday.endOf('day')];
   } else {
     const results = chrono.parse(dateString);
     if (!results) {
