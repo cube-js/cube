@@ -36,6 +36,7 @@ class CubejsApi {
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
     this.transport = options.transport || new HttpTransport({ authorization: apiToken, apiUrl: this.apiUrl });
+    this.pollInterval = options.pollInterval || 5;
   }
 
   request(method, params) {
@@ -58,17 +59,44 @@ class CubejsApi {
 
     const requestInstance = request();
 
+    let unsubscribed = false;
+
     const checkMutex = async () => {
       if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
-        await requestInstance.unsubscribe();
+        unsubscribed = true;
+        if (requestInstance.unsubscribe) {
+          await requestInstance.unsubscribe();
+        }
         throw MUTEX_ERROR;
       }
     };
 
     const loadImpl = async (response, next) => {
+      const subscribeNext = async () => {
+        if (options.subscribe && !unsubscribed) {
+          if (requestInstance.unsubscribe) {
+            return next();
+          } else {
+            await new Promise(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
+            return next();
+          }
+        }
+        return null;
+      };
+
+      const continueWait = async (wait) => {
+        if (!unsubscribed) {
+          if (wait) {
+            await new Promise(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
+          }
+          return next();
+        }
+        return null;
+      };
+
       if (response.status === 502) {
         await checkMutex();
-        return next(); // TODO backoff wait
+        return continueWait(true);
       }
       const body = await response.json();
       if (body.error === 'Continue wait') {
@@ -76,11 +104,11 @@ class CubejsApi {
         if (options.progressCallback) {
           options.progressCallback(new ProgressResult(body));
         }
-        return next();
+        return continueWait();
       }
       if (response.status !== 200) {
         await checkMutex();
-        if (!options.subscribe) {
+        if (!options.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
         }
         const error = new Error(body.error); // TODO error class
@@ -90,12 +118,10 @@ class CubejsApi {
           throw error;
         }
 
-        if (options.subscribe) {
-          return next();
-        }
+        return subscribeNext();
       }
       await checkMutex();
-      if (!options.subscribe) {
+      if (!options.subscribe && requestInstance.unsubscribe) {
         await requestInstance.unsubscribe();
       }
       const result = toResult(body);
@@ -105,17 +131,21 @@ class CubejsApi {
         return result;
       }
 
-      if (options.subscribe) {
-        return next();
-      }
-
-      return null;
+      return subscribeNext();
     };
 
     const promise = mutexPromise(requestInstance.subscribe(loadImpl));
 
     if (callback) {
-      return requestInstance; // TODO
+      return {
+        unsubscribe: async () => {
+          unsubscribed = true;
+          if (requestInstance.unsubscribe) {
+            return requestInstance.unsubscribe();
+          }
+          return null;
+        }
+      };
     } else {
       return promise;
     }
@@ -220,3 +250,5 @@ class CubejsApi {
  * @order -10
  */
 export default (apiToken, options) => new CubejsApi(apiToken, options);
+
+export { HttpTransport };

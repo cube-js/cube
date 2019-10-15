@@ -251,6 +251,14 @@ class ApiGateway {
       });
     }));
 
+    app.get(`${this.basePath}/v1/subscribe`, this.checkAuthMiddleware, (async (req, res) => {
+      await this.load({
+        query: req.query.query,
+        context: this.contextByReq(req),
+        res: this.resToResultFn(res)
+      });
+    }));
+
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
       await this.sql({
         query: req.query.query,
@@ -353,6 +361,13 @@ class ApiGateway {
       });
       let result = null;
       let error = null;
+
+      if (!subscribe) {
+        await this.load({ query, context, res });
+        return;
+      }
+
+      // TODO subscribe to refreshKeys instead of constantly firing load
       await this.load({
         query,
         context,

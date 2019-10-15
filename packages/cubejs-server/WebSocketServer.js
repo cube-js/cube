@@ -6,7 +6,7 @@ class WebSocketServer {
   constructor(serverCore, options) {
     options = options || {};
     this.serverCore = serverCore;
-    this.processSubscriptionsInterval = options.processSubscriptionsInterval || 1000;
+    this.processSubscriptionsInterval = options.processSubscriptionsInterval || 5;
   }
 
   initServer(server) {
@@ -39,7 +39,7 @@ class WebSocketServer {
 
     this.subscriptionsTimer = setInterval(async () => {
       await subscriptionServer.processSubscriptions();
-    }, this.processSubscriptionsInterval);
+    }, this.processSubscriptionsInterval * 1000);
   }
 
   async close() {

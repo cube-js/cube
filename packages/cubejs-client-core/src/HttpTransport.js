@@ -8,7 +8,11 @@ class HttpTransport {
   }
 
   request(method, params) {
-    const searchParams = new URLSearchParams(params);
+    const searchParams = new URLSearchParams(
+      params && Object.keys(params)
+        .map(k => ({ [k]: typeof params[k] === 'object' ? JSON.stringify(params[k]) : params[k] }))
+        .reduce((a, b) => ({ ...a, ...b }), {})
+    );
 
     const runRequest = () => fetch(
       `${this.apiUrl}${method}?${searchParams}`, {
@@ -20,9 +24,6 @@ class HttpTransport {
       async subscribe(callback) {
         const result = await runRequest();
         return callback(result, () => this.subscribe(callback));
-      },
-      async unsubscribe() {
-        return null;
       }
     };
   }

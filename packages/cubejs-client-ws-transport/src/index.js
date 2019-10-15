@@ -12,12 +12,13 @@ class WebSocketTransportResult {
 }
 
 class WebSocketTransport {
-  constructor({ authorization, apiUrl }) {
+  constructor({ authorization, apiUrl, hearBeatInterval }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.messageCounter = 1;
     this.messageIdToSubscription = {};
     this.messageQueue = [];
+    this.hearBeatInterval = hearBeatInterval || 60;
   }
 
   initSocket() {
@@ -41,17 +42,32 @@ class WebSocketTransport {
       this.messageQueue = [];
     };
 
+    ws.reconcile = () => {
+      if (new Date().getTime() - ws.lastMessageTimestamp.getTime() > 4 * this.hearBeatInterval * 1000) {
+        ws.close();
+      } else {
+        Object.keys(this.messageIdToSubscription).forEach(messageId => {
+          ws.sendMessage(this.messageIdToSubscription[messageId].message);
+        });
+      }
+    };
+
+    ws.lastMessageTimestamp = new Date();
+
     ws.initPromise = new Promise(resolve => {
       ws.onopen = () => {
         ws.sendMessage({ authorization: this.authorization });
       };
 
       ws.onmessage = (message) => {
+        ws.lastMessageTimestamp = new Date();
         message = JSON.parse(message.data);
         if (message.handshake) {
-          Object.keys(this.messageIdToSubscription).forEach(messageId => {
-            ws.sendMessage(this.messageIdToSubscription[messageId].message);
-          });
+          ws.reconcile();
+          ws.reconcileTimer = setInterval(() => {
+            ws.messageIdSent = {};
+            ws.reconcile();
+          }, this.hearBeatInterval * 1000);
           resolve();
         }
         if (this.messageIdToSubscription[message.messageId]) {
@@ -64,10 +80,14 @@ class WebSocketTransport {
         if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
           ws.close();
         }
+        if (ws.reconcileTimer) {
+          clearInterval(ws.reconcileTimer);
+          ws.reconcileTimer = null;
+        }
         if (this.ws === ws) {
           this.ws = null;
           if (Object.keys(this.messageIdToSubscription).length) {
-            this.initSocket().then(() => resolve());
+            this.initSocket();
           }
         }
       };

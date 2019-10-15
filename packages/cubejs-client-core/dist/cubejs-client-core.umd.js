@@ -1,8 +1,8 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
-  typeof define === 'function' && define.amd ? define(factory) :
-  (global = global || self, global.cubejs = factory());
-}(this, function () { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (global = global || self, factory(global.cubejs = {}));
+}(this, function (exports) { 'use strict';
 
   function _typeof(obj) {
     if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
@@ -15079,7 +15079,11 @@
       value: function request(method, params) {
         var _this = this;
 
-        var searchParams = new URLSearchParams(params);
+        var searchParams = new URLSearchParams(params && Object.keys(params).map(function (k) {
+          return _defineProperty({}, k, _typeof(params[k]) === 'object' ? JSON.stringify(params[k]) : params[k]);
+        }).reduce(function (a, b) {
+          return _objectSpread({}, a, b);
+        }, {}));
 
         var runRequest = function runRequest() {
           return browserPonyfill("".concat(_this.apiUrl).concat(method, "?").concat(searchParams), {
@@ -15121,28 +15125,6 @@
 
             return function subscribe(_x) {
               return _subscribe.apply(this, arguments);
-            };
-          }(),
-          unsubscribe: function () {
-            var _unsubscribe = _asyncToGenerator(
-            /*#__PURE__*/
-            regeneratorRuntime.mark(function _callee2() {
-              return regeneratorRuntime.wrap(function _callee2$(_context2) {
-                while (1) {
-                  switch (_context2.prev = _context2.next) {
-                    case 0:
-                      return _context2.abrupt("return", null);
-
-                    case 1:
-                    case "end":
-                      return _context2.stop();
-                  }
-                }
-              }, _callee2, this);
-            }));
-
-            return function unsubscribe() {
-              return _unsubscribe.apply(this, arguments);
             };
           }()
         };
@@ -15189,6 +15171,7 @@
         authorization: apiToken,
         apiUrl: this.apiUrl
       });
+      this.pollInterval = options.pollInterval || 5;
     }
 
     _createClass(CubejsApi, [{
@@ -15199,6 +15182,8 @@
     }, {
       key: "loadMethod",
       value: function loadMethod(request, toResult, options, callback) {
+        var _this = this;
+
         var mutexValue = ++mutexCounter;
 
         if (typeof options === 'function' && !callback) {
@@ -15214,6 +15199,7 @@
         }
 
         var requestInstance = request();
+        var unsubscribed = false;
 
         var checkMutex =
         /*#__PURE__*/
@@ -15226,17 +15212,24 @@
                 switch (_context.prev = _context.next) {
                   case 0:
                     if (!(options.mutexObj && options.mutexObj[mutexKey] !== mutexValue)) {
-                      _context.next = 4;
+                      _context.next = 6;
                       break;
                     }
 
-                    _context.next = 3;
+                    unsubscribed = true;
+
+                    if (!requestInstance.unsubscribe) {
+                      _context.next = 5;
+                      break;
+                    }
+
+                    _context.next = 5;
                     return requestInstance.unsubscribe();
 
-                  case 3:
+                  case 5:
                     throw MUTEX_ERROR;
 
-                  case 4:
+                  case 6:
                   case "end":
                     return _context.stop();
                 }
@@ -15254,131 +15247,213 @@
         function () {
           var _ref2 = _asyncToGenerator(
           /*#__PURE__*/
-          regeneratorRuntime.mark(function _callee2(response, next) {
-            var body, error, result;
-            return regeneratorRuntime.wrap(function _callee2$(_context2) {
+          regeneratorRuntime.mark(function _callee4(response, next) {
+            var subscribeNext, continueWait, body, error, result;
+            return regeneratorRuntime.wrap(function _callee4$(_context4) {
               while (1) {
-                switch (_context2.prev = _context2.next) {
+                switch (_context4.prev = _context4.next) {
                   case 0:
+                    subscribeNext =
+                    /*#__PURE__*/
+                    function () {
+                      var _ref3 = _asyncToGenerator(
+                      /*#__PURE__*/
+                      regeneratorRuntime.mark(function _callee2() {
+                        return regeneratorRuntime.wrap(function _callee2$(_context2) {
+                          while (1) {
+                            switch (_context2.prev = _context2.next) {
+                              case 0:
+                                if (!(options.subscribe && !unsubscribed)) {
+                                  _context2.next = 8;
+                                  break;
+                                }
+
+                                if (!requestInstance.unsubscribe) {
+                                  _context2.next = 5;
+                                  break;
+                                }
+
+                                return _context2.abrupt("return", next());
+
+                              case 5:
+                                _context2.next = 7;
+                                return new Promise(function (resolve) {
+                                  return setTimeout(function () {
+                                    return resolve();
+                                  }, _this.pollInterval * 1000);
+                                });
+
+                              case 7:
+                                return _context2.abrupt("return", next());
+
+                              case 8:
+                                return _context2.abrupt("return", null);
+
+                              case 9:
+                              case "end":
+                                return _context2.stop();
+                            }
+                          }
+                        }, _callee2, this);
+                      }));
+
+                      return function subscribeNext() {
+                        return _ref3.apply(this, arguments);
+                      };
+                    }();
+
+                    continueWait =
+                    /*#__PURE__*/
+                    function () {
+                      var _ref4 = _asyncToGenerator(
+                      /*#__PURE__*/
+                      regeneratorRuntime.mark(function _callee3(wait) {
+                        return regeneratorRuntime.wrap(function _callee3$(_context3) {
+                          while (1) {
+                            switch (_context3.prev = _context3.next) {
+                              case 0:
+                                if (unsubscribed) {
+                                  _context3.next = 5;
+                                  break;
+                                }
+
+                                if (!wait) {
+                                  _context3.next = 4;
+                                  break;
+                                }
+
+                                _context3.next = 4;
+                                return new Promise(function (resolve) {
+                                  return setTimeout(function () {
+                                    return resolve();
+                                  }, _this.pollInterval * 1000);
+                                });
+
+                              case 4:
+                                return _context3.abrupt("return", next());
+
+                              case 5:
+                                return _context3.abrupt("return", null);
+
+                              case 6:
+                              case "end":
+                                return _context3.stop();
+                            }
+                          }
+                        }, _callee3, this);
+                      }));
+
+                      return function continueWait(_x3) {
+                        return _ref4.apply(this, arguments);
+                      };
+                    }();
+
                     if (!(response.status === 502)) {
-                      _context2.next = 4;
+                      _context4.next = 6;
                       break;
                     }
 
-                    _context2.next = 3;
+                    _context4.next = 5;
                     return checkMutex();
 
-                  case 3:
-                    return _context2.abrupt("return", next());
-
-                  case 4:
-                    _context2.next = 6;
-                    return response.json();
+                  case 5:
+                    return _context4.abrupt("return", continueWait(true));
 
                   case 6:
-                    body = _context2.sent;
+                    _context4.next = 8;
+                    return response.json();
+
+                  case 8:
+                    body = _context4.sent;
 
                     if (!(body.error === 'Continue wait')) {
-                      _context2.next = 12;
+                      _context4.next = 14;
                       break;
                     }
 
-                    _context2.next = 10;
+                    _context4.next = 12;
                     return checkMutex();
 
-                  case 10:
+                  case 12:
                     if (options.progressCallback) {
                       options.progressCallback(new ProgressResult(body));
                     }
 
-                    return _context2.abrupt("return", next());
+                    return _context4.abrupt("return", continueWait());
 
-                  case 12:
+                  case 14:
                     if (!(response.status !== 200)) {
-                      _context2.next = 26;
+                      _context4.next = 27;
                       break;
                     }
 
-                    _context2.next = 15;
+                    _context4.next = 17;
                     return checkMutex();
 
-                  case 15:
-                    if (options.subscribe) {
-                      _context2.next = 18;
+                  case 17:
+                    if (!(!options.subscribe && requestInstance.unsubscribe)) {
+                      _context4.next = 20;
                       break;
                     }
 
-                    _context2.next = 18;
+                    _context4.next = 20;
                     return requestInstance.unsubscribe();
 
-                  case 18:
+                  case 20:
                     error = new Error(body.error); // TODO error class
 
                     if (!callback) {
-                      _context2.next = 23;
+                      _context4.next = 25;
                       break;
                     }
 
                     callback(error);
-                    _context2.next = 24;
+                    _context4.next = 26;
                     break;
 
-                  case 23:
+                  case 25:
                     throw error;
 
-                  case 24:
-                    if (!options.subscribe) {
-                      _context2.next = 26;
-                      break;
-                    }
-
-                    return _context2.abrupt("return", next());
-
                   case 26:
-                    _context2.next = 28;
+                    return _context4.abrupt("return", subscribeNext());
+
+                  case 27:
+                    _context4.next = 29;
                     return checkMutex();
 
-                  case 28:
-                    if (options.subscribe) {
-                      _context2.next = 31;
+                  case 29:
+                    if (!(!options.subscribe && requestInstance.unsubscribe)) {
+                      _context4.next = 32;
                       break;
                     }
 
-                    _context2.next = 31;
+                    _context4.next = 32;
                     return requestInstance.unsubscribe();
 
-                  case 31:
+                  case 32:
                     result = toResult(body);
 
                     if (!callback) {
-                      _context2.next = 36;
+                      _context4.next = 37;
                       break;
                     }
 
                     callback(null, result);
-                    _context2.next = 37;
+                    _context4.next = 38;
                     break;
 
-                  case 36:
-                    return _context2.abrupt("return", result);
-
                   case 37:
-                    if (!options.subscribe) {
-                      _context2.next = 39;
-                      break;
-                    }
+                    return _context4.abrupt("return", result);
 
-                    return _context2.abrupt("return", next());
+                  case 38:
+                    return _context4.abrupt("return", subscribeNext());
 
                   case 39:
-                    return _context2.abrupt("return", null);
-
-                  case 40:
                   case "end":
-                    return _context2.stop();
+                    return _context4.stop();
                 }
               }
-            }, _callee2, this);
+            }, _callee4, this);
           }));
 
           return function loadImpl(_x, _x2) {
@@ -15389,7 +15464,40 @@
         var promise = mutexPromise(requestInstance.subscribe(loadImpl));
 
         if (callback) {
-          return requestInstance; // TODO
+          return {
+            unsubscribe: function () {
+              var _unsubscribe = _asyncToGenerator(
+              /*#__PURE__*/
+              regeneratorRuntime.mark(function _callee5() {
+                return regeneratorRuntime.wrap(function _callee5$(_context5) {
+                  while (1) {
+                    switch (_context5.prev = _context5.next) {
+                      case 0:
+                        unsubscribed = true;
+
+                        if (!requestInstance.unsubscribe) {
+                          _context5.next = 3;
+                          break;
+                        }
+
+                        return _context5.abrupt("return", requestInstance.unsubscribe());
+
+                      case 3:
+                        return _context5.abrupt("return", null);
+
+                      case 4:
+                      case "end":
+                        return _context5.stop();
+                    }
+                  }
+                }, _callee5, this);
+              }));
+
+              return function unsubscribe() {
+                return _unsubscribe.apply(this, arguments);
+              };
+            }()
+          };
         } else {
           return promise;
         }
@@ -15425,10 +15533,10 @@
     }, {
       key: "load",
       value: function load(query, options, callback) {
-        var _this = this;
+        var _this2 = this;
 
         return this.loadMethod(function () {
-          return _this.request("load", {
+          return _this2.request("load", {
             query: query
           });
         }, function (body) {
@@ -15446,10 +15554,10 @@
     }, {
       key: "sql",
       value: function sql(query, options, callback) {
-        var _this2 = this;
+        var _this3 = this;
 
         return this.loadMethod(function () {
-          return _this2.request("sql", {
+          return _this3.request("sql", {
             query: query
           });
         }, function (body) {
@@ -15466,10 +15574,10 @@
     }, {
       key: "meta",
       value: function meta(options, callback) {
-        var _this3 = this;
+        var _this4 = this;
 
         return this.loadMethod(function () {
-          return _this3.request("meta");
+          return _this4.request("meta");
         }, function (body) {
           return new Meta(body);
         }, options, callback);
@@ -15477,10 +15585,10 @@
     }, {
       key: "subscribe",
       value: function subscribe(query, options, callback) {
-        var _this4 = this;
+        var _this5 = this;
 
         return this.loadMethod(function () {
-          return _this4.request("subscribe", {
+          return _this5.request("subscribe", {
             query: query
           });
         }, function (body) {
@@ -15520,6 +15628,9 @@
     return new CubejsApi(apiToken, options);
   });
 
-  return index;
+  exports.default = index;
+  exports.HttpTransport = HttpTransport;
+
+  Object.defineProperty(exports, '__esModule', { value: true });
 
 }));

@@ -78,6 +78,7 @@ class SubscriptionServer {
         }),
         unsubscribe: async () => this.subscriptionStore.unsubscribe(connectionId, message.messageId)
       });
+      await this.sendMessage(connectionId, { messageProcessedId: message.messageId });
     } catch (e) {
       this.apiGateway.handleError({
         e,
