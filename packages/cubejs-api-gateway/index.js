@@ -5,6 +5,8 @@ const moment = require('moment');
 const dateParser = require('./dateParser');
 
 const UserError = require('./UserError');
+const SubscriptionServer = require('./SubscriptionServer');
+const LocalSubscriptionStore = require('./LocalSubscriptionStore');
 
 const toConfigMap = (metaConfig) => (
   R.pipe(
@@ -216,12 +218,12 @@ const normalizeQuery = (query) => {
   };
 };
 
-const coerceForSqlQuery = (query, req) => ({
+const coerceForSqlQuery = (query, context) => ({
   ...query,
   timeDimensions: (query.timeDimensions || [])
     .map(td => (td.granularity === 'day' ? { ...td, granularity: 'date' } : td)),
   contextSymbols: {
-    userContext: req.authInfo && req.authInfo.u || {}
+    userContext: context.authInfo && context.authInfo.u || {}
   }
 });
 
@@ -233,95 +235,188 @@ class ApiGateway {
     this.adapterApi = adapterApi;
     this.logger = logger;
     this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
+    this.checkAuthFn = options.checkAuth || this.defaultCheckAuth.bind(this);
     this.basePath = options.basePath || '/cubejs-api';
     // eslint-disable-next-line no-unused-vars
     this.queryTransformer = options.queryTransformer || (async (query, context) => query);
+    this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
   }
 
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
-      try {
-        if (!req.query.query || req.query.query === 'undefined') {
-          throw new UserError(`query param is required`);
-        }
-        const query = JSON.parse(req.query.query);
-        this.log(req, {
-          type: 'Load Request',
-          query: req.query.query
-        });
-        const normalizedQuery = await this.queryTransformer(normalizeQuery(query), this.contextByReq(req));
-        const [compilerSqlResult, metaConfigResult] = await Promise.all([
-          this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req)),
-          this.getCompilerApi(req).metaConfig()
-        ]);
-        const sqlQuery = compilerSqlResult;
-        const metaConfig = metaConfigResult;
-        const annotation = prepareAnnotation(metaConfig, normalizedQuery);
-        const aliasToMemberNameMap = prepareAliasToMemberNameMap(metaConfig, sqlQuery, normalizedQuery);
-        const toExecute = {
-          ...sqlQuery,
-          query: sqlQuery.sql[0],
-          values: sqlQuery.sql[1],
-          continueWait: true,
-          renewQuery: normalizedQuery.renewQuery
-        };
-        const response = await this.getAdapterApi(req).executeQuery(toExecute);
-        this.log(req, {
-          type: 'Load Request Success',
-          query: req.query.query,
-        });
-        const flattenAnnotation = {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        };
-        res.json({
-          query: normalizedQuery,
-          data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data),
-          annotation
-        });
-      } catch (e) {
-        this.handleError(e, req, res);
-      }
+      await this.load({
+        query: req.query.query,
+        context: this.contextByReq(req),
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.get(`${this.basePath}/v1/subscribe`, this.checkAuthMiddleware, (async (req, res) => {
+      await this.load({
+        query: req.query.query,
+        context: this.contextByReq(req),
+        res: this.resToResultFn(res)
+      });
     }));
 
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
-      try {
-        if (!req.query.query || req.query.query === 'undefined') {
-          throw new UserError(`query param is required`);
-        }
-        const query = JSON.parse(req.query.query);
-        const normalizedQuery = await this.queryTransformer(normalizeQuery(query), this.contextByReq(req));
-        const sqlQuery = await this.getCompilerApi(req).getSql(coerceForSqlQuery(normalizedQuery, req));
-        res.json({
-          sql: sqlQuery
-        });
-      } catch (e) {
-        this.handleError(e, req, res);
-      }
+      await this.sql({
+        query: req.query.query,
+        context: this.contextByReq(req),
+        res: this.resToResultFn(res)
+      });
     }));
 
     app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
-      try {
-        const metaConfig = await this.getCompilerApi(req).metaConfig();
-        const cubes = metaConfig.map(c => c.config);
-        res.json({ cubes });
-      } catch (e) {
-        this.handleError(e, req, res);
-      }
+      await this.meta({
+        context: this.contextByReq(req),
+        res: this.resToResultFn(res)
+      });
     }));
   }
 
-  getCompilerApi(req) {
+  initSubscriptionServer(sendMessage) {
+    return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
+  }
+
+  async meta({ context, res }) {
+    try {
+      const metaConfig = await this.getCompilerApi(context).metaConfig();
+      const cubes = metaConfig.map(c => c.config);
+      res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e, context, res
+      });
+    }
+  }
+
+  async sql({ query, context, res }) {
+    try {
+      query = this.parseQueryParam(query);
+      const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
+      const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
+      res.json({
+        sql: sqlQuery
+      });
+    } catch (e) {
+      this.handleError({
+        e, context, query, res
+      });
+    }
+  }
+
+  async load({ query, context, res }) {
+    try {
+      query = this.parseQueryParam(query);
+      this.log(context, {
+        type: 'Load Request',
+        query
+      });
+      const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
+      const [compilerSqlResult, metaConfigResult] = await Promise.all([
+        this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context)),
+        this.getCompilerApi(context).metaConfig()
+      ]);
+      const sqlQuery = compilerSqlResult;
+      const metaConfig = metaConfigResult;
+      const annotation = prepareAnnotation(metaConfig, normalizedQuery);
+      const aliasToMemberNameMap = prepareAliasToMemberNameMap(metaConfig, sqlQuery, normalizedQuery);
+      const toExecute = {
+        ...sqlQuery,
+        query: sqlQuery.sql[0],
+        values: sqlQuery.sql[1],
+        continueWait: true,
+        renewQuery: normalizedQuery.renewQuery
+      };
+      const response = await this.getAdapterApi(context).executeQuery(toExecute);
+      this.log(context, {
+        type: 'Load Request Success',
+        query,
+      });
+      const flattenAnnotation = {
+        ...annotation.measures,
+        ...annotation.dimensions,
+        ...annotation.timeDimensions
+      };
+      res({
+        query: normalizedQuery,
+        data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data),
+        annotation
+      });
+    } catch (e) {
+      this.handleError({
+        e, context, query, res
+      });
+    }
+  }
+
+  async subscribe({
+    query, context, res, subscribe, subscriptionState
+  }) {
+    try {
+      this.log(context, {
+        type: 'Subscribe',
+        query
+      });
+      let result = null;
+      let error = null;
+
+      if (!subscribe) {
+        await this.load({ query, context, res });
+        return;
+      }
+
+      // TODO subscribe to refreshKeys instead of constantly firing load
+      await this.load({
+        query,
+        context,
+        res: (message) => {
+          if (message.error) {
+            error = message;
+          } else {
+            result = message;
+          }
+        }
+      });
+      const state = await subscriptionState();
+      if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
+        res(result);
+      } else if (error) {
+        res(error);
+      }
+      await subscribe({ error, result });
+    } catch (e) {
+      this.handleError({
+        e, context, query, res
+      });
+    }
+  }
+
+  resToResultFn(res) {
+    return (message, { status } = {}) => (status ? res.status(status).json(message) : res.json(message));
+  }
+
+  parseQueryParam(query) {
+    if (!query || query === 'undefined') {
+      throw new UserError(`query param is required`);
+    }
+    if (typeof query === 'string') {
+      query = JSON.parse(query);
+    }
+    return query;
+  }
+
+  getCompilerApi(context) {
     if (typeof this.compilerApi === 'function') {
-      return this.compilerApi(this.contextByReq(req));
+      return this.compilerApi(context);
     }
     return this.compilerApi;
   }
 
-  getAdapterApi(req) {
+  getAdapterApi(context) {
     if (typeof this.adapterApi === 'function') {
-      return this.adapterApi(this.contextByReq(req));
+      return this.adapterApi(context);
     }
     return this.adapterApi;
   }
@@ -330,69 +425,86 @@ class ApiGateway {
     return { authInfo: req.authInfo };
   }
 
-  handleError(e, req, res) {
+  handleError({
+    e, context, query, res
+  }) {
     if (e instanceof UserError) {
-      this.log(req, {
+      this.log(context, {
         type: 'User Error',
-        query: req.query && req.query.query,
+        query,
         error: e.message
       });
-      res.status(400).json({ error: e.message });
+      res({ error: e.message }, { status: 400 });
     } else if (e.error === 'Continue wait') {
-      this.log(req, {
+      this.log(context, {
         type: 'Continue wait',
-        query: req.query && req.query.query,
+        query,
         error: e.message
       });
-      res.status(200).json(e);
+      res(e, { status: 200 });
     } else if (e.error) {
-      this.log(req, {
+      this.log(context, {
         type: 'Orchestrator error',
-        query: req.query && req.query.query,
+        query,
         error: e.error
       });
-      res.status(400).json(e);
+      res(e, { status: 400 });
     } else {
-      this.log(req, {
+      this.log(context, {
         type: 'Internal Server Error',
-        query: req.query && req.query.query,
+        query,
         error: e.stack || e.toString()
       });
-      res.status(500).json({ error: e.toString() });
+      res({ error: e.toString() }, { status: 500 });
     }
   }
 
-  async checkAuth(req, res, next) {
-    const auth = req.headers.authorization;
-
+  async defaultCheckAuth(req, auth) {
     if (auth) {
       const secret = this.apiSecret;
       try {
         req.authInfo = jwt.verify(auth, secret);
-        return next && next();
       } catch (e) {
         if (process.env.NODE_ENV === 'production') {
-          res.status(403).json({ error: 'Invalid token' });
+          throw new UserError('Invalid token');
         } else {
           this.log(req, {
             type: 'Invalid Token',
             token: auth,
             error: e.stack || e.toString()
           });
-          return next && next();
         }
       }
     } else if (process.env.NODE_ENV === 'production') {
-      res.status(403).send({ error: "Authorization header isn't set" });
-    } else {
-      return next && next();
+      throw new UserError("Authorization header isn't set");
     }
-    return null;
   }
 
-  log(req, event) {
+  async checkAuth(req, res, next) {
+    const auth = req.headers.authorization;
+
+    try {
+      this.checkAuthFn(req, auth);
+    } catch (e) {
+      if (e instanceof UserError) {
+        res.status(403).json({ error: e.message });
+      } else {
+        this.log(req, {
+          type: 'Auth Error',
+          token: auth,
+          error: e.stack || e.toString()
+        });
+        res.status(500).json({ error: e.toString() });
+      }
+    }
+    if (next) {
+      next();
+    }
+  }
+
+  log(context, event) {
     const { type, ...restParams } = event;
-    this.logger(type, { ...restParams, authInfo: req.authInfo });
+    this.logger(type, { ...restParams, authInfo: context.authInfo });
   }
 }
 

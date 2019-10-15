@@ -26,7 +26,8 @@
     "dotenv": "^8.1.0",
     "express": "^4.17.1",
     "jsonwebtoken": "^8.4.0",
-    "node-machine-id": "^1.1.10"
+    "node-machine-id": "^1.1.10",
+    "ws": "^7.1.2"
   },
   "devDependencies": {
     "eslint": "^4.14.0",

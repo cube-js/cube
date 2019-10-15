@@ -191,20 +191,33 @@ class CubejsServerCore {
 
   async initApp(app) {
     checkEnvForPlaceholders();
-    const apiGateway = new ApiGateway(
-      this.apiSecret,
-      this.getCompilerApi.bind(this),
-      this.getOrchestratorApi.bind(this),
-      this.logger, {
-        basePath: this.options.basePath,
-        checkAuthMiddleware: this.options.checkAuthMiddleware,
-        queryTransformer: this.options.queryTransformer
-      }
-    );
+    const apiGateway = this.apiGateway();
     apiGateway.initApp(app);
     if (this.options.devServer) {
       this.devServer.initDevEnv(app);
     }
+  }
+
+  initSubscriptionServer(sendMessage) {
+    checkEnvForPlaceholders();
+    const apiGateway = this.apiGateway();
+    return apiGateway.initSubscriptionServer(sendMessage);
+  }
+
+  apiGateway() {
+    if (!this.apiGatewayInstance) {
+      this.apiGatewayInstance = new ApiGateway(
+        this.apiSecret,
+        this.getCompilerApi.bind(this),
+        this.getOrchestratorApi.bind(this),
+        this.logger, {
+          basePath: this.options.basePath,
+          checkAuthMiddleware: this.options.checkAuthMiddleware,
+          queryTransformer: this.options.queryTransformer
+        }
+      );
+    }
+    return this.apiGatewayInstance;
   }
 
   getCompilerApi(context) {

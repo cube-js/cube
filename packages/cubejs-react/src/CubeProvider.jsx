@@ -10,7 +10,7 @@ const CubeProvider = ({ cubejsApi, children }) => (
 
 CubeProvider.propTypes = {
   cubejsApi: PropTypes.object.isRequired,
-  children: PropTypes.array.isRequired
+  children: PropTypes.any.isRequired
 };
 
 export default CubeProvider;

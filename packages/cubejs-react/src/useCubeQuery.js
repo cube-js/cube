@@ -13,17 +13,40 @@ export default (query, options = {}) => {
   const [error, setError] = useState(null);
   const context = useContext(CubeContext);
 
+  let subscribeRequest = null;
+
   useEffect(() => {
     async function loadQuery() {
-      if (query && isQueryPresent(query) && !equals(currentQuery, query)) {
-        setCurrentQuery(query);
+      if (query && isQueryPresent(query)) {
+        if (!equals(currentQuery, query)) {
+          setCurrentQuery(query);
+        }
         setLoading(true);
         try {
-          setResultSet(await (options.cubejsApi || context && context.cubejsApi).load(query, {
-            mutexObj,
-            mutexKey: 'query'
-          }));
-          setLoading(false);
+          if (subscribeRequest) {
+            await subscribeRequest.unsubscribe();
+            subscribeRequest = null;
+          }
+          const cubejsApi = options.cubejsApi || context && context.cubejsApi;
+          if (options.subscribe) {
+            subscribeRequest = cubejsApi.subscribe(query, {
+              mutexObj,
+              mutexKey: 'query'
+            }, (e, result) => {
+              setLoading(false);
+              if (e) {
+                setError(e);
+              } else {
+                setResultSet(result);
+              }
+            });
+          } else {
+            setResultSet(await cubejsApi.load(query, {
+              mutexObj,
+              mutexKey: 'query'
+            }));
+            setLoading(false);
+          }
         } catch (e) {
           setError(e);
           setLoading(false);
@@ -31,6 +54,12 @@ export default (query, options = {}) => {
       }
     }
     loadQuery();
+    return () => {
+      if (subscribeRequest) {
+        subscribeRequest.unsubscribe();
+        subscribeRequest = null;
+      }
+    };
   }, [query, options.cubejsApi, context]);
 
   return { isLoading, resultSet, error };

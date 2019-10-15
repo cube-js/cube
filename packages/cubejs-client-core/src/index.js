@@ -6,11 +6,11 @@
  * @menuOrder 2
  */
 
-import fetch from 'cross-fetch';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
 import ProgressResult from './ProgressResult';
+import HttpTransport from './HttpTransport';
 
 const API_URL = process.env.CUBEJS_API_URL;
 
@@ -18,11 +18,9 @@ let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
-const mutexPromise = (promise) => {
-  return new Promise((resolve, reject) => {
-    promise.then(r => resolve(r), e => e !== MUTEX_ERROR && reject(e));
-  });
-};
+const mutexPromise = (promise) => new Promise((resolve, reject) => {
+  promise.then(r => resolve(r), e => e !== MUTEX_ERROR && reject(e));
+});
 
 /**
  * Main class for accessing Cube.js API
@@ -30,16 +28,19 @@ const mutexPromise = (promise) => {
  */
 class CubejsApi {
   constructor(apiToken, options) {
+    if (typeof apiToken === 'object') {
+      options = apiToken;
+      apiToken = undefined;
+    }
     options = options || {};
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
+    this.transport = options.transport || new HttpTransport({ authorization: apiToken, apiUrl: this.apiUrl });
+    this.pollInterval = options.pollInterval || 5;
   }
 
-  request(url, config) {
-    return fetch(
-      `${this.apiUrl}${url}`,
-      Object.assign({ headers: { Authorization: this.apiToken, 'Content-Type': 'application/json' }}, config || {})
-    );
+  request(method, params) {
+    return this.transport.request(method, params);
   }
 
   loadMethod(request, toResult, options, callback) {
@@ -56,37 +57,97 @@ class CubejsApi {
       options.mutexObj[mutexKey] = mutexValue;
     }
 
-    const checkMutex = () => {
+    const requestInstance = request();
+
+    let unsubscribed = false;
+
+    const checkMutex = async () => {
       if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
+        unsubscribed = true;
+        if (requestInstance.unsubscribe) {
+          await requestInstance.unsubscribe();
+        }
         throw MUTEX_ERROR;
       }
     };
 
-    const loadImpl = async () => {
-      const response = await request();
+    const loadImpl = async (response, next) => {
+      const subscribeNext = async () => {
+        if (options.subscribe && !unsubscribed) {
+          if (requestInstance.unsubscribe) {
+            return next();
+          } else {
+            await new Promise(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
+            return next();
+          }
+        }
+        return null;
+      };
+
+      const continueWait = async (wait) => {
+        if (!unsubscribed) {
+          if (wait) {
+            await new Promise(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
+          }
+          return next();
+        }
+        return null;
+      };
+
       if (response.status === 502) {
-        checkMutex();
-        return loadImpl(); // TODO backoff wait
+        await checkMutex();
+        return continueWait(true);
       }
       const body = await response.json();
       if (body.error === 'Continue wait') {
-        checkMutex();
+        await checkMutex();
         if (options.progressCallback) {
           options.progressCallback(new ProgressResult(body));
         }
-        return loadImpl();
+        return continueWait();
       }
       if (response.status !== 200) {
-        checkMutex();
-        throw new Error(body.error); // TODO error class
+        await checkMutex();
+        if (!options.subscribe && requestInstance.unsubscribe) {
+          await requestInstance.unsubscribe();
+        }
+        const error = new Error(body.error); // TODO error class
+        if (callback) {
+          callback(error);
+        } else {
+          throw error;
+        }
+
+        return subscribeNext();
       }
-      checkMutex();
-      return toResult(body);
+      await checkMutex();
+      if (!options.subscribe && requestInstance.unsubscribe) {
+        await requestInstance.unsubscribe();
+      }
+      const result = toResult(body);
+      if (callback) {
+        callback(null, result);
+      } else {
+        return result;
+      }
+
+      return subscribeNext();
     };
+
+    const promise = mutexPromise(requestInstance.subscribe(loadImpl));
+
     if (callback) {
-      mutexPromise(loadImpl()).then(r => callback(null, r), e => callback(e));
+      return {
+        unsubscribe: async () => {
+          unsubscribed = true;
+          if (requestInstance.unsubscribe) {
+            return requestInstance.unsubscribe();
+          }
+          return null;
+        }
+      };
     } else {
-      return mutexPromise(loadImpl());
+      return promise;
     }
   }
 
@@ -119,7 +180,7 @@ class CubejsApi {
    */
   load(query, options, callback) {
     return this.loadMethod(
-      () => this.request(`/load?query=${encodeURIComponent(JSON.stringify(query))}`),
+      () => this.request(`load`, { query }),
       (body) => new ResultSet(body),
       options,
       callback
@@ -135,7 +196,7 @@ class CubejsApi {
    */
   sql(query, options, callback) {
     return this.loadMethod(
-      () => this.request(`/sql?query=${JSON.stringify(query)}`),
+      () => this.request(`sql`, { query }),
       (body) => new SqlQuery(body),
       options,
       callback
@@ -150,9 +211,18 @@ class CubejsApi {
    */
   meta(options, callback) {
     return this.loadMethod(
-      () => this.request(`/meta`),
+      () => this.request(`meta`),
       (body) => new Meta(body),
       options,
+      callback
+    );
+  }
+
+  subscribe(query, options, callback) {
+    return this.loadMethod(
+      () => this.request(`subscribe`, { query }),
+      (body) => new ResultSet(body),
+      { ...options, subscribe: true },
       callback
     );
   }
@@ -179,6 +249,6 @@ class CubejsApi {
  * @returns {CubejsApi}
  * @order -10
  */
-export default (apiToken, options) => {
-  return new CubejsApi(apiToken, options);
-};
+export default (apiToken, options) => new CubejsApi(apiToken, options);
+
+export { HttpTransport };

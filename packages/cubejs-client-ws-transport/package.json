@@ -1,20 +1,13 @@
 {
-  "name": "@cubejs-client/core",
+  "name": "@cubejs-client/ws-transport",
   "version": "0.10.61",
-  "description": "cube.js client",
-  "main": "dist/cubejs-client-core.js",
+  "description": "Cube.js WebSocket transport",
+  "main": "dist/cubejs-client-ws-transport.js",
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
     "core-js": "^2.5.3",
-    "cross-fetch": "^3.0.2",
-    "moment": "^2.22.2",
-    "moment-range": "^4.0.1",
-    "ramda": "^0.25.0",
-    "url-search-params-polyfill": "^7.0.0"
-  },
-  "scripts": {
-    "test": "jest"
+    "isomorphic-ws": "^4.0.1"
   },
   "files": [
     "src",
@@ -26,5 +19,8 @@
     "@babel/preset-env": "^7.3.1",
     "babel-jest": "^24.1.0",
     "jest": "^24.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

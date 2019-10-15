@@ -10,7 +10,7 @@ import _getPrototypeOf from '@babel/runtime/helpers/getPrototypeOf';
 import _createClass from '@babel/runtime/helpers/createClass';
 import _inherits from '@babel/runtime/helpers/inherits';
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { func, object, any, bool, array } from 'prop-types';
+import { func, object, any, bool } from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import _extends from '@babel/runtime/helpers/extends';
 import _objectSpread from '@babel/runtime/helpers/objectSpread';
@@ -734,7 +734,7 @@ var CubeProvider = function CubeProvider(_ref) {
 
 CubeProvider.propTypes = {
   cubejsApi: object.isRequired,
-  children: array.isRequired
+  children: any.isRequired
 };
 
 var useCubeQuery = (function (query) {
@@ -765,6 +765,7 @@ var useCubeQuery = (function (query) {
       setError = _useState10[1];
 
   var context = useContext(CubeContext);
+  var subscribeRequest = null;
   useEffect(function () {
     function loadQuery() {
       return _loadQuery.apply(this, arguments);
@@ -774,49 +775,97 @@ var useCubeQuery = (function (query) {
       _loadQuery = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee() {
+        var cubejsApi;
         return _regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                if (!(query && isQueryPresent(query) && !equals(currentQuery, query))) {
-                  _context.next = 16;
+                if (!(query && isQueryPresent(query))) {
+                  _context.next = 25;
                   break;
                 }
 
-                setCurrentQuery(query);
+                if (!equals(currentQuery, query)) {
+                  setCurrentQuery(query);
+                }
+
                 setLoading(true);
                 _context.prev = 3;
-                _context.t0 = setResultSet;
+
+                if (!subscribeRequest) {
+                  _context.next = 8;
+                  break;
+                }
+
                 _context.next = 7;
-                return (options.cubejsApi || context && context.cubejsApi).load(query, {
+                return subscribeRequest.unsubscribe();
+
+              case 7:
+                subscribeRequest = null;
+
+              case 8:
+                cubejsApi = options.cubejsApi || context && context.cubejsApi;
+
+                if (!options.subscribe) {
+                  _context.next = 13;
+                  break;
+                }
+
+                subscribeRequest = cubejsApi.subscribe(query, {
+                  mutexObj: mutexObj,
+                  mutexKey: 'query'
+                }, function (e, result) {
+                  setLoading(false);
+
+                  if (e) {
+                    setError(e);
+                  } else {
+                    setResultSet(result);
+                  }
+                });
+                _context.next = 19;
+                break;
+
+              case 13:
+                _context.t0 = setResultSet;
+                _context.next = 16;
+                return cubejsApi.load(query, {
                   mutexObj: mutexObj,
                   mutexKey: 'query'
                 });
 
-              case 7:
+              case 16:
                 _context.t1 = _context.sent;
                 (0, _context.t0)(_context.t1);
                 setLoading(false);
-                _context.next = 16;
+
+              case 19:
+                _context.next = 25;
                 break;
 
-              case 12:
-                _context.prev = 12;
+              case 21:
+                _context.prev = 21;
                 _context.t2 = _context["catch"](3);
                 setError(_context.t2);
                 setLoading(false);
 
-              case 16:
+              case 25:
               case "end":
                 return _context.stop();
             }
           }
-        }, _callee, this, [[3, 12]]);
+        }, _callee, this, [[3, 21]]);
       }));
       return _loadQuery.apply(this, arguments);
     }
 
     loadQuery();
+    return function () {
+      if (subscribeRequest) {
+        subscribeRequest.unsubscribe();
+        subscribeRequest = null;
+      }
+    };
   }, [query, options.cubejsApi, context]);
   return {
     isLoading: isLoading,

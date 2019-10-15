@@ -1,18 +1,18 @@
+import _objectSpread from '@babel/runtime/helpers/objectSpread';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
-import 'core-js/modules/es6.object.assign';
+import _typeof from '@babel/runtime/helpers/typeof';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
 import _createClass from '@babel/runtime/helpers/createClass';
 import 'core-js/modules/es6.promise';
-import fetch from 'cross-fetch';
 import 'core-js/modules/es6.number.constructor';
 import 'core-js/modules/es6.number.parse-float';
-import _objectSpread from '@babel/runtime/helpers/objectSpread';
 import 'core-js/modules/web.dom.iterable';
 import 'core-js/modules/es6.array.iterator';
 import 'core-js/modules/es6.object.keys';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
+import 'core-js/modules/es6.object.assign';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import 'core-js/modules/es6.array.reduce';
 import 'core-js/modules/es6.array.index-of';
@@ -28,6 +28,8 @@ import momentRange from 'moment-range';
 import 'core-js/modules/es6.array.is-array';
 import 'core-js/modules/es6.regexp.split';
 import 'core-js/modules/es6.function.name';
+import fetch from 'cross-fetch';
+import 'url-search-params-polyfill';
 
 var moment = momentRange.extendMoment(Moment);
 var TIME_SERIES = {
@@ -731,6 +733,79 @@ function () {
   return ProgressResult;
 }();
 
+var HttpTransport =
+/*#__PURE__*/
+function () {
+  function HttpTransport(_ref) {
+    var authorization = _ref.authorization,
+        apiUrl = _ref.apiUrl;
+
+    _classCallCheck(this, HttpTransport);
+
+    this.authorization = authorization;
+    this.apiUrl = apiUrl;
+  }
+
+  _createClass(HttpTransport, [{
+    key: "request",
+    value: function request(method, params) {
+      var _this = this;
+
+      var searchParams = new URLSearchParams(params && Object.keys(params).map(function (k) {
+        return _defineProperty({}, k, _typeof(params[k]) === 'object' ? JSON.stringify(params[k]) : params[k]);
+      }).reduce(function (a, b) {
+        return _objectSpread({}, a, b);
+      }, {}));
+
+      var runRequest = function runRequest() {
+        return fetch("".concat(_this.apiUrl).concat(method, "?").concat(searchParams), {
+          headers: {
+            Authorization: _this.authorization,
+            'Content-Type': 'application/json'
+          }
+        });
+      };
+
+      return {
+        subscribe: function () {
+          var _subscribe = _asyncToGenerator(
+          /*#__PURE__*/
+          _regeneratorRuntime.mark(function _callee(callback) {
+            var _this2 = this;
+
+            var result;
+            return _regeneratorRuntime.wrap(function _callee$(_context) {
+              while (1) {
+                switch (_context.prev = _context.next) {
+                  case 0:
+                    _context.next = 2;
+                    return runRequest();
+
+                  case 2:
+                    result = _context.sent;
+                    return _context.abrupt("return", callback(result, function () {
+                      return _this2.subscribe(callback);
+                    }));
+
+                  case 4:
+                  case "end":
+                    return _context.stop();
+                }
+              }
+            }, _callee, this);
+          }));
+
+          return function subscribe(_x) {
+            return _subscribe.apply(this, arguments);
+          };
+        }()
+      };
+    }
+  }]);
+
+  return HttpTransport;
+}();
+
 var API_URL = "https://statsbot.co/cubejs-api/v1";
 var mutexCounter = 0;
 var MUTEX_ERROR = 'Mutex has been changed';
@@ -756,24 +831,31 @@ function () {
   function CubejsApi(apiToken, options) {
     _classCallCheck(this, CubejsApi);
 
+    if (_typeof(apiToken) === 'object') {
+      options = apiToken;
+      apiToken = undefined;
+    }
+
     options = options || {};
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
+    this.transport = options.transport || new HttpTransport({
+      authorization: apiToken,
+      apiUrl: this.apiUrl
+    });
+    this.pollInterval = options.pollInterval || 5;
   }
 
   _createClass(CubejsApi, [{
     key: "request",
-    value: function request(url, config) {
-      return fetch("".concat(this.apiUrl).concat(url), Object.assign({
-        headers: {
-          Authorization: this.apiToken,
-          'Content-Type': 'application/json'
-        }
-      }, config || {}));
+    value: function request(method, params) {
+      return this.transport.request(method, params);
     }
   }, {
     key: "loadMethod",
     value: function loadMethod(request, toResult, options, callback) {
+      var _this = this;
+
       var mutexValue = ++mutexCounter;
 
       if (typeof options === 'function' && !callback) {
@@ -788,71 +870,38 @@ function () {
         options.mutexObj[mutexKey] = mutexValue;
       }
 
-      var checkMutex = function checkMutex() {
-        if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
-          throw MUTEX_ERROR;
-        }
-      };
+      var requestInstance = request();
+      var unsubscribed = false;
 
-      var loadImpl =
+      var checkMutex =
       /*#__PURE__*/
       function () {
         var _ref = _asyncToGenerator(
         /*#__PURE__*/
         _regeneratorRuntime.mark(function _callee() {
-          var response, body;
           return _regeneratorRuntime.wrap(function _callee$(_context) {
             while (1) {
               switch (_context.prev = _context.next) {
                 case 0:
-                  _context.next = 2;
-                  return request();
-
-                case 2:
-                  response = _context.sent;
-
-                  if (!(response.status === 502)) {
+                  if (!(options.mutexObj && options.mutexObj[mutexKey] !== mutexValue)) {
                     _context.next = 6;
                     break;
                   }
 
-                  checkMutex();
-                  return _context.abrupt("return", loadImpl());
+                  unsubscribed = true;
+
+                  if (!requestInstance.unsubscribe) {
+                    _context.next = 5;
+                    break;
+                  }
+
+                  _context.next = 5;
+                  return requestInstance.unsubscribe();
+
+                case 5:
+                  throw MUTEX_ERROR;
 
                 case 6:
-                  _context.next = 8;
-                  return response.json();
-
-                case 8:
-                  body = _context.sent;
-
-                  if (!(body.error === 'Continue wait')) {
-                    _context.next = 13;
-                    break;
-                  }
-
-                  checkMutex();
-
-                  if (options.progressCallback) {
-                    options.progressCallback(new ProgressResult(body));
-                  }
-
-                  return _context.abrupt("return", loadImpl());
-
-                case 13:
-                  if (!(response.status !== 200)) {
-                    _context.next = 16;
-                    break;
-                  }
-
-                  checkMutex();
-                  throw new Error(body.error);
-
-                case 16:
-                  checkMutex();
-                  return _context.abrupt("return", toResult(body));
-
-                case 18:
                 case "end":
                   return _context.stop();
               }
@@ -860,19 +909,269 @@ function () {
           }, _callee, this);
         }));
 
-        return function loadImpl() {
+        return function checkMutex() {
           return _ref.apply(this, arguments);
         };
       }();
 
+      var loadImpl =
+      /*#__PURE__*/
+      function () {
+        var _ref2 = _asyncToGenerator(
+        /*#__PURE__*/
+        _regeneratorRuntime.mark(function _callee4(response, next) {
+          var subscribeNext, continueWait, body, error, result;
+          return _regeneratorRuntime.wrap(function _callee4$(_context4) {
+            while (1) {
+              switch (_context4.prev = _context4.next) {
+                case 0:
+                  subscribeNext =
+                  /*#__PURE__*/
+                  function () {
+                    var _ref3 = _asyncToGenerator(
+                    /*#__PURE__*/
+                    _regeneratorRuntime.mark(function _callee2() {
+                      return _regeneratorRuntime.wrap(function _callee2$(_context2) {
+                        while (1) {
+                          switch (_context2.prev = _context2.next) {
+                            case 0:
+                              if (!(options.subscribe && !unsubscribed)) {
+                                _context2.next = 8;
+                                break;
+                              }
+
+                              if (!requestInstance.unsubscribe) {
+                                _context2.next = 5;
+                                break;
+                              }
+
+                              return _context2.abrupt("return", next());
+
+                            case 5:
+                              _context2.next = 7;
+                              return new Promise(function (resolve) {
+                                return setTimeout(function () {
+                                  return resolve();
+                                }, _this.pollInterval * 1000);
+                              });
+
+                            case 7:
+                              return _context2.abrupt("return", next());
+
+                            case 8:
+                              return _context2.abrupt("return", null);
+
+                            case 9:
+                            case "end":
+                              return _context2.stop();
+                          }
+                        }
+                      }, _callee2, this);
+                    }));
+
+                    return function subscribeNext() {
+                      return _ref3.apply(this, arguments);
+                    };
+                  }();
+
+                  continueWait =
+                  /*#__PURE__*/
+                  function () {
+                    var _ref4 = _asyncToGenerator(
+                    /*#__PURE__*/
+                    _regeneratorRuntime.mark(function _callee3(wait) {
+                      return _regeneratorRuntime.wrap(function _callee3$(_context3) {
+                        while (1) {
+                          switch (_context3.prev = _context3.next) {
+                            case 0:
+                              if (unsubscribed) {
+                                _context3.next = 5;
+                                break;
+                              }
+
+                              if (!wait) {
+                                _context3.next = 4;
+                                break;
+                              }
+
+                              _context3.next = 4;
+                              return new Promise(function (resolve) {
+                                return setTimeout(function () {
+                                  return resolve();
+                                }, _this.pollInterval * 1000);
+                              });
+
+                            case 4:
+                              return _context3.abrupt("return", next());
+
+                            case 5:
+                              return _context3.abrupt("return", null);
+
+                            case 6:
+                            case "end":
+                              return _context3.stop();
+                          }
+                        }
+                      }, _callee3, this);
+                    }));
+
+                    return function continueWait(_x3) {
+                      return _ref4.apply(this, arguments);
+                    };
+                  }();
+
+                  if (!(response.status === 502)) {
+                    _context4.next = 6;
+                    break;
+                  }
+
+                  _context4.next = 5;
+                  return checkMutex();
+
+                case 5:
+                  return _context4.abrupt("return", continueWait(true));
+
+                case 6:
+                  _context4.next = 8;
+                  return response.json();
+
+                case 8:
+                  body = _context4.sent;
+
+                  if (!(body.error === 'Continue wait')) {
+                    _context4.next = 14;
+                    break;
+                  }
+
+                  _context4.next = 12;
+                  return checkMutex();
+
+                case 12:
+                  if (options.progressCallback) {
+                    options.progressCallback(new ProgressResult(body));
+                  }
+
+                  return _context4.abrupt("return", continueWait());
+
+                case 14:
+                  if (!(response.status !== 200)) {
+                    _context4.next = 27;
+                    break;
+                  }
+
+                  _context4.next = 17;
+                  return checkMutex();
+
+                case 17:
+                  if (!(!options.subscribe && requestInstance.unsubscribe)) {
+                    _context4.next = 20;
+                    break;
+                  }
+
+                  _context4.next = 20;
+                  return requestInstance.unsubscribe();
+
+                case 20:
+                  error = new Error(body.error); // TODO error class
+
+                  if (!callback) {
+                    _context4.next = 25;
+                    break;
+                  }
+
+                  callback(error);
+                  _context4.next = 26;
+                  break;
+
+                case 25:
+                  throw error;
+
+                case 26:
+                  return _context4.abrupt("return", subscribeNext());
+
+                case 27:
+                  _context4.next = 29;
+                  return checkMutex();
+
+                case 29:
+                  if (!(!options.subscribe && requestInstance.unsubscribe)) {
+                    _context4.next = 32;
+                    break;
+                  }
+
+                  _context4.next = 32;
+                  return requestInstance.unsubscribe();
+
+                case 32:
+                  result = toResult(body);
+
+                  if (!callback) {
+                    _context4.next = 37;
+                    break;
+                  }
+
+                  callback(null, result);
+                  _context4.next = 38;
+                  break;
+
+                case 37:
+                  return _context4.abrupt("return", result);
+
+                case 38:
+                  return _context4.abrupt("return", subscribeNext());
+
+                case 39:
+                case "end":
+                  return _context4.stop();
+              }
+            }
+          }, _callee4, this);
+        }));
+
+        return function loadImpl(_x, _x2) {
+          return _ref2.apply(this, arguments);
+        };
+      }();
+
+      var promise = mutexPromise(requestInstance.subscribe(loadImpl));
+
       if (callback) {
-        mutexPromise(loadImpl()).then(function (r) {
-          return callback(null, r);
-        }, function (e) {
-          return callback(e);
-        });
+        return {
+          unsubscribe: function () {
+            var _unsubscribe = _asyncToGenerator(
+            /*#__PURE__*/
+            _regeneratorRuntime.mark(function _callee5() {
+              return _regeneratorRuntime.wrap(function _callee5$(_context5) {
+                while (1) {
+                  switch (_context5.prev = _context5.next) {
+                    case 0:
+                      unsubscribed = true;
+
+                      if (!requestInstance.unsubscribe) {
+                        _context5.next = 3;
+                        break;
+                      }
+
+                      return _context5.abrupt("return", requestInstance.unsubscribe());
+
+                    case 3:
+                      return _context5.abrupt("return", null);
+
+                    case 4:
+                    case "end":
+                      return _context5.stop();
+                  }
+                }
+              }, _callee5, this);
+            }));
+
+            return function unsubscribe() {
+              return _unsubscribe.apply(this, arguments);
+            };
+          }()
+        };
       } else {
-        return mutexPromise(loadImpl());
+        return promise;
       }
     }
     /**
@@ -906,10 +1205,12 @@ function () {
   }, {
     key: "load",
     value: function load(query, options, callback) {
-      var _this = this;
+      var _this2 = this;
 
       return this.loadMethod(function () {
-        return _this.request("/load?query=".concat(encodeURIComponent(JSON.stringify(query))));
+        return _this2.request("load", {
+          query: query
+        });
       }, function (body) {
         return new ResultSet(body);
       }, options, callback);
@@ -925,10 +1226,12 @@ function () {
   }, {
     key: "sql",
     value: function sql(query, options, callback) {
-      var _this2 = this;
+      var _this3 = this;
 
       return this.loadMethod(function () {
-        return _this2.request("/sql?query=".concat(JSON.stringify(query)));
+        return _this3.request("sql", {
+          query: query
+        });
       }, function (body) {
         return new SqlQuery(body);
       }, options, callback);
@@ -943,13 +1246,28 @@ function () {
   }, {
     key: "meta",
     value: function meta(options, callback) {
-      var _this3 = this;
+      var _this4 = this;
 
       return this.loadMethod(function () {
-        return _this3.request("/meta");
+        return _this4.request("meta");
       }, function (body) {
         return new Meta(body);
       }, options, callback);
+    }
+  }, {
+    key: "subscribe",
+    value: function subscribe(query, options, callback) {
+      var _this5 = this;
+
+      return this.loadMethod(function () {
+        return _this5.request("subscribe", {
+          query: query
+        });
+      }, function (body) {
+        return new ResultSet(body);
+      }, _objectSpread({}, options, {
+        subscribe: true
+      }), callback);
     }
   }]);
 
@@ -983,3 +1301,4 @@ var index = (function (apiToken, options) {
 });
 
 export default index;
+export { HttpTransport };

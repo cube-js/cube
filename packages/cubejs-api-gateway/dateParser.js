@@ -5,8 +5,8 @@ const UserError = require('./UserError');
 module.exports = (dateString) => {
   let momentRange;
   dateString = dateString.toLowerCase();
-  if (dateString.match(/(this|last)\s+(day|week|month|year|quarter)/)) {
-    const match = dateString.match(/(this|last)\s+(day|week|month|year|quarter)/);
+  if (dateString.match(/(this|last)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
+    const match = dateString.match(/(this|last)\s+(day|week|month|year|quarter|hour|minute|second)/);
     let start = moment();
     let end = moment();
     if (match[1] === 'last') {
@@ -15,18 +15,18 @@ module.exports = (dateString) => {
     }
     const span = match[2] === 'week' ? 'isoWeek' : match[2];
     momentRange = [start.startOf(span), end.endOf(span)];
-  } else if (dateString.match(/last\s+(\d+)\s+(day|week|month|year|quarter)/)) {
-    const match = dateString.match(/last\s+(\d+)\s+(day|week|month|year|quarter)/);
+  } else if (dateString.match(/last\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
+    const match = dateString.match(/last\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/);
     const span = match[2] === 'week' ? 'isoWeek' : match[2];
     momentRange = [
       moment().add(-parseInt(match[1], 10) - 1, match[2]).startOf(span),
       moment().add(-1, match[2]).endOf(span)
     ];
   } else if (dateString.match(/today/)) {
-    momentRange = [moment(), moment()];
+    momentRange = [moment().startOf('day'), moment().endOf('day')];
   } else if (dateString.match(/yesterday/)) {
     const yesterday = moment().add(-1, 'day');
-    momentRange = [yesterday, yesterday];
+    momentRange = [yesterday.startOf('day'), yesterday.endOf('day')];
   } else {
     const results = chrono.parse(dateString);
     if (!results) {
@@ -40,5 +40,5 @@ module.exports = (dateString) => {
       results[0].start.moment()
     ];
   }
-  return momentRange.map(d => d.format(moment.HTML5_FMT.DATE));
+  return momentRange.map(d => d.format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
 };
