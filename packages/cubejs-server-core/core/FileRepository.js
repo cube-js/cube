@@ -30,7 +30,7 @@ class FileRepository {
       files
         .filter(file => R.endsWith(".js", file))
         .map(async file => {
-          const content = await fs.readFile(file, "utf-8");
+          const content = await fs.readFile(path.join(self.localPath(), file), "utf-8");
           return { fileName: file, content };
         })
     );
