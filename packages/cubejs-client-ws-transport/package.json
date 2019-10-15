@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "0.10.61",
+  "version": "0.11.0",
   "description": "Cube.js WebSocket transport",
   "main": "dist/cubejs-client-ws-transport.js",
   "author": "Statsbot, Inc.",

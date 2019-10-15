@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.11.0](https://github.com/statsbotco/cubejs-client/compare/v0.10.62...v0.11.0) (2019-10-15)
+
+
+### Bug Fixes
+
+* TypeError: Cannot destructure property authInfo of 'undefined' or 'null'. ([1886d13](https://github.com/statsbotco/cubejs-client/commit/1886d13))
+
+
+### Features
+
+* Read schema subfolders ([#230](https://github.com/statsbotco/cubejs-client/issues/230)). Thanks to [@lksilva](https://github.com/lksilva)! ([aa736b1](https://github.com/statsbotco/cubejs-client/commit/aa736b1))
+* Sockets Preview ([#231](https://github.com/statsbotco/cubejs-client/issues/231)) ([89fc762](https://github.com/statsbotco/cubejs-client/commit/89fc762)), closes [#221](https://github.com/statsbotco/cubejs-client/issues/221)
+
+
+
+
+
 ## [0.10.62](https://github.com/statsbotco/cubejs-client/compare/v0.10.61...v0.10.62) (2019-10-11)
 
 
