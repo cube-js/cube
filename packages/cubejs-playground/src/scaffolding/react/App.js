@@ -6,9 +6,8 @@ import { CubeProvider } from "@cubejs-client/react";
 import client from "./graphql/client";
 import Header from "./components/Header";
 
-// change to your actual endpoint
 const API_URL = undefined;
-// should be refreshed by your backend API endpoint. More info: https://cube.dev/docs/security
+
 const CUBEJS_TOKEN = undefined;
 
 const cubejsApi = cubejs(
