@@ -45,8 +45,8 @@ export default (query, options = {}) => {
               mutexObj,
               mutexKey: 'query'
             }));
+            setLoading(false);
           }
-          setLoading(false);
         } catch (e) {
           setError(e);
           setLoading(false);

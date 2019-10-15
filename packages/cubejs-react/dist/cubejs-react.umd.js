@@ -6352,7 +6352,7 @@
 	                    setResultSet(result);
 	                  }
 	                });
-	                _context.next = 18;
+	                _context.next = 19;
 	                break;
 
 	              case 13:
@@ -6366,9 +6366,9 @@
 	              case 16:
 	                _context.t1 = _context.sent;
 	                (0, _context.t0)(_context.t1);
-
-	              case 18:
 	                setLoading(false);
+
+	              case 19:
 	                _context.next = 25;
 	                break;
 
