@@ -15086,7 +15086,7 @@
         }, {}));
 
         var runRequest = function runRequest() {
-          return browserPonyfill("".concat(_this.apiUrl).concat(method, "?").concat(searchParams), {
+          return browserPonyfill("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
             headers: {
               Authorization: _this.authorization,
               'Content-Type': 'application/json'

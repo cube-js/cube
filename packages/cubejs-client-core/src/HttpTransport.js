@@ -15,7 +15,7 @@ class HttpTransport {
     );
 
     const runRequest = () => fetch(
-      `${this.apiUrl}${method}?${searchParams}`, {
+      `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`, {
         headers: { Authorization: this.authorization, 'Content-Type': 'application/json' }
       }
     );

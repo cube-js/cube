@@ -34,6 +34,8 @@ var momentRange = _interopDefault(require('moment-range'));
 require('core-js/modules/es6.array.is-array');
 require('core-js/modules/es6.regexp.split');
 require('core-js/modules/es6.function.name');
+require('core-js/modules/es6.regexp.to-string');
+require('core-js/modules/es6.date.to-string');
 var fetch = _interopDefault(require('cross-fetch'));
 require('url-search-params-polyfill');
 
@@ -764,7 +766,7 @@ function () {
       }, {}));
 
       var runRequest = function runRequest() {
-        return fetch("".concat(_this.apiUrl).concat(method, "?").concat(searchParams), {
+        return fetch("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
           headers: {
             Authorization: _this.authorization,
             'Content-Type': 'application/json'

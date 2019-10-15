@@ -28,6 +28,8 @@ import momentRange from 'moment-range';
 import 'core-js/modules/es6.array.is-array';
 import 'core-js/modules/es6.regexp.split';
 import 'core-js/modules/es6.function.name';
+import 'core-js/modules/es6.regexp.to-string';
+import 'core-js/modules/es6.date.to-string';
 import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
@@ -758,7 +760,7 @@ function () {
       }, {}));
 
       var runRequest = function runRequest() {
-        return fetch("".concat(_this.apiUrl).concat(method, "?").concat(searchParams), {
+        return fetch("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
           headers: {
             Authorization: _this.authorization,
             'Content-Type': 'application/json'
