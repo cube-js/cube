@@ -793,6 +793,8 @@ var useCubeQuery = (function (query) {
                 }
 
                 if (!ramda.equals(currentQuery, query)) {
+                  setResultSet(null);
+                  setError(null);
                   setCurrentQuery(query);
                 }
 

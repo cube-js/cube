@@ -19,6 +19,8 @@ export default (query, options = {}) => {
     async function loadQuery() {
       if (query && isQueryPresent(query)) {
         if (!equals(currentQuery, query)) {
+          setResultSet(null);
+          setError(null);
           setCurrentQuery(query);
         }
         setLoading(true);

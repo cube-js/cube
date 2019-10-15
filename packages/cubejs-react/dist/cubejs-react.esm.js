@@ -786,6 +786,8 @@ var useCubeQuery = (function (query) {
                 }
 
                 if (!equals(currentQuery, query)) {
+                  setResultSet(null);
+                  setError(null);
                   setCurrentQuery(query);
                 }
 
