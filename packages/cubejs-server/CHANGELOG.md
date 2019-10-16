@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.4](https://github.com/statsbotco/cubejs-client/compare/v0.11.3...v0.11.4) (2019-10-16)
+
+
+### Bug Fixes
+
+* TLS redirect is failing if cube.js listening on port other than 80 ([0fe92ec](https://github.com/statsbotco/cubejs-client/commit/0fe92ec))
+
+
+
+
+
 ## [0.11.2](https://github.com/statsbotco/cubejs-client/compare/v0.11.1...v0.11.2) (2019-10-15)
 
 **Note:** Version bump only for package @cubejs-backend/server
