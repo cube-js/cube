@@ -38,7 +38,7 @@ class CubejsServer {
         if (enableTls) {
           this.redirector = http.createServer((req, res) => {
             res.writeHead(301, {
-              Location: `https://${req.headers.host}:${TLS_PORT}${req.url}`
+              Location: `https://${req.headers.host.split(':')[0]}:${TLS_PORT}${req.url}`
             });
             res.end();
           });
