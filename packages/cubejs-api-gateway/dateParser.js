@@ -26,7 +26,7 @@ module.exports = (dateString) => {
     momentRange = [moment().startOf('day'), moment().endOf('day')];
   } else if (dateString.match(/yesterday/)) {
     const yesterday = moment().add(-1, 'day');
-    momentRange = [yesterday.startOf('day'), yesterday.endOf('day')];
+    momentRange = [moment(yesterday).startOf('day'), moment(yesterday).endOf('day')];
   } else {
     const results = chrono.parse(dateString);
     if (!results) {
