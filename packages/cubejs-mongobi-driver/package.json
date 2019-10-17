@@ -2,13 +2,13 @@
   "name": "@cubejs-backend/mongobi-driver",
   "description": "Cube.js MongoBI driver",
   "author": "krunalsabnis@gmail.com",
-  "version": "0.11.0",
+  "version": "0.11.6",
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "driver/MongoBIDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.11.0",
+    "@cubejs-backend/query-orchestrator": "^0.11.6",
     "generic-pool": "^3.6.0",
     "mysql2": "^1.6.5"
   },

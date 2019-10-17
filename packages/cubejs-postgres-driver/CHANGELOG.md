@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.6](https://github.com/statsbotco/cubejs-client/compare/v0.11.5...v0.11.6) (2019-10-17)
+
+
+### Bug Fixes
+
+* Postgres driver with redis in non UTC timezone returns timezone shifted results ([f1346da](https://github.com/statsbotco/cubejs-client/commit/f1346da))
+* TypeError: Cannot read property 'table_name' of undefined: Drop orphaned tables implementation drops recent tables in cluster environments ([84ea78a](https://github.com/statsbotco/cubejs-client/commit/84ea78a))
+
+
+
+
+
 # [0.11.0](https://github.com/statsbotco/cubejs-client/compare/v0.10.62...v0.11.0) (2019-10-15)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
