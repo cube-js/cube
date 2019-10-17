@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.5](https://github.com/statsbotco/cubejs-client/compare/v0.11.4...v0.11.5) (2019-10-17)
+
+
+### Bug Fixes
+
+* **api-gateway:** TypeError: res.json is not a function ([7f3f0a8](https://github.com/statsbotco/cubejs-client/commit/7f3f0a8))
+
+
+
+
+
 # [0.11.0](https://github.com/statsbotco/cubejs-client/compare/v0.10.62...v0.11.0) (2019-10-15)
 
 
