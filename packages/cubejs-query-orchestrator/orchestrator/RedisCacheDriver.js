@@ -17,6 +17,10 @@ class RedisCacheDriver {
   remove(key) {
     return this.redisClient.delAsync(key);
   }
+
+  keysStartingWith(prefix) {
+    return this.redisClient.keysAsync(`${prefix}*`);
+  }
 }
 
 module.exports = RedisCacheDriver;

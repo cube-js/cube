@@ -22,6 +22,10 @@ class LocalCacheDriver {
   async remove(key) {
     delete this.store[key];
   }
+
+  async keysStartingWith(prefix) {
+    return Object.keys(this.store).filter(k => k.indexOf(prefix) === 0);
+  }
 }
 
 module.exports = LocalCacheDriver;

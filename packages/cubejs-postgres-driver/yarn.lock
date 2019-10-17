@@ -18,10 +18,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.10.30":
-  version "0.10.30"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.10.30.tgz#5961000bda1882c93e29476cf219a93a89b22b55"
-  integrity sha512-ulAOkBAKR52ojA6p/zF/Zx57Zf+1cvGaskEQw2n3GhrqAOX2PIO4h02fE5loF44gc/1VCNW2Z7LNyPga47GLMw==
+"@cubejs-backend/query-orchestrator@^0.11.0":
+  version "0.11.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.11.0.tgz#8cc898038be6a4da59e2dcbcb0f1a8d5631a66ef"
+  integrity sha512-uOByU8i2oUNVy1CgWZx8F/JoxXbERmskewkpJD3Kwwx3Pe8kKzAOGj7TtL/9Nrqcq/MRgJwHSLCTlxmDv2x/9g==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
@@ -721,6 +721,11 @@ mkdirp@^0.5.1:
   integrity sha1-MAV0OOrGz3+MR2fzhkjWaX11yQM=
   dependencies:
     minimist "0.0.8"
+
+moment@^2.24.0:
+  version "2.24.0"
+  resolved "https://registry.yarnpkg.com/moment/-/moment-2.24.0.tgz#0d055d53f5052aa653c9f6eb68bb5d12bf5c2b5b"
+  integrity sha512-bV7f+6l2QigeBBZSM/6yTNq4P2fNpSWj/0e7jQcy87A8e7o2nAfP/34/2ky5Vw4B9S446EtIhodAzkFCcR4dQg==
 
 ms@2.0.0:
   version "2.0.0"

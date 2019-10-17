@@ -367,7 +367,7 @@ class PreAggregationLoader {
   }
 
   async dropOrphanedTables(client, justCreatedTable) {
-    this.flushUsedTables();
+    await this.preAggregations.addTableUsed(justCreatedTable);
     const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
     const versionEntries = tablesToVersionEntries(this.preAggregation.preAggregationsSchema, actualTables);
     const versionEntriesToSave = R.pipe(
@@ -376,7 +376,7 @@ class PreAggregationLoader {
       R.map(p => p[1][0])
     )(versionEntries);
     const tablesToSave =
-      Object.keys(this.preAggregations.tablesUsedInQuery)
+      (await this.preAggregations.tablesUsed())
         .concat(versionEntriesToSave.map(v => this.targetTableName(v)))
         .concat([justCreatedTable]);
     const toDrop = actualTables
@@ -384,13 +384,6 @@ class PreAggregationLoader {
       .filter(t => tablesToSave.indexOf(t) === -1);
     this.logger('Dropping orphaned tables', { tablesToDrop: JSON.stringify(toDrop) });
     await Promise.all(toDrop.map(table => client.dropTable(table)));
-  }
-
-  flushUsedTables() {
-    this.preAggregations.tablesUsedInQuery = R.filter(
-      timeStamp => new Date().getTime() - timeStamp.getTime() < 10 * 60 * 1000,
-      this.preAggregations.tablesUsedInQuery
-    );
   }
 }
 
@@ -402,11 +395,23 @@ class PreAggregations {
     this.logger = logger;
     this.queryCache = queryCache;
     this.refreshErrors = {}; // TODO should be in redis
-    this.tablesUsedInQuery = {}; // TODO should be in redis
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver() :
       new LocalCacheDriver();
     this.externalDriverFactory = options.externalDriverFactory;
+  }
+
+  tablesUsedRedisKey(tableName) {
+    return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_USED_${tableName}`;
+  }
+
+  async addTableUsed(tableName) {
+    return this.cacheDriver.set(this.tablesUsedRedisKey(tableName), true, 600);
+  }
+
+  async tablesUsed() {
+    return (await this.cacheDriver.keysStartingWith(this.tablesUsedRedisKey('')))
+      .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
   }
 
   loadAllPreAggregationsIfNeeded(queryBody) {
@@ -424,8 +429,8 @@ class PreAggregations {
         loadCache,
         { waitForRenew: queryBody.renewQuery }
       );
-      const preAggregationPromise = () => loader.loadPreAggregation().then(tempTableName => {
-        this.tablesUsedInQuery[tempTableName] = new Date();
+      const preAggregationPromise = () => loader.loadPreAggregation().then(async tempTableName => {
+        await this.addTableUsed(tempTableName);
         return [p.tableName, tempTableName];
       });
       return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
