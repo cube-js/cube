@@ -296,7 +296,7 @@ class ApiGateway {
       query = this.parseQueryParam(query);
       const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
       const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
-      res.json({
+      res({
         sql: sqlQuery
       });
     } catch (e) {
