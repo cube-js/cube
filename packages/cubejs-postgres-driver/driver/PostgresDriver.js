@@ -1,9 +1,15 @@
+const pg = require('pg');
+const moment = require('moment');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
-const { Pool } = require('pg');
+
+const { Pool } = pg;
 
 const GenericTypeToPostgres = {
   string: 'text'
 };
+
+pg.types.setTypeParser(1114, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+pg.types.setTypeParser(1184, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
 
 class PostgresDriver extends BaseDriver {
   constructor(config) {
