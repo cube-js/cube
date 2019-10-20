@@ -7,10 +7,10 @@ subCategory: Tutorials
 menuOrder: 22
 ---
 
-Cube.js Schema is a Javascript code, so full power of this language can be used to configure your schema definitions.
-In this guide we generate several measure definitions based on a array of Javascript objects.
+Cube.js Schema is Javascript code, which means the full power of this language can be used to configure your schema definitions.
+In this guide we generate several measure definitions based on an array of strings.
 
-One example real world scenario is when you have single `events` table which has `event_type` and `user_id` columns in it and you want to create separate user count measure for each event.
+One example, based on a real world scenario, is when you have a single `events` table containing an `event_type` and `user_id` column. Based on this table you want to create a separate user count measure for each event.
 
 It can be done as simple as
 
