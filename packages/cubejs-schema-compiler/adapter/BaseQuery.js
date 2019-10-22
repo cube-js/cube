@@ -1167,8 +1167,8 @@ class BaseQuery {
   }
 
   renderDimensionCase(symbol, cubeName) {
-    const when = symbol.case.when.map(w => ({ sql: this.evaluateSql(cubeName, w.sql), label: w.label }));
-    return this.caseWhenStatement(when, symbol.case.else && symbol.case.else.label);
+    const when = symbol.case.when.map(w => ({ sql: this.evaluateSql(cubeName, w.sql), label: this.evaluateSql(cubeName, w.label) }));
+    return this.caseWhenStatement(when, symbol.case.else && this.evaluateSql(cubeName, symbol.case.else.label));
   }
 
   caseWhenStatement(when, elseLabel) {
