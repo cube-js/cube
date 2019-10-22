@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.7](https://github.com/statsbotco/cubejs-client/compare/v0.11.6...v0.11.7) (2019-10-22)
+
+
+### Features
+
+* dynamic case label ([#236](https://github.com/statsbotco/cubejs-client/issues/236)) ([1a82605](https://github.com/statsbotco/cubejs-client/commit/1a82605)), closes [#235](https://github.com/statsbotco/cubejs-client/issues/235)
+
+
+
+
+
 # [0.11.0](https://github.com/statsbotco/cubejs-client/compare/v0.10.62...v0.11.0) (2019-10-15)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
