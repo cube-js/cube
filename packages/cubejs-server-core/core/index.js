@@ -213,6 +213,7 @@ class CubejsServerCore {
         this.logger, {
           basePath: this.options.basePath,
           checkAuthMiddleware: this.options.checkAuthMiddleware,
+          checkAuth: this.options.checkAuth,
           queryTransformer: this.options.queryTransformer
         }
       );
