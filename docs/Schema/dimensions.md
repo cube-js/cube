@@ -83,7 +83,7 @@ The first `when` statement declares a condition and result if the rule returns a
 The second `else` statement declares results for options when rules return a false value.
 
 
-The following example will create a `size` dimension with values 'xl' and 'xxl'.
+The following static `label` example will create a `size` dimension with values 'xl' and 'xxl'.
 
 ```javascript
 size: {
@@ -100,7 +100,7 @@ size: {
 }
 ```
 
-`label` can be statically defined as a string or use a property from the cube as an object with a `sql` property.
+`label` can be defined dynamically as an object with a `sql` property.
 
 ```javascript
 size: {
