@@ -174,7 +174,7 @@ describe('DataSchemaCompiler', function test() {
     return result;
   });
 
-  it('dimension case', () => {
+  it('static dimension case', () => {
     const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
     cube('visitors', {
       sql: \`
@@ -233,6 +233,7 @@ describe('DataSchemaCompiler', function test() {
 
     return result;
   });
+
   it('filtered dates', () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
     cube('visitors', {

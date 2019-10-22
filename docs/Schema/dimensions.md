@@ -83,7 +83,7 @@ The first `when` statement declares a condition and result if the rule returns a
 The second `else` statement declares results for options when rules return a false value.
 
 
-The following example will create a `size` dimension with values 'xl' and 'xxl'.
+The following static `label` example will create a `size` dimension with values 'xl' and 'xxl'.
 
 ```javascript
 size: {
@@ -94,6 +94,23 @@ size: {
         { sql: `${CUBE}.meta_value = 'xl'`, label: `xl` },
         { sql: `${CUBE}.meta_value = 'xxl-en'`, label: `xxl` },
         { sql: `${CUBE}.meta_value = 'xxl'`, label: `xxl` },
+    ],
+    else: { label: `Unknown` }
+  }
+}
+```
+
+`label` can be defined dynamically as an object with a `sql` property.
+
+```javascript
+size: {
+  type: `string`,
+  case: {
+    when: [
+        { sql: `${CUBE}.meta_value = 'xl-en'`, label: {sql: `${CUBE}.english_size`} },
+        { sql: `${CUBE}.meta_value = 'xl'`, label: {sql: `${CUBE}.euro_size`} },
+        { sql: `${CUBE}.meta_value = 'xxl-en'`, label: {sql: `${CUBE}.english_size`} },
+        { sql: `${CUBE}.meta_value = 'xxl'`, label: {sql: `${CUBE}.euro_size`} },
     ],
     else: { label: `Unknown` }
   }
