@@ -15248,7 +15248,7 @@
           var _ref2 = _asyncToGenerator(
           /*#__PURE__*/
           regeneratorRuntime.mark(function _callee4(response, next) {
-            var subscribeNext, continueWait, body, error, result;
+            var subscribeNext, continueWait, token, body, error, result;
             return regeneratorRuntime.wrap(function _callee4$(_context4) {
               while (1) {
                 switch (_context4.prev = _context4.next) {
@@ -15348,42 +15348,42 @@
                       };
                     }();
 
-                    if (!(response.status === 502)) {
-                      _context4.next = 6;
+                    if (!(typeof _this.apiToken === 'function')) {
+                      _context4.next = 7;
                       break;
                     }
 
                     _context4.next = 5;
-                    return checkMutex();
+                    return _this.apiToken();
 
                   case 5:
-                    return _context4.abrupt("return", continueWait(true));
+                    token = _context4.sent;
 
-                  case 6:
-                    _context4.next = 8;
-                    return response.json();
+                    if (_this.transport.authorization !== token) {
+                      _this.transport.authorization = token;
+                    }
 
-                  case 8:
-                    body = _context4.sent;
-
-                    if (!(body.error === 'Continue wait')) {
-                      _context4.next = 14;
+                  case 7:
+                    if (!(response.status === 502)) {
+                      _context4.next = 11;
                       break;
                     }
 
-                    _context4.next = 12;
+                    _context4.next = 10;
                     return checkMutex();
 
-                  case 12:
-                    if (options.progressCallback) {
-                      options.progressCallback(new ProgressResult(body));
-                    }
+                  case 10:
+                    return _context4.abrupt("return", continueWait(true));
 
-                    return _context4.abrupt("return", continueWait());
+                  case 11:
+                    _context4.next = 13;
+                    return response.json();
 
-                  case 14:
-                    if (!(response.status !== 200)) {
-                      _context4.next = 27;
+                  case 13:
+                    body = _context4.sent;
+
+                    if (!(body.error === 'Continue wait')) {
+                      _context4.next = 19;
                       break;
                     }
 
@@ -15391,64 +15391,80 @@
                     return checkMutex();
 
                   case 17:
-                    if (!(!options.subscribe && requestInstance.unsubscribe)) {
-                      _context4.next = 20;
-                      break;
+                    if (options.progressCallback) {
+                      options.progressCallback(new ProgressResult(body));
                     }
 
-                    _context4.next = 20;
-                    return requestInstance.unsubscribe();
+                    return _context4.abrupt("return", continueWait());
 
-                  case 20:
-                    error = new Error(body.error); // TODO error class
-
-                    if (!callback) {
-                      _context4.next = 25;
-                      break;
-                    }
-
-                    callback(error);
-                    _context4.next = 26;
-                    break;
-
-                  case 25:
-                    throw error;
-
-                  case 26:
-                    return _context4.abrupt("return", subscribeNext());
-
-                  case 27:
-                    _context4.next = 29;
-                    return checkMutex();
-
-                  case 29:
-                    if (!(!options.subscribe && requestInstance.unsubscribe)) {
+                  case 19:
+                    if (!(response.status !== 200)) {
                       _context4.next = 32;
                       break;
                     }
 
-                    _context4.next = 32;
+                    _context4.next = 22;
+                    return checkMutex();
+
+                  case 22:
+                    if (!(!options.subscribe && requestInstance.unsubscribe)) {
+                      _context4.next = 25;
+                      break;
+                    }
+
+                    _context4.next = 25;
                     return requestInstance.unsubscribe();
 
-                  case 32:
-                    result = toResult(body);
+                  case 25:
+                    error = new Error(body.error); // TODO error class
 
                     if (!callback) {
+                      _context4.next = 30;
+                      break;
+                    }
+
+                    callback(error);
+                    _context4.next = 31;
+                    break;
+
+                  case 30:
+                    throw error;
+
+                  case 31:
+                    return _context4.abrupt("return", subscribeNext());
+
+                  case 32:
+                    _context4.next = 34;
+                    return checkMutex();
+
+                  case 34:
+                    if (!(!options.subscribe && requestInstance.unsubscribe)) {
                       _context4.next = 37;
                       break;
                     }
 
-                    callback(null, result);
-                    _context4.next = 38;
-                    break;
+                    _context4.next = 37;
+                    return requestInstance.unsubscribe();
 
                   case 37:
+                    result = toResult(body);
+
+                    if (!callback) {
+                      _context4.next = 42;
+                      break;
+                    }
+
+                    callback(null, result);
+                    _context4.next = 43;
+                    break;
+
+                  case 42:
                     return _context4.abrupt("return", result);
 
-                  case 38:
+                  case 43:
                     return _context4.abrupt("return", subscribeNext());
 
-                  case 39:
+                  case 44:
                   case "end":
                     return _context4.stop();
                 }

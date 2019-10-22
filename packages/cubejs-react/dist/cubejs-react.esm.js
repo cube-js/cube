@@ -705,13 +705,14 @@ QueryBuilder.propTypes = {
   stateChangeHeuristics: func,
   setQuery: func,
   setVizState: func,
-  cubejsApi: object.isRequired,
+  cubejsApi: object,
   disableHeuristics: bool,
   wrapWithQueryRenderer: bool,
   query: object,
   vizState: object
 };
 QueryBuilder.defaultProps = {
+  cubejsApi: null,
   query: {},
   setQuery: null,
   setVizState: null,

@@ -21,6 +21,17 @@ class WebSocketTransport {
     this.hearBeatInterval = hearBeatInterval || 60;
   }
 
+  set authorization(token) {
+    this.token = token;
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+
+  get authorization() {
+    return this.token;
+  }
+
   initSocket() {
     if (this.ws) {
       return this.ws.initPromise;

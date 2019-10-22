@@ -94,6 +94,13 @@ class CubejsApi {
         return null;
       };
 
+      if (typeof this.apiToken === 'function') {
+        const token = await this.apiToken();
+        if (this.transport.authorization !== token) {
+          this.transport.authorization = token;
+        }
+      }
+
       if (response.status === 502) {
         await checkMutex();
         return continueWait(true);
