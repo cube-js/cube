@@ -1179,8 +1179,7 @@ class BaseQuery {
 
   renderDimensionCaseLabel(label, cubeName) {
     if (typeof label === 'object' && label.sql){
-      let res = this.evaluateSql(cubeName, label.sql)
-      return res
+      return res = this.evaluateSql(cubeName, label.sql)
     }
     return `'${label}'`
   }
