@@ -100,6 +100,23 @@ size: {
 }
 ```
 
+`label` can be statically defined as a string or use a property from the cube as an object with a `sql` property.
+
+```javascript
+size: {
+  type: `string`,
+  case: {
+    when: [
+        { sql: `${CUBE}.meta_value = 'xl-en'`, label: {sql: `${CUBE}.english_size`} },
+        { sql: `${CUBE}.meta_value = 'xl'`, label: {sql: `${CUBE}.euro_size`} },
+        { sql: `${CUBE}.meta_value = 'xxl-en'`, label: {sql: `${CUBE}.english_size`} },
+        { sql: `${CUBE}.meta_value = 'xxl'`, label: {sql: `${CUBE}.euro_size`} },
+    ],
+    else: { label: `Unknown` }
+  }
+}
+```
+
 ### primaryKey
 Specify which dimension is a primary key for a cube. The default value is `false`.
 
