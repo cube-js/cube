@@ -88,6 +88,27 @@ $ serverless logs -t -f cubejs
 $ serverless logs -t -f cubejsProcess
 ```
 
+### Passing server core options for serverless
+
+[Server core options](@cubejs-backend-server-core#options-reference) can be passed by instantiating appropriate `Handlers` class directly.
+For example:
+
+```
+const AWSHandlers = require('@cubejs-backend/serverless-aws');
+const MySQLDriver = require('@cubejs-backend/mysql-driver');
+
+module.exports = new AWSHandlers({
+  externalDbType: 'mysql',
+  externalDriverFactory: () => new MySQLDriver({
+    host: process.env.CUBEJS_EXT_DB_HOST,
+    database: process.env.CUBEJS_EXT_DB_NAME,
+    port: process.env.CUBEJS_EXT_DB_PORT,
+    user: process.env.CUBEJS_EXT_DB_USER,
+    password: process.env.CUBEJS_EXT_DB_PASS,
+  })
+});
+```
+
 ## Heroku
 
 ### Create new app using Cube.js-CLI
