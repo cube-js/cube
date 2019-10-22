@@ -181,7 +181,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
     return result;
   });
 
-  it('dimension case', () => {
+  it('static dimension case', () => {
     const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
     cube('visitors', {
       sql: \`
@@ -233,6 +233,80 @@ describe('ClickHouse DataSchemaCompiler', function test() {
           [
             { "visitors__status": "Approved", "visitors__visitor_count": "2" },
             { "visitors__status": "Canceled", "visitors__visitor_count": "4" }
+          ]
+        );
+      });
+    });
+
+    return result;
+  });
+
+  it('dynamic dimension case', () => {
+    const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
+    cube('visitors', {
+      sql: \`
+      select * from visitors
+      \`,
+
+      measures: {
+        visitor_count: {
+          type: 'count',
+          sql: 'id'
+        }
+      },
+
+      dimensions: {
+        source: {
+          type: 'string',
+          sql: 'source'
+        },
+        latitude: {
+          type: 'string',
+          sql: 'latitude'
+        },
+        enabled_source: {
+          type: 'string',
+          case: {
+            when: [{
+              sql: \`\${CUBE}.status = 3\`,
+              label: 'three'
+            }, {
+              sql: \`\${CUBE}.status = 2\`,
+              label: {
+                sql: \`\${CUBE}.source\`
+              }
+            }],
+            else: {
+              label: {
+                sql: \`\${CUBE}.source\`
+              }
+            }
+          }
+        },
+        created_at: {
+          type: 'time',
+          sql: 'created_at'
+        }
+      }
+    })
+    `);
+    const result = compiler.compile().then(() => {
+      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.visitor_count'],
+        dimensions: ['visitors.enabled_source'],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.enabled_source'
+        }]
+      });
+      logSqlAndParams(query);
+
+      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+        res.should.be.deepEqual(
+          [
+            { "visitors__enabled_source": "google", "visitors__visitor_count": "1" },
+            { "visitors__enabled_source": "some", "visitors__visitor_count": "2" },
+            { "visitors__enabled_source": null, "visitors__visitor_count": "3" },
           ]
         );
       });

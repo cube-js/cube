@@ -1167,13 +1167,29 @@ class BaseQuery {
   }
 
   renderDimensionCase(symbol, cubeName) {
-    const when = symbol.case.when.map(w => ({ sql: this.evaluateSql(cubeName, w.sql), label: this.evaluateSql(cubeName, w.label) }));
-    return this.caseWhenStatement(when, symbol.case.else && this.evaluateSql(cubeName, symbol.case.else.label));
+    const when = symbol.case.when.map(w => ({
+        sql: this.evaluateSql(cubeName, w.sql),
+        label: this.renderDimensionCaseLabel(w.label, cubeName)
+    }));
+    return this.caseWhenStatement(
+        when,
+        symbol.case.else && this.renderDimensionCaseLabel(symbol.case.else.label, cubeName)
+    );
+  }
+
+  renderDimensionCaseLabel(label, cubeName) {
+    if (typeof label === 'object' && label.sql){
+      console.log("cubeName, label.sql",{cubeName, sql: label.sql})
+      let res = this.evaluateSql(cubeName, label.sql)
+      console.log(res)
+      return res
+    }
+    return `'${label}'`
   }
 
   caseWhenStatement(when, elseLabel) {
     return `CASE
-    ${when.map(w => `WHEN ${w.sql} THEN '${w.label}'`).join("\n")}${elseLabel ? ` ELSE '${elseLabel}'` : ''} END`;
+    ${when.map(w => `WHEN ${w.sql} THEN ${w.label}`).join("\n")}${elseLabel ? ` ELSE ${elseLabel}` : ''} END`;
   }
 
   applyMeasureFilters(evaluateSql, symbol, cubeName) {

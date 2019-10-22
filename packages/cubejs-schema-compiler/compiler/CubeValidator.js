@@ -106,10 +106,20 @@ const cubeSchema = Joi.object().keys({
         case: Joi.object().keys({
           when: Joi.array().items(Joi.object().keys({
             sql: Joi.func().required(),
-            label: Joi.string()
+            label: Joi.alternatives([
+              Joi.string(),
+              Joi.object().keys({
+                sql: Joi.func().required()
+              })
+            ])
           })),
           else: Joi.object().keys({
-            label: Joi.string()
+          label: Joi.alternatives([
+              Joi.string(),
+              Joi.object().keys({
+                sql: Joi.func().required()
+              })
+            ])
           })
         }).required()
       })
