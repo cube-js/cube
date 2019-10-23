@@ -15168,7 +15168,7 @@
       this.apiToken = apiToken;
       this.apiUrl = options.apiUrl || API_URL;
       this.transport = options.transport || new HttpTransport({
-        authorization: apiToken,
+        authorization: typeof apiToken === 'function' ? undefined : apiToken,
         apiUrl: this.apiUrl
       });
       this.pollInterval = options.pollInterval || 5;
@@ -15198,7 +15198,9 @@
           options.mutexObj[mutexKey] = mutexValue;
         }
 
-        var requestInstance = request();
+        var requestPromise = this.updateTransportAuthorization().then(function () {
+          return request();
+        });
         var unsubscribed = false;
 
         var checkMutex =
@@ -15207,29 +15209,36 @@
           var _ref = _asyncToGenerator(
           /*#__PURE__*/
           regeneratorRuntime.mark(function _callee() {
+            var requestInstance;
             return regeneratorRuntime.wrap(function _callee$(_context) {
               while (1) {
                 switch (_context.prev = _context.next) {
                   case 0:
+                    _context.next = 2;
+                    return requestPromise;
+
+                  case 2:
+                    requestInstance = _context.sent;
+
                     if (!(options.mutexObj && options.mutexObj[mutexKey] !== mutexValue)) {
-                      _context.next = 6;
+                      _context.next = 9;
                       break;
                     }
 
                     unsubscribed = true;
 
                     if (!requestInstance.unsubscribe) {
-                      _context.next = 5;
+                      _context.next = 8;
                       break;
                     }
 
-                    _context.next = 5;
+                    _context.next = 8;
                     return requestInstance.unsubscribe();
 
-                  case 5:
+                  case 8:
                     throw MUTEX_ERROR;
 
-                  case 6:
+                  case 9:
                   case "end":
                     return _context.stop();
                 }
@@ -15248,11 +15257,17 @@
           var _ref2 = _asyncToGenerator(
           /*#__PURE__*/
           regeneratorRuntime.mark(function _callee4(response, next) {
-            var subscribeNext, continueWait, token, body, error, result;
+            var requestInstance, subscribeNext, continueWait, body, error, result;
             return regeneratorRuntime.wrap(function _callee4$(_context4) {
               while (1) {
                 switch (_context4.prev = _context4.next) {
                   case 0:
+                    _context4.next = 2;
+                    return requestPromise;
+
+                  case 2:
+                    requestInstance = _context4.sent;
+
                     subscribeNext =
                     /*#__PURE__*/
                     function () {
@@ -15348,20 +15363,8 @@
                       };
                     }();
 
-                    if (!(typeof _this.apiToken === 'function')) {
-                      _context4.next = 7;
-                      break;
-                    }
-
-                    _context4.next = 5;
-                    return _this.apiToken();
-
-                  case 5:
-                    token = _context4.sent;
-
-                    if (_this.transport.authorization !== token) {
-                      _this.transport.authorization = token;
-                    }
+                    _context4.next = 7;
+                    return _this.updateTransportAuthorization();
 
                   case 7:
                     if (!(response.status === 502)) {
@@ -15477,7 +15480,9 @@
           };
         }();
 
-        var promise = mutexPromise(requestInstance.subscribe(loadImpl));
+        var promise = requestPromise.then(function (requestInstance) {
+          return mutexPromise(requestInstance.subscribe(loadImpl));
+        });
 
         if (callback) {
           return {
@@ -15485,23 +15490,29 @@
               var _unsubscribe = _asyncToGenerator(
               /*#__PURE__*/
               regeneratorRuntime.mark(function _callee5() {
+                var requestInstance;
                 return regeneratorRuntime.wrap(function _callee5$(_context5) {
                   while (1) {
                     switch (_context5.prev = _context5.next) {
                       case 0:
+                        _context5.next = 2;
+                        return requestPromise;
+
+                      case 2:
+                        requestInstance = _context5.sent;
                         unsubscribed = true;
 
                         if (!requestInstance.unsubscribe) {
-                          _context5.next = 3;
+                          _context5.next = 6;
                           break;
                         }
 
                         return _context5.abrupt("return", requestInstance.unsubscribe());
 
-                      case 3:
+                      case 6:
                         return _context5.abrupt("return", null);
 
-                      case 4:
+                      case 7:
                       case "end":
                         return _context5.stop();
                     }
@@ -15518,6 +15529,44 @@
           return promise;
         }
       }
+    }, {
+      key: "updateTransportAuthorization",
+      value: function () {
+        var _updateTransportAuthorization = _asyncToGenerator(
+        /*#__PURE__*/
+        regeneratorRuntime.mark(function _callee6() {
+          var token;
+          return regeneratorRuntime.wrap(function _callee6$(_context6) {
+            while (1) {
+              switch (_context6.prev = _context6.next) {
+                case 0:
+                  if (!(typeof this.apiToken === 'function')) {
+                    _context6.next = 5;
+                    break;
+                  }
+
+                  _context6.next = 3;
+                  return this.apiToken();
+
+                case 3:
+                  token = _context6.sent;
+
+                  if (this.transport.authorization !== token) {
+                    this.transport.authorization = token;
+                  }
+
+                case 5:
+                case "end":
+                  return _context6.stop();
+              }
+            }
+          }, _callee6, this);
+        }));
+
+        return function updateTransportAuthorization() {
+          return _updateTransportAuthorization.apply(this, arguments);
+        };
+      }()
       /**
        * Fetch data for passed `query`.
        *
@@ -15632,6 +15681,7 @@
    * @name cubejs
    * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
    * In the development mode, Cube.js Backend will print the API token to the console on on startup.
+   * Can be an async function without arguments that returns API token.
    * @param options - options object.
    * @param options.apiUrl - URL of your Cube.js Backend.
    * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.

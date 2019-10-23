@@ -28,6 +28,7 @@ API entry point.
 
 - `apiToken` - [API token](security) is used to authorize requests and determine SQL database you're accessing.
 In the development mode, Cube.js Backend will print the API token to the console on on startup.
+Can be an async function without arguments that returns API token.
 - `options` - options object.
 - `options.apiUrl` - URL of your Cube.js Backend.
 By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.

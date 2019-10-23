@@ -35,7 +35,10 @@ class CubejsApi {
     options = options || {};
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
-    this.transport = options.transport || new HttpTransport({ authorization: apiToken, apiUrl: this.apiUrl });
+    this.transport = options.transport || new HttpTransport({
+      authorization: typeof apiToken === 'function' ? undefined : apiToken,
+      apiUrl: this.apiUrl
+    });
     this.pollInterval = options.pollInterval || 5;
   }
 
@@ -57,11 +60,13 @@ class CubejsApi {
       options.mutexObj[mutexKey] = mutexValue;
     }
 
-    const requestInstance = request();
+    const requestPromise = this.updateTransportAuthorization().then(() => request());
 
     let unsubscribed = false;
 
     const checkMutex = async () => {
+      const requestInstance = await requestPromise;
+
       if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
         unsubscribed = true;
         if (requestInstance.unsubscribe) {
@@ -72,6 +77,8 @@ class CubejsApi {
     };
 
     const loadImpl = async (response, next) => {
+      const requestInstance = await requestPromise;
+
       const subscribeNext = async () => {
         if (options.subscribe && !unsubscribed) {
           if (requestInstance.unsubscribe) {
@@ -94,12 +101,7 @@ class CubejsApi {
         return null;
       };
 
-      if (typeof this.apiToken === 'function') {
-        const token = await this.apiToken();
-        if (this.transport.authorization !== token) {
-          this.transport.authorization = token;
-        }
-      }
+      await this.updateTransportAuthorization();
 
       if (response.status === 502) {
         await checkMutex();
@@ -141,11 +143,13 @@ class CubejsApi {
       return subscribeNext();
     };
 
-    const promise = mutexPromise(requestInstance.subscribe(loadImpl));
+    const promise = requestPromise.then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
 
     if (callback) {
       return {
         unsubscribe: async () => {
+          const requestInstance = await requestPromise;
+
           unsubscribed = true;
           if (requestInstance.unsubscribe) {
             return requestInstance.unsubscribe();
@@ -155,6 +159,15 @@ class CubejsApi {
       };
     } else {
       return promise;
+    }
+  }
+
+  async updateTransportAuthorization() {
+    if (typeof this.apiToken === 'function') {
+      const token = await this.apiToken();
+      if (this.transport.authorization !== token) {
+        this.transport.authorization = token;
+      }
     }
   }
 
@@ -250,6 +263,7 @@ class CubejsApi {
  * @name cubejs
  * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
  * In the development mode, Cube.js Backend will print the API token to the console on on startup.
+ * Can be an async function without arguments that returns API token.
  * @param options - options object.
  * @param options.apiUrl - URL of your Cube.js Backend.
  * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
