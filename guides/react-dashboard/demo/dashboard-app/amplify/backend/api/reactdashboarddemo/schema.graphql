@@ -1,0 +1,6 @@
+type DashboardItem @model @auth(rules: [{allow: owner}]) {
+  id: ID!
+  name: String
+  layout: AWSJSON
+  vizState: AWSJSON
+}
