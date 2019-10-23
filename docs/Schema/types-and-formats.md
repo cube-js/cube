@@ -65,7 +65,8 @@ uniqueUserCount: {
 ### countDistinctApprox
 
 Calculates approximate number of distinct values in a given field.
-Unlike `countDistinct` measure type, `countDistinctApprox` is *Additive* which allows it's usage in [rollup pre-aggregations](pre-aggregations#rollup).
+Unlike `countDistinct` measure type, `countDistinctApprox` is decomposable aggregate function or *Additive*.
+This allows it's usage in *Additive* [rollup pre-aggregations](pre-aggregations#rollup) which are much more versatile than *Not Additive* ones.
 It uses special SQL backend dependent functions to estimate distinct counts.
 It usually based on HyperLogLog or similar algorithms.
 Where possible Cube.js will use multi-stage HLL which significantly improves calculation of distinct counts on scale.
