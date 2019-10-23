@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.11.7",
+  "version": "0.11.9",
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
   "author": "Statsbot, Inc.",

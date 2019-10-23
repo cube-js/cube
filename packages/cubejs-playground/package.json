@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.11.7",
+  "version": "0.11.9",
   "dependencies": {
     "@babel/generator": "^7.4.0",
     "@babel/parser": "^7.4.2",
@@ -9,8 +9,8 @@
     "@babel/standalone": "^7.3.4",
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
-    "@cubejs-client/core": "^0.11.7",
-    "@cubejs-client/react": "^0.11.7",
+    "@cubejs-client/core": "^0.11.9",
+    "@cubejs-client/react": "^0.11.9",
     "antd": "^3.14.1",
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
