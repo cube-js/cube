@@ -92,7 +92,7 @@ const TableOfContents = ({ current }) => (
             </StyledLink>
           ))}
           <ExternalLinksContainer>
-            <ExternalLink href="https://github.com/cube-js/cube.js">
+            <ExternalLink href="https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard">
               <img src={githubLogo} />
               Edit on Github
             </ExternalLink>

@@ -97,7 +97,7 @@ const Header = ({ location }) => (
         <Button href="https://slack.cube.dev">Slack</Button>
       </MenuItemStyled>
       <MenuItemStyled style={{ float: "right", paddingRight: 0, paddingLeft: 8 }} key="sign-out">
-        <Button href="https://github.com/cube-js/cube.js">GitHub</Button>
+        <Button href="https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard/demo">GitHub</Button>
       </MenuItemStyled>
       <MenuItemStyled style={{ float: "right", paddingRight: 0, paddingLeft: 8 }} key="sign-out">
         <Button href="https://cube.dev/docs">Docs</Button>

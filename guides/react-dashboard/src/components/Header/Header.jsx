@@ -68,7 +68,7 @@ const Header = () => (
       learn
     </LogoLink>
     <div>
-      <StyledLink href="https://github.com/cube-js/cube.js">
+      <StyledLink href="https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard">
         <img src={githubLogo} alt="" />
         <span>Check the Code on Github</span>
       </StyledLink>
