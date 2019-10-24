@@ -75,18 +75,16 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - yarn-packages-v1-{{ .Branch }}-{{ checksum "guides/react-dashboard/yarn.lock" }}
-            - yarn-packages-v1-{{ .Branch }}-
-            - yarn-packages-v1-
+            - yarn-guides-v1-{{ .Branch }}-{{ checksum "guides/react-dashboard/yarn.lock" }}
+            - yarn-guides-v1-{{ .Branch }}-
+            - yarn-guides-v1-
 
-      - run: cd guides/react-dashboard
-      - run: yarn install
-      - run: yarn deploy
+      - run: cd guides/react-dashboard && yarn && yarn deploy
 
       - save_cache:
           paths:
             - ~/.cache/yarn
-          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "guides/react-dashboard/yarn.lock" }}
+          key: yarn-guides-v1-{{ .Branch }}-{{ checksum "guides/react-dashboard/yarn.lock" }}
 
       - run: yarn deploy
 
