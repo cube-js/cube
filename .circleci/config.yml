@@ -64,6 +64,31 @@ jobs:
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground lint
+      
+  react_dashboard_guide:
+    docker:
+      - image: circleci/node:10.15
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - yarn-packages-v1-{{ .Branch }}-{{ checksum "guides/react-dashboard/yarn.lock" }}
+            - yarn-packages-v1-{{ .Branch }}-
+            - yarn-packages-v1-
+
+      - run: cd guides/react-dashboard
+      - run: yarn install
+      - run: yarn deploy
+
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "guides/react-dashboard/yarn.lock" }}
+
+      - run: yarn deploy
 
 workflows:
   version: 2
@@ -73,3 +98,6 @@ workflows:
   lint:
     jobs:
       - lint
+  guides:
+    jobs:
+      - react_dashboard_guide
