@@ -1,8 +1,5 @@
 version: 2
 
-orbs:
-  aws-cli: circleci/aws-cli@0.1.16
-
 jobs:
   test:
     docker:
@@ -83,6 +80,9 @@ jobs:
             sudo apt update
             sudo apt install python-pip python-dev
             pip install awscli --upgrade --user
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID --profile default
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile default
+            aws configure set region $AWS_DEFAULT_REGION --profile default
       - checkout
       - restore_cache:
           keys:
@@ -90,7 +90,6 @@ jobs:
             - yarn-guides-v1-{{ .Branch }}-
             - yarn-guides-v1-
 
-      - aws-cli/setup
       - run: yarn global add @aws-amplify/cli
       - run: cd guides/react-dashboard && amplify init --amplify "{\"envName\":\"prod\"}" --providers "{\"awscloudformation\":{\"useProfile\":true,\"profileName\":\"default\"}}" --yes
       - run: cd guides/react-dashboard && yarn && yarn deploy
