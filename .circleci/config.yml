@@ -76,6 +76,13 @@ jobs:
     working_directory: ~/repo
 
     steps:
+      - run:
+          name: Install awscli
+          working_directory: /
+          command: |
+            sudo apt update
+            sudo apt install python-pip python-dev
+            pip install awscli --upgrade --user
       - checkout
       - restore_cache:
           keys:
@@ -83,7 +90,6 @@ jobs:
             - yarn-guides-v1-{{ .Branch }}-
             - yarn-guides-v1-
 
-      - aws-cli/install
       - aws-cli/setup
       - run: yarn global add @aws-amplify/cli
       - run: cd guides/react-dashboard && amplify init --amplify "{\"envName\":\"prod\"}" --providers "{\"awscloudformation\":{\"useProfile\":true,\"profileName\":\"default\"}}" --yes
