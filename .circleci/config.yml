@@ -86,8 +86,6 @@ jobs:
             - ~/.cache/yarn
           key: yarn-guides-v1-{{ .Branch }}-{{ checksum "guides/react-dashboard/yarn.lock" }}
 
-      - run: yarn deploy
-
 workflows:
   version: 2
   test:
