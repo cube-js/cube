@@ -95,8 +95,8 @@ jobs:
           name: Deploy
           working_directory: ~/repo/guides/react-dashboard
           command: |
-            PATH=~/.local/bin:$PATH
-            npm install -g @aws-amplify/cli
+            PATH="$(yarn global bin):~/.local/bin:$PATH"
+            yarn global add @aws-amplify/cli
             amplify init --amplify "{\"envName\":\"prod\"}" --providers "{\"awscloudformation\":{\"useProfile\":true,\"profileName\":\"default\"}}" --yes
             yarn
             yarn deploy
