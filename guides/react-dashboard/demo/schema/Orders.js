@@ -17,13 +17,6 @@ cube(`Orders`, {
       type: `count`,
     },
 
-    countCompleted: {
-      type: `count`,
-      filters: [{
-        sql: `${completed}`
-      }]
-    },
-
     totalAmount: {
       sql: `${amount}`,
       type: `sum`,

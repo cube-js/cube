@@ -8,7 +8,7 @@ component. Feel free to skip this part if you don't need to style it. Below, you
 can see the final design of the query builder, which we'll have by the end of this
 part.
 
-<QUERY BUILDER GIF>
+`video: /videos/5-video.mp4`
 
 The query builder component in the template, `<ExploreQueryBuilder />`, is built based on the
 `<QueryBuilder />` component from the `@cubejs-client/react` package. The `<QueryBuilder />` abstracts state management and API calls to Cube.js Backend. It uses render prop and doesn’t render anything itself, but calls the render function instead. This way it gives maximum flexibility to building a custom-tailored UI with a minimal API.
@@ -28,7 +28,6 @@ with the following.
 
 ```jsx
 import React from "react";
-import * as PropTypes from "prop-types";
 import { Row, Col, Card, Divider } from "antd";
 import styled from 'styled-components';
 import { QueryBuilder } from "@cubejs-client/react";
@@ -191,7 +190,6 @@ with the following.
 
 ```jsx
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import MemberGroupTitle from './MemberGroupTitle';
@@ -237,7 +235,6 @@ following.
 
 ```jsx
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import { Button, Dropdown } from 'antd';
 
 import PlusIcon from './PlusIcon';
@@ -326,11 +323,6 @@ const ButtonDropdown = ({ overlay, type, ...buttonProps }) => {
  )
 }
 
-ButtonDropdown.propTypes = {
-  overlay: PropTypes.object.isRequired,
-  type: PropTypes.oneOf(['new', 'icon', 'selected'])
-};
-
 export default ButtonDropdown;
 ```
 
@@ -345,7 +337,6 @@ with the following.
 
 ```jsx
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import { Button } from 'antd';
 import removeButtonSvg from './remove-button.svg';
 
@@ -482,7 +473,6 @@ following.
 
 ```jsx
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import {
   Menu
 } from 'antd';
@@ -593,7 +583,6 @@ Finally, update the `<FilterGroup />` component in `src/components/QueryBuilder/
 
 ```jsx
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import { Select } from 'antd';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
@@ -657,7 +646,6 @@ following.
 
 ```jsx
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import {
   Menu, Icon, Dropdown
 } from 'antd';
@@ -689,7 +677,7 @@ const SelectChartType = ({ chartType, updateChartType }) => {
       {ChartTypes.map(m => (
         <Menu.Item key={m.title} onClick={() => updateChartType(m.name)}>
           <Icon type={m.icon} />
-          {m.title}
+          &nbsp;{m.title}
         </Menu.Item>
       ))}
     </Menu>
@@ -705,11 +693,6 @@ const SelectChartType = ({ chartType, updateChartType }) => {
     </StyledDropdownTrigger>
     </Dropdown>
   );
-};
-
-SelectChartType.propTypes = {
-  chartType: PropTypes.string.isRequired,
-  updateChartType: PropTypes.func.isRequired
 };
 
 export default SelectChartType;

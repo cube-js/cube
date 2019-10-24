@@ -5,9 +5,9 @@ order: 4
 
 On the Explore page, the user either creates a new chart or updates the existing one. To do so, the user should be able to select measures, dimensions, apply filters if needed, and select a chart type. We also need to provide a way to save a new chart to the dashboard or to update the existing one when editing.
 
-The GIF below shows how the page will look after the styling is applied.
+The image below shows how the page will look after the styling is applied.
 
-<GIF>
+![](/images/4-screenshot-1.png)
 
 Let’s break down the page into components. We need a modal window to let the user set or update the chart’s title—`<TitleModal />`. Next, we have a page’s header—`<PageHeader />`. Inside the page’s header to the right, we have a button that is used to either add a chart to the dashboard or update it. It is a regular `<Button />` component from antd’s UI kit. To the left—a page’s title, which either displays a chart’s title when editing or just says ‘Explore’ when we are building a new one. Let’s call it an `<ExploreTitle />` component.
 
