@@ -17,7 +17,8 @@ Let’s go through the backend first -
 
 We're going to store our data for the dashboard in [PostgreSQL](https://www.postgresql.org/), a free and open-source relational database. For those who don’t have Postgres or would like to use a different database, I’ll put some useful links on how to do the same setup for different databases, such as MongoDB, later in this tutorial.
 
-Next, we’ll install [Cube.js](https://github.com/cube-js/cube.js) and connect it to the database. Cube.js is an open-source framework for building analytical web applications. It creates an analytics API on top of the database and handles things like SQL organization, caching, security, authentication, and much more.
+Next, we’ll install [Cube.js](https://github.com/cube-js/cube.js) and connect it to the database. Cube.js is an open-source framework for building analytical web applications. It creates an analytics API on top of the database and handles things like SQL organization, caching, security, authentication, and much more. 
+For the sake of simplicity you can think of Cube.js as dashboard framework.
 
 We’ll also use [AWS Cognito](https://aws.amazon.com/cognito/) for user registrations and sign-ins and [AWS AppSync](https://aws.amazon.com/appsync/) as a GraphQL backend. Optionally, you can use your own authentication service, as well as GraphQL backend. But to keep things simple, we’ll rely on AWS services for the purpose of this tutorial.
 
