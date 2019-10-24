@@ -74,7 +74,7 @@ A filter is a Javascript object with the following properties:
 - `operator`: An operator to be used in filter. Only some operators are available for measures, for dimensions available operators depend on the type
     of the dimension. Please see the reference below for the full list of available
     operators.
-- `values`: An array of values for the filter. Values must be of type String. If you need to pass a date, pass it as a string in `YYYY-MM-DD` format.
+- `values`: An array of values for the filter. Values must be of type String. If you need to pass a date, pass it as a string in `YYYY-MM-DD`.
 
 #### Filtering Dimensions vs Filtering Measures
 Filters are applied differently to dimensions and measures.
@@ -300,7 +300,10 @@ The same as `beforeDate`, but used to get all results after specific date.
 Since grouping and filtering by a time dimension is quite a common case, Cube.js provides a convient shortcut to pass a dimension and a filter as a `timeDimension` property.
 
   - `dimension`: Time dimension name.
-  - `dateRange`: An array of dates with the following format `YYYY-MM-DD`, e.g. `2015-01-01`, if only one date specified the filter would be set exactly to this date. You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
+  - `dateRange`: An array of dates with the following format `YYYY-MM-DD` or in `YYYY-MM-DDTHH:mm:ss.SSS` format.
+Dates in `YYYY-MM-DD` format padded to start and end of day if used in start and end of date range interval accordingly. 
+If only one date specified it's equivalent to passing two same dates as a date range.
+You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
   - `granularity`: A granularity for a time dimension. It supports following values `hour`, `day`, `week`, `month`, `year`. If you pass `null` to the granularity, the Cube.js will only perform a filtering by specified time dimension, without grouping.
 
 ```js
