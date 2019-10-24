@@ -79,6 +79,7 @@ jobs:
             - yarn-guides-v1-{{ .Branch }}-
             - yarn-guides-v1-
 
+      - run: yarn global add @aws-amplify/cli
       - run: cd guides/react-dashboard && yarn && yarn deploy
 
       - save_cache:
