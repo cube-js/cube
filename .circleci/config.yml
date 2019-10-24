@@ -1,7 +1,7 @@
 version: 2
 
 orbs:
-  aws-cli: circleci/aws-cli@0.1.13
+  aws-cli: circleci/aws-cli@0.1.16
 
 jobs:
   test:
