@@ -7,7 +7,7 @@ Nowadays, we see analytics dashboards and reporting features in almost any appli
 
 And I cannot say I always enjoyed the process. Several years ago I was rendering all the HTML, including dashboards and charts, on the server and then was trying to make it dynamic with some jQuery and a lot of hacks. Backends were huge monolith applications, doing a ton of things, including analytics processing, which often ends up to be slow, inefficient, and hard to maintain. Thanks to microservices, containers, frontend frameworks, and a lot of great charting libraries it is easier and definitely more fun to build such analytics dashboards and report builders today.
 
-In this tutorial, we’ll learn step by step how to build a full-stack analytics application, including a report builder and a dynamic dashboard. We’ll build our application in a microservice architecture with the frontend decoupled from the backend. We’ll rely on AWS services for some of the functionality, but that could be easily substituted by your own microservices, which we cover later in the tutorial.
+In this React Dashboard tutorial, we’ll learn step by step how to build a full-stack analytics application, including a report builder and a dynamic dashboard. We’ll build our application in a microservice architecture with the frontend decoupled from the backend. We’ll rely on AWS services for some of the functionality, but that could be easily substituted by your own microservices, which we cover later in the tutorial.
 
 You can check out the [final application we are going to build here.](https://react-dashboard-demo.cube.dev) The diagram below shows the architecture of our app.
 
