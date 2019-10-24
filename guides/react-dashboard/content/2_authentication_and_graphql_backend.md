@@ -7,7 +7,7 @@ Now we have a basic version of our app, which uses local storage to save charts 
 
 To do so, we first need to add authentication to our application and then save the users’ dashboard in the database. We are going to use [AWS Cognito](https://aws.amazon.com/cognito/) for authentication. AWS Cognito User Pool makes it easy for developers to add sign-up and sign-in functionality to web and mobile applications. It supports user registration and sign-in, as well as provisioning identity tokens for signed-in users.
 
-To store the dashboards, we will use [AWS AppSync](https://aws.amazon.com/appsync/). It allows us to create a flexible API to access and manipulate data and uses GraphQL as a query language. AppSync natively integrates with Cognito and can use its identity tokens to manage the ownership of the data—and in our case, the ownership of the dashboards.
+To store the dashboards, we will use [AWS AppSync](https://aws.amazon.com/appsync/). It allows us to create a flexible API to access and manipulate data and uses GraphQL as a query language. AppSync natively integrates with Cognito and can use its identity tokens to manage the ownership of the data—and in our case, the ownership of the dashboards. As a prerequisite to this part you need to have an AWS account, so you can use its services.
 
 ## Install and Configure Amplify CLI
 

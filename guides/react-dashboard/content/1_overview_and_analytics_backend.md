@@ -5,7 +5,7 @@ order: 1
 
 Nowadays, we see analytics dashboards and reporting features in almost any application. In my career as a web developer, I’ve built dozens of different dashboards from internal tools to measure application performance to customer-facing portals with interactive report builders and dynamic dashboards.
 
-And I cannot say I always enjoyed the process. Several years ago I was rendering all the HTML, including dashboards and charts, on the server and then was trying to make it dynamic with some jQuery and a lot of hacks. Backends were huge monolith applications, doing a ton of things, including analytics processing, which often ends up to be slow, inefficient, and hard to maintain. Thanks to microservices, containers, frontend frameworks, and a lot of great charting libraries it is easier and definitely more fun to build such analytics dashboards and reports today.
+And I cannot say I always enjoyed the process. Several years ago I was rendering all the HTML, including dashboards and charts, on the server and then was trying to make it dynamic with some jQuery and a lot of hacks. Backends were huge monolith applications, doing a ton of things, including analytics processing, which often ends up to be slow, inefficient, and hard to maintain. Thanks to microservices, containers, frontend frameworks, and a lot of great charting libraries it is easier and definitely more fun to build such analytics dashboards and report builders today.
 
 In this tutorial, we’ll learn step by step how to build a full-stack analytics application, including a report builder and a dynamic dashboard. We’ll build our application in a microservice architecture with the frontend decoupled from the backend. We’ll rely on AWS services for some of the functionality, but that could be easily substituted by your own microservices, which we cover later in the tutorial.
 
@@ -19,14 +19,14 @@ We're going to store our data for the dashboard in [PostgreSQL](https://www.post
 
 Next, we’ll install [Cube.js](https://github.com/cube-js/cube.js) and connect it to the database. Cube.js is an open-source framework for building analytical web applications. It creates an analytics API on top of the database and handles things like SQL organization, caching, security, authentication, and much more.
 
-We’ll also use AWS Cognito for user registrations and sign-ins and AWS AppSync as a GraphQL backend. Optionally, you can use your own authentication service, as well as GraphQL backend. But to keep things simple, we’ll rely on AWS services for the purpose of this tutorial.
+We’ll also use [AWS Cognito](https://aws.amazon.com/cognito/) for user registrations and sign-ins and [AWS AppSync](https://aws.amazon.com/appsync/) as a GraphQL backend. Optionally, you can use your own authentication service, as well as GraphQL backend. But to keep things simple, we’ll rely on AWS services for the purpose of this tutorial.
 
-The frontend is a React application. We’re going to use Cube.js playground to generate a React dashboard boilerplate with a report builder and a dashboard. It uses Create React App under the hood to create all the configuration and additionally wires together all the components to work with Cube.js API and a GraphQL backend. Finally, for the visualizations, we’ll use Recharts, a powerful and customizable React-based charting library.
+The frontend is a React application. We’re going to use Cube.js playground to generate a React dashboard boilerplate with a report builder and a dashboard. It uses [Create React App](https://create-react-app.dev/) under the hood to create all the configuration and additionally wires together all the components to work with Cube.js API and a GraphQL backend. Finally, for the visualizations, we’ll use Recharts, a powerful and customizable React-based charting library.
 
 
 ## Setting up a Database and Cube.js
 
-The first thing we need to have in place is a database. We’ll use a PostgreSQL database, but any other relational database should work fine as well. If you want to use MongoDB, you’d need to add a MongoDB Connector for BI. It allows you to execute SQL code on top of your MongoDB data. It can be easily downloaded from the MongoDB website.
+The first thing we need to have in place is a database. We’ll use a [PostgreSQL](https://www.postgresql.org/) database, but any other relational database should work fine as well. If you want to use MongoDB, you’d need to add a MongoDB Connector for BI. It allows you to execute SQL code on top of your MongoDB data. It can be easily downloaded from the MongoDB website.
 
 One more thing to keep in mind is a replication. It is considered a bad practice to run analytics queries against your production database mostly because of the performance issues. Cube.js can dramatically reduce the amount of a database’s workload, but still, I’d recommend connecting to the replica.
 
