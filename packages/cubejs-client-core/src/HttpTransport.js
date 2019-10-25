@@ -2,9 +2,10 @@ import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
 class HttpTransport {
-  constructor({ authorization, apiUrl }) {
+  constructor({ authorization, apiUrl, headers = {} }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
+    this.headers = headers
   }
 
   request(method, params) {
@@ -16,7 +17,7 @@ class HttpTransport {
 
     const runRequest = () => fetch(
       `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`, {
-        headers: { Authorization: this.authorization, 'Content-Type': 'application/json' }
+        headers: Object.assign({ Authorization: this.authorization, 'Content-Type': 'application/json' }, this.headers)
       }
     );
 

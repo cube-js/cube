@@ -35,9 +35,11 @@ class CubejsApi {
     options = options || {};
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
+    this.headers = options.headers || {};
     this.transport = options.transport || new HttpTransport({
       authorization: typeof apiToken === 'function' ? undefined : apiToken,
-      apiUrl: this.apiUrl
+      apiUrl: this.apiUrl,
+      headers: this.headers
     });
     this.pollInterval = options.pollInterval || 5;
   }

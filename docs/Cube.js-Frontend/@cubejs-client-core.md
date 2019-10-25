@@ -32,6 +32,8 @@ Can be an async function without arguments that returns API token.
 - `options` - options object.
 - `options.apiUrl` - URL of your Cube.js Backend.
 By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
+- `options.headers` - optional object of additional headers to apply to requests
+
 
 **Returns:** [CubejsApi](#cubejs-api)
 
