@@ -13,24 +13,17 @@ class CubeEvaluator extends CubeSymbols {
 
   compile(cubes, errorReporter) {
     super.compile(cubes, errorReporter);
-    this.evaluatedCubes = R.fromPairs(this.cubeList
-        .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
-        .map((v) => [v.name, v])
-    );
-    this.byFileName = R.compose(
-      R.groupBy(v => v.fileName),
-      R.filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
-    )(this.cubeList);
-    this.primaryKeys = R.fromPairs(this.cubeList
-        .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
-        .map((v) => {
-          const primaryKeyNameToSymbol = R.compose(R.find(d => d[1].primaryKey), R.toPairs)(v.dimensions || {});
-          return [
-            v.name,
-            primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
-          ];
-        })
-    );
+    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
+
+    this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
+    this.byFileName = R.groupBy(v => v.fileName, validCubes);
+    this.primaryKeys = R.fromPairs(validCubes.map((v) => {
+      const primaryKeyNameToSymbol = R.compose(R.find(d => d[1].primaryKey), R.toPairs)(v.dimensions || {});
+      return [
+        v.name,
+        primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
+      ];
+    }));
   }
 
   cubesByFileName(fileName) {
