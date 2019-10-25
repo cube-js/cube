@@ -10,6 +10,7 @@ import TableOfContents from "../components/TableOfContents/TableOfContents";
 import Header from "../components/Header/Header";
 import Footer from "../components/Footer/Footer";
 import NextPrev from "../components/NextPrev/NextPrev";
+import Social from "../components/Social/Social";
 import config from "../../data/SiteConfig";
 
 const Markdown = styled.div`
@@ -59,6 +60,7 @@ export default class PostTemplate extends React.Component {
           <ContentContainer>
             <ContentHeader>{post.title}</ContentHeader>
             <Markdown dangerouslySetInnerHTML={{ __html: postNode.html }} />
+            <Social path={slug} title={post.title} />
           </ContentContainer>
           <TableOfContents current={slug} />
         </Container>

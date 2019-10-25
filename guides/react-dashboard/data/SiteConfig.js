@@ -1,5 +1,5 @@
 const config = {
-  siteTitle: "React Dashboard: an Ultimate Guide", // Site title.
+  siteTitle: "React Dashboard Guide", // Site title.
   siteTitleShort: "React Dashboard", // Short site title for homescreen (PWA). Preferably should be under 12 characters to prevent truncation.
   siteTitleAlt: "React Dashboard: an Ultimate Guide", // Alternative site title for SEO.
   siteLogo: "/logos/icon.png", // Logo used for SEO and manifest.
