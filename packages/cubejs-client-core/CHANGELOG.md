@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.10](https://github.com/statsbotco/cubejs-client/compare/v0.11.9...v0.11.10) (2019-10-25)
+
+
+### Features
+
+* client headers for CubejsApi ([#242](https://github.com/statsbotco/cubejs-client/issues/242)). Thanks to [@ferrants](https://github.com/ferrants)! ([2f75ef3](https://github.com/statsbotco/cubejs-client/commit/2f75ef3)), closes [#241](https://github.com/statsbotco/cubejs-client/issues/241)
+
+
+
+
+
 ## [0.11.9](https://github.com/statsbotco/cubejs-client/compare/v0.11.8...v0.11.9) (2019-10-23)
 
 
