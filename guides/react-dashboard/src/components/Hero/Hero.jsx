@@ -6,6 +6,7 @@ import theme, { sharedStyles } from '../../theme';
 import DashboardImg from './dashboard-sample.png';
 import browserControls from './browser-controls.svg';
 import cover from './react-dashboard-cover.jpg';
+import Social from "../Social/Social";
 
 const Container = styled.div`
   background-color: ${theme.colors.lightBlue};
@@ -115,6 +116,7 @@ const SecondaryButton = styled.a`
 const ButtonsContainer = styled.div`
   display: flex;
   margin-top: 45px;
+  margin-bottom: 25px;
   justify-content: space-between;
   flex-wrap: wrap;
   ${media.lessThan("small")`
@@ -137,6 +139,7 @@ const Hero = ({ startUrl }) => (
           <PrimaryButton to={startUrl}>Start Learning</PrimaryButton>
           <SecondaryButton href="https://react-dashboard-demo.cube.dev">Demo</SecondaryButton>
         </ButtonsContainer>
+        <Social align="flex-start" />
       </CopyContainer>
       <MediaContainer>
         <video muted autoPlay playsInline loop preload="auto" poster={cover}>
