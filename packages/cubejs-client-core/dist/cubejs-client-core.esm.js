@@ -740,12 +740,15 @@ var HttpTransport =
 function () {
   function HttpTransport(_ref) {
     var authorization = _ref.authorization,
-        apiUrl = _ref.apiUrl;
+        apiUrl = _ref.apiUrl,
+        _ref$headers = _ref.headers,
+        headers = _ref$headers === void 0 ? {} : _ref$headers;
 
     _classCallCheck(this, HttpTransport);
 
     this.authorization = authorization;
     this.apiUrl = apiUrl;
+    this.headers = headers;
   }
 
   _createClass(HttpTransport, [{
@@ -761,10 +764,10 @@ function () {
 
       var runRequest = function runRequest() {
         return fetch("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
-          headers: {
+          headers: Object.assign({
             Authorization: _this.authorization,
             'Content-Type': 'application/json'
-          }
+          }, _this.headers)
         });
       };
 
@@ -841,9 +844,11 @@ function () {
     options = options || {};
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
+    this.headers = options.headers || {};
     this.transport = options.transport || new HttpTransport({
       authorization: typeof apiToken === 'function' ? undefined : apiToken,
-      apiUrl: this.apiUrl
+      apiUrl: this.apiUrl,
+      headers: this.headers
     });
     this.pollInterval = options.pollInterval || 5;
   }
