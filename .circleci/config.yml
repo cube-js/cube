@@ -73,7 +73,7 @@ jobs:
     working_directory: ~/repo
 
     steps:
-      run: |
+      - run: |
           if [ "x$AWS_ACCESS_KEY_ID" = "x" ]; then
               circleci-agent step halt
           fi
