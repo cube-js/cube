@@ -242,6 +242,7 @@ export default () => {
 ## Tutorials
 
 ### Getting Started Tutorials
+- [React Dashboard: an Ultimate Guide](https://react-dashboard.cube.dev)
 - [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
 - [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
 - [Node Express Analytics Dashboard with Cube.js](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)
