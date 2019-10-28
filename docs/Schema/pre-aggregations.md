@@ -94,6 +94,11 @@ cube(`Orders`, {
     revenue: {
       sql: `amount`,
       type: `sum`
+    },
+    
+    averageRevenue: {
+      sql: `${amount} / ${count}`,
+      type: `number`
     }
   },
 
@@ -133,6 +138,7 @@ In this particular example these queries will use `categoryAndDate` pre-aggregat
 - Order Revenue by Category this month
 - Order Count by Created At Day this year
 - Order Count for all time
+- Order Average Revenue by Category this month
 
 These queries won't use `categoryAndDate` pre-aggregation:
 - Order Revenue by Created At Week this year
