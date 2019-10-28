@@ -41,6 +41,29 @@ const checkEnvForPlaceholders = () => {
   }
 };
 
+const devLogger = (type, message, error) => {
+  const colors = {
+    red: '31', // ERROR
+    green: '32', // INFO
+    blue: '34', // TRACE
+  }
+  const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
+  const format = json => JSON.stringify(json, null, 2);
+
+  if ([ // INFO list
+    'Performing query',
+    'Performing query completed',
+  ].includes(type)) {
+    if (error) console.log(`${withColor(type, colors.blue)}: ${error}`);
+    else console.log(`${withColor(type, colors.blue)}: ${format(message)}`);
+    return;
+  }
+  // ERROR
+  if (error) return console.log(`${withColor(type, colors.red)}: ${error}`);
+  // TRACE
+  console.log(`${withColor(type, colors.green)}: ${format(message)}`);
+}
+
 class CubejsServerCore {
   constructor(options) {
     options = options || {};
@@ -68,7 +91,7 @@ class CubejsServerCore {
     this.logger = options.logger || ((msg, params) => {
       const { error, ...restParams } = params;
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`\u001b[32m${msg}\u001b[0m: ${JSON.stringify(restParams, null, 2)}${error ? `\n${error}` : ''}`);
+        devLogger(msg, restParams, error);
       } else {
         console.log(JSON.stringify({ message: msg, ...params }));
       }
