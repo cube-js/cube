@@ -68,7 +68,7 @@ class CubejsServerCore {
     this.logger = options.logger || ((msg, params) => {
       const { error, ...restParams } = params;
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`${msg}: ${JSON.stringify(restParams)}${error ? `\n${error}` : ''}`);
+        console.log(`\u001b[32m${msg}\u001b[0m: ${JSON.stringify(restParams, null, 2)}${error ? `\n${error}` : ''}`);
       } else {
         console.log(JSON.stringify({ message: msg, ...params }));
       }
