@@ -76,6 +76,10 @@ const Chart = ({ query }) => {
     return <pre>{error.toString()}</pre>;
   }
   
+  if (!resultSet) {
+    return null;
+  }
+  
   return <LineChart resultSet={resultSet}/>;
 };
 ```
