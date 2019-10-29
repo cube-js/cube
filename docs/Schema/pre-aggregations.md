@@ -97,7 +97,7 @@ cube(`Orders`, {
     },
     
     averageRevenue: {
-      sql: `${amount} / ${count}`,
+      sql: `${revenue} / ${count}`,
       type: `number`
     }
   },
