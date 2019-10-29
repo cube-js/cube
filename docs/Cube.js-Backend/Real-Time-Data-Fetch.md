@@ -41,7 +41,7 @@ import cubejs from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 
 const cubejsApi = cubejs({
-  transport: new WebSocketTransport({ authentication: CUBEJS_TOKEN, apiUrl: 'ws://localhost:4000/' })
+  transport: new WebSocketTransport({ authorization: CUBEJS_TOKEN, apiUrl: 'ws://localhost:4000/' })
 });
 
 cubejsApi.subscribe({
@@ -65,8 +65,8 @@ cubejsApi.subscribe({
 ```javascript
 import { useCubeQuery } from '@cubejs-client/react';
 
-const Chart = ({ query }) => {
-  const { resultSet, error, isLoading } = useCubeQuery(query, { subscribe: true });
+const Chart = ({ query, cubejsApi }) => {
+  const { resultSet, error, isLoading } = useCubeQuery(query, { subscribe: true, cubejsApi });
   
   if (isLoading) {
     return <div>Loading...</div>;
