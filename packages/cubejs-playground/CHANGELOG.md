@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.12](https://github.com/statsbotco/cubejs-client/compare/v0.11.11...v0.11.12) (2019-10-29)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
 ## [0.11.10](https://github.com/statsbotco/cubejs-client/compare/v0.11.9...v0.11.10) (2019-10-25)
 
 **Note:** Version bump only for package @cubejs-client/playground

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.12](https://github.com/statsbotco/cubejs-client/compare/v0.11.11...v0.11.12) (2019-10-29)
+
+
+### Bug Fixes
+
+* Playground shouldn't be run in serverless environment by default ([41cd46c](https://github.com/statsbotco/cubejs-client/commit/41cd46c))
+
+
+
+
+
 # [0.11.0](https://github.com/statsbotco/cubejs-client/compare/v0.10.62...v0.11.0) (2019-10-15)
 
 **Note:** Version bump only for package cubejs-cli

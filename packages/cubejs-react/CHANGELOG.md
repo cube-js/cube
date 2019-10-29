@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.12](https://github.com/statsbotco/cubejs-client/compare/v0.11.11...v0.11.12) (2019-10-29)
+
+
+### Bug Fixes
+
+* **react:** Refetch hook only actual query changes ([10b8988](https://github.com/statsbotco/cubejs-client/commit/10b8988))
+
+
+
+
+
 ## [0.11.9](https://github.com/statsbotco/cubejs-client/compare/v0.11.8...v0.11.9) (2019-10-23)
 
 
