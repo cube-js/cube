@@ -62,7 +62,7 @@ export default (query, options = {}) => {
         subscribeRequest = null;
       }
     };
-  }, [query, options.cubejsApi, context]);
+  }, [JSON.stringify(query), options.cubejsApi, context]);
 
   return { isLoading, resultSet, error };
 };
