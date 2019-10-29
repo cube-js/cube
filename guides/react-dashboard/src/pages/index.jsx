@@ -4,15 +4,14 @@ import { graphql } from "gatsby";
 import Layout from "../layout";
 import PartsListing from "../components/PartsListing/PartsListing";
 import SEO from "../components/SEO/SEO";
-import Header from "../components/Header/Header";
-import Hero from "../components/Hero/Hero";
-import Footer from "../components/Footer/Footer";
-import Feature from "../components/Feature/Feature";
+import { Header, Hero, Footer, Feature, Social } from "guides-base";
 import config from "../../data/SiteConfig";
 
 import featureOneImg from "./feature-1.png";
 import featureOneTwo from "./feature-2.png";
 import featureOneThree from "./feature-3.png";
+
+import cover from './react-dashboard-cover.jpg';
 
 class Index extends React.Component {
   render() {
@@ -22,7 +21,15 @@ class Index extends React.Component {
         <SEO />
         <Helmet title={config.siteTitle} />
         <Header />
-        <Hero startUrl={partsEdges[0].node.fields.slug} />
+        <Hero
+          startUrl={partsEdges[0].node.fields.slug}
+          socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
+          media={
+            <video muted autoPlay playsInline loop preload="auto" poster={cover}>
+              <source type="video/mp4" src="videos/demo.mp4" />
+            </video>
+          }
+        />
         <Feature
           imageAlign='left'
           image={featureOneImg}
