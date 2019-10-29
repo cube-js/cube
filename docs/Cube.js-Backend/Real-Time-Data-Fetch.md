@@ -26,7 +26,7 @@ import cubejs from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 
 const cubejsApi = cubejs({
-  transport: new WebSocketTransport({ authentication: CUBEJS_TOKEN, apiUrl: 'ws://localhost:4000/' })
+  transport: new WebSocketTransport({ authorization: CUBEJS_TOKEN, apiUrl: 'ws://localhost:4000/' })
 });
 ```
 
