@@ -226,6 +226,18 @@ amount: {
 }
 ```
 
+### boolean
+
+`boolean` is used with fields that contain boolean data or data coercible to boolean.
+For example:
+
+```javascript
+isEnabled: {
+  sql: `is_enabled`,
+  type: `boolean`
+}
+```
+
 ### geo
 
 `geo` dimension is used to display data on the map. Unlike other dimension types it requires to set two fields: latitude and longitude.
