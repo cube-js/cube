@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.13](https://github.com/statsbotco/cubejs-client/compare/v0.11.12...v0.11.13) (2019-10-30)
+
+
+### Features
+
+* **playground:** Static dashboard template ([2458aad](https://github.com/statsbotco/cubejs-client/commit/2458aad))
+
+
+
+
+
 ## [0.11.11](https://github.com/statsbotco/cubejs-client/compare/v0.11.10...v0.11.11) (2019-10-26)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.13](https://github.com/cube-js/cube.js/compare/v0.11.12...v0.11.13) (2019-10-30)
+
+
+### Features
+
+* **playground:** Static dashboard template ([2458aad](https://github.com/cube-js/cube.js/commit/2458aad))
+
+
+
+
+
 ## [0.11.12](https://github.com/cube-js/cube.js/compare/v0.11.11...v0.11.12) (2019-10-29)
 
 
