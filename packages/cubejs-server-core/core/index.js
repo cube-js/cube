@@ -41,6 +41,37 @@ const checkEnvForPlaceholders = () => {
   }
 };
 
+const devLogger = (level) => (type, message, error) => {
+  const colors = {
+    red: '31', // ERROR
+    green: '32', // INFO
+  };
+
+  const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
+  const format = json => JSON.stringify(json, null, 2);
+
+  const logError = () => console.log(`${withColor(type, colors.red)}: ${format(message)} \n${error}`);
+  const logType = () => console.log(`${withColor(type)}`);
+  const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
+
+  if (error) return logError();
+
+  switch (level) {
+    case "ERROR":
+      return logType();
+    case "TRACE":
+      return logDetails();
+    case "INFO":
+    default: {
+      if ([
+        'Performing query',
+        'Performing query completed',
+      ].includes(type)) return logDetails();
+      return logType();
+    }
+  }
+};
+
 class CubejsServerCore {
   constructor(options) {
     options = options || {};
@@ -68,7 +99,7 @@ class CubejsServerCore {
     this.logger = options.logger || ((msg, params) => {
       const { error, ...restParams } = params;
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`${msg}: ${JSON.stringify(restParams)}${error ? `\n${error}` : ''}`);
+        devLogger(process.env.CUBEJS_LOG_LEVEL)(msg, restParams, error);
       } else {
         console.log(JSON.stringify({ message: msg, ...params }));
       }
