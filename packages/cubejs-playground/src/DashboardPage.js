@@ -26,7 +26,8 @@ class DashboardPage extends Component {
     super(props);
     this.state = {
       chartLibrary: chartLibraries[0].value,
-      framework: 'react'
+      framework: 'react',
+      templatePackageName: 'react-antd-dynamic'
     };
   }
 
@@ -36,13 +37,13 @@ class DashboardPage extends Component {
   }
 
   async loadDashboard(createApp) {
-    const { chartLibrary } = this.state;
+    const { chartLibrary, templatePackageName } = this.state;
     this.setState({
       appCode: null,
       loadError: null
     });
     try {
-      await this.dashboardSource.load(createApp, { chartLibrary });
+      await this.dashboardSource.load(createApp, { chartLibrary, templatePackageName });
       this.setState({
         dashboardStarting: false,
         appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardAppCode(),
@@ -75,9 +76,11 @@ class DashboardPage extends Component {
   }
 
   render() {
-    const { chartLibrary, framework } = this.state;
+    const { chartLibrary, framework, templatePackageName } = this.state;
     const currentLibraryItem = chartLibraries.find(m => m.value === chartLibrary);
     const frameworkItem = frameworks.find(m => m.id === framework);
+    const templatePackage = this.dashboardSource && this.dashboardSource.templatePackages
+      .find(m => m.name === templatePackageName);
 
     const chartLibrariesMenu = (
       <Menu
@@ -113,6 +116,23 @@ class DashboardPage extends Component {
       </Menu>
     );
 
+    const templatePackagesMenu = (
+      <Menu
+        onClick={(e) => {
+          playgroundAction('Set Template Package', { templatePackageName: e.key });
+          this.setState({ templatePackageName: e.key });
+        }}
+      >
+        {
+          (this.dashboardSource && this.dashboardSource.templatePackages || []).map(f => (
+            <Menu.Item key={f.name}>
+              {f.description}
+            </Menu.Item>
+          ))
+        }
+      </Menu>
+    );
+
     const {
       appCode, dashboardPort, loadError, dashboardRunning, dashboardStarting, dashboardAppPath
     } = this.state;
@@ -127,6 +147,17 @@ class DashboardPage extends Component {
               <Dropdown overlay={frameworkMenu}>
                 <Button>
                   {frameworkItem && frameworkItem.title}
+                  <Icon type="down" />
+                </Button>
+              </Dropdown>
+            </Form.Item>
+            <Form.Item>
+              <Dropdown
+                overlay={templatePackagesMenu}
+                disabled={!!frameworkItem.docsLink}
+              >
+                <Button>
+                  {templatePackage && templatePackage.description}
                   <Icon type="down" />
                 </Button>
               </Dropdown>

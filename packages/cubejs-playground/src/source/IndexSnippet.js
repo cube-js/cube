@@ -1,12 +1,7 @@
 import traverse from "@babel/traverse";
 import SourceSnippet from './SourceSnippet';
-import ScaffoldingSources from '../codegen/ScaffoldingSources';
 
 class IndexSnippet extends SourceSnippet {
-  constructor() {
-    super(ScaffoldingSources['react/index.js']);
-  }
-
   mergeTo(targetSource) {
     super.mergeTo(targetSource);
     this.replaceRouter(targetSource);

@@ -1,15 +1,15 @@
 /* globals window */
 import traverse from "@babel/traverse";
+import { uniq } from 'ramda';
 import fetch from './playgroundFetch';
-import AppSnippet from './source/AppSnippet';
 import TargetSource from './source/TargetSource';
 import ScaffoldingSources from "./codegen/ScaffoldingSources";
-import MergeScaffolding from "./source/MergeScaffolding";
-import IndexSnippet from "./source/IndexSnippet";
-import ExploreSnippet from "./source/ExploreSnippet";
-import ChartRendererSnippet from "./source/ChartRendererSnippet";
-import DashboardStoreSnippet from "./source/DashboardStoreSnippet";
 import SourceSnippet from "./source/SourceSnippet";
+import ReactAntdDynamicTemplate from "./source/ReactAntdDynamicTemplate";
+import ReactAntdStaticTemplate from "./source/ReactAntdStaticTemplate";
+import AppCredentialsTemplate from "./source/AppCredentialsTemplate";
+import ChartRendererTemplate from "./source/ChartRendererTemplate";
+import StaticChartTemplate from "./source/StaticChartTemplate";
 
 const indexCss = `
 @import '~antd/dist/antd.css';
@@ -21,7 +21,7 @@ body {
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
 class DashboardSource {
-  async load(createApp, { chartLibrary }) {
+  async load(createApp, { chartLibrary, templatePackageName } = {}) {
     this.loadError = null;
     if (createApp) {
       await fetchWithRetry('/playground/ensure-dashboard-app', undefined, 10);
@@ -37,8 +37,10 @@ class DashboardSource {
       this.filesToPersist = [];
       this.parse(result.fileContents);
     }
-    if (!result.error && this.ensureDashboardIsInApp({ chartLibrary })) {
-      await this.persist();
+    if (chartLibrary && templatePackageName) {
+      if (!result.error && this.ensureDashboardIsInApp({ chartLibrary, templatePackageName })) {
+        await this.persist();
+      }
     }
     if (!result.error) {
       await this.ensureDependencies({});
@@ -132,7 +134,14 @@ class DashboardSource {
     this.appTargetSource = this.targetSourceByFile('/src/App.js');
   }
 
-  ensureDashboardIsInApp({ chartLibrary }) {
+  get templatePackages() {
+    return [
+      new ReactAntdDynamicTemplate(),
+      new ReactAntdStaticTemplate()
+    ];
+  }
+
+  ensureDashboardIsInApp({ chartLibrary, templatePackageName }) {
     let dashboardAdded = false;
     let headerElement = null;
     traverse(this.appTargetSource.ast, {
@@ -155,31 +164,39 @@ class DashboardSource {
     let merged = false;
     if (!dashboardAdded && headerElement) {
       this.appLayoutAdded = true;
-      const scaffoldingFileToSnippet = {
-        'react/App.js': new AppSnippet(this.playgroundContext),
-        'react/index.js': new IndexSnippet(),
-        'react/pages/ExplorePage.js': new ExploreSnippet(),
-        'react/components/ChartRenderer.js': new ChartRendererSnippet(chartLibrary)
-      };
 
-      const scaffoldingFileNames = Object.keys(ScaffoldingSources)
-        .filter(fileName => fileName.indexOf('react/') === 0);
+      const templatesToApply = [this.templatePackages.find(t => t.name === templatePackageName)].concat([
+        new AppCredentialsTemplate(this.playgroundContext),
+        new ChartRendererTemplate(chartLibrary)
+      ]);
 
-      scaffoldingFileNames.forEach(scaffoldingFile => {
-        this.mergeSnippetToFile(
-          scaffoldingFileToSnippet[scaffoldingFile] || new SourceSnippet(ScaffoldingSources[scaffoldingFile]),
-          MergeScaffolding.targetSourceName(scaffoldingFile)
-        );
-      });
+      this.applyTemplatePackages(templatesToApply);
+
       merged = true;
     }
     return merged;
   }
 
-  targetSourceByFile(fileName) {
+  applyTemplatePackages(templatesToApply) {
+    templatesToApply.forEach(template => {
+      template.initSources(ScaffoldingSources);
+
+      uniq(
+        Object.keys(template.templateSources).concat(Object.keys(template.fileToSnippet))
+      ).forEach(scaffoldingFile => {
+        this.mergeSnippetToFile(
+          template.fileToSnippet[scaffoldingFile] || new SourceSnippet(template.templateSources[scaffoldingFile]),
+          scaffoldingFile,
+          template.templateSources[scaffoldingFile]
+        );
+      });
+    });
+  }
+
+  targetSourceByFile(fileName, content) {
     let file = this.sourceFiles.find(f => f.fileName === fileName);
     if (!file) {
-      file = { fileName, content: ScaffoldingSources[MergeScaffolding.scaffoldingSourceName(fileName)] };
+      file = { fileName, content };
     }
     if (!this.fileToTargetSource[fileName]) {
       this.fileToTargetSource[fileName] = new TargetSource(file.fileName, file.content);
@@ -187,23 +204,33 @@ class DashboardSource {
     return this.fileToTargetSource[fileName];
   }
 
-  mergeSnippetToFile(snippet, fileName) {
-    const targetSource = this.targetSourceByFile(fileName);
+  mergeSnippetToFile(snippet, fileName, content) {
+    const targetSource = this.targetSourceByFile(fileName, content);
     snippet.mergeTo(targetSource);
   }
 
-  /*
+  async canAddChart() {
+    await this.load();
+    if (this.loadError) {
+      return this.loadError;
+    }
+    const dashboardPage = this.targetSourceByFile('/src/pages/DashboardPage.js', '');
+    const dashboardItemsArray = dashboardPage.definitions.find(
+      d => d.get('id').node.type === 'Identifier'
+        && d.get('id').node.name === 'DashboardItems'
+    );
+    return !!dashboardItemsArray;
+  }
+
   async addChart(chartCode) {
     await this.load(true);
     if (this.loadError) {
       return;
     }
-    this.ensureDashboardIsInApp();
-    const chartSnippet = new ChartSnippet(chartCode);
-    this.mergeSnippetToFile(chartSnippet, '/src/DashboardPage.js');
+    const staticChartTemplate = new StaticChartTemplate(chartCode);
+    this.applyTemplatePackages([staticChartTemplate]);
     await this.persist();
   }
-  */
 
   dashboardAppCode() {
     return this.appTargetSource.code();

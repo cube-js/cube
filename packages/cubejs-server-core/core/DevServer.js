@@ -137,22 +137,25 @@ class DevServer {
         return;
       }
 
-      const files = await fs.readdir(sourcePath);
-      const fileContents = (await Promise.all(files
-        .map(async file => {
-          const fileName = path.join(sourcePath, file);
-          const stats = await fs.lstat(fileName);
-          if (!stats.isDirectory()) {
-            const content = await fs.readFile(fileName, "utf-8");
-            return [{
-              fileName: fileName.replace(dashboardAppPath, '').replace(/\\/g, '/'),
-              content
-            }];
-          }
-          return [];
-        }))).reduce((a, b) => a.concat(b), []);
+      const fileContentsRecursive = async (dir) => {
+        const files = await fs.readdir(dir);
+        return (await Promise.all(files
+          .map(async file => {
+            const fileName = path.join(dir, file);
+            const stats = await fs.lstat(fileName);
+            if (!stats.isDirectory()) {
+              const content = await fs.readFile(fileName, "utf-8");
+              return [{
+                fileName: fileName.replace(dashboardAppPath, '').replace(/\\/g, '/'),
+                content
+              }];
+            } else {
+              return fileContentsRecursive(fileName);
+            }
+          }))).reduce((a, b) => a.concat(b), []);
+      };
 
-      res.json({ fileContents });
+      res.json({ fileContents: await fileContentsRecursive(sourcePath) });
     }));
 
     app.post('/playground/dashboard-app-files', catchErrors(async (req, res) => {

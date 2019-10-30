@@ -1,12 +1,24 @@
 import { parse } from '@babel/parser';
 import traverse from "@babel/traverse";
 import * as t from "@babel/types";
+import generator from "@babel/generator";
 
 class SourceSnippet {
   constructor(source) {
+    if (source) {
+      this.source = source;
+    }
+  }
+
+  get source() {
+    return generator(this.ast, {}, this.sourceValue).code;
+  }
+
+  set source(source) {
     if (!source) {
       throw new Error('Empty source is provided');
     }
+    this.sourceValue = source;
     this.ast = SourceSnippet.parse(source);
   }
 

@@ -1,12 +1,12 @@
 /* global navigator */
 import React from 'react';
 import {
-  Card, Button, Menu, Dropdown, Icon, notification
+  Card, Button, Menu, Dropdown, Icon, notification, Modal
 } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
-import { Redirect } from 'react-router-dom';
+import { Redirect, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from "sql-formatter";
 import PropTypes from 'prop-types';
@@ -94,7 +94,8 @@ class ChartContainer extends React.Component {
       cubejsApi,
       chartLibrary,
       setChartLibrary,
-      chartLibraries
+      chartLibraries,
+      history
     } = this.props;
 
     if (redirectToDashboard) {
@@ -143,23 +144,42 @@ class ChartContainer extends React.Component {
       <form action="https://codesandbox.io/api/v1/sandboxes/define" method="POST" target="_blank">
         <input type="hidden" name="parameters" value={parameters} />
         <Button.Group>
-          {/* TODO: implement add to static dashboard */}
-          {/*{dashboardSource && (
+          {dashboardSource && (
             <Button
               onClick={async () => {
-                playgroundAction('Add to Dashboard');
                 this.setState({ addingToDashboard: true });
-                await dashboardSource.addChart(codeExample);
-                this.setState({ redirectToDashboard: true, addingToDashboard: false });
+                const canAddChart = await dashboardSource.canAddChart();
+                if (typeof canAddChart === 'boolean' && canAddChart) {
+                  playgroundAction('Add to Dashboard');
+                  await dashboardSource.addChart(codeExample);
+                  this.setState({ redirectToDashboard: true, addingToDashboard: false });
+                } else if (!canAddChart) {
+                  this.setState({ addingToDashboard: false });
+                  Modal.error({
+                    title: 'Your dashboard app does not support adding of static charts',
+                    content: 'Please use static dashboard template'
+                  });
+                } else {
+                  this.setState({ addingToDashboard: false });
+                  Modal.error({
+                    title: 'There is an error loading your dashboard app',
+                    content: canAddChart,
+                    okText: 'Fix',
+                    okCancel: true,
+                    onOk() {
+                      history.push('/dashboard');
+                    }
+                  });
+                }
               }}
               icon="plus"
               size="small"
               loading={addingToDashboard}
               disabled={!!frameworkItem.docsLink}
             >
-              {addingToDashboard ? 'Installing modules. It may take a while. Please check console for progress...' : 'Add to Dashboard'}
+              {addingToDashboard ? 'Preparing dashboard app. It may take a while. Please check console for progress...' : 'Add to Dashboard'}
             </Button>
-          )}*/}
+          )}
           <Dropdown overlay={frameworkMenu}>
             <Button size="small">
               {frameworkItem && frameworkItem.title}
@@ -342,6 +362,7 @@ ChartContainer.propTypes = {
   hideActions: PropTypes.array,
   query: PropTypes.object,
   cubejsApi: PropTypes.object,
+  history: PropTypes.object.isRequired,
   chartLibrary: PropTypes.string.isRequired,
   setChartLibrary: PropTypes.func.isRequired,
   chartLibraries: PropTypes.array.isRequired
@@ -358,4 +379,4 @@ ChartContainer.defaultProps = {
   resultSet: null
 };
 
-export default ChartContainer;
+export default withRouter(ChartContainer);

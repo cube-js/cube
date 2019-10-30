@@ -1,11 +1,10 @@
 import SourceSnippet from './SourceSnippet';
-import ScaffoldingSources from '../codegen/ScaffoldingSources';
 import { selectChartLibrary } from "../ChartRenderer";
 import ChartTypeSnippet from "./ChartTypeSnippet";
 
 class ChartRendererSnippet extends SourceSnippet {
   constructor(chartLibrary) {
-    super(ScaffoldingSources['react/components/ChartRenderer.js']);
+    super();
     this.chartLibrary = chartLibrary;
   }
 
