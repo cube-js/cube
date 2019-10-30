@@ -2,16 +2,13 @@ import React from "react";
 import urljoin from "url-join";
 import {
   FacebookShareButton,
-  LinkedinShareButton,
   TwitterShareButton,
   RedditShareButton,
   FacebookIcon,
   TwitterIcon,
-  LinkedinIcon,
   RedditIcon
 } from "react-share";
 import styled from 'styled-components'
-import theme from '../../theme';
 import media from "styled-media-query";
 
 const Container = styled.div`

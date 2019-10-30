@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import { Link } from "gatsby";
 import media from "styled-media-query";
 import theme, { sharedStyles } from '../../theme';
-import DashboardImg from './dashboard-sample.png';
 import browserControls from './browser-controls.svg';
 
 const Container = styled.div`

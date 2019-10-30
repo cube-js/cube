@@ -55,20 +55,20 @@ const Footer = () => (
     <Logo>
       Created by
       <a href="https://cube.dev">
-        <img src={logo} />
+        <img alt="logo" src={logo} />
       </a>
     </Logo>
     <Social>
       Get in Touch
       <span>
         <a href="https://slack.cube.dev">
-          <img src={slack} />
+          <img alt="slack" src={slack} />
         </a>
         <a href="https://twitter.com/thecubejs">
-          <img src={twitter} />
+          <img alt="twitter" src={twitter} />
         </a>
         <a href="https://github.com/cube-js/cube.js">
-          <img src={github} />
+          <img alt="github" src={github} />
         </a>
       </span>
     </Social>

@@ -84,7 +84,7 @@ module.exports = (config, dirname) => {
           background_color: config.backgroundColor,
           theme_color: config.themeColor,
           display: "minimal-ui",
-          icon: path.join(__dirname, '../static/logos/icon.png')
+          icon: path.join(__dirname, './static/logos/icon.png')
         }
       },
       "gatsby-plugin-offline"

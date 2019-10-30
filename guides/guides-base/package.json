@@ -9,9 +9,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "lodash": "^4.17.15",
     "react": "^16.11.0",
+    "react-helmet": "^5.2.1",
     "react-share": "^3.0.1",
-    "styled-media-query": "^2.1.2"
+    "styled-media-query": "^2.1.2",
+    "styled-normalize": "^8.0.6"
   },
   "devDependencies": {
     "styled-components": "^4.4.0"
