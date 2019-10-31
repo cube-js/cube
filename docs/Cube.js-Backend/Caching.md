@@ -109,8 +109,8 @@ preAggregations: {
 
 ### Refresh Strategy
 
-Every two minutes on a new request Cube.js will initiate the refresh
-check. Refresh strategy could be customized by setting the `refreshKey` property
+If 2 minutes passed since last `refreshKey` query renew Cube.js will initiate the refresh check. 
+Refresh strategy could be customized by setting the `refreshKey` property
 for the pre-aggregation.
 
 The default value of the `refreshKey` is `select date_trunc('hour', now())`. It means
