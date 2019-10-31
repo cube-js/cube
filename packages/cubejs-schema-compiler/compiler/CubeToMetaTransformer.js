@@ -1,16 +1,16 @@
 const R = require('ramda');
 const inflection = require('inflection');
 const BaseMeasure = require('../adapter/BaseMeasure');
+const BaseQuery = require('../adapter/BaseQuery');
 const UserError = require('./UserError');
 
 class CubeToMetaTransformer {
-  constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph, adapter) {
+  constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
     this.cubeEvaluator = cubeEvaluator;
     this.contextEvaluator = contextEvaluator;
     this.joinGraph = joinGraph;
-    this.adapter = adapter;
   }
 
   compile(cubes, errorReporter) {
@@ -39,7 +39,7 @@ class CubeToMetaTransformer {
             title: this.title(cubeTitle, nameToDimension),
             type: nameToDimension[1].type,
             description: nameToDimension[1].description,
-            aliasName: this.adapter.aliasName(`${cube.name}.${nameToDimension[0]}`),
+            aliasName: BaseQuery.aliasName(`${cube.name}.${nameToDimension[0]}`),
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
@@ -102,7 +102,7 @@ class CubeToMetaTransformer {
       description: nameToMetric[1].description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
       format: nameToMetric[1].format,
-      aliasName: this.adapter.aliasName(name),
+      aliasName: BaseQuery.aliasName(name),
       cumulativeTotal: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       type: 'number', // TODO

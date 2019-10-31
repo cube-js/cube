@@ -1239,6 +1239,10 @@ class BaseQuery {
   }
 
   aliasName(name) {
+    return BaseQuery.aliasName(name);
+  }
+
+  static aliasName(name) {
     return inflection.underscore(name).replace(/\./g, '__');
   }
 
