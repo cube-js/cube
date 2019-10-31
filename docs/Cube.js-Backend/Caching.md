@@ -75,6 +75,7 @@ For situations like real-time analytics or responding to live user changes to un
 Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
 In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
 For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
+If you want to continously look for a new data you can use [Real Time Data Fetch](real-time-data-fetch) for that.
 Please note `renewQuery` also triggers pre-aggregations refresh as well.
 
 ## Pre-Aggregations
