@@ -16,6 +16,27 @@ Cube.js Schema JavaScript is standard JavaScript supported by Node.js starting v
 Being executed in VM data schema JavaScript code doesn't have access to [Node.js require](https://nodejs.org/api/modules.html#modules_require_id) directly.
 Instead `require()` is implemented by Schema Compiler to provide access to other data schema files and to regular Node.js modules.
 
+## Node.js globals (process.env and others)
+
+Data schema JavaScript code doesn't have access to any standard Node.js globals like `process`.
+In order to access `process.env` variable helper service can be introduced outside of `schema` directory:
+
+**tablePrefix.js:**
+```javascript
+exports.tableSchema = () => process.env.TABLE_SCHEMA;
+```
+
+**schema/Users.js**:
+```javascript
+import { tableSchema } from '../tablePrefix';
+
+cube(`Users`, {
+ sql: `SELECT * FROM ${tableSchema()}.users`,
+ 
+ // ...
+});
+```
+
 ## Import / Export
 
 Data schema JavaScript files are transpiled to convert ES6 `import` and `export` expressions to corresponding Node.js calls.
