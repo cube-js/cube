@@ -82,7 +82,7 @@ const createApp = async (projectName, options) => {
     version: '0.0.1',
     private: true,
     scripts: {
-      dev: "./node_modules/.bin/cubejs-dev-server"
+      dev: template === 'express' ? 'node index.js' : "./node_modules/.bin/cubejs-dev-server"
     }
   });
 
