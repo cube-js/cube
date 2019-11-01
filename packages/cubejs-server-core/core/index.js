@@ -64,10 +64,13 @@ const devLogger = (level) => (type, message, error) => {
     case "INFO":
     default: {
       if ([
+        'Load Request',
+        'Load Request Success',
         'Performing query',
         'Performing query completed',
-      ].includes(type)) return logDetails();
-      return logType();
+      ].includes(type)) {
+        logDetails();
+      }
     }
   }
 };
