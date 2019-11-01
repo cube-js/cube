@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.14](https://github.com/statsbotco/cubejs-client/compare/v0.11.13...v0.11.14) (2019-11-01)
+
+
+### Features
+
+* pretty default logger and log levels ([#244](https://github.com/statsbotco/cubejs-client/issues/244)) ([b1302d2](https://github.com/statsbotco/cubejs-client/commit/b1302d2))
+
+
+
+
+
 ## [0.11.13](https://github.com/statsbotco/cubejs-client/compare/v0.11.12...v0.11.13) (2019-10-30)
 
 
