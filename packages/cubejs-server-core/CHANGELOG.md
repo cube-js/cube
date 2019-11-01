@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.15](https://github.com/statsbotco/cubejs-client/compare/v0.11.14...v0.11.15) (2019-11-01)
+
+
+### Bug Fixes
+
+* Reduce output for logging ([aaf55e0](https://github.com/statsbotco/cubejs-client/commit/aaf55e0))
+
+
+
+
+
 ## [0.11.14](https://github.com/statsbotco/cubejs-client/compare/v0.11.13...v0.11.14) (2019-11-01)
 
 
