@@ -253,6 +253,7 @@ export default () => {
 - [Building an Open Source Mixpanel Alternative. Part 2: Conversion Funnels](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
 - [Building Open Source Google Analytics from Scratch](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)
 - [React Query Builder with Cube.js](https://cube.dev/blog/react-query-builder-with-cubejs/)
+- [External Rollups: Using MySQL as a Cache Layer for BigQuery](https://cube.dev/blog/when-mysql-is-faster-than-bigquery/)
 
 
 ## Community
