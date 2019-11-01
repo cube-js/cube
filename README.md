@@ -246,7 +246,6 @@ export default () => {
 - [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
 - [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
 - [Node Express Analytics Dashboard with Cube.js](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)
-- [Building a Serverless Stripe Analytics Dashboard](https://cube.dev/blog/building-serverless-stripe-analytics-dashboard/)
 ### Advanced
 - [Optimize Cube.js Performance with Pre-Aggregations](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/)
 - [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)
