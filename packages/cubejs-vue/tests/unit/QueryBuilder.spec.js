@@ -409,7 +409,7 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.filters.length).toBe(1);
       expect(wrapper.vm.filters[0].member.name).toBe('Orders.status');
       expect(wrapper.vm.filters[0].values).toContain('valid');
-    });    
+    });
 
     it('sets filters when using measure', async () => {
       const cube = CubejsApi('token');
@@ -464,7 +464,7 @@ describe('QueryBuilder.vue', () => {
       await flushPromises();
 
       expect(wrapper.vm.limit).toBe(10);
-    });   
+    });
 
     it('sets offset', async () => {
       const cube = CubejsApi('token');
@@ -518,6 +518,32 @@ describe('QueryBuilder.vue', () => {
       await flushPromises();
 
       expect(wrapper.vm.renewQuery).toBe(true);
+    });
+
+    it('ignore order if empty', async () => {
+      const cube = CubejsApi('token');
+      jest.spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        member: 'Orders.status',
+        operator: 'equals',
+        values: ['invalid'],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.order).toBe(null);
     });
 
     it('sets order', async () => {

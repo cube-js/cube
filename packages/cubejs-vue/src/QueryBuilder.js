@@ -30,7 +30,7 @@ export default {
       limit: null,
       offset: null,
       renewQuery: false,
-      order: {}
+      order: null,
     };
 
     data.granularities = [
@@ -233,7 +233,7 @@ export default {
       this.limit = (limit || null);
       this.offset = (offset || null);
       this.renewQuery = (renewQuery || false);
-      this.order = (order || {});
+      this.order = (order || null);
     },
     addMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
