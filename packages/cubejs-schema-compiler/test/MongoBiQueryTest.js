@@ -45,7 +45,7 @@ describe('MongoBiQuery', () => {
 
       const queryAndParams = query.buildSqlAndParams();
       console.log(queryAndParams);
-      queryAndParams[0].should.match(/TIMESTAMPADD\(HOUR, -7/);
+      queryAndParams[0].should.match(/TIMESTAMPADD\(HOUR, -/);
     });
   });
 });
