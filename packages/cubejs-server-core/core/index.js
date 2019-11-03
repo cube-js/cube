@@ -54,13 +54,18 @@ const devLogger = (level) => (type, message, error) => {
   const logType = () => console.log(`${withColor(type)}`);
   const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
 
-  if (error) return logError();
+  if (error) {
+    logError();
+    return;
+  }
 
   switch (level) {
     case "ERROR":
-      return logType();
+      logType();
+      break;
     case "TRACE":
-      return logDetails();
+      logDetails();
+      break;
     case "INFO":
     default: {
       if ([
