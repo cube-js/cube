@@ -1315,7 +1315,7 @@
         // Set @@toStringTag to native iterators
         _setToStringTag(IteratorPrototype, TAG, true);
         // fix for some old engines
-        if (!_library && typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
+        if (typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
       }
     }
     // fix Array#{values, @@iterator}.name in V8 / FF
@@ -1324,7 +1324,7 @@
       $default = function values() { return $native.call(this); };
     }
     // Define iterator
-    if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR$3])) {
+    if (BUGGY || VALUES_BUG || !proto[ITERATOR$3]) {
       _hide(proto, ITERATOR$3, $default);
     }
     // Plug for library
@@ -7626,7 +7626,7 @@
         limit: null,
         offset: null,
         renewQuery: false,
-        order: {}
+        order: null
       };
       data.granularities = [{
         name: 'hour',
@@ -7891,7 +7891,7 @@
         this.limit = limit || null;
         this.offset = offset || null;
         this.renewQuery = renewQuery || false;
-        this.order = order || {};
+        this.order = order || null;
       },
       addMember: function addMember(element, member) {
         var name = element.charAt(0).toUpperCase() + element.slice(1);

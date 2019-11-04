@@ -333,7 +333,7 @@ var QueryBuilder = {
       limit: null,
       offset: null,
       renewQuery: false,
-      order: {}
+      order: null
     };
     data.granularities = [{
       name: 'hour',
@@ -598,7 +598,7 @@ var QueryBuilder = {
       this.limit = limit || null;
       this.offset = offset || null;
       this.renewQuery = renewQuery || false;
-      this.order = order || {};
+      this.order = order || null;
     },
     addMember: function addMember(element, member) {
       var name = element.charAt(0).toUpperCase() + element.slice(1);
