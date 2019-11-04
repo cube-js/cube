@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.16](https://github.com/statsbotco/cubejs-client/compare/v0.11.15...v0.11.16) (2019-11-04)
+
+
+### Bug Fixes
+
+* Use `node index.js` for `npm run dev` where available to ensure it starts servers with changed code ([527e274](https://github.com/statsbotco/cubejs-client/commit/527e274))
+
+
+
+
+
 ## [0.11.14](https://github.com/statsbotco/cubejs-client/compare/v0.11.13...v0.11.14) (2019-11-01)
 
 

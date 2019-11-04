@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Statsbot, Inc.",
-  "version": "0.11.14",
+  "version": "0.11.16",
   "engines": {
     "node": ">=8.11.1"
   },

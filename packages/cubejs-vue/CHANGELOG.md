@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.16](https://github.com/statsbotco/cubejs-client/compare/v0.11.15...v0.11.16) (2019-11-04)
+
+
+### Bug Fixes
+
+* **vue:** Error: Invalid query format: "order" is not allowed ([e6a738a](https://github.com/statsbotco/cubejs-client/commit/e6a738a))
+
+
+
+
+
 ## [0.11.13](https://github.com/statsbotco/cubejs-client/compare/v0.11.12...v0.11.13) (2019-10-30)
 
 
