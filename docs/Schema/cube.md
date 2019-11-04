@@ -245,3 +245,23 @@ cube(`Orders`, {
   }
 });
 ```
+
+### Unsafe Value
+
+> **NOTE:** Use of this feature entails SQL injection security risk. Use it with caution.
+
+You can access values of context variables directly in javascript in order to use it during your SQL generation.
+For example:
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM ${USER_CONTEXT.type.unsafeValue() === 'employee' ? 'employee' : 'public'}.orders`,
+
+  dimensions: {
+    date: {
+      sql: `date`,
+      type: `time`
+    }
+  }
+});
+```
