@@ -206,7 +206,7 @@ const normalizeQuery = (query) => {
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
       if (typeof td.dateRange === 'string') {
-        dateRange = dateParser(td.dateRange);
+        dateRange = dateParser(td.dateRange, timezone);
       } else {
         dateRange = td.dateRange && td.dateRange.length === 1 ? [td.dateRange[0], td.dateRange[0]] : td.dateRange;
       }
