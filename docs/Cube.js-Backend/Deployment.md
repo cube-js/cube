@@ -5,15 +5,6 @@ category: Cube.js Backend
 menuOrder: 3
 ---
 
-
-Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. It uses it for query caching
-and queue. Set `REDIS_URL` environment variable to provide Cube.js with Redis
-connection. Make sure, your Redis allows at least 15 concurrent connections.
-Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
-If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
-
-> *NOTE:* Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
-
 Below you can find guides for popular deployment environments:
 
 - [AWS Lambda with Serverless Framework](#serverless)
@@ -27,6 +18,20 @@ When running Cube.js Backend in production make sure `NODE_ENV` is set to `produ
 Such platforms, such as Heroku, do it by default.
 In this mode Cube.js unsecured development server and Playground will be disabled by default because there's a security risk serving those in production environments.
 Production Cube.js servers can be accessed only with [REST API](rest-api) and Cube.js frontend libraries. 
+
+### Redis
+
+Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. 
+It uses it for query caching and queue. 
+Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. 
+Make sure, your Redis allows at least 15 concurrent connections.
+Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
+
+### Running without Redis
+
+If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
+
+> **NOTE:** Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
 
 ## Serverless
 
