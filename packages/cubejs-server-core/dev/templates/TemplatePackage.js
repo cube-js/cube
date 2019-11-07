@@ -1,0 +1,65 @@
+const R = require('ramda');
+const AppContainer = require('./AppContainer');
+const SourceSnippet = require('./SourceSnippet');
+
+class TemplatePackage {
+  constructor({
+    name,
+    description,
+    fileToSnippet,
+    receives,
+    requires,
+    type
+  }) {
+    this.name = name;
+    this.description = description;
+    this.fileToSnippet = fileToSnippet || {};
+    this.receives = receives;
+    this.requires = requires;
+    this.type = type;
+  }
+
+  async initSources() {
+    const sources = await AppContainer.fileContentsRecursive(this.scaffoldingPath);
+    this.templateSources = sources
+      .map(({ fileName, content }) => ({ [fileName]: content }))
+      .reduce((a, b) => ({ ...a, ...b }), {});
+    Object.keys(this.fileToSnippet).forEach(file => {
+      if (this.templateSources[file]) {
+        this.fileToSnippet[file].source = this.templateSources[file];
+      }
+    });
+  }
+
+  async initSourceContainer(sourceContainer) {
+    this.sourceContainer = sourceContainer;
+  }
+
+  mergeSources(sourceContainer) {
+    R.uniq(
+      Object.keys(this.templateSources).concat(Object.keys(this.fileToSnippet))
+    ).forEach(scaffoldingFile => {
+      sourceContainer.mergeSnippetToFile(
+        this.fileToSnippet[scaffoldingFile] || new SourceSnippet(this.templateSources[scaffoldingFile]),
+        scaffoldingFile,
+        this.templateSources[scaffoldingFile]
+      );
+    });
+  }
+
+  async applyPackage(sourceContainer) {
+    await this.initSourceContainer(sourceContainer);
+
+    this.mergeSources(sourceContainer);
+
+    const toReceive = this.appContainer.packagesToReceive(this);
+    await toReceive.map(p => () => this.receive(p)).reduce((a, b) => a.then(b), Promise.resolve());
+    return this.sourceContainer;
+  }
+
+  async receive(packageToApply) {
+    await packageToApply.applyPackage(this.sourceContainer);
+  }
+}
+
+module.exports = TemplatePackage;

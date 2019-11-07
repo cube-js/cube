@@ -46,7 +46,7 @@ class DashboardPage extends Component {
       await this.dashboardSource.load(createApp, { chartLibrary, templatePackageName });
       this.setState({
         dashboardStarting: false,
-        appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardAppCode(),
+        appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardCreated,
         loadError: this.dashboardSource.loadError
       });
       const dashboardStatus = await (await fetch('/playground/dashboard-app-status')).json();
