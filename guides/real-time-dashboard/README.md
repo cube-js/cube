@@ -4,6 +4,6 @@
 
 # Real Time Dashboard Guide
 You will Learn how to build real-time dashboard with Cube.js. The guide covers setting up real-time dashboard with MongoDB and BigQuery.
-You can also check out a demo of real-time dashboard built with Cube.js and MongoDB [here](https://real-time-dashboard-demo.cube.dev/).
+You can also check out a [demo of real-time dashboard built with Cube.js and MongoDB](https://real-time-dashboard-demo.cube.dev/).
 
 [The guide is available here.](https://real-time-dashboard.cube.dev)
