@@ -54,7 +54,7 @@ const ExternalLink = styled.a`
   }
 `
 
-const TableOfContents = ({ data, current }) => {
+const TableOfContents = ({ data, current, githubUrl }) => {
   return (
     <Container>
       <StickyContainer>
@@ -68,7 +68,7 @@ const TableOfContents = ({ data, current }) => {
           </StyledLink>
         ))}
         <ExternalLinksContainer>
-          <ExternalLink href="https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard">
+          <ExternalLink href={githubUrl}>
             <img alt="github" src={githubLogo} />
             Edit on Github
           </ExternalLink>

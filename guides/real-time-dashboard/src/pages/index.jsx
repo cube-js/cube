@@ -8,8 +8,6 @@ import featureOneImg from "./feature-1.png";
 import featureOneTwo from "./feature-2.png";
 import featureOneThree from "./feature-3.png";
 
-import cover from './react-dashboard-cover.jpg';
-
 class Index extends React.Component {
   render() {
     const partsEdges = this.props.data.allMarkdownRemark.edges;
@@ -17,36 +15,39 @@ class Index extends React.Component {
       <Layout config={config}>
         <SEO config={config} />
         <Helmet title={config.siteTitle} />
-        <Header />
+        <Header githubUrl={config.githubUrl} />
         <Hero
+          title="Real-Time Dashboard Guide"
+          subtitle="Learn how to build real-time dashboard with open source tools."
+          demoUrl="https://real-time-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={
-            <video muted autoPlay playsInline loop preload="auto" poster={cover}>
-              <source type="video/mp4" src="videos/demo.mp4" />
-            </video>
+            <div></div>
           }
         />
         <Feature
           imageAlign='left'
           image={featureOneImg}
-          metaTitle="Internal tools"
-          title="Build Internal Dashboards"
-          text="Learn how to build a full-stack React Dashboard from the database to the dynamic charts and drag-n-drop features. You’ll learn how to create an analytics API with Cube.js, how to generate a React dashboard boilerplate, and then customize it however you want."
+          metaTitle="tools"
+          title="Open Source Tools"
+          text="
+          The guide shows how to build a full-stack real time dashboard with only open-source tools - from the database to the visualizations. You’ll learn how to set up a database, seed it with data, build an API endpoint on top of it and then load and update charts on the frontend via WebSockets in real-time.
+          "
         />
         <Feature
           imageAlign='right'
           image={featureOneTwo}
-          metaTitle="customer-facing apps"
-          title="Build Customer-Facing Dashboards"
-          text="Learn how to build the React Dashboard directly into your app. You’ll learn the best practices on the backend organization of analytics API and building a customer-facing dynamic React Dashboard."
+          metaTitle="databases"
+          title="Real-Time Dashboard with MongoDB"
+          text=" You will learn how to build a real-time dashboard with React, Cube.js, and MongoDB. Even though MongoDB is the NoSQL database, it recently released MongoDB Connector for BI, which allows using the full power of SQL to build an analytics dashboard on top of data in MongoDB. We will show how to analyze the stream of events and update the dashboard in real-time."
         />
         <Feature
           imageAlign='left'
           image={featureOneThree}
-          metaTitle="analytics platforms"
-          title="Build an Analytics Platform"
-          text="Do you want to build your own data analytics platform, like Mixpanel or Google Analytics? You can learn how to set up a backend infrastructure, as well as understand the best practices both on the backend and frontend."
+          metaTitle="databases"
+          title="Real-Time Dashboard with BigQuery"
+          text=" BigQuery is a great database for the analytic workload. It dramatically outperforms traditional RDBMS in processing large datasets. But it has its caveats, which can affect both performance and pricing. You will learn how to manage requests sent to BigQuery to control the cost, but not give up on the performance.  "
         />
         <PartsListing partsEdges={partsEdges} />
         <Footer />

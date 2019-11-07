@@ -124,17 +124,22 @@ const ButtonsContainer = styled.div`
   `}
 `
 
-const Hero = ({ startUrl, socialButtons, media }) => (
+const Hero = ({
+  startUrl,
+  socialButtons,
+  media,
+  title,
+  subtitle,
+  demoUrl
+}) => (
   <Container>
     <InnerContainer>
       <CopyContainer>
-        <Title>React Dashboard: an Ultimate Guide</Title>
-        <Subtitle>
-          Learn how to build a dynamic dashboard with React, GraphQL, and Cube.js.
-        </Subtitle>
+        <Title> { title }</Title>
+        <Subtitle> { subtitle } </Subtitle>
         <ButtonsContainer>
           <PrimaryButton to={startUrl}>Start Learning</PrimaryButton>
-          <SecondaryButton href="https://react-dashboard-demo.cube.dev">Demo</SecondaryButton>
+          <SecondaryButton href={demoUrl}>Demo</SecondaryButton>
         </ButtonsContainer>
         { socialButtons }
       </CopyContainer>

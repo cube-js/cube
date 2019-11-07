@@ -61,14 +61,14 @@ const LogoLink = styled(Link)`
   }
 `
 
-const Header = () => (
+const Header = ({ githubUrl }) => (
   <Container>
     <LogoLink to="/">
       <img src={logo} alt="" />
       learn
     </LogoLink>
     <div>
-      <StyledLink href="https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard">
+      <StyledLink href={githubUrl}>
         <img src={githubLogo} alt="" />
         <span>Check the Code on Github</span>
       </StyledLink>
