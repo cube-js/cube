@@ -1,0 +1,38 @@
+body {
+  background-color: #f3f3fb !important;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ant-layout, .ant-layout-header {
+  background-color: #f3f3fb;
+}
+
+.ant-layout-header .stats {
+  font-size: 17px;
+  color: #b1b7c5;
+  display: inline-block;
+  margin-left: 8px;
+  position: relative;
+  bottom: -2px;
+}
+
+.ant-card {
+  border-radius: 15px;
+}
+
+.ant-card-head {
+  border-bottom: 1px solid #e5e5f6!important;
+}
+
+.ant-card-head-title {
+  color: #141446;
+}
+
+.ant-statistic-content-value-int {
+  font-size: 40px;
+}
