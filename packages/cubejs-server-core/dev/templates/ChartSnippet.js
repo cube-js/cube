@@ -5,12 +5,12 @@ const SourceSnippet = require("./SourceSnippet");
 class ChartSnippet extends SourceSnippet {
   mergeTo(targetSource) {
     const dashboardItemsArray = targetSource.definitions.find(
-      d => d.get('id').node.type === 'Identifirer'
-        && d.get('id').node.name === 'DashboardItems'
+      d => d.get('id').node.type === 'Identifier' &&
+        d.get('id').node.name === 'DashboardItems'
     );
 
     if (!dashboardItemsArray) {
-      throw new Error(`DasbhoardItems array not found. Please use adding chart feature only with static dashboard`);
+      throw new Error(`DashboardItems array not found. Please use adding chart feature only with static dashboard`);
     }
 
     traverse(this.ast, {

@@ -16,18 +16,11 @@ class DashboardSource {
     this.loadError = null;
     this.playgroundContext = await this.loadContext();
     if (createApp) {
-      await fetchWithRetry('/playground/apply-template-packages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          templatePackages: ['create-react-app', templatePackageName, `${chartLibrary}-charts`, 'antd-tables', 'credentials'],
-          templateConfig: {
-            credentials: this.playgroundContext
-          }
-        })
-      });
+      await this.applyTemplatePackages(
+        ['create-react-app', templatePackageName, `${chartLibrary}-charts`, 'antd-tables', 'credentials'], {
+          credentials: this.playgroundContext
+        }
+      );
     }
     const res = await fetchWithRetry('/playground/dashboard-app-create-status', undefined, 10);
     const result = await res.json();
@@ -35,7 +28,21 @@ class DashboardSource {
       this.loadError = result.error;
     } else {
       this.dashboardCreated = result.status === 'created';
+      this.installedTemplates = result.installedTemplates;
     }
+  }
+
+  applyTemplatePackages(templatePackages, templateConfig) {
+    return fetchWithRetry('/playground/apply-template-packages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        templatePackages,
+        templateConfig
+      })
+    });
   }
 
   async loadContext() {
@@ -59,24 +66,19 @@ class DashboardSource {
     if (this.loadError) {
       return this.loadError;
     }
-    return false; // TODO
-    // const dashboardPage = this.targetSourceByFile('/src/pages/DashboardPage.js', '');
-    // const dashboardItemsArray = dashboardPage.definitions.find(
-    //   d => d.get('id').node.type === 'Identifier'
-    //     && d.get('id').node.name === 'DashboardItems'
-    // );
-    // return !!dashboardItemsArray;
+    return !!this.installedTemplates['react-antd-static'];
   }
 
   async addChart(chartCode) {
-    await this.load(true);
+    await this.load();
     if (this.loadError) {
       return;
     }
-    // TODO
-    // const staticChartTemplate = new StaticChartTemplate(chartCode);
-    // this.applyTemplatePackages([staticChartTemplate]);
-    // await this.persist();
+    await this.applyTemplatePackages(['create-react-app', 'react-antd-static', 'static-chart'], {
+      'static-chart': {
+        chartCode
+      }
+    });
   }
 }
 

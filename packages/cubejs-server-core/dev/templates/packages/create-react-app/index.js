@@ -5,7 +5,8 @@ class CreateReactAppTemplate extends RootTemplatePackage {
     super({
       name: 'create-react-app',
       description: 'Create react app',
-      fileToSnippet: {}
+      fileToSnippet: {},
+      version: '0.0.1'
     });
   }
 

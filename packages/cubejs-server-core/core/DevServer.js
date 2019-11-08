@@ -101,7 +101,12 @@ class DevServer {
         return;
       }
 
-      res.json({ status: 'created' }); // TODO get installed templates
+      const appContainer = new AppContainer(dashboardAppPath);
+
+      res.json({
+        status: 'created',
+        installedTemplates: await appContainer.getPackageVersions()
+      });
     }));
 
     const dashboardAppPort = this.cubejsServer.options.dashboardAppPort || 3000;
@@ -166,6 +171,16 @@ class DevServer {
       } else {
         this.applyTemplatePackagesPromise = applyTemplates();
       }
+      const promise = this.applyTemplatePackagesPromise;
+      promise.then(() => {
+        if (promise === this.applyTemplatePackagesPromise) {
+          this.applyTemplatePackagesPromise = null;
+        }
+      }, () => {
+        if (promise === this.applyTemplatePackagesPromise) {
+          this.applyTemplatePackagesPromise = null;
+        }
+      });
       res.json(true); // TODO
     }));
 

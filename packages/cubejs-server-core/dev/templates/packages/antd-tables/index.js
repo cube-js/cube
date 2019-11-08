@@ -8,7 +8,8 @@ class AntdTablesTemplate extends TemplatePackage {
       fileToSnippet: {
         '/src/components/ChartRenderer.js': new ChartRendererSnippet(chartLibrary)
       },
-      type: 'charts'
+      type: 'charts',
+      version: '0.0.1'
     });
   }
 }

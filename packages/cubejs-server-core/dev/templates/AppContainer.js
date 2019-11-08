@@ -12,8 +12,6 @@ class AppContainer {
   }
 
   async applyTemplates() {
-    let sourceContainer = await this.loadSources();
-
     const toApply = await this.templatePackages.map(
       templatePackage => async (packages) => packages.concat([await this.createTemplatePackage(templatePackage)])
     ).reduce((a, b) => a.then(b), Promise.resolve([]));
@@ -24,8 +22,7 @@ class AppContainer {
     if (rootPackages.length > 1) {
       throw new Error(`Only one root allowed but found: ${rootPackages.map(p => p.name).join(', ')}`);
     }
-    sourceContainer = await rootPackages[0].applyPackage(this, sourceContainer);
-    await this.persistSources(sourceContainer);
+    await rootPackages[0].applyPackage(await this.loadSources());
   }
 
   async loadSources() {
@@ -59,7 +56,11 @@ class AppContainer {
       }))).reduce((a, b) => a.concat(b), []);
   }
 
-  async persistSources(sourceContainer) {
+  async getPackageVersions() {
+    return (await fs.readJson(path.join(this.appPath, 'package.json'))).cubejsTemplates || {};
+  }
+
+  async persistSources(sourceContainer, packageVersions) {
     const sources = sourceContainer.outputSources();
     await Promise.all(
       sources.map(file => fs.outputFile(
@@ -67,6 +68,11 @@ class AppContainer {
         file.content
       ))
     );
+    const packageJson = await fs.readJson(path.join(this.appPath, 'package.json'));
+    packageJson.cubejsTemplates = { ...packageJson.cubejsTemplates, ...packageVersions };
+    await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
+      spaces: 2
+    });
   }
 
   async createTemplatePackage(templatePackage) {

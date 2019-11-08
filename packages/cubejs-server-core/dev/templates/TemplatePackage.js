@@ -9,7 +9,8 @@ class TemplatePackage {
     fileToSnippet,
     receives,
     requires,
-    type
+    type,
+    version
   }) {
     this.name = name;
     this.description = description;
@@ -17,6 +18,7 @@ class TemplatePackage {
     this.receives = receives;
     this.requires = requires;
     this.type = type;
+    this.version = version;
   }
 
   async initSources() {
@@ -50,11 +52,13 @@ class TemplatePackage {
   async applyPackage(sourceContainer) {
     await this.initSourceContainer(sourceContainer);
 
-    this.mergeSources(sourceContainer);
+    if ((await this.appContainer.getPackageVersions()[this.name]) !== this.version) {
+      this.mergeSources(sourceContainer);
+    }
 
     const toReceive = this.appContainer.packagesToReceive(this);
     await toReceive.map(p => () => this.receive(p)).reduce((a, b) => a.then(b), Promise.resolve());
-    return this.sourceContainer;
+    await this.appContainer.persistSources(this.sourceContainer, { [this.name]: this.version });
   }
 
   async receive(packageToApply) {

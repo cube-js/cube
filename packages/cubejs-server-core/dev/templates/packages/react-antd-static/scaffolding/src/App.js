@@ -2,7 +2,7 @@ import 'antd/dist/antd.css';
 import React from "react";
 import { Layout } from "antd";
 import cubejs from '@cubejs-client/core';
-import { CubeProvider } from "cubejs-client/react";
+import { CubeProvider } from "@cubejs-client/react";
 import Header from "./components/Header";
 
 const API_URL = undefined;

@@ -7,7 +7,8 @@ class AppCredentialsTemplate extends TemplatePackage {
       name: 'credentials',
       fileToSnippet: {
         '/src/App.js': new CredentialsSnippet(playgroundContext)
-      }
+      },
+      version: '0.0.1'
     });
   }
 }

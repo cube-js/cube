@@ -12,7 +12,8 @@ class ReactAntdStaticTemplate extends TemplatePackage {
         '/src/index.js': new IndexSnippet(),
       },
       requires: 'create-react-app',
-      receives: ['credentials', 'charts']
+      receives: ['credentials', 'charts', 'static-chart'],
+      version: '0.0.1'
     });
   }
 }
