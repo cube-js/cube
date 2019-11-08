@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.17](https://github.com/statsbotco/cubejs-client/compare/v0.11.16...v0.11.17) (2019-11-08)
+
+
+### Bug Fixes
+
+* **server-core:** the schemaPath option does not work when generating schema ([#255](https://github.com/statsbotco/cubejs-client/issues/255)) ([92f17b2](https://github.com/statsbotco/cubejs-client/commit/92f17b2))
+
+
+### Features
+
+* Default root path message for servers running in production ([5b7ef41](https://github.com/statsbotco/cubejs-client/commit/5b7ef41))
+
+
+
+
+
 ## [0.11.16](https://github.com/statsbotco/cubejs-client/compare/v0.11.15...v0.11.16) (2019-11-04)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
