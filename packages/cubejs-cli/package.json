@@ -3,6 +3,11 @@
   "description": "Cube.js Command Line Interface",
   "author": "Statsbot, Inc.",
   "version": "0.11.16",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-cli"
+  },
   "engines": {
     "node": ">=8.11.1"
   },

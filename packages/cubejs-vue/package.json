@@ -1,6 +1,11 @@
 {
   "name": "@cubejs-client/vue",
   "version": "0.11.16",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-vue"
+  },
   "description": "Vue.js components for cube.js",
   "author": "Ricardo Tapia",
   "scripts": {

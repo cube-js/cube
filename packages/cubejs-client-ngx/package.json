@@ -1,6 +1,11 @@
 {
   "name": "@cubejs-client/ngx",
   "version": "0.11.10",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-client-ngx"
+  },
   "description": "Cube.js client for Angular",
   "main": "dist/bundles/cubejs-client-ngx.umd.js",
   "files": [

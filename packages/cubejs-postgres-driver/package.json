@@ -3,6 +3,11 @@
   "description": "Cube.js Postgres database driver",
   "author": "Statsbot, Inc.",
   "version": "0.11.11",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-postgres-driver"
+  },
   "engines": {
     "node": ">=8.11.1"
   },

@@ -3,6 +3,11 @@
   "description": "Cube.js base component to wire all backend components together",
   "author": "Statsbot, Inc.",
   "version": "0.11.17",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-server-core"
+  },
   "engines": {
     "node": ">=8.11.1"
   },

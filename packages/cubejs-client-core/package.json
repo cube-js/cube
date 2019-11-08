@@ -1,6 +1,11 @@
 {
   "name": "@cubejs-client/core",
   "version": "0.11.10",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-client-core"
+  },
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
   "author": "Statsbot, Inc.",

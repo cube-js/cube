@@ -1,6 +1,11 @@
 {
   "name": "@cubejs-client/playground",
   "version": "0.11.13",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-playground"
+  },
   "dependencies": {
     "@babel/generator": "^7.4.0",
     "@babel/parser": "^7.4.2",
