@@ -1,3 +1,4 @@
+import './body.css';
 import 'antd/dist/antd.css';
 import React from "react";
 import { Layout } from "antd";

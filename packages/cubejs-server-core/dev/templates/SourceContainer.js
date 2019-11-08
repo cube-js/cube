@@ -1,4 +1,5 @@
 const TargetSource = require("./TargetSource");
+const CssTargetSource = require("./CssTargetSource");
 
 class SourceContainer {
   constructor(sourceFiles) {
@@ -17,9 +18,17 @@ class SourceContainer {
       file = { fileName, content };
     }
     if (!this.fileToTargetSource[fileName]) {
-      this.fileToTargetSource[fileName] = new TargetSource(file.fileName, file.content);
+      this.fileToTargetSource[fileName] = this.createTargetSource(file.fileName, file.content);
     }
     return this.fileToTargetSource[fileName];
+  }
+
+  createTargetSource(fileName, content) {
+    if (fileName.match(/\.css$/)) {
+      return new CssTargetSource(fileName, content);
+    } else {
+      return new TargetSource(fileName, content);
+    }
   }
 
   outputSources() {

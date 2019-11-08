@@ -1,6 +1,7 @@
 const R = require('ramda');
 const AppContainer = require('./AppContainer');
 const SourceSnippet = require('./SourceSnippet');
+const CssSourceSnippet = require('./CssSourceSnippet');
 
 class TemplatePackage {
   constructor({
@@ -42,11 +43,21 @@ class TemplatePackage {
       Object.keys(this.templateSources).concat(Object.keys(this.fileToSnippet))
     ).forEach(scaffoldingFile => {
       sourceContainer.mergeSnippetToFile(
-        this.fileToSnippet[scaffoldingFile] || new SourceSnippet(this.templateSources[scaffoldingFile]),
+        this.fileToSnippet[scaffoldingFile] || this.createSourceSnippet(
+          scaffoldingFile, this.templateSources[scaffoldingFile]
+        ),
         scaffoldingFile,
         this.templateSources[scaffoldingFile]
       );
     });
+  }
+
+  createSourceSnippet(fileName, source) {
+    if (fileName.match(/\.css$/)) {
+      return new CssSourceSnippet(source);
+    } else {
+      return new SourceSnippet(source);
+    }
   }
 
   async applyPackage(sourceContainer) {
