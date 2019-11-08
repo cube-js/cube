@@ -240,6 +240,7 @@ class ApiGateway {
     // eslint-disable-next-line no-unused-vars
     this.queryTransformer = options.queryTransformer || (async (query, context) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
+    this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
   }
 
   initApp(app) {
@@ -465,7 +466,7 @@ class ApiGateway {
       try {
         req.authInfo = jwt.verify(auth, secret);
       } catch (e) {
-        if (process.env.NODE_ENV === 'production') {
+        if (this.enforceSecurityChecks) {
           throw new UserError('Invalid token');
         } else {
           this.log(req, {
@@ -475,7 +476,7 @@ class ApiGateway {
           });
         }
       }
-    } else if (process.env.NODE_ENV === 'production') {
+    } else if (this.enforceSecurityChecks) {
       throw new UserError("Authorization header isn't set");
     }
   }
@@ -484,7 +485,10 @@ class ApiGateway {
     const auth = req.headers.authorization;
 
     try {
-      this.checkAuthFn(req, auth);
+      await this.checkAuthFn(req, auth);
+      if (next) {
+        next();
+      }
     } catch (e) {
       if (e instanceof UserError) {
         res.status(403).json({ error: e.message });
@@ -496,9 +500,6 @@ class ApiGateway {
         });
         res.status(500).json({ error: e.toString() });
       }
-    }
-    if (next) {
-      next();
     }
   }
 
