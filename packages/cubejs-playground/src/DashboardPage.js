@@ -3,6 +3,7 @@ import React, { Component } from 'react';
 import {
   Spin, Button, Alert, Menu, Dropdown, Icon, Form
 } from 'antd';
+import { Link, withRouter } from 'react-router-dom';
 import DashboardSource from "./DashboardSource";
 import fetch from './playgroundFetch';
 import { frameworks } from "./ChartContainer";
@@ -196,14 +197,15 @@ class DashboardPage extends Component {
             )
           }
           <p style={{ marginTop: 25 }}>
-            <Button
-              type="primary"
-              size="large"
-              onClick={() => this.loadDashboard(true)}
-              disabled={!!frameworkItem.docsLink}
-            >
-              Create dashboard app template in your project directory
-            </Button>
+            <Link to="/template-gallery">
+              <Button
+                type="primary"
+                size="large"
+                disabled={!!frameworkItem.docsLink}
+              >
+                Create dashboard app in your project directory
+              </Button>
+            </Link>
           </p>
           <Hint />
         </Frame>
@@ -290,4 +292,4 @@ class DashboardPage extends Component {
   }
 }
 
-export default DashboardPage;
+export default withRouter(DashboardPage);

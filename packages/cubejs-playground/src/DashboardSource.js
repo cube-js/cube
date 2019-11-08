@@ -1,25 +1,14 @@
 /* globals window */
 import fetch from './playgroundFetch';
 
-// TODO
-const indexCss = `
-@import '~antd/dist/antd.css';
-body {
-  background-color: #f0f2f5 !important;
-}
-`;
-
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
 class DashboardSource {
-  async load(createApp, { chartLibrary, templatePackageName } = {}) {
+  async load(createApp, templatePackages) {
     this.loadError = null;
-    this.playgroundContext = await this.loadContext();
     if (createApp) {
       await this.applyTemplatePackages(
-        ['create-react-app', templatePackageName, `${chartLibrary}-charts`, 'antd-tables', 'credentials'], {
-          credentials: this.playgroundContext
-        }
+        templatePackages
       );
     }
     const res = await fetchWithRetry('/playground/dashboard-app-create-status', undefined, 10);
@@ -32,7 +21,10 @@ class DashboardSource {
     }
   }
 
-  applyTemplatePackages(templatePackages, templateConfig) {
+  async applyTemplatePackages(templatePackages, templateConfig) {
+    if (!this.playgroundContext) {
+      this.playgroundContext = await this.loadContext();
+    }
     return fetchWithRetry('/playground/apply-template-packages', {
       method: 'POST',
       headers: {
@@ -40,7 +32,9 @@ class DashboardSource {
       },
       body: JSON.stringify({
         templatePackages,
-        templateConfig
+        templateConfig: templateConfig || {
+          credentials: this.playgroundContext
+        }
       })
     });
   }
