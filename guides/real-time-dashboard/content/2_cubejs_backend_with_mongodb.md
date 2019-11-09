@@ -3,6 +3,9 @@ order: 2
 title: "Cube.js Backend with MongoDB"
 ---
 
+_Feel free to jump to the [next part](cube-js-backend-with-big-query) if you want to use BigQuery instead of
+MongoDB_
+
 For quite a long time, doing analytics with MongoDB required additional overhead
 compared to modern SQL RDBMS and Data Warehouses associated with aggregation pipeline and MapReduce practices. To fill this gap, MongoDB released the MongoDB connector for BI, which acts as a MySQL server on top of your MongoDB data. Under the hood, it bridges existing aggregation mechanisms to the MySQL protocol, allowing standard MySQL clients to connect and issue SQL queries.
 

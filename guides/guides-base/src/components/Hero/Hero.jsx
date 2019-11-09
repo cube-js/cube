@@ -55,13 +55,13 @@ const Subtitle = styled.div`
 `
 
 const MediaContainer = styled.div`
-  background-image: url(${browserControls});
-  background-position: 11px 6px;
-  background-repeat: no-repeat;
-  background-color: white;
-  box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.15);
-  padding: 5px;
-  border-radius: 10px;
+  //background-image: url(${browserControls});
+  //background-position: 11px 6px;
+  //background-repeat: no-repeat;
+  //background-color: white;
+  //box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.15);
+  //padding: 5px;
+  //border-radius: 10px;
   padding-top: 20px;
   padding-bottom: 2px;
   ${media.greaterThan("medium")`
@@ -70,7 +70,7 @@ const MediaContainer = styled.div`
   img, video {
     max-width: 630px;
     width: 100%;
-    border: 10px solid #F3F3FB;
+    //border: 10px solid #F3F3FB;
     border-radius: 10px;
     box-sizing: border-box;
   }

@@ -8,6 +8,8 @@ import featureOneImg from "./feature-1.png";
 import featureOneTwo from "./feature-2.png";
 import featureOneThree from "./feature-3.png";
 
+import hero from "./hero.png";
+
 class Index extends React.Component {
   render() {
     const partsEdges = this.props.data.allMarkdownRemark.edges;
@@ -22,9 +24,7 @@ class Index extends React.Component {
           demoUrl="https://real-time-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
-          media={
-            <div></div>
-          }
+          media={ <img src={hero} /> }
         />
         <Feature
           imageAlign='left'
