@@ -2,9 +2,6 @@
   "name": "cubejs",
   "version": "0.1.0",
   "description": "",
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
