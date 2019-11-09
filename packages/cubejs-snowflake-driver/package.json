@@ -2,10 +2,10 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.11.6",
+  "version": "0.11.18",
   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/cube-js/cube.js.git",
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-snowflake-driver"
   },
   "engines": {
@@ -13,7 +13,7 @@
   },
   "main": "driver/SnowflakeDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.11.6",
+    "@cubejs-backend/query-orchestrator": "^0.11.18",
     "snowflake-sdk": "^1.1.15"
   },
   "license": "Apache-2.0",

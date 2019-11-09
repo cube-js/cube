@@ -2,10 +2,10 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Statsbot, Inc.",
-  "version": "0.11.17",
+  "version": "0.11.18",
   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/cube-js/cube.js.git",
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-server-core"
   },
   "engines": {
@@ -21,9 +21,9 @@
     "lint": "eslint core/**/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.11.17",
-    "@cubejs-backend/query-orchestrator": "^0.11.6",
-    "@cubejs-backend/schema-compiler": "^0.11.16",
+    "@cubejs-backend/api-gateway": "^0.11.18",
+    "@cubejs-backend/query-orchestrator": "^0.11.18",
+    "@cubejs-backend/schema-compiler": "^0.11.18",
     "analytics-node": "^3.4.0-beta.1",
     "codesandbox-import-utils": "^1.3.8",
     "cross-spawn": "^6.0.5",

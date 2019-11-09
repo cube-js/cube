@@ -2,10 +2,10 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Statsbot, Inc.",
-  "version": "0.11.6",
+  "version": "0.11.18",
   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/cube-js/cube.js.git",
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-query-orchestrator"
   },
   "engines": {
