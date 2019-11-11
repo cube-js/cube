@@ -36,3 +36,42 @@ body {
 .ant-statistic-content-value-int {
   font-size: 40px;
 }
+
+.top-menu {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+}
+
+.top-menu a {
+  color: #A1A1B5;
+  font-size: 16px;
+  height: 32px;
+  line-height: 1.5;
+  padding: 0 15px;
+  border: 1px solid rgba(161, 161, 181, 0.3);
+  box-sizing: border-box;
+  border-radius: 4px;
+}
+
+.top-menu .ant-divider {
+  margin: 0 15px;
+}
+
+.top-menu a:last-child {
+  margin-left: 10px;
+}
+
+.top-menu a span {
+  vertical-align: sub;
+}
+
+.top-menu a:hover {
+  color: #141446;
+  border: 1px solid #141446;
+}
+
+.top-menu a i {
+  margin-right: 5px;
+}

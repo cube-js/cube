@@ -1,10 +1,8 @@
-import React, { useState } from "react";
-import { Col, Row, Button } from "antd";
+import React from "react";
+import { Col, Row } from "antd";
 import ChartRenderer from "../components/ChartRenderer";
 import Dashboard from "../components/Dashboard";
 import DashboardItem from "../components/DashboardItem";
-import tracker from "../tracker";
-import moment from "moment";
 const DashboardItems = [
   {
     id: 10,

@@ -31,7 +31,7 @@ const TypeToChartComponent = {
         }]
       }
     };
-    return <Line data={data} options={options} />;
+    return <Line height={157} data={data} options={options} />;
   },
   bar: ({ resultSet }) => {
     const data = {

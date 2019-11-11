@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import { withRouter } from "react-router";
-import { Layout, Button, Divider } from "antd";
+import { Layout, Button, Divider, Icon } from "antd";
 import cubejsLogo from "../cubejs-logo.png";
 import tracker from "../tracker";
 
@@ -25,26 +24,38 @@ const Header = ({ location }) => {
             marginRight: "1em"
           }}
         >
-          <img src={cubejsLogo} height={40} />
+          <img alt="cubejs-logo" src={cubejsLogo} height={40} />
           <p className="stats">Real Time Demo</p>
         </h2>
       </div>
-      <div style={{display: "flex", justifyContent: "flex-end", height: "100%", alignItems: "center"}}>
-          <Button
-            onClick={() => {
-              setSendingEvent(true);
-              setTimeout(() => setSendingEvent(false), 2500);
-              tracker.event("buttonClicked");
-            }}
-            loading={sendingEvent}
-            type="primary"
-          >
-            {sendingEvent
-              ? "Sending Button Click Event"
-              : "Send Button Click Event"}
-          </Button>
-          <Divider type="vertical" />
-        </div>
+      <div className="top-menu">
+        <Button
+          onClick={() => {
+            setSendingEvent(true);
+            setTimeout(() => setSendingEvent(false), 2500);
+            tracker.event("buttonClicked");
+          }}
+          loading={sendingEvent}
+          type="primary"
+        >
+          {sendingEvent
+            ? "Sending Button Click Event"
+            : "Send Button Click Event"}
+        </Button>
+        <Divider type="vertical" />
+        <a href="https://github.com/cube-js/cube.js/tree/master/examples/real-time-dashboard">
+          <span>
+            <Icon type="github" />
+            Github
+          </span>
+        </a>
+        <a href="https://slack.cube.dev">
+          <span>
+            <Icon type="slack" />
+            Slack
+          </span>
+        </a>
+      </div>
     </Layout.Header>
   )
 };
