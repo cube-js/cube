@@ -1,0 +1,16 @@
+{
+  "name": "real-time-dashboard",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-dev-server",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/mongobi-driver": "^0.11.6",
+    "@cubejs-backend/server": "^0.11.16",
+    "moment": "^2.24.0",
+    "mongodb": "^3.3.3",
+    "serve-static": "^1.14.1"
+  }
+}
