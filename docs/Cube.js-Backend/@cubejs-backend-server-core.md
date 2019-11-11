@@ -131,7 +131,7 @@ in [Multitenancy Applications](multitenancy-setup).
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 CubejsServerCore.create({
-  driverFactory: () => new PostgresDriver();
+  driverFactory: () => new PostgresDriver()
 })
 ```
 
