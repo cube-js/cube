@@ -45,14 +45,19 @@ body {
 }
 
 .top-menu a {
-  color: #A1A1B5;
+  color: #43436B;
   font-size: 16px;
   height: 32px;
   line-height: 1.5;
   padding: 0 15px;
-  border: 1px solid rgba(161, 161, 181, 0.3);
+  border: 0.5px solid rgba(67,67,107,0.4);
   box-sizing: border-box;
   border-radius: 4px;
+  transition: border-color .25s ease-in-out;
+}
+
+.top-menu a i {
+  opacity: 0.4;
 }
 
 .top-menu .ant-divider {
@@ -67,9 +72,13 @@ body {
   vertical-align: sub;
 }
 
+.top-menu a:hover i {
+  opacity: 0.6;
+}
+
 .top-menu a:hover {
   color: #141446;
-  border: 1px solid #141446;
+  border: 0.5px solid #141446;
 }
 
 .top-menu a i {
