@@ -24,7 +24,7 @@ class Index extends React.Component {
           demoUrl="https://real-time-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
-          media={ <img src={hero} /> }
+          media={ <img alt="hero" src={hero} /> }
         />
         <Feature
           imageAlign='left'
