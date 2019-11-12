@@ -35,12 +35,11 @@ class SourceSnippet {
 
   mergeImport(targetSource, importDeclaration) {
     const sameSourceImport = targetSource.imports.find(
-      i => i.get('source').node.value === importDeclaration.get('source').node.value
-        && (
-          i.get('specifiers')[0] && i.get('specifiers')[0].type
-        ) === (
-          importDeclaration.get('specifiers')[0] && importDeclaration.get('specifiers')[0].type
-        )
+      i => i.get('source').node.value === importDeclaration.get('source').node.value && (
+        i.get('specifiers')[0] && i.get('specifiers')[0].type
+      ) === (
+        importDeclaration.get('specifiers')[0] && importDeclaration.get('specifiers')[0].type
+      )
     );
     if (!sameSourceImport) {
       targetSource.imports[targetSource.imports.length - 1].insertAfter(importDeclaration.node);
@@ -117,7 +116,10 @@ class SourceSnippet {
     )).filter(d => !!d);
     const lastHistoryDefinition = historyDefinitions.length && historyDefinitions[historyDefinitions.length - 1];
     const newVariableDeclaration = t.variableDeclaration('const', [newDefinition.node]);
-    if (!this.compareDefinitions(existingDefinition, lastHistoryDefinition)) {
+    if (
+      !this.compareDefinitions(existingDefinition, lastHistoryDefinition) &&
+      !this.compareDefinitions(existingDefinition, newDefinition)
+    ) {
       t.addComment(newVariableDeclaration, 'leading', `\n${this.generateCode(existingDefinition)}\n`);
     }
     if (existingDefinition.node.type === 'VariableDeclarator') {
