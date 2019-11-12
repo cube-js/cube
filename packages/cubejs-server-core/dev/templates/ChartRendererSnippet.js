@@ -12,7 +12,7 @@ class ChartRendererSnippet extends SourceSnippet {
       const existingPropertyNames = existingDefinition.get('init').get('properties').map(p => p.node.key.name);
       existingDefinition.get('init').pushContainer(
         'properties',
-        newDefinition.declarations[0].init.properties.filter(p => existingPropertyNames.indexOf(p.key.name) === -1)
+        newDefinition.node.init.properties.filter(p => existingPropertyNames.indexOf(p.key.name) === -1)
       );
     } else {
       super.handleExistingMerge(existingDefinition, newDefinition);

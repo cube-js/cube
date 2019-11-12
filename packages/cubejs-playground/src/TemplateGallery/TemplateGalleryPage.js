@@ -2,7 +2,7 @@
 import React, { Component } from 'react';
 import styled from 'styled-components';
 import {
-  Spin, Button, Alert, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal
+  Button, Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal
 } from 'antd';
 import { withRouter } from "react-router-dom";
 import DashboardSource from "../DashboardSource";
@@ -25,6 +25,14 @@ const RecipeCard = styled(Card)`
   
   && .ant-card-meta-description {
     height: 5em;
+  }
+`;
+
+const CreateOwnDashboardForm = styled(Form)`
+  && {
+    .ant-dropdown-trigger {
+      width: 100%
+    }
   }
 `;
 
@@ -74,7 +82,7 @@ class TemplateGalleryPage extends Component {
   }
 
   render() {
-    const { chartLibrary, framework, templatePackageName, createOwnModalVisible } = this.state;
+    const { chartLibrary, framework, templatePackageName, createOwnModalVisible, enableWebSocketTransport } = this.state;
     const { history } = this.props;
     const currentLibraryItem = chartLibraries.find(m => m.value === chartLibrary);
     const frameworkItem = frameworks.find(m => m.id === framework);
@@ -152,13 +160,19 @@ class TemplateGalleryPage extends Component {
         visible={createOwnModalVisible}
         onOk={async () => {
           this.setState({ createOwnModalVisible: false });
-          const templatePackages = ['create-react-app', templatePackageName, `${chartLibrary}-charts`, 'antd-tables', 'credentials'];
+          const templatePackages = [
+            'create-react-app',
+            templatePackageName,
+            `${chartLibrary}-charts`,
+            'antd-tables',
+            'credentials'
+          ].concat(enableWebSocketTransport ? ['web-socket-transport'] : []);
           await this.dashboardSource.applyTemplatePackages(templatePackages);
           history.push('/dashboard');
         }}
         onCancel={() => this.setState({ createOwnModalVisible: false })}
       >
-        <Form>
+        <CreateOwnDashboardForm>
           <Form.Item label="Framework">
             <Dropdown overlay={frameworkMenu}>
               <Button>
@@ -167,6 +181,26 @@ class TemplateGalleryPage extends Component {
               </Button>
             </Dropdown>
           </Form.Item>
+          {
+            frameworkItem && frameworkItem.docsLink && (
+              <p style={{ paddingTop: 24 }}>
+                We do not support&nbsp;
+                {frameworkItem.title}
+                &nbsp;dashboard scaffolding generation yet.
+                Please refer to&nbsp;
+                <a
+                  href={frameworkItem.docsLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => playgroundAction('Unsupported Dashboard Framework Docs', { framework })}
+                >
+                  {frameworkItem.title}
+                  &nbsp;docs
+                </a>
+                &nbsp;to see on how to use it with Cube.js.
+              </p>
+            )
+          }
           <Form.Item label="Main Template">
             <Dropdown
               overlay={templatePackagesMenu}
@@ -189,7 +223,13 @@ class TemplateGalleryPage extends Component {
               </Button>
             </Dropdown>
           </Form.Item>
-        </Form>
+          <Form.Item label="Web Socket Transport (Real-time)">
+            <Switch
+              checked={enableWebSocketTransport}
+              onChange={(checked) => this.setState({ enableWebSocketTransport: checked })}
+            />
+          </Form.Item>
+        </CreateOwnDashboardForm>
       </Modal>
     );
 

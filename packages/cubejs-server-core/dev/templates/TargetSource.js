@@ -62,7 +62,11 @@ class TargetSource {
   }
 
   formattedCode() {
-    return prettier.format(this.code(), { parser: "babylon", plugins });
+    return TargetSource.formatCode(this.code());
+  }
+
+  static formatCode(code) {
+    return prettier.format(code, { parser: "babylon", plugins });
   }
 }
 

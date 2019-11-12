@@ -12,7 +12,7 @@ class ReactAntdDynamicTemplate extends TemplatePackage {
         '/src/index.js': new IndexSnippet()
       },
       requires: 'create-react-app',
-      receives: ['credentials', 'charts'],
+      receives: ['credentials', 'charts', 'transport'],
       version: '0.0.1'
     });
   }

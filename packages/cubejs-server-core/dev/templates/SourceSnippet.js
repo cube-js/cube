@@ -2,13 +2,14 @@ const { parse } = require("@babel/parser");
 const traverse = require("@babel/traverse").default;
 const t = require("@babel/types");
 const generator = require("@babel/generator").default;
+const TargetSource = require('./TargetSource');
 
 class SourceSnippet {
   constructor(source, historySnippets) {
     if (source) {
       this.source = source;
     }
-    this.historySnippets = historySnippets;
+    this.historySnippets = historySnippets || [];
   }
 
   get source() {
@@ -69,7 +70,7 @@ class SourceSnippet {
     return targetSource.defaultExport;
   }
 
-  mergeDefinition(targetSource, constDef) {
+  mergeDefinition(targetSource, constDef, allHistoryDefinitions) {
     constDef.get('declarations').forEach(declaration => {
       const existingDefinition = targetSource.definitions.find(
         d => d.get('id').node.type === 'Identifier' &&
@@ -79,13 +80,50 @@ class SourceSnippet {
       if (!existingDefinition) {
         this.insertAnchor(targetSource).insertBefore(t.variableDeclaration('const', [declaration.node]));
       } else {
-        this.handleExistingMerge(existingDefinition, t.variableDeclaration('const', [declaration.node]));
+        this.handleExistingMerge(
+          existingDefinition,
+          declaration,
+          allHistoryDefinitions
+        );
       }
     });
   }
 
-  handleExistingMerge(existingDefinition, newDefinition) {
-    // TODO
+  generateCode(path, comments) {
+    if (!path.node) {
+      return '';
+    }
+    if (path.node.type === 'VariableDeclarator') {
+      path = path.parent;
+    } else {
+      path = path.node;
+    }
+    return TargetSource.formatCode(generator(t.program([path]), {
+      comments: comments != null ? comments : true
+    }, this.sourceValue).code);
+  }
+
+  compareDefinitions(a, b) {
+    return this.generateCode(a, false) === this.generateCode(b, false);
+  }
+
+  handleExistingMerge(existingDefinition, newDefinition, allHistoryDefinitions) {
+    const historyDefinitions = allHistoryDefinitions.map(definitions => (
+      definitions.find(
+        d => d.get('id').node.type === 'Identifier' &&
+          existingDefinition.get('id').node.type === 'Identifier' &&
+          existingDefinition.get('id').node.name === d.get('id').node.name
+      )
+    )).filter(d => !!d);
+    const lastHistoryDefinition = historyDefinitions.length && historyDefinitions[historyDefinitions.length - 1];
+    const newVariableDeclaration = t.variableDeclaration('const', [newDefinition.node]);
+    if (!this.compareDefinitions(existingDefinition, lastHistoryDefinition)) {
+      t.addComment(newVariableDeclaration, 'leading', `\n${this.generateCode(existingDefinition)}\n`);
+    }
+    if (existingDefinition.node.type === 'VariableDeclarator') {
+      existingDefinition = existingDefinition.parentPath;
+    }
+    existingDefinition.replaceWith(newVariableDeclaration);
   }
 
   findImports() {
@@ -123,10 +161,13 @@ class SourceSnippet {
   }
 
   mergeTo(targetSource) {
+    const historyDefinitions = this.historySnippets.map(
+      snippet => snippet.findDefinitions().map(d => d.get('declarations')).reduce((a, b) => a.concat(b), [])
+    );
     const chartImports = this.findImports();
     const definitions = this.findDefinitions();
     chartImports.forEach(i => this.mergeImport(targetSource, i));
-    definitions.forEach(d => this.mergeDefinition(targetSource, d));
+    definitions.forEach(d => this.mergeDefinition(targetSource, d, historyDefinitions));
     targetSource.findAllImports();
     targetSource.findAllDefinitions();
   }

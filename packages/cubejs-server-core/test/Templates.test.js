@@ -30,4 +30,22 @@ describe(`Templates`, () => {
     await appContainer.applyTemplates();
     await appContainer.ensureDependencies();
   });
+
+  test(`web-socket-transport`, async () => {
+    const appContainer = new AppContainer('test-output/real-time', [
+      'create-react-app',
+      'react-antd-dynamic',
+      'credentials',
+      'bizcharts-charts',
+      'antd-tables',
+      'web-socket-transport'
+    ], {
+      credentials: {
+        apiUrl: "http://localhost:4000",
+        cubejsToken: "foo"
+      }
+    });
+
+    await appContainer.applyTemplates();
+  });
 });

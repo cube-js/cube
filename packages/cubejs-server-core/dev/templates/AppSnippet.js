@@ -1,5 +1,6 @@
 const traverse = require("@babel/traverse").default;
 const SourceSnippet = require("./SourceSnippet");
+const t = require("@babel/types");
 
 class AppSnippet extends SourceSnippet {
   insertAnchor(targetSource) {
@@ -19,7 +20,7 @@ class AppSnippet extends SourceSnippet {
 
   handleExistingMerge(existingDefinition, newDefinition) {
     if (existingDefinition && existingDefinition.node.type === 'FunctionDeclaration') {
-      existingDefinition.replaceWith(newDefinition);
+      existingDefinition.replaceWith(t.variableDeclaration('const', [newDefinition.node]));
     }
   }
 }

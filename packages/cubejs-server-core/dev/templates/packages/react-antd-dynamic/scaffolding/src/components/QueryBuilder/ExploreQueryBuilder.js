@@ -93,7 +93,7 @@ const ExploreQueryBuilder = ({
                 cubejsApi={cubejsApi}
               />
             </Card>
-          ) : <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>}
+          ) : <h2 style={{ textAlign: "center" }}>Choose a measure or dimension to get started</h2>}
         </Col>
       </Row>
     ]}
