@@ -20,7 +20,7 @@ class Index extends React.Component {
         <Header githubUrl={config.githubUrl} />
         <Hero
           title="Real-Time Dashboard Guide"
-          subtitle="Learn how to build real-time dashboard with open source tools."
+          subtitle="Learn how to build a real-time dashboard with open-source tools."
           demoUrl="https://real-time-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
@@ -30,24 +30,22 @@ class Index extends React.Component {
           imageAlign='left'
           image={featureOneImg}
           metaTitle="tools"
-          title="Open Source Tools"
-          text="
-          The guide shows how to build a full-stack real time dashboard with only open-source tools - from the database to the visualizations. You’ll learn how to set up a database, seed it with data, build an API endpoint on top of it and then load and update charts on the frontend via WebSockets in real-time.
-          "
+          title="Open-Source Tools"
+          text="This guide shows how to build a full-stack real-time dashboard with only open-source tools—from the database to the visualizations. You’ll learn how to set up a database, seed it with data, build an API endpoint on top of it, and then load and update charts on the frontend via WebSockets in real time."
         />
         <Feature
           imageAlign='right'
           image={featureOneTwo}
           metaTitle="databases"
           title="Real-Time Dashboard with MongoDB"
-          text=" You will learn how to build a real-time dashboard with React, Cube.js, and MongoDB. Even though MongoDB is the NoSQL database, it recently released MongoDB Connector for BI, which allows using the full power of SQL to build an analytics dashboard on top of data in MongoDB. We will show how to analyze the stream of events and update the dashboard in real-time."
+          text="You will learn how to build a real-time dashboard with React, Cube.js, and MongoDB. Even though MongoDB is a NoSQL database, it recently released MongoDB Connector for BI, which allows using the full power of SQL to build an analytics dashboard on top of data in MongoDB. We will show how to analyze the stream of events and update the dashboard in real time."
         />
         <Feature
           imageAlign='left'
           image={featureOneThree}
           metaTitle="databases"
           title="Real-Time Dashboard with BigQuery"
-          text=" BigQuery is a great database for the analytic workload. It dramatically outperforms traditional RDBMS in processing large datasets. But it has its caveats, which can affect both performance and pricing. You will learn how to manage requests sent to BigQuery to control the cost, but not give up on the performance.  "
+          text="BigQuery is a great database for the analytic workload. It dramatically outperforms traditional RDBMS in processing large datasets. But it has its caveats, which can affect both performance and pricing. You will learn how to manage requests sent to BigQuery to control the cost, but not give up on the performance."
         />
         <PartsListing partsEdges={partsEdges} />
         <Footer />

@@ -3,7 +3,7 @@ order: 5
 title: "Deployment"
 ---
 
-There are multiple ways you can deploy a Cube.js Backend service; you can learn more about them [here in the docs](https://cube.dev/docs/deployment/). In this tutorial, we'll deploy both backend and the dashboard on Heroku.
+There are multiple ways you can deploy a Cube.js Backend service; you can learn more about them [here in the docs](https://cube.dev/docs/deployment/). In this tutorial, we'll deploy both the backend and the dashboard on Heroku.
 
 The tutorial assumes that you have a free [Heroku account](https://signup.heroku.com/signup/dc). You'd also need a Heroku CLI; you can [learn how to install it here](https://devcenter.heroku.com/articles/heroku-cli).
 
@@ -28,7 +28,7 @@ $ heroku config:set \
 ```
 
 Next, we need to make some changes to our `index.js` file to make it serve
-static files from `dashboard-app/build` folder. Update the content of the
+static files from the `dashboard-app/build` folder. Update the content of 
 `index.js` with the following.
 
 ```javascript
@@ -84,11 +84,11 @@ application.
    },
 ```
 
-Finally, we need to run `npm build` command inside the `dashboard-app` folder
+Finally, we need to run the `npm build` command inside the `dashboard-app` folder
 and make sure the build folder is tracked by Git. By default, `.gitignore`
 excludes that folder, so you need to remove it from `.gitignore`.
 
-Once done, commit your changes and push to Heroku 🚀
+Once done, commit your changes and push to Heroku. 🚀
 
 ```bash
 $ git add -A
@@ -96,7 +96,7 @@ $ git commit -am "Initial"
 $ git push heroku master
 ```
 
-That’s it! You can run `heroku open` command to open your dashboard.
+That’s it! You can run the `heroku open` command to open your dashboard.
 
 Congratulations on completing this guide! 🎉
 

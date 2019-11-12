@@ -7,9 +7,9 @@ A real-time dashboard is a dashboard that contains charts that are automatically
 
 The main challenge of building such a dashboard is to design a proper architecture to react to changes in data all the way up from the database to the charts on the frontend. The part from the server to the frontend is a simple one, since we have a lot of technologies and frameworks built to handle real-time data updates. Going from database to server is much trickier. The underlying problem is that most of the databases, which are good for analytic workload, don't provide out-of-the-box ways to subscribe to changes in the data. Instead, they are designed to be polled.
 
-DEMO
-
 [Cube.js](https://github.com/cube-js/cube.js), which acts as a middleman between your database and analytics dashboard, can provide a real-time WebSockets-based API for the frontend, while polling the database for changes in data.
+
+You can check out [the demo of real-time dashboard built with Cube.js here](https://real-time-dashboard-demo.cube.dev).
 
 ![](/images/schema-1.png)
 
