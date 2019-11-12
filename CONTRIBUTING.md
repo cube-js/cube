@@ -50,6 +50,10 @@ In case you need to tweak it a little bit please follow [Implementing Driver](#i
 2. Copy it and adjust SQL generation accordingly.
 3. Add `BaseQuery` implementation to `@cubejs-backend/schema-compiler/adapter/QueryBuilder.js` with same name as driver.
 
+### Testing Schema Compiler
+
+In order to run tests in `cubejs-schema-compiler` package you need to have running [Docker](https://docs.docker.com/install/) on your machine.
+When it's running just run `$ npm test` in `packages/cubejs-schema-compiler`.
 
 ## Style guides
 
