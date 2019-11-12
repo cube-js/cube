@@ -53,7 +53,7 @@ In case you need to tweak it a little bit please follow [Implementing Driver](#i
 ### Testing Schema Compiler
 
 In order to run tests in `cubejs-schema-compiler` package you need to have running [Docker](https://docs.docker.com/install/) on your machine.
-When it's running just run `$ npm test` in `packages/cubejs-schema-compiler`.
+When it's up and running just use `$ npm test` in `packages/cubejs-schema-compiler` to execute tests.
 
 ## Style guides
 
