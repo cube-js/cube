@@ -1,16 +1,18 @@
 import React from "react";
-import { Card } from "antd";
+import { Card, Col } from "antd";
 
 const DashboardItem = ({ children, title }) => (
-  <Card
-    title={title}
-    style={{
-      height: "100%",
-      width: "100%"
-    }}
-  >
-    {children}
-  </Card>
+  <Col span={24} lg={12} style={{ marginBottom: '24px' }}>
+    <Card
+      title={title}
+      style={{
+        height: "100%",
+        width: "100%"
+      }}
+    >
+      {children}
+    </Card>
+  </Col>
 );
 
 export default DashboardItem;

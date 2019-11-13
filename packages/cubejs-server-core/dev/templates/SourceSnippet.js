@@ -120,7 +120,7 @@ class SourceSnippet {
       !this.compareDefinitions(existingDefinition, lastHistoryDefinition) &&
       !this.compareDefinitions(existingDefinition, newDefinition)
     ) {
-      t.addComment(newVariableDeclaration, 'leading', `\n${this.generateCode(existingDefinition)}\n`);
+      t.addComment(newVariableDeclaration, 'leading', `\n${this.generateCode(existingDefinition, false)}`);
     }
     if (existingDefinition.node.type === 'VariableDeclarator') {
       existingDefinition = existingDefinition.parentPath;

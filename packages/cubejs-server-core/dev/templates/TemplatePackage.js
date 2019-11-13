@@ -14,7 +14,8 @@ class TemplatePackage {
     receives,
     requires,
     type,
-    version
+    version,
+    multiPackage
   }) {
     this.name = name;
     this.description = description;
@@ -23,6 +24,7 @@ class TemplatePackage {
     this.requires = requires;
     this.type = type;
     this.version = version;
+    this.multiPackage = multiPackage;
   }
 
   async initSources() {
@@ -89,9 +91,12 @@ class TemplatePackage {
     await this.initSourceContainer(sourceContainer);
 
     const packageVersions = await this.appContainer.getPackageVersions();
-    if (packageVersions[this.name] !== this.version) {
+    if (this.multiPackage || packageVersions[this.name] !== this.version) {
       this.mergeSources(sourceContainer, packageVersions[this.name]);
-      await this.appContainer.persistSources(this.sourceContainer, { [this.name]: this.version });
+      await this.appContainer.persistSources(
+        this.sourceContainer,
+        this.multiPackage ? {} : { [this.name]: this.version }
+      );
     }
 
     const toReceive = this.appContainer.packagesToReceive(this);

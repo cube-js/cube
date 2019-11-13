@@ -8,7 +8,7 @@ class StaticChartTemplate extends TemplatePackage {
       fileToSnippet: {
         '/src/pages/DashboardPage.js': new ChartSnippet(chartCode)
       },
-      version: '0.0.1'
+      multiPackage: true
     });
   }
 }
