@@ -8,7 +8,7 @@ menuOrder: 8
 ---
 
 Pre-aggregations are materialized query results persisted as tables.
-In order to start using pre-aggregations Cube.js should have write access to `stb_pre_aggregations` schema where pre-aggregation tables will be stored.
+In order to start using pre-aggregations Cube.js should have write access to `stb_pre_aggregations` schema, or whatever your [preAggregationsSchema]((@cubejs-backend-server-core#options-reference-pre-aggregations-schema)) setting is set to, where pre-aggregation tables will be stored.
 Cube.js has an ability to analyze queries against defined set of pre-aggregation rules in order to choose optimal one that will be used to create pre-aggregation table.
 
 If Cube.js finds suitable pre-aggregation rule database querying becomes multi-stage.
@@ -20,11 +20,13 @@ Pre-aggregation rules are defined by `preAggregations` cube parameter.
 Any pre-aggregation should have name and type.
 Pre-aggregation name together with cube name will be used as a prefix for pre-aggregation tables.
 
-Pre-aggreations names should:
+Pre-aggregations names should:
 - Be unique within a cube
 - Start with a lowercase letter
 
 You can use `0-9`,`_` and letters when naming pre-aggregations.
+
+Pre-aggregations must include all dimensions, measures, and filters you will query with. They will not join to other cubes at query-time.
 
 ## Original SQL
 
@@ -47,25 +49,25 @@ cube(`Orders`, {
 ## Rollup
 
 Rollup pre-aggregations are most effective way to boost performance of any analytical application.
-Blazing fast performance of tools like Google Analytics or Mixpanel backed by similar concept.
-Theory behind it lies in multi-dimensional analysis and Rollup pre-aggregation is in fact result of [Roll-up Operation on a OLAP cube](https://en.wikipedia.org/wiki/OLAP_cube#Operations).
-Rollup pre-aggregation is basically summarized data of original cube grouped by selected dimensions of interest.
+Blazing fast performance of tools like Google Analytics or Mixpanel are backed by a similar concept.
+The theory behind it lies in multi-dimensional analysis and Rollup pre-aggregation is in fact the result of [Roll-up Operation on a OLAP cube](https://en.wikipedia.org/wiki/OLAP_cube#Operations).
+Rollup pre-aggregation is basically summarized data of the original cube grouped by selected dimensions of interest.
 
 The most winning type of Rollup pre-aggregation is Additive Rollup: all measures of which are based on [Decomposable aggregate functions](https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions).
 Additive measure types are: `count`, `sum`, `min`, `max` or `countDistinctApprox`.
 Performance boost in this case is based on two main properties of Additive Rollup pre-aggregation:
-1. Rollup pre-aggregation table usually contains much less rows than an original fact table.
-Less dimensions you selected to roll-up less rows you get.
+1. Rollup pre-aggregation table usually contains many fewer rows than an original fact table.
+Less dimensions you selected to roll-up means less rows you get.
 Less rows means less time to query Rollup pre-aggregation tables.
-2. If your query is in fact subset of dimensions and measures of Additive Rollup then it can be used to calculate such query without accessing raw data.
+2. If your query is in fact a subset of dimensions and measures of Additive Rollup then it can be used to calculate such query without accessing raw data.
 More dimensions and measures you select to roll-up more queries you can cover with this particular Rollup.
 
 ### Rollup selection rules
 
-Rollup pre-aggregation defines set of measures and dimensions used to construct query for pre-aggregation table.
+Rollup pre-aggregation defines a set of measures and dimensions used to construct the query for pre-aggregation table.
 Each query issued against cube where pre-aggregation is defined will be checked if specific rollup pre-aggregation can be used by following algorithm:
-1. Determine type of a query as one of *Additive*, *Leaf Measure Additive*, *Not Additive*.
-2. If query is *Additive* check if rollup contains all dimensions, filter dimensions and measures used in query.
+1. Determine the type of a query as one of *Additive*, *Leaf Measure Additive*, *Not Additive*.
+2. If the query is *Additive* check if rollup contains all dimensions, filter dimensions and measures used in query.
 3. If query is *Leaf Measure Additive* check if rollup contains all dimensions, filter dimensions and *Leaf Measures* used in query.
 4. If query is *Not Additive* check if query time dimension granularity is set, all query filter dimensions are included in query dimensions, rollup defines exact set of dimensions used in query and rollup contains all measures used in query.
 
@@ -174,6 +176,8 @@ This can reduce rollup refreshing time and cost significantly.
 Partitioned rollups currently cannot be used by queries without time dimensions. 
 
 ## Auto Rollup
+
+**Enterprise Feature Only**
 
 Auto rollup is an extension to rollup which instructs Cube.js to select rollup measures and dimensions at query time.
 Cube.js uses query history to select optimal set of measures and dimensions for a given query.
