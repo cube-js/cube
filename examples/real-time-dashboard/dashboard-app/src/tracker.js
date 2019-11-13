@@ -4,7 +4,7 @@ import { fetch } from "whatwg-fetch";
 
 let URL;
 if (process.env.NODE_ENV === 'production') {
-  URL = "https://cubejs-real-time-demo.herokuapp.com"
+  URL = "https://real-time-dashboard-demo.cube.dev"
 } else {
   URL = "http://localhost:4000"
 }

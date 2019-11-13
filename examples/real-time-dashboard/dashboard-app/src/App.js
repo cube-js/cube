@@ -6,10 +6,10 @@ import { CubeProvider } from "@cubejs-client/react";
 import Header from "./components/Header";
 import WebSocketTransport from "@cubejs-client/ws-transport";
 import tracker from "./tracker";
-const CUBEJS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NzI1ODQzNjd9.8Po-ZchZlEJEtqwq5hU0aHDnsJrlkpKs1P2Cs5dbfBQ";
+const CUBEJS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NzM2MjI5MjR9.iD_sSpXRBQSO0ywh5zSPHpHV-1O37oQMakrkG03kR-o";
 let WS_URL;
 if (process.env.NODE_ENV === 'production') {
-  WS_URL = "wss://cubejs-real-time-demo.herokuapp.com/"
+  WS_URL = "wss://real-time-dashboard-demo.cube.dev/"
 } else {
   WS_URL = "ws://localhost:4000/"
 }

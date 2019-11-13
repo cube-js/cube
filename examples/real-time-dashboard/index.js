@@ -22,6 +22,10 @@ const cubejsServer = CubejsServerCore.create({
   }
 });
 
+if (process.env.NODE_ENV === 'production') {
+  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
+}
+
 cubejsServer.initApp(app);
 const server = http.createServer({}, app);
 
@@ -41,10 +45,6 @@ app.post('/collect', (req, res) => {
     }))
   });
 });
-
-if (process.env.NODE_ENV === 'production') {
-  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
-}
 
 const port = process.env.PORT || 4000;
 server.listen(port, () => {

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "./node_modules/.bin/cubejs-dev-server",
+    "build-front": "cd dashboard-app && yarn build",
     "start": "node index.js"
   },
   "dependencies": {
