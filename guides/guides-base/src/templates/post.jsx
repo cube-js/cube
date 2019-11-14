@@ -54,7 +54,7 @@ export default class PostTemplate extends React.Component {
           <title>{`${post.title} | ${config.siteTitle}`}</title>
         </Helmet>
         <SEO config={config} postPath={slug} postNode={postNode} postSEO />
-        <Header />
+        <Header githubUrl={config.githubUrl} />
         <Container>
           <ContentContainer>
             <ContentHeader>{post.title}</ContentHeader>
