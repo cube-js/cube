@@ -44,16 +44,12 @@ const Header = ({ location }) => {
         </Button>
         <Divider type="vertical" />
         <a href="https://github.com/cube-js/cube.js/tree/master/examples/real-time-dashboard">
-          <span>
-            <Icon type="github" />
-            Github
-          </span>
+          <Icon type="github" />
+          <span>Github</span>
         </a>
         <a href="https://slack.cube.dev">
-          <span>
-            <Icon type="slack" />
-            Slack
-          </span>
+          <Icon type="slack" />
+          <span>Slack</span>
         </a>
       </div>
     </Layout.Header>

@@ -48,12 +48,14 @@ body {
   color: #43436B;
   font-size: 16px;
   height: 32px;
-  line-height: 1.5;
+  line-height: 1;
   padding: 0 15px;
   border: 0.5px solid rgba(67,67,107,0.4);
   box-sizing: border-box;
   border-radius: 4px;
   transition: border-color .25s ease-in-out;
+  display: flex;
+  align-items: center;
 }
 
 .top-menu a i {
@@ -68,10 +70,6 @@ body {
   margin-left: 10px;
 }
 
-.top-menu a span {
-  vertical-align: sub;
-}
-
 .top-menu a:hover i {
   opacity: 0.6;
 }
@@ -83,4 +81,25 @@ body {
 
 .top-menu a i {
   margin-right: 5px;
+}
+
+@media only screen and (max-width: 600px) {
+  .ant-layout-header {
+    height: 100%;
+  }
+
+  .top-menu {
+    display: block;
+  }
+
+  .top-menu a {
+    padding: 0;
+    border: 0;
+    font-size: 20px;
+    display: inline;
+  }
+
+  .top-menu a span  {
+    display: none;
+  }
 }

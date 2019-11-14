@@ -81,7 +81,7 @@ const DashboardItems = [
         order: {
           "Events.minutesAgo": "desc"
         },
-        limit: 10
+        limit: 11
       },
       chartType: "bar"
     },
