@@ -39,11 +39,6 @@ cube(`Events`, {
       type: `number`
     },
 
-    quaterMinutes: {
-      sql: 'CONCAT(CAST(MINUTE(timestamp) as CHAR), ":", CAST((FLOOR(SECOND(timestamp)/15) + 1)*15 as CHAR))',
-      type: `string`
-    },
-
     minutesAgoHumanized: {
       type: `string`,
       case: {
@@ -116,11 +111,9 @@ cube(`EventsBucketed`, {
   `
     ${derivedTables(FILTER_PARAMS.EventsBucketed.time.filter(filterSuffix))}
     select * from unioned
-    WHERE ${FILTER_PARAMS.EventsBucketed.time.filter('timestamp')}
   `,
 
   refreshKey: {
-    //sql: `select (FLOOR(SECOND(max(a.timestamp))/15))*15 from ${CUBE.sql()} as a `
     sql: `select (FLOOR(UNIX_TIMESTAMP(now())/15))*15`
   },
 
