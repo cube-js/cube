@@ -116,7 +116,7 @@ const TypeToChartComponent = {
       ]}
       dataSource={resultSet.tablePivot().map((row) => {
         const addMinsAgo = (text) => {
-          if (text.match(/minute/)) {
+          if (text.toString().match(/minute/)) {
             return text;
           } else {
             return `${text} minutes ago`;

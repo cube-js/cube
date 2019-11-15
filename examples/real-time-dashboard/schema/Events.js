@@ -73,7 +73,7 @@ cube(`Events`, {
   }
 });
 
-const derivedTables =
+const derivedTables = (where) => (
   `
       with generator as (
         select 0 as d union all
@@ -99,6 +99,7 @@ const derivedTables =
       1 as events,
       events.timestamp
     from stats.events
+    WHERE ${where}
     union all
     select
       0,
@@ -106,11 +107,14 @@ const derivedTables =
     from series
     )
   `
+)
+
+const filterSuffix =  (from, to) => `stats.events.timestamp >= TIMESTAMP(${from}) AND stats.events.timestamp <= TIMESTAMP(${to})`
 
 cube(`EventsBucketed`, {
   sql:
   `
-    ${derivedTables}
+    ${derivedTables(FILTER_PARAMS.EventsBucketed.time.filter(filterSuffix))}
     select * from unioned
     WHERE ${FILTER_PARAMS.EventsBucketed.time.filter('timestamp')}
   `,
