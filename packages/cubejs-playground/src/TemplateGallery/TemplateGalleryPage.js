@@ -2,7 +2,7 @@
 import React, { Component } from 'react';
 import styled from 'styled-components';
 import {
-  Button, Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal
+  Button, Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal, Typography
 } from 'antd';
 import { withRouter } from "react-router-dom";
 import DashboardSource from "../DashboardSource";
@@ -12,19 +12,45 @@ import { playgroundAction } from "../events";
 import { chartLibraries } from "../ChartRenderer";
 
 const MarginFrame = ({ children }) => (
-  <div style={{ textAlign: 'center', marginTop: 50, margin: 25 }}>
+  <div style={{ marginTop: 50, margin: 25 }}>
     { children }
   </div>
 );
 
 const RecipeCard = styled(Card)`
-  && .ant-card-cover {
-    padding: 15px;
-    height: 200px;
+  border-radius: 4px;
+  button {
+    display: none;
+    position: absolute;
+    margin-left: -64px;
+    top: 80px;
+    left: 50%;
   }
-  
+  padding: 16px;
+
+  && .ant-card-cover {
+    height: 168px;
+    background: #EEEEF5;
+    border-radius: 4px;
+  }
+
+  &&.ant-card-hoverable:hover {
+    box-shadow: 0px 15px 20px rgba(67, 67, 107, 0.1);
+    button { display: block; }
+  }
+
+  && .ant-card-meta {
+    text-align: center;
+  }
+
+  && .ant-card-meta-title {
+    white-space: unset;
+    color: #43436B;
+  }
+
   && .ant-card-meta-description {
-    height: 5em;
+    color: #A1A1B5;
+    font-size: 11px;
   }
 `;
 
@@ -35,6 +61,13 @@ const CreateOwnDashboardForm = styled(Form)`
     }
   }
 `;
+
+const StyledTitle = styled(Typography.Text)`
+  display: block;
+  font-size: 16px;
+  margin-bottom: 25px;
+  margin-left: 15px;
+`
 
 class TemplateGalleryPage extends Component {
   constructor(props) {
@@ -234,31 +267,30 @@ class TemplateGalleryPage extends Component {
     );
 
     const recipeCards = recipes.map(({ name, description, templatePackages }) => (
-      <Col span={8} key={name}>
+      <Col span={6} key={name}>
         <RecipeCard
-          cover={<img alt="example" src="./cubejs-playground-logo.svg"/>}
-          actions={[
-            <Button
-              type="primary"
-              onClick={async () => {
-                await this.dashboardSource.applyTemplatePackages(templatePackages);
-                history.push('/dashboard');
-              }}
-            >
-              Create App
-            </Button>
-          ]}
+          hoverable
+          bordered={false}
+          cover={<div />}
         >
           <Card.Meta title={name} description={description} />
+          <Button
+            type="primary"
+            onClick={async () => {
+              await this.dashboardSource.applyTemplatePackages(templatePackages);
+              history.push('/dashboard');
+            }}
+          >
+            Create App
+          </Button>
         </RecipeCard>
       </Col>
     )).concat([
-      <Col span={8} key="own">
+      <Col span={6} key="own">
         <RecipeCard
+          hoverable
+          bordered={false}
           cover={<Icon type="plus" size="large" style={{ fontSize: 160 }}/>}
-          actions={[
-            <Button type="primary" onClick={() => this.setState({ createOwnModalVisible: true })}>Configure</Button>
-          ]}
         >
           <Card.Meta
             title="Create your Own"
@@ -271,10 +303,10 @@ class TemplateGalleryPage extends Component {
 
     return (
       <MarginFrame>
-        <h1>
-          Template Gallery
-        </h1>
-        <Row type="flex" justify="center" align="top" gutter={24}>
+        <StyledTitle>
+          Build your app from one the popular templates below or create your own
+        </StyledTitle>
+        <Row type="flex" align="top" gutter={24}>
           {recipeCards}
         </Row>
       </MarginFrame>

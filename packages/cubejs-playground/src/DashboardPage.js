@@ -90,7 +90,6 @@ class DashboardPage extends Component {
             <Link to="/template-gallery">
               <Button
                 type="primary"
-                size="large"
               >
                 Create dashboard app in your project directory
               </Button>
