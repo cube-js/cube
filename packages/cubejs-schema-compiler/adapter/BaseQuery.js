@@ -1017,13 +1017,6 @@ class BaseQuery {
     return this.evaluateSymbolSqlWithContext(fn, { cubeAliasPrefix });
   }
 
-  // TODO merge fail. Remove sqlAlias us unused?
-  /*
-  cubeAlias(cube) {
-    return this.cubeAlias(this.cubeEvaluator.cubeFromPath(cube).sqlAlias || cube);
-  }
-  */
-
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
     return this.escapeColumnName(this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`));
@@ -1239,6 +1232,13 @@ class BaseQuery {
   }
 
   aliasName(name) {
+    const path = name.split('.');
+    if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
+      const cubeName = path[0];
+      path.splice(0, 1);
+      path.unshift(this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias);
+      name = this.cubeEvaluator.pathFromArray(path);
+    }
     return inflection.underscore(name).replace(/\./g, '__');
   }
 

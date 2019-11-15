@@ -28,8 +28,6 @@ describe('SQL Generation', function test() {
       \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
       
-      sqlAlias: 'visitors_table',
-      
       refreshKey: {
         sql: 'SELECT 1',
       },
@@ -288,6 +286,20 @@ describe('SQL Generation', function test() {
         }
       }
     })
+    
+    cube('CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName', {
+      sql: \`
+      select * from cards
+      \`,
+      
+      sqlAlias: 'cube_with_long_name',
+
+      measures: {
+        count: {
+          type: 'count'
+        }
+      }
+    });
     `);
 
   it('simple join', () => {
@@ -1400,4 +1412,18 @@ describe('SQL Generation', function test() {
   }, {
     "visitors__created_at_date": "2017-01-06T00:00:00.000Z"
   }]));
+
+  it(
+    'sqlAlias',
+    () => runQueryTest({
+      measures: ['CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName.count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: []
+    }, [
+      { "cube_with_long_name__count": '3' }
+    ])
+  );
 });
