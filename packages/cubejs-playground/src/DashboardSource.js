@@ -51,7 +51,8 @@ class DashboardSource {
   get templatePackages() { // TODO load
     return [
       { name: 'react-antd-dynamic', description: 'React Antd Dynamic' },
-      { name: 'react-antd-static', description: 'React Antd Static' }
+      { name: 'react-antd-static', description: 'React Antd Static' },
+      { name: 'react-material-static', description: 'React Material UI Static' }
     ];
   }
 
@@ -60,7 +61,7 @@ class DashboardSource {
     if (this.loadError) {
       return this.loadError;
     }
-    return !!this.installedTemplates['react-antd-static'];
+    return !!Object.keys(this.installedTemplates).find(template => template.match(/-static$/)); // TODO
   }
 
   async addChart(chartCode) {
@@ -68,7 +69,11 @@ class DashboardSource {
     if (this.loadError) {
       return;
     }
-    await this.applyTemplatePackages(['create-react-app', 'react-antd-static', 'static-chart'], {
+    await this.applyTemplatePackages([
+      'create-react-app',
+      Object.keys(this.installedTemplates).find(template => template.match(/-static$/)), // TODO
+      'static-chart'
+    ], {
       'static-chart': {
         chartCode
       }

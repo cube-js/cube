@@ -1,10 +1,10 @@
 const TemplatePackage = require("../../TemplatePackage");
 const ChartRendererSnippet = require("../../ChartRendererSnippet");
 
-class AntdTablesTemplate extends TemplatePackage {
+class MaterialTablesTemplate extends TemplatePackage {
   constructor(chartLibrary) {
     super({
-      name: 'antd-tables',
+      name: 'material-tables',
       fileToSnippet: {
         '/src/components/ChartRenderer.js': new ChartRendererSnippet(chartLibrary)
       },
@@ -13,4 +13,4 @@ class AntdTablesTemplate extends TemplatePackage {
   }
 }
 
-module.exports = AntdTablesTemplate;
+module.exports = MaterialTablesTemplate;

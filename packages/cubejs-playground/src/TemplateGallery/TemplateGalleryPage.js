@@ -164,7 +164,7 @@ class TemplateGalleryPage extends Component {
             'create-react-app',
             templatePackageName,
             `${chartLibrary}-charts`,
-            'antd-tables',
+            `${templatePackageName.match(/^react-(\w+)/)[1]}-tables`, // TODO
             'credentials'
           ].concat(enableWebSocketTransport ? ['web-socket-transport'] : []);
           await this.dashboardSource.applyTemplatePackages(templatePackages);
