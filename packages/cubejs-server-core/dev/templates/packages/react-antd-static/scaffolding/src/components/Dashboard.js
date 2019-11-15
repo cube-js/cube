@@ -1,18 +1,7 @@
 import React from "react";
 import { Row } from 'antd';
 
-const Empty = () => (
-  <div
-    style={{
-      textAlign: "center",
-      padding: 12
-    }}
-  >
-    <h2>There are no charts on this dashboard. Use Playground Build to add one.</h2>
-  </div>
-);
-
-const Dashboard = ({ children }) => children ? (
+const Dashboard = ({ children }) => (
   <Row
     type="flex"
     justify="space-around"
@@ -25,6 +14,6 @@ const Dashboard = ({ children }) => children ? (
   >
     {children}
   </Row>
-) : <Empty />;
+);
 
 export default Dashboard;

@@ -149,9 +149,9 @@ class TemplateGalleryPage extends Component {
       description: 'Use this template if you need to create dashboard application where users can edit their dashboards',
       templatePackages: ['create-react-app', 'react-antd-dynamic', 'chartjs-charts', 'antd-tables', 'credentials']
     }, {
-      name: 'React Antd static dashboard',
+      name: 'React Antd static dashboard with Recharts',
       description: 'Use this template if you want to create static dashboard application and add charts to it using code or Cube.js Playground',
-      templatePackages: ['create-react-app', 'react-antd-static', 'credentials']
+      templatePackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials']
     }];
 
     const CreateOwnModal = (
@@ -163,12 +163,10 @@ class TemplateGalleryPage extends Component {
           const templatePackages = [
             'create-react-app',
             templatePackageName,
+            `${chartLibrary}-charts`,
+            'antd-tables',
             'credentials'
-          ].concat(
-            templatePackageName.indexOf('static') === -1 ? [`${chartLibrary}-charts`, 'antd-tables'] : []
-          ).concat(
-            enableWebSocketTransport ? ['web-socket-transport'] : []
-          );
+          ].concat(enableWebSocketTransport ? ['web-socket-transport'] : []);
           await this.dashboardSource.applyTemplatePackages(templatePackages);
           history.push('/dashboard');
         }}
@@ -214,19 +212,17 @@ class TemplateGalleryPage extends Component {
               </Button>
             </Dropdown>
           </Form.Item>
-          {templatePackageName.indexOf('static') === -1 && (
-            <Form.Item label="Charting Library">
-              <Dropdown
-                overlay={chartLibrariesMenu}
-                disabled={!!frameworkItem.docsLink}
-              >
-                <Button>
-                  {currentLibraryItem && currentLibraryItem.title}
-                  <Icon type="down" />
-                </Button>
-              </Dropdown>
-            </Form.Item>
-          )}
+          <Form.Item label="Charting Library">
+            <Dropdown
+              overlay={chartLibrariesMenu}
+              disabled={!!frameworkItem.docsLink}
+            >
+              <Button>
+                {currentLibraryItem && currentLibraryItem.title}
+                <Icon type="down" />
+              </Button>
+            </Dropdown>
+          </Form.Item>
           <Form.Item label="Web Socket Transport (Real-time)">
             <Switch
               checked={enableWebSocketTransport}
