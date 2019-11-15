@@ -3,7 +3,7 @@ import React, { Component } from 'react';
 import {
   Spin, Button, Alert, Menu, Dropdown, Icon, Form
 } from 'antd';
-import { Link, withRouter } from 'react-router-dom';
+import { Link, withRouter, Redirect } from 'react-router-dom';
 import DashboardSource from "./DashboardSource";
 import fetch from './playgroundFetch';
 import { frameworks } from "./ChartContainer";
@@ -81,23 +81,7 @@ class DashboardPage extends Component {
       appCode, dashboardPort, loadError, dashboardRunning, dashboardStarting, dashboardAppPath
     } = this.state;
     if (loadError) {
-      return (
-        <Frame>
-          <h2>
-            {loadError}
-          </h2>
-          <p style={{ marginTop: 25 }}>
-            <Link to="/template-gallery">
-              <Button
-                type="primary"
-              >
-                Create dashboard app in your project directory
-              </Button>
-            </Link>
-          </p>
-          <Hint />
-        </Frame>
-      );
+      return <Redirect to="/template-gallery" />;
     }
     if (!appCode) {
       return (

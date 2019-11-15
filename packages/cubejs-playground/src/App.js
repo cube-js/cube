@@ -9,6 +9,14 @@ import { withRouter } from "react-router";
 import Header from './components/Header';
 import { event } from './events';
 
+const selectedTab = (pathname) => {
+  if (pathname === '/template-gallery') {
+    return ['/dashboard'];
+  } else {
+    return [pathname];
+  }
+};
+
 class App extends Component {
   async componentDidMount() {
     window.addEventListener("unhandledrejection", (promiseRejectionEvent) => {
@@ -65,7 +73,7 @@ class App extends Component {
     const { location, children } = this.props;
     return (
       <Layout style={{ height: '100%' }}>
-        <Header selectedKeys={[location.pathname]} />
+        <Header selectedKeys={selectedTab(location.pathname)} />
         <Layout.Content style={{ height: '100%' }}>
           {fatalError ? (
             <Alert
