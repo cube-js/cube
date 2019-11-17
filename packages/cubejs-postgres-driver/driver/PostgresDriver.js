@@ -10,10 +10,8 @@ const GenericTypeToPostgres = {
 
 const timestampDataTypes = [1114, 1184];
 
-const defaultTypeParser = (val) => val;
-const timestampTypeParser = (val) => {
-  return moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)
-};
+const defaultTypeParser = val => val;
+const timestampTypeParser = val => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 
 class PostgresDriver extends BaseDriver {
   constructor(config) {
@@ -55,17 +53,15 @@ class PostgresDriver extends BaseDriver {
         text: query,
         values: values || [],
         types: {
-          getTypeParser: (dataType) => {
+          getTypeParser: dataType => {
             const isTimestamp = timestampDataTypes.indexOf(dataType) > -1;
-            let parser = defaultTypeParser
+            let parser = defaultTypeParser;
 
             if (isTimestamp) {
               parser = timestampTypeParser;
             }
 
-            return (val) => {
-              return parser(val);
-            }
+            return val => parser(val);
           },
         },
       });
