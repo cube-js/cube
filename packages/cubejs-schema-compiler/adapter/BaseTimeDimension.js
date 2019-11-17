@@ -73,10 +73,7 @@ class BaseTimeDimension extends BaseFilter {
       if (context.rollupGranularity === this.granularity) {
         return super.dimensionSql();
       }
-      return this.query.timeGroupedColumn(
-        granularity,
-        this.query.escapeColumnName(this.unescapedAliasName(context.rollupGranularity))
-      );
+      return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
     }
     if (context.ungrouped) {
       return this.convertedToTz();
