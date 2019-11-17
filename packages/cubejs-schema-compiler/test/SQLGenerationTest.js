@@ -293,6 +293,8 @@ describe('SQL Generation', function test() {
       \`,
       
       sqlAlias: 'cube_with_long_name',
+      
+      dataSource: 'oracle',
 
       measures: {
         count: {
@@ -1426,4 +1428,17 @@ describe('SQL Generation', function test() {
       { "cube_with_long_name__count": '3' }
     ])
   );
+
+  it('data source', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName.count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: []
+    });
+
+    query.dataSource.should.be.deepEqual('oracle');
+  }));
 });

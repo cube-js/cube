@@ -68,7 +68,7 @@ class BaseQuery {
       return dimension;
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
-    this.join = this.joinGraph.buildJoin(this.collectCubeNames());
+    this.join = this.joinGraph.buildJoin(this.allCubeNames);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption =
       this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
@@ -79,6 +79,31 @@ class BaseQuery {
 
     this.externalQueryClass = this.options.externalQueryClass;
     this.initUngrouped();
+  }
+
+  get allCubeNames() {
+    if (!this.collectedCubeNames) {
+      this.collectedCubeNames = this.collectCubeNames();
+    }
+    return this.collectedCubeNames;
+  }
+
+  get dataSource() {
+    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeEvaluator.cubeFromPath(c).dataSource || 'default'));
+    if (dataSources.length > 1) {
+      throw new UserError(`Joins across data sources aren't supported in community edition. Found data sources: ${dataSources.join(', ')}`);
+    }
+    return dataSources[0];
+  }
+
+  get aliasNameToMember() {
+    return R.fromPairs(
+      this.measures.map(m => [m.unescapedAliasName(), m.measure]).concat(
+        this.dimensions.map(m => [m.unescapedAliasName(), m.dimension])
+      ).concat(
+        this.timeDimensions.map(m => [m.unescapedAliasName(), m.dimension])
+      )
+    );
   }
 
   initUngrouped() {

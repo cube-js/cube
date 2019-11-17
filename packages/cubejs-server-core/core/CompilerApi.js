@@ -26,7 +26,6 @@ class CompilerApi {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', { version: compilerVersion });
       // TODO check if saving this promise can produce memory leak?
       this.compilers = PrepareCompiler.compile(this.repository, {
-        adapter: this.dbType,
         allowNodeRequire: this.allowNodeRequire
       });
       this.compilerVersion = compilerVersion;
@@ -34,25 +33,48 @@ class CompilerApi {
     return this.compilers;
   }
 
+  getDbType(dataSource) {
+    if (typeof this.dbType === 'function') {
+      return this.dbType({ dataSource: dataSource || 'default' });
+    }
+    return this.dbType;
+  }
+
   async getSql(query) {
-    const sqlGenerator = QueryBuilder.query(
-      await this.getCompilers(),
-      this.dbType, {
-        ...query,
-        externalDbType: this.options.externalDbType,
-        preAggregationsSchema: this.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
-      }
-    );
-    return (await this.getCompilers()).compiler.withQuery(sqlGenerator, () => ({
+    const dbType = this.getDbType('default');
+    const compilers = await this.getCompilers();
+    let sqlGenerator = this.createQuery(compilers, dbType, query);
+
+    const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
+
+    if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
+      // TODO consider more efficient way than instantiating query
+      sqlGenerator = this.createQuery(compilers, this.getDbType(dataSource), query);
+    }
+
+    return compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
       order: sqlGenerator.order,
       cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
-      preAggregations: sqlGenerator.preAggregations.preAggregationsDescription()
+      preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
+      dataSource: sqlGenerator.dataSource,
+      aliasNameToMember: sqlGenerator.aliasNameToMember
     }));
+  }
+
+  createQuery(compilers, dbType, query) {
+    return QueryBuilder.query(
+      compilers,
+      dbType, {
+        ...query,
+        externalDbType: this.options.externalDbType,
+        preAggregationsSchema: this.preAggregationsSchema,
+        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
+      }
+    );
   }
 
   async metaConfig() {

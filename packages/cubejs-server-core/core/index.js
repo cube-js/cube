@@ -121,7 +121,7 @@ class CubejsServerCore {
     this.preAggregationsSchema =
       typeof options.preAggregationsSchema === 'function' ? options.preAggregationsSchema : () => options.preAggregationsSchema;
     this.appIdToCompilerApi = {};
-    this.appIdToOrchestratorApi = {};
+    this.dataSourceIdToOrchestratorApi = {};
     this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
@@ -270,7 +270,7 @@ class CubejsServerCore {
     if (!this.appIdToCompilerApi[appId]) {
       this.appIdToCompilerApi[appId] = this.createCompilerApi(
         this.repositoryFactory(context), {
-          dbType: this.contextToDbType(context),
+          dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
           schemaVersion: this.options.schemaVersion && (() => this.options.schemaVersion(context)),
           preAggregationsSchema: this.preAggregationsSchema(context)
@@ -280,12 +280,16 @@ class CubejsServerCore {
     return this.appIdToCompilerApi[appId];
   }
 
+  contextToDataSourceId(context) {
+    return `${this.contextToAppId(context)}_${context.dataSource}`;
+  }
+
   getOrchestratorApi(context) {
-    const appId = this.contextToAppId(context);
-    if (!this.appIdToOrchestratorApi[appId]) {
+    const dataSourceId = this.contextToDataSourceId(context);
+    if (!this.dataSourceIdToOrchestratorApi[dataSourceId]) {
       let driverPromise;
       let externalPreAggregationsDriverPromise;
-      this.appIdToOrchestratorApi[appId] = this.createOrchestratorApi({
+      this.dataSourceIdToOrchestratorApi[dataSourceId] = this.createOrchestratorApi({
         getDriver: () => {
           if (!driverPromise) {
             const driver = this.driverFactory(context);
@@ -306,11 +310,11 @@ class CubejsServerCore {
           }
           return externalPreAggregationsDriverPromise;
         },
-        redisPrefix: appId,
+        redisPrefix: dataSourceId,
         orchestratorOptions: this.orchestratorOptions(context)
       });
     }
-    return this.appIdToOrchestratorApi[appId];
+    return this.dataSourceIdToOrchestratorApi[dataSourceId];
   }
 
   createCompilerApi(repository, options) {

@@ -79,6 +79,7 @@ const cubeSchema = Joi.object().keys({
   allDefinitions: Joi.func(),
   title: Joi.string(),
   sqlAlias: Joi.string(),
+  dataSource: Joi.string(),
   description: Joi.string(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),

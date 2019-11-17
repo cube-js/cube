@@ -8,7 +8,6 @@ const CubeEvaluator = require('./CubeEvaluator');
 const ContextEvaluator = require('./ContextEvaluator');
 const DashboardTemplateEvaluator = require('./DashboardTemplateEvaluator');
 const JoinGraph = require('./JoinGraph');
-const QueryBuilder = require('../adapter/QueryBuilder');
 const Funnels = require('../extensions/Funnels');
 const CubeToMetaTransformer = require('./CubeToMetaTransformer');
 
@@ -27,12 +26,7 @@ exports.prepareCompiler = (repo, options) => {
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
   const dashboardTemplateEvaluator = new DashboardTemplateEvaluator(cubeEvaluator);
-  const query = QueryBuilder.query(
-    { cubeEvaluator, joinGraph },
-    options.adapter,
-    {}
-  );
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph, query);
+  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const compiler = new DataSchemaCompiler(repo, Object.assign({}, {
     cubeNameCompilers: [cubeDictionary],
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],

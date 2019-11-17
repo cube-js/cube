@@ -55,10 +55,14 @@ class BaseMeasure {
   }
 
   aliasName() {
+    return this.query.escapeColumnName(this.unescapedAliasName());
+  }
+
+  unescapedAliasName() {
     if (this.expression) {
-      return this.query.escapeColumnName(this.query.aliasName(this.expressionName));
+      return this.query.aliasName(this.expressionName);
     }
-    return this.query.escapeColumnName(this.query.aliasName(this.measure));
+    return this.query.aliasName(this.measure);
   }
 
   isCumulative() {
