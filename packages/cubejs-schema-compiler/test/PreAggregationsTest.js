@@ -94,27 +94,13 @@ describe('PreAggregations', function test() {
           measureReferences: [checkinsTotal],
           segmentReferences: [google],
           timeDimensionReference: createdAt,
-          granularity: 'day',
+          granularity: 'week',
         },
         approx: {
           type: 'rollup',
           measureReferences: [countDistinctApprox],
           timeDimensionReference: createdAt,
           granularity: 'day'
-        },
-        ratio: {
-          type: 'rollup',
-          measureReferences: [checkinsTotal, uniqueSourceCount],
-          timeDimensionReference: createdAt,
-          granularity: 'day'
-        },
-        partitioned: {
-          type: 'rollup',
-          measureReferences: [checkinsTotal],
-          dimensionReferences: [source],
-          timeDimensionReference: createdAt,
-          granularity: 'day',
-          partitionGranularity: 'month'
         },
         multiStage: {
           useOriginalSqlPreAggregations: true,
@@ -126,6 +112,20 @@ describe('PreAggregations', function test() {
           refreshKey: {
             sql: \`SELECT CASE WHEN \${FILTER_PARAMS.visitors.createdAt.filter((from, to) => \`\${to}::timestamp > now()\`)} THEN now() END\`
           }
+        },
+        partitioned: {
+          type: 'rollup',
+          measureReferences: [checkinsTotal],
+          dimensionReferences: [source],
+          timeDimensionReference: createdAt,
+          granularity: 'day',
+          partitionGranularity: 'month'
+        },
+        ratio: {
+          type: 'rollup',
+          measureReferences: [checkinsTotal, uniqueSourceCount],
+          timeDimensionReference: createdAt,
+          granularity: 'day'
         }
       }
     })
@@ -518,7 +518,7 @@ describe('PreAggregations', function test() {
         preAggregationsSchema: '',
         timeDimensions: [{
           dimension: 'visitors.createdAt',
-          granularity: 'date',
+          granularity: 'week',
           dateRange: ['2016-12-30', '2017-01-05']
         }],
         order: [{
@@ -542,7 +542,7 @@ describe('PreAggregations', function test() {
         res.should.be.deepEqual(
           [
             {
-              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__created_at_week": "2017-01-02T00:00:00.000Z",
               "visitors__checkins_total": "1"
             }
           ]
