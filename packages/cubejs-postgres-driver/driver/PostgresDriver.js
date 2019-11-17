@@ -8,8 +8,12 @@ const GenericTypeToPostgres = {
   string: 'text'
 };
 
-pg.types.setTypeParser(1114, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
-pg.types.setTypeParser(1184, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+const timestampDataTypes = [1114, 1184];
+
+const defaultTypeParser = (val) => val;
+const timestampTypeParser = (val) => {
+  return moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)
+};
 
 class PostgresDriver extends BaseDriver {
   constructor(config) {
@@ -49,7 +53,21 @@ class PostgresDriver extends BaseDriver {
       await client.query("set statement_timeout to 600000");
       const res = await client.query({
         text: query,
-        values: values || []
+        values: values || [],
+        types: {
+          getTypeParser: (dataType) => {
+            const isTimestamp = timestampDataTypes.indexOf(dataType) > -1;
+            let parser = defaultTypeParser
+
+            if (isTimestamp) {
+              parser = timestampTypeParser;
+            }
+
+            return (val) => {
+              return parser(val);
+            }
+          },
+        },
       });
       return res && res.rows;
     } finally {
