@@ -1,15 +1,16 @@
 /* globals window */
 import React, { Component } from 'react';
 import styled from 'styled-components';
-import {
-  Button, Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal, Typography
-} from 'antd';
+import { Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal, Typography } from 'antd';
 import { withRouter } from "react-router-dom";
 import DashboardSource from "../DashboardSource";
 import fetch from '../playgroundFetch';
 import { frameworks } from "../ChartContainer";
 import { playgroundAction } from "../events";
 import { chartLibraries } from "../ChartRenderer";
+import Button from "../components/Button";
+import { ReactComponent as PlusSVG } from "./plus.svg";
+import CreateOwnModal from "./CreateOwnModal";
 
 const MarginFrame = ({ children }) => (
   <div style={{ marginTop: 50, margin: 25 }}>
@@ -27,16 +28,30 @@ const RecipeCard = styled(Card)`
     left: 50%;
   }
   padding: 16px;
+  svg path {
+    transition: stroke 0.25s ease;
+  }
 
   && .ant-card-cover {
     height: 168px;
-    background: #EEEEF5;
     border-radius: 4px;
+    background: ${props => props.createYourOwn ? "#F8F8FB" : "#EEEEF5"}
+    display: flex;
+    align-items: center;
   }
 
   &&.ant-card-hoverable:hover {
     box-shadow: 0px 15px 20px rgba(67, 67, 107, 0.1);
     button { display: block; }
+    svg path {
+      stroke: #7A77FF;
+    }
+  }
+
+  && .ant-card-body {
+    min-height: 144px;
+    display: flex;
+    align-items: center;
   }
 
   && .ant-card-meta {
@@ -54,13 +69,6 @@ const RecipeCard = styled(Card)`
   }
 `;
 
-const CreateOwnDashboardForm = styled(Form)`
-  && {
-    .ant-dropdown-trigger {
-      width: 100%
-    }
-  }
-`;
 
 const StyledTitle = styled(Typography.Text)`
   display: block;
@@ -83,37 +91,6 @@ class TemplateGalleryPage extends Component {
     this.dashboardSource = new DashboardSource();
   }
 
-  async loadDashboard(createApp) {
-    const { chartLibrary, templatePackageName } = this.state;
-    this.setState({
-      appCode: null,
-      loadError: null
-    });
-    try {
-      await this.dashboardSource.load(createApp, { chartLibrary, templatePackageName });
-      this.setState({
-        dashboardStarting: false,
-        appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardCreated,
-        loadError: this.dashboardSource.loadError
-      });
-      const dashboardStatus = await (await fetch('/playground/dashboard-app-status')).json();
-      this.setState({
-        dashboardRunning: dashboardStatus.running,
-        dashboardPort: dashboardStatus.dashboardPort,
-        dashboardAppPath: dashboardStatus.dashboardAppPath
-      });
-      if (createApp) {
-        await this.startDashboardApp();
-      }
-    } catch (e) {
-      this.setState({
-        dashboardStarting: false,
-        loadError: <pre>{e.toString()}</pre>
-      });
-      throw e;
-    }
-  }
-
   render() {
     const { chartLibrary, framework, templatePackageName, createOwnModalVisible, enableWebSocketTransport } = this.state;
     const { history } = this.props;
@@ -121,57 +98,6 @@ class TemplateGalleryPage extends Component {
     const frameworkItem = frameworks.find(m => m.id === framework);
     const templatePackage = this.dashboardSource && this.dashboardSource.templatePackages
       .find(m => m.name === templatePackageName);
-
-    const chartLibrariesMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Chart Library', { chartLibrary: e.key });
-          this.setState({ chartLibrary: e.key });
-        }}
-      >
-        {
-          chartLibraries.map(library => (
-            <Menu.Item key={library.value}>
-              {library.title}
-            </Menu.Item>
-          ))
-        }
-      </Menu>
-    );
-
-    const frameworkMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Framework', { framework: e.key });
-          this.setState({ framework: e.key });
-        }}
-      >
-        {
-          frameworks.map(f => (
-            <Menu.Item key={f.id}>
-              {f.title}
-            </Menu.Item>
-          ))
-        }
-      </Menu>
-    );
-
-    const templatePackagesMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Template Package', { templatePackageName: e.key });
-          this.setState({ templatePackageName: e.key });
-        }}
-      >
-        {
-          (this.dashboardSource && this.dashboardSource.templatePackages || []).map(f => (
-            <Menu.Item key={f.name}>
-              {f.description}
-            </Menu.Item>
-          ))
-        }
-      </Menu>
-    );
 
     const {
       appCode, dashboardPort, loadError, dashboardRunning, dashboardStarting, dashboardAppPath
@@ -187,84 +113,6 @@ class TemplateGalleryPage extends Component {
       templatePackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials']
     }];
 
-    const CreateOwnModal = (
-      <Modal
-        title="Create your own Dashboard App"
-        visible={createOwnModalVisible}
-        onOk={async () => {
-          this.setState({ createOwnModalVisible: false });
-          const templatePackages = [
-            'create-react-app',
-            templatePackageName,
-            `${chartLibrary}-charts`,
-            `${templatePackageName.match(/^react-(\w+)/)[1]}-tables`, // TODO
-            'credentials'
-          ].concat(enableWebSocketTransport ? ['web-socket-transport'] : []);
-          await this.dashboardSource.applyTemplatePackages(templatePackages);
-          history.push('/dashboard');
-        }}
-        onCancel={() => this.setState({ createOwnModalVisible: false })}
-      >
-        <CreateOwnDashboardForm>
-          <Form.Item label="Framework">
-            <Dropdown overlay={frameworkMenu}>
-              <Button>
-                {frameworkItem && frameworkItem.title}
-                <Icon type="down" />
-              </Button>
-            </Dropdown>
-          </Form.Item>
-          {
-            frameworkItem && frameworkItem.docsLink && (
-              <p style={{ paddingTop: 24 }}>
-                We do not support&nbsp;
-                {frameworkItem.title}
-                &nbsp;dashboard scaffolding generation yet.
-                Please refer to&nbsp;
-                <a
-                  href={frameworkItem.docsLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => playgroundAction('Unsupported Dashboard Framework Docs', { framework })}
-                >
-                  {frameworkItem.title}
-                  &nbsp;docs
-                </a>
-                &nbsp;to see on how to use it with Cube.js.
-              </p>
-            )
-          }
-          <Form.Item label="Main Template">
-            <Dropdown
-              overlay={templatePackagesMenu}
-              disabled={!!frameworkItem.docsLink}
-            >
-              <Button>
-                {templatePackage && templatePackage.description}
-                <Icon type="down" />
-              </Button>
-            </Dropdown>
-          </Form.Item>
-          <Form.Item label="Charting Library">
-            <Dropdown
-              overlay={chartLibrariesMenu}
-              disabled={!!frameworkItem.docsLink}
-            >
-              <Button>
-                {currentLibraryItem && currentLibraryItem.title}
-                <Icon type="down" />
-              </Button>
-            </Dropdown>
-          </Form.Item>
-          <Form.Item label="Web Socket Transport (Real-time)">
-            <Switch
-              checked={enableWebSocketTransport}
-              onChange={(checked) => this.setState({ enableWebSocketTransport: checked })}
-            />
-          </Form.Item>
-        </CreateOwnDashboardForm>
-      </Modal>
-    );
 
     const recipeCards = recipes.map(({ name, description, templatePackages }) => (
       <Col span={6} key={name}>
@@ -288,23 +136,49 @@ class TemplateGalleryPage extends Component {
     )).concat([
       <Col span={6} key="own">
         <RecipeCard
+          onClick={() => this.setState({ createOwnModalVisible: true })}
           hoverable
+          createYourOwn
           bordered={false}
-          cover={<Icon type="plus" size="large" style={{ fontSize: 160 }}/>}
+          cover={<PlusSVG />}
         >
           <Card.Meta
             title="Create your Own"
             description="Mix different templates together to create your own dashboard application"
           />
         </RecipeCard>
-        {CreateOwnModal}
+        <CreateOwnModal
+          visible={createOwnModalVisible}
+          onOk={async () => {
+            this.setState({ createOwnModalVisible: false });
+            const templatePackages = [
+              'create-react-app',
+              templatePackageName,
+              `${chartLibrary}-charts`,
+              `${templatePackageName.match(/^react-(\w+)/)[1]}-tables`, // TODO
+              'credentials'
+            ].concat(enableWebSocketTransport ? ['web-socket-transport'] : []);
+            await this.dashboardSource.applyTemplatePackages(templatePackages);
+            history.push('/dashboard');
+          }}
+          onCancel={() => this.setState({ createOwnModalVisible: false })}
+          onChange={(key, value) => this.setState({ [key]: value })}
+          chartLibraries={chartLibraries}
+          currentLibraryItem={currentLibraryItem}
+          frameworks={frameworks}
+          framework={framework}
+          frameworkItem={frameworkItem}
+          templatePackages={this.dashboardSource && this.dashboardSource.templatePackages}
+          templatePackage={templatePackage}
+          enableWebSocketTransport={enableWebSocketTransport}
+        />
       </Col>
     ]);
 
     return (
       <MarginFrame>
         <StyledTitle>
-          Build your app from one the popular templates below or create your own
+          Build your app from one the popular templates below or <a onClick={() => this.setState({ createOwnModalVisible: true })}>create your own</a>
         </StyledTitle>
         <Row type="flex" align="top" gutter={24}>
           {recipeCards}
