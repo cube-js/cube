@@ -891,8 +891,9 @@ class BaseQuery {
   }
 
   dimensionSql(dimension) {
-    if (this.safeEvaluateSymbolContext().rollupQuery) {
-      return this.escapeColumnName(dimension.unescapedAliasName());
+    const context = this.safeEvaluateSymbolContext();
+    if (context.rollupQuery) {
+      return this.escapeColumnName(dimension.unescapedAliasName(context.rollupGranularity));
     }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }

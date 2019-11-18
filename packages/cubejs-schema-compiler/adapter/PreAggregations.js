@@ -201,6 +201,23 @@ class PreAggregations {
         timeDimensions.map(d => [d.dimension, d.granularity || 'date'])
       ) || [];
     }
+    // TimeDimension :: [Dimension, Granularity]
+    // TimeDimension -> [TimeDimension]
+    function expandTimeDimension(timeDimension) {
+      const [dimension, granularity] = timeDimension;
+      const makeTimeDimension = newGranularity => [dimension, newGranularity];
+
+      const tds = [timeDimension];
+      const updateTds = (...granularitys) => tds.push(...granularitys.map(makeTimeDimension))
+      
+      if (granularity === 'year') updateTds('hour', 'date', 'month');
+      if (['month', 'week'].includes(granularity)) updateTds('hour', 'date');
+      if (granularity === 'date') updateTds('hour');
+      
+      return tds;
+    }
+    // [[TimeDimension]]
+    const queryTimeDimensionsList = transformedQuery.sortedTimeDimensions.map(expandTimeDimension);
 
     const canUsePreAggregationNotAdditive = (references) =>
       transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
@@ -222,7 +239,7 @@ class PreAggregations {
       ) &&
       R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures) &&
       R.allPass(
-        transformedQuery.sortedTimeDimensions.map(td => R.contains(td))
+        queryTimeDimensionsList.map(tds => R.anyPass(tds.map(td => R.contains(td))))
       )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
 
     const canUsePreAggregationAdditive = (references) =>
@@ -235,7 +252,7 @@ class PreAggregations {
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures)
       ) &&
       R.allPass(
-        transformedQuery.sortedTimeDimensions.map(td => R.contains(td))
+        queryTimeDimensionsList.map(tds => R.anyPass(tds.map(td => R.contains(td))))
       )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
 
 
@@ -440,6 +457,8 @@ class PreAggregations {
       preAggregationForQuery.preAggregation.measures :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures
     );
+    
+    const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'date';
 
     return this.query.evaluateSymbolSqlWithContext(
       () => `SELECT ${this.query.baseSelect()} FROM ${table} ${this.query.baseWhere(filters)}` +
@@ -449,7 +468,8 @@ class PreAggregations {
         this.query.groupByDimensionLimit(),
       {
         renderedReference,
-        rollupQuery: true
+        rollupQuery: true,
+        rollupGranularity,
       }
     );
   }
