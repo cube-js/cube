@@ -99,7 +99,8 @@ describe('SQL Generation', function test() {
         averageCheckins: {
           type: 'avg',
           sql: \`\${doubledCheckings}\`
-        }
+        },
+        ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
       },
 
       dimensions: {
@@ -1441,4 +1442,18 @@ describe('SQL Generation', function test() {
 
     query.dataSource.should.be.deepEqual('oracle');
   }));
+
+  it(
+    'objectRestSpread generator',
+    () => runQueryTest({
+      measures: ['visitors.foo'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: []
+    }, [
+      { "visitors__foo": '6' }
+    ])
+  );
 });
