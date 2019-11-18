@@ -1,4 +1,5 @@
 const pg = require('pg');
+const { types } = require('pg');
 const moment = require('moment');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
@@ -8,8 +9,9 @@ const GenericTypeToPostgres = {
   string: 'text'
 };
 
-pg.types.setTypeParser(1114, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
-pg.types.setTypeParser(1184, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+const timestampDataTypes = [1114, 1184];
+
+const timestampTypeParser = val => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 
 class PostgresDriver extends BaseDriver {
   constructor(config) {
@@ -49,7 +51,19 @@ class PostgresDriver extends BaseDriver {
       await client.query("set statement_timeout to 600000");
       const res = await client.query({
         text: query,
-        values: values || []
+        values: values || [],
+        types: {
+          getTypeParser: (dataType, format) => {
+            const isTimestamp = timestampDataTypes.indexOf(dataType) > -1;
+            let parser = types.getTypeParser(dataType, format);
+
+            if (isTimestamp) {
+              parser = timestampTypeParser;
+            }
+
+            return val => parser(val);
+          },
+        },
       });
       return res && res.rows;
     } finally {
