@@ -48,8 +48,10 @@ class BaseTimeDimension extends BaseFilter {
     return super.aliasName();
   }
 
-  unescapedAliasName() {
-    return `${this.query.aliasName(this.dimension)}_${this.granularity || 'date'}`; // TODO date here for rollups
+  unescapedAliasName(granularity) {
+    const actualGranularity = granularity || this.granularity || 'date';
+
+    return `${this.query.aliasName(this.dimension)}_${actualGranularity}`; // TODO date here for rollups
   }
 
   dateSeriesAliasName() {
@@ -64,16 +66,19 @@ class BaseTimeDimension extends BaseFilter {
   }
 
   dimensionSql() {
-    if (this.query.safeEvaluateSymbolContext().rollupQuery) {
-      return super.dimensionSql();
+    const context = this.query.safeEvaluateSymbolContext();
+    const granularity = context.granularityOverride || this.granularity;
+
+    if (context.rollupQuery) {
+      if (context.rollupGranularity === this.granularity) {
+        return super.dimensionSql();
+      }
+      return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
     }
-    if (this.query.safeEvaluateSymbolContext().ungrouped) {
+    if (context.ungrouped) {
       return this.convertedToTz();
     }
-    return this.query.timeGroupedColumn(
-      this.query.safeEvaluateSymbolContext().granularityOverride || this.granularity,
-      this.convertedToTz()
-    );
+    return this.query.timeGroupedColumn(granularity, this.convertedToTz());
   }
 
   convertedToTz() {

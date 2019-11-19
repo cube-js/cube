@@ -134,7 +134,7 @@ curl \
  -H "Authorization: EXAMPLE-API-TOKEN" \
  -G \
  --data-urlencode 'query={"measures":["Users.count"],
- "timeDimensions":[{"dimension": "Users.createdAt","granularity":"day",dateRange":["2019-03-01","2019-03-31"]}]}' \
+ "timeDimensions":[{"dimension": "Users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
  http://localhost:4000/cubejs-api/v1/sql
 ````
 

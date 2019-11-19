@@ -28,8 +28,6 @@ describe('ClickHouse JoinGraph', function test() {
       \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
       
-      sqlAlias: 'visitors_table',
-      
       refreshKey: {
         sql: 'SELECT 1',
       },

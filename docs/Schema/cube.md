@@ -169,6 +169,23 @@ cube(`OrderFacts`, {
 });
 ```
 
+### dataSource
+
+Each cube in schema can have it's own `dataSource` name to support scenarios where data should be fetched from multiple databases.
+Value of `dataSource` parameter will be passed to [dbType](@cubejs-backend-server-core#options-reference-db-type) and 
+[driverFactory](@cubejs-backend-server-core#options-reference-driver-factory) functions as part of context param.
+By default each cube has a `default` value for it's `dataSource`.
+To override it you can use:
+
+```javascript
+cube(`OrderFacts`, {
+  sql: `SELECT * FROM orders`,
+  
+  dataSource: `prod_db`
+});
+```
+
+
 ## Context Variables
 
 ### Filter Params

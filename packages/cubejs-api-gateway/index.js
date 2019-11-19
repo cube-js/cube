@@ -41,28 +41,6 @@ const prepareAnnotation = (metaConfig, query) => {
   };
 };
 
-const prepareAliasToMemberNameMap = (metaConfig, sqlQuery, query) => {
-  const configMap = toConfigMap(metaConfig);
-
-  const lookupAlias = (memberType) => (member) => {
-    const path = member.split('.');
-    const config = configMap[path[0]][memberType].find(m => m.name === member);
-    if (!config) {
-      return undefined;
-    }
-    return [config.aliasName, member];
-  };
-
-  return R.fromPairs(
-    (query.measures || []).map(lookupAlias('measures'))
-      .concat((query.dimensions || []).map(lookupAlias('dimensions')))
-      .concat((query.segments || []).map(lookupAlias('segments')))
-      .concat((query.timeDimensions || []).map(td => lookupAlias('dimensions')(td.dimension)))
-      .concat(sqlQuery.timeDimensionAlias ? [[sqlQuery.timeDimensionAlias, sqlQuery.timeDimensionField]] : [])
-      .filter(a => !!a)
-  );
-};
-
 const transformValue = (value, type) => {
   if (value && type === 'time') {
     return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
@@ -240,6 +218,7 @@ class ApiGateway {
     // eslint-disable-next-line no-unused-vars
     this.queryTransformer = options.queryTransformer || (async (query, context) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
+    this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
   }
 
   initApp(app) {
@@ -319,9 +298,8 @@ class ApiGateway {
         this.getCompilerApi(context).metaConfig()
       ]);
       const sqlQuery = compilerSqlResult;
-      const metaConfig = metaConfigResult;
-      const annotation = prepareAnnotation(metaConfig, normalizedQuery);
-      const aliasToMemberNameMap = prepareAliasToMemberNameMap(metaConfig, sqlQuery, normalizedQuery);
+      const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
+      const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
       const toExecute = {
         ...sqlQuery,
         query: sqlQuery.sql[0],
@@ -329,7 +307,9 @@ class ApiGateway {
         continueWait: true,
         renewQuery: normalizedQuery.renewQuery
       };
-      const response = await this.getAdapterApi(context).executeQuery(toExecute);
+      const response = await this.getAdapterApi({
+        ...context, dataSource: sqlQuery.dataSource
+      }).executeQuery(toExecute);
       this.log(context, {
         type: 'Load Request Success',
         query,
@@ -465,7 +445,7 @@ class ApiGateway {
       try {
         req.authInfo = jwt.verify(auth, secret);
       } catch (e) {
-        if (process.env.NODE_ENV === 'production') {
+        if (this.enforceSecurityChecks) {
           throw new UserError('Invalid token');
         } else {
           this.log(req, {
@@ -475,7 +455,7 @@ class ApiGateway {
           });
         }
       }
-    } else if (process.env.NODE_ENV === 'production') {
+    } else if (this.enforceSecurityChecks) {
       throw new UserError("Authorization header isn't set");
     }
   }
@@ -484,7 +464,10 @@ class ApiGateway {
     const auth = req.headers.authorization;
 
     try {
-      this.checkAuthFn(req, auth);
+      await this.checkAuthFn(req, auth);
+      if (next) {
+        next();
+      }
     } catch (e) {
       if (e instanceof UserError) {
         res.status(403).json({ error: e.message });
@@ -496,9 +479,6 @@ class ApiGateway {
         });
         res.status(500).json({ error: e.toString() });
       }
-    }
-    if (next) {
-      next();
     }
   }
 

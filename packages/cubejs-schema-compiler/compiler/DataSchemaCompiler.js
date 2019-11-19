@@ -2,9 +2,9 @@ const vm = require('vm');
 const syntaxCheck = require('syntax-error');
 const CompileError = require('./CompileError');
 const UserError = require('./UserError');
-const babylon = require("babylon");
-const babelGenerator = require("babel-generator").default;
-const babelTraverse = require("babel-traverse").default;
+const { parse } = require("@babel/parser");
+const babelGenerator = require("@babel/generator").default;
+const babelTraverse = require("@babel/traverse").default;
 const fs = require('fs');
 const path = require('path');
 
@@ -105,8 +105,14 @@ class DataSchemaCompiler {
 
   transpileFile(file, errorsReport) {
     try {
-      babelTraverse.clearCache();
-      const ast = babylon.parse(file.content, { sourceFilename: file.fileName, sourceType: 'module' });
+      const ast = parse(
+        file.content,
+        {
+          sourceFilename: file.fileName,
+          sourceType: 'module',
+          plugins: ['objectRestSpread']
+        },
+      );
       this.transpilers.forEach((t) => babelTraverse(ast, t.traverseObject()));
       const content = babelGenerator(ast, {}, file.content).code;
       return Object.assign({}, file, { content });
