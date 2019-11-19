@@ -3,9 +3,13 @@ import styled from 'styled-components';
 import { Button as AntdButton } from 'antd';
 
 const StyledButton = styled(AntdButton)`
-  border: none;
   padding: 0 27px;
   height: 40px;
+  border-radius: 4px;
+  border: 1px solid #D0D0DA;
+  &.ant-btn-primary {
+    border: none;
+  }
 `;
 
 const Button = (props) => (

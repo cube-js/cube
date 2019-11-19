@@ -1,18 +1,53 @@
-import React, { Component } from 'react';
-import { playgroundAction } from "../events";
+import React from 'react';
+import {
+  Switch, Menu, Dropdown, Icon, Form, Modal, Alert
+} from 'antd';
 import styled from 'styled-components';
-import { Switch, Button, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal, Typography } from 'antd';
+import { playgroundAction } from "../events";
+import Button from "../components/Button";
 
 const StyledModal = styled(Modal)`
-`
-
-const CreateOwnDashboardForm = styled(Form)`
   && {
     .ant-modal-header {
       border-bottom: none;
+      padding: 40px 32px 0 32px;
+
+      .ant-modal-title {
+        font-size: 20px;
+      }
+    }
+
+    .ant-modal-footer {
+      border-top: none;
+      padding: 0 32px 34px 32px;
+      text-align: left;
+    }
+  }
+`
+
+const StyledForm = styled(Form)`
+  && {
+    .ant-form-item-label {
+      line-height: 16px;
+      margin-bottom: 7px;
+      label {
+        font-weight: 500;
+        font-size: 12px;
+        line-height: 16px;
+      }
+    }
+
+    .ant-dropdown-trigger {
+      border-color: #ECECF0;
+      padding: 13px 16px;
+      line-height: 13px;
     }
   }
 `;
+
+const DropdownIcon = () => (
+  <Icon type="caret-down" style={{ color: '#727290' }} />
+);
 
 const CreateOwnModal = ({
   visible,
@@ -78,40 +113,55 @@ const CreateOwnModal = ({
       }
     </Menu>
   );
+
   return (
-    <Modal
+    <StyledModal
       title="Create your own Dashboard App"
       visible={visible}
       onOk={onOk}
       onCancel={onCancel}
+      footer={[
+        <Button key="submit" type="primary" onClick={onOk}>
+          Ok
+        </Button>,
+        <Button key="back" onClick={onCancel}>
+          Cancel
+        </Button>
+      ]}
     >
-      <CreateOwnDashboardForm>
+      <StyledForm>
         <Form.Item label="Framework">
           <Dropdown overlay={frameworkMenu}>
             <Button>
               {frameworkItem && frameworkItem.title}
-              <Icon type="down" />
+              <DropdownIcon />
             </Button>
           </Dropdown>
         </Form.Item>
         {
           frameworkItem && frameworkItem.docsLink && (
-            <p style={{ paddingTop: 24 }}>
-              We do not support&nbsp;
-              {frameworkItem.title}
-              &nbsp;dashboard scaffolding generation yet.
-              Please refer to&nbsp;
-              <a
-                href={frameworkItem.docsLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => playgroundAction('Unsupported Dashboard Framework Docs', { framework })}
-              >
-                {frameworkItem.title}
-                &nbsp;docs
-              </a>
-              &nbsp;to see on how to use it with Cube.js.
-            </p>
+            <Alert
+              style={{marginBottom: 23}}
+              type="info"
+              message={
+                <span>
+                  We do not support&nbsp;
+                  {frameworkItem.title}
+                  &nbsp;dashboard scaffolding generation yet.
+                  Please refer to&nbsp;
+                  <a
+                    href={frameworkItem.docsLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => playgroundAction('Unsupported Dashboard Framework Docs', { framework })}
+                  >
+                    {frameworkItem.title}
+                    &nbsp;docs
+                  </a>
+                  &nbsp;to see on how to use it with Cube.js.
+                </span>
+              }
+            />
           )
         }
         <Form.Item label="Main Template">
@@ -121,7 +171,7 @@ const CreateOwnModal = ({
           >
             <Button>
               {templatePackage && templatePackage.description}
-              <Icon type="down" />
+              <DropdownIcon />
             </Button>
           </Dropdown>
         </Form.Item>
@@ -132,7 +182,7 @@ const CreateOwnModal = ({
           >
             <Button>
               {currentLibraryItem && currentLibraryItem.title}
-              <Icon type="down" />
+              <DropdownIcon />
             </Button>
           </Dropdown>
         </Form.Item>
@@ -142,8 +192,8 @@ const CreateOwnModal = ({
             onChange={(checked) => onChange('enableWebSocketTransport', checked)}
           />
         </Form.Item>
-      </CreateOwnDashboardForm>
-    </Modal>
+      </StyledForm>
+    </StyledModal>
   );
 };
 

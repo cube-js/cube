@@ -18,10 +18,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.11.0":
-  version "0.11.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.11.0.tgz#8cc898038be6a4da59e2dcbcb0f1a8d5631a66ef"
-  integrity sha512-uOByU8i2oUNVy1CgWZx8F/JoxXbERmskewkpJD3Kwwx3Pe8kKzAOGj7TtL/9Nrqcq/MRgJwHSLCTlxmDv2x/9g==
+"@cubejs-backend/query-orchestrator@^0.11.6":
+  version "0.11.18"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.11.18.tgz#1d0f75819159a5eb9fd4e75cbb74a21f8f4fe3f4"
+  integrity sha512-V7m2T13AceIW2zVSWBbdXZH80/SA3lSkrc0EloZd+1djhdjfUV6jLn5HLN25BK9oucS1tfQ9igI82pO/yX5K9Q==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"

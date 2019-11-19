@@ -18,8 +18,21 @@ const MarginFrame = ({ children }) => (
   </div>
 );
 
+const Image = styled.div`
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin: auto;
+  max-width: 1024px;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-image: ${props => `url("${props.src}")`}
+`;
+
 const RecipeCard = styled(Card)`
   border-radius: 4px;
+  margin-bottom: 20px;
   button {
     display: none;
     position: absolute;
@@ -35,9 +48,22 @@ const RecipeCard = styled(Card)`
   && .ant-card-cover {
     height: 168px;
     border-radius: 4px;
-    background: ${props => props.createYourOwn ? "#F8F8FB" : "#EEEEF5"}
+    background: ${props => props.createYourOwn ? "#F8F8FB" : "#EEEEF5"};
     display: flex;
     align-items: center;
+    position: relative;
+
+    &:after {
+      content: '';
+      position: absolute;
+      width: 100%; height:100%;
+      top:0;
+      left:0;
+      background: rgba(81, 87, 125, 0.3);
+      opacity: 0;
+      transition: all 0.25s;
+    }
+
   }
 
   &&.ant-card-hoverable:hover {
@@ -46,12 +72,16 @@ const RecipeCard = styled(Card)`
     svg path {
       stroke: #7A77FF;
     }
+    &:hover .ant-card-cover:after {
+      opacity: ${props => props.createYourOwn ? "0" : "1"};
+    }
   }
 
   && .ant-card-body {
     min-height: 144px;
     display: flex;
     align-items: center;
+    justify-content: center;
   }
 
   && .ant-card-meta {
@@ -104,22 +134,29 @@ class TemplateGalleryPage extends Component {
     } = this.state;
 
     const recipes = [{
-      name: 'React Antd dynamic dashboard with Chart.js',
+      name: 'Dynamic Dashboard with React, AntD, and Recharts',
       description: 'Use this template if you need to create dashboard application where users can edit their dashboards',
-      templatePackages: ['create-react-app', 'react-antd-dynamic', 'chartjs-charts', 'antd-tables', 'credentials']
+      coverUrl: "https://thepracticaldev.s3.amazonaws.com/i/zel6nkrzaklevw6q0xxf.png",
+      templatePackages: ['create-react-app', 'react-antd-dynamic', 'recharts-charts', 'antd-tables', 'credentials']
     }, {
-      name: 'React Antd static dashboard with Recharts',
+      name: 'Real-Time Dashboard with React, AntD, and Chart.js',
       description: 'Use this template if you want to create static dashboard application and add charts to it using code or Cube.js Playground',
-      templatePackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials']
+      templatePackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials'],
+      coverUrl: "https://thepracticaldev.s3.amazonaws.com/i/7mj0mefi4sebsoaxkm9i.png"
+    }, {
+      name: 'Material UI React Dashboard',
+      coverUrl: 'https://material-ui.com/static/images/themes-light.jpg',
+      description: 'use this template if you want to create static dashboard application and add charts to it using code or cube.js playground',
+      templatepackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials']
     }];
 
 
-    const recipeCards = recipes.map(({ name, description, templatePackages }) => (
-      <Col span={6} key={name}>
+    const recipeCards = recipes.map(({ name, description, templatePackages, coverUrl }) => (
+      <Col xs={{ span: 24 }} md={{span: 12 }} lg={{ span: 8 }} xl={{ span: 6 }} key={name}>
         <RecipeCard
           hoverable
           bordered={false}
-          cover={<div />}
+          cover={<Image src={coverUrl} />}
         >
           <Card.Meta title={name} description={description} />
           <Button
@@ -134,7 +171,7 @@ class TemplateGalleryPage extends Component {
         </RecipeCard>
       </Col>
     )).concat([
-      <Col span={6} key="own">
+      <Col xs={{ span: 24 }} md={{ span: 8 }} lg={{ span: 6 }} key="own">
         <RecipeCard
           onClick={() => this.setState({ createOwnModalVisible: true })}
           hoverable
