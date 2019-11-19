@@ -9,6 +9,9 @@ const StyledButton = styled(AntdButton)`
   border: 1px solid #D0D0DA;
   &.ant-btn-primary {
     border: none;
+    &:hover {
+      background-color: #644AFF;
+    }
   }
 `;
 

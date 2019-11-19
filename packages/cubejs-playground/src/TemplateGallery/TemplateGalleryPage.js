@@ -31,6 +31,8 @@ const Image = styled.div`
 `;
 
 const RecipeCard = styled(Card)`
+  border: 1px solid #ECECF0;
+
   border-radius: 4px;
   margin-bottom: 20px;
   button {
@@ -78,7 +80,7 @@ const RecipeCard = styled(Card)`
   }
 
   && .ant-card-body {
-    min-height: 144px;
+    min-height: 175px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -95,7 +97,7 @@ const RecipeCard = styled(Card)`
 
   && .ant-card-meta-description {
     color: #A1A1B5;
-    font-size: 11px;
+    font-size: 13px;
   }
 `;
 

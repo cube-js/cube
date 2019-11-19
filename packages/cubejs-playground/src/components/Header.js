@@ -53,14 +53,6 @@ const StyledMenuButton = styled.a`
     border-color: rgba(67, 67, 107, 1);
     color: #43436B;
   }
-
-  //padding: 6px 10px;
-  //font-size: 12px;
-  //color: #43436B;
-  //opacity: 0.4;
-  //border: 0.5px solid #43436B;
-  //box-sizing: border-box;
-  //border-radius: 3px;
 `
 
 const Header = ({ selectedKeys }) => {
