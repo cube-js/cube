@@ -6,10 +6,10 @@ import {
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
 import { playgroundAction } from './events';
-import MemberGroup from './scaffolding/react-antd-dynamic/src/components/QueryBuilder/MemberGroup';
-import FilterGroup from './scaffolding/react-antd-dynamic/src/components/QueryBuilder/FilterGroup';
-import TimeGroup from './scaffolding/react-antd-dynamic/src/components/QueryBuilder/TimeGroup';
-import SelectChartType from './scaffolding/react-antd-dynamic/src/components/QueryBuilder/SelectChartType';
+import MemberGroup from './QueryBuilder/MemberGroup';
+import FilterGroup from './QueryBuilder/FilterGroup';
+import TimeGroup from './QueryBuilder/TimeGroup';
+import SelectChartType from './QueryBuilder/SelectChartType';
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) => (
   Object.keys(updateMethods).map(method => ({

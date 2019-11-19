@@ -1,17 +1,21 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
 import React, { Component } from 'react';
-import { Link } from "react-router-dom";
 import * as PropTypes from 'prop-types';
 import "./index.less";
 import "./index.css";
-import {
-  Layout, Menu, Alert, notification, Icon
-} from "antd";
+import { Layout, Alert, notification } from "antd";
 import { fetch } from 'whatwg-fetch';
 import { withRouter } from "react-router";
+import Header from './components/Header';
 import { event } from './events';
 
-const { Header, Content } = Layout;
+const selectedTab = (pathname) => {
+  if (pathname === '/template-gallery') {
+    return ['/dashboard'];
+  } else {
+    return [pathname];
+  }
+};
 
 class App extends Component {
   async componentDidMount() {
@@ -69,39 +73,8 @@ class App extends Component {
     const { location, children } = this.props;
     return (
       <Layout style={{ height: '100%' }}>
-        <Header style={{ padding: '0 32px' }}>
-          <div style={{ float: 'left' }}>
-            <img src="./cubejs-playground-logo.svg" style={{ display: 'inline', height: 43, marginRight: 15 }} alt="" />
-          </div>
-          <Menu
-            theme="light"
-            mode="horizontal"
-            selectedKeys={[location.pathname]}
-          >
-            <Menu.Item key="/build"><Link to="/build">Build</Link></Menu.Item>
-            <Menu.Item key="/dashboard"><Link to="/dashboard">Dashboard App</Link></Menu.Item>
-            <Menu.Item key="/schema"><Link to="/schema">Schema</Link></Menu.Item>
-            <Menu.Item
-              key="docs"
-              style={{ float: 'right' }}
-            >
-              <a href="https://cube.dev/docs" target="_blank">
-                <Icon type="book" />
-                Docs
-              </a>
-            </Menu.Item>
-            <Menu.Item
-              key="slack"
-              style={{ float: 'right' }}
-            >
-              <a href="https://slack.cube.dev" target="_blank">
-                <Icon type="slack" />
-                Slack
-              </a>
-            </Menu.Item>
-          </Menu>
-        </Header>
-        <Content style={{ height: '100%' }}>
+        <Header selectedKeys={selectedTab(location.pathname)} />
+        <Layout.Content style={{ height: '100%' }}>
           {fatalError ? (
             <Alert
               message="Error occured while rendering"
@@ -109,7 +82,7 @@ class App extends Component {
               type="error"
             />
           ) : children}
-        </Content>
+        </Layout.Content>
       </Layout>
     );
   }

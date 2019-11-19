@@ -18,12 +18,12 @@ export const frameworks = [{
   title: 'Vanilla JavaScript',
   docsLink: 'https://cube.dev/docs/@cubejs-client-core'
 }, {
+  id: 'react',
+  title: 'React'
+}, {
   id: 'angular',
   title: 'Angular',
   docsLink: 'https://cube.dev/docs/@cubejs-client-ngx'
-}, {
-  id: 'react',
-  title: 'React'
 }, {
   id: 'vue',
   title: 'Vue.js',

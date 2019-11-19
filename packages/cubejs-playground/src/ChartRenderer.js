@@ -17,9 +17,9 @@ import * as chartjsLibrary from './libraries/chartjs';
 import * as tablesLibrary from './libraries/tables';
 
 export const libraryToTemplate = {
-  bizcharts: { library: bizChartLibrary, title: 'Bizcharts' },
+  chartjs: { library: chartjsLibrary, title: 'Chart.js' },
   recharts: { library: rechartsLibrary, title: 'Recharts' },
-  chartjs: { library: chartjsLibrary, title: 'Chart.js' }
+  bizcharts: { library: bizChartLibrary, title: 'Bizcharts' }
 };
 
 export const babelConfig = {

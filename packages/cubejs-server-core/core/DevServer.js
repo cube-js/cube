@@ -3,19 +3,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const spawn = require('cross-spawn');
-
-const executeCommand = (command, args, options) => {
-  const child = spawn(command, args, { stdio: 'inherit', ...options });
-  return new Promise((resolve, reject) => {
-    child.on('close', code => {
-      if (code !== 0) {
-        reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}. Please check your console.`));
-        return;
-      }
-      resolve();
-    });
-  });
-};
+const AppContainer = require('../dev/templates/AppContainer');
 
 class DevServer {
   constructor(cubejsServer) {
@@ -95,35 +83,11 @@ class DevServer {
 
     const dashboardAppPath = this.cubejsServer.options.dashboardAppPath || 'dashboard-app';
 
-    app.get('/playground/ensure-dashboard-app', catchErrors(async (req, res) => {
-      this.cubejsServer.event('Dev Server Ensure Dashboard App');
-      if (!await fs.pathExists(dashboardAppPath) || this.createReactAppInit) {
-        if (!this.createReactAppInit) {
-          this.cubejsServer.event('Dev Server Create Dashboard App');
-          this.createReactAppInit = executeCommand('npx', ['create-react-app', dashboardAppPath]).catch(e => {
-            if (e.toString().indexOf('ENOENT') !== -1) {
-              throw new Error(`npx is not installed. Please update your npm: \`$ npm install -g npm\`.`);
-            }
-            throw e;
-          });
-        }
-        await this.createReactAppInit;
-        this.cubejsServer.event('Dev Server Create Dashboard App Success');
-        this.createReactAppInit = null;
-      }
-
-      res.json();
-    }));
-
-    app.get('/playground/dashboard-app-files', catchErrors(async (req, res) => {
+    app.get('/playground/dashboard-app-create-status', catchErrors(async (req, res) => {
       const sourcePath = await path.join(dashboardAppPath, 'src');
 
-      if (this.createReactAppInit) {
-        await this.createReactAppInit;
-      }
-
-      if (this.curNpmInstall) {
-        await this.curNpmInstall;
+      if (this.applyTemplatePackagesPromise) {
+        await this.applyTemplatePackagesPromise;
       }
 
       if (!(await fs.pathExists(sourcePath))) {
@@ -140,84 +104,12 @@ class DevServer {
         return;
       }
 
-      const fileContentsRecursive = async (dir) => {
-        const files = await fs.readdir(dir);
-        return (await Promise.all(files
-          .map(async file => {
-            const fileName = path.join(dir, file);
-            const stats = await fs.lstat(fileName);
-            if (!stats.isDirectory()) {
-              const content = await fs.readFile(fileName, "utf-8");
-              return [{
-                fileName: fileName.replace(dashboardAppPath, '').replace(/\\/g, '/'),
-                content
-              }];
-            } else {
-              return fileContentsRecursive(fileName);
-            }
-          }))).reduce((a, b) => a.concat(b), []);
-      };
+      const appContainer = new AppContainer(dashboardAppPath);
 
-      res.json({ fileContents: await fileContentsRecursive(sourcePath) });
-    }));
-
-    app.post('/playground/dashboard-app-files', catchErrors(async (req, res) => {
-      this.cubejsServer.event('Dev Server App File Write');
-      const { files } = req.body;
-      await Promise.all(
-        files.map(file => fs.outputFile(
-          path.join(...[dashboardAppPath].concat(file.fileName.split('/'))),
-          file.content
-        ))
-      );
-      res.json({ files });
-    }));
-
-    app.post('/playground/ensure-dependencies', catchErrors(async (req, res) => {
-      this.cubejsServer.event('Dev Server App Ensure Dependencies');
-      const { dependencies } = req.body;
-      const cmd = async () => {
-        const packageJson = await fs.readJson(path.join(dashboardAppPath, 'package.json'));
-        const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
-        if (toInstall.length) {
-          this.cubejsServer.event('Dev Server Dashboard Npm Install');
-          // TODO downgrade react-scripts version because of https://github.com/facebook/create-react-app/issues/7753
-          await executeCommand(
-            'npm',
-            ['install', '--save-exact'].concat('react-scripts@3.0.1'),
-            { cwd: path.resolve(dashboardAppPath) }
-          );
-          await executeCommand(
-            'npm',
-            ['install'],
-            { cwd: path.resolve(dashboardAppPath) }
-          );
-          const cubeDependencies = toInstall.filter(p => p.match(/^@cubejs/));
-          await executeCommand(
-            'npm',
-            ['install', '--save'].concat(toInstall),
-            { cwd: path.resolve(dashboardAppPath) }
-          );
-          await executeCommand(
-            'npm',
-            ['update'].concat(cubeDependencies),
-            { cwd: path.resolve(dashboardAppPath) }
-          );
-          this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
-        }
-        return toInstall;
-      };
-      if (this.curNpmInstall) {
-        this.curNpmInstall = this.curNpmInstall.then(cmd);
-      } else {
-        this.curNpmInstall = cmd();
-      }
-      const { curNpmInstall } = this;
-      const toInstall = await this.curNpmInstall;
-      if (curNpmInstall === this.curNpmInstall) {
-        this.curNpmInstall = null;
-      }
-      res.json({ toInstall });
+      res.json({
+        status: 'created',
+        installedTemplates: await appContainer.getPackageVersions()
+      });
     }));
 
     const dashboardAppPort = this.cubejsServer.options.dashboardAppPort || 3000;
@@ -262,6 +154,37 @@ class DevServer {
         dashboardPort,
         dashboardAppPath: path.resolve(dashboardAppPath)
       });
+    }));
+
+    app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server App File Write');
+      const { templatePackages, templateConfig } = req.body;
+      const appContainer = new AppContainer(dashboardAppPath, templatePackages, templateConfig);
+      const applyTemplates = async () => {
+        this.cubejsServer.event('Dev Server Create Dashboard App');
+        await appContainer.applyTemplates();
+        this.cubejsServer.event('Dev Server Create Dashboard App Success');
+
+        this.cubejsServer.event('Dev Server Dashboard Npm Install');
+        await appContainer.ensureDependencies();
+        this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
+      };
+      if (this.applyTemplatePackagesPromise) {
+        this.applyTemplatePackagesPromise = this.applyTemplatePackagesPromise.then(applyTemplates);
+      } else {
+        this.applyTemplatePackagesPromise = applyTemplates();
+      }
+      const promise = this.applyTemplatePackagesPromise;
+      promise.then(() => {
+        if (promise === this.applyTemplatePackagesPromise) {
+          this.applyTemplatePackagesPromise = null;
+        }
+      }, () => {
+        if (promise === this.applyTemplatePackagesPromise) {
+          this.applyTemplatePackagesPromise = null;
+        }
+      });
+      res.json(true); // TODO
     }));
 
     app.use(serveStatic(path.join(__dirname, '../playground'), {
