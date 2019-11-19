@@ -134,6 +134,9 @@ class AppContainer {
   async ensureDependencies() {
     const dependencies = await this.importDependencies();
     const packageJson = await fs.readJson(path.join(this.appPath, 'package.json'));
+    if (!packageJson || !packageJson.dependencies) {
+      return [];
+    }
     const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
     if (toInstall.length) {
       await this.executeCommand(

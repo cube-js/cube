@@ -1,4 +1,3 @@
-/* globals window */
 import React, { Component } from 'react';
 import styled from 'styled-components';
 import { Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal, Typography } from 'antd';
@@ -131,24 +130,20 @@ class TemplateGalleryPage extends Component {
     const templatePackage = this.dashboardSource && this.dashboardSource.templatePackages
       .find(m => m.name === templatePackageName);
 
-    const {
-      appCode, dashboardPort, loadError, dashboardRunning, dashboardStarting, dashboardAppPath
-    } = this.state;
-
     const recipes = [{
       name: 'Dynamic Dashboard with React, AntD, and Recharts',
-      description: 'Use this template if you need to create dashboard application where users can edit their dashboards',
+      description: 'Use this template to create dashboard application with user editable dashboards backed by GraphQL backend.',
       coverUrl: "https://thepracticaldev.s3.amazonaws.com/i/zel6nkrzaklevw6q0xxf.png",
       templatePackages: ['create-react-app', 'react-antd-dynamic', 'recharts-charts', 'antd-tables', 'credentials']
     }, {
       name: 'Real-Time Dashboard with React, AntD, and Chart.js',
-      description: 'Use this template if you want to create static dashboard application and add charts to it using code or Cube.js Playground',
-      templatePackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials'],
+      description: 'Use this template to create static dashboard application with Real-Time WebSocket transport.',
+      templatePackages: ['create-react-app', 'react-antd-static', 'chartjs-charts', 'antd-tables', 'credentials', 'web-socket-transport'],
       coverUrl: "https://thepracticaldev.s3.amazonaws.com/i/7mj0mefi4sebsoaxkm9i.png"
     }, {
       name: 'Material UI React Dashboard',
       coverUrl: 'https://material-ui.com/static/images/themes-light.jpg',
-      description: 'use this template if you want to create static dashboard application and add charts to it using code or cube.js playground',
+      description: 'Use this template to create Material UI based static dashboard application and add charts to it using code or Cube.js Playground.',
       templatepackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials']
     }];
 
