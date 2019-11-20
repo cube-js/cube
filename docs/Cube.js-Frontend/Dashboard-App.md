@@ -23,6 +23,11 @@ Dashboard App is generated in the `dashboard-app` folder within your project fol
 
 Dashboard App uses Cube.js backend to power the query builder and the dashboard. It also uses Apollo GraphQL with local storage to save meta data such as dashboard items titles and locations on the dashboard. You can easily switch from local storage to your own or hosted GraphQL backend.
 
+## Customization Guides
+
+* [Dynamic React Dashboard](https://react-dashboard.cube.dev/)
+* [Real Time Dashboard](https://real-time-dashboard.cube.dev/)
+
 ## Deployment
 
 `npm run build` creates a build directory with a production build of your dashboard app. There a lot of options to deploy your static applications. You can serve it with your favorite HTTP server ot just select one of the popular cloud providers. Below you can find quick guides for [Netlify](https://www.netlify.com/) and [ZEIT Now](https://zeit.co/). Also, you can refer to the [create-react-app deployment](https://create-react-app.dev/docs/deployment) guide for additional deployment options.
