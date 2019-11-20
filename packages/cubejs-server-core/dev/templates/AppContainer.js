@@ -29,14 +29,14 @@ class AppContainer {
     return new SourceContainer(await AppContainer.fileContentsRecursive(this.appPath));
   }
 
-  static async fileContentsRecursive(dir, rootPath) {
+  static async fileContentsRecursive(dir, rootPath, includeNodeModules) {
     if (!rootPath) {
       rootPath = dir;
     }
     if (!(await fs.pathExists(dir))) {
       return [];
     }
-    if (dir.indexOf('node_modules/') !== -1) {
+    if (dir.indexOf('node_modules/') !== -1 && !includeNodeModules) {
       return [];
     }
     const files = await fs.readdir(dir);
@@ -51,7 +51,7 @@ class AppContainer {
             content
           }];
         } else {
-          return AppContainer.fileContentsRecursive(fileName, rootPath);
+          return AppContainer.fileContentsRecursive(fileName, rootPath, includeNodeModules);
         }
       }))).reduce((a, b) => a.concat(b), []);
   }

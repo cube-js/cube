@@ -28,7 +28,7 @@ class TemplatePackage {
   }
 
   async initSources() {
-    const sources = await AppContainer.fileContentsRecursive(this.scaffoldingPath);
+    const sources = await AppContainer.fileContentsRecursive(this.scaffoldingPath, null, true);
     this.templateSources = sources
       .map(({ fileName, content }) => ({ [fileName]: content }))
       .reduce((a, b) => ({ ...a, ...b }), {});
