@@ -83,8 +83,16 @@ class DevServer {
 
     const dashboardAppPath = this.cubejsServer.options.dashboardAppPath || 'dashboard-app';
 
+    let lastApplyTemplatePackagesError = null;
+
     app.get('/playground/dashboard-app-create-status', catchErrors(async (req, res) => {
       const sourcePath = await path.join(dashboardAppPath, 'src');
+
+      if (lastApplyTemplatePackagesError) {
+        const toThrow = lastApplyTemplatePackagesError;
+        lastApplyTemplatePackagesError = null;
+        throw toThrow;
+      }
 
       if (this.applyTemplatePackagesPromise) {
         await this.applyTemplatePackagesPromise;
@@ -179,7 +187,8 @@ class DevServer {
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
         }
-      }, () => {
+      }, (err) => {
+        lastApplyTemplatePackagesError = err;
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
         }

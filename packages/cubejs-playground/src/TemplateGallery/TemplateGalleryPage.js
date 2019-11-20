@@ -144,7 +144,7 @@ class TemplateGalleryPage extends Component {
       name: 'Material UI React Dashboard',
       coverUrl: 'https://material-ui.com/static/images/themes-light.jpg',
       description: 'Use this template to create Material UI based static dashboard application and add charts to it using code or Cube.js Playground.',
-      templatepackages: ['create-react-app', 'react-antd-static', 'recharts-charts', 'antd-tables', 'credentials']
+      templatePackages: ['create-react-app', 'react-material-static', 'recharts-charts', 'material-tables', 'credentials']
     }];
 
 

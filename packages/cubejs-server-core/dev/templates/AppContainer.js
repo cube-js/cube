@@ -12,6 +12,9 @@ class AppContainer {
   }
 
   async applyTemplates() {
+    if (!this.templatePackages || !this.templatePackages.length) {
+      throw new Error(`templatePackages is required`);
+    }
     const toApply = await this.templatePackages.map(
       templatePackage => async (packages) => packages.concat([await this.createTemplatePackage(templatePackage)])
     ).reduce((a, b) => a.then(b), Promise.resolve([]));
