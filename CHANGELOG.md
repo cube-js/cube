@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.24](https://github.com/cube-js/cube.js/compare/v0.11.23...v0.11.24) (2019-11-20)
+
+
+### Bug Fixes
+
+* Material UI template doesn't work ([deccca1](https://github.com/cube-js/cube.js/commit/deccca1))
+
+
+
+
+
 ## [0.11.23](https://github.com/cube-js/cube.js/compare/v0.11.22...v0.11.23) (2019-11-20)
 
 
