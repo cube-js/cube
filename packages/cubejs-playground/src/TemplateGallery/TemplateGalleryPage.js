@@ -132,18 +132,18 @@ class TemplateGalleryPage extends Component {
 
     const recipes = [{
       name: 'Dynamic Dashboard with React, AntD, and Recharts',
-      description: 'Use this template to create dashboard application with user editable dashboards backed by GraphQL backend.',
-      coverUrl: "https://thepracticaldev.s3.amazonaws.com/i/zel6nkrzaklevw6q0xxf.png",
+      description: 'Use this template to create a dynamic dashboard application with React, AntD, and Chart.js. It comes with a dynamic query builder and Apollo GraphQL client.',
+      coverUrl: "https://cube.dev/downloads/template-react-dashboard.png",
       templatePackages: ['create-react-app', 'react-antd-dynamic', 'recharts-charts', 'antd-tables', 'credentials']
     }, {
       name: 'Real-Time Dashboard with React, AntD, and Chart.js',
-      description: 'Use this template to create static dashboard application with Real-Time WebSocket transport.',
+      description: 'Use this template to create a static dashboard application with real-time WebSocket transport.',
       templatePackages: ['create-react-app', 'react-antd-static', 'chartjs-charts', 'antd-tables', 'credentials', 'web-socket-transport'],
-      coverUrl: "https://thepracticaldev.s3.amazonaws.com/i/7mj0mefi4sebsoaxkm9i.png"
+      coverUrl: "https://cube.dev/downloads/template-real-time-dashboard.png"
     }, {
       name: 'Material UI React Dashboard',
-      coverUrl: 'https://material-ui.com/static/images/themes-light.jpg',
-      description: 'Use this template to create Material UI based static dashboard application and add charts to it using code or Cube.js Playground.',
+      coverUrl: 'https://cube.dev/downloads/template-material-ui.jpg',
+      description: 'Use this template to create a Material UI–based static dashboard application and add charts to it by editing the source code or via Cube.js Playground.',
       templatePackages: ['create-react-app', 'react-material-static', 'recharts-charts', 'material-tables', 'credentials']
     }];
 
