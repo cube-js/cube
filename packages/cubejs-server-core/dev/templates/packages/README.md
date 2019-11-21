@@ -1,3 +1,5 @@
+# Cube.js Templates
+
 Setting up a new project, writing tons of configurations, and wiring all the things together is hard and boring. It's fun to write actual application code, not Webpack config. That's why Create React App is so extremely popular. 
 
 Same for analytics apps and dashboards. Although [Cube.js](https://github.com/cube-js/cube.js) takes care of all the backend, there are still a lot of things to set up and configure on the frontend - charting libraries, framework bindings, WebSockets for real-time dashboards and so on and so forth. 
