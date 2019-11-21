@@ -958,7 +958,7 @@ class BaseQuery {
         // TODO - function for commonly setting this
         // TODO - confirm context
         // TODO - don't return here, return later
-        return this.escapeColumnName(`${cubeName}__${name}`)
+        return this.escapeColumnName(`${this.aliasName(cubeName)}__${name}`)
       } else if (this.safeEvaluateSymbolContext().rollupQuery && symbol.type === 'sum' && symbol.filters) {
 
         evaluatedSql = this.evaluateSymbolSqlWithContext(
@@ -1008,7 +1008,7 @@ class BaseQuery {
           this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
         ])
       } else if (this.safeEvaluateSymbolContext().rollupQuery) {
-        return this.escapeColumnName(`${cubeName}__${this.aliasName(name)}`)
+        return this.escapeColumnName(`${this.aliasName(cubeName)}__${this.aliasName(name)}`)
       } else {
         return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql)
       }
