@@ -317,7 +317,7 @@ describe('PreAggregations', function test() {
     });
   });
 
-  it('leaf measure pre-aggregation with measure filter', () => {
+  it('leaf measure pre-aggregation with measure filter and filtered dimension used', () => {
     return compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
@@ -345,7 +345,7 @@ describe('PreAggregations', function test() {
 
       return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
         query.buildSqlAndParams()
-      ]).map(q => replaceTableName(q, preAggregationsDescription, 10))).then(res => {
+      ]).map(q => replaceTableName(q, preAggregationsDescription, 11))).then(res => {
         res.should.be.deepEqual(
           [
             {
@@ -370,6 +370,62 @@ describe('PreAggregations', function test() {
               "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
               "visitors__count": "2",
               "visitors__source": null,
+              "visitors__google_count": null
+            }
+          ]
+        );
+      });
+    });
+  });
+
+  it('leaf measure pre-aggregation with measure filter without filtered dimension used', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.count',
+          'visitors.google_count',
+        ],
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'date',
+          dateRange: ['2017-01-01', '2017-01-30']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log("queryAndParams", { queryAndParams });
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log("preAggregationsDescription", { preAggregationsDescription });
+      preAggregationsDescription[0].loadSql[0].should.match(/visitors_filtered_metrics/);
+
+      return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
+        query.buildSqlAndParams()
+      ]).map(q => replaceTableName(q, preAggregationsDescription, 12))).then(res => {
+        res.should.be.deepEqual(
+          [
+            {
+              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__count": '1',
+              "visitors__google_count": null
+            },
+            {
+              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__count": '1',
+              "visitors__google_count": null
+            },
+            {
+              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__count": '1',
+              "visitors__google_count": '1'
+            },
+            {
+              "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
+              "visitors__count": "2",
               "visitors__google_count": null
             }
           ]
