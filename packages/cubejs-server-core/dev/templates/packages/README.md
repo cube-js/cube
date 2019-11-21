@@ -8,6 +8,8 @@ Same for analytics apps and dashboards. Although [Cube.js](https://github.com/cu
 
 React with WebSockets, Chart.js and Material UI? You got it. Template wires it all together and configure to work with the Cube.js backend. 
 
+[![Cube.js Templates Demo](https://img.youtube.com/vi/YsbF95tbSAQ/0.jpg)](https://www.youtube.com/watch?v=YsbF95tbSAQ)
+
 Today we've released it only for React, but soon we'll add Angular, Vue, and Vanilla Javascript support. And it is open-sourced, same as Cube.js. Contributions are very welcomed! ❤️
 
 
