@@ -14,6 +14,7 @@ test('dotEnv should return default env vars for mysql DB type', () => {
 CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
 CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
+CUBEJS_WEB_SOCKETS=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}`;
 
@@ -26,6 +27,7 @@ test('dotEnv should return default env vars for unsupported DB type', () => {
 CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
 CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
+CUBEJS_WEB_SOCKETS=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}`;
 
