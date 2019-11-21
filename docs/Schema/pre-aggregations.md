@@ -8,7 +8,7 @@ menuOrder: 8
 ---
 
 Pre-aggregations are materialized query results persisted as tables.
-In order to start using pre-aggregations Cube.js should have write access to `stb_pre_aggregations` schema, or whatever your [preAggregationsSchema]((@cubejs-backend-server-core#options-reference-pre-aggregations-schema)) setting is set to, where pre-aggregation tables will be stored.
+In order to start using pre-aggregations Cube.js should have write access to `stb_pre_aggregations` schema, or whatever your [preAggregationsSchema](@cubejs-backend-server-core#options-reference-pre-aggregations-schema) setting is set to, where pre-aggregation tables will be stored.
 Cube.js has an ability to analyze queries against defined set of pre-aggregation rules in order to choose optimal one that will be used to create pre-aggregation table.
 
 If Cube.js finds suitable pre-aggregation rule database querying becomes multi-stage.

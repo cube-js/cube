@@ -952,17 +952,35 @@ class BaseQuery {
           this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
         }
       }
+      let auto_prefix;
+      if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
+        // TODO - check if this is a measure in the cube
+        // TODO - function for commonly setting this
+        // TODO - confirm context
+        // TODO - don't return here, return later
+        return this.escapeColumnName(`${cubeName}__${name}`)
+      } else if (this.safeEvaluateSymbolContext().rollupQuery && symbol.type === 'sum' && symbol.filters) {
+
+        auto_prefix = this.evaluateSymbolSqlWithContext(
+          () => this.evaluateSql(cubeName, symbol.sql),
+          { usedInAggregationWithFilter: true }
+        )
+      } else {
+        auto_prefix = this.autoPrefixWithCubeName(
+          cubeName,
+          symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
+          // symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
+          this.cubeEvaluator.primaryKeys[cubeName] && this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName) || '*'
+        )
+      }
+      const applied_filters = this.applyMeasureFilters(
+        auto_prefix,
+        symbol,
+        cubeName
+      );
       const result = this.renderSqlMeasure(
         name,
-        this.applyMeasureFilters(
-          this.autoPrefixWithCubeName(
-            cubeName,
-            symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
-            this.cubeEvaluator.primaryKeys[cubeName] && this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName) || '*'
-          ),
-          symbol,
-          cubeName
-        ),
+        applied_filters,
         symbol,
         cubeName,
         parentMeasure
@@ -990,6 +1008,8 @@ class BaseQuery {
           "','",
           this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
         ])
+      } else if (this.safeEvaluateSymbolContext().rollupQuery) {
+        return this.escapeColumnName(`${cubeName}__${this.aliasName(name)}`)
       } else {
         return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql)
       }
@@ -1034,7 +1054,7 @@ class BaseQuery {
     }, {
       sqlResolveFn: (symbol, cube, n) => self.evaluateSymbolSql(cube, n, symbol),
       cubeAliasFn: self.cubeAlias.bind(self),
-      contextSymbols: this.parametrizedContextSymbols(),
+      contextSymbols: this.parameterizedContextSymbols(),
       query: this
     });
   }
@@ -1214,7 +1234,6 @@ class BaseQuery {
     }
 
     const where = this.evaluateMeasureFilters(symbol, cubeName);
-
     return `CASE WHEN ${where} THEN ${evaluateSql === '*' ? '1' : evaluateSql} END`;
   }
 
@@ -1391,7 +1410,7 @@ class BaseQuery {
     )];
   }
 
-  parametrizedContextSymbols() {
+  parameterizedContextSymbols() {
     return Object.assign({
       filterParams: this.filtersProxy(),
       sqlUtils: {
