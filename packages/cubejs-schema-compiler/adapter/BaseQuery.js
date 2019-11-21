@@ -952,21 +952,22 @@ class BaseQuery {
           this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
         }
       }
-      let evaluatedSql;
       if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
         return this.escapeColumnName(this.aliasCubeField(cubeName, name))
-      } else if (this.safeEvaluateSymbolContext().rollupQuery && symbol.type === 'sum' && symbol.filters) {
+      }
 
+      let evaluatedSql;
+      if (this.safeEvaluateSymbolContext().rollupQuery && symbol.type === 'sum' && symbol.filters) {
         evaluatedSql = this.evaluateSymbolSqlWithContext(
           () => this.evaluateSql(cubeName, symbol.sql),
           { usedInAggregationWithFilter: true }
-        )
+        );
       } else {
         evaluatedSql = this.autoPrefixWithCubeName(
           cubeName,
           symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
           this.cubeEvaluator.primaryKeys[cubeName] && this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName) || '*'
-        )
+        );
       }
       const appliedFilters = this.applyMeasureFilters(
         evaluatedSql,
