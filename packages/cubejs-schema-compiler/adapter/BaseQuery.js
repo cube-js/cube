@@ -954,7 +954,7 @@ class BaseQuery {
       }
       let evaluatedSql;
       if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
-        // TODO - check if this is a measure in the cube
+        // TODO - check if this is a measure in the cube preaggregation? elsewhere?
         // TODO - function for commonly setting this
         // TODO - confirm context
         // TODO - don't return here, return later
