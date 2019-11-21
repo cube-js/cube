@@ -954,11 +954,7 @@ class BaseQuery {
       }
       let evaluatedSql;
       if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
-        // TODO - check if this is a measure in the cube preaggregation? elsewhere?
-        // TODO - function for commonly setting this
-        // TODO - confirm context
-        // TODO - don't return here, return later
-        return this.escapeColumnName(`${this.aliasName(cubeName)}__${name}`)
+        return this.escapeColumnName(this.aliasCubeField(cubeName, name))
       } else if (this.safeEvaluateSymbolContext().rollupQuery && symbol.type === 'sum' && symbol.filters) {
 
         evaluatedSql = this.evaluateSymbolSqlWithContext(
@@ -1008,7 +1004,7 @@ class BaseQuery {
           this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
         ])
       } else if (this.safeEvaluateSymbolContext().rollupQuery) {
-        return this.escapeColumnName(`${this.aliasName(cubeName)}__${this.aliasName(name)}`)
+        return this.escapeColumnName(this.aliasCubeField(cubeName, name))
       } else {
         return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql)
       }
@@ -1284,6 +1280,10 @@ class BaseQuery {
       name = this.cubeEvaluator.pathFromArray(path);
     }
     return inflection.underscore(name).replace(/\./g, '__');
+  }
+
+  aliasCubeField(cubeName, field) {
+    return `${this.aliasName(cubeName)}__${this.aliasName(field)}`
   }
 
   newSubQuery(options) {

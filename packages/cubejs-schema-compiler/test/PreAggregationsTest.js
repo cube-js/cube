@@ -143,6 +143,12 @@ describe('PreAggregations', function test() {
           dimensionReferences: [source],
           timeDimensionReference: createdAt,
           granularity: 'day',
+        },
+        nonFilterableMetrics: {
+          type: 'rollup',
+          measureReferences: [count],
+          timeDimensionReference: createdAt,
+          granularity: 'day',
         }
       }
     })
