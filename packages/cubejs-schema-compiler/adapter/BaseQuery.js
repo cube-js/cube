@@ -952,7 +952,7 @@ class BaseQuery {
           this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
         }
       }
-      let auto_prefix;
+      let evaluatedSql;
       if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
         // TODO - check if this is a measure in the cube
         // TODO - function for commonly setting this
@@ -961,26 +961,25 @@ class BaseQuery {
         return this.escapeColumnName(`${cubeName}__${name}`)
       } else if (this.safeEvaluateSymbolContext().rollupQuery && symbol.type === 'sum' && symbol.filters) {
 
-        auto_prefix = this.evaluateSymbolSqlWithContext(
+        evaluatedSql = this.evaluateSymbolSqlWithContext(
           () => this.evaluateSql(cubeName, symbol.sql),
           { usedInAggregationWithFilter: true }
         )
       } else {
-        auto_prefix = this.autoPrefixWithCubeName(
+        evaluatedSql = this.autoPrefixWithCubeName(
           cubeName,
           symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
-          // symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
           this.cubeEvaluator.primaryKeys[cubeName] && this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName) || '*'
         )
       }
-      const applied_filters = this.applyMeasureFilters(
-        auto_prefix,
+      const appliedFilters = this.applyMeasureFilters(
+        evaluatedSql,
         symbol,
         cubeName
       );
       const result = this.renderSqlMeasure(
         name,
-        applied_filters,
+        appliedFilters,
         symbol,
         cubeName,
         parentMeasure
