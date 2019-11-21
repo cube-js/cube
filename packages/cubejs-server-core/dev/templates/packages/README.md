@@ -1,3 +1,7 @@
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+
+[Demo](https://cube.dev/templates)
+
 # Cube.js Templates
 
 Setting up a new project, writing tons of configurations, and wiring all the things together is hard and boring. It's fun to write actual application code, not Webpack config. That's why Create React App is so extremely popular. 
