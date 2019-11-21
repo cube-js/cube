@@ -68,3 +68,11 @@ Once you created your app from the template, you can start it from the Cube.js p
 That's it! Now, you have a full working both backend and frontend for your dashboard. You can follow [React Dashboard Guide](https://react-dashboard.cube.dev/) or [Real-Time Dashboard Guide](https://real-time-dashboard.cube.dev/) to learn how to customize the dashboard app and deploy it to production 🚀
 
 Please feel free to share your feedback or ask any questions in the comments below or in this [Slack community](https://slack.cube.dev/).
+
+## What's in this directory?
+
+Here's repository of all template packages supported by Cube.js Templates.
+Each package consists of `TemplatePackage` description and `scaffolding/` sources.
+Babel is used to parse apply code changes and generate resulting code.
+Each template packages has default rules how they applied. 
+Those defalts can easily be overriden by providing custom `SourceSnippet` implementations.
