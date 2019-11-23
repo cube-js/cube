@@ -928,6 +928,14 @@ class BaseQuery {
   }
 
   evaluateSymbolSql(cubeName, name, symbol) {
+    const measurePath = `${cubeName}.${name}`;
+    if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
+        return this.escapeColumnName(this.aliasCubeField(cubeName, name))
+    }
+    if (((this.evaluateSymbolContext || {}).renderedReference || {})[measurePath]) {
+      return this.evaluateSymbolContext.renderedReference[measurePath];
+    }
+
     this.pushCubeNameForCollectionIfNecessary(cubeName);
     if (this.cubeEvaluator.isMeasure([cubeName, name])) {
       let parentMeasure;
@@ -952,10 +960,6 @@ class BaseQuery {
           this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
         }
       }
-      if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
-        return this.escapeColumnName(this.aliasCubeField(cubeName, name))
-      }
-
       let evaluatedSql;
       if (this.safeEvaluateSymbolContext().rollupQuery && symbol.type === 'sum' && symbol.filters) {
         evaluatedSql = this.evaluateSymbolSqlWithContext(
@@ -1133,9 +1137,6 @@ class BaseQuery {
     }
     if (this.safeEvaluateSymbolContext().foundCompositeCubeMeasures && !parentMeasure) {
       this.safeEvaluateSymbolContext().rootMeasure = { multiplied: resultMultiplied, measure: measurePath };
-    }
-    if (((this.evaluateSymbolContext || {}).renderedReference || {})[measurePath]) {
-      return this.evaluateSymbolContext.renderedReference[measurePath];
     }
     if (
       this.safeEvaluateSymbolContext().ungrouped ||

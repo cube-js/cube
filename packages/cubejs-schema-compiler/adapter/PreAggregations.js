@@ -443,7 +443,7 @@ class PreAggregations {
           )
         }))).filter(f => !!f);
 
-    const renderedReference = R.pipe(
+    const renderedMeasureReference = R.pipe(
       R.map(path => {
         const measure = this.query.newMeasure(path);
         return [
@@ -457,7 +457,24 @@ class PreAggregations {
       preAggregationForQuery.preAggregation.measures :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures
     );
-    
+
+    const renderedDimensionReference = R.pipe(
+      R.map(path => {
+        const dimension = this.query.newDimension(path);
+        return [
+          path,
+          this.query.aggregateOnGroupedColumn(dimension.dimensionDefinition(), dimension.aliasName()) ||
+          dimension.aliasName()
+        ];
+      }),
+      R.fromPairs
+    )(preAggregationForQuery.preAggregation.type === 'autoRollup' ?
+      preAggregationForQuery.preAggregation.dimensions :
+      this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).dimensions
+    );
+
+    const renderedReference = Object.assign({}, renderedMeasureReference, renderedDimensionReference)
+
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'date';
 
     return this.query.evaluateSymbolSqlWithContext(
