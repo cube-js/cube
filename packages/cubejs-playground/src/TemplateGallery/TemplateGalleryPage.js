@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import styled from 'styled-components';
 import { Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal, Typography } from 'antd';
-import { withRouter } from "react-router-dom";
+import { withRouter, Redirect } from "react-router-dom";
 import DashboardSource from "../DashboardSource";
 import fetch from '../playgroundFetch';
 import { frameworks } from "../ChartContainer";
@@ -120,10 +120,23 @@ class TemplateGalleryPage extends Component {
 
   async componentDidMount() {
     this.dashboardSource = new DashboardSource();
+    await this.dashboardSource.load(true);
+    this.setState({
+      loadError: this.dashboardSource.loadError
+    });
   }
 
   render() {
-    const { chartLibrary, framework, templatePackageName, createOwnModalVisible, enableWebSocketTransport } = this.state;
+    const {
+      loadError
+    } = this.state;
+    if (loadError && loadError.indexOf('Dashboard app not found') === -1) {
+      return <Redirect to="/dashboard" />;
+    }
+
+    const {
+      chartLibrary, framework, templatePackageName, createOwnModalVisible, enableWebSocketTransport
+    } = this.state;
     const { history } = this.props;
     const currentLibraryItem = chartLibraries.find(m => m.value === chartLibrary);
     const frameworkItem = frameworks.find(m => m.id === framework);

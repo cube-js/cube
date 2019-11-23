@@ -4,14 +4,11 @@ import fetch from './playgroundFetch';
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
 class DashboardSource {
-  async load(createApp, templatePackages) {
+  async load(instant) {
     this.loadError = null;
-    if (createApp) {
-      await this.applyTemplatePackages(
-        templatePackages
-      );
-    }
-    const res = await fetchWithRetry('/playground/dashboard-app-create-status', undefined, 10);
+    const res = await fetchWithRetry(
+      `/playground/dashboard-app-create-status${instant ? '?instant=true' : ''}`, undefined, 10
+    );
     const result = await res.json();
     if (result.error) {
       this.loadError = result.error;

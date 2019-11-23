@@ -37,14 +37,13 @@ class DashboardPage extends Component {
     await this.loadDashboard();
   }
 
-  async loadDashboard(createApp) {
-    const { chartLibrary, templatePackageName } = this.state;
+  async loadDashboard() {
     this.setState({
       appCode: null,
       loadError: null
     });
     try {
-      await this.dashboardSource.load(createApp, { chartLibrary, templatePackageName });
+      await this.dashboardSource.load();
       this.setState({
         dashboardStarting: false,
         appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardCreated,
@@ -56,9 +55,6 @@ class DashboardPage extends Component {
         dashboardPort: dashboardStatus.dashboardPort,
         dashboardAppPath: dashboardStatus.dashboardAppPath
       });
-      if (createApp) {
-        await this.startDashboardApp();
-      }
     } catch (e) {
       this.setState({
         dashboardStarting: false,
@@ -80,8 +76,27 @@ class DashboardPage extends Component {
     const {
       appCode, dashboardPort, loadError, dashboardRunning, dashboardStarting, dashboardAppPath
     } = this.state;
-    if (loadError) {
+    if (loadError && typeof loadError === 'string' && loadError.indexOf('Dashboard app not found') !== -1) {
       return <Redirect to="/template-gallery" />;
+    }
+    if (loadError) {
+      return (
+        <Frame>
+          <h2>
+            {loadError}
+          </h2>
+          <p style={{ marginTop: 25 }}>
+            <Link to="/template-gallery">
+              <Button
+                type="primary"
+              >
+                Create dashboard app in your project directory
+              </Button>
+            </Link>
+          </p>
+          <Hint />
+        </Frame>
+      );
     }
     if (!appCode) {
       return (

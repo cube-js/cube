@@ -95,6 +95,10 @@ class DevServer {
       }
 
       if (this.applyTemplatePackagesPromise) {
+        if (req.query.instant) {
+          res.status(404).json({ error: 'Dashboard app creating' });
+          return;
+        }
         await this.applyTemplatePackagesPromise;
       }
 
