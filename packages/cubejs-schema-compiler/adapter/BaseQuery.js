@@ -929,6 +929,7 @@ class BaseQuery {
 
   evaluateSymbolSql(cubeName, name, symbol) {
     const measurePath = `${cubeName}.${name}`;
+    // Avoids nested aggregation function calls
     if (this.safeEvaluateSymbolContext().usedInAggregationWithFilter){
         return this.escapeColumnName(this.aliasCubeField(cubeName, name))
     }
@@ -1008,8 +1009,6 @@ class BaseQuery {
           "','",
           this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
         ])
-      } else if (this.safeEvaluateSymbolContext().rollupQuery) {
-        return this.escapeColumnName(this.aliasCubeField(cubeName, name))
       } else {
         return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql)
       }

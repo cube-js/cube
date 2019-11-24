@@ -473,7 +473,22 @@ class PreAggregations {
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).dimensions
     );
 
-    const renderedReference = Object.assign({}, renderedMeasureReference, renderedDimensionReference)
+    const renderedTimeDimensionsReference = R.pipe(
+      R.map(path => {
+        const timeDimension = this.query.newTimeDimension(path);
+        return [
+          path,
+          this.query.aggregateOnGroupedColumn(timeDimension.dimensionDefinition(), timeDimension.aliasName()) ||
+          timeDimension.aliasName()
+        ];
+      }),
+      R.fromPairs
+    )(preAggregationForQuery.preAggregation.type === 'autoRollup' ?
+      preAggregationForQuery.preAggregation.timeDimensions :
+      this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).timeDimensions
+    );
+
+    const renderedReference = Object.assign({}, renderedMeasureReference, renderedDimensionReference, renderedTimeDimensionsReference)
 
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'date';
 
