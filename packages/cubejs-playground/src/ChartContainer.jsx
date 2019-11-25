@@ -1,7 +1,7 @@
 /* global navigator */
 import React from 'react';
 import {
-  Card, Button, Menu, Dropdown, Icon, notification, Modal
+  Card, Button, Menu, Dropdown, Icon, notification, Modal, Table
 } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
@@ -234,6 +234,18 @@ class ChartContainer extends React.Component {
             SQL
           </Button>
           <Button
+            onClick={() => {
+              playgroundAction('Show Cache');
+              this.setState({ showCode: showCode === 'cache' ? null : 'cache' });
+            }}
+            icon="sync"
+            size="small"
+            type={showCode === 'cache' ? 'primary' : 'default'}
+            disabled={!!frameworkItem.docsLink}
+          >
+            Cache
+          </Button>
+          <Button
             icon="code-sandbox"
             size="small"
             onClick={() => playgroundAction('Open Code Sandbox')}
@@ -280,6 +292,51 @@ class ChartContainer extends React.Component {
             query={query}
             cubejsApi={cubejsApi}
             render={({ sqlQuery }) => <PrismCode code={sqlQuery && sqlFormatter.format(sqlQuery.sql())} />}
+          />
+        );
+      } else if (showCode === 'cache') {
+        return (
+          <QueryRenderer
+            loadSql
+            query={{ ...query, renewQuery: true }}
+            cubejsApi={cubejsApi}
+            render={
+              ({ sqlQuery, resultSet: rs }) => (
+                <div>
+                  <h3>
+                    Last Refresh Time:
+                    {rs && rs.loadResponse.lastRefreshTime}
+                  </h3>
+                  <Table
+                    loading={!sqlQuery}
+                    pagination={false}
+                    columns={[
+                      {
+                        title: 'Refresh Key SQL',
+                        key: 'refreshKey',
+                        render: (text, record) => <PrismCode code={sqlFormatter.format(record[0])} />,
+                      },
+                      {
+                        title: 'Value',
+                        key: 'value',
+                        render: (text, record) => (
+                          <PrismCode
+                            code={
+                              rs && rs.loadResponse.refreshKeyValues
+                              && JSON.stringify(rs.loadResponse.refreshKeyValues[
+                                sqlQuery.sqlQuery.sql.cacheKeyQueries.queries.indexOf(record)
+                              ], null, 2)
+                            }
+                          />
+                        ),
+                      }
+                    ]}
+                    dataSource={
+                      sqlQuery && sqlQuery.sqlQuery.sql && sqlQuery.sqlQuery.sql.cacheKeyQueries.queries
+                    }
+                  />
+                </div>
+              )}
           />
         );
       }

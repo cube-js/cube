@@ -16,17 +16,19 @@ class QueryCache {
       new LocalCacheDriver();
   }
 
-  cachedQueryResult (queryBody, preAggregationsTablesToTempTables) {
-    const replacePreAggregationTableNames = (queryAndParams) =>
-      QueryCache.replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables);
+  async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
+    const replacePreAggregationTableNames = (queryAndParams) => QueryCache.replacePreAggregationTableNames(
+      queryAndParams, preAggregationsTablesToTempTables
+    );
 
     const query = replacePreAggregationTableNames(queryBody.query);
     let queuePriority = 10;
     if (Number.isInteger(queryBody.queuePriority)) {
+      // eslint-disable-next-line prefer-destructuring
       queuePriority = queryBody.queuePriority;
     }
     const forceNoCache = queryBody.forceNoCache || false;
-    const values = queryBody.values;
+    const { values } = queryBody;
     const cacheKeyQueries =
       (
         queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.queries ||
@@ -39,7 +41,7 @@ class QueryCache {
     const expireSecs = queryBody.expireSecs || 24 * 3600;
 
     if (!cacheKeyQueries) {
-      return this.queryWithRetryAndRelease(query, values, queryBody.external);
+      return { data: await this.queryWithRetryAndRelease(query, values, queryBody.external) };
     }
     const cacheKey = QueryCache.queryCacheKey(queryBody);
 
@@ -67,7 +69,10 @@ class QueryCache {
       });
     }
 
-    return mainPromise;
+    return {
+      data: await mainPromise,
+      lastRefreshTime: await this.lastRefreshTime(cacheKey)
+    };
   }
 
   static queryCacheKey(queryBody) {
@@ -75,14 +80,14 @@ class QueryCache {
   }
 
   static replaceAll(replaceThis, withThis, inThis) {
-    withThis = withThis.replace(/\$/g,"$$$$");
+    withThis = withThis.replace(/\$/g, "$$$$");
     return inThis.replace(
-      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g,"\\$&"),"g"),
+      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, "\\$&"), "g"),
       withThis
     );
   }
 
-  static replacePreAggregationTableNames (queryAndParams, preAggregationsTablesToTempTables) {
+  static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
     const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, tempTable]) => QueryCache.replaceAll(tableName, tempTable, query),
@@ -169,9 +174,9 @@ class QueryCache {
       query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
     ).catch(e => {
       if (!(e instanceof ContinueWaitError)) {
-        this.logger('Error while renew cycle', { query, query_values: values, error: e.stack || e })
+        this.logger('Error while renew cycle', { query, query_values: values, error: e.stack || e });
       }
-    })
+    });
   }
 
   renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
@@ -192,30 +197,34 @@ class QueryCache {
         this.logger('Error fetching cache key queries', { error: e.stack || e });
         return [];
       })
-      .then(cacheKeyQueryResults => {
-        return this.cacheQueryResult(
-          query, values,
-          cacheKey,
-          expireSecs,
-          {
-            renewalThreshold: renewalThreshold || 6 * 60 * 60,
-            renewalKey: cacheKeyQueryResults && [
-              cacheKeyQueries, cacheKeyQueryResults, this.queryRedisKey([query, values])
-            ],
-            waitForRenew: true,
-            external: options.external
-          }
-        );
-      });
+      .then(async cacheKeyQueryResults => (
+        {
+          data: await this.cacheQueryResult(
+            query, values,
+            cacheKey,
+            expireSecs,
+            {
+              renewalThreshold: renewalThreshold || 6 * 60 * 60,
+              renewalKey: cacheKeyQueryResults && [
+                cacheKeyQueries, cacheKeyQueryResults, this.queryRedisKey([query, values])
+              ],
+              waitForRenew: true,
+              external: options.external
+            }
+          ),
+          refreshKeyValues: cacheKeyQueryResults,
+          lastRefreshTime: await this.lastRefreshTime(cacheKey)
+        }
+      ));
   }
 
   cacheQueryResult(query, values, cacheKey, expiration, options) {
     options = options || {};
-    const renewalThreshold = options.renewalThreshold;
+    const { renewalThreshold } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
-    const fetchNew = () => {
-      return this.queryWithRetryAndRelease(query, values, options.priority, cacheKey, options.external).then(res => {
+    const fetchNew = () => (
+      this.queryWithRetryAndRelease(query, values, options.priority, cacheKey, options.external).then(res => {
         const result = {
           time: (new Date()).getTime(),
           result: res,
@@ -224,17 +233,17 @@ class QueryCache {
         return this.cacheDriver.set(redisKey, result, expiration)
           .then(() => {
             this.logger('Renewed', { cacheKey });
-            return res
+            return res;
           });
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
           this.logger('Dropping Cache', { cacheKey, error: e.stack || e });
           this.cacheDriver.remove(redisKey)
-            .catch(e => this.logger('Error removing key', { cacheKey, error: e.stack || e }));
+            .catch(err => this.logger('Error removing key', { cacheKey, error: err.stack || err }));
         }
         throw e;
-      });
-    };
+      })
+    );
 
     if (options.forceNoCache) {
       this.logger('Force no cache for', { cacheKey });
@@ -268,7 +277,7 @@ class QueryCache {
             this.logger('Renewing existing key', { cacheKey, renewalThreshold });
             fetchNew().catch(e => {
               if (!(e instanceof ContinueWaitError)) {
-                this.logger('Error renewing', {cacheKey, error: e.stack || e})
+                this.logger('Error renewing', { cacheKey, error: e.stack || e });
               }
             });
           }
@@ -282,8 +291,13 @@ class QueryCache {
     });
   }
 
+  async lastRefreshTime(cacheKey) {
+    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    return cachedValue && new Date(cachedValue.time);
+  }
+
   queryRedisKey(cacheKey) {
-    return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest("hex")}`
+    return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest("hex")}`;
   }
 }
 

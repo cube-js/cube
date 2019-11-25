@@ -322,6 +322,8 @@ class ApiGateway {
       res({
         query: normalizedQuery,
         data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data),
+        lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
+        refreshKeyValues: process.env.NODE_ENV === 'production' ? undefined : response.refreshKeyValues,
         annotation
       });
     } catch (e) {

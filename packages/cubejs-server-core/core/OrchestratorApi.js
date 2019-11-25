@@ -32,7 +32,7 @@ class OrchestratorApi {
         params: query.values
       });
 
-      return { data };
+      return data;
     } catch (err) {
       if ((err instanceof pt.TimeoutError || err instanceof ContinueWaitError)) {
         this.logger('Continue wait', {
