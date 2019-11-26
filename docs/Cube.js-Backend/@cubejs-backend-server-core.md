@@ -46,7 +46,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   basePath: String,
   devServer: Boolean,
   logger: (msg: String, params: Object) => any,
-  driverFactory: (context: RequestContext) => BaseDriver,
+  driverFactory: (context: DriverContext) => BaseDriver,
   externalDriverFactory: (context: RequestContext) => BaseDriver,
   contextToAppId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => String,
@@ -78,6 +78,10 @@ QueueOptions {
 
 RequestContext {
   authInfo: Object
+}
+
+DriverContext extends RequestContext {
+  dataSource: String
 }
 ```
 
@@ -131,7 +135,7 @@ in [Multitenancy Applications](multitenancy-setup).
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 CubejsServerCore.create({
-  driverFactory: () => new PostgresDriver()
+  driverFactory: ({ dataSource }) => new PostgresDriver({ database: dataSource })
 })
 ```
 
