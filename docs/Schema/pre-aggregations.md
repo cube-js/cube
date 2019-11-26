@@ -8,7 +8,7 @@ menuOrder: 8
 ---
 
 Pre-aggregations are materialized query results persisted as tables.
-In order to start using pre-aggregations Cube.js should have write access to `stb_pre_aggregations` schema, or whatever your [preAggregationsSchema]((@cubejs-backend-server-core#options-reference-pre-aggregations-schema)) setting is set to, where pre-aggregation tables will be stored.
+In order to start using pre-aggregations Cube.js should have write access to `stb_pre_aggregations` schema, or whatever your [preAggregationsSchema](@cubejs-backend-server-core#options-reference-pre-aggregations-schema) setting is set to, where pre-aggregation tables will be stored.
 Cube.js has an ability to analyze queries against defined set of pre-aggregation rules in order to choose optimal one that will be used to create pre-aggregation table.
 
 If Cube.js finds suitable pre-aggregation rule database querying becomes multi-stage.
@@ -173,7 +173,35 @@ cube(`Orders`, {
 `partitionGranularity` can be either `day`, `week` or `month`.
 For example if `partitionGranularity` is set to `month` Cube.js will generate separate `rollup` table for each month.
 This can reduce rollup refreshing time and cost significantly.
-Partitioned rollups currently cannot be used by queries without time dimensions. 
+Partitioned rollups currently cannot be used by queries without time dimensions.
+
+
+### Segment Partitioning
+
+Any rollup can be auto-filtered to some segments by using the `segmentReferences` property:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  segments: {
+    toys: {
+        sql: `category = 'toys'`
+    }
+  },
+
+  preAggregations: {
+    categoryAndDate: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      segmentReferences: [toys],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`
+    }
+  }
+});
+```
 
 ## Auto Rollup
 

@@ -121,7 +121,7 @@ cube(`OrderFacts`, {
 cube(`ExtendedOrderFacts`, {
   extends: OrderFacts,
 
-  measure: {
+  measures: {
     doubleCount: {
       type: `number`,
       sql: `${count} * 2`
