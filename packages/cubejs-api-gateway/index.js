@@ -274,7 +274,10 @@ class ApiGateway {
     try {
       query = this.parseQueryParam(query);
       const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
-      const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
+      const sqlQuery = await this.getCompilerApi(context).getSql(
+        coerceForSqlQuery(normalizedQuery, context),
+        { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+      );
       res({
         sql: sqlQuery
       });
@@ -323,7 +326,10 @@ class ApiGateway {
         query: normalizedQuery,
         data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data),
         lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
-        refreshKeyValues: process.env.NODE_ENV === 'production' ? undefined : response.refreshKeyValues,
+        ...(process.env.NODE_ENV === 'production' ? undefined : {
+          refreshKeyValues: response.refreshKeyValues,
+          usedPreAggregations: response.usedPreAggregations
+        }),
         annotation
       });
     } catch (e) {

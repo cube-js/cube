@@ -187,15 +187,15 @@ class PreAggregationLoader {
         return this.loadPreAggregationWithKeys();
       }
     } else {
-      return this.loadPreAggregationWithKeys();
+      return {
+        targetTableName: await this.loadPreAggregationWithKeys(),
+        refreshKeyValues: await this.getInvalidationKeyValues()
+      };
     }
   }
 
   async loadPreAggregationWithKeys() {
-    const invalidationKeys = await Promise.all(
-      (this.preAggregation.invalidateKeyQueries || [])
-        .map(keyQuery => this.loadCache.keyQueryResult(keyQuery))
-    );
+    const invalidationKeys = await this.getInvalidationKeyValues();
     const contentVersion = version([this.preAggregation.loadSql, invalidationKeys]);
     const structureVersion = version(this.preAggregation.loadSql);
 
@@ -273,6 +273,13 @@ class PreAggregationLoader {
       return mostRecentTargetTableName();
     }
     return this.targetTableName(versionEntry);
+  }
+
+  getInvalidationKeyValues() {
+    return Promise.all(
+      (this.preAggregation.invalidateKeyQueries || [])
+        .map(keyQuery => this.loadCache.keyQueryResult(keyQuery))
+    );
   }
 
   scheduleRefresh(invalidationKeys, newVersionEntry) {
@@ -429,9 +436,10 @@ class PreAggregations {
         loadCache,
         { waitForRenew: queryBody.renewQuery }
       );
-      const preAggregationPromise = () => loader.loadPreAggregation().then(async tempTableName => {
-        await this.addTableUsed(tempTableName);
-        return [p.tableName, tempTableName];
+      const preAggregationPromise = () => loader.loadPreAggregation().then(async targetTableName => {
+        const usedPreAggregation = typeof targetTableName === 'string' ? { targetTableName } : targetTableName;
+        await this.addTableUsed(usedPreAggregation.targetTableName);
+        return [p.tableName, usedPreAggregation];
       });
       return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));

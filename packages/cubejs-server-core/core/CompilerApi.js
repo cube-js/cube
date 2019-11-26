@@ -40,7 +40,9 @@ class CompilerApi {
     return this.dbType;
   }
 
-  async getSql(query) {
+  async getSql(query, options) {
+    options = options || {};
+    const { includeDebugInfo } = options;
     const dbType = this.getDbType('default');
     const compilers = await this.getCompilers();
     let sqlGenerator = this.createQuery(compilers, dbType, query);
@@ -61,7 +63,9 @@ class CompilerApi {
       cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
       preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
       dataSource: sqlGenerator.dataSource,
-      aliasNameToMember: sqlGenerator.aliasNameToMember
+      aliasNameToMember: sqlGenerator.aliasNameToMember,
+      rollupMatchResults: includeDebugInfo ?
+        sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined
     }));
   }
 

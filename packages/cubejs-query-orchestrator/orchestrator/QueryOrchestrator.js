@@ -1,3 +1,4 @@
+const R = require('ramda');
 const QueryCache = require('./QueryCache');
 const PreAggregations = require('./PreAggregations');
 
@@ -33,9 +34,15 @@ class QueryOrchestrator {
 
   async fetchQuery(queryBody) {
     return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
-      .then(preAggregationsTablesToTempTables => this.queryCache.cachedQueryResult(
-        queryBody, preAggregationsTablesToTempTables
-      ));
+      .then(async preAggregationsTablesToTempTables => {
+        const result = await this.queryCache.cachedQueryResult(
+          queryBody, preAggregationsTablesToTempTables
+        );
+        return {
+          ...result,
+          usedPreAggregations: R.fromPairs(preAggregationsTablesToTempTables)
+        };
+      });
   }
 
   async queryStage(queryBody) {

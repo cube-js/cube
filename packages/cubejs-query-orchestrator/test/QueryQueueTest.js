@@ -1,6 +1,6 @@
+/* globals describe,it */
 const QueryQueue = require('../orchestrator/QueryQueue');
 const should = require('should');
-const redis = require('redis');
 
 const QueryQueueTest = (name, options) => {
   describe(`QueryQueue${name}`, function () {
@@ -16,7 +16,7 @@ const QueryQueueTest = (name, options) => {
           const result = query.result + delayCount;
           delayCount += 1;
           await setCancelHandler(result);
-          return await delayFn(result, query.delay);
+          return delayFn(result, query.delay);
         }
       },
       cancelHandlers: {
@@ -57,6 +57,7 @@ const QueryQueueTest = (name, options) => {
           await queue.executeInQueue('delay', query, { delay: 3000, result: '1' });
         } catch (e) {
           if (e.message === 'Continue wait') {
+            // eslint-disable-next-line no-continue
             continue;
           }
           errorString = e.toString();
@@ -89,7 +90,7 @@ const QueryQueueTest = (name, options) => {
 
     it('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
-        await queue.executeInQueue('delay', `11` + i, { delay: 50, result: '' + i }, 0);
+        await queue.executeInQueue('delay', `11` + i, { delay: 50, result: `${i}` }, 0);
       }
       cancelledQuery = null;
       delayCount = 0;

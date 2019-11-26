@@ -90,7 +90,7 @@ class QueryCache {
   static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
     const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, tempTable]) => QueryCache.replaceAll(tableName, tempTable, query),
+      (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
       keyQuery
     );
     return Array.isArray(queryAndParams) ? [replacedKeqQuery, params] : replacedKeqQuery;

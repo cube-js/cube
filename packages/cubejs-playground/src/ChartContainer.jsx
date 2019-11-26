@@ -11,6 +11,7 @@ import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from "sql-formatter";
 import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
+import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 
 export const frameworks = [{
@@ -296,47 +297,9 @@ class ChartContainer extends React.Component {
         );
       } else if (showCode === 'cache') {
         return (
-          <QueryRenderer
-            loadSql
-            query={{ ...query, renewQuery: true }}
+          <CachePane
+            query={query}
             cubejsApi={cubejsApi}
-            render={
-              ({ sqlQuery, resultSet: rs }) => (
-                <div>
-                  <h3>
-                    Last Refresh Time:
-                    {rs && rs.loadResponse.lastRefreshTime}
-                  </h3>
-                  <Table
-                    loading={!sqlQuery}
-                    pagination={false}
-                    columns={[
-                      {
-                        title: 'Refresh Key SQL',
-                        key: 'refreshKey',
-                        render: (text, record) => <PrismCode code={sqlFormatter.format(record[0])} />,
-                      },
-                      {
-                        title: 'Value',
-                        key: 'value',
-                        render: (text, record) => (
-                          <PrismCode
-                            code={
-                              rs && rs.loadResponse.refreshKeyValues
-                              && JSON.stringify(rs.loadResponse.refreshKeyValues[
-                                sqlQuery.sqlQuery.sql.cacheKeyQueries.queries.indexOf(record)
-                              ], null, 2)
-                            }
-                          />
-                        ),
-                      }
-                    ]}
-                    dataSource={
-                      sqlQuery && sqlQuery.sqlQuery.sql && sqlQuery.sqlQuery.sql.cacheKeyQueries.queries
-                    }
-                  />
-                </div>
-              )}
           />
         );
       }

@@ -283,52 +283,80 @@ class PreAggregations {
 
   findPreAggregationForQuery() {
     if (!this.preAggregationForQuery) {
-      const query = this.query;
-
-      if (PreAggregations.hasCumulativeMeasures(query)) {
-        return null;
-      }
-
-      const canUsePreAggregation = this.canUsePreAggregationFn(query);
-
-      this.preAggregationForQuery = R.pipe(
-        R.map(cube => {
-          const preAggregations = this.query.cubeEvaluator.preAggregationsForCube(cube);
-          let rollupPreAggregations = R.pipe(
-            R.toPairs,
-            R.filter(([k, a]) => a.type === 'rollup'),
-            R.filter(([k, aggregation]) => canUsePreAggregation(this.evaluateAllReferences(cube, aggregation))),
-            R.map(([preAggregationName, preAggregation]) => ({ preAggregationName, preAggregation, cube }))
-          )(preAggregations);
-          if (
-            R.any(m => m.path() && m.path()[0] === cube, this.query.measures) ||
-            !this.query.measures.length && !this.query.timeDimensions.length &&
-            R.all(d => d.path() && d.path()[0] === cube, this.query.dimensions)
-          ) {
-            const autoRollupPreAggregations = R.pipe(
-              R.toPairs,
-              R.filter(([k, a]) => a.type === 'autoRollup'),
-              R.map(([preAggregationName, preAggregation]) => {
-                const cubeLattice = this.getCubeLattice(cube, preAggregationName, preAggregation);
-                const optimalPreAggregation = cubeLattice.findOptimalPreAggregationFromLattice(this.query);
-                return optimalPreAggregation && {
-                  preAggregationName: preAggregationName + this.autoRollupNameSuffix(cube, optimalPreAggregation),
-                  preAggregation: Object.assign(
-                    optimalPreAggregation,
-                    preAggregation
-                  ),
-                  cube
-                };
-              })
-            )(preAggregations);
-            rollupPreAggregations = rollupPreAggregations.concat(autoRollupPreAggregations);
-          }
-          return rollupPreAggregations;
-        }),
-        R.unnest
-      )(query.collectCubeNames())[0];
+      this.preAggregationForQuery = this.rollupMatchResults().find(p => p.canUsePreAggregation);
     }
     return this.preAggregationForQuery;
+  }
+
+  findAutoRollupPreAggregationsForCube(cube, preAggregations) {
+    if (
+      R.any(m => m.path() && m.path()[0] === cube, this.query.measures) ||
+      !this.query.measures.length && !this.query.timeDimensions.length &&
+      R.all(d => d.path() && d.path()[0] === cube, this.query.dimensions)
+    ) {
+      return R.pipe(
+        R.toPairs,
+        R.filter(([k, a]) => a.type === 'autoRollup'),
+        R.map(([preAggregationName, preAggregation]) => {
+          const cubeLattice = this.getCubeLattice(cube, preAggregationName, preAggregation);
+          const optimalPreAggregation = cubeLattice.findOptimalPreAggregationFromLattice(this.query);
+          return optimalPreAggregation && {
+            preAggregationName: preAggregationName + this.autoRollupNameSuffix(cube, optimalPreAggregation),
+            preAggregation: Object.assign(
+              optimalPreAggregation,
+              preAggregation
+            ),
+            cube,
+            canUsePreAggregation: true
+          };
+        })
+      )(preAggregations);
+    }
+    return [];
+  }
+
+  rollupMatchResults() {
+    const { query } = this;
+
+    if (PreAggregations.hasCumulativeMeasures(query)) {
+      return [];
+    }
+
+    const canUsePreAggregation = this.canUsePreAggregationFn(query);
+
+    return R.pipe(
+      R.map(cube => {
+        const preAggregations = this.query.cubeEvaluator.preAggregationsForCube(cube);
+        let rollupPreAggregations =
+          this.findRollupPreAggregationsForCube(cube, canUsePreAggregation, preAggregations);
+        rollupPreAggregations = rollupPreAggregations.concat(
+          this.findAutoRollupPreAggregationsForCube(cube, preAggregations)
+        );
+        return rollupPreAggregations;
+      }),
+      R.unnest
+    )(query.collectCubeNames());
+  }
+
+  findRollupPreAggregationsForCube(cube, canUsePreAggregation, preAggregations) {
+    return R.pipe(
+      R.toPairs,
+      R.filter(([k, a]) => a.type === 'rollup'),
+      R.map(([preAggregationName, preAggregation]) => ({
+        preAggregationName,
+        preAggregation,
+        cube,
+        canUsePreAggregation: canUsePreAggregation(this.evaluateAllReferences(cube, preAggregation))
+      }))
+    )(preAggregations);
+  }
+
+  rollupMatchResultDescriptions() {
+    return this.rollupMatchResults().map(p => ({
+      ...this.preAggregationDescriptionFor(p.cube, p),
+      references: this.evaluateAllReferences(p.cube, p.preAggregation),
+      canUsePreAggregation: p.canUsePreAggregation
+    }));
   }
 
   static hasCumulativeMeasures(query) {
