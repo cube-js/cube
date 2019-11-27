@@ -4,6 +4,7 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var CubejsServerCore = require('@cubejs-backend/server-core');
+var cors = require('cors');
 
 var indexRouter = require('./routes/index');
 
@@ -17,6 +18,7 @@ app.set('view engine', 'hbs');
 app.locals.cubejsApiToken = process.env.CUBEJS_API_TOKEN;
 app.locals.cubejsApiUrl = process.env.CUBEJS_API_URL;
 
+app.use(cors());
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
