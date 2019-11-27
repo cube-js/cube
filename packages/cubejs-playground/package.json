@@ -20,6 +20,7 @@
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
+    "component-cookie": "^1.1.4",
     "customize-cra": "^0.7.0",
     "history": "^4.9.0",
     "less": "^3.10.3",
@@ -41,6 +42,7 @@
     "recharts": "^1.7.1",
     "sql-formatter": "^2.3.2",
     "styled-components": "^4.4.1",
+    "uuid": "^3.3.3",
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {

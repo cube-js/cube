@@ -7,6 +7,7 @@ const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
+const track = require('./track');
 
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
@@ -128,10 +129,7 @@ class CubejsServerCore {
         options.orchestratorOptions :
         () => options.orchestratorOptions;
 
-    const Analytics = require('analytics-node');
-    const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
     const { machineIdSync } = require('node-machine-id');
-    const { promisify } = require('util');
     let anonymousId = 'unknown';
     try {
       anonymousId = machineIdSync();
@@ -154,16 +152,13 @@ class CubejsServerCore {
             // console.error(e);
           }
         }
-        await promisify(client.track.bind(client))({
+        await track({
           event: name,
           anonymousId,
-          properties: {
-            projectFingerprint: this.projectFingerprint,
-            coreServerVersion: this.coreServerVersion,
-            ...props
-          }
+          projectFingerprint: this.projectFingerprint,
+          coreServerVersion: this.coreServerVersion,
+          ...props
         });
-        await promisify(client.flush.bind(client))();
       } catch (e) {
         // console.error(e);
       }

@@ -23,6 +23,7 @@
     "test": "jest --testPathPattern test/*.test.js --runInBand"
   },
   "dependencies": {
+    "@babel/core": "^7.7.4",
     "@babel/generator": "^7.4.0",
     "@babel/parser": "^7.4.2",
     "@babel/preset-env": "^7.3.4",
@@ -33,11 +34,11 @@
     "@cubejs-backend/api-gateway": "^0.12.1",
     "@cubejs-backend/query-orchestrator": "^0.12.1",
     "@cubejs-backend/schema-compiler": "^0.12.1",
-    "analytics-node": "^3.4.0-beta.1",
     "codesandbox-import-utils": "^1.3.8",
     "cross-spawn": "^6.0.5",
     "fs-extra": "^7.0.1",
     "jsonwebtoken": "^8.4.0",
+    "node-fetch": "^2.6.0",
     "node-machine-id": "^1.1.10",
     "prettier": "^1.16.4",
     "promise-timeout": "^1.3.0",

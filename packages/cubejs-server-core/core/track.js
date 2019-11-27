@@ -1,18 +1,13 @@
-import { fetch } from 'whatwg-fetch';
-import cookie from 'component-cookie';
-import uuidv4 from 'uuid/v4';
+const fetch = require('node-fetch');
+const crypto = require('crypto');
 
 let flushPromise = null;
 let trackEvents = [];
 
-const track = async (event) => {
-  if (!cookie('playground_anonymous')) {
-    cookie('playground_anonymous', uuidv4());
-  }
+module.exports = async (event) => {
   trackEvents.push({
     ...event,
-    id: uuidv4(),
-    clientAnonymousId: cookie('playground_anonymous'),
+    id: crypto.randomBytes(16).toString('hex'),
     clientTimestamp: new Date().toJSON()
   });
   const flush = async (toFlush, retries) => {
@@ -51,20 +46,4 @@ const track = async (event) => {
     }
   });
   flushPromise = currentPromise;
-};
-
-export const setAnonymousId = (anonymousId, props) => {
-  track({ event: 'identify', anonymousId, ...props });
-};
-
-export const event = (name, params) => {
-  track({ event: name, ...params });
-};
-
-export const playgroundAction = (name, options) => {
-  event('Playground Action', { name, ...options });
-};
-
-export const page = (path) => {
-  track({ event: 'page', ...path });
 };

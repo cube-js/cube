@@ -1031,10 +1031,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.11.10":
-  version "0.11.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.11.10.tgz#880f4007efae1ecf78a78af9496fd6b6b1473805"
-  integrity sha512-UduykGWNFcRoejh0jmeOlx5Utt/fgpDFoaWHBrUMkrAgxg87kGrmYV57lL+bCeunrKRwg4HvvUItyxyFWrVZXQ==
+"@cubejs-client/core@^0.12.0":
+  version "0.12.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.12.0.tgz#ef3f474ac405e80a67532e6a3e3fd8e693ef2853"
+  integrity sha512-I7msBRbSdnOb+Q+tWb3j8O4aKs4AKg9gAFuT4lEuaJZEUxBng243a/l73f/+2rMBMxYf6Q7TaUiCzJ2lFrqCoA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -1044,10 +1044,10 @@
     ramda "^0.25.0"
     url-search-params-polyfill "^7.0.0"
 
-"@cubejs-client/react@^0.11.12":
-  version "0.11.12"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.11.12.tgz#75c0878c8cc3a378e324ed99666b3bec3046e9b4"
-  integrity sha512-cOHddjt+CtXipcBTr783nF0jmDBvh/Hc1DgD+el9xm9Vig346WERHCz9GBMEd2YkWXIr6YB8J3Pshcj1h0Qhww==
+"@cubejs-client/react@^0.12.0":
+  version "0.12.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.12.0.tgz#71792351456210ba45f72896325a478111da30dc"
+  integrity sha512-sWG1zlvGuaN3WbxP5D5uXryM86jEt6aqurrM1dYPyXxGtgAWK3al9/vQ2GuZOa5oaawkuAc6+TeeUaH542cKZA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -2857,6 +2857,13 @@ component-classes@1.x, component-classes@^1.2.5, component-classes@^1.2.6:
   dependencies:
     component-indexof "0.0.3"
 
+component-cookie@^1.1.4:
+  version "1.1.4"
+  resolved "https://registry.yarnpkg.com/component-cookie/-/component-cookie-1.1.4.tgz#1b88b3dda4953d890163dd52fa53df374247cf8d"
+  integrity sha512-j6rzl+vHDTowvYz7Al3V0ud84O2l4YqGdA9qMj1W1nlZ5yWi7EhOd7ZSPzWFM25gZgv2OxWh6JlJYfsz2+XYow==
+  dependencies:
+    debug "2.2.0"
+
 component-emitter@^1.2.1:
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/component-emitter/-/component-emitter-1.3.0.tgz#16e4070fba8ae29b679f2215853ee181ab2eabc0"
@@ -3509,6 +3516,13 @@ date-now@^0.1.4:
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/date-now/-/date-now-0.1.4.tgz#eaf439fd4d4848ad74e5cc7dbef200672b9e345b"
   integrity sha1-6vQ5/U1ISK105cx9vvIAZyueNFs=
+
+debug@2.2.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/debug/-/debug-2.2.0.tgz#f87057e995b1a1f6ae6a4960664137bc56f039da"
+  integrity sha1-+HBX6ZWxofauaklgZkE3vFbwOdo=
+  dependencies:
+    ms "0.7.1"
 
 debug@2.6.9, debug@^2.2.0, debug@^2.3.3, debug@^2.6.0, debug@^2.6.8, debug@^2.6.9:
   version "2.6.9"
@@ -7378,6 +7392,11 @@ move-concurrently@^1.0.1:
     mkdirp "^0.5.1"
     rimraf "^2.5.4"
     run-queue "^1.0.3"
+
+ms@0.7.1:
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/ms/-/ms-0.7.1.tgz#9cd13c03adbff25b65effde7ce864ee952017098"
+  integrity sha1-nNE8A62/8ltl7/3nzoZO6VIBcJg=
 
 ms@2.0.0:
   version "2.0.0"
@@ -11632,7 +11651,7 @@ utils-merge@1.0.1:
   resolved "https://registry.yarnpkg.com/utils-merge/-/utils-merge-1.0.1.tgz#9f95710f50a267947b2ccc124741c1028427e713"
   integrity sha1-n5VxD1CiZ5R7LMwSR0HBAoQn5xM=
 
-uuid@^3.0.1, uuid@^3.3.2:
+uuid@^3.0.1, uuid@^3.3.2, uuid@^3.3.3:
   version "3.3.3"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.3.tgz#4568f0216e78760ee1dbf3a4d2cf53e224112866"
   integrity sha512-pW0No1RGHgzlpHJO1nsVrHKpOEIxkGg1xB+v0ZmdNH5OAeAwzAVrCnI2/6Mtx+Uys6iaylxa+D3g4j63IKKjSQ==

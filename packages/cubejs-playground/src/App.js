@@ -7,7 +7,7 @@ import { Layout, Alert, notification } from "antd";
 import { fetch } from 'whatwg-fetch';
 import { withRouter } from "react-router";
 import Header from './components/Header';
-import { event } from './events';
+import { event, setAnonymousId } from './events';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
@@ -50,11 +50,10 @@ class App extends Component {
 
     const res = await fetch('/playground/context');
     const result = await res.json();
-    if (window.analytics) {
-      window.analytics.identify(result.anonymousId, {
-        coreServerVersion: result.coreServerVersion
-      });
-    }
+    setAnonymousId(result.anonymousId, {
+      coreServerVersion: result.coreServerVersion,
+      projectFingerprint: result.projectFingerprint
+    });
   }
 
   static getDerivedStateFromError(error) {
