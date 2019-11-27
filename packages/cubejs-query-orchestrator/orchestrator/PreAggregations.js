@@ -100,13 +100,13 @@ class PreAggregationLoadCache {
   }
 
   async getVersionEntries(preAggregation) {
-    if (!this.versionEnries) {
-      this.versionEnries = tablesToVersionEntries(
+    if (!this.versionEntries) {
+      this.versionEntries = tablesToVersionEntries(
         preAggregation.preAggregationsSchema,
         await this.getTablesQuery(preAggregation)
       );
     }
-    return this.versionEnries;
+    return this.versionEntries;
   }
 
   async keyQueryResult(keyQuery) {
@@ -137,7 +137,7 @@ class PreAggregationLoadCache {
   async reset(preAggregation) {
     this.tables = undefined;
     this.queryStageState = undefined;
-    this.versionEnries = undefined;
+    this.versionEntries = undefined;
     await this.tablesFromCache(preAggregation, true);
   }
 }
