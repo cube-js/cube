@@ -28,7 +28,7 @@ const track = async (event) => {
     }
     try {
       const sentAt = new Date().toJSON();
-      const result = await fetch('https://us-central1-cubejs-analytics.cloudfunctions.net/track', {
+      const result = await fetch('https://track.cube.dev/track', {
         method: 'post',
         body: JSON.stringify(toFlush.map(r => ({ ...r, sentAt }))),
         headers: { 'Content-Type': 'application/json' },
@@ -51,6 +51,7 @@ const track = async (event) => {
     }
   });
   flushPromise = currentPromise;
+  return flushPromise;
 };
 
 export const setAnonymousId = (anonymousId, props) => {

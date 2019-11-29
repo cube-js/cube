@@ -2,21 +2,17 @@ const path = require('path');
 const fs = require('fs-extra');
 const { machineIdSync } = require('node-machine-id');
 const chalk = require('chalk');
-const { promisify } = require('util');
-const Analytics = require('analytics-node');
-
-const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
+const track = require('./track');
 
 const anonymousId = machineIdSync();
 
 const event = async (name, props) => {
   try {
-    await promisify(client.track.bind(client))({
+    await track({
       event: name,
       anonymousId,
-      properties: props
+      ...props
     });
-    await promisify(client.flush.bind(client))();
   } catch (e) {
     // ignore
   }
