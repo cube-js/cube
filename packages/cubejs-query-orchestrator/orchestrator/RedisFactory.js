@@ -4,16 +4,19 @@ const { promisify } = require('util');
 module.exports = function createRedisClient(url) {
   redis.Multi.prototype.execAsync = promisify(redis.Multi.prototype.exec);
 
-  let options;
+  let options = {
+    url,
+  };
 
   if (process.env.REDIS_TLS === 'true') {
-    options = {
-      url,
-      tls: {}
-    };
+    options.tls = {};
   }
 
-  const client = redis.createClient(options || url);
+  if (process.env.REDIS_PASSWORD) {
+    options.password = process.env.REDIS_PASSWORD;
+  }
+
+  const client = redis.createClient(options);
 
   ['brpop', 'del', 'get', 'hget', 'rpop', 'set', 'zadd', 'zrange', 'zrangebyscore', 'keys'].forEach(
     k => {
