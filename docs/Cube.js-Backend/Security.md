@@ -74,9 +74,25 @@ app.use((req, res, next) => {
 
 app.get('/auth/cubejs-token', (req, res) => {
   res.json({
-    token: jwt.sign({ u: req.user }, process.env.CUBE_API_SECRET, { expiresIn: '1d' })
+    token: jwt.sign({ u: req.user }, process.env.CUBEJS_API_SECRET, { expiresIn: '1d' })
   })
 })
+```
+
+Then fetched on client side as:
+
+```javascript
+let apiTokenPromise;
+
+const cubejsApi = cubejs(() => {
+  if (!apiTokenPromise) {
+    apiTokenPromise = fetch(`${API_URL}/auth/cubejs-token`)
+      .then(res => res.json()).then(r => r.token)
+  }
+  return apiTokenPromise;
+}, {
+  apiUrl: `${API_URL}/cubejs-api/v1`
+});
 ```
 
 ## Security Context
