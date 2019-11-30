@@ -61,6 +61,24 @@ const CUBE_API_SECRET='secret';
 const cubejsToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: '30d' });
 ```
 
+Most often generation of tokens should be served as protected url:
+
+```javascript
+app.use((req, res, next) => {
+  if (!req.user) {
+    res.redirect('/login');
+    return;
+  }
+  next();
+});
+
+app.get('/auth/cubejs-token', (req, res) => {
+  res.json({
+    token: jwt.sign({ u: req.user }, process.env.CUBE_API_SECRET, { expiresIn: '1d' })
+  })
+})
+```
+
 ## Security Context
 
 Security context can be provided by passing `u` param for payload.
