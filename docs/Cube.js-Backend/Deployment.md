@@ -40,6 +40,7 @@ Cube.js server is an Express application itself and it can be served as part of 
 Minimal setup for such serving looks as following:
 
 ```javascript
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const CubejsServerCore = require('@cubejs-backend/server-core');
@@ -48,7 +49,7 @@ const app = express();
 app.use(require('cors')());
 app.use(bodyParser.json({ limit: '50mb' }));
 
-const serverCore = CubejsServerCore.create(config);
+const serverCore = CubejsServerCore.create();
 serverCore.initApp(app);
 
 const port = process.env.PORT || 4000;
