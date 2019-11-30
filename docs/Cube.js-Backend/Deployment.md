@@ -7,6 +7,7 @@ menuOrder: 3
 
 Below you can find guides for popular deployment environments:
 
+- [As a part of Express application](#express)
 - [AWS Lambda with Serverless Framework](#serverless)
 - [Heroku](#heroku)
 - [Docker](#docker)
@@ -32,6 +33,33 @@ Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
 If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
 
 > **NOTE:** Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
+
+## Express
+
+Cube.js server is an Express application itself and it can be served as part of an existing Express application.
+Minimal setup for such serving looks as following:
+
+```javascript
+const express = require('express');
+const bodyParser = require('body-parser');
+const CubejsServerCore = require('@cubejs-backend/server-core');
+
+const app = express();
+app.use(require('cors')());
+app.use(bodyParser.json({ limit: '50mb' }));
+
+const serverCore = CubejsServerCore.create(config);
+serverCore.initApp(app);
+
+const port = process.env.PORT || 4000;
+app.listen(port, (err) => {
+  if (err) {
+    console.error('Fatal error during server start: ');
+    console.error(e.stack || e);
+  }
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+});
+```
 
 ## Serverless
 
