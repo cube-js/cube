@@ -242,7 +242,7 @@ COPY . .
 
 EXPOSE 4000
 
-CMD ['node', 'index.js']
+CMD ["index.js"]
 ```
 
 Example .dockerignore
@@ -261,12 +261,11 @@ $ docker build -t <YOUR-USERNAME>/cubejs-docker-demo .
 
 ### Run Docker image
 
-To run docker image, you need to set environment variables required by Cube.js Backend.
+To test just built docker image, you need to set environment variables required by Cube.js Backend.
 Generate a secret for JWT Tokens as described in [Security](/security) section and fill in database credentials.
 
 ```bash
-$ docker run -p 49160:8080 \
-  -d \
+$ docker --rm \
   --name cubejs-docker-demo \
   -e CUBEJS_API_SECRET=<YOUR-API-SECRET> \
   -e CUBEJS_DB_HOST=<YOUR-DB-HOST-HERE> \
