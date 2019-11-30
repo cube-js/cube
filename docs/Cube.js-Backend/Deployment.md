@@ -249,7 +249,6 @@ Example .dockerignore
 node_modules
 npm-debug.log
 .env
-schema
 ```
 
 ### Build Docker image
@@ -274,7 +273,6 @@ $ docker run -p 49160:8080 \
   -e CUBEJS_DB_USER=<YOUR-DB-USER-HERE> \
   -e CUBEJS_DB_PASS=<YOUR-DB-PASS-HERE> \
   -e CUBEJS_DB_TYPE=postgres \
-  -v <PATH-TO-SCHEMA>:/usr/src/app/schema \
   <YOUR-USERNAME>/cubejs-docker-demo
 ```
 
