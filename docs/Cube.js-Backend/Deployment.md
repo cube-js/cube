@@ -23,8 +23,8 @@ Production Cube.js servers can be accessed only with [REST API](rest-api) and Cu
 ### Redis
 
 Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. 
-It uses it for query caching and queue. 
-Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. 
+It uses Redis for query caching and queue. 
+Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. In case your Redis instance has password, please set password via `REDIS_PASSWORD` environment variable. 
 Make sure, your Redis allows at least 15 concurrent connections.
 Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
 
