@@ -23,6 +23,7 @@
     "cubejsCli.js",
     "token.js",
     "utils.js",
+    "track.js",
     "templates.js",
     "yarn.lock",
     "README.md",
