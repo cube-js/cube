@@ -141,10 +141,10 @@ In this particular example these queries will use `categoryAndDate` pre-aggregat
 - Order Count by Created At Day this year
 - Order Count for all time
 - Order Average Revenue by Category this month
-
-These queries won't use `categoryAndDate` pre-aggregation:
 - Order Revenue by Created At Week this year
 - Order Revenue by Created At Month this year
+
+These queries won't use `categoryAndDate` pre-aggregation:
 - Order Count by Customer Name this year
 
 ### Time partitioning
