@@ -8,16 +8,63 @@ menuOrder: 6
 proofread: 06/18/2019
 ---
 
-The `segments` parameter declares a block to specify some partitions.
+Segments are predefined filters.
 
-A segment is a subset of your data. Usually items with similar properties are divided into segments. For example, users for one particular city can be treated as a segment.
+You can use segments to define complex filtering logic in SQL. 
+For example, users for one particular city can be treated as a segment.
 
 ```javascript
-segments: {
-  sfUsers: {
-    sql: `location = 'San Francisco'`
+cube(`Users`, {
+  // ...
+  
+  segments: {
+    sfUsers: {
+      sql: `${CUBE}.location = 'San Francisco'`
+    }
   }
-}
+});
 ```
 
-After creating a segment, you can choose it in the segments section and receive partitioned data.
+Or use segments to implement cross-column `OR` logic:
+
+```javascript
+cube(`Users`, {
+  // ...
+  
+  segments: {
+    sfUsers: {
+      sql: `${CUBE}.location = 'San Francisco' or ${CUBE}.state = 'CA'`
+    }
+  }
+});
+```
+
+As with other cube member definitions segments can be [generated](/schema-generation):
+
+```javascript
+const userSegments = {
+  sfUsers: ['San Francisco', 'CA'],
+  nyUsers: ['New York City', 'NY']
+}
+
+cube(`Users`, {
+  // ...
+  
+  segments: {
+    ...(Object.keys(userSegments).map(segment => ({
+      [segment]: {
+        sql: `${CUBE}.location = '${userSegments[segment][0]}' or ${CUBE}.state = '${userSegments[segment][1]}'`
+      }
+    })).reduce((a, b) => ({ ...a, ...b })))
+  }
+});
+```
+
+After defining a segment, you can pass it in [query object](/query-format):
+
+```javascript
+{
+  measures: ['Users.count'],
+  segments: ['Users.sfUsers']
+}
+```
