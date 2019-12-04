@@ -1,21 +1,20 @@
 {
-  "name": "@cubejs-backend/mysql-driver",
-  "description": "Cube.js Mysql database driver",
+  "name": "@cubejs-backend/sqlite-driver",
+  "description": "Cube.js Sqlite database driver",
   "author": "Statsbot, Inc.",
   "version": "0.12.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
-    "directory": "packages/cubejs-mysql-driver"
+    "directory": "packages/cubejs-sqlite-driver"
   },
   "engines": {
     "node": ">=8.11.1"
   },
-  "main": "driver/MySqlDriver.js",
+  "main": "driver/SqliteDriver.js",
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.12.2",
-    "generic-pool": "^3.6.0",
-    "mysql": "^2.16.0"
+    "sqlite3": "^4.1.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {

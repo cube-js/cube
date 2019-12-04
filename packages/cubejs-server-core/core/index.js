@@ -23,6 +23,7 @@ const DriverDependencies = {
   snowflake: '@cubejs-backend/snowflake-driver',
   prestodb: '@cubejs-backend/prestodb-driver',
   oracle: '@cubejs-backend/oracle-driver',
+  sqlite: '@cubejs-backend/sqlite-driver',
 };
 
 const checkEnvForPlaceholders = () => {

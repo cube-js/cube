@@ -10,6 +10,7 @@ const snowflake = require('./SnowflakeQuery');
 const clickhouse = require('./ClickHouseQuery');
 const hive = require('./HiveQuery');
 const oracle = require('./OracleQuery');
+const sqlite = require('./SqliteQuery');
 
 const ADAPTERS = {
   postgres,
@@ -26,6 +27,7 @@ const ADAPTERS = {
   clickhouse,
   hive,
   oracle,
+  sqlite,
 };
 exports.query = (compilers, dbType, queryOptions) => {
   if (!ADAPTERS[dbType]) {
