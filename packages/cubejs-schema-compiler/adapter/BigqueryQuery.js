@@ -2,9 +2,11 @@ const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_TO_INTERVAL = {
-  date: 'DAY',
+  day: 'DAY',
   week: 'WEEK(MONDAY)',
   hour: 'HOUR',
+  minute: 'MINUTE',
+  second: 'SECOND',
   month: 'MONTH',
   year: 'YEAR'
 };

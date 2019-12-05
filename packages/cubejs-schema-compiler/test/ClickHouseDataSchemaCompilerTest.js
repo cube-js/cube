@@ -150,7 +150,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
         measures: ['visitors.visitor_count'],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         filters: [{
@@ -169,10 +169,10 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors__created_at_date": "2017-01-02T00:00:00.000", "visitors__visitor_count": "1" },
-            { "visitors__created_at_date": "2017-01-04T00:00:00.000", "visitors__visitor_count": "1" },
-            { "visitors__created_at_date": "2017-01-05T00:00:00.000", "visitors__visitor_count": "1" },
-            { "visitors__created_at_date": "2017-01-06T00:00:00.000", "visitors__visitor_count": "2" }
+            { "visitors__created_at_day": "2017-01-02T00:00:00.000", "visitors__visitor_count": "1" },
+            { "visitors__created_at_day": "2017-01-04T00:00:00.000", "visitors__visitor_count": "1" },
+            { "visitors__created_at_day": "2017-01-05T00:00:00.000", "visitors__visitor_count": "1" },
+            { "visitors__created_at_day": "2017-01-06T00:00:00.000", "visitors__visitor_count": "2" }
           ]
         );
       });

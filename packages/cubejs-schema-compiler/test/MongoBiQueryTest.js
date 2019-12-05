@@ -34,7 +34,7 @@ describe('MongoBiQuery', () => {
         ],
         timeDimensions: [{
           dimension: 'visitors.createdAt',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',

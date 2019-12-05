@@ -29,9 +29,11 @@ class MssqlParamAllocator extends ParamAllocator {
 }
 
 const GRANULARITY_TO_INTERVAL = {
-  date: (date) => `FORMAT(${date}, 'yyyy-MM-ddT00:00:00.000')`,
+  day: (date) => `FORMAT(${date}, 'yyyy-MM-ddT00:00:00.000')`,
   week: (date) => `FORMAT(dateadd(week, DATEDIFF(week, '1900-01-01', ${date}), '1900-01-01'), 'yyyy-MM-ddT00:00:00.000')`,
   hour: (date) => `FORMAT(${date}, 'yyyy-MM-ddTHH:00:00.000')`,
+  minute: (date) => `FORMAT(${date}, 'yyyy-MM-ddTHH:mm:00.000')`,
+  second: (date) => `FORMAT(${date}, 'yyyy-MM-ddTHH:mm:ss.000')`,
   month: (date) => `FORMAT(${date}, 'yyyy-MM-01T00:00:00.000')`,
   year: (date) => `FORMAT(${date}, 'yyyy-01-01T00:00:00.000')`
 };

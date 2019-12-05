@@ -14,6 +14,15 @@ const PreAggregations = require('./PreAggregations');
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = `stb_pre_aggregations`;
 
+const standardGranularitiesParents = {
+  year: 'month',
+  week: 'day',
+  month: 'day',
+  day: 'hour',
+  hour: 'minute',
+  minute: 'second'
+};
+
 class BaseQuery {
   constructor(compilers, options) {
     this.compilers = compilers;
@@ -25,6 +34,8 @@ class BaseQuery {
     this.defaultOrder = this.defaultOrder.bind(this);
 
     this.initFromOptions();
+
+    this.granularityParentHierarchyCache = {};
   }
 
   initFromOptions() {
@@ -406,6 +417,23 @@ class BaseQuery {
     return this.convertTz(dateParam);
   }
 
+  granularityHierarchies() {
+    return R.fromPairs(Object.keys(standardGranularitiesParents).map(k => [k, this.granularityParentHierarchy(k)]));
+  }
+
+  granularityParent(granularity) {
+    return standardGranularitiesParents[granularity];
+  }
+
+  granularityParentHierarchy(granularity) {
+    if (!this.granularityParentHierarchyCache[granularity]) {
+      this.granularityParentHierarchyCache[granularity] = [granularity].concat(
+        this.granularityParent(granularity) ? this.granularityParentHierarchy(this.granularityParent(granularity)) : []
+      );
+    }
+    return this.granularityParentHierarchyCache[granularity];
+  }
+
   minGranularity(granularityA, granularityB) {
     if (!granularityA) {
       return granularityB;
@@ -413,18 +441,19 @@ class BaseQuery {
     if (!granularityB) {
       return granularityA;
     }
-    if (granularityA === 'hour' || granularityB === 'hour') {
-      return 'hour';
-    } else if (granularityA === 'date' || granularityB === 'date') {
-      return 'date';
-    } else if (granularityA === 'month' && granularityB === 'month') {
-      return 'month';
-    } else if (granularityA === 'year' && granularityB === 'year') {
-      return 'year';
-    } else if (granularityA === 'week' && granularityB === 'week') {
-      return 'week';
+    const aHierarchy = R.reverse(this.granularityParentHierarchy(granularityA));
+    const bHierarchy = R.reverse(this.granularityParentHierarchy(granularityB));
+    let lastIndex = Math.max(
+      aHierarchy.findIndex((g, i) => g !== bHierarchy[i]),
+      bHierarchy.findIndex((g, i) => g !== aHierarchy[i])
+    );
+    if (lastIndex === -1 && aHierarchy.length === bHierarchy.length) {
+      lastIndex = aHierarchy.length - 1;
     }
-    return 'date';
+    if (lastIndex <= 0) {
+      throw new Error(`Can't find common parent for '${granularityA}' and '${granularityB}'`);
+    }
+    return aHierarchy[lastIndex - 1];
   }
 
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure) {

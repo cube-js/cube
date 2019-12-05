@@ -131,7 +131,7 @@ class PreAggregations {
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         R.prop(0),
-        timeDimensions.map(d => [d.dimension, d.granularity || 'date'])
+        timeDimensions.map(d => [d.dimension, d.granularity || 'day'])
       ) || [];
     }
 
@@ -145,6 +145,7 @@ class PreAggregations {
 
     const isAdditive = R.all(m => m.isAdditive(), query.measures);
     const leafMeasureAdditive = R.all(path => query.newMeasure(path).isAdditive(), leafMeasurePaths);
+    const granularityHierarchies = query.granularityHierarchies();
 
     return {
       sortedDimensions,
@@ -154,7 +155,8 @@ class PreAggregations {
       leafMeasures: leafMeasurePaths,
       hasNoTimeDimensionsWithoutGranularity,
       allFiltersWithinSelectedDimensions,
-      isAdditive
+      isAdditive,
+      granularityHierarchies
     };
   }
 
@@ -198,7 +200,7 @@ class PreAggregations {
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         d => d.join('.'),
-        timeDimensions.map(d => [d.dimension, d.granularity || 'date'])
+        timeDimensions.map(d => [d.dimension, d.granularity || 'day'])
       ) || [];
     }
     // TimeDimension :: [Dimension, Granularity]
@@ -206,15 +208,7 @@ class PreAggregations {
     function expandTimeDimension(timeDimension) {
       const [dimension, granularity] = timeDimension;
       const makeTimeDimension = newGranularity => [dimension, newGranularity];
-
-      const tds = [timeDimension];
-      const updateTds = (...granularitys) => tds.push(...granularitys.map(makeTimeDimension))
-      
-      if (granularity === 'year') updateTds('hour', 'date', 'month');
-      if (['month', 'week'].includes(granularity)) updateTds('hour', 'date');
-      if (granularity === 'date') updateTds('hour');
-      
-      return tds;
+      return (transformedQuery.granularityHierarchies[granularity] || [granularity]).map(makeTimeDimension);
     }
     // [[TimeDimension]]
     const queryTimeDimensionsList = transformedQuery.sortedTimeDimensions.map(expandTimeDimension);
@@ -371,10 +365,6 @@ class PreAggregations {
   }
 
   castGranularity(granularity) {
-    // TODO replace date granularity with day
-    if (granularity === 'day') {
-      return 'date';
-    }
     return granularity;
   }
 
@@ -486,7 +476,7 @@ class PreAggregations {
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures
     );
     
-    const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'date';
+    const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
 
     return this.query.evaluateSymbolSqlWithContext(
       () => `SELECT ${this.query.baseSelect()} FROM ${table} ${this.query.baseWhere(filters)}` +

@@ -197,7 +197,7 @@ describe('MSSqlPreAggregations', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.createdAt',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-30']
       }],
       timezone: 'UTC',
@@ -218,19 +218,19 @@ describe('MSSqlPreAggregations', function test() {
       res.should.be.deepEqual(
         [
           {
-            "visitors__created_at_date": "2017-01-03T00:00:00.000",
+            "visitors__created_at_day": "2017-01-03T00:00:00.000",
             "visitors__count": 1
           },
           {
-            "visitors__created_at_date": "2017-01-05T00:00:00.000",
+            "visitors__created_at_day": "2017-01-05T00:00:00.000",
             "visitors__count": 1
           },
           {
-            "visitors__created_at_date": "2017-01-06T00:00:00.000",
+            "visitors__created_at_day": "2017-01-06T00:00:00.000",
             "visitors__count": 1
           },
           {
-            "visitors__created_at_date": "2017-01-07T00:00:00.000",
+            "visitors__created_at_day": "2017-01-07T00:00:00.000",
             "visitors__count": 2
           }
         ]
@@ -245,7 +245,7 @@ describe('MSSqlPreAggregations', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.createdAt',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-30']
       }],
       timezone: 'UTC',
@@ -267,19 +267,19 @@ describe('MSSqlPreAggregations', function test() {
       res.should.be.deepEqual(
         [
           {
-            "visitors__created_at_date": "2017-01-03T00:00:00.000",
+            "visitors__created_at_day": "2017-01-03T00:00:00.000",
             "visitors__ratio": 0.333333333333
           },
           {
-            "visitors__created_at_date": "2017-01-05T00:00:00.000",
+            "visitors__created_at_day": "2017-01-05T00:00:00.000",
             "visitors__ratio": 0.5
           },
           {
-            "visitors__created_at_date": "2017-01-06T00:00:00.000",
+            "visitors__created_at_day": "2017-01-06T00:00:00.000",
             "visitors__ratio": 1
           },
           {
-            "visitors__created_at_date": "2017-01-07T00:00:00.000",
+            "visitors__created_at_day": "2017-01-07T00:00:00.000",
             "visitors__ratio": null
           }
         ]
@@ -298,7 +298,7 @@ describe('MSSqlPreAggregations', function test() {
       preAggregationsSchema: '',
       timeDimensions: [{
         dimension: 'visitors.createdAt',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2016-12-30', '2017-01-06']
       }],
       order: [{
@@ -322,7 +322,7 @@ describe('MSSqlPreAggregations', function test() {
       res.should.be.deepEqual(
         [
           {
-            "visitors__created_at_date": "2017-01-06T00:00:00.000",
+            "visitors__created_at_day": "2017-01-06T00:00:00.000",
             "visitors__checkins_total": 1
           }
         ]

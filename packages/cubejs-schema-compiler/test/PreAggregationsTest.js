@@ -207,7 +207,7 @@ describe('PreAggregations', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.createdAt',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -228,19 +228,19 @@ describe('PreAggregations', function test() {
         res.should.be.deepEqual(
           [
             {
-              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
               "visitors__count": "1"
             },
             {
-              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-04T00:00:00.000Z",
               "visitors__count": "1"
             },
             {
-              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
               "visitors__count": "1"
             },
             {
-              "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-06T00:00:00.000Z",
               "visitors__count": "2"
             }
           ]
@@ -257,7 +257,7 @@ describe('PreAggregations', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.createdAt',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -279,19 +279,19 @@ describe('PreAggregations', function test() {
         res.should.be.deepEqual(
           [
             {
-              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
               "visitors__ratio": '0.33333333333333333333'
             },
             {
-              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-04T00:00:00.000Z",
               "visitors__ratio": '0.50000000000000000000'
             },
             {
-              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
               "visitors__ratio": '1.00000000000000000000'
             },
             {
-              "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-06T00:00:00.000Z",
               "visitors__ratio": null
             }
           ]
@@ -308,7 +308,7 @@ describe('PreAggregations', function test() {
         ],
         timeDimensions: [{
           dimension: 'GoogleVisitors.createdAt',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -329,7 +329,7 @@ describe('PreAggregations', function test() {
         res.should.be.deepEqual(
           [
             {
-              "google_visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "google_visitors__created_at_day": "2017-01-05T00:00:00.000Z",
               "google_visitors__count": "1"
             }
           ]
@@ -346,7 +346,7 @@ describe('PreAggregations', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.createdAt',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -462,7 +462,7 @@ describe('PreAggregations', function test() {
         preAggregationsSchema: '',
         timeDimensions: [{
           dimension: 'visitors.createdAt',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2016-12-30', '2017-01-05']
         }],
         order: [{
@@ -487,17 +487,17 @@ describe('PreAggregations', function test() {
           [
             {
               "visitors__source": "some",
-              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
               "visitors__checkins_total": "3"
             },
             {
               "visitors__source": "some",
-              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-04T00:00:00.000Z",
               "visitors__checkins_total": "2"
             },
             {
               "visitors__source": "google",
-              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
               "visitors__checkins_total": "1"
             }
           ]

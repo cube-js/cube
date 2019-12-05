@@ -61,7 +61,7 @@ describe('Extensions', () => {
         ],
         timeDimensions: [{
           dimension: 'VisitorsFunnel.time',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: { from: '2017-01-01', to: '2017-01-30' }
         }],
         timezone: 'America/Los_Angeles'

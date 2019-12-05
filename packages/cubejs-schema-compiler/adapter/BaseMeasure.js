@@ -118,7 +118,7 @@ class BaseMeasure {
       return undefined;
     }
     if (interval.match(/day/)) {
-      return 'date';
+      return 'day';
     } else if (interval.match(/month/)) {
       return 'month';
     } else if (interval.match(/year/)) {

@@ -5,8 +5,10 @@ const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_TO_INTERVAL = {
-  date: 'Day',
+  day: 'Day',
   hour: 'Hour',
+  minute: 'Minute',
+  second: 'Second',
   month: 'Month',
   quarter: 'Quarter',
   year: 'Year',

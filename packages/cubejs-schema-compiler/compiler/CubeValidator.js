@@ -115,7 +115,7 @@ const cubeSchema = Joi.object().keys({
             ])
           })),
           else: Joi.object().keys({
-          label: Joi.alternatives([
+            label: Joi.alternatives([
               Joi.string(),
               Joi.object().keys({
                 sql: Joi.func().required()
@@ -167,7 +167,9 @@ const cubeSchema = Joi.object().keys({
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
       timeDimensionReference: Joi.func().required(),
-      granularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year').required()
+      granularity: Joi.any().valid(
+        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+      ).required()
     }))
   ))
 });
@@ -179,8 +181,8 @@ class CubeValidator {
   }
 
   compile(cubes, errorReporter) {
-    return this.cubeSymbols.cubeList.map((v) =>
-        this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
+    return this.cubeSymbols.cubeList.map(
+      (v) => this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
     );
   }
 

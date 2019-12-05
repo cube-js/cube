@@ -302,7 +302,7 @@ describe('ClickHouse JoinGraph', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -317,28 +317,28 @@ describe('ClickHouse JoinGraph', function test() {
         res.should.be.deepEqual(
           [
             {
-              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
               "visitors__visitor_revenue": "100",
               "visitors__visitor_count": "1",
               "visitor_checkins__visitor_checkins_count": "3",
               "visitors__per_visitor_revenue": "100"
             },
             {
-              "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-04T00:00:00.000Z",
               "visitors__visitor_revenue": "200",
               "visitors__visitor_count": "1",
               "visitor_checkins__visitor_checkins_count": "2",
               "visitors__per_visitor_revenue": "200"
             },
             {
-              "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
               "visitors__visitor_revenue": null,
               "visitors__visitor_count": "1",
               "visitor_checkins__visitor_checkins_count": "1",
               "visitors__per_visitor_revenue": null
             },
             {
-              "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-06T00:00:00.000Z",
               "visitors__visitor_revenue": null,
               "visitors__visitor_count": "2",
               "visitor_checkins__visitor_checkins_count": "0",
@@ -383,7 +383,7 @@ describe('ClickHouse JoinGraph', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-10']
         }],
         order: [{
@@ -399,34 +399,34 @@ describe('ClickHouse JoinGraph', function test() {
         debugLog(JSON.stringify(res));
         res.should.be.deepEqual(
           [{
-            "visitors__created_at_date": "2017-01-01T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-01T00:00:00.000Z",
             "visitors__revenue_running": null
           }, {
-            "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
             "visitors__revenue_running": "100"
           }, {
-            "visitors__created_at_date": "2017-01-03T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-03T00:00:00.000Z",
             "visitors__revenue_running": "100"
           }, {
-            "visitors__created_at_date": "2017-01-04T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-04T00:00:00.000Z",
             "visitors__revenue_running": "300"
           }, {
-            "visitors__created_at_date": "2017-01-05T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
             "visitors__revenue_running": "600"
           }, {
-            "visitors__created_at_date": "2017-01-06T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-06T00:00:00.000Z",
             "visitors__revenue_running": "1500"
           }, {
-            "visitors__created_at_date": "2017-01-07T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-07T00:00:00.000Z",
             "visitors__revenue_running": "1500"
           }, {
-            "visitors__created_at_date": "2017-01-08T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-08T00:00:00.000Z",
             "visitors__revenue_running": "1500"
           }, {
-            "visitors__created_at_date": "2017-01-09T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-09T00:00:00.000Z",
             "visitors__revenue_running": "1500"
           }, {
-            "visitors__created_at_date": "2017-01-10T00:00:00.000Z",
+            "visitors__created_at_day": "2017-01-10T00:00:00.000Z",
             "visitors__revenue_running": "1500"
           }]
         );
@@ -444,7 +444,7 @@ describe('ClickHouse JoinGraph', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-10']
         }],
         order: [{
@@ -452,16 +452,16 @@ describe('ClickHouse JoinGraph', function test() {
         }],
         timezone: 'America/Los_Angeles'
       }, [
-        { "visitors__created_at_date": "2017-01-01T00:00:00.000Z", "visitors__revenue_rolling": null },
-        { "visitors__created_at_date": "2017-01-02T00:00:00.000Z", "visitors__revenue_rolling": null },
-        { "visitors__created_at_date": "2017-01-03T00:00:00.000Z", "visitors__revenue_rolling": "100" },
-        { "visitors__created_at_date": "2017-01-04T00:00:00.000Z", "visitors__revenue_rolling": "100" },
-        { "visitors__created_at_date": "2017-01-05T00:00:00.000Z", "visitors__revenue_rolling": "200" },
-        { "visitors__created_at_date": "2017-01-06T00:00:00.000Z", "visitors__revenue_rolling": "500" },
-        { "visitors__created_at_date": "2017-01-07T00:00:00.000Z", "visitors__revenue_rolling": "1200" },
-        { "visitors__created_at_date": "2017-01-08T00:00:00.000Z", "visitors__revenue_rolling": "900" },
-        { "visitors__created_at_date": "2017-01-09T00:00:00.000Z", "visitors__revenue_rolling": null },
-        { "visitors__created_at_date": "2017-01-10T00:00:00.000Z", "visitors__revenue_rolling": null }
+        { "visitors__created_at_day": "2017-01-01T00:00:00.000Z", "visitors__revenue_rolling": null },
+        { "visitors__created_at_day": "2017-01-02T00:00:00.000Z", "visitors__revenue_rolling": null },
+        { "visitors__created_at_day": "2017-01-03T00:00:00.000Z", "visitors__revenue_rolling": "100" },
+        { "visitors__created_at_day": "2017-01-04T00:00:00.000Z", "visitors__revenue_rolling": "100" },
+        { "visitors__created_at_day": "2017-01-05T00:00:00.000Z", "visitors__revenue_rolling": "200" },
+        { "visitors__created_at_day": "2017-01-06T00:00:00.000Z", "visitors__revenue_rolling": "500" },
+        { "visitors__created_at_day": "2017-01-07T00:00:00.000Z", "visitors__revenue_rolling": "1200" },
+        { "visitors__created_at_day": "2017-01-08T00:00:00.000Z", "visitors__revenue_rolling": "900" },
+        { "visitors__created_at_day": "2017-01-09T00:00:00.000Z", "visitors__revenue_rolling": null },
+        { "visitors__created_at_day": "2017-01-10T00:00:00.000Z", "visitors__revenue_rolling": null }
       ])
   );
 
@@ -474,7 +474,7 @@ describe('ClickHouse JoinGraph', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.created_at',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-10']
       }],
       order: [{
@@ -483,19 +483,19 @@ describe('ClickHouse JoinGraph', function test() {
       timezone: 'America/Los_Angeles'
     }, [
       {
-        "visitors__created_at_date": "2017-01-02T00:00:00.000Z", "visitors__revenue_rolling": null,
+        "visitors__created_at_day": "2017-01-02T00:00:00.000Z", "visitors__revenue_rolling": null,
         "visitor_checkins__visitor_checkins_count": "3"
       },
       {
-        "visitors__created_at_date": "2017-01-04T00:00:00.000Z", "visitors__revenue_rolling": "100",
+        "visitors__created_at_day": "2017-01-04T00:00:00.000Z", "visitors__revenue_rolling": "100",
         'visitor_checkins.visitor_checkins_count': '2'
       },
       {
-        "visitors__created_at_date": "2017-01-05T00:00:00.000Z", "visitors__revenue_rolling": "200",
+        "visitors__created_at_day": "2017-01-05T00:00:00.000Z", "visitors__revenue_rolling": "200",
         'visitor_checkins.visitor_checkins_count': '1'
       },
       {
-        "visitors__created_at_date": "2017-01-06T00:00:00.000Z", "visitors__revenue_rolling": "500",
+        "visitors__created_at_day": "2017-01-06T00:00:00.000Z", "visitors__revenue_rolling": "500",
         'visitor_checkins.visitor_checkins_count': '0'
       }
     ])
@@ -529,7 +529,7 @@ describe('ClickHouse JoinGraph', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.created_at',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-10']
       }],
       order: [{
@@ -537,16 +537,16 @@ describe('ClickHouse JoinGraph', function test() {
       }],
       timezone: 'America/Los_Angeles'
     }, [
-      { "visitors__created_at_date": "2017-01-01T00:00:00.000Z", "visitors__count_rolling": null },
-      { "visitors__created_at_date": "2017-01-02T00:00:00.000Z", "visitors__count_rolling": null },
-      { "visitors__created_at_date": "2017-01-03T00:00:00.000Z", "visitors__count_rolling": "1" },
-      { "visitors__created_at_date": "2017-01-04T00:00:00.000Z", "visitors__count_rolling": "1" },
-      { "visitors__created_at_date": "2017-01-05T00:00:00.000Z", "visitors__count_rolling": "1" },
-      { "visitors__created_at_date": "2017-01-06T00:00:00.000Z", "visitors__count_rolling": "2" },
-      { "visitors__created_at_date": "2017-01-07T00:00:00.000Z", "visitors__count_rolling": "3" },
-      { "visitors__created_at_date": "2017-01-08T00:00:00.000Z", "visitors__count_rolling": "2" },
-      { "visitors__created_at_date": "2017-01-09T00:00:00.000Z", "visitors__count_rolling": null },
-      { "visitors__created_at_date": "2017-01-10T00:00:00.000Z", "visitors__count_rolling": null }
+      { "visitors__created_at_day": "2017-01-01T00:00:00.000Z", "visitors__count_rolling": null },
+      { "visitors__created_at_day": "2017-01-02T00:00:00.000Z", "visitors__count_rolling": null },
+      { "visitors__created_at_day": "2017-01-03T00:00:00.000Z", "visitors__count_rolling": "1" },
+      { "visitors__created_at_day": "2017-01-04T00:00:00.000Z", "visitors__count_rolling": "1" },
+      { "visitors__created_at_day": "2017-01-05T00:00:00.000Z", "visitors__count_rolling": "1" },
+      { "visitors__created_at_day": "2017-01-06T00:00:00.000Z", "visitors__count_rolling": "2" },
+      { "visitors__created_at_day": "2017-01-07T00:00:00.000Z", "visitors__count_rolling": "3" },
+      { "visitors__created_at_day": "2017-01-08T00:00:00.000Z", "visitors__count_rolling": "2" },
+      { "visitors__created_at_day": "2017-01-09T00:00:00.000Z", "visitors__count_rolling": null },
+      { "visitors__created_at_day": "2017-01-10T00:00:00.000Z", "visitors__count_rolling": null }
     ])
   );
 
@@ -557,7 +557,7 @@ describe('ClickHouse JoinGraph', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.createdAtSqlUtils',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-10']
       }],
       order: [{
@@ -565,10 +565,10 @@ describe('ClickHouse JoinGraph', function test() {
       }],
       timezone: 'America/Los_Angeles'
     }, [
-      {"visitors__created_at_sql_utils_date":"2017-01-02T00:00:00.000","visitors__visitor_count":"1"},
-      {"visitors__created_at_sql_utils_date":"2017-01-04T00:00:00.000","visitors__visitor_count":"1"},
-      {"visitors__created_at_sql_utils_date":"2017-01-05T00:00:00.000","visitors__visitor_count":"1"},
-      {"visitors__created_at_sql_utils_date":"2017-01-06T00:00:00.000","visitors__visitor_count":"2"}
+      {"visitors__created_at_sql_utils_day":"2017-01-02T00:00:00.000","visitors__visitor_count":"1"},
+      {"visitors__created_at_sql_utils_day":"2017-01-04T00:00:00.000","visitors__visitor_count":"1"},
+      {"visitors__created_at_sql_utils_day":"2017-01-05T00:00:00.000","visitors__visitor_count":"1"},
+      {"visitors__created_at_sql_utils_day":"2017-01-06T00:00:00.000","visitors__visitor_count":"2"}
     ])
   );
 
@@ -600,7 +600,7 @@ describe('ClickHouse JoinGraph', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-10']
         }],
         order: [{
@@ -608,16 +608,16 @@ describe('ClickHouse JoinGraph', function test() {
         }],
         timezone: 'America/Los_Angeles'
       }, [
-        { "visitors__created_at_date": "2017-01-01T00:00:00.000Z", "visitors__running_revenue_per_count": null },
-        { "visitors__created_at_date": "2017-01-02T00:00:00.000Z", "visitors__running_revenue_per_count": "100" },
-        { "visitors__created_at_date": "2017-01-03T00:00:00.000Z", "visitors__running_revenue_per_count": "100" },
-        { "visitors__created_at_date": "2017-01-04T00:00:00.000Z", "visitors__running_revenue_per_count": "150" },
-        { "visitors__created_at_date": "2017-01-05T00:00:00.000Z", "visitors__running_revenue_per_count": "200" },
-        { "visitors__created_at_date": "2017-01-06T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
-        { "visitors__created_at_date": "2017-01-07T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
-        { "visitors__created_at_date": "2017-01-08T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
-        { "visitors__created_at_date": "2017-01-09T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
-        { "visitors__created_at_date": "2017-01-10T00:00:00.000Z", "visitors__running_revenue_per_count": "300" }
+        { "visitors__created_at_day": "2017-01-01T00:00:00.000Z", "visitors__running_revenue_per_count": null },
+        { "visitors__created_at_day": "2017-01-02T00:00:00.000Z", "visitors__running_revenue_per_count": "100" },
+        { "visitors__created_at_day": "2017-01-03T00:00:00.000Z", "visitors__running_revenue_per_count": "100" },
+        { "visitors__created_at_day": "2017-01-04T00:00:00.000Z", "visitors__running_revenue_per_count": "150" },
+        { "visitors__created_at_day": "2017-01-05T00:00:00.000Z", "visitors__running_revenue_per_count": "200" },
+        { "visitors__created_at_day": "2017-01-06T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
+        { "visitors__created_at_day": "2017-01-07T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
+        { "visitors__created_at_day": "2017-01-08T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
+        { "visitors__created_at_day": "2017-01-09T00:00:00.000Z", "visitors__running_revenue_per_count": "300" },
+        { "visitors__created_at_day": "2017-01-10T00:00:00.000Z", "visitors__running_revenue_per_count": "300" }
       ])
   );
 
@@ -630,7 +630,7 @@ describe('ClickHouse JoinGraph', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-10']
         }],
         order: [{
@@ -875,7 +875,7 @@ describe('ClickHouse JoinGraph', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -892,19 +892,19 @@ describe('ClickHouse JoinGraph', function test() {
         res.should.be.deepEqual(
           [{
             "visitors__checkins": "0",
-            "visitors__created_at_date": "2017-01-06T00:00:00.000",
+            "visitors__created_at_day": "2017-01-06T00:00:00.000",
             "visitors__visitor_count": "2"
           }, {
             "visitors__checkins": "1",
-            "visitors__created_at_date": "2017-01-05T00:00:00.000",
+            "visitors__created_at_day": "2017-01-05T00:00:00.000",
             "visitors__visitor_count": "1"
           }, {
             "visitors__checkins": "2",
-            "visitors__created_at_date": "2017-01-04T00:00:00.000",
+            "visitors__created_at_day": "2017-01-04T00:00:00.000",
             "visitors__visitor_count": "1"
           }, {
             "visitors__checkins": "3",
-            "visitors__created_at_date": "2017-01-02T00:00:00.000",
+            "visitors__created_at_day": "2017-01-02T00:00:00.000",
             "visitors__visitor_count": "1"
           }]
         );
@@ -925,7 +925,7 @@ describe('ClickHouse JoinGraph', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -944,7 +944,7 @@ describe('ClickHouse JoinGraph', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
         res.should.be.deepEqual(
-          [{ "visitors__created_at_date": "2017-01-02T00:00:00.000Z", "visitors__average_checkins": "6__0000000000000000" }]
+          [{ "visitors__created_at_day": "2017-01-02T00:00:00.000Z", "visitors__average_checkins": "6__0000000000000000" }]
         );
       });
     });
@@ -974,7 +974,7 @@ describe('ClickHouse JoinGraph', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.created_at',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-30']
       }],
       timezone: 'America/Los_Angeles',
@@ -983,15 +983,15 @@ describe('ClickHouse JoinGraph', function test() {
       }]
     }, [
       {
-        "visitors__min_visitor_checkin_date_date": "2017-01-02T00:00:00.000Z",
+        "visitors__min_visitor_checkin_date_day": "2017-01-02T00:00:00.000Z",
         "visitors__visitor_count": "1"
       },
       {
-        "visitors__min_visitor_checkin_date_date": "2017-01-04T00:00:00.000Z",
+        "visitors__min_visitor_checkin_date_day": "2017-01-04T00:00:00.000Z",
         "visitors__visitor_count": "1"
       },
       {
-        "visitors__min_visitor_checkin_date_date": "2017-01-05T00:00:00.000Z",
+        "visitors__min_visitor_checkin_date_day": "2017-01-05T00:00:00.000Z",
         "visitors__visitor_count": "1"
       }
     ]).then(() => {
@@ -1008,7 +1008,7 @@ describe('ClickHouse JoinGraph', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.minVisitorCheckinDate',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-30']
       }],
       timezone: 'America/Los_Angeles',
@@ -1017,15 +1017,15 @@ describe('ClickHouse JoinGraph', function test() {
       }]
     }, [
       {
-        "visitors__min_visitor_checkin_date_date": "2017-01-02T00:00:00.000",
+        "visitors__min_visitor_checkin_date_day": "2017-01-02T00:00:00.000",
         "visitors__visitor_count": "1"
       },
       {
-        "visitors__min_visitor_checkin_date_date": "2017-01-04T00:00:00.000",
+        "visitors__min_visitor_checkin_date_day": "2017-01-04T00:00:00.000",
         "visitors__visitor_count": "1"
       },
       {
-        "visitors__min_visitor_checkin_date_date": "2017-01-05T00:00:00.000",
+        "visitors__min_visitor_checkin_date_day": "2017-01-05T00:00:00.000",
         "visitors__visitor_count": "1"
       }
     ])
@@ -1038,7 +1038,7 @@ describe('ClickHouse JoinGraph', function test() {
       ],
       timeDimensions: [{
         dimension: 'visitors.minVisitorCheckinDate1',
-        granularity: 'date',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-30']
       }],
       timezone: 'America/Los_Angeles',
@@ -1086,7 +1086,7 @@ describe('ClickHouse JoinGraph', function test() {
         dimensions: ['visitor_checkins.source'],
         timeDimensions: [{
           dimension: 'visitors.created_at',
-          granularity: 'date',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles',
@@ -1119,7 +1119,7 @@ describe('ClickHouse JoinGraph', function test() {
           [
             {
               "visitor_checkins__source": "google",
-              "visitors__created_at_date": "2017-01-02T00:00:00.000Z",
+              "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
               "visitors__per_visitor_revenue": "100"
             }
           ]
