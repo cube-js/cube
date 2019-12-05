@@ -198,8 +198,7 @@ const normalizeQuery = (query) => {
 
 const coerceForSqlQuery = (query, context) => ({
   ...query,
-  timeDimensions: (query.timeDimensions || [])
-    .map(td => (td.granularity === 'day' ? { ...td, granularity: 'date' } : td)),
+  timeDimensions: query.timeDimensions || [],
   contextSymbols: {
     userContext: context.authInfo && context.authInfo.u || {}
   }

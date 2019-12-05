@@ -61,6 +61,16 @@ var TIME_SERIES = {
       return d.format('YYYY-MM-DDTHH:00:00.000');
     });
   },
+  minute: function minute(range) {
+    return Array.from(range.by('minute')).map(function (d) {
+      return d.format('YYYY-MM-DDTHH:mm:00.000');
+    });
+  },
+  second: function second(range) {
+    return Array.from(range.by('second')).map(function (d) {
+      return d.format('YYYY-MM-DDTHH:mm:ss.000');
+    });
+  },
   week: function week(range) {
     return Array.from(range.snapTo('isoweek').by('week')).map(function (d) {
       return d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000');
@@ -214,8 +224,9 @@ function () {
         return null;
       }
 
-      var start = moment(dateRange[0]).format('YYYY-MM-DD 00:00:00');
-      var end = moment(dateRange[1]).format('YYYY-MM-DD 23:59:59');
+      var padToDay = timeDimension.granularity !== 'minute' && timeDimension.granularity !== 'second';
+      var start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+      var end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
       var range = moment.range(start, end);
 
       if (!TIME_SERIES[timeDimension.granularity]) {
