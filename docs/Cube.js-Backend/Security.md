@@ -164,16 +164,13 @@ This enables you to specify your TLS security directly within the Node process w
 ```javascript
 const fs = require("fs-extra");
 const CubejsServer = require("@cubejs-backend/server");
-const cubejsOptions = require("./cubejsOptions");
 
 var tlsOptions = {
   key: fs.readFileSync(process.env.CUBEJS_TLS_PRIVATE_KEY_FILE),
   cert: fs.readFileSync(process.env.CUBEJS_TLS_PRIVATE_FULLCHAIN_FILE),
 };
 
-const cubejsServer = cubejsOptions
-  ? new CubejsServer(cubejsOptions)
-  : new CubejsServer();
+const cubejsServer = new CubejsServer();
 
 cubejsServer.listen(tlsOptions).then(({ tlsPort }) => {
   console.log(`🚀 Cube.js server is listening securely on ${tlsPort}`);
@@ -197,16 +194,14 @@ Here is an example of how to do leverage `server` to have self-signed, self-rene
 
 ```js
 const CubejsServer = require("@cubejs-backend/server");
-const cubejsOptions = require("./cubejsOptions");
+
 const {
   createCertificate,
   scheduleCertificateRenewal,
 } = require("./certificate");
 
 async function main() {
-  const cubejsServer = cubejsOptions
-    ? new CubejsServer(cubejsOptions)
-    : new CubejsServer();
+  const cubejsServer = new CubejsServer();
 
   const certOptions = { days: 2, selfSigned: true };
   const tlsOptions = await createCertificate(certOptions);
