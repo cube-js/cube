@@ -29,6 +29,14 @@ You put data into `authInfo` when creating a Cube.js API Token.
 
 There're several multitenancy setup scenarios that can be achieved by using combinations of these configuration options.
 
+### Multitenancy vs Multiple Data Sources
+
+In cases where your Cube.js schema is spread across multiple different databases you may consider using [dataSource cube parameter](cube#parameters-data-source) instead of multitenancy.
+Multitenancy designed for cases where you need to serve different datasets for multiple users or tenants which aren't related to each other.
+On other hand multiple data sources can be used for a scenario where users need to access same data but from different databases.
+Multitenancy and multiple data sources features aren't mutually exclusive and can be used together.
+
+
 ## Same DB Instance with per Tenant Row Level Security
 
 Per tenant row level security can be achieved by providing [queryTransformer](@cubejs-backend-server-core#query-transformer) which adds tenant identifier filter to the original query.
