@@ -257,19 +257,25 @@ class ApiGateway {
     return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
   }
 
+  duration(requestStarted) {
+    return new Date().getTime() - requestStarted.getTime();
+  }
+
   async meta({ context, res }) {
+    const requestStarted = new Date();
     try {
       const metaConfig = await this.getCompilerApi(context).metaConfig();
       const cubes = metaConfig.map(c => c.config);
       res({ cubes });
     } catch (e) {
       this.handleError({
-        e, context, res
+        e, context, res, requestStarted
       });
     }
   }
 
   async sql({ query, context, res }) {
+    const requestStarted = new Date();
     try {
       query = this.parseQueryParam(query);
       const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
@@ -282,12 +288,13 @@ class ApiGateway {
       });
     } catch (e) {
       this.handleError({
-        e, context, query, res
+        e, context, query, res, requestStarted
       });
     }
   }
 
   async load({ query, context, res }) {
+    const requestStarted = new Date();
     try {
       query = this.parseQueryParam(query);
       this.log(context, {
@@ -300,6 +307,11 @@ class ApiGateway {
         this.getCompilerApi(context).metaConfig()
       ]);
       const sqlQuery = compilerSqlResult;
+      this.log(context, {
+        type: 'Load Request SQL',
+        query,
+        sqlQuery
+      });
       const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
       const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
       const toExecute = {
@@ -315,6 +327,7 @@ class ApiGateway {
       this.log(context, {
         type: 'Load Request Success',
         query,
+        duration: this.duration(requestStarted)
       });
       const flattenAnnotation = {
         ...annotation.measures,
@@ -333,7 +346,7 @@ class ApiGateway {
       });
     } catch (e) {
       this.handleError({
-        e, context, query, res
+        e, context, query, res, requestStarted
       });
     }
   }
@@ -341,6 +354,7 @@ class ApiGateway {
   async subscribe({
     query, context, res, subscribe, subscriptionState
   }) {
+    const requestStarted = new Date();
     try {
       this.log(context, {
         type: 'Subscribe',
@@ -358,24 +372,24 @@ class ApiGateway {
       await this.load({
         query,
         context,
-        res: (message) => {
+        res: (message, opts) => {
           if (message.error) {
-            error = message;
+            error = { message, opts };
           } else {
-            result = message;
+            result = { message, opts };
           }
         }
       });
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
-        res(result);
+        res(result.message, result.opts);
       } else if (error) {
-        res(error);
+        res(error.message, error.opts);
       }
       await subscribe({ error, result });
     } catch (e) {
       this.handleError({
-        e, context, query, res
+        e, context, query, res, requestStarted
       });
     }
   }
@@ -413,34 +427,38 @@ class ApiGateway {
   }
 
   handleError({
-    e, context, query, res
+    e, context, query, res, requestStarted
   }) {
     if (e instanceof UserError) {
       this.log(context, {
         type: 'User Error',
         query,
-        error: e.message
+        error: e.message,
+        duration: this.duration(requestStarted)
       });
       res({ error: e.message }, { status: 400 });
     } else if (e.error === 'Continue wait') {
       this.log(context, {
         type: 'Continue wait',
         query,
-        error: e.message
+        error: e.message,
+        duration: this.duration(requestStarted)
       });
       res(e, { status: 200 });
     } else if (e.error) {
       this.log(context, {
         type: 'Orchestrator error',
         query,
-        error: e.error
+        error: e.error,
+        duration: this.duration(requestStarted)
       });
       res(e, { status: 400 });
     } else {
       this.log(context, {
         type: 'Internal Server Error',
         query,
-        error: e.stack || e.toString()
+        error: e.stack || e.toString(),
+        duration: this.duration(requestStarted)
       });
       res({ error: e.toString() }, { status: 500 });
     }
