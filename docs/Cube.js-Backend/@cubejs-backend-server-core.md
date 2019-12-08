@@ -48,12 +48,16 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   logger: (msg: String, params: Object) => any,
   driverFactory: (context: DriverContext) => BaseDriver,
   externalDriverFactory: (context: RequestContext) => BaseDriver,
+  requestToContext: (req: ExpressRequest) => RequestContext,
   contextToAppId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => String,
   checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
+  compilerCacheSize: Number,
+  maxCompilerCacheKeepAlive: Number,
+  updateCompilerCacheKeepAlive: Boolean,
   telemetry: Boolean,
   allowUngroupedWithoutPrimaryKey: Boolean,
   orchestratorOptions: {
@@ -175,6 +179,18 @@ CubejsServerCore.create({
 })
 ```
 
+### requestToContext
+
+`requestToContext` is a function to customize the context object passed to other hooks.  Default implementation sets authInfo from the payload.  Custom headers and query parameters could be separated into a useful context here.
+
+```javascript
+const independantInfoSource = {};
+
+CubejsServerCore.create({
+  requestToContext: (req) => ({ authInfo: req.authInfo, customProp: independantInfoSource.currentValue })
+});
+```
+
 ### repositoryFactory
 
 This option allows to customize the repository for Cube.js data schema files. It
@@ -259,6 +275,18 @@ CubejsServerCore.create({
   schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId]
 });
 ```
+
+### compilerCacheSize
+
+Maximum number of compiled schemas to persist with in-memory cache.  Defaults to 250, but optimum value will depend on deployed environment. When the max is reached, will start dropping the least recently used schemas from the cache.
+
+### maxCompilerCacheKeepAlive
+
+Maximum length of time in ms to keep compiled schemas in memory.  Default keeps schemas in memory indefinitely.
+
+### updateCompilerCacheKeepAlive
+
+Providing `updateCompilerCacheKeepAlive: true` keeps frequently used schemas in memory by reseting their `maxCompilerCacheKeepAlive` every time they are accessed.
 
 ### allowUngroupedWithoutPrimaryKey
 
