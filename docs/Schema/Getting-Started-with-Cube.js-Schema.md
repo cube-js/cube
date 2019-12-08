@@ -7,6 +7,7 @@ proofread: 06/18/2019
 ---
 
 Cube.js Schema is used to model raw data into meaningful business definitions and pre-aggregate and optimize results.
+Cube.js Schema is exposed as the [querying API](rest-api) that allows end-users to query wide variety of analytical queries without modyfing Cube.js Schema itself.
 
 Let’s use a users table with the following columns as an example:
 
