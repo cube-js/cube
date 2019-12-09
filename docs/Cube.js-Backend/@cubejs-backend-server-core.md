@@ -50,6 +50,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   externalDriverFactory: (context: RequestContext) => BaseDriver,
   requestToContext: (req: ExpressRequest) => RequestContext,
   contextToAppId: (context: RequestContext) => String,
+  contextToDataSourceId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => String,
   checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
@@ -177,6 +178,17 @@ It is a [Multitenancy Setup](multitenancy-setup) option.
 CubejsServerCore.create({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`
 })
+```
+
+### contextToDataSourceId
+
+`contextToDataSourceId` is a function to determine a DataSource Id which is used to override the `contextToAppId` caching key for managing connection pools.
+
+```javascript
+CubejsServerCore.create({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`,
+  contextToDataSourceId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`
+});
 ```
 
 ### requestToContext

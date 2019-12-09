@@ -122,7 +122,7 @@ class CubejsServerCore {
       options.externalDbType :
       () => options.externalDbType;
     this.preAggregationsSchema =
-    typeof options.preAggregationsSchema === 'function' ? options.preAggregationsSchema : () => options.preAggregationsSchema;
+      typeof options.preAggregationsSchema === 'function' ? options.preAggregationsSchema : () => options.preAggregationsSchema;
     this.compilerCache = new LRUCache({
       max: options.compilerCacheSize || 250,
       maxAge: options.maxCompilerCacheKeepAlive,
@@ -130,6 +130,7 @@ class CubejsServerCore {
     });
     this.dataSourceIdToOrchestratorApi = {};
     this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
+    this.contextToDataSourceId = options.contextToDataSourceId || this.defaultContextToDataSourceId.bind(this);
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
         options.orchestratorOptions :
@@ -289,7 +290,7 @@ class CubejsServerCore {
     return compilerApi;
   }
 
-  contextToDataSourceId(context) {
+  defaultContextToDataSourceId(context) {
     return `${this.contextToAppId(context)}_${context.dataSource}`;
   }
 

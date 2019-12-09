@@ -9,6 +9,7 @@ declare module '@cubejs-backend/server-core' {
     checkAuthMiddleware?: (req: any, res: any, next: any) => any;
     queryTransformer?: () => (query: any, context: any) => any;
     contextToAppId?: any;
+    contextToDataSourceId?: (context: any) => string;
     requestToContext?: (req: any) => any;
     devServer?: boolean;
     dbType?: DatabaseType;
