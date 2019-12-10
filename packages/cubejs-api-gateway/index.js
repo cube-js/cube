@@ -218,14 +218,13 @@ class ApiGateway {
     this.queryTransformer = options.queryTransformer || (async (query, context) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
-    this.requestToContext = options.requestToContext || this.defaultRequestToContext.bind(this);
   }
 
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
-        context: this.requestToContext(req),
+        context: this.contextByReq(req),
         res: this.resToResultFn(res)
       });
     }));
@@ -233,7 +232,7 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/subscribe`, this.checkAuthMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
-        context: this.requestToContext(req),
+        context: this.contextByReq(req),
         res: this.resToResultFn(res)
       });
     }));
@@ -241,14 +240,14 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
       await this.sql({
         query: req.query.query,
-        context: this.requestToContext(req),
+        context: this.contextByReq(req),
         res: this.resToResultFn(res)
       });
     }));
 
     app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
       await this.meta({
-        context: this.requestToContext(req),
+        context: this.contextByReq(req),
         res: this.resToResultFn(res)
       });
     }));
@@ -423,7 +422,7 @@ class ApiGateway {
     return this.adapterApi;
   }
 
-  defaultRequestToContext(req) {
+  contextByReq(req) {
     return { authInfo: req.authInfo };
   }
 
