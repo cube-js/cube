@@ -258,7 +258,7 @@ class ApiGateway {
   }
 
   duration(requestStarted) {
-    return new Date().getTime() - requestStarted.getTime();
+    return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
   async meta({ context, res }) {
