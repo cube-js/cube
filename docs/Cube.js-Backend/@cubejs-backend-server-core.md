@@ -48,7 +48,6 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   logger: (msg: String, params: Object) => any,
   driverFactory: (context: DriverContext) => BaseDriver,
   externalDriverFactory: (context: RequestContext) => BaseDriver,
-  requestToContext: (req: ExpressRequest) => RequestContext,
   contextToAppId: (context: RequestContext) => String,
   contextToDataSourceId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => String,
@@ -188,18 +187,6 @@ CubejsServerCore.create({
 CubejsServerCore.create({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`,
   contextToDataSourceId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`
-});
-```
-
-### requestToContext
-
-`requestToContext` is a function to customize the context object passed to other hooks.  Default implementation sets authInfo from the payload.  Custom headers and query parameters could be separated into a useful context here.
-
-```javascript
-const independantInfoSource = {};
-
-CubejsServerCore.create({
-  requestToContext: (req) => ({ authInfo: req.authInfo, customProp: independantInfoSource.currentValue })
 });
 ```
 
