@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Statsbot, Inc.",
-  "version": "0.12.3",
+  "version": "0.13.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",

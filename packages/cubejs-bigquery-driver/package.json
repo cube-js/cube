@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "driver/BigQueryDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.12.2",
+    "@cubejs-backend/query-orchestrator": "^0.13.0",
     "@google-cloud/bigquery": "^4.1.4",
     "ramda": "^0.26.1"
   },
