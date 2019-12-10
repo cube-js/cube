@@ -3,6 +3,7 @@ const ApiGateway = require('@cubejs-backend/api-gateway');
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
+const LRUCache = require('lru-cache');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
@@ -122,13 +123,23 @@ class CubejsServerCore {
       () => options.externalDbType;
     this.preAggregationsSchema =
       typeof options.preAggregationsSchema === 'function' ? options.preAggregationsSchema : () => options.preAggregationsSchema;
-    this.appIdToCompilerApi = {};
+    this.compilerCache = new LRUCache({
+      max: options.compilerCacheSize || 250,
+      maxAge: options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+    });
     this.dataSourceIdToOrchestratorApi = {};
     this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
+    this.contextToDataSourceId = options.contextToDataSourceId || this.defaultContextToDataSourceId.bind(this);
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
         options.orchestratorOptions :
         () => options.orchestratorOptions;
+
+    // proactively free up old cache values occassionally
+    if (options.maxCompilerCacheKeepAlive) {
+      setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
+    }
 
     const { machineIdSync } = require('node-machine-id');
     let anonymousId = 'unknown';
@@ -263,8 +274,9 @@ class CubejsServerCore {
 
   getCompilerApi(context) {
     const appId = this.contextToAppId(context);
-    if (!this.appIdToCompilerApi[appId]) {
-      this.appIdToCompilerApi[appId] = this.createCompilerApi(
+    let compilerApi = this.compilerCache.get(appId);
+    if (!compilerApi) {
+      compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
@@ -272,11 +284,12 @@ class CubejsServerCore {
           preAggregationsSchema: this.preAggregationsSchema(context)
         }
       );
+      this.compilerCache.set(appId, compilerApi);
     }
-    return this.appIdToCompilerApi[appId];
+    return compilerApi;
   }
 
-  contextToDataSourceId(context) {
+  defaultContextToDataSourceId(context) {
     return `${this.contextToAppId(context)}_${context.dataSource}`;
   }
 

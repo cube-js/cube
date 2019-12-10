@@ -49,11 +49,15 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   driverFactory: (context: DriverContext) => BaseDriver,
   externalDriverFactory: (context: RequestContext) => BaseDriver,
   contextToAppId: (context: RequestContext) => String,
+  contextToDataSourceId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => String,
   checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
+  compilerCacheSize: Number,
+  maxCompilerCacheKeepAlive: Number,
+  updateCompilerCacheKeepAlive: Boolean,
   telemetry: Boolean,
   allowUngroupedWithoutPrimaryKey: Boolean,
   orchestratorOptions: {
@@ -175,6 +179,17 @@ CubejsServerCore.create({
 })
 ```
 
+### contextToDataSourceId
+
+`contextToDataSourceId` is a function to determine a DataSource Id which is used to override the `contextToAppId` caching key for managing connection pools.
+
+```javascript
+CubejsServerCore.create({
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`,
+  contextToDataSourceId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`
+});
+```
+
 ### repositoryFactory
 
 This option allows to customize the repository for Cube.js data schema files. It
@@ -259,6 +274,18 @@ CubejsServerCore.create({
   schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId]
 });
 ```
+
+### compilerCacheSize
+
+Maximum number of compiled schemas to persist with in-memory cache.  Defaults to 250, but optimum value will depend on deployed environment. When the max is reached, will start dropping the least recently used schemas from the cache.
+
+### maxCompilerCacheKeepAlive
+
+Maximum length of time in ms to keep compiled schemas in memory.  Default keeps schemas in memory indefinitely.
+
+### updateCompilerCacheKeepAlive
+
+Providing `updateCompilerCacheKeepAlive: true` keeps frequently used schemas in memory by reseting their `maxCompilerCacheKeepAlive` every time they are accessed.
 
 ### allowUngroupedWithoutPrimaryKey
 
