@@ -4,7 +4,7 @@ import { fetch } from "whatwg-fetch";
 
 let URL;
 if (process.env.NODE_ENV === 'production') {
-  URL = "https://real-time-dashboard-demo.cube.dev"
+  URL = window.location.origin
 } else {
   URL = "http://localhost:4000"
 }

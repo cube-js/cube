@@ -9,7 +9,7 @@ import tracker from "./tracker";
 const CUBEJS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NzM2MjI5MjR9.iD_sSpXRBQSO0ywh5zSPHpHV-1O37oQMakrkG03kR-o";
 let WS_URL;
 if (process.env.NODE_ENV === 'production') {
-  WS_URL = "wss://real-time-dashboard-demo.cube.dev/"
+  WS_URL = window.location.origin.replace('http', 'ws').replace('https', 'wss')
 } else {
   WS_URL = "ws://localhost:4000/"
 }
