@@ -200,3 +200,24 @@ cube(`Users`, {
   }
 });
 ```
+
+So for example if you want to pass definition of `ratio` outside of the cube you should define it as:
+
+```javascript
+const measureRatioDefinition = {
+  sql: (CUBE, count) => `sum(${CUBE}.amount) / ${count}`,
+  type: `number`
+}
+
+cube(`Users`, {
+  // ...
+  
+  measures: {
+    count: {
+      type: `count`
+    },
+    
+    ratio: measureRatioDefinition
+  }
+});
+```
