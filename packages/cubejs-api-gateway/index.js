@@ -5,6 +5,7 @@ const moment = require('moment');
 const dateParser = require('./dateParser');
 
 const UserError = require('./UserError');
+const HttpError = require('./HttpError');
 const SubscriptionServer = require('./SubscriptionServer');
 const LocalSubscriptionStore = require('./LocalSubscriptionStore');
 
@@ -437,6 +438,15 @@ class ApiGateway {
         duration: this.duration(requestStarted)
       });
       res({ error: e.message }, { status: 400 });
+    } else if (e instanceof HttpError) {
+      this.log(context, {
+        type: e.type,
+        query,
+        error: e.message,
+        duration: this.duration(requestStarted)
+      });
+      console.log(`status: ${e.status}`);
+      res({ error: e.message }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log(context, {
         type: 'Continue wait',
