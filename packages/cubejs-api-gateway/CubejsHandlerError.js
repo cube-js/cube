@@ -1,4 +1,4 @@
-class HttpError extends Error {
+class CubejsHandlerError extends Error {
   constructor(status, type, message) {
     super(message || type);
     this.status = status;
@@ -6,4 +6,4 @@ class HttpError extends Error {
   }
 }
 
-module.exports = HttpError;
+module.exports = CubejsHandlerError;

@@ -5,7 +5,7 @@ const moment = require('moment');
 const dateParser = require('./dateParser');
 
 const UserError = require('./UserError');
-const HttpError = require('./HttpError');
+const CubejsHandlerError = require('./CubejsHandlerError');
 const SubscriptionServer = require('./SubscriptionServer');
 const LocalSubscriptionStore = require('./LocalSubscriptionStore');
 
@@ -430,22 +430,13 @@ class ApiGateway {
   handleError({
     e, context, query, res, requestStarted
   }) {
-    if (e instanceof UserError) {
-      this.log(context, {
-        type: 'User Error',
-        query,
-        error: e.message,
-        duration: this.duration(requestStarted)
-      });
-      res({ error: e.message }, { status: 400 });
-    } else if (e instanceof HttpError) {
+    if (e instanceof CubejsHandlerError) {
       this.log(context, {
         type: e.type,
         query,
         error: e.message,
         duration: this.duration(requestStarted)
       });
-      console.log(`status: ${e.status}`);
       res({ error: e.message }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log(context, {
