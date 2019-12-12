@@ -49,9 +49,11 @@ class SqliteDriver extends BaseDriver {
       default: {
         ...(tables.map(
           table => ({
-            [table.name]: table.sql.match(/\((.*)\)/)[1].split(',')
-              .map(nameAndType => nameAndType.trim().split(' ')).map(([name, type]) => ({ name, type }))
+            [table.name]: table.sql.replace(/\n/g, '').match(/\((.*)\)/)[1].split(',')
+              .map(nameAndType => nameAndType.trim().split(' ')).map(([name, type]) => ({ name: name.splice(1, -1), type }))
           })
+          
+          
         )).reduce((a, b) => ({ ...a, ...b }), {})
       }
     };
