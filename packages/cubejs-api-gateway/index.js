@@ -2,8 +2,9 @@ const jwt = require('jsonwebtoken');
 const R = require('ramda');
 const Joi = require('@hapi/joi');
 const moment = require('moment');
-const dateParser = require('./dateParser');
+const uuid = require('uuid/v4');
 
+const dateParser = require('./dateParser');
 const UserError = require('./UserError');
 const CubejsHandlerError = require('./CubejsHandlerError');
 const SubscriptionServer = require('./SubscriptionServer');
@@ -226,7 +227,8 @@ class ApiGateway {
       await this.load({
         query: req.query.query,
         context: this.contextByReq(req),
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        requestId: this.requestIdByReq(req)
       });
     }));
 
@@ -234,7 +236,8 @@ class ApiGateway {
       await this.load({
         query: req.query.query,
         context: this.contextByReq(req),
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        requestId: this.requestIdByReq(req)
       });
     }));
 
@@ -242,14 +245,16 @@ class ApiGateway {
       await this.sql({
         query: req.query.query,
         context: this.contextByReq(req),
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        requestId: this.requestIdByReq(req)
       });
     }));
 
     app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
       await this.meta({
         context: this.contextByReq(req),
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        requestId: this.requestIdByReq(req)
       });
     }));
   }
@@ -262,7 +267,7 @@ class ApiGateway {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
-  async meta({ context, res }) {
+  async meta({ context, res, requestId }) {
     const requestStarted = new Date();
     try {
       const metaConfig = await this.getCompilerApi(context).metaConfig();
@@ -270,12 +275,14 @@ class ApiGateway {
       res({ cubes });
     } catch (e) {
       this.handleError({
-        e, context, res, requestStarted
+        e, context, res, requestStarted, requestId
       });
     }
   }
 
-  async sql({ query, context, res }) {
+  async sql({
+    query, context, res, requestId
+  }) {
     const requestStarted = new Date();
     try {
       query = this.parseQueryParam(query);
@@ -289,18 +296,21 @@ class ApiGateway {
       });
     } catch (e) {
       this.handleError({
-        e, context, query, res, requestStarted
+        e, context, query, res, requestStarted, requestId
       });
     }
   }
 
-  async load({ query, context, res }) {
+  async load({
+    query, context, res, requestId
+  }) {
     const requestStarted = new Date();
     try {
       query = this.parseQueryParam(query);
       this.log(context, {
         type: 'Load Request',
-        query
+        query,
+        requestId
       });
       const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
       const [compilerSqlResult, metaConfigResult] = await Promise.all([
@@ -320,7 +330,8 @@ class ApiGateway {
         query: sqlQuery.sql[0],
         values: sqlQuery.sql[1],
         continueWait: true,
-        renewQuery: normalizedQuery.renewQuery
+        renewQuery: normalizedQuery.renewQuery,
+        requestId
       };
       const response = await this.getAdapterApi({
         ...context, dataSource: sqlQuery.dataSource
@@ -328,7 +339,8 @@ class ApiGateway {
       this.log(context, {
         type: 'Load Request Success',
         query,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
+        requestId
       });
       const flattenAnnotation = {
         ...annotation.measures,
@@ -347,13 +359,13 @@ class ApiGateway {
       });
     } catch (e) {
       this.handleError({
-        e, context, query, res, requestStarted
+        e, context, query, res, requestStarted, requestId
       });
     }
   }
 
   async subscribe({
-    query, context, res, subscribe, subscriptionState
+    query, context, res, subscribe, subscriptionState, requestId
   }) {
     const requestStarted = new Date();
     try {
@@ -373,6 +385,7 @@ class ApiGateway {
       await this.load({
         query,
         context,
+        requestId: `${requestId}-${uuid()}`,
         res: (message, opts) => {
           if (message.error) {
             error = { message, opts };
@@ -427,14 +440,19 @@ class ApiGateway {
     return { authInfo: req.authInfo };
   }
 
+  requestIdByReq(req) {
+    return req.headers['x-request-id'] || req.headers.traceparent || uuid();
+  }
+
   handleError({
-    e, context, query, res, requestStarted
+    e, context, query, res, requestStarted, requestId
   }) {
     if (e instanceof CubejsHandlerError) {
       this.log(context, {
         type: e.type,
         query,
         error: e.message,
+        requestId,
         duration: this.duration(requestStarted)
       });
       res({ error: e.message }, { status: e.status });
@@ -443,6 +461,7 @@ class ApiGateway {
         type: 'Continue wait',
         query,
         error: e.message,
+        requestId,
         duration: this.duration(requestStarted)
       });
       res(e, { status: 200 });
@@ -451,6 +470,7 @@ class ApiGateway {
         type: 'Orchestrator error',
         query,
         error: e.error,
+        requestId,
         duration: this.duration(requestStarted)
       });
       res(e, { status: 400 });
@@ -459,6 +479,7 @@ class ApiGateway {
         type: 'Internal Server Error',
         query,
         error: e.stack || e.toString(),
+        requestId,
         duration: this.duration(requestStarted)
       });
       res({ error: e.toString() }, { status: 500 });

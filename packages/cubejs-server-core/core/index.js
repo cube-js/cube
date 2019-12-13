@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
 const LRUCache = require('lru-cache');
+const SqlString = require('sqlstring');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const FileRepository = require('./FileRepository');
@@ -51,7 +52,13 @@ const devLogger = (level) => (type, message, error) => {
   };
 
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
-  const format = json => JSON.stringify(json, null, 2);
+  const format = ({ queryKey, duration, ...json }) => {
+    const restParams = JSON.stringify(json, null, 2);
+    if (queryKey) {
+      return `${duration ? `(${duration}ms)` : ''}\n${SqlString.format(queryKey[0], queryKey[1]).replace(/\\s+/g, ' ')}\n${restParams}`;
+    }
+    return restParams;
+  };
 
   const logError = () => console.log(`${withColor(type, colors.red)}: ${format(message)} \n${error}`);
   const logType = () => console.log(`${withColor(type)}`);

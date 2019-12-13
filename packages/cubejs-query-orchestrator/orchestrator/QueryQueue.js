@@ -54,7 +54,11 @@ class QueryQueue {
 
       if (added > 0) {
         this.logger('Added to queue', {
-          priority, queueSize, queryKey, queuePrefix: this.redisQueuePrefix
+          priority,
+          queueSize,
+          queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: options.requestId
         });
       }
 
@@ -91,7 +95,11 @@ class QueryQueue {
     await Promise.all(toCancel.map(async queryKey => {
       const [query] = await redisClient.getQueryAndRemove(queryKey);
       if (query) {
-        this.logger('Removing orphaned query', { queryKey: query.queryKey, queuePrefix: this.redisQueuePrefix });
+        this.logger('Removing orphaned query', {
+          queryKey: query.queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: query.requestId
+        });
         await this.sendCancelMessageFn(query);
       }
     }));
@@ -173,7 +181,8 @@ class QueryQueue {
           this.logger('Performing query', {
             queueSize,
             queryKey: query.queryKey,
-            queuePrefix: this.redisQueuePrefix
+            queuePrefix: this.redisQueuePrefix,
+            requestId: query.requestId
           });
           await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime });
 
@@ -193,7 +202,8 @@ class QueryQueue {
                       this.logger(`Error while query update`, {
                         queryKey,
                         error: e.stack || e,
-                        queuePrefix: this.redisQueuePrefix
+                        queuePrefix: this.redisQueuePrefix,
+                        requestId: query.requestId
                       });
                     }
                     return null;
@@ -205,7 +215,8 @@ class QueryQueue {
               queueSize,
               duration: ((new Date()).getTime() - startQueryTime),
               queryKey: query.queryKey,
-              queuePrefix: this.redisQueuePrefix
+              queuePrefix: this.redisQueuePrefix,
+              requestId: query.requestId
             });
           } catch (e) {
             executionResult = {
@@ -214,14 +225,16 @@ class QueryQueue {
             this.logger('Error while querying', {
               queryKey: query.queryKey,
               error: (e.stack || e).toString(),
-              queuePrefix: this.redisQueuePrefix
+              queuePrefix: this.redisQueuePrefix,
+              requestId: query.requestId
             });
             if (e instanceof TimeoutError) {
               query = await redisClient.getQueryDef(queryKey);
               if (query) {
                 this.logger('Cancelling query due to timeout', {
                   queryKey: query.queryKey,
-                  queuePrefix: this.redisQueuePrefix
+                  queuePrefix: this.redisQueuePrefix,
+                  requestId: query.requestId
                 });
                 await this.sendCancelMessageFn(query);
               }
@@ -232,7 +245,12 @@ class QueryQueue {
 
           await redisClient.setResultAndRemoveQuery(queryKey, executionResult);
         } else {
-          this.logger('Query cancelled in-flight', { queueSize, queryKey, queuePrefix: this.redisQueuePrefix });
+          this.logger('Query cancelled in-flight', {
+            queueSize,
+            queryKey,
+            queuePrefix: this.redisQueuePrefix,
+            requestId: query.requestId
+          });
           await redisClient.removeQuery(queryKey);
         }
 
@@ -254,7 +272,8 @@ class QueryQueue {
       this.logger(`Error while cancel`, {
         queryKey: query.queryKey,
         error: e.stack || e,
-        queuePrefix: this.redisQueuePrefix
+        queuePrefix: this.redisQueuePrefix,
+        requestId: query.requestId
       });
     }
   }

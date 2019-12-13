@@ -61,7 +61,7 @@ class LocalQueueDriverConnection {
 
   addToQueue(keyScore, queryKey, time, queryHandler, query, priority, options) {
     const queryQueueObj = {
-      queryHandler, query, queryKey, stageQueryKey: options.stageQueryKey, priority
+      queryHandler, query, queryKey, stageQueryKey: options.stageQueryKey, priority, requestId: options.requestId
     };
     const key = this.redisHash(queryKey);
     if (!this.queryDef[key]) {

@@ -34,7 +34,7 @@ class RedisQueueDriverConnection {
         this.queriesDefKey(),
         this.redisHash(queryKey),
         JSON.stringify({
-          queryHandler, query, queryKey, stageQueryKey: options.stageQueryKey, priority
+          queryHandler, query, queryKey, stageQueryKey: options.stageQueryKey, priority, requestId: options.requestId
         })
       ])
       .zcard(this.toProcessRedisKey())

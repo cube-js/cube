@@ -68,6 +68,7 @@ class SubscriptionServer {
         context,
         isSubscription,
         res: this.resultFn(connectionId, message.messageId),
+        requestId: message.requestId || `${connectionId}-${message.messageId}`,
         subscriptionState: async () => {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, message.messageId);
           return subscription && subscription.state;

@@ -821,10 +821,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.12.1":
-  version "0.12.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.12.1.tgz#9e54a17f894a86b5155024cb91a835e1cf5efdcb"
-  integrity sha512-3G44lczJcxIdaaI1RBh2j/YfekWd9dQhBSqNPjFf+4HNn+J0VhS2doVoGrs83KB9r6udb9sYoNI4uIEu8Qu6Zg==
+"@cubejs-backend/api-gateway@^0.13.1":
+  version "0.13.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.13.1.tgz#4cf318b47838e89ff97eb1965a05e588dc0cf8a3"
+  integrity sha512-Li+1Bw9HTYjs8py36cQH78e8NgPYcN/wvcZEZFWDypa1IYYNfg2OCbf1CZFikQZV8Rl3rap69c4gmNdJJQUPKg==
   dependencies:
     "@hapi/joi" "^14.0.6"
     chrono-node "^1.3.11"
@@ -833,18 +833,18 @@
     moment-timezone "^0.5.27"
     ramda "^0.25.0"
 
-"@cubejs-backend/query-orchestrator@^0.12.2":
-  version "0.12.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.12.2.tgz#13c3be7c3fa150a7a8047810143f0eb4bc5854bb"
-  integrity sha512-fy+8Mfhez1MF4eVpGFpBjYHxqf4AX9nRBqXKg+8BBrc6Rz7xLOoh3xvI7IGMrtahCo+HyuCgHpBqejryB24TEQ==
+"@cubejs-backend/query-orchestrator@^0.13.0":
+  version "0.13.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.0.tgz#cd5d524b4a15d208124e6eaa58063c5ac79d4945"
+  integrity sha512-63DVy9+GZ5/5nwR42gITDBrHxSlURQUGTDzZ1mZn60GmjgwbQhtzXIgJjPNpUJXuDiErlHkYgh43wMNOFG77sw==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.12.1":
-  version "0.12.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.12.1.tgz#bb1a9cbd65d76f507d58561dd6209b5765ed820e"
-  integrity sha512-Lw33gCp+PoNuzwVAGLWus5GTfEYiN5vI2DMJIYPE4Oiku77cf7fZ4HZMiXGK0lFB8ZxYLHQjGc7g+XXhMF1TwQ==
+"@cubejs-backend/schema-compiler@^0.13.0":
+  version "0.13.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.13.0.tgz#0fb6771e29e1a61a50c0674bd8e649727779891e"
+  integrity sha512-nzQM7BADIwhlxDIikgoKRlQOSALF63Fhc9xYX81SwZK2NGF53BacHmDDuavpkRaKhYIM8ztK98JTAa4FP55sxw==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -5020,6 +5020,11 @@ sprintf-js@~1.0.2:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
   integrity sha1-BOaSb2YolTVPPdAVIDYzuFcpfiw=
+
+sqlstring@^2.3.1:
+  version "2.3.1"
+  resolved "https://registry.yarnpkg.com/sqlstring/-/sqlstring-2.3.1.tgz#475393ff9e91479aea62dcaf0ca3d14983a7fb40"
+  integrity sha1-R1OT/56RR5rqYtyvDKPRSYOn+0A=
 
 sshpk@^1.7.0:
   version "1.16.1"

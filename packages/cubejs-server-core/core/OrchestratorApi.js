@@ -17,7 +17,8 @@ class OrchestratorApi {
     try {
       this.logger('Query started', {
         query: queryForLog,
-        params: query.values
+        params: query.values,
+        requestId: query.requestId
       });
 
       let fetchQueryPromise = this.orchestrator.fetchQuery(query);
@@ -29,7 +30,8 @@ class OrchestratorApi {
       this.logger('Query completed', {
         duration: ((new Date()).getTime() - startQueryTime),
         query: queryForLog,
-        params: query.values
+        params: query.values,
+        requestId: query.requestId
       });
 
       return data;
@@ -38,7 +40,8 @@ class OrchestratorApi {
         this.logger('Continue wait', {
           duration: ((new Date()).getTime() - startQueryTime),
           query: queryForLog,
-          params: query.values
+          params: query.values,
+          requestId: query.requestId
         });
 
         throw { error: 'Continue wait', stage: await this.orchestrator.queryStage(query) };
@@ -47,7 +50,8 @@ class OrchestratorApi {
       this.logger('Error querying db', {
         query: queryForLog,
         params: query.values,
-        error: (err.stack || err)
+        error: (err.stack || err),
+        requestId: query.requestId
       });
 
       throw { error: err.toString() };

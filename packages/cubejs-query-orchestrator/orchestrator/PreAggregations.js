@@ -165,6 +165,7 @@ class PreAggregationLoader {
     this.loadCache = loadCache;
     this.waitForRenew = options.waitForRenew;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
+    this.requestId = options.requestId;
   }
 
   async loadPreAggregation() {
@@ -179,7 +180,11 @@ class PreAggregationLoader {
       if (versionEntryByStructureVersion) {
         this.loadPreAggregationWithKeys().catch(e => {
           if (!(e instanceof ContinueWaitError)) {
-            this.logger('Error loading pre-aggregation', { error: (e.stack || e), preAggregation: this.preAggregation });
+            this.logger('Error loading pre-aggregation', {
+              error: (e.stack || e),
+              preAggregation: this.preAggregation,
+              requestId: this.requestId
+            });
           }
         });
         return this.targetTableName(versionEntryByStructureVersion);
@@ -248,12 +253,18 @@ class PreAggregationLoader {
 
     if (versionEntry) {
       if (versionEntry.structure_version !== newVersionEntry.structure_version) {
-        this.logger('Invalidating pre-aggregation structure', { preAggregation: this.preAggregation });
+        this.logger('Invalidating pre-aggregation structure', {
+          preAggregation: this.preAggregation,
+          requestId: this.requestId
+        });
         await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
         return mostRecentTargetTableName();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (this.waitForRenew) {
-          this.logger('Waiting for pre-aggregation renew', { preAggregation: this.preAggregation });
+          this.logger('Waiting for pre-aggregation renew', {
+            preAggregation: this.preAggregation,
+            requestId: this.requestId
+          });
           await this.executeInQueue(invalidationKeys, 0, newVersionEntry);
           return mostRecentTargetTableName();
         } else {
@@ -268,7 +279,10 @@ class PreAggregationLoader {
         }
       }
     } else {
-      this.logger('Creating pre-aggregation from scratch', { preAggregation: this.preAggregation });
+      this.logger('Creating pre-aggregation from scratch', {
+        preAggregation: this.preAggregation,
+        requestId: this.requestId
+      });
       await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
       return mostRecentTargetTableName();
     }
@@ -283,7 +297,10 @@ class PreAggregationLoader {
   }
 
   scheduleRefresh(invalidationKeys, newVersionEntry) {
-    this.logger('Refreshing pre-aggregation content', { preAggregation: this.preAggregation });
+    this.logger('Refreshing pre-aggregation content', {
+      preAggregation: this.preAggregation,
+      requestId: this.requestId
+    });
     this.executeInQueue(invalidationKeys, 0, newVersionEntry)
       .then(() => {
         delete this.preAggregations.refreshErrors[newVersionEntry.table_name];
@@ -297,9 +314,11 @@ class PreAggregationLoader {
             this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].error = e;
             this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].counter += 1;
           }
-          this.logger('Error refreshing pre-aggregation', { error: (e.stack || e), preAggregation: this.preAggregation })
+          this.logger('Error refreshing pre-aggregation', {
+            error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId
+          });
         }
-      })
+      });
   }
 
   executeInQueue(invalidationKeys, priority, newVersionEntry) {
@@ -309,7 +328,8 @@ class PreAggregationLoader {
       {
         preAggregation: this.preAggregation,
         preAggregationsTablesToTempTables: this.preAggregationsTablesToTempTables,
-        newVersionEntry
+        newVersionEntry,
+        requestId: this.requestId
       },
       priority,
       { stageQueryKey: PreAggregations.preAggregationQueryCacheKey(this.preAggregation) }
@@ -360,14 +380,20 @@ class PreAggregationLoader {
       throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadTable()`);
     }
     const table = this.targetTableName(newVersionEntry);
-    this.logger('Downloading external pre-aggregation', { preAggregation: this.preAggregation });
+    this.logger('Downloading external pre-aggregation', {
+      preAggregation: this.preAggregation,
+      requestId: this.requestId
+    });
     const tableData = await client.downloadTable(table);
     const columns = await client.tableColumnTypes(table);
     const externalDriver = await this.externalDriverFactory();
     if (!externalDriver.uploadTable) {
       throw new Error(`Can't load external pre-aggregation: destination driver doesn't support uploadTable()`);
     }
-    this.logger('Uploading external pre-aggregation', { preAggregation: this.preAggregation });
+    this.logger('Uploading external pre-aggregation', {
+      preAggregation: this.preAggregation,
+      requestId: this.requestId
+    });
     await externalDriver.uploadTable(table, columns, tableData);
     await this.loadCache.reset(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table);
@@ -389,7 +415,10 @@ class PreAggregationLoader {
     const toDrop = actualTables
       .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
       .filter(t => tablesToSave.indexOf(t) === -1);
-    this.logger('Dropping orphaned tables', { tablesToDrop: JSON.stringify(toDrop) });
+    this.logger('Dropping orphaned tables', {
+      tablesToDrop: JSON.stringify(toDrop),
+      requestId: this.requestId
+    });
     await Promise.all(toDrop.map(table => client.dropTable(table)));
   }
 }
@@ -434,7 +463,7 @@ class PreAggregations {
         p,
         preAggregationsTablesToTempTables,
         loadCache,
-        { waitForRenew: queryBody.renewQuery }
+        { waitForRenew: queryBody.renewQuery, requestId: queryBody.requestId }
       );
       const preAggregationPromise = () => loader.loadPreAggregation().then(async targetTableName => {
         const usedPreAggregation = typeof targetTableName === 'string' ? { targetTableName } : targetTableName;
@@ -448,7 +477,9 @@ class PreAggregations {
   getQueue() {
     if (!this.queue) {
       this.queue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}`, this.driverFactory, (client, q) => {
-        const { preAggregation, preAggregationsTablesToTempTables, newVersionEntry } = q;
+        const {
+          preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId
+        } = q;
         const loader = new PreAggregationLoader(
           this.redisPrefix,
           this.driverFactory,
@@ -457,7 +488,8 @@ class PreAggregations {
           this,
           preAggregation,
           preAggregationsTablesToTempTables,
-          new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this)
+          new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this),
+          { requestId }
         );
         return loader.refresh(newVersionEntry)(client);
       }, {
