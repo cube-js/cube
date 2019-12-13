@@ -14,12 +14,14 @@ import ChartContainer from './ChartContainer';
 import * as bizChartLibrary from './libraries/bizChart';
 import * as rechartsLibrary from './libraries/recharts';
 import * as chartjsLibrary from './libraries/chartjs';
+import * as d3ChartLibrary from './libraries/d3';
 import * as tablesLibrary from './libraries/tables';
 
 export const libraryToTemplate = {
   chartjs: { library: chartjsLibrary, title: 'Chart.js' },
   recharts: { library: rechartsLibrary, title: 'Recharts' },
-  bizcharts: { library: bizChartLibrary, title: 'Bizcharts' }
+  bizcharts: { library: bizChartLibrary, title: 'Bizcharts' },
+  d3: { library: d3ChartLibrary, title: 'D3' }
 };
 
 export const babelConfig = {
