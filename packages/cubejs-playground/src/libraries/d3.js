@@ -1,7 +1,6 @@
 import * as d3 from 'd3';
 
-const drawFrame = `
-  // set the dimensions and margins of the graph
+const drawFrame = `// Set the dimensions and margins of the graph
   var margin = {top: 10, right: 30, bottom: 30, left: 60},
       width = node.clientWidth - margin.left - margin.right, height = 400 - margin.top - margin.bottom;
 
@@ -14,16 +13,14 @@ const drawFrame = `
     .attr("transform",
           "translate(" + margin.left + "," + margin.top + ")");`;
 
-const yAxis = (max) => (`
-  // Add Y axis
+const yAxis = (max) => (`// Add Y axis
   var y = d3.scaleLinear()
     .domain([0, ${max}])
     .range([ height, 0 ]);
   svg.append("g")
     .call(d3.axisLeft(y));`);
 
-const xAxisTime = `
-  // Add X axis
+const xAxisTime = `// Add X axis
   var x = d3.scaleTime()
     .domain(d3.extent(resultSet.chartPivot(), c => d3.isoParse(c.x)))
     .range([ 0, width ]);
@@ -31,32 +28,32 @@ const xAxisTime = `
     .attr("transform", "translate(0," + height + ")")
     .call(d3.axisBottom(x));`;
 
-const stackData = `
-  // Transform data into D3 format
+const stackData = `// Transform data into D3 format
   var keys = resultSet.seriesNames().map(s => s.key)
   const data = d3.stack()
     .keys(keys)
     (resultSet.chartPivot())
 
-  // color palette
+  // Color palette
   var color = d3.scaleOrdinal()
     .domain(keys)
     .range(COLORS_SERIES)`;
 
 const drawByChartType = {
   line: `
-  ${xAxisTime}
-
-  // prepare data
+  // Prepare data in D3 format
   const data = resultSet.series().map((series) => ({
     key: series.title, values: series.series
   }));
-  ${yAxis(`d3.max(data.map((s) => d3.max(s.values, (i) => i.value)))`)}
 
   // color palette
   var color = d3.scaleOrdinal()
     .domain(data.map(d => d.key ))
     .range(COLORS_SERIES)
+
+  ${xAxisTime}
+
+  ${yAxis(`d3.max(data.map((s) => d3.max(s.values, (i) => i.value)))`)}
 
   // Draw the lines
   svg.selectAll(".line")
@@ -75,6 +72,7 @@ const drawByChartType = {
   `,
   bar: `
   ${stackData}
+
   // Add X axis
   var x = d3.scaleBand()
     .range([ 0, width ])
@@ -104,7 +102,9 @@ const drawByChartType = {
     `,
   area: `
   ${stackData}
+
   ${xAxisTime}
+
   ${yAxis(`d3.max(data.map((s) => d3.max(s, (i) => i[1])))`)}
 
   // Add the areas
@@ -119,30 +119,28 @@ const drawByChartType = {
       .y1(d => y(d[1]))
   )
   `,
-  pie: `
-    const data = resultSet.series()[0].series.map(s => s.value);
-    const data_ready = d3.pie()(data);
+  pie: `const data = resultSet.series()[0].series.map(s => s.value);
+  const data_ready = d3.pie()(data);
 
-    // The radius of the pieplot is half the width or half the height (smallest one).
-    var radius = Math.min(400, 400) / 2 - 40;
+  // The radius of the pieplot is half the width or half the height (smallest one).
+  var radius = Math.min(400, 400) / 2 - 40;
 
-    // Seprate container to center align pie chart
-    var pieContainer = svg.attr('height', height)
-        .append('g')
-        .attr('transform', 'translate(' + width/2 +  ',' + height/2 +')');
+  // Seprate container to center align pie chart
+  var pieContainer = svg.attr('height', height)
+      .append('g')
+      .attr('transform', 'translate(' + width/2 +  ',' + height/2 +')');
 
-    pieContainer
-      .selectAll('pieArcs')
-      .data(data_ready)
-      .enter()
-      .append('path')
-      .attr('d', d3.arc()
-        .innerRadius(0)
-        .outerRadius(radius)
-      )
-      .attr('fill', d => COLORS_SERIES[d.index])
-      .style("opacity", 0.7)
-
+  pieContainer
+    .selectAll('pieArcs')
+    .data(data_ready)
+    .enter()
+    .append('path')
+    .attr('d', d3.arc()
+      .innerRadius(0)
+      .outerRadius(radius)
+    )
+    .attr('fill', d => COLORS_SERIES[d.index])
+    .style("opacity", 0.7)
   `
 };
 
@@ -152,9 +150,6 @@ import * as d3 from 'd3';
 const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
 
 const draw = (node, resultSet, chartType) => {
-  if (node === null) {
-    return null;
-  }
   ${drawFrame}
   ${drawByChartType[chartType]}
 }
@@ -162,7 +157,7 @@ const draw = (node, resultSet, chartType) => {
 const ${renderFnName} = ({ resultSet }) => {
     return (
       <div
-        ref={el => draw(el, resultSet, '${chartType}')}
+        ref={el => el && draw(el, resultSet, '${chartType}')}
       />
     );
 };
