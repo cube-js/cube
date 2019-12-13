@@ -46,16 +46,23 @@ class SqliteDriver extends BaseDriver {
     const tables = await this.query(query);
 
     return {
-      default: {
-        ...(tables.map(
-          table => ({
-            [table.name]: table.sql.replace(/\n/g, '').match(/\((.*)\)/)[1].split(',')
-              .map(nameAndType => nameAndType.trim().split(' ')).map(([name, type]) => ({ name: name.splice(1, -1), type }))
-          })
-          
-          
-        )).reduce((a, b) => ({ ...a, ...b }), {})
-      }
+      default: tables.reduce((acc, table) => ({
+          ...acc,
+          [table.name]: table.sql
+              // remove EOL for next .match to read full string
+              .replace(/\n/g, '')
+              // extract fields
+              .match(/\((.*)\)/)[1]
+              // split fields
+              .split(',')
+              .map((nameAndType) => {
+                  const match = nameAndType
+                    .trim()
+                    // obtain "([|`|")?name(]|`|")? type"
+                    .match(/(\[|`|")?([^\[\]"`]+)(\]|`|")?\s+(\w+)/)
+                  return { name: match[2], type: match[4] };
+              })
+        }), {}),
     };
   }
 }
