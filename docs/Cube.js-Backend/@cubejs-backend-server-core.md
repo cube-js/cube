@@ -263,7 +263,7 @@ It is usually used in [Multitenancy Setup](multitenancy-setup).
 ### schemaVersion
 
 Schema version can be used to tell Cube.js schema should be recompiled in case schema code depends on dynamic definitions fetched from some external database or API. 
-This method is called on each request. 
+This method is called on each request however `RequestContext` parameter is reused per application id returned by [contextToAppId](#options-reference-context-to-app-id).
 If returned string has been changed, schema will be recompiled.
 It can be used in both multitenant and single tenant environments.
 
