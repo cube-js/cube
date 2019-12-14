@@ -220,41 +220,46 @@ class ApiGateway {
     this.queryTransformer = options.queryTransformer || (async (query, context) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
+    this.extendContext = options.extendContext;
   }
 
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = this.contextByReq(req);
       await this.load({
         query: req.query.query,
-        context: this.contextByReq(req),
+        context: context,
         res: this.resToResultFn(res),
-        requestId: this.requestIdByReq(req)
+        requestId: context.requestId
       });
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = this.contextByReq(req);
       await this.load({
         query: req.query.query,
-        context: this.contextByReq(req),
+        context: context,
         res: this.resToResultFn(res),
-        requestId: this.requestIdByReq(req)
+        requestId: context.requestId
       });
     }));
 
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = this.contextByReq(req);
       await this.sql({
         query: req.query.query,
-        context: this.contextByReq(req),
+        context: context,
         res: this.resToResultFn(res),
-        requestId: this.requestIdByReq(req)
+        requestId: context.requestId
       });
     }));
 
     app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = this.contextByReq(req);
       await this.meta({
-        context: this.contextByReq(req),
+        context: context,
         res: this.resToResultFn(res),
-        requestId: this.requestIdByReq(req)
+        requestId: context.requestId
       });
     }));
   }
@@ -437,7 +442,13 @@ class ApiGateway {
   }
 
   contextByReq(req) {
-    return { authInfo: req.authInfo };
+    let overrides = typeof this.extendContext === 'function' ?
+      this.extendContext(req) : {};
+    return {
+      authInfo: req.authInfo,
+      requestId: this.requestIdByReq(req),
+      ...overrides
+    };
   }
 
   requestIdByReq(req) {
