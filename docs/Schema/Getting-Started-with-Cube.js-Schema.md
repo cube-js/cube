@@ -15,7 +15,7 @@ Let’s use a users table with the following columns as an example:
 | -- | ------- | ----- | -----------  |
 | 1  | true    | San Francisco | Pied Piper   |
 | 2  | true    | Palo Alto | Raviga       |
-| 3  | true    | Redwood | Avito        |
+| 3  | true    | Redwood | Aviato        |
 | 4  | false   | Mountain View | Bream-Hall   |
 | 5  | false   | Santa Cruz | Hooli        |
 
