@@ -1,11 +1,12 @@
 import * as d3 from 'd3';
 
 const drawFrame = `// Set the dimensions and margins of the graph
-  var margin = {top: 10, right: 30, bottom: 30, left: 60},
-      width = node.clientWidth - margin.left - margin.right, height = 400 - margin.top - margin.bottom;
+  const margin = {top: 10, right: 30, bottom: 30, left: 60},
+    width = node.clientWidth - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
 
   d3.select(node).html("");
-  var svg = d3.select(node)
+  const svg = d3.select(node)
   .append("svg")
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
@@ -14,14 +15,14 @@ const drawFrame = `// Set the dimensions and margins of the graph
           "translate(" + margin.left + "," + margin.top + ")");`;
 
 const yAxis = (max) => (`// Add Y axis
-  var y = d3.scaleLinear()
+  const y = d3.scaleLinear()
     .domain([0, ${max}])
     .range([ height, 0 ]);
   svg.append("g")
     .call(d3.axisLeft(y));`);
 
 const xAxisTime = `// Add X axis
-  var x = d3.scaleTime()
+  const x = d3.scaleTime()
     .domain(d3.extent(resultSet.chartPivot(), c => d3.isoParse(c.x)))
     .range([ 0, width ]);
   svg.append("g")
@@ -29,13 +30,13 @@ const xAxisTime = `// Add X axis
     .call(d3.axisBottom(x));`;
 
 const stackData = `// Transform data into D3 format
-  var keys = resultSet.seriesNames().map(s => s.key)
+  const keys = resultSet.seriesNames().map(s => s.key)
   const data = d3.stack()
     .keys(keys)
     (resultSet.chartPivot())
 
   // Color palette
-  var color = d3.scaleOrdinal()
+  const color = d3.scaleOrdinal()
     .domain(keys)
     .range(COLORS_SERIES)`;
 
@@ -47,7 +48,7 @@ const drawByChartType = {
   }));
 
   // color palette
-  var color = d3.scaleOrdinal()
+  const color = d3.scaleOrdinal()
     .domain(data.map(d => d.key ))
     .range(COLORS_SERIES)
 
@@ -74,7 +75,7 @@ const drawByChartType = {
   ${stackData}
 
   // Add X axis
-  var x = d3.scaleBand()
+  const x = d3.scaleBand()
     .range([ 0, width ])
     .domain(resultSet.chartPivot().map(c => c.x))
     .padding(0.3);
@@ -123,10 +124,10 @@ const drawByChartType = {
   const data_ready = d3.pie()(data);
 
   // The radius of the pieplot is half the width or half the height (smallest one).
-  var radius = Math.min(400, 400) / 2 - 40;
+  const radius = Math.min(400, 400) / 2 - 40;
 
   // Seprate container to center align pie chart
-  var pieContainer = svg.attr('height', height)
+  const pieContainer = svg.attr('height', height)
       .append('g')
       .attr('transform', 'translate(' + width/2 +  ',' + height/2 +')');
 
@@ -140,7 +141,6 @@ const drawByChartType = {
       .outerRadius(radius)
     )
     .attr('fill', d => COLORS_SERIES[d.index])
-    .style("opacity", 0.7)
   `
 };
 
@@ -154,13 +154,9 @@ const draw = (node, resultSet, chartType) => {
   ${drawByChartType[chartType]}
 }
 
-const ${renderFnName} = ({ resultSet }) => {
-    return (
-      <div
-        ref={el => el && draw(el, resultSet, '${chartType}')}
-      />
-    );
-};
+const ${renderFnName} = ({ resultSet }) => (
+  <div ref={el => el && draw(el, resultSet, '${chartType}')} />
+)
 `
 );
 
