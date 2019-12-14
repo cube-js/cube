@@ -35,9 +35,41 @@ class ResultSet {
     this.loadResponse = loadResponse;
   }
 
+  /**
+   * Returns an array of series with key, title and series data.
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-12-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.series() will return
+   * [
+   *   {
+   *     "key":"Stories.count",
+   *     "title": "Stories Count",
+   *     "series": [
+   *       { "x":"2015-01-01T00:00:00", "value": 27120 },
+   *       { "x":"2015-02-01T00:00:00", "value": 25861 },
+   *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+   *       //...
+   *     ]
+   *   }
+   * ]
+   * ```
+   * @param pivotConfig
+   * @returns {Array}
+   */
   series(pivotConfig) {
     return this.seriesNames(pivotConfig).map(({ title, key }) => ({
       title,
+      key,
       series: this.chartPivot(pivotConfig).map(({ category, x, ...obj }) => ({ value: obj[key], category, x }))
     }));
   }
