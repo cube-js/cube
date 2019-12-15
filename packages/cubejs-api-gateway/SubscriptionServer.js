@@ -21,13 +21,15 @@ class SubscriptionServer {
 
   async processMessage(connectionId, message, isSubscription) {
     let context = {};
+    let requestId = '';
     try {
       if (typeof message === 'string') {
         message = JSON.parse(message);
       }
       if (message.authorization) {
-        const newContext = {};
-        await this.apiGateway.checkAuthFn(newContext, message.authorization);
+        const req = { isSubscription: true };
+        await this.apiGateway.checkAuthFn(req, message.authorization);
+        const newContext = this.apiGateway.contextByReq(req);
         await this.subscriptionStore.setAuthContext(connectionId, newContext);
         this.sendMessage(connectionId, { handshake: true });
         return;
@@ -60,15 +62,15 @@ class SubscriptionServer {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
+      requestId = message.requestId || `${connectionId}-${message.messageId}`;
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
         .reduce((a, b) => ({ ...a, ...b }), {});
       await this.apiGateway[message.method]({
         ...params,
-        context,
+        context: { ...context, requestId },
         isSubscription,
         res: this.resultFn(connectionId, message.messageId),
-        requestId: message.requestId || `${connectionId}-${message.messageId}`,
         subscriptionState: async () => {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, message.messageId);
           return subscription && subscription.state;
