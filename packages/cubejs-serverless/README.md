@@ -9,6 +9,7 @@
 
 Package used to deploy Cube.js Serverless way.
 
+
 ## Getting Started
 
 Create Cube.js Serverless app:
