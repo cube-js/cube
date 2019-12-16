@@ -3,6 +3,8 @@ const ProviderToHandlerPackage = {
   google: '@cubejs-backend/serverless-google'
 };
 
+// bump commit
+
 const platform = process.env.CUBEJS_SERVERLESS_PLATFORM || process.env.SERVERLESS_EXPRESS_PLATFORM || 'aws';
 const handlerPackage = ProviderToHandlerPackage[platform];
 
