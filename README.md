@@ -232,6 +232,8 @@ export default () => {
 
 | Demo | Code | Description |
 |:------|:----------:|:-------------|
+|[Real-Time Dashboard](https://real-time-dashboard-demo.cube.dev/)|[real-time-dashboard](./examples/real-time-dashboard)|Real-Time Dashboard Demo using Web Sockets transport|
+|[React Dashboard](https://react-dashboard-demo.cube.dev/)|[react-dashboard](./guides/react-dashboard)|Dynamic dashboard with React, GraphQL, and Cube.js|
 |[Examples Gallery](https://statsbotco.github.io/cubejs-client/)|[examples-gallery](./examples/examples-gallery)|Examples Gallery with different visualizations libraries|
 |[Stripe Dashboard](http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/)|[stripe-dashboard](./examples/stripe-dashboard)|Stripe Demo Dashboard built with Cube.js and Recharts|
 |[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](./examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js|
