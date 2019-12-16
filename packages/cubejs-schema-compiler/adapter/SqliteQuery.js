@@ -58,6 +58,10 @@ class SqliteQuery extends BaseQuery {
     ).join(' UNION ALL ');
     return `SELECT dates.f date_from, dates.t date_to FROM (${values}) AS dates`;
   }
+
+  nowTimestampSql() {
+    return `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
+  }
 }
 
 module.exports = SqliteQuery;

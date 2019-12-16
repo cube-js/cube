@@ -12,11 +12,23 @@
     "node": ">=8.11.1"
   },
   "main": "driver/SqliteDriver.js",
+  "scripts": {
+    "lint": "eslint **/*.js"
+  },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.13.2",
     "sqlite3": "^4.1.0"
   },
   "license": "Apache-2.0",
+  "devDependencies": {
+    "eslint": "^5.16.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-node": "^5.2.1",
+    "mocha": "^5.2.0",
+    "should": "^13.2.3",
+    "testcontainers": "^1.1.10"
+  },
   "publishConfig": {
     "access": "public"
   }
