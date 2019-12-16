@@ -54,8 +54,11 @@ const devLogger = (level) => (type, message, error) => {
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
   const format = ({ queryKey, duration, ...json }) => {
     const restParams = JSON.stringify(json, null, 2);
-    if (queryKey) {
+    if (queryKey && typeof queryKey[0] === 'string') {
       return `${duration ? `(${duration}ms)` : ''}\n${SqlString.format(queryKey[0], queryKey[1]).replace(/\\s+/g, ' ')}\n${restParams}`;
+    }
+    if (queryKey) {
+      return `${duration ? `(${duration}ms)` : ''}\n${JSON.stringify(queryKey)}\n${restParams}`; // TODO format
     }
     return restParams;
   };
