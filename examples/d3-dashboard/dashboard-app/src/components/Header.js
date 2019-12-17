@@ -1,21 +1,25 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { withRouter } from "react-router";
 import AppBar from "@material-ui/core/AppBar";
 import Toolbar from "@material-ui/core/Toolbar";
 import Typography from "@material-ui/core/Typography";
 import IconButton from "@material-ui/core/IconButton";
-import MenuIcon from "@material-ui/icons/Menu";
+import GithubIcon from "@material-ui/icons/GitHub";
+import Button from "@material-ui/core/Button";
 
 const Header = ({ location }) => (
   <AppBar position="static">
-    <Toolbar variant="dense">
-      <IconButton edge="start" color="inherit" aria-label="menu">
-        <MenuIcon />
-      </IconButton>
-      <Typography variant="h6" color="inherit">
+    <Toolbar>
+      <Typography variant="h6" color="inherit" style={{ flex: 1 }}>
         Cube.js with D3 Example
       </Typography>
+      <Button
+        color="inherit"
+        size="large"
+        startIcon={<GithubIcon />}
+      >
+        View Source Code
+      </Button>
     </Toolbar>
   </AppBar>
 );
