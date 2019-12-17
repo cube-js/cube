@@ -26,6 +26,7 @@ const DriverDependencies = {
   prestodb: '@cubejs-backend/prestodb-driver',
   oracle: '@cubejs-backend/oracle-driver',
   sqlite: '@cubejs-backend/sqlite-driver',
+  odelasticsearch: '@cubejs-backend/elasticsearch-driver',
 };
 
 const checkEnvForPlaceholders = () => {

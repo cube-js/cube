@@ -1,0 +1,36 @@
+{
+  "name": "@cubejs-backend/elasticsearch-driver",
+  "description": "Cube.js elasticsearch database driver",
+  "author": "Statsbot, Inc.",
+  "version": "0.13.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-elasticsearch-driver"
+  },
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/ElasticSearchDriver.js",
+  "scripts": {
+    "lint": "eslint **/*.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.13.2",
+    "@elastic/elasticsearch": "^7.5.0",
+    "sqlstring": "^2.3.1"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "eslint": "^5.16.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-node": "^5.2.1",
+    "mocha": "^5.2.0",
+    "should": "^13.2.3",
+    "testcontainers": "^1.1.10"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
