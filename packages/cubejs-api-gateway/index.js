@@ -440,7 +440,7 @@ class ApiGateway {
   }
 
   requestIdByReq(req) {
-    return req.headers && req.headers['x-request-id'] || req.headers && req.headers.traceparent || uuid();
+    return req.headers['x-request-id'] || req.headers.traceparent || uuid();
   }
 
   handleError({
