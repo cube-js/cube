@@ -20,17 +20,15 @@ class SubscriptionServer {
   }
 
   async processMessage(connectionId, message, isSubscription) {
-    let context = {};
-    let requestId = '';
+    let authContext = {};
     try {
       if (typeof message === 'string') {
         message = JSON.parse(message);
       }
       if (message.authorization) {
-        const req = { isSubscription: true };
-        await this.apiGateway.checkAuthFn(req, message.authorization);
-        const newContext = this.apiGateway.contextByReq(req);
-        await this.subscriptionStore.setAuthContext(connectionId, newContext);
+        authContext = { isSubscription: true };
+        await this.apiGateway.checkAuthFn(authContext, message.authorization);
+        await this.subscriptionStore.setAuthContext(connectionId, authContext);
         this.sendMessage(connectionId, { handshake: true });
         return;
       }
@@ -44,9 +42,9 @@ class SubscriptionServer {
         throw new UserError(`messageId is required`);
       }
 
-      context = await this.subscriptionStore.getAuthContext(connectionId);
+      authContext = await this.subscriptionStore.getAuthContext(connectionId);
 
-      if (!context) {
+      if (!authContext) {
         await this.sendMessage(
           connectionId,
           {
@@ -62,13 +60,15 @@ class SubscriptionServer {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
-      requestId = message.requestId || `${connectionId}-${message.messageId}`;
+      const requestId = message.requestId || `${connectionId}-${message.messageId}`;
+      const context = this.apiGateway.contextByReq(message, authContext.authInfo, requestId);
+
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
         .reduce((a, b) => ({ ...a, ...b }), {});
       await this.apiGateway[message.method]({
         ...params,
-        context: { ...context, requestId },
+        context,
         isSubscription,
         res: this.resultFn(connectionId, message.messageId),
         subscriptionState: async () => {

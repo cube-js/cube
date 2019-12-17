@@ -227,7 +227,7 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
-        context: this.contextByReq(req),
+        context: this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
         res: this.resToResultFn(res)
       });
     }));
@@ -235,7 +235,7 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/subscribe`, this.checkAuthMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
-        context: this.contextByReq(req),
+        context: this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
         res: this.resToResultFn(res)
       });
     }));
@@ -243,14 +243,14 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
       await this.sql({
         query: req.query.query,
-        context: this.contextByReq(req),
+        context: this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
         res: this.resToResultFn(res)
       });
     }));
 
     app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
       await this.meta({
-        context: context,
+        context: this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
         res: this.resToResultFn(res)
       });
     }));
@@ -430,12 +430,12 @@ class ApiGateway {
     return this.adapterApi;
   }
 
-  contextByReq(req) {
-    let overrides = typeof this.extendContext === 'function' ? this.extendContext(req) : {};
+  contextByReq(req, authInfo, requestId) {
+    const extensions = typeof this.extendContext === 'function' ? this.extendContext(req) : {};
     return {
-      authInfo: req.authInfo,
-      requestId: this.requestIdByReq(req),
-      ...overrides
+      authInfo,
+      requestId,
+      ...extensions
     };
   }
 
