@@ -12644,6 +12644,38 @@
 
       this.loadResponse = loadResponse;
     }
+    /**
+     * Returns an array of series with key, title and series data.
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-12-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.series() will return
+     * [
+     *   {
+     *     "key":"Stories.count",
+     *     "title": "Stories Count",
+     *     "series": [
+     *       { "x":"2015-01-01T00:00:00", "value": 27120 },
+     *       { "x":"2015-02-01T00:00:00", "value": 25861 },
+     *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+     *       //...
+     *     ]
+     *   }
+     * ]
+     * ```
+     * @param pivotConfig
+     * @returns {Array}
+     */
+
 
     _createClass(ResultSet, [{
       key: "series",
@@ -12655,6 +12687,7 @@
               key = _ref.key;
           return {
             title: title,
+            key: key,
             series: _this.chartPivot(pivotConfig).map(function (_ref2) {
               var category = _ref2.category,
                   x = _ref2.x,
