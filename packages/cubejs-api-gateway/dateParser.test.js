@@ -9,10 +9,26 @@ describe(`dateParser`, () => {
     );
   });
 
+  test(`last 1 day`, () => {
+    expect(dateParser('last 1 day', 'UTC')).toStrictEqual(
+      [dateParser('yesterday', 'UTC')[0], dateParser('yesterday', 'UTC')[1]]
+    );
+  });
+
+  test(`today`, () => {
+    const start = new Date();
+    const end = new Date();
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(23, 59, 59, 999);
+    expect(dateParser('today', 'UTC')).toStrictEqual(
+      [start.toISOString().replace('Z', ''), end.toISOString().replace('Z', '')]
+    );
+  });
+
   test(`last 6 hours`, () => {
     expect(dateParser('last 6 hours', 'UTC')).toStrictEqual(
       [
-        new Date((Math.floor(new Date().getTime() / (1000 * 60 * 60)) - 7) * (1000 * 60 * 60)).toISOString().replace('Z', ''),
+        new Date((Math.floor(new Date().getTime() / (1000 * 60 * 60)) - 6) * (1000 * 60 * 60)).toISOString().replace('Z', ''),
         new Date((Math.floor(new Date().getTime() / (1000 * 60 * 60))) * (1000 * 60 * 60) - 1).toISOString().replace('Z', '')
       ]
     );

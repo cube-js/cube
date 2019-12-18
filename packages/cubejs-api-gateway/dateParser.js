@@ -19,14 +19,16 @@ module.exports = (dateString, timezone) => {
     const match = dateString.match(/last\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/);
     const span = match[2] === 'week' ? 'isoWeek' : match[2];
     momentRange = [
-      moment.tz(timezone).add(-parseInt(match[1], 10) - 1, match[2]).startOf(span),
-      moment.tz(timezone).add(-1, match[2]).endOf(span)
+      moment.tz(timezone).startOf(span).add(-parseInt(match[1], 10), match[2]),
+      moment.tz(timezone).endOf(span).add(-1, match[2])
     ];
   } else if (dateString.match(/today/)) {
     momentRange = [moment.tz(timezone).startOf('day'), moment.tz(timezone).endOf('day')];
   } else if (dateString.match(/yesterday/)) {
-    const yesterday = moment.tz(timezone).add(-1, 'day');
-    momentRange = [moment(yesterday).startOf('day'), moment(yesterday).endOf('day')];
+    momentRange = [
+      moment.tz(timezone).startOf('day').add(-1, 'day'),
+      moment.tz(timezone).endOf('day').add(-1, 'day')
+    ];
   } else {
     const results = chrono.parse(dateString);
     if (!results) {
