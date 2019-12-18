@@ -96,12 +96,16 @@ Either `String` or `Function` could be passed. Providing a `Function` allows to 
 If no option is passed, Cube.js will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve `dbType`.
 
+Called only once per [appId](#options-reference-context-to-app-id).
+
 ### externalDbType
 
 Should be used in conjunction with [externalDriverFactory](#external-driver-factory) option.
 Either `String` or `Function` could be passed.
 Providing a `Function` allows to dynamically select a database type depending on the user's context.
 It is usually used in [Multitenancy Setup](multitenancy-setup).
+
+Called only once per [appId](#options-reference-context-to-app-id).
 
 ### schemaPath
 
@@ -135,6 +139,8 @@ Set a custom database driver. The function accepts context object as an argument
 to let dynamically load database drivers, which is usually used
 in [Multitenancy Applications](multitenancy-setup).
 
+Called once per [dataSourceId](#options-reference-context-to-data-source-id).
+
 ```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
@@ -150,6 +156,8 @@ Please refer to [External Rollup](pre-aggregations#external-rollup) documentatio
 The function accepts context object as an argument
 to let dynamically load database drivers, which is usually used
 in [Multitenancy Applications](multitenancy-setup).
+
+Called once per [appId](#options-reference-context-to-app-id).
 
 ```javascript
 const MySQLDriver = require('@cubejs-backend/mysql-driver');
@@ -173,6 +181,8 @@ It is a [Multitenancy Setup](multitenancy-setup) option.
 
 `contextToAppId` is a  function to determine an App ID which is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
 
+Called on each request.
+
 ```javascript
 CubejsServerCore.create({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`
@@ -182,6 +192,8 @@ CubejsServerCore.create({
 ### contextToDataSourceId
 
 `contextToDataSourceId` is a function to determine a DataSource Id which is used to override the `contextToAppId` caching key for managing connection pools.
+
+Called on each request.
 
 ```javascript
 CubejsServerCore.create({
@@ -195,6 +207,8 @@ CubejsServerCore.create({
 This option allows to customize the repository for Cube.js data schema files. It
 is a function, which accepts a context object and can dynamically select
 repositories with schema files. Learn more about it in [Multitenancy Setup](multitenancy-setup) guide.
+
+Called only once per [appId](#options-reference-context-to-app-id).
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
@@ -212,6 +226,8 @@ More info on how to generate such tokens is [here](security#security-context).
 
 You can set `req.authInfo = { u: { ...userContextObj } }` inside the middleware if you want to customize [USER_CONTEXT](cube#context-variables-user-context).
 
+Called on each request.
+
 Also, you can use `checkAuthMiddleware` to disable built-in security. See an example below.
 
 ```javascript
@@ -226,6 +242,8 @@ CubejsServerCore.create({
 
 This is a security hook to check your query just before it gets processed.
 You can use this very generic API to implement any type of custom security checks your app needs and transform input query accordingly.
+
+Called on each request.
 
 For example you can use `queryTransformer` to add row level security filter where needed.
 
@@ -251,6 +269,8 @@ Schema name to use for storing pre-aggregations.
 For some drivers like MySQL it's name for pre-aggregation database as there's no database schema concept there.
 Either `String` or `Function` could be passed.
 Providing a `Function` allows to dynamically set the pre-aggregation schema name depending on the user's context.
+
+Called once per [appId](#options-reference-context-to-app-id).
 
 ```javascript
 CubejsServerCore.create({
