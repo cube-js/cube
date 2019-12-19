@@ -20,15 +20,15 @@ class SubscriptionServer {
   }
 
   async processMessage(connectionId, message, isSubscription) {
-    let context = {};
+    let authContext = {};
     try {
       if (typeof message === 'string') {
         message = JSON.parse(message);
       }
       if (message.authorization) {
-        const newContext = {};
-        await this.apiGateway.checkAuthFn(newContext, message.authorization);
-        await this.subscriptionStore.setAuthContext(connectionId, newContext);
+        authContext = { isSubscription: true };
+        await this.apiGateway.checkAuthFn(authContext, message.authorization);
+        await this.subscriptionStore.setAuthContext(connectionId, authContext);
         this.sendMessage(connectionId, { handshake: true });
         return;
       }
@@ -42,9 +42,9 @@ class SubscriptionServer {
         throw new UserError(`messageId is required`);
       }
 
-      context = await this.subscriptionStore.getAuthContext(connectionId);
+      authContext = await this.subscriptionStore.getAuthContext(connectionId);
 
-      if (!context) {
+      if (!authContext) {
         await this.sendMessage(
           connectionId,
           {
@@ -60,6 +60,9 @@ class SubscriptionServer {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
+      const requestId = message.requestId || `${connectionId}-${message.messageId}`;
+      const context = await this.apiGateway.contextByReq(message, authContext.authInfo, requestId);
+
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
         .reduce((a, b) => ({ ...a, ...b }), {});
@@ -68,7 +71,6 @@ class SubscriptionServer {
         context,
         isSubscription,
         res: this.resultFn(connectionId, message.messageId),
-        requestId: message.requestId || `${connectionId}-${message.messageId}`,
         subscriptionState: async () => {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, message.messageId);
           return subscription && subscription.state;

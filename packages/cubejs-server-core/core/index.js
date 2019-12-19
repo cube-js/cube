@@ -276,7 +276,8 @@ class CubejsServerCore {
           basePath: this.options.basePath,
           checkAuthMiddleware: this.options.checkAuthMiddleware,
           checkAuth: this.options.checkAuth,
-          queryTransformer: this.options.queryTransformer
+          queryTransformer: this.options.queryTransformer,
+          extendContext: this.options.extendContext
         }
       );
     }
