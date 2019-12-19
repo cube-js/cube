@@ -66,7 +66,7 @@ class ElasticSearchDriver extends BaseDriver {
     });
 
     const schema = (await Promise.all(indices.body.map(async i => {
-      const props = (await this.client.indices.getMapping({ index: i.index })).body[i.index].mappings.properties;
+      const props = (await this.client.indices.getMapping({ index: i.index })).body[i.index].mappings.properties || {};
       return {
         [i.index]: Object.keys(props).map(p => ({ name: p, type: props[p].type })).filter(c => !!c.type)
       };
