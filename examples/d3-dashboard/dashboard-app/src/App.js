@@ -1,15 +1,18 @@
 import React from "react";
-import logo from "./logo.svg";
 import "./App.css";
 import "./body.css";
 import { makeStyles } from "@material-ui/core/styles";
-import { Layout } from "antd";
 import cubejs from "@cubejs-client/core";
 import { CubeProvider } from "@cubejs-client/react";
 import Header from "./components/Header";
-const API_URL = "http://localhost:4000";
+let API_URL;
+if (process.env.NODE_ENV === 'production') {
+  API_URL = window.location.origin;
+} else {
+  API_URL = "http://localhost:4000";
+}
 const CUBEJS_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NzYzMDIyNjIsImV4cCI6MTU3NjM4ODY2Mn0._lhZS_L33fK8U_30X0iH7DTQiPRJYdDgnj5Xefzrgok";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NzY3MTExODl9.K3-dV7mFDCmAL8LAzPSjdNWp9JCoeVczZ3IgnTTH94I";
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`
 });
