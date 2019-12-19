@@ -55,6 +55,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
+  extendContext: (req: ExpressRequest) => any,
   compilerCacheSize: Number,
   maxCompilerCacheKeepAlive: Number,
   updateCompilerCacheKeepAlive: Boolean,
@@ -81,7 +82,8 @@ QueueOptions {
 }
 
 RequestContext {
-  authInfo: Object
+  authInfo: Object,
+  requestId: String
 }
 
 DriverContext extends RequestContext {
@@ -294,6 +296,10 @@ CubejsServerCore.create({
   schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId]
 });
 ```
+
+### extendContext
+
+Option to extend the `RequestContext` with custom values. This method is called on each request.  Can be async.
 
 ### compilerCacheSize
 
