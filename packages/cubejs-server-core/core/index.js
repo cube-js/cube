@@ -380,6 +380,14 @@ class CubejsServerCore {
     }
     return DriverDependencies[dbType];
   }
+
+  async testConnections() {
+    Object.keys(this.dataSourceIdToOrchestratorApi).map((dataSourceId) => {
+      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
+      orchestratorApi
+      console.log(value);
+    });
+  }
 }
 
 module.exports = CubejsServerCore;

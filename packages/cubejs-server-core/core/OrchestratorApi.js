@@ -7,6 +7,7 @@ class OrchestratorApi {
   constructor(driverFactory, logger, options) {
     options = options || {};
     this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
+    this.driverFactory = driverFactory;
     this.logger = logger;
   }
 
@@ -56,6 +57,13 @@ class OrchestratorApi {
 
       throw { error: err.toString() };
     }
+  }
+
+  async testConnection() {
+    const driver = await this.driverFactory();
+
+    // this.driverFactory() tests the connection on startup, but now we want to explicitly test again.
+    driver.testConnection();
   }
 }
 
