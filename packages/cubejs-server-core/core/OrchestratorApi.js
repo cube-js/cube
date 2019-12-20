@@ -8,6 +8,8 @@ class OrchestratorApi {
     options = options || {};
     this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
     this.driverFactory = driverFactory;
+    const { externalDriverFactory } = options;
+    this.externalDriverFactory = externalDriverFactory;
     this.logger = logger;
   }
 
@@ -59,11 +61,30 @@ class OrchestratorApi {
     }
   }
 
-  async testConnection() {
-    const driver = await this.driverFactory();
+  testConnection() {
+    return Promise.all([
+      this.testDriverConnection(this.driverFactory),
+      this.testDriverConnection(this.externalDriverFactory)
+    ]);
+  }
 
-    // this.driverFactory() tests the connection on startup, but now we want to explicitly test again.
-    driver.testConnection();
+  async testDriverConnection(driverFn) {
+    const driver = await driverFn();
+    await driver.testConnection();
+  }
+
+  release() {
+    return Promise.all([
+      this.releaseDriver(this.driverFactory),
+      this.releaseDriver(this.externalDriverFactory)
+    ]);
+  }
+
+  async releaseDriver(driverFn) {
+    const driver = await driverFn();
+    if (driver.release) {
+      await driver.release();
+    }
   }
 }
 

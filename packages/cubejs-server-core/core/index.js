@@ -382,11 +382,22 @@ class CubejsServerCore {
   }
 
   async testConnections() {
-    Object.keys(this.dataSourceIdToOrchestratorApi).map((dataSourceId) => {
+    const tests = [];
+    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
       const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
-      orchestratorApi
-      console.log(value);
+      tests.push(orchestratorApi.testConnection());
     });
+    return Promise.all(tests);
+  }
+
+  async releaseConnections() {
+    const releases = [];
+    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
+      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
+      releases.push(orchestratorApi.release());
+    });
+    await Promise.all(releases);
+    this.dataSourceIdToOrchestratorApi = {};
   }
 }
 
