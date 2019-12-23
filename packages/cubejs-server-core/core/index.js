@@ -381,7 +381,7 @@ class CubejsServerCore {
     return DriverDependencies[dbType];
   }
 
-  async testConnections() {
+  testConnections() {
     const tests = [];
     Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
       const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
