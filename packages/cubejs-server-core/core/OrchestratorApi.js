@@ -69,8 +69,10 @@ class OrchestratorApi {
   }
 
   async testDriverConnection(driverFn) {
-    const driver = await driverFn();
-    await driver.testConnection();
+    if (driverFn) {
+      const driver = await driverFn();
+      await driver.testConnection();
+    }
   }
 
   release() {
@@ -81,9 +83,11 @@ class OrchestratorApi {
   }
 
   async releaseDriver(driverFn) {
-    const driver = await driverFn();
-    if (driver.release) {
-      await driver.release();
+    if (driverFn) {
+      const driver = await driverFn();
+      if (driver.release) {
+        await driver.release();
+      }
     }
   }
 }
