@@ -11,11 +11,12 @@ class CompilerApi {
     this.logger = this.options.logger;
     this.preAggregationsSchema = this.options.preAggregationsSchema;
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
+    this.schemaVersion = this.options.schemaVersion;
   }
 
   async getCompilers() {
     let compilerVersion = (
-      this.options.schemaVersion && this.options.schemaVersion() ||
+      this.schemaVersion && this.schemaVersion() ||
       'default_schema_version'
     ).toString();
     if (this.options.devServer) {
