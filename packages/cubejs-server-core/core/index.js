@@ -287,17 +287,20 @@ class CubejsServerCore {
   getCompilerApi(context) {
     const appId = this.contextToAppId(context);
     let compilerApi = this.compilerCache.get(appId);
+    const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
     if (!compilerApi) {
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
-          schemaVersion: this.options.schemaVersion && (() => this.options.schemaVersion(context)),
+          schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context)
         }
       );
       this.compilerCache.set(appId, compilerApi);
     }
+
+    compilerApi.schemaVersion = currentSchemaVersion;
     return compilerApi;
   }
 
