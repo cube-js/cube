@@ -7,6 +7,9 @@ class OrchestratorApi {
   constructor(driverFactory, logger, options) {
     options = options || {};
     this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
+    this.driverFactory = driverFactory;
+    const { externalDriverFactory } = options;
+    this.externalDriverFactory = externalDriverFactory;
     this.logger = logger;
   }
 
@@ -55,6 +58,36 @@ class OrchestratorApi {
       });
 
       throw { error: err.toString() };
+    }
+  }
+
+  testConnection() {
+    return Promise.all([
+      this.testDriverConnection(this.driverFactory),
+      this.testDriverConnection(this.externalDriverFactory)
+    ]);
+  }
+
+  async testDriverConnection(driverFn) {
+    if (driverFn) {
+      const driver = await driverFn();
+      await driver.testConnection();
+    }
+  }
+
+  release() {
+    return Promise.all([
+      this.releaseDriver(this.driverFactory),
+      this.releaseDriver(this.externalDriverFactory)
+    ]);
+  }
+
+  async releaseDriver(driverFn) {
+    if (driverFn) {
+      const driver = await driverFn();
+      if (driver.release) {
+        await driver.release();
+      }
     }
   }
 }

@@ -383,6 +383,25 @@ class CubejsServerCore {
     }
     return DriverDependencies[dbType];
   }
+
+  testConnections() {
+    const tests = [];
+    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
+      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
+      tests.push(orchestratorApi.testConnection());
+    });
+    return Promise.all(tests);
+  }
+
+  async releaseConnections() {
+    const releases = [];
+    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
+      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
+      releases.push(orchestratorApi.release());
+    });
+    await Promise.all(releases);
+    this.dataSourceIdToOrchestratorApi = {};
+  }
 }
 
 module.exports = CubejsServerCore;

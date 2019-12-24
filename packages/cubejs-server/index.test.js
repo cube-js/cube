@@ -2,6 +2,7 @@ jest.mock("@cubejs-backend/server-core", () => {
   const staticCreate = jest.fn();
   const initApp = jest.fn(() => Promise.resolve())
   const event = jest.fn(() => Promise.resolve())
+  const releaseConnections = jest.fn(() => Promise.resolve())
   class CubejsServerCore {
     static create() {
       staticCreate.call(null, arguments);
@@ -14,11 +15,16 @@ jest.mock("@cubejs-backend/server-core", () => {
     event() {
       return event();
     }
+
+    releaseConnections() {
+      return releaseConnections();
+    }
   }
   CubejsServerCore.mock = {
     staticCreate,
     initApp,
     event,
+    releaseConnections,
   };
   return CubejsServerCore;
 });
