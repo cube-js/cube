@@ -173,7 +173,15 @@ class PreAggregationLoader {
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
     if (notLoadedKey && !this.waitForRenew) {
       const structureVersion = version(this.preAggregation.loadSql);
+
+      const getVersionsStarted = new Date();
       const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation);
+      this.logger('Load PreAggregations Tables', {
+        preAggregation: this.preAggregation,
+        requestId: this.requestId,
+        duration: (new Date().getTime() - getVersionsStarted.getTime())
+      });
+
       const versionEntryByStructureVersion = versionEntries.find(
         v => v.table_name === this.preAggregation.tableName && v.structure_version === structureVersion
       );
