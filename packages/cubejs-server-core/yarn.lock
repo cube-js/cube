@@ -821,10 +821,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.13.1":
-  version "0.13.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.13.1.tgz#4cf318b47838e89ff97eb1965a05e588dc0cf8a3"
-  integrity sha512-Li+1Bw9HTYjs8py36cQH78e8NgPYcN/wvcZEZFWDypa1IYYNfg2OCbf1CZFikQZV8Rl3rap69c4gmNdJJQUPKg==
+"@cubejs-backend/api-gateway@^0.13.6":
+  version "0.13.6"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.13.6.tgz#d5a7996f0b2f2842ca54f015b553febd7c942597"
+  integrity sha512-uylnk8BgmuwhANnUrWbTyWqnPvq/bI/SNyzNMs5muJ0GMVSKHdn8U2Of4Smwch0Njh3HlCuvEvySUvyRcADEjA==
   dependencies:
     "@hapi/joi" "^14.0.6"
     chrono-node "^1.3.11"
@@ -832,19 +832,20 @@
     moment "^2.24.0"
     moment-timezone "^0.5.27"
     ramda "^0.25.0"
+    uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.13.0":
-  version "0.13.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.0.tgz#cd5d524b4a15d208124e6eaa58063c5ac79d4945"
-  integrity sha512-63DVy9+GZ5/5nwR42gITDBrHxSlURQUGTDzZ1mZn60GmjgwbQhtzXIgJjPNpUJXuDiErlHkYgh43wMNOFG77sw==
+"@cubejs-backend/query-orchestrator@^0.13.2":
+  version "0.13.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.2.tgz#d11a4d72e8afdc88001aa36aaf16170a0a429d9e"
+  integrity sha512-gVkQfgAFK431MA7zGXPjsx3oUbKGM2Cu6uBJBRR7RudL4WWcMc1/Wy2qEL80de4PyoxnArDKSzV+NCLWrO6jkA==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.13.0":
-  version "0.13.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.13.0.tgz#0fb6771e29e1a61a50c0674bd8e649727779891e"
-  integrity sha512-nzQM7BADIwhlxDIikgoKRlQOSALF63Fhc9xYX81SwZK2NGF53BacHmDDuavpkRaKhYIM8ztK98JTAa4FP55sxw==
+"@cubejs-backend/schema-compiler@^0.13.5":
+  version "0.13.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.13.5.tgz#d2af9de8975e270b5be28df3341a4c30a4e1fd4a"
+  integrity sha512-7r1iD76g6V6rI4hdjbrhMkTmrZGCgUDD/+rZvjpBlhBbRoI1Hkgbm+wRVzBwz7BTfSgb11b10E5LmVugiX743w==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -2526,9 +2527,9 @@ growly@^1.3.0:
   integrity sha1-8QdIy+dq+WS3yWyTxrzCivEgwIE=
 
 handlebars@^4.1.2:
-  version "4.5.1"
-  resolved "https://registry.yarnpkg.com/handlebars/-/handlebars-4.5.1.tgz#8a01c382c180272260d07f2d1aa3ae745715c7ba"
-  integrity sha512-C29UoFzHe9yM61lOsIlCE5/mQVGrnIOrOq7maQl76L7tYPCgC1og0Ajt6uWnX4ZTxBPnjw+CUvawphwCfJgUnA==
+  version "4.5.3"
+  resolved "https://registry.yarnpkg.com/handlebars/-/handlebars-4.5.3.tgz#5cf75bd8714f7605713511a56be7c349becb0482"
+  integrity sha512-3yPecJoJHK/4c6aZhSvxOyG4vJKDshV36VHp0iVCDVh7o9w2vwi3NSnL2MMPj3YdduqaBcu7cGbggJQM0br9xA==
   dependencies:
     neo-async "^2.6.0"
     optimist "^0.6.1"
@@ -5338,9 +5339,9 @@ type-check@~0.3.2:
     prelude-ls "~1.1.2"
 
 uglify-js@^3.1.4:
-  version "3.6.8"
-  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-3.6.8.tgz#5edcbcf9d49cbb0403dc49f856fe81530d65145e"
-  integrity sha512-XhHJ3S3ZyMwP8kY1Gkugqx3CJh2C3O0y8NPiSxtm1tyD/pktLAkFZsFGpuNfTZddKDQ/bbDBLAd2YyA1pbi8HQ==
+  version "3.7.3"
+  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-3.7.3.tgz#f918fce9182f466d5140f24bb0ff35c2d32dcc6a"
+  integrity sha512-7tINm46/3puUA4hCkKYo4Xdts+JDaVC9ZPRcG8Xw9R4nhO/gZgUM3TENq8IF4Vatk8qCig4MzP/c8G4u2BkVQg==
   dependencies:
     commander "~2.20.3"
     source-map "~0.6.1"
@@ -5421,7 +5422,7 @@ util.promisify@^1.0.0:
     define-properties "^1.1.2"
     object.getownpropertydescriptors "^2.0.3"
 
-uuid@^3.3.2:
+uuid@^3.3.2, uuid@^3.3.3:
   version "3.3.3"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.3.tgz#4568f0216e78760ee1dbf3a4d2cf53e224112866"
   integrity sha512-pW0No1RGHgzlpHJO1nsVrHKpOEIxkGg1xB+v0ZmdNH5OAeAwzAVrCnI2/6Mtx+Uys6iaylxa+D3g4j63IKKjSQ==
