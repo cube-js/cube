@@ -38,6 +38,7 @@
     "eslint-plugin-node": "^5.2.1",
     "mocha": "^3.4.2",
     "mssql": "^5.1.0",
+    "mysql": "^2.17.1",
     "pg-promise": "^7.3.2",
     "request": "^2.88.0",
     "request-promise": "^4.2.4",

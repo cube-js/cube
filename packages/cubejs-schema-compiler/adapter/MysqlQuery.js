@@ -32,6 +32,10 @@ class MysqlQuery extends BaseQuery {
     return `TIMESTAMP(convert_tz(${value}, '+00:00', @@session.time_zone))`;
   }
 
+  inDbTimeZone(date) {
+    return this.inIntegrationTimeZone(date).clone().utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  }
+
   dateTimeCast(value) {
     return `TIMESTAMP(${value})`;
   }

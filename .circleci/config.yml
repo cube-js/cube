@@ -10,6 +10,9 @@ jobs:
           TEST_LOCAL: true
           TEST_DB_PASSWORD: Test1test
       - image: circleci/redis:5.0.5
+      - image: circleci/mysql:5.7
+        environment:
+          MYSQL_ROOT_PASSWORD: Test1test
       - image: circleci/postgres:9.6.8
         environment:
           POSTGRES_USER: root
