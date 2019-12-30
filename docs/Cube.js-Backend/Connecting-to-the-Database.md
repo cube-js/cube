@@ -43,7 +43,8 @@ The table below shows which environment variables are used for different databas
 
 | Database             | Credentials    |
 | -------------------- |--------------- |
-| PostgreSQL, MySQL, AWS Redshift, MS SQL, ClickHouse, Hive/SparkSQL, Oracle | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
+| PostgreSQL, MySQL, MS SQL, ClickHouse, Hive/SparkSQL, Oracle | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
+| AWS Redshift | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER` |
 | AWS Athena | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION` |
 | Google Bigquery | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS` |
 | MongoDB | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` |
@@ -61,6 +62,18 @@ here.](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
 ### MongoDB Atlas
 
 Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` can be left blank.
+
+### AWS Redshift
+
+For Redshift, you'll need to ensure that the IAM role used on your EC2 instance or Lambda has the following permissions:
+
+```json
+{
+    "Effect": "Allow",
+    "Action": "redshift:GetClusterCredentials",
+    "Resource": "<REDSHIFT_CLUSTER_ARN>/<REDSHIFT_USER>"
+}
+```
 
 ### AWS Athena
 
