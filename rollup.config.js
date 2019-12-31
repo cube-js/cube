@@ -4,7 +4,7 @@ import commonjs from "rollup-plugin-commonjs";
 import replace from "rollup-plugin-replace";
 import alias from 'rollup-plugin-alias';
 
-const bundle = (name, globalName, baseConfig) => {
+const bundle = (name, globalName, baseConfig, umdConfig) => {
   baseConfig = {
     plugins: [
       replace({
@@ -15,7 +15,7 @@ const bundle = (name, globalName, baseConfig) => {
   };
 
   const baseUmdConfig = {
-    ...baseConfig,
+    ...(umdConfig || baseConfig),
     plugins: [
       resolve({
         extensions: [ '.ts', '.js', '.json' ],
@@ -136,6 +136,8 @@ const bundle = (name, globalName, baseConfig) => {
 
 export default bundle('cubejs-client-core', 'cubejs', {
   input: "packages/cubejs-client-core/src/index.js",
+}, {
+  input: "packages/cubejs-client-core/src/index.umd.js",
 }).concat(bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
   input: "packages/cubejs-client-ws-transport/src/index.js",
 })).concat(bundle('cubejs-react', 'cubejsReact', {

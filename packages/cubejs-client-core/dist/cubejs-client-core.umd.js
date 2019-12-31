@@ -1,8 +1,8 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-  typeof define === 'function' && define.amd ? define(['exports'], factory) :
-  (global = global || self, factory(global.cubejs = {}));
-}(this, function (exports) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+  typeof define === 'function' && define.amd ? define(factory) :
+  (global = global || self, global.cubejs = factory());
+}(this, function () { 'use strict';
 
   function _typeof(obj) {
     if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
@@ -15743,9 +15743,15 @@
     return new CubejsApi(apiToken, options);
   });
 
-  exports.default = index;
-  exports.HttpTransport = HttpTransport;
+  var src = /*#__PURE__*/Object.freeze({
+    default: index,
+    HttpTransport: HttpTransport
+  });
 
-  Object.defineProperty(exports, '__esModule', { value: true });
+  var index$1 = ( src && index ) || src;
+
+  var index_umd = index$1;
+
+  return index_umd;
 
 }));
