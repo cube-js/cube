@@ -527,7 +527,11 @@ class ApiGateway {
 
   log(context, event) {
     const { type, ...restParams } = event;
-    this.logger(type, { ...restParams, ...context });
+    this.logger(type, {
+      ...restParams,
+      authInfo: context.authInfo,
+      requestId: context.requestId
+    });
   }
 }
 
