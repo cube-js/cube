@@ -18,15 +18,29 @@ declare module '@cubejs-backend/server-core' {
     logger?: (msg: string, params: any) => void;
     orchestratorOptions?: any;
     preAggregationsSchema?: string | (() => string)
-    repositoryFactory?: any;
+    repositoryFactory?: (context: any) => SchemaFileRepository;
     schemaPath?: string;
     compilerCacheSize?: number;
     maxCompilerCacheKeepAlive?: number;
     updateCompilerCacheKeepAlive?: boolean;
+    schemaVersion?: (context: any) => string;
   }
 
   export interface DriverFactory {
   }
 
   export type DatabaseType = 'athena' | 'bigquery' | 'clickhouse' | 'jdbc' | 'mongobi' | 'mssql' | 'mysql' | 'postgres' | 'redshift';
+
+  export class FileRepository implements SchemaFileRepository {
+    dataSchemaFiles(): Promise<SchemaFileContent[]>;
+  }
+
+  export interface SchemaFileRepository {
+    dataSchemaFiles(): Promise<SchemaFileContent[]>;
+  }
+
+  export interface SchemaFileContent {
+    fileName: string;
+    content: string;
+  }
 }
