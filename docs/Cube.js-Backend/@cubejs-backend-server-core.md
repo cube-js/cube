@@ -50,7 +50,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
   externalDriverFactory: (context: RequestContext) => BaseDriver,
   contextToAppId: (context: RequestContext) => String,
   contextToDataSourceId: (context: RequestContext) => String,
-  repositoryFactory: (context: RequestContext) => String,
+  repositoryFactory: (context: RequestContext) => SchemaFileRepository,
   checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
@@ -88,6 +88,15 @@ RequestContext {
 
 DriverContext extends RequestContext {
   dataSource: String
+}
+
+SchemaFileRepository {
+  dataSchemaFiles(): Promise<FileContent[]>
+}
+
+FileContent {
+  fileName: String,
+  content: String
 }
 ```
 
@@ -208,15 +217,25 @@ CubejsServerCore.create({
 
 This option allows to customize the repository for Cube.js data schema files. It
 is a function, which accepts a context object and can dynamically select
-repositories with schema files. Learn more about it in [Multitenancy Setup](multitenancy-setup) guide.
+repositories with schema files based on [SchemaFileRepository](#SchemaFileRepository) contract. Learn more about it in [Multitenancy Setup](multitenancy-setup) guide.
 
 Called only once per [appId](#options-reference-context-to-app-id).
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
 
+// using built-in SchemaFileRepository implementation and supplying the path to schema files
 CubejsServerCore.create({
   repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
+});
+
+// supplying your own SchemaFileRepository implementation to return array of files
+CubejsServerCore.create({
+  repositoryFactory: ({ authInfo }) => {
+    return {
+      dataSchemaFiles: async () => await Promise.resolve([{ fileName: 'file.js', content: 'contents of file'}])
+    }
+  }
 });
 ```
 
@@ -383,3 +402,20 @@ Timeout and interval options' values are in seconds.
 
 Defined as `req.authInfo` which should be set by [checkAuthMiddleware](#checkAuthMiddleware).
 Default implementation of [checkAuthMiddleware](#checkAuthMiddleware) uses [JWT Security Token](security) payload and sets it to `req.authInfo`.
+
+## SchemaFileRepository
+
+The `SchemaFileRepository` contract defines an async `dataSchemaFiles` function which returns the files to compile for a schema. Returned by [repositoryFactory](#repositoryFactory). `@cubejs-backend/server-core/core/FileRepository` is the default implementation of the `SchemaFileRepository` contract which accepts [schemaPath](#schemaPath) in the constructor.
+
+```javascript
+class ApiFileRepository {
+  async dataSchemaFiles() {
+    const fileContents = await callExternalApiForFileContents();
+    return [{ fileName: 'apiFile', content: fileContents }];
+  }
+}
+
+CubejsServerCore.create({
+  repositoryFactory: ({authInfo}) => new ApiFileRepository()
+});
+```

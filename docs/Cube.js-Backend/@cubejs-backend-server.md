@@ -39,3 +39,29 @@ Instantiates the Express.js App to listen to the specified `PORT`. Returns a pro
 * `server {http.Server}` The `http` Server instance. If TLS is enabled, returns a `https.Server` instance instead.
 
 Cube.js can also support TLS encryption. See the [Security page on how to enable tls](security#enabling-tls) for more information.
+
+### this.testConnections()
+
+Tests all existing open connections in the application.  Can be used for healthchecks by implementing custom methods, or extending the server with other packages such as [@godaddy/terminus](https://github.com/godaddy/terminus).
+
+```javascript
+const CubejsServer = require('@cubejs-backend/server');
+const { createTerminus } = require('@godaddy/terminus');
+
+const cubejsServer = new CubejsServer();
+
+cubejsServer.listen().then(({ port, server }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+
+    createTerminus(server, {
+    healthChecks: {
+      '/ready': () => cubejsServer.testConnections()
+    },
+    onSignal: () => cubejsServer.close()
+  });
+});
+```
+
+### this.close()
+
+Shuts down the server and closes any open db connections.
