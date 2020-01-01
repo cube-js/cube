@@ -31,11 +31,6 @@ declare module '@cubejs-backend/server-core' {
 
   export type DatabaseType = 'athena' | 'bigquery' | 'clickhouse' | 'jdbc' | 'mongobi' | 'mssql' | 'mysql' | 'postgres' | 'redshift';
 
-  export class FileRepository implements SchemaFileRepository {
-    constructor(path: string);
-    dataSchemaFiles(): Promise<SchemaFileContent[]>;
-  }
-
   export interface SchemaFileRepository {
     dataSchemaFiles(): Promise<SchemaFileContent[]>;
   }
