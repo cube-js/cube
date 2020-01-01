@@ -33,12 +33,8 @@ class QueryOrchestrator {
   }
 
   async fetchQuery(queryBody) {
-    const started = new Date();
     return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
       .then(async preAggregationsTablesToTempTables => {
-        this.logger("PreAggregations are loaded", {
-          duration: (new Date().getTime() - started.getTime())
-        });
         const result = await this.queryCache.cachedQueryResult(
           queryBody, preAggregationsTablesToTempTables
         );
