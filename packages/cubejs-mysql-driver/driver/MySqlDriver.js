@@ -140,7 +140,7 @@ class MySqlDriver extends BaseDriver {
     }
     await this.createTable(table, columns);
     try {
-      const batchSize = 100; // TODO make dynamic?
+      const batchSize = 1000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);
