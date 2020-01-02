@@ -308,6 +308,7 @@ class ApiGateway {
         type: 'Load Request',
         query
       });
+      const loadRequestSQLStarted = new Date();
       const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
       const [compilerSqlResult, metaConfigResult] = await Promise.all([
         this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context)),
@@ -316,6 +317,7 @@ class ApiGateway {
       const sqlQuery = compilerSqlResult;
       this.log(context, {
         type: 'Load Request SQL',
+        duration: this.duration(loadRequestSQLStarted),
         query,
         sqlQuery
       });
