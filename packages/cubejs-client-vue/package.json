@@ -4,7 +4,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
-    "directory": "packages/cubejs-vue"
+    "directory": "packages/cubejs-client-vue"
   },
   "description": "Vue.js components for cube.js",
   "author": "Ricardo Tapia",
@@ -16,8 +16,8 @@
     "test:unit": "vue-cli-service test:unit",
     "test:unit:watch": "vue-cli-service test:unit --watch --require tests/setup.js"
   },
-  "main": "dist/cubejs-vue.js",
-  "module": "dist/cubejs-vue.esm.js",
+  "main": "dist/cubejs-client-vue.js",
+  "module": "dist/cubejs-client-vue.esm.js",
   "files": [
     "dist",
     "src"

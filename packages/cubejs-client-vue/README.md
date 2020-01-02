@@ -2,10 +2,10 @@
 
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
 
-[![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
+[![npm version](https://badge.fury.io/js/%40cubejs-client%2Fvue.svg)](https://badge.fury.io/js/%40cubejs-client%2Fvue)
 [![CircleCI](https://circleci.com/gh/cube-js/cube.js.svg?style=shield)](https://circleci.com/gh/cube-js/cube.js)
 
-# cubejs-vue
+# Cube.js Vue
 
 ## Project setup
 ```
