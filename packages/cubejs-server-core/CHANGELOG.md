@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.13.9](https://github.com/cube-js/cube.js/compare/v0.13.8...v0.13.9) (2020-01-03)
+
+
+### Features
+
+* Improve logging ([8a692c1](https://github.com/cube-js/cube.js/commit/8a692c1))
+
+
+
+
+
 ## [0.13.8](https://github.com/cube-js/cube.js/compare/v0.13.7...v0.13.8) (2019-12-31)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
