@@ -21,6 +21,7 @@ class SubscriptionServer {
 
   async processMessage(connectionId, message, isSubscription) {
     let authContext = {};
+    let context = {};
     try {
       if (typeof message === 'string') {
         message = JSON.parse(message);
@@ -61,7 +62,7 @@ class SubscriptionServer {
       }
 
       const requestId = message.requestId || `${connectionId}-${message.messageId}`;
-      const context = await this.apiGateway.contextByReq(message, authContext.authInfo, requestId);
+      context = await this.apiGateway.contextByReq(message, authContext.authInfo, requestId);
 
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
