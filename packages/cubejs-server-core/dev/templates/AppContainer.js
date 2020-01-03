@@ -39,7 +39,7 @@ class AppContainer {
     if (!(await fs.pathExists(dir))) {
       return [];
     }
-    if (dir.indexOf('node_modules/') !== -1 && !includeNodeModules) {
+    if (dir.indexOf('node_modules') !== -1 && !includeNodeModules) {
       return [];
     }
     const files = await fs.readdir(dir);
