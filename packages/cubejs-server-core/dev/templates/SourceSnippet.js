@@ -25,12 +25,16 @@ class SourceSnippet {
   }
 
   static parse(source) {
-    return parse(source, {
-      sourceType: 'module',
-      plugins: [
-        "jsx"
-      ]
-    });
+    try {
+      return parse(source, {
+        sourceType: 'module',
+        plugins: [
+          "jsx"
+        ]
+      });
+    } catch (e) {
+      throw new Error(`Can't parse source snippet: ${e.message}\n${source}`);
+    }
   }
 
   mergeImport(targetSource, importDeclaration) {

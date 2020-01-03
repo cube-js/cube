@@ -10,13 +10,17 @@ class TargetSource {
   constructor(fileName, source) {
     this.source = source;
     this.fileName = fileName;
-    this.ast = parse(source, {
-      sourceFilename: fileName,
-      sourceType: 'module',
-      plugins: [
-        "jsx"
-      ]
-    });
+    try {
+      this.ast = parse(source, {
+        sourceFilename: fileName,
+        sourceType: 'module',
+        plugins: [
+          "jsx"
+        ]
+      });
+    } catch (e) {
+      throw new Error(`Can't parse ${fileName}: ${e.message}`);
+    }
     this.findAllImports();
     this.findAllDefinitions();
     this.findDefaultExport();
