@@ -140,8 +140,8 @@ export default bundle('cubejs-client-core', 'cubejs', {
   input: "packages/cubejs-client-core/src/index.umd.js",
 }).concat(bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
   input: "packages/cubejs-client-ws-transport/src/index.js",
-})).concat(bundle('cubejs-react', 'cubejsReact', {
-  input: "packages/cubejs-react/src/index.js",
+})).concat(bundle('cubejs-client-react', 'cubejsReact', {
+  input: "packages/cubejs-client-react/src/index.js",
   external: [
     'react',
     'prop-types'

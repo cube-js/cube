@@ -4,7 +4,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
-    "directory": "packages/cubejs-react"
+    "directory": "packages/cubejs-client-react"
   },
   "description": "React components for cube.js",
   "author": "Statsbot, Inc.",
@@ -17,7 +17,8 @@
     "prop-types": "^15.6.2",
     "react": "^16.10.2"
   },
-  "main": "dist/cubejs-react.js",
+  "main": "dist/cubejs-client-react.js",
+  "module": "dist/cubejs-client-react.esm.js",
   "scripts": {
     "lint": "eslint src/*.js src/*.jsx"
   },
