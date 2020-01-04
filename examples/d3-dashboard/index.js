@@ -8,6 +8,7 @@ require('dotenv').config();
 
 var app = express();
 app.use(bodyParser.json({ limit: "50mb" }));
+app.use(require('cors')());
 
 const cubejsServer = CubejsServerCore.create();
 

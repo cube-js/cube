@@ -15,6 +15,7 @@ const Header = ({ location }) => (
       <Button
         color="inherit"
         size="large"
+        href="https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard"
         startIcon={<GithubIcon />}
       >
         View Source Code
