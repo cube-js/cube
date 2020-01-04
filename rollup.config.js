@@ -146,8 +146,8 @@ export default bundle('cubejs-client-core', 'cubejs', {
     'react',
     'prop-types'
   ],
-})).concat(bundle('cubejs-vue', 'cubejsVue', {
-  input: "packages/cubejs-vue/src/index.js",
+})).concat(bundle('cubejs-client-vue', 'cubejsVue', {
+  input: "packages/cubejs-client-vue/src/index.js",
   external: [
     'vue',
   ],

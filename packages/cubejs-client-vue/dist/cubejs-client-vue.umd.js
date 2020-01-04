@@ -127,7 +127,7 @@
   }
 
   function createCommonjsModule(fn, module) {
-  	return module = { exports: {} }, fn(module, module.exports), module.exports;
+	return module = { exports: {} }, fn(module, module.exports), module.exports;
   }
 
   var _global = createCommonjsModule(function (module) {
@@ -140,7 +140,7 @@
   });
 
   var _core = createCommonjsModule(function (module) {
-  var core = module.exports = { version: '2.6.5' };
+  var core = module.exports = { version: '2.6.11' };
   if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
   });
   var _core_1 = _core.version;
@@ -206,7 +206,7 @@
   };
 
   var _objectDp = {
-  	f: f
+	f: f
   };
 
   var _propertyDesc = function (bitmap, value) {
@@ -773,7 +773,7 @@
   };
 
   var _newPromiseCapability = {
-  	f: f$1
+	f: f$1
   };
 
   var _perform = function (exec) {
@@ -1477,16 +1477,17 @@
   var f$2 = Object.getOwnPropertySymbols;
 
   var _objectGops = {
-  	f: f$2
+	f: f$2
   };
 
   var f$3 = {}.propertyIsEnumerable;
 
   var _objectPie = {
-  	f: f$3
+	f: f$3
   };
 
   // 19.1.2.1 Object.assign(target, source, ...)
+
 
 
 
@@ -1516,7 +1517,10 @@
       var length = keys.length;
       var j = 0;
       var key;
-      while (length > j) if (isEnum.call(S, key = keys[j++])) T[key] = S[key];
+      while (length > j) {
+        key = keys[j++];
+        if (!_descriptors || isEnum.call(S, key)) T[key] = S[key];
+      }
     } return T;
   } : $assign;
 
@@ -1537,7 +1541,7 @@
   };
 
   var _objectGopd = {
-  	f: f$4
+	f: f$4
   };
 
   // Works with __proto__ only. Old v8 can't work with null proto objects.
@@ -1603,7 +1607,7 @@
   var f$5 = _wks;
 
   var _wksExt = {
-  	f: f$5
+	f: f$5
   };
 
   var defineProperty = _objectDp.f;
@@ -1700,7 +1704,7 @@
   };
 
   var _objectGopn = {
-  	f: f$6
+	f: f$6
   };
 
   // fallback for IE11 buggy Object.getOwnPropertyNames with iframe and window
@@ -1724,7 +1728,7 @@
   };
 
   var _objectGopnExt = {
-  	f: f$7
+	f: f$7
   };
 
   // ECMAScript 6 symbols shim
@@ -1734,6 +1738,8 @@
 
 
   var META = _meta.KEY;
+
+
 
 
 
@@ -1767,7 +1773,7 @@
   var AllSymbols = _shared('symbols');
   var OPSymbols = _shared('op-symbols');
   var ObjectProto$1 = Object[PROTOTYPE$2];
-  var USE_NATIVE$1 = typeof $Symbol == 'function';
+  var USE_NATIVE$1 = typeof $Symbol == 'function' && !!_objectGops.f;
   var QObject = _global.QObject;
   // Don't use setters in Qt Script, https://github.com/zloirock/core-js/issues/173
   var setter = !QObject || !QObject[PROTOTYPE$2] || !QObject[PROTOTYPE$2].findChild;
@@ -1926,6 +1932,16 @@
     getOwnPropertyNames: $getOwnPropertyNames,
     // 19.1.2.8 Object.getOwnPropertySymbols(O)
     getOwnPropertySymbols: $getOwnPropertySymbols
+  });
+
+  // Chrome 38 and 39 `Object.getOwnPropertySymbols` fails on primitives
+  // https://bugs.chromium.org/p/v8/issues/detail?id=3443
+  var FAILS_ON_PRIMITIVES = _fails(function () { _objectGops.f(1); });
+
+  _export(_export.S + _export.F * FAILS_ON_PRIMITIVES, 'Object', {
+    getOwnPropertySymbols: function getOwnPropertySymbols(it) {
+      return _objectGops.f(_toObject(it));
+    }
   });
 
   // 24.3.2 JSON.stringify(value [, replacer [, space]])
