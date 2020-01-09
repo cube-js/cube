@@ -9,6 +9,9 @@ To do so, we first need to add authentication to our application and then save t
 
 To store the dashboards, we will use [AWS AppSync](https://aws.amazon.com/appsync/). It allows us to create a flexible API to access and manipulate data and uses GraphQL as a query language. AppSync natively integrates with Cognito and can use its identity tokens to manage the ownership of the data—and in our case, the ownership of the dashboards. As a prerequisite to this part you need to have an AWS account, so you can use its services.
 
+Besides AWS AppSync you can use any other GraphQL server to persist your dashboard data and athenticate/authorize your users.
+Cube.js itself doesn't have any dependencies on dashboard data persistance and it's completely up to your frontend application on how to handle this implementation.
+
 ## Install and Configure Amplify CLI
 
 I highly recommend using [Yarn](https://yarnpkg.com) instead of NPM while working with our
