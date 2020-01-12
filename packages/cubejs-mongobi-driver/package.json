@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mongobi-driver",
   "description": "Cube.js MongoBI driver",
   "author": "krunalsabnis@gmail.com",
-  "version": "0.13.9",
+  "version": "0.13.12",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
