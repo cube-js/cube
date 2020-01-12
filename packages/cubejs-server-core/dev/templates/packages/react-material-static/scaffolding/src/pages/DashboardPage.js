@@ -13,6 +13,7 @@ const DashboardPage = () => {
       item
       xs={12}
       lg={6}
+      key={item.id}
     >
       <DashboardItem title={item.name}>
         <ChartRenderer vizState={item.vizState} />
