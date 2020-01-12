@@ -814,10 +814,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.13.6":
-  version "0.13.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.13.6.tgz#d5a7996f0b2f2842ca54f015b553febd7c942597"
-  integrity sha512-uylnk8BgmuwhANnUrWbTyWqnPvq/bI/SNyzNMs5muJ0GMVSKHdn8U2Of4Smwch0Njh3HlCuvEvySUvyRcADEjA==
+"@cubejs-backend/api-gateway@^0.13.9":
+  version "0.13.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.13.9.tgz#5e0e2f4ebcfe8cd9065b5a989d9542d6e4b953c1"
+  integrity sha512-3JBQs8fSqvHCM6QgwMXxVumj2nMEEv09FFjGZ3FJ39gX2Br3o5ZXxa8ehJPYDBvlObydf3Rz5Y33MOjscqJQlw==
   dependencies:
     "@hapi/joi" "^14.0.6"
     chrono-node "^1.3.11"
@@ -827,18 +827,18 @@
     ramda "^0.25.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.13.2":
-  version "0.13.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.2.tgz#d11a4d72e8afdc88001aa36aaf16170a0a429d9e"
-  integrity sha512-gVkQfgAFK431MA7zGXPjsx3oUbKGM2Cu6uBJBRR7RudL4WWcMc1/Wy2qEL80de4PyoxnArDKSzV+NCLWrO6jkA==
+"@cubejs-backend/query-orchestrator@^0.13.9":
+  version "0.13.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.9.tgz#16bef231c1d74d451b0ae96c406708fdb321dd89"
+  integrity sha512-1Wbbnd0Q/cGclV9moJ+wLnTTmWiwJn4FZb6OrkLJx9GB8mTtPGW/l5N4O8y1ir93TLXbadoQ3hc3ED3WguV2Tw==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.13.5":
-  version "0.13.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.13.5.tgz#d2af9de8975e270b5be28df3341a4c30a4e1fd4a"
-  integrity sha512-7r1iD76g6V6rI4hdjbrhMkTmrZGCgUDD/+rZvjpBlhBbRoI1Hkgbm+wRVzBwz7BTfSgb11b10E5LmVugiX743w==
+"@cubejs-backend/schema-compiler@^0.13.7":
+  version "0.13.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.13.7.tgz#0d01ae455fc9ae97e27a7e60f21f7bdcfc04a1be"
+  integrity sha512-8AFO6JLoLKmv9KjDVPvqokIvHkVR6j4CB3TRyC2ZdO9p8/F6OfGtUujRSjAR7WgO5qcQua10e/jzbiW0ocuirQ==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -855,10 +855,10 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.13.6":
-  version "0.13.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.13.6.tgz#c423336a542c0bdda29271e7b946b76ca47fbcba"
-  integrity sha512-iRiy2l29gFQO+E4q8uNWl7VQY9wrQgmnOV6H2RD7oKPFUs5qbRjqZ0vtfisbkFoZFT3Cfh545ukfBx7SUd602Q==
+"@cubejs-backend/server-core@^0.13.11":
+  version "0.13.11"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.13.11.tgz#4a11f15ee1985f397a4293e00b04dc418caabf9d"
+  integrity sha512-d4SLVwQdQLk+41Uh2kWbkbAx6ClzfMeyIoEuY+/2HXz3xBA0aYDdJtd/zzkK2WB9+Cau/WuunXVhDF6U52D5YQ==
   dependencies:
     "@babel/core" "^7.7.4"
     "@babel/generator" "^7.4.0"
@@ -868,9 +868,9 @@
     "@babel/standalone" "^7.3.4"
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
-    "@cubejs-backend/api-gateway" "^0.13.6"
-    "@cubejs-backend/query-orchestrator" "^0.13.2"
-    "@cubejs-backend/schema-compiler" "^0.13.5"
+    "@cubejs-backend/api-gateway" "^0.13.9"
+    "@cubejs-backend/query-orchestrator" "^0.13.9"
+    "@cubejs-backend/schema-compiler" "^0.13.7"
     codesandbox-import-utils "^1.3.8"
     cross-spawn "^6.0.5"
     fs-extra "^7.0.1"

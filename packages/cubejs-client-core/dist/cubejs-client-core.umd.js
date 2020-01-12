@@ -199,7 +199,7 @@
   }
 
   var _core = createCommonjsModule(function (module) {
-  var core = module.exports = { version: '2.6.11' };
+  var core = module.exports = { version: '2.5.7' };
   if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
   });
   var _core_1 = _core.version;
@@ -224,7 +224,7 @@
   })('versions', []).push({
     version: _core.version,
     mode: 'global',
-    copyright: '© 2019 Denis Pushkarev (zloirock.ru)'
+    copyright: '© 2018 Denis Pushkarev (zloirock.ru)'
   });
   });
 
@@ -373,16 +373,14 @@
     return hasOwnProperty.call(it, key);
   };
 
-  var _functionToString = _shared('native-function-to-string', Function.toString);
-
   var _redefine = createCommonjsModule(function (module) {
   var SRC = _uid('src');
-
   var TO_STRING = 'toString';
-  var TPL = ('' + _functionToString).split(TO_STRING);
+  var $toString = Function[TO_STRING];
+  var TPL = ('' + $toString).split(TO_STRING);
 
   _core.inspectSource = function (it) {
-    return _functionToString.call(it);
+    return $toString.call(it);
   };
 
   (module.exports = function (O, key, val, safe) {
@@ -402,7 +400,7 @@
     }
   // add fake Function#toString for correct work wrapped methods / constructors with methods like LoDash isNative
   })(Function.prototype, TO_STRING, function toString() {
-    return typeof this == 'function' && this[SRC] || _functionToString.call(this);
+    return typeof this == 'function' && this[SRC] || $toString.call(this);
   });
   });
 
@@ -1719,8 +1717,6 @@
 
 
 
-
-
   var gOPD$1 = _objectGopd.f;
   var dP$2 = _objectDp.f;
   var gOPN$1 = _objectGopnExt.f;
@@ -1735,7 +1731,7 @@
   var AllSymbols = _shared('symbols');
   var OPSymbols = _shared('op-symbols');
   var ObjectProto$1 = Object[PROTOTYPE$2];
-  var USE_NATIVE$1 = typeof $Symbol == 'function' && !!_objectGops.f;
+  var USE_NATIVE$1 = typeof $Symbol == 'function';
   var QObject = _global.QObject;
   // Don't use setters in Qt Script, https://github.com/zloirock/core-js/issues/173
   var setter = !QObject || !QObject[PROTOTYPE$2] || !QObject[PROTOTYPE$2].findChild;
@@ -1896,16 +1892,6 @@
     getOwnPropertySymbols: $getOwnPropertySymbols
   });
 
-  // Chrome 38 and 39 `Object.getOwnPropertySymbols` fails on primitives
-  // https://bugs.chromium.org/p/v8/issues/detail?id=3443
-  var FAILS_ON_PRIMITIVES = _fails(function () { _objectGops.f(1); });
-
-  _export(_export.S + _export.F * FAILS_ON_PRIMITIVES, 'Object', {
-    getOwnPropertySymbols: function getOwnPropertySymbols(it) {
-      return _objectGops.f(_toObject(it));
-    }
-  });
-
   // 24.3.2 JSON.stringify(value [, replacer [, space]])
   $JSON && _export(_export.S + _export.F * (!USE_NATIVE$1 || _fails(function () {
     var S = $Symbol();
@@ -1939,14 +1925,14 @@
   // 24.3.3 JSON[@@toStringTag]
   _setToStringTag(_global.JSON, 'JSON', true);
 
-  var runtime_1 = createCommonjsModule(function (module) {
+  var runtime = createCommonjsModule(function (module) {
     /**
      * Copyright (c) 2014-present, Facebook, Inc.
      *
      * This source code is licensed under the MIT license found in the
      * LICENSE file in the root directory of this source tree.
      */
-    var runtime = function (exports) {
+    !function (global) {
 
       var Op = Object.prototype;
       var hasOwn = Op.hasOwnProperty;
@@ -1956,6 +1942,23 @@
       var iteratorSymbol = $Symbol.iterator || "@@iterator";
       var asyncIteratorSymbol = $Symbol.asyncIterator || "@@asyncIterator";
       var toStringTagSymbol = $Symbol.toStringTag || "@@toStringTag";
+      var runtime = global.regeneratorRuntime;
+
+      if (runtime) {
+        {
+          // If regeneratorRuntime is defined globally and we're in a module,
+          // make the exports object identical to regeneratorRuntime.
+          module.exports = runtime;
+        } // Don't bother evaluating the rest of this file if the runtime was
+        // already defined globally.
+
+
+        return;
+      } // Define the runtime globally (as expected by generated code) as either
+      // module.exports (if we're in a module) or a new, empty object.
+
+
+      runtime = global.regeneratorRuntime = module.exports;
 
       function wrap(innerFn, outerFn, self, tryLocsList) {
         // If outerFn provided and outerFn.prototype is a Generator, then outerFn.prototype instanceof Generator.
@@ -1968,7 +1971,7 @@
         return generator;
       }
 
-      exports.wrap = wrap; // Try/catch helper to minimize deoptimizations. Returns a completion
+      runtime.wrap = wrap; // Try/catch helper to minimize deoptimizations. Returns a completion
       // record like context.tryEntries[i].completion. This interface could
       // have been (and was previously) designed to take a closure to be
       // invoked without arguments, but in all the cases we care about we
@@ -2041,14 +2044,14 @@
         });
       }
 
-      exports.isGeneratorFunction = function (genFun) {
+      runtime.isGeneratorFunction = function (genFun) {
         var ctor = typeof genFun === "function" && genFun.constructor;
         return ctor ? ctor === GeneratorFunction || // For the native GeneratorFunction constructor, the best we can
         // do is to check its .name property.
         (ctor.displayName || ctor.name) === "GeneratorFunction" : false;
       };
 
-      exports.mark = function (genFun) {
+      runtime.mark = function (genFun) {
         if (Object.setPrototypeOf) {
           Object.setPrototypeOf(genFun, GeneratorFunctionPrototype);
         } else {
@@ -2067,7 +2070,7 @@
       // meant to be awaited.
 
 
-      exports.awrap = function (arg) {
+      runtime.awrap = function (arg) {
         return {
           __await: arg
         };
@@ -2142,13 +2145,13 @@
         return this;
       };
 
-      exports.AsyncIterator = AsyncIterator; // Note that simple async functions are implemented on top of
+      runtime.AsyncIterator = AsyncIterator; // Note that simple async functions are implemented on top of
       // AsyncIterator objects; they just return a Promise for the value of
       // the final result produced by the iterator.
 
-      exports.async = function (innerFn, outerFn, self, tryLocsList) {
+      runtime.async = function (innerFn, outerFn, self, tryLocsList) {
         var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList));
-        return exports.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
+        return runtime.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
         : iter.next().then(function (result) {
           return result.done ? result.value : iter.next();
         });
@@ -2241,8 +2244,7 @@
           context.delegate = null;
 
           if (context.method === "throw") {
-            // Note: ["return"] must be used for ES3 parsing compatibility.
-            if (delegate.iterator["return"]) {
+            if (delegate.iterator.return) {
               // If the delegate iterator has a return method, give it a
               // chance to clean up.
               context.method = "return";
@@ -2360,7 +2362,7 @@
         this.reset(true);
       }
 
-      exports.keys = function (object) {
+      runtime.keys = function (object) {
         var keys = [];
 
         for (var key in object) {
@@ -2427,7 +2429,7 @@
         };
       }
 
-      exports.values = values;
+      runtime.values = values;
 
       function doneResult() {
         return {
@@ -2618,32 +2620,13 @@
 
           return ContinueSentinel;
         }
-      }; // Regardless of whether this script is executing as a CommonJS module
-      // or not, return the runtime object so that we can declare the variable
-      // regeneratorRuntime in the outer scope, which allows this module to be
-      // injected easily by `bin/regenerator --include-runtime script.js`.
-
-      return exports;
-    }( // If this script is executing as a CommonJS module, use module.exports
-    // as the regeneratorRuntime namespace. Otherwise create a new empty
-    // object. Either way, the resulting object will be used to initialize
-    // the regeneratorRuntime variable at the top of this file.
-    module.exports);
-
-    try {
-      regeneratorRuntime = runtime;
-    } catch (accidentalStrictMode) {
-      // This module should not be running in strict mode, so the above
-      // assignment should always work unless something is misconfigured. Just
-      // in case runtime.js accidentally runs in strict mode, we can escape
-      // strict mode using a global Function call. This could conceivably fail
-      // if a Content Security Policy forbids using Function, but in that case
-      // the proper solution is to fix the accidental strict mode problem. If
-      // you've misconfigured your bundler to force strict mode and applied a
-      // CSP to forbid Function, and you're not willing to fix either of those
-      // problems, please detail your unique predicament in a GitHub issue.
-      Function("r", "regeneratorRuntime = r")(runtime);
-    }
+      };
+    }( // In sloppy mode, unbound `this` refers to the global object, fallback to
+    // Function constructor if we're in global strict mode. That is sadly a form
+    // of indirect eval which violates Content Security Policy.
+    function () {
+      return this || (typeof self === "undefined" ? "undefined" : _typeof(self)) === "object" && self;
+    }() || Function("return this")());
   });
 
   var setPrototypeOf = _setProto.set;
@@ -2787,7 +2770,6 @@
 
 
 
-
   var $assign = Object.assign;
 
   // should work with symbols and should have deterministic property order (V8 bug)
@@ -2812,10 +2794,7 @@
       var length = keys.length;
       var j = 0;
       var key;
-      while (length > j) {
-        key = keys[j++];
-        if (!_descriptors || isEnum.call(S, key)) T[key] = S[key];
-      }
+      while (length > j) if (isEnum.call(S, key = keys[j++])) T[key] = S[key];
     } return T;
   } : $assign;
 
@@ -4637,172 +4616,16 @@
     return _arity(arguments[0].length, reduce(_pipe, arguments[0], tail(arguments)));
   }
 
-  var at = _stringAt(true);
-
-   // `AdvanceStringIndex` abstract operation
-  // https://tc39.github.io/ecma262/#sec-advancestringindex
-  var _advanceStringIndex = function (S, index, unicode) {
-    return index + (unicode ? at(S, index).length : 1);
-  };
-
-  var builtinExec = RegExp.prototype.exec;
-
-   // `RegExpExec` abstract operation
-  // https://tc39.github.io/ecma262/#sec-regexpexec
-  var _regexpExecAbstract = function (R, S) {
-    var exec = R.exec;
-    if (typeof exec === 'function') {
-      var result = exec.call(R, S);
-      if (typeof result !== 'object') {
-        throw new TypeError('RegExp exec method returned something other than an Object or null');
-      }
-      return result;
-    }
-    if (_classof(R) !== 'RegExp') {
-      throw new TypeError('RegExp#exec called on incompatible receiver');
-    }
-    return builtinExec.call(R, S);
-  };
-
-  var nativeExec = RegExp.prototype.exec;
-  // This always refers to the native implementation, because the
-  // String#replace polyfill uses ./fix-regexp-well-known-symbol-logic.js,
-  // which loads this file before patching the method.
-  var nativeReplace = String.prototype.replace;
-
-  var patchedExec = nativeExec;
-
-  var LAST_INDEX = 'lastIndex';
-
-  var UPDATES_LAST_INDEX_WRONG = (function () {
-    var re1 = /a/,
-        re2 = /b*/g;
-    nativeExec.call(re1, 'a');
-    nativeExec.call(re2, 'a');
-    return re1[LAST_INDEX] !== 0 || re2[LAST_INDEX] !== 0;
-  })();
-
-  // nonparticipating capturing group, copied from es5-shim's String#split patch.
-  var NPCG_INCLUDED = /()??/.exec('')[1] !== undefined;
-
-  var PATCH = UPDATES_LAST_INDEX_WRONG || NPCG_INCLUDED;
-
-  if (PATCH) {
-    patchedExec = function exec(str) {
-      var re = this;
-      var lastIndex, reCopy, match, i;
-
-      if (NPCG_INCLUDED) {
-        reCopy = new RegExp('^' + re.source + '$(?!\\s)', _flags.call(re));
-      }
-      if (UPDATES_LAST_INDEX_WRONG) lastIndex = re[LAST_INDEX];
-
-      match = nativeExec.call(re, str);
-
-      if (UPDATES_LAST_INDEX_WRONG && match) {
-        re[LAST_INDEX] = re.global ? match.index + match[0].length : lastIndex;
-      }
-      if (NPCG_INCLUDED && match && match.length > 1) {
-        // Fix browsers whose `exec` methods don't consistently return `undefined`
-        // for NPCG, like IE8. NOTE: This doesn' work for /(.?)?/
-        // eslint-disable-next-line no-loop-func
-        nativeReplace.call(match[0], reCopy, function () {
-          for (i = 1; i < arguments.length - 2; i++) {
-            if (arguments[i] === undefined) match[i] = undefined;
-          }
-        });
-      }
-
-      return match;
-    };
-  }
-
-  var _regexpExec = patchedExec;
-
-  _export({
-    target: 'RegExp',
-    proto: true,
-    forced: _regexpExec !== /./.exec
-  }, {
-    exec: _regexpExec
-  });
-
-  var SPECIES$3 = _wks('species');
-
-  var REPLACE_SUPPORTS_NAMED_GROUPS = !_fails(function () {
-    // #replace needs built-in support for named groups.
-    // #match works fine because it just return the exec results, even if it has
-    // a "grops" property.
-    var re = /./;
-    re.exec = function () {
-      var result = [];
-      result.groups = { a: '7' };
-      return result;
-    };
-    return ''.replace(re, '$<a>') !== '7';
-  });
-
-  var SPLIT_WORKS_WITH_OVERWRITTEN_EXEC = (function () {
-    // Chrome 51 has a buggy "split" implementation when RegExp#exec !== nativeExec
-    var re = /(?:)/;
-    var originalExec = re.exec;
-    re.exec = function () { return originalExec.apply(this, arguments); };
-    var result = 'ab'.split(re);
-    return result.length === 2 && result[0] === 'a' && result[1] === 'b';
-  })();
-
   var _fixReWks = function (KEY, length, exec) {
     var SYMBOL = _wks(KEY);
-
-    var DELEGATES_TO_SYMBOL = !_fails(function () {
-      // String methods call symbol-named RegEp methods
+    var fns = exec(_defined, SYMBOL, ''[KEY]);
+    var strfn = fns[0];
+    var rxfn = fns[1];
+    if (_fails(function () {
       var O = {};
       O[SYMBOL] = function () { return 7; };
       return ''[KEY](O) != 7;
-    });
-
-    var DELEGATES_TO_EXEC = DELEGATES_TO_SYMBOL ? !_fails(function () {
-      // Symbol-named RegExp methods call .exec
-      var execCalled = false;
-      var re = /a/;
-      re.exec = function () { execCalled = true; return null; };
-      if (KEY === 'split') {
-        // RegExp[@@split] doesn't call the regex's exec method, but first creates
-        // a new one. We need to return the patched regex when creating the new one.
-        re.constructor = {};
-        re.constructor[SPECIES$3] = function () { return re; };
-      }
-      re[SYMBOL]('');
-      return !execCalled;
-    }) : undefined;
-
-    if (
-      !DELEGATES_TO_SYMBOL ||
-      !DELEGATES_TO_EXEC ||
-      (KEY === 'replace' && !REPLACE_SUPPORTS_NAMED_GROUPS) ||
-      (KEY === 'split' && !SPLIT_WORKS_WITH_OVERWRITTEN_EXEC)
-    ) {
-      var nativeRegExpMethod = /./[SYMBOL];
-      var fns = exec(
-        _defined,
-        SYMBOL,
-        ''[KEY],
-        function maybeCallNative(nativeMethod, regexp, str, arg2, forceStringMethod) {
-          if (regexp.exec === _regexpExec) {
-            if (DELEGATES_TO_SYMBOL && !forceStringMethod) {
-              // The native String method already delegates to @@method (this
-              // polyfilled function), leasing to infinite recursion.
-              // We avoid it by directly calling the native @@method method.
-              return { done: true, value: nativeRegExpMethod.call(regexp, str, arg2) };
-            }
-            return { done: true, value: nativeMethod.call(str, regexp, arg2) };
-          }
-          return { done: false };
-        }
-      );
-      var strfn = fns[0];
-      var rxfn = fns[1];
-
+    })) {
       _redefine(String.prototype, KEY, strfn);
       _hide(RegExp.prototype, SYMBOL, length == 2
         // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
@@ -4815,19 +4638,14 @@
     }
   };
 
-  var $min = Math.min;
-  var $push = [].push;
-  var $SPLIT = 'split';
-  var LENGTH = 'length';
-  var LAST_INDEX$1 = 'lastIndex';
-  var MAX_UINT32 = 0xffffffff;
-
-  // babel-minify transpiles RegExp('x', 'y') -> /x/y and it causes SyntaxError
-  var SUPPORTS_Y = !_fails(function () { });
-
   // @@split logic
-  _fixReWks('split', 2, function (defined, SPLIT, $split, maybeCallNative) {
-    var internalSplit;
+  _fixReWks('split', 2, function (defined, SPLIT, $split) {
+    var isRegExp = _isRegexp;
+    var _split = $split;
+    var $push = [].push;
+    var $SPLIT = 'split';
+    var LENGTH = 'length';
+    var LAST_INDEX = 'lastIndex';
     if (
       'abbc'[$SPLIT](/(b)*/)[1] == 'c' ||
       'test'[$SPLIT](/(?:)/, -1)[LENGTH] != 4 ||
@@ -4836,32 +4654,41 @@
       '.'[$SPLIT](/()()/)[LENGTH] > 1 ||
       ''[$SPLIT](/.?/)[LENGTH]
     ) {
+      var NPCG = /()??/.exec('')[1] === undefined; // nonparticipating capturing group
       // based on es5-shim implementation, need to rework it
-      internalSplit = function (separator, limit) {
+      $split = function (separator, limit) {
         var string = String(this);
         if (separator === undefined && limit === 0) return [];
         // If `separator` is not a regex, use native split
-        if (!_isRegexp(separator)) return $split.call(string, separator, limit);
+        if (!isRegExp(separator)) return _split.call(string, separator, limit);
         var output = [];
         var flags = (separator.ignoreCase ? 'i' : '') +
                     (separator.multiline ? 'm' : '') +
                     (separator.unicode ? 'u' : '') +
                     (separator.sticky ? 'y' : '');
         var lastLastIndex = 0;
-        var splitLimit = limit === undefined ? MAX_UINT32 : limit >>> 0;
+        var splitLimit = limit === undefined ? 4294967295 : limit >>> 0;
         // Make `global` and avoid `lastIndex` issues by working with a copy
         var separatorCopy = new RegExp(separator.source, flags + 'g');
-        var match, lastIndex, lastLength;
-        while (match = _regexpExec.call(separatorCopy, string)) {
-          lastIndex = separatorCopy[LAST_INDEX$1];
+        var separator2, match, lastIndex, lastLength, i;
+        // Doesn't need flags gy, but they don't hurt
+        if (!NPCG) separator2 = new RegExp('^' + separatorCopy.source + '$(?!\\s)', flags);
+        while (match = separatorCopy.exec(string)) {
+          // `separatorCopy.lastIndex` is not reliable cross-browser
+          lastIndex = match.index + match[0][LENGTH];
           if (lastIndex > lastLastIndex) {
             output.push(string.slice(lastLastIndex, match.index));
+            // Fix browsers whose `exec` methods don't consistently return `undefined` for NPCG
+            // eslint-disable-next-line no-loop-func
+            if (!NPCG && match[LENGTH] > 1) match[0].replace(separator2, function () {
+              for (i = 1; i < arguments[LENGTH] - 2; i++) if (arguments[i] === undefined) match[i] = undefined;
+            });
             if (match[LENGTH] > 1 && match.index < string[LENGTH]) $push.apply(output, match.slice(1));
             lastLength = match[0][LENGTH];
             lastLastIndex = lastIndex;
             if (output[LENGTH] >= splitLimit) break;
           }
-          if (separatorCopy[LAST_INDEX$1] === match.index) separatorCopy[LAST_INDEX$1]++; // Avoid an infinite loop
+          if (separatorCopy[LAST_INDEX] === match.index) separatorCopy[LAST_INDEX]++; // Avoid an infinite loop
         }
         if (lastLastIndex === string[LENGTH]) {
           if (lastLength || !separatorCopy.test('')) output.push('');
@@ -4870,74 +4697,16 @@
       };
     // Chakra, V8
     } else if ('0'[$SPLIT](undefined, 0)[LENGTH]) {
-      internalSplit = function (separator, limit) {
-        return separator === undefined && limit === 0 ? [] : $split.call(this, separator, limit);
+      $split = function (separator, limit) {
+        return separator === undefined && limit === 0 ? [] : _split.call(this, separator, limit);
       };
-    } else {
-      internalSplit = $split;
     }
-
-    return [
-      // `String.prototype.split` method
-      // https://tc39.github.io/ecma262/#sec-string.prototype.split
-      function split(separator, limit) {
-        var O = defined(this);
-        var splitter = separator == undefined ? undefined : separator[SPLIT];
-        return splitter !== undefined
-          ? splitter.call(separator, O, limit)
-          : internalSplit.call(String(O), separator, limit);
-      },
-      // `RegExp.prototype[@@split]` method
-      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@split
-      //
-      // NOTE: This cannot be properly polyfilled in engines that don't support
-      // the 'y' flag.
-      function (regexp, limit) {
-        var res = maybeCallNative(internalSplit, regexp, this, limit, internalSplit !== $split);
-        if (res.done) return res.value;
-
-        var rx = _anObject(regexp);
-        var S = String(this);
-        var C = _speciesConstructor(rx, RegExp);
-
-        var unicodeMatching = rx.unicode;
-        var flags = (rx.ignoreCase ? 'i' : '') +
-                    (rx.multiline ? 'm' : '') +
-                    (rx.unicode ? 'u' : '') +
-                    (SUPPORTS_Y ? 'y' : 'g');
-
-        // ^(? + rx + ) is needed, in combination with some S slicing, to
-        // simulate the 'y' flag.
-        var splitter = new C(SUPPORTS_Y ? rx : '^(?:' + rx.source + ')', flags);
-        var lim = limit === undefined ? MAX_UINT32 : limit >>> 0;
-        if (lim === 0) return [];
-        if (S.length === 0) return _regexpExecAbstract(splitter, S) === null ? [S] : [];
-        var p = 0;
-        var q = 0;
-        var A = [];
-        while (q < S.length) {
-          splitter.lastIndex = SUPPORTS_Y ? q : 0;
-          var z = _regexpExecAbstract(splitter, SUPPORTS_Y ? S : S.slice(q));
-          var e;
-          if (
-            z === null ||
-            (e = $min(_toLength(splitter.lastIndex + (SUPPORTS_Y ? 0 : q)), S.length)) === p
-          ) {
-            q = _advanceStringIndex(S, q, unicodeMatching);
-          } else {
-            A.push(S.slice(p, q));
-            if (A.length === lim) return A;
-            for (var i = 1; i <= z.length - 1; i++) {
-              A.push(z[i]);
-              if (A.length === lim) return A;
-            }
-            q = p = e;
-          }
-        }
-        A.push(S.slice(p));
-        return A;
-      }
-    ];
+    // 21.1.3.17 String.prototype.split(separator, limit)
+    return [function split(separator, limit) {
+      var O = defined(this);
+      var fn = separator == undefined ? undefined : separator[SPLIT];
+      return fn !== undefined ? fn.call(separator, O, limit) : $split.call(String(O), separator, limit);
+    }, $split];
   });
 
   /**
@@ -5050,37 +4819,13 @@
   }
 
   // @@match logic
-  _fixReWks('match', 1, function (defined, MATCH, $match, maybeCallNative) {
-    return [
-      // `String.prototype.match` method
-      // https://tc39.github.io/ecma262/#sec-string.prototype.match
-      function match(regexp) {
-        var O = defined(this);
-        var fn = regexp == undefined ? undefined : regexp[MATCH];
-        return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[MATCH](String(O));
-      },
-      // `RegExp.prototype[@@match]` method
-      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@match
-      function (regexp) {
-        var res = maybeCallNative($match, regexp, this);
-        if (res.done) return res.value;
-        var rx = _anObject(regexp);
-        var S = String(this);
-        if (!rx.global) return _regexpExecAbstract(rx, S);
-        var fullUnicode = rx.unicode;
-        rx.lastIndex = 0;
-        var A = [];
-        var n = 0;
-        var result;
-        while ((result = _regexpExecAbstract(rx, S)) !== null) {
-          var matchStr = String(result[0]);
-          A[n] = matchStr;
-          if (matchStr === '') rx.lastIndex = _advanceStringIndex(S, _toLength(rx.lastIndex), fullUnicode);
-          n++;
-        }
-        return n === 0 ? null : A;
-      }
-    ];
+  _fixReWks('match', 1, function (defined, MATCH, $match) {
+    // 21.1.3.11 String.prototype.match(regexp)
+    return [function match(regexp) {
+      var O = defined(this);
+      var fn = regexp == undefined ? undefined : regexp[MATCH];
+      return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[MATCH](String(O));
+    }, $match];
   });
 
   function _functionName(f) {
@@ -5390,115 +5135,16 @@
     return _indexOf(list, a, 0) >= 0;
   }
 
-  var max$2 = Math.max;
-  var min$2 = Math.min;
-  var floor$2 = Math.floor;
-  var SUBSTITUTION_SYMBOLS = /\$([$&`']|\d\d?|<[^>]*>)/g;
-  var SUBSTITUTION_SYMBOLS_NO_NAMED = /\$([$&`']|\d\d?)/g;
-
-  var maybeToString = function (it) {
-    return it === undefined ? it : String(it);
-  };
-
   // @@replace logic
-  _fixReWks('replace', 2, function (defined, REPLACE, $replace, maybeCallNative) {
-    return [
-      // `String.prototype.replace` method
-      // https://tc39.github.io/ecma262/#sec-string.prototype.replace
-      function replace(searchValue, replaceValue) {
-        var O = defined(this);
-        var fn = searchValue == undefined ? undefined : searchValue[REPLACE];
-        return fn !== undefined
-          ? fn.call(searchValue, O, replaceValue)
-          : $replace.call(String(O), searchValue, replaceValue);
-      },
-      // `RegExp.prototype[@@replace]` method
-      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@replace
-      function (regexp, replaceValue) {
-        var res = maybeCallNative($replace, regexp, this, replaceValue);
-        if (res.done) return res.value;
-
-        var rx = _anObject(regexp);
-        var S = String(this);
-        var functionalReplace = typeof replaceValue === 'function';
-        if (!functionalReplace) replaceValue = String(replaceValue);
-        var global = rx.global;
-        if (global) {
-          var fullUnicode = rx.unicode;
-          rx.lastIndex = 0;
-        }
-        var results = [];
-        while (true) {
-          var result = _regexpExecAbstract(rx, S);
-          if (result === null) break;
-          results.push(result);
-          if (!global) break;
-          var matchStr = String(result[0]);
-          if (matchStr === '') rx.lastIndex = _advanceStringIndex(S, _toLength(rx.lastIndex), fullUnicode);
-        }
-        var accumulatedResult = '';
-        var nextSourcePosition = 0;
-        for (var i = 0; i < results.length; i++) {
-          result = results[i];
-          var matched = String(result[0]);
-          var position = max$2(min$2(_toInteger(result.index), S.length), 0);
-          var captures = [];
-          // NOTE: This is equivalent to
-          //   captures = result.slice(1).map(maybeToString)
-          // but for some reason `nativeSlice.call(result, 1, result.length)` (called in
-          // the slice polyfill when slicing native arrays) "doesn't work" in safari 9 and
-          // causes a crash (https://pastebin.com/N21QzeQA) when trying to debug it.
-          for (var j = 1; j < result.length; j++) captures.push(maybeToString(result[j]));
-          var namedCaptures = result.groups;
-          if (functionalReplace) {
-            var replacerArgs = [matched].concat(captures, position, S);
-            if (namedCaptures !== undefined) replacerArgs.push(namedCaptures);
-            var replacement = String(replaceValue.apply(undefined, replacerArgs));
-          } else {
-            replacement = getSubstitution(matched, S, position, captures, namedCaptures, replaceValue);
-          }
-          if (position >= nextSourcePosition) {
-            accumulatedResult += S.slice(nextSourcePosition, position) + replacement;
-            nextSourcePosition = position + matched.length;
-          }
-        }
-        return accumulatedResult + S.slice(nextSourcePosition);
-      }
-    ];
-
-      // https://tc39.github.io/ecma262/#sec-getsubstitution
-    function getSubstitution(matched, str, position, captures, namedCaptures, replacement) {
-      var tailPos = position + matched.length;
-      var m = captures.length;
-      var symbols = SUBSTITUTION_SYMBOLS_NO_NAMED;
-      if (namedCaptures !== undefined) {
-        namedCaptures = _toObject(namedCaptures);
-        symbols = SUBSTITUTION_SYMBOLS;
-      }
-      return $replace.call(replacement, symbols, function (match, ch) {
-        var capture;
-        switch (ch.charAt(0)) {
-          case '$': return '$';
-          case '&': return matched;
-          case '`': return str.slice(0, position);
-          case "'": return str.slice(tailPos);
-          case '<':
-            capture = namedCaptures[ch.slice(1, -1)];
-            break;
-          default: // \d\d?
-            var n = +ch;
-            if (n === 0) return match;
-            if (n > m) {
-              var f = floor$2(n / 10);
-              if (f === 0) return match;
-              if (f <= m) return captures[f - 1] === undefined ? ch.charAt(1) : captures[f - 1] + ch.charAt(1);
-              return match;
-            }
-            capture = captures[n - 1];
-        }
-        return capture === undefined ? '' : capture;
-      });
-    }
+  _fixReWks('replace', 2, function (defined, REPLACE, $replace) {
+    // 21.1.3.14 String.prototype.replace(searchValue, replaceValue)
+    return [function replace(searchValue, replaceValue) {
+      var O = defined(this);
+      var fn = searchValue == undefined ? undefined : searchValue[REPLACE];
+      return fn !== undefined
+        ? fn.call(searchValue, O, replaceValue)
+        : $replace.call(String(O), searchValue, replaceValue);
+    }, $replace];
   });
 
   function _quote(s) {
@@ -8977,36 +8623,20 @@
       function createDate(y, m, d, h, M, s, ms) {
         // can't just apply() to create a date:
         // https://stackoverflow.com/q/181348
-        var date; // the date constructor remaps years 0-99 to 1900-1999
+        var date = new Date(y, m, d, h, M, s, ms); // the date constructor remaps years 0-99 to 1900-1999
 
-        if (y < 100 && y >= 0) {
-          // preserve leap years using a full 400 year cycle, then reset
-          date = new Date(y + 400, m, d, h, M, s, ms);
-
-          if (isFinite(date.getFullYear())) {
-            date.setFullYear(y);
-          }
-        } else {
-          date = new Date(y, m, d, h, M, s, ms);
+        if (y < 100 && y >= 0 && isFinite(date.getFullYear())) {
+          date.setFullYear(y);
         }
 
         return date;
       }
 
       function createUTCDate(y) {
-        var date; // the Date.UTC function remaps years 0-99 to 1900-1999
+        var date = new Date(Date.UTC.apply(null, arguments)); // the Date.UTC function remaps years 0-99 to 1900-1999
 
-        if (y < 100 && y >= 0) {
-          var args = Array.prototype.slice.call(arguments); // preserve leap years using a full 400 year cycle, then reset
-
-          args[0] = y + 400;
-          date = new Date(Date.UTC.apply(null, args));
-
-          if (isFinite(date.getUTCFullYear())) {
-            date.setUTCFullYear(y);
-          }
-        } else {
-          date = new Date(Date.UTC.apply(null, arguments));
+        if (y < 100 && y >= 0 && isFinite(date.getUTCFullYear())) {
+          date.setUTCFullYear(y);
         }
 
         return date;
@@ -9101,7 +8731,7 @@
       var defaultLocaleWeek = {
         dow: 0,
         // Sunday is the first day of the week.
-        doy: 6 // The week that contains Jan 6th is the first week of the year.
+        doy: 6 // The week that contains Jan 1st is the first week of the year.
 
       };
 
@@ -9199,27 +8829,26 @@
       } // LOCALES
 
 
-      function shiftWeekdays(ws, n) {
-        return ws.slice(n, 7).concat(ws.slice(0, n));
-      }
-
       var defaultLocaleWeekdays = 'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split('_');
 
       function localeWeekdays(m, format) {
-        var weekdays = isArray(this._weekdays) ? this._weekdays : this._weekdays[m && m !== true && this._weekdays.isFormat.test(format) ? 'format' : 'standalone'];
-        return m === true ? shiftWeekdays(weekdays, this._week.dow) : m ? weekdays[m.day()] : weekdays;
+        if (!m) {
+          return isArray(this._weekdays) ? this._weekdays : this._weekdays['standalone'];
+        }
+
+        return isArray(this._weekdays) ? this._weekdays[m.day()] : this._weekdays[this._weekdays.isFormat.test(format) ? 'format' : 'standalone'][m.day()];
       }
 
       var defaultLocaleWeekdaysShort = 'Sun_Mon_Tue_Wed_Thu_Fri_Sat'.split('_');
 
       function localeWeekdaysShort(m) {
-        return m === true ? shiftWeekdays(this._weekdaysShort, this._week.dow) : m ? this._weekdaysShort[m.day()] : this._weekdaysShort;
+        return m ? this._weekdaysShort[m.day()] : this._weekdaysShort;
       }
 
       var defaultLocaleWeekdaysMin = 'Su_Mo_Tu_We_Th_Fr_Sa'.split('_');
 
       function localeWeekdaysMin(m) {
-        return m === true ? shiftWeekdays(this._weekdaysMin, this._week.dow) : m ? this._weekdaysMin[m.day()] : this._weekdaysMin;
+        return m ? this._weekdaysMin[m.day()] : this._weekdaysMin;
       }
 
       function handleStrictParse$1(weekdayName, format, strict) {
@@ -9989,14 +9618,14 @@
               weekdayOverflow = true;
             }
           } else if (w.e != null) {
-            // local weekday -- counting starts from beginning of week
+            // local weekday -- counting starts from begining of week
             weekday = w.e + dow;
 
             if (w.e < 0 || w.e > 6) {
               weekdayOverflow = true;
             }
           } else {
-            // default to beginning of week
+            // default to begining of week
             weekday = dow;
           }
         }
@@ -10572,7 +10201,7 @@
             years = normalizedInput.year || 0,
             quarters = normalizedInput.quarter || 0,
             months = normalizedInput.month || 0,
-            weeks = normalizedInput.week || normalizedInput.isoWeek || 0,
+            weeks = normalizedInput.week || 0,
             days = normalizedInput.day || 0,
             hours = normalizedInput.hour || 0,
             minutes = normalizedInput.minute || 0,
@@ -10868,7 +10497,7 @@
 
           };
         } else if (!!(match = isoRegex.exec(input))) {
-          sign = match[1] === '-' ? -1 : 1;
+          sign = match[1] === '-' ? -1 : match[1] === '+' ? 1 : 1;
           duration = {
             y: parseIso(match[2], sign),
             M: parseIso(match[3], sign),
@@ -10910,7 +10539,10 @@
       }
 
       function positiveMomentsDifference(base, other) {
-        var res = {};
+        var res = {
+          milliseconds: 0,
+          months: 0
+        };
         res.months = other.month() - base.month() + (other.year() - base.year()) * 12;
 
         if (base.clone().add(res.months, 'M').isAfter(other)) {
@@ -11021,7 +10653,7 @@
           return false;
         }
 
-        units = normalizeUnits(units) || 'millisecond';
+        units = normalizeUnits(!isUndefined(units) ? units : 'millisecond');
 
         if (units === 'millisecond') {
           return this.valueOf() > localInput.valueOf();
@@ -11037,7 +10669,7 @@
           return false;
         }
 
-        units = normalizeUnits(units) || 'millisecond';
+        units = normalizeUnits(!isUndefined(units) ? units : 'millisecond');
 
         if (units === 'millisecond') {
           return this.valueOf() < localInput.valueOf();
@@ -11047,15 +10679,8 @@
       }
 
       function isBetween(from, to, units, inclusivity) {
-        var localFrom = isMoment(from) ? from : createLocal(from),
-            localTo = isMoment(to) ? to : createLocal(to);
-
-        if (!(this.isValid() && localFrom.isValid() && localTo.isValid())) {
-          return false;
-        }
-
         inclusivity = inclusivity || '()';
-        return (inclusivity[0] === '(' ? this.isAfter(localFrom, units) : !this.isBefore(localFrom, units)) && (inclusivity[1] === ')' ? this.isBefore(localTo, units) : !this.isAfter(localTo, units));
+        return (inclusivity[0] === '(' ? this.isAfter(from, units) : !this.isBefore(from, units)) && (inclusivity[1] === ')' ? this.isBefore(to, units) : !this.isAfter(to, units));
       }
 
       function isSame(input, units) {
@@ -11066,7 +10691,7 @@
           return false;
         }
 
-        units = normalizeUnits(units) || 'millisecond';
+        units = normalizeUnits(units || 'millisecond');
 
         if (units === 'millisecond') {
           return this.valueOf() === localInput.valueOf();
@@ -11295,149 +10920,74 @@
         return this._locale;
       }
 
-      var MS_PER_SECOND = 1000;
-      var MS_PER_MINUTE = 60 * MS_PER_SECOND;
-      var MS_PER_HOUR = 60 * MS_PER_MINUTE;
-      var MS_PER_400_YEARS = (365 * 400 + 97) * 24 * MS_PER_HOUR; // actual modulo - handles negative numbers (for dates before 1970):
-
-      function mod$1(dividend, divisor) {
-        return (dividend % divisor + divisor) % divisor;
-      }
-
-      function localStartOfDate(y, m, d) {
-        // the date constructor remaps years 0-99 to 1900-1999
-        if (y < 100 && y >= 0) {
-          // preserve leap years using a full 400 year cycle, then reset
-          return new Date(y + 400, m, d) - MS_PER_400_YEARS;
-        } else {
-          return new Date(y, m, d).valueOf();
-        }
-      }
-
-      function utcStartOfDate(y, m, d) {
-        // Date.UTC remaps years 0-99 to 1900-1999
-        if (y < 100 && y >= 0) {
-          // preserve leap years using a full 400 year cycle, then reset
-          return Date.UTC(y + 400, m, d) - MS_PER_400_YEARS;
-        } else {
-          return Date.UTC(y, m, d);
-        }
-      }
-
       function startOf(units) {
-        var time;
-        units = normalizeUnits(units);
-
-        if (units === undefined || units === 'millisecond' || !this.isValid()) {
-          return this;
-        }
-
-        var startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
+        units = normalizeUnits(units); // the following switch intentionally omits break keywords
+        // to utilize falling through the cases.
 
         switch (units) {
           case 'year':
-            time = startOfDate(this.year(), 0, 1);
-            break;
+            this.month(0);
+
+          /* falls through */
 
           case 'quarter':
-            time = startOfDate(this.year(), this.month() - this.month() % 3, 1);
-            break;
-
           case 'month':
-            time = startOfDate(this.year(), this.month(), 1);
-            break;
+            this.date(1);
+
+          /* falls through */
 
           case 'week':
-            time = startOfDate(this.year(), this.month(), this.date() - this.weekday());
-            break;
-
           case 'isoWeek':
-            time = startOfDate(this.year(), this.month(), this.date() - (this.isoWeekday() - 1));
-            break;
-
           case 'day':
           case 'date':
-            time = startOfDate(this.year(), this.month(), this.date());
-            break;
+            this.hours(0);
+
+          /* falls through */
 
           case 'hour':
-            time = this._d.valueOf();
-            time -= mod$1(time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE), MS_PER_HOUR);
-            break;
+            this.minutes(0);
+
+          /* falls through */
 
           case 'minute':
-            time = this._d.valueOf();
-            time -= mod$1(time, MS_PER_MINUTE);
-            break;
+            this.seconds(0);
+
+          /* falls through */
 
           case 'second':
-            time = this._d.valueOf();
-            time -= mod$1(time, MS_PER_SECOND);
-            break;
+            this.milliseconds(0);
+        } // weeks are a special case
+
+
+        if (units === 'week') {
+          this.weekday(0);
         }
 
-        this._d.setTime(time);
+        if (units === 'isoWeek') {
+          this.isoWeekday(1);
+        } // quarters are also special
 
-        hooks.updateOffset(this, true);
+
+        if (units === 'quarter') {
+          this.month(Math.floor(this.month() / 3) * 3);
+        }
+
         return this;
       }
 
       function endOf(units) {
-        var time;
         units = normalizeUnits(units);
 
-        if (units === undefined || units === 'millisecond' || !this.isValid()) {
+        if (units === undefined || units === 'millisecond') {
           return this;
+        } // 'date' is an alias for 'day', so it should be considered as such.
+
+
+        if (units === 'date') {
+          units = 'day';
         }
 
-        var startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
-
-        switch (units) {
-          case 'year':
-            time = startOfDate(this.year() + 1, 0, 1) - 1;
-            break;
-
-          case 'quarter':
-            time = startOfDate(this.year(), this.month() - this.month() % 3 + 3, 1) - 1;
-            break;
-
-          case 'month':
-            time = startOfDate(this.year(), this.month() + 1, 1) - 1;
-            break;
-
-          case 'week':
-            time = startOfDate(this.year(), this.month(), this.date() - this.weekday() + 7) - 1;
-            break;
-
-          case 'isoWeek':
-            time = startOfDate(this.year(), this.month(), this.date() - (this.isoWeekday() - 1) + 7) - 1;
-            break;
-
-          case 'day':
-          case 'date':
-            time = startOfDate(this.year(), this.month(), this.date() + 1) - 1;
-            break;
-
-          case 'hour':
-            time = this._d.valueOf();
-            time += MS_PER_HOUR - mod$1(time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE), MS_PER_HOUR) - 1;
-            break;
-
-          case 'minute':
-            time = this._d.valueOf();
-            time += MS_PER_MINUTE - mod$1(time, MS_PER_MINUTE) - 1;
-            break;
-
-          case 'second':
-            time = this._d.valueOf();
-            time += MS_PER_SECOND - mod$1(time, MS_PER_SECOND) - 1;
-            break;
-        }
-
-        this._d.setTime(time);
-
-        hooks.updateOffset(this, true);
-        return this;
+        return this.startOf(units).add(1, units === 'isoWeek' ? 'week' : units).subtract(1, 'ms');
       }
 
       function valueOf() {
@@ -12040,20 +11590,10 @@
         var milliseconds = this._milliseconds;
         units = normalizeUnits(units);
 
-        if (units === 'month' || units === 'quarter' || units === 'year') {
+        if (units === 'month' || units === 'year') {
           days = this._days + milliseconds / 864e5;
           months = this._months + daysToMonths(days);
-
-          switch (units) {
-            case 'month':
-              return months;
-
-            case 'quarter':
-              return months / 3;
-
-            case 'year':
-              return months / 12;
-          }
+          return units === 'month' ? months : months / 12;
         } else {
           // handle milliseconds separately because of floating point math errors (issue #1867)
           days = this._days + Math.round(monthsToDays(this._months));
@@ -12106,7 +11646,6 @@
       var asDays = makeAs('d');
       var asWeeks = makeAs('w');
       var asMonths = makeAs('M');
-      var asQuarters = makeAs('Q');
       var asYears = makeAs('y');
 
       function clone$1() {
@@ -12284,7 +11823,6 @@
       proto$2.asDays = asDays;
       proto$2.asWeeks = asWeeks;
       proto$2.asMonths = asMonths;
-      proto$2.asQuarters = asQuarters;
       proto$2.asYears = asYears;
       proto$2.valueOf = valueOf$1;
       proto$2._bubble = bubble;
@@ -12320,7 +11858,7 @@
         config._d = new Date(toInt(input));
       }); // Side effect imports
 
-      hooks.version = '2.24.0';
+      hooks.version = '2.22.2';
       setHookCallback(createLocal);
       hooks.fn = proto;
       hooks.min = min;
@@ -12365,7 +11903,7 @@
         // <input type="time" step="1" />
         TIME_MS: 'HH:mm:ss.SSS',
         // <input type="time" step="0.001" />
-        WEEK: 'GGGG-[W]WW',
+        WEEK: 'YYYY-[W]WW',
         // <input type="week" />
         MONTH: 'YYYY-MM' // <input type="month" />
 
@@ -12374,36 +11912,14 @@
     });
   });
 
-  // 7.2.9 SameValue(x, y)
-  var _sameValue = Object.is || function is(x, y) {
-    // eslint-disable-next-line no-self-compare
-    return x === y ? x !== 0 || 1 / x === 1 / y : x != x && y != y;
-  };
-
   // @@search logic
-  _fixReWks('search', 1, function (defined, SEARCH, $search, maybeCallNative) {
-    return [
-      // `String.prototype.search` method
-      // https://tc39.github.io/ecma262/#sec-string.prototype.search
-      function search(regexp) {
-        var O = defined(this);
-        var fn = regexp == undefined ? undefined : regexp[SEARCH];
-        return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[SEARCH](String(O));
-      },
-      // `RegExp.prototype[@@search]` method
-      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@search
-      function (regexp) {
-        var res = maybeCallNative($search, regexp, this);
-        if (res.done) return res.value;
-        var rx = _anObject(regexp);
-        var S = String(this);
-        var previousLastIndex = rx.lastIndex;
-        if (!_sameValue(previousLastIndex, 0)) rx.lastIndex = 0;
-        var result = _regexpExecAbstract(rx, S);
-        if (!_sameValue(rx.lastIndex, previousLastIndex)) rx.lastIndex = previousLastIndex;
-        return result === null ? -1 : result.index;
-      }
-    ];
+  _fixReWks('search', 1, function (defined, SEARCH, $search) {
+    // 21.1.3.15 String.prototype.search(regexp)
+    return [function search(regexp) {
+      var O = defined(this);
+      var fn = regexp == undefined ? undefined : regexp[SEARCH];
+      return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[SEARCH](String(O));
+    }, $search];
   });
 
   // 19.1.2.3 / 15.2.3.7 Object.defineProperties(O, Properties)
@@ -14667,7 +14183,6 @@
     var __self__ = function (root) {
       function F() {
         this.fetch = false;
-        this.DOMException = root.DOMException;
       }
 
       F.prototype = root;

@@ -127,7 +127,7 @@
   }
 
   function createCommonjsModule(fn, module) {
-	return module = { exports: {} }, fn(module, module.exports), module.exports;
+  	return module = { exports: {} }, fn(module, module.exports), module.exports;
   }
 
   var _global = createCommonjsModule(function (module) {
@@ -206,7 +206,7 @@
   };
 
   var _objectDp = {
-	f: f
+  	f: f
   };
 
   var _propertyDesc = function (bitmap, value) {
@@ -773,7 +773,7 @@
   };
 
   var _newPromiseCapability = {
-	f: f$1
+  	f: f$1
   };
 
   var _perform = function (exec) {
@@ -1315,7 +1315,7 @@
         // Set @@toStringTag to native iterators
         _setToStringTag(IteratorPrototype, TAG, true);
         // fix for some old engines
-        if (!_library && typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
+        if (typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
       }
     }
     // fix Array#{values, @@iterator}.name in V8 / FF
@@ -1324,7 +1324,7 @@
       $default = function values() { return $native.call(this); };
     }
     // Define iterator
-    if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR$3])) {
+    if (BUGGY || VALUES_BUG || !proto[ITERATOR$3]) {
       _hide(proto, ITERATOR$3, $default);
     }
     // Plug for library
@@ -1477,13 +1477,13 @@
   var f$2 = Object.getOwnPropertySymbols;
 
   var _objectGops = {
-	f: f$2
+  	f: f$2
   };
 
   var f$3 = {}.propertyIsEnumerable;
 
   var _objectPie = {
-	f: f$3
+  	f: f$3
   };
 
   // 19.1.2.1 Object.assign(target, source, ...)
@@ -1541,7 +1541,7 @@
   };
 
   var _objectGopd = {
-	f: f$4
+  	f: f$4
   };
 
   // Works with __proto__ only. Old v8 can't work with null proto objects.
@@ -1607,7 +1607,7 @@
   var f$5 = _wks;
 
   var _wksExt = {
-	f: f$5
+  	f: f$5
   };
 
   var defineProperty = _objectDp.f;
@@ -1704,7 +1704,7 @@
   };
 
   var _objectGopn = {
-	f: f$6
+  	f: f$6
   };
 
   // fallback for IE11 buggy Object.getOwnPropertyNames with iframe and window
@@ -1728,7 +1728,7 @@
   };
 
   var _objectGopnExt = {
-	f: f$7
+  	f: f$7
   };
 
   // ECMAScript 6 symbols shim

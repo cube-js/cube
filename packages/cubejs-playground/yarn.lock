@@ -1031,10 +1031,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.13.5":
-  version "0.13.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.13.5.tgz#5663b805019cb9a2ff89c3584840da7ec7055414"
-  integrity sha512-vE8VdG+cO7X4kdSvRD26luIWOd/rJxmpU1OPo0168BY/mT51YDWEGr+0Oixd72Z6MuatfHSX2Mv2PKMGRHl4Pw==
+"@cubejs-client/core@^0.13.9":
+  version "0.13.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.13.9.tgz#0e6fef3562a65813cbeaba9f6aa70715d69fe859"
+  integrity sha512-pAQxZF8lep0uJ8PPreQTy71KNUwfTcyB2Z/6mVXKT/YH/jcNPKJyHRRQKCweaoB6CrRAtpj6dVtsjIUiKbUhyQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"

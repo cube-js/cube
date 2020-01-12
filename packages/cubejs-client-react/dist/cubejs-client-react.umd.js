@@ -20,7 +20,7 @@
 	});
 
 	var _core = createCommonjsModule(function (module) {
-	var core = module.exports = { version: '2.6.11' };
+	var core = module.exports = { version: '2.6.5' };
 	if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
 	});
 	var _core_1 = _core.version;
@@ -1436,7 +1436,7 @@
 	      // Set @@toStringTag to native iterators
 	      _setToStringTag(IteratorPrototype, TAG, true);
 	      // fix for some old engines
-	      if (!_library && typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
+	      if (typeof IteratorPrototype[ITERATOR$3] != 'function') _hide(IteratorPrototype, ITERATOR$3, returnThis);
 	    }
 	  }
 	  // fix Array#{values, @@iterator}.name in V8 / FF
@@ -1445,7 +1445,7 @@
 	    $default = function values() { return $native.call(this); };
 	  }
 	  // Define iterator
-	  if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR$3])) {
+	  if (BUGGY || VALUES_BUG || !proto[ITERATOR$3]) {
 	    _hide(proto, ITERATOR$3, $default);
 	  }
 	  // Plug for library
@@ -2497,8 +2497,6 @@
 
 
 
-
-
 	var gOPD$2 = _objectGopd.f;
 	var dP$2 = _objectDp.f;
 	var gOPN$2 = _objectGopnExt.f;
@@ -2513,7 +2511,7 @@
 	var AllSymbols = _shared('symbols');
 	var OPSymbols = _shared('op-symbols');
 	var ObjectProto$1 = Object[PROTOTYPE$2];
-	var USE_NATIVE$1 = typeof $Symbol == 'function' && !!_objectGops.f;
+	var USE_NATIVE$1 = typeof $Symbol == 'function';
 	var QObject = _global.QObject;
 	// Don't use setters in Qt Script, https://github.com/zloirock/core-js/issues/173
 	var setter = !QObject || !QObject[PROTOTYPE$2] || !QObject[PROTOTYPE$2].findChild;
@@ -2672,16 +2670,6 @@
 	  getOwnPropertyNames: $getOwnPropertyNames,
 	  // 19.1.2.8 Object.getOwnPropertySymbols(O)
 	  getOwnPropertySymbols: $getOwnPropertySymbols
-	});
-
-	// Chrome 38 and 39 `Object.getOwnPropertySymbols` fails on primitives
-	// https://bugs.chromium.org/p/v8/issues/detail?id=3443
-	var FAILS_ON_PRIMITIVES = _fails(function () { _objectGops.f(1); });
-
-	_export(_export.S + _export.F * FAILS_ON_PRIMITIVES, 'Object', {
-	  getOwnPropertySymbols: function getOwnPropertySymbols(it) {
-	    return _objectGops.f(_toObject(it));
-	  }
 	});
 
 	// 24.3.2 JSON.stringify(value [, replacer [, space]])
@@ -6105,7 +6093,6 @@
 
 
 
-
 	var $assign = Object.assign;
 
 	// should work with symbols and should have deterministic property order (V8 bug)
@@ -6130,10 +6117,7 @@
 	    var length = keys.length;
 	    var j = 0;
 	    var key;
-	    while (length > j) {
-	      key = keys[j++];
-	      if (!_descriptors || isEnum.call(S, key)) T[key] = S[key];
-	    }
+	    while (length > j) if (isEnum.call(S, key = keys[j++])) T[key] = S[key];
 	  } return T;
 	} : $assign;
 
