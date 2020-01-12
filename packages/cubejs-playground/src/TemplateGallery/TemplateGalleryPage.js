@@ -158,6 +158,11 @@ class TemplateGalleryPage extends Component {
       coverUrl: 'https://cube.dev/downloads/template-material-ui.jpg',
       description: 'Use this template to create a Material UI–based static dashboard application and add charts to it by editing the source code or via Cube.js Playground.',
       templatePackages: ['create-react-app', 'react-material-static', 'recharts-charts', 'material-tables', 'credentials']
+    }, {
+      name: 'Material UI D3 Dashboard',
+      coverUrl: 'https://cube.dev/downloads/template-material-d3.png',
+      description: 'Use this template to create a Material UI–based dashboard with D3.js. Add charts to it by editing the source code or via Cube.js Playground.',
+      templatePackages: ['create-react-app', 'react-material-static', 'd3-charts', 'material-tables', 'credentials']
     }];
 
 
