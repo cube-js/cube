@@ -422,23 +422,7 @@ class PreAggregations {
   }
 
   evaluateAllReferences(cube, aggregation) {
-    const timeDimensions = aggregation.timeDimensionReference ? [{
-      dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
-      granularity: this.castGranularity(aggregation.granularity)
-    }] : [];
-    return {
-      dimensions:
-        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || []).concat(
-          aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences) || []
-        ),
-      measures:
-        aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
-      timeDimensions
-    };
-  }
-
-  evaluateReferences(cube, referencesFn) {
-    return this.query.cubeEvaluator.evaluateReferences(cube, referencesFn);
+    return this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
   }
 
   rollupPreAggregation(preAggregationForQuery) {

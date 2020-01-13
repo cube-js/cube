@@ -46,6 +46,22 @@ class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
+  scheduledPreAggregations() {
+    return Object.keys(this.evaluatedCubes).map(cube => {
+      const preAggregations = this.preAggregationsForCube(cube);
+      return Object.keys(preAggregations)
+        .filter(name => preAggregations[name].scheduledRefresh)
+        .map(preAggregationName => ({
+          preAggregationName,
+          preAggregation: preAggregations[preAggregationName],
+          cube,
+          references: preAggregations[preAggregationName].type === 'rollup' ?
+            this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]) :
+            null
+        }));
+    }).reduce((a, b) => a.concat(b), []);
+  }
+
   isMeasure(measurePath) {
     return this.isInstanceOfType('measures', measurePath);
   }
@@ -146,6 +162,23 @@ class CubeEvaluator extends CubeSymbols {
 
     const references = arrayOrSingle.map(p => p.toString());
     return options.originalSorting ? references : R.sortBy(R.identity, references);
+  }
+
+  evaluatePreAggregationReferences(cube, aggregation) {
+    const timeDimensions = aggregation.timeDimensionReference ? [{
+      dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
+      granularity: aggregation.granularity
+    }] : [];
+    return {
+      dimensions:
+        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
+          .concat(
+            aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences) || []
+          ),
+      measures:
+      aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
+      timeDimensions
+    };
   }
 }
 

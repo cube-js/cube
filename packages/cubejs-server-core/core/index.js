@@ -7,6 +7,7 @@ const LRUCache = require('lru-cache');
 const SqlString = require('sqlstring');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
+const RefreshScheduler = require('./RefreshScheduler');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
 const track = require('./track');
@@ -363,6 +364,11 @@ class CubejsServerCore {
       externalDriverFactory: options.getExternalDriverFactory,
       ...(options.orchestratorOptions || this.options.orchestratorOptions)
     });
+  }
+
+  async runScheduledRefresh(context, queryingOptions) {
+    const scheduler = new RefreshScheduler(this);
+    await scheduler.ensurePreAggregationsRefreshed(context, queryingOptions);
   }
 
   async getDriver() {

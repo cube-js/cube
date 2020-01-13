@@ -88,6 +88,19 @@ const QueryQueueTest = (name, options) => {
       should(await queue.getQueryStage('12')).be.eql(undefined);
     });
 
+    it('negative priority', async () => {
+      delayCount = 0;
+      const results = [];
+      await Promise.all([
+        queue.executeInQueue('delay', '31', { delay: 100, result: '4' }, -10).then(r => results.push(r)),
+        queue.executeInQueue('delay', '32', { delay: 100, result: '3' }, -9).then(r => results.push(r)),
+        queue.executeInQueue('delay', '33', { delay: 100, result: '2' }, -8).then(r => results.push(r)),
+        queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => results.push(r))
+      ]);
+
+      should(results).be.eql(['10', '21', '32', '43']);
+    });
+
     it('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11` + i, { delay: 50, result: `${i}` }, 0);

@@ -37,15 +37,15 @@ class QueryQueue {
       if (priority == null) {
         priority = 0;
       }
-      if (!(priority >= 0 && priority <= 100)) {
-        throw new Error('Priority should be between 0 and 100');
+      if (!(priority >= -10000 && priority <= 10000)) {
+        throw new Error('Priority should be between -10000 and 10000');
       }
       let result = await redisClient.getResult(queryKey);
       if (result) {
         return this.parseResult(result);
       }
       const time = new Date().getTime();
-      const keyScore = time + (100 - priority) * 1E14;
+      const keyScore = time + (10000 - priority) * 1E14;
 
       // eslint-disable-next-line no-unused-vars
       const [added, b, c, queueSize] = await redisClient.addToQueue(

@@ -87,6 +87,10 @@ class CubejsServer {
     return this.core.testConnections();
   }
 
+  runScheduledRefresh(context, queryingOptions) {
+    return this.core.runScheduledRefresh(context, queryingOptions);
+  }
+
   async close() {
     try {
       if (this.socketServer) {

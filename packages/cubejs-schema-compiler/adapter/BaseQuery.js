@@ -100,11 +100,15 @@ class BaseQuery {
   }
 
   get dataSource() {
-    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeEvaluator.cubeFromPath(c).dataSource || 'default'));
+    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1) {
       throw new UserError(`Joins across data sources aren't supported in community edition. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
+  }
+
+  cubeDataSource(cube) {
+    return this.cubeEvaluator.cubeFromPath(cube).dataSource || 'default';
   }
 
   get aliasNameToMember() {
@@ -1335,13 +1339,9 @@ class BaseQuery {
         if (timeDimensions.length) {
           const dimension = timeDimensions.filter(f => f.toLowerCase().indexOf('update') !== -1)[0] || timeDimensions[0];
           const foundMainTimeDimension = this.newTimeDimension({ dimension });
-          const cubeNamesForTimeDimension = this.collectFrom(
-            [foundMainTimeDimension],
-            this.collectCubeNamesFor.bind(this)
-          );
-          if (cubeNamesForTimeDimension.length === 1 && cubeNamesForTimeDimension[0] === cube) {
-            const dimensionSql = this.dimensionSql(foundMainTimeDimension);
-            return `select max(${dimensionSql}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
+          const aggSelect = this.aggSelectForDimension(cube, foundMainTimeDimension, 'max');
+          if (aggSelect) {
+            return aggSelect;
           }
         }
         return `select count(*) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
@@ -1350,6 +1350,18 @@ class BaseQuery {
       queries,
       renewalThreshold: this.renewalThreshold(refreshKeyAllSetManually)
     };
+  }
+
+  aggSelectForDimension(cube, dimension, aggFunction) {
+    const cubeNamesForTimeDimension = this.collectFrom(
+      [dimension],
+      this.collectCubeNamesFor.bind(this)
+    );
+    if (cubeNamesForTimeDimension.length === 1 && cubeNamesForTimeDimension[0] === cube) {
+      const dimensionSql = this.dimensionSql(dimension);
+      return `select ${aggFunction}(${dimensionSql}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
+    }
+    return null;
   }
 
   cubeCardinalityQueries() { // TODO collect sub queries
@@ -1418,6 +1430,16 @@ class BaseQuery {
     return [this.paramAllocator.buildSqlAndParams(
       `SELECT ${this.timeGroupedColumn('hour', this.convertTz(this.nowTimestampSql()))} as current_hour`
     )];
+  }
+
+  preAggregationStartEndQueries(cube, preAggregation) {
+    const references = this.cubeEvaluator.evaluatePreAggregationReferences(cube, preAggregation);
+    const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
+
+    return this.evaluateSymbolSqlWithContext(() => [
+      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(cube, timeDimension, 'min')),
+      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(cube, timeDimension, 'max'))
+    ], { preAggregationQuery: true });
   }
 
   parametrizedContextSymbols() {

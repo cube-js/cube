@@ -35,12 +35,18 @@ class QueryOrchestrator {
   async fetchQuery(queryBody) {
     return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
       .then(async preAggregationsTablesToTempTables => {
+        const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
+        if (!queryBody.query) {
+          return {
+            usedPreAggregations
+          };
+        }
         const result = await this.queryCache.cachedQueryResult(
           queryBody, preAggregationsTablesToTempTables
         );
         return {
           ...result,
-          usedPreAggregations: R.fromPairs(preAggregationsTablesToTempTables)
+          usedPreAggregations
         };
       });
   }

@@ -70,6 +70,11 @@ class CompilerApi {
     }));
   }
 
+  async scheduledPreAggregations() {
+    const { cubeEvaluator } = await this.getCompilers();
+    return cubeEvaluator.scheduledPreAggregations();
+  }
+
   createQuery(compilers, dbType, query) {
     return QueryBuilder.query(
       compilers,

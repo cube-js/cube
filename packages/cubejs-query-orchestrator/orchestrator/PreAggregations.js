@@ -109,14 +109,18 @@ class PreAggregationLoadCache {
     return this.versionEntries;
   }
 
-  async keyQueryResult(keyQuery) {
+  async keyQueryResult(keyQuery, waitForRenew) {
     if (!this.queryResults[this.queryCache.queryRedisKey(keyQuery)]) {
       this.queryResults[this.queryCache.queryRedisKey(keyQuery)] = await this.queryCache.cacheQueryResult(
         Array.isArray(keyQuery) ? keyQuery[0] : keyQuery,
         Array.isArray(keyQuery) ? keyQuery[1] : [],
         keyQuery,
         60 * 60,
-        { renewalThreshold: 5 * 60, renewalKey: keyQuery }
+        {
+          renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold || 2 * 60,
+          renewalKey: keyQuery,
+          waitForRenew
+        }
       );
     }
     return this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
@@ -265,7 +269,7 @@ class PreAggregationLoader {
           preAggregation: this.preAggregation,
           requestId: this.requestId
         });
-        await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
+        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
         return mostRecentTargetTableName();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (this.waitForRenew) {
@@ -273,7 +277,7 @@ class PreAggregationLoader {
             preAggregation: this.preAggregation,
             requestId: this.requestId
           });
-          await this.executeInQueue(invalidationKeys, 0, newVersionEntry);
+          await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
           return mostRecentTargetTableName();
         } else {
           if (
@@ -291,16 +295,20 @@ class PreAggregationLoader {
         preAggregation: this.preAggregation,
         requestId: this.requestId
       });
-      await this.executeInQueue(invalidationKeys, 10, newVersionEntry);
+      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
       return mostRecentTargetTableName();
     }
     return this.targetTableName(versionEntry);
   }
 
+  priority(defaultValue) {
+    return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
+  }
+
   getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || [])
-        .map(keyQuery => this.loadCache.keyQueryResult(keyQuery))
+        .map(keyQuery => this.loadCache.keyQueryResult(keyQuery, this.waitForRenew))
     );
   }
 
@@ -309,7 +317,7 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    this.executeInQueue(invalidationKeys, 0, newVersionEntry)
+    this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry)
       .then(() => {
         delete this.preAggregations.refreshErrors[newVersionEntry.table_name];
       })
