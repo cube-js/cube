@@ -228,7 +228,7 @@ SELECT * FROM orders WHERE date >= '2018-01-01 00:00:00' and date <= '2018-12-31
 
 for the `['2018-01-01', '2018-12-31']` date range passed for the `OrderFacts.date` dimension as in following query:
 
-```
+```javascript
 {
   measures: ['OrderFacts.count'],
   timeDimensions: [{
