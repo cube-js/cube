@@ -204,6 +204,12 @@ examples below.
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders WHERE ${FILTER_PARAMS.OrderFacts.date.filter('date')}`,
+  
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
 
   dimensions: {
     date: {
@@ -220,7 +226,18 @@ This will generate the following SQL:
 SELECT * FROM orders WHERE date >= '2018-01-01 00:00:00' and date <= '2018-12-31 23:59:59'
 ```
 
-for the `['2018-01-01', '2018-12-31']` date range passed for the `OrderFacts.date` dimension.
+for the `['2018-01-01', '2018-12-31']` date range passed for the `OrderFacts.date` dimension as in following query:
+
+```
+{
+  measures: ['OrderFacts.count'],
+  timeDimensions: [{
+    dimension: 'OrderFacts.date',
+    granularity: 'day',
+    dateRange: ['2018-01-01', '2018-12-31']
+  }]
+}
+```
 
 You can also pass a function instead of an SQL expression as a `filter()` argument.
 This way you can add BigQuery sharding filtering for events, which will reduce your billing cost.
