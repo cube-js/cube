@@ -33,4 +33,19 @@ describe(`dateParser`, () => {
       ]
     );
   });
+
+  test(`from 23 hours ago to now`, () => {
+    expect(dateParser('from 23 hours ago to now', 'UTC')).toStrictEqual(
+      [
+        new Date((Math.floor(new Date().getTime() / (1000 * 60 * 60)) - 23) * (1000 * 60 * 60)).toISOString().replace('Z', ''),
+        new Date((Math.ceil(new Date().getTime() / (1000 * 60 * 60))) * (1000 * 60 * 60) - 1).toISOString().replace('Z', '')
+      ]
+    );
+  });
+
+  test(`from 7 days ago to now`, () => {
+    expect(dateParser('from 7 days ago to now', 'UTC')).toStrictEqual(
+      [dateParser('last 7 days', 'UTC')[0], dateParser('today', 'UTC')[1]]
+    );
+  });
 });
