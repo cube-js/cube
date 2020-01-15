@@ -248,8 +248,7 @@ class QueryQueue {
           this.logger('Query cancelled in-flight', {
             queueSize,
             queryKey,
-            queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            queuePrefix: this.redisQueuePrefix
           });
           await redisClient.removeQuery(queryKey);
         }
