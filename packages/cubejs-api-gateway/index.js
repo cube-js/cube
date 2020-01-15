@@ -212,6 +212,7 @@ class ApiGateway {
     this.apiSecret = apiSecret;
     this.compilerApi = compilerApi;
     this.adapterApi = adapterApi;
+    this.refreshScheduler = options.refreshScheduler;
     this.logger = logger;
     this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
     this.checkAuthFn = options.checkAuth || this.defaultCheckAuth.bind(this);
@@ -254,6 +255,14 @@ class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+
+    app.get(`${this.basePath}/v1/run-scheduled-refresh`, this.checkAuthMiddleware, (async (req, res) => {
+      await this.runScheduledRefresh({
+        queryingOptions: req.query.queryingOptions,
+        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        res: this.resToResultFn(res)
+      });
+    }));
   }
 
   initSubscriptionServer(sendMessage) {
@@ -262,6 +271,19 @@ class ApiGateway {
 
   duration(requestStarted) {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
+  }
+
+  async runScheduledRefresh({ context, res, queryingOptions }) {
+    const requestStarted = new Date();
+    try {
+      const refreshScheduler = this.refreshScheduler();
+      await refreshScheduler.runScheduledRefresh(context, this.parseQueryParam(queryingOptions || {}));
+      res({}); // TODO status
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
   }
 
   async meta({ context, res }) {

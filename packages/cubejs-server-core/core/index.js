@@ -281,7 +281,8 @@ class CubejsServerCore {
           checkAuthMiddleware: this.options.checkAuthMiddleware,
           checkAuth: this.options.checkAuth,
           queryTransformer: this.options.queryTransformer,
-          extendContext: this.options.extendContext
+          extendContext: this.options.extendContext,
+          refreshScheduler: () => new RefreshScheduler(this)
         }
       );
     }
@@ -368,7 +369,7 @@ class CubejsServerCore {
 
   async runScheduledRefresh(context, queryingOptions) {
     const scheduler = new RefreshScheduler(this);
-    await scheduler.ensurePreAggregationsRefreshed(context, queryingOptions);
+    await scheduler.runScheduledRefresh(context, queryingOptions);
   }
 
   async getDriver() {

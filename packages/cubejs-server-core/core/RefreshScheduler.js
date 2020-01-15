@@ -73,7 +73,7 @@ class RefreshScheduler {
     }
   }
 
-  async ensurePreAggregationsRefreshed(context, queryingOptions) {
+  async runScheduledRefresh(context, queryingOptions) {
     queryingOptions = { timezone: 'UTC', ...queryingOptions };
     context = { requestId: `scheduler-${uuid()}`, ...context };
     this.serverCore.logger('Refresh Scheduler Run', {
