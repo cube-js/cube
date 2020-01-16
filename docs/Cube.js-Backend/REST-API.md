@@ -232,3 +232,23 @@ Example response:
   ]
 }
 ```
+
+### /v1/run-scheduled-refresh
+
+Trigger scheduled refresh run to refresh pre-aggregations.
+
+| Parameter | Description |
+| --- | --- |
+| queryingOptions | Optional URL encoded Cube.js [Query](/query-format) options such as timezone |
+
+Empty object response if scheduled successfully.
+
+Example request:
+
+```bash
+curl \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -G \
+ --data-urlencode 'queryingOptions={"timezone":"UTC"}' \
+ http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
+````
