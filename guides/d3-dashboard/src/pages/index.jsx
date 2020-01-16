@@ -8,7 +8,16 @@ import featureOneImg from "./feature-1.png";
 import featureOneTwo from "./feature-2.png";
 import featureOneThree from "./feature-3.png";
 
+import styled from 'styled-components';
+import media from "styled-media-query";
+
 import hero from "./hero.png";
+
+const StyledHeroImage = styled.img`
+  ${media.greaterThan("large")`
+    margin-top: -50px;
+  `}
+`;
 
 class Index extends React.Component {
   render() {
@@ -24,7 +33,7 @@ class Index extends React.Component {
           demoUrl="https://d3-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
-          media={ <img alt="hero" src={hero} /> }
+          media={ <StyledHeroImage alt="hero" src={hero} /> }
         />
         <Feature
           imageAlign='left'
