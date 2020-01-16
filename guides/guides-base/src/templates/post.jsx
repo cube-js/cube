@@ -59,7 +59,12 @@ export default class PostTemplate extends React.Component {
           <ContentContainer>
             <ContentHeader>{post.title}</ContentHeader>
             <Markdown dangerouslySetInnerHTML={{ __html: postNode.html }} />
-            <Social path={slug} title={post.title} />
+            <Social
+              path={slug}
+              title={post.title}
+              siteUrl={config.siteUrl}
+              siteTitle={config.siteTitle}
+            />
           </ContentContainer>
           <TableOfContents current={slug} data={tableOfContents} githubUrl={config.githubUrl} />
         </Container>

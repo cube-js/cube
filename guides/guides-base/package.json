@@ -14,7 +14,8 @@
     "react-helmet": "^5.2.1",
     "react-share": "^3.0.1",
     "styled-media-query": "^2.1.2",
-    "styled-normalize": "^8.0.6"
+    "styled-normalize": "^8.0.6",
+    "url-join": "^4.0.1"
   },
   "devDependencies": {
     "styled-components": "^4.4.0"
