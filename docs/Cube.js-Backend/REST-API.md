@@ -236,7 +236,7 @@ Example response:
 ### /v1/run-scheduled-refresh
 
 Trigger scheduled refresh run to refresh pre-aggregations.
-Learn more about [scheduled refresh here](caching#in-memory-cache-keeping-cache-up-to-date).
+Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date).
 
 | Parameter | Description |
 | --- | --- |
