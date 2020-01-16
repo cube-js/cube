@@ -121,8 +121,5 @@ As I mentioned in the previous chapter the default value for the `pivotConfig` u
 
 To customize the rendering of the charts, you can edit the `dashboard-app/src/pages/ChartRenderer.js` file. It should look familiar to what we saw in the previous chapter.
 
-You can check [the online demo of this dashboard here](http://d3-dashboard-demo.cube.dev/) and [the complete source code of the example app is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard).
-
-Congratulations on completing this guide! 🎉
-
-I’d love to hear from you about your experience following this guide. Please send any comments or feedback you might have in this [Slack Community](http://slack.cube.dev/). Thank you and I hope you found this guide helpful!
+In the next, final, chapter I'll show you how to add a filter to the dashboard
+and make it more interactive and dynamic.

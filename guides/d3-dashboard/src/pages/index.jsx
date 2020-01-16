@@ -39,7 +39,7 @@ class Index extends React.Component {
           imageAlign='left'
           image={featureOneImg}
           metaTitle="d3 dashboard example"
-          title="Build Dashboard App with D3 and React"
+          title="Build Interactive Dashboard App with D3"
           text="This guide shows how to build a dashboard application with React, D3.js and Material UI. You’ll learn how to set up a database, seed it with data, build an API endpoint on top of it, and then visualize data on the frontend with D3.js."
         />
         <Feature
