@@ -675,7 +675,7 @@
         // Set @@toStringTag to native iterators
         _setToStringTag(IteratorPrototype, TAG, true);
         // fix for some old engines
-        if (typeof IteratorPrototype[ITERATOR] != 'function') _hide(IteratorPrototype, ITERATOR, returnThis);
+        if (!_library && typeof IteratorPrototype[ITERATOR] != 'function') _hide(IteratorPrototype, ITERATOR, returnThis);
       }
     }
     // fix Array#{values, @@iterator}.name in V8 / FF
@@ -684,7 +684,7 @@
       $default = function values() { return $native.call(this); };
     }
     // Define iterator
-    if (BUGGY || VALUES_BUG || !proto[ITERATOR]) {
+    if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR])) {
       _hide(proto, ITERATOR, $default);
     }
     // Plug for library
@@ -12746,20 +12746,34 @@
         var timeDimensions = (query.timeDimensions || []).filter(function (td) {
           return !!td.granularity;
         });
+        var dimensions = query.dimensions || [];
         pivotConfig = pivotConfig || (timeDimensions.length ? {
           x: timeDimensions.map(function (td) {
-            return td.dimension;
+            return ResultSet.timeDimensionMember(td);
           }),
-          y: query.dimensions || []
+          y: dimensions
         } : {
-          x: query.dimensions || [],
+          x: dimensions,
           y: []
         });
-        pivotConfig.x = pivotConfig.x || [];
-        pivotConfig.y = pivotConfig.y || [];
+
+        var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
+          return axis.map(function (subDim) {
+            return timeDimensions.find(function (td) {
+              return td.dimension === subDim;
+            }) && !dimensions.find(function (d) {
+              return d === subDim;
+            }) ? ResultSet.timeDimensionMember(query.timeDimensions.find(function (td) {
+              return td.dimension === subDim;
+            })) : subDim;
+          });
+        };
+
+        pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
+        pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
         var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
         var allDimensions = timeDimensions.map(function (td) {
-          return td.dimension;
+          return ResultSet.timeDimensionMember(td);
         }).concat(query.dimensions);
         pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
           return allIncludedDimensions.indexOf(d) === -1;
@@ -12797,7 +12811,7 @@
 
         if (!dateRange) {
           var dates = pipe(map(function (row) {
-            return row[timeDimension.dimension] && moment$1(row[timeDimension.dimension]);
+            return row[ResultSet.timeDimensionMember(timeDimension)] && moment$1(row[ResultSet.timeDimensionMember(timeDimension)]);
           }), filter(function (r) {
             return !!r;
           }))(this.loadResponse.data);
@@ -12841,7 +12855,7 @@
         if (pivotConfig.fillMissingDates && pivotConfig.x.length === 1 && equals(pivotConfig.x, (this.loadResponse.query.timeDimensions || []).filter(function (td) {
           return !!td.granularity;
         }).map(function (td) {
-          return td.dimension;
+          return ResultSet.timeDimensionMember(td);
         }))) {
           var series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
 
@@ -13011,7 +13025,7 @@
     }, {
       key: "tablePivot",
       value: function tablePivot(pivotConfig) {
-        var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+        var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
 
         var valueToObject = function valueToObject(valuesArray, measureValue) {
           return function (field, index) {
@@ -13145,6 +13159,11 @@
         return this.loadResponse.data;
       }
     }], [{
+      key: "timeDimensionMember",
+      value: function timeDimensionMember(td) {
+        return "".concat(td.dimension, ".").concat(td.granularity);
+      }
+    }, {
       key: "measureFromAxis",
       value: function measureFromAxis(axisValues) {
         return axisValues[axisValues.length - 1];

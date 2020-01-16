@@ -116,7 +116,8 @@ class BaseQuery {
       this.measures.map(m => [m.unescapedAliasName(), m.measure]).concat(
         this.dimensions.map(m => [m.unescapedAliasName(), m.dimension])
       ).concat(
-        this.timeDimensions.map(m => [m.unescapedAliasName(), m.dimension])
+        this.timeDimensions.filter(m => !!m.granularity)
+          .map(m => [m.unescapedAliasName(), `${m.dimension}.${m.granularity}`])
       )
     );
   }

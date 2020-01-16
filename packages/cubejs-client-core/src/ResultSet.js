@@ -99,20 +99,36 @@ class ResultSet {
     return axisValues.map(formatValue).join(delimiter || ', ');
   }
 
+  static timeDimensionMember(td) {
+    return `${td.dimension}.${td.granularity}`;
+  }
+
   normalizePivotConfig(pivotConfig) {
     const { query } = this.loadResponse;
     const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+    const dimensions = query.dimensions || [];
     pivotConfig = pivotConfig || (timeDimensions.length ? {
-      x: timeDimensions.map(td => td.dimension),
-      y: query.dimensions || []
+      x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
+      y: dimensions
     } : {
-      x: query.dimensions || [],
+      x: dimensions,
       y: []
     });
-    pivotConfig.x = pivotConfig.x || [];
-    pivotConfig.y = pivotConfig.y || [];
+
+    const substituteTimeDimensionMembers = axis => axis.map(
+      subDim => (
+        timeDimensions.find(td => td.dimension === subDim) &&
+        !dimensions.find(d => d === subDim) ?
+          ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
+          subDim
+      )
+    );
+
+    pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
+    pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
+
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
-    const allDimensions = timeDimensions.map(td => td.dimension).concat(query.dimensions);
+    const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(query.dimensions);
     pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(d => allIncludedDimensions.indexOf(d) === -1));
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
@@ -138,7 +154,10 @@ class ResultSet {
     let { dateRange } = timeDimension;
     if (!dateRange) {
       const dates = pipe(
-        map(row => row[timeDimension.dimension] && moment(row[timeDimension.dimension])),
+        map(
+          row => row[ResultSet.timeDimensionMember(timeDimension)] &&
+            moment(row[ResultSet.timeDimensionMember(timeDimension)])
+        ),
         filter(r => !!r)
       )(this.loadResponse.data);
 
@@ -172,7 +191,9 @@ class ResultSet {
       pivotConfig.x.length === 1 &&
       equals(
         pivotConfig.x,
-        (this.loadResponse.query.timeDimensions || []).filter(td => !!td.granularity).map(td => td.dimension)
+        (this.loadResponse.query.timeDimensions || [])
+          .filter(td => !!td.granularity)
+          .map(td => ResultSet.timeDimensionMember(td))
       )
     ) {
       const series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
@@ -299,7 +320,7 @@ class ResultSet {
    * @returns {Array} of pivoted rows
    */
   tablePivot(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const valueToObject =
       (valuesArray, measureValue) => (
         (field, index) => ({

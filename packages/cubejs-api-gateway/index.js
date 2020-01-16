@@ -22,7 +22,8 @@ const prepareAnnotation = (metaConfig, query) => {
 
   const annotation = (memberType) => (member) => {
     const path = member.split('.');
-    const config = configMap[path[0]][memberType].find(m => m.name === member);
+    const memberWithoutGranularity = [path[0], path[1]].join('.');
+    const config = configMap[path[0]][memberType].find(m => m.name === memberWithoutGranularity);
     if (!config) {
       return undefined;
     }
@@ -39,7 +40,10 @@ const prepareAnnotation = (metaConfig, query) => {
     measures: R.fromPairs((query.measures || []).map(annotation('measures')).filter(a => !!a)),
     dimensions: R.fromPairs((query.dimensions || []).map(annotation('dimensions')).filter(a => !!a)),
     segments: R.fromPairs((query.segments || []).map(annotation('segments')).filter(a => !!a)),
-    timeDimensions: R.fromPairs((query.timeDimensions || []).map(td => annotation('dimensions')(td.dimension)).filter(a => !!a)), // TODO
+    timeDimensions: R.fromPairs((query.timeDimensions || [])
+      .filter(td => !!td.granularity)
+      .map(td => annotation('dimensions')(`${td.dimension}.${td.granularity}`))
+      .filter(a => !!a)),
   };
 };
 
@@ -59,11 +63,28 @@ const transformData = (aliasToMemberNameMap, annotation, data) => (data.map(r =>
     if (!annotationForMember) {
       throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\``);
     }
-    return [
+    const transformResult = [
       memberName,
       transformValue(p[1], annotationForMember.type)
     ];
+
+    const path = memberName.split('.');
+
+    // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
+    const memberNameWithoutGranularity = [path[0], path[1]].join('.');
+    if (path.length === 3 && !annotation[memberNameWithoutGranularity]) {
+      return [
+        transformResult,
+        [
+          memberNameWithoutGranularity,
+          transformResult[1]
+        ]
+      ];
+    }
+
+    return [transformResult];
   }),
+  R.unnest,
   R.fromPairs
 )(r)));
 
