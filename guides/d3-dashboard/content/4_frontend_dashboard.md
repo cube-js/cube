@@ -108,6 +108,17 @@ If you refresh the dashboard, you should be able to see your charts!
 
 ![](/images/4-screenshot-3.png)
 
+You can notice that one of our queries have the `pivotConfig` defined as the following.
+
+```javascript
+  pivotConfig: {
+    x: ["Users.city"],
+    y: ["Orders.status", "measures"]
+  }
+```
+
+As I mentioned in the previous chapter the default value for `pivotConfig` usually works fine, but in some cases like this one, we need to adjust it to get the desired result. We want to plot a bar here with the cities on the X-Axis and the number of orders on the Y-Axis grouped by the orders' statuses. That is exactly what we are passing here in the `pivotConfig`: `Users.city` to the X-Axis and measures with `Orders.status` to the Y-axis to get the grouped result.
+
 To customize the rendering of the charts, you can edit the `dashboard-app/src/pages/ChartRenderer.js` file. It should look familiar to what we saw in the previous chapter.
 
 You can check the online demo of this dashboard here and the complete source code of the example is available on Github here.

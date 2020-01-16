@@ -45,7 +45,7 @@ Let’s test our newly generated schema. Go to the Build page and select a measu
 
 ![](/images/2-screenshot-2.png)
 
-Now, let’s make some updates to our schema. The schema generation makes it easy to get started and test the dataset, but for real-world use cases, we almost always need to make manual changes. This is an optional step; feel free to skip to the [next chapter](http://localhost:8000/rendering-chart-with-d-3-js), where we’ll focus on rendering results with D3.
+Now, let’s make some updates to our schema. The schema generation makes it easy to get started and test the dataset, but for real-world use cases, we almost always need to make manual changes. This is an optional step; feel free to skip to the [next chapter](/rendering-chart-with-d-3-js), where we’ll focus on rendering results with D3.
 
 In the schema, we define measures and dimensions and how they map into SQL queries. You can find extensive documentation about [data schema here](https://cube.dev/docs/getting-started-cubejs-schema). We’re going to add a `priceRange` dimension to the Orders cube. It will indicate whether the total price of the order falls into one of the buckets: “$0 - $100”, “$100 - $200”, “$200+”.
 
