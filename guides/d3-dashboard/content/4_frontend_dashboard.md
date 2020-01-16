@@ -108,7 +108,7 @@ If you refresh the dashboard, you should be able to see your charts!
 
 ![](/images/4-screenshot-3.png)
 
-You can notice that one of our queries have the `pivotConfig` defined as the following.
+You can notice that one of our queries has the `pivotConfig` defined as the following.
 
 ```javascript
   pivotConfig: {
@@ -117,11 +117,11 @@ You can notice that one of our queries have the `pivotConfig` defined as the fol
   }
 ```
 
-As I mentioned in the previous chapter the default value for `pivotConfig` usually works fine, but in some cases like this one, we need to adjust it to get the desired result. We want to plot a bar here with the cities on the X-Axis and the number of orders on the Y-Axis grouped by the orders' statuses. That is exactly what we are passing here in the `pivotConfig`: `Users.city` to the X-Axis and measures with `Orders.status` to the Y-axis to get the grouped result.
+As I mentioned in the previous chapter the default value for the `pivotConfig` usually works fine, but in some cases like this one, we need to adjust it to get the desired result. We want to plot a bar chart here with the cities on the X-Axis and the number of orders on the Y-Axis grouped by the orders' statuses. That is exactly what we are passing here in the `pivotConfig`: `Users.city` to the X-Axis and measures with `Orders.status` to the Y-axis to get the grouped result.
 
 To customize the rendering of the charts, you can edit the `dashboard-app/src/pages/ChartRenderer.js` file. It should look familiar to what we saw in the previous chapter.
 
-You can check the online demo of this dashboard here and the complete source code of the example is available on Github here.
+You can check [the online demo of this dashboard here](http://d3-dashboard-demo.cube.dev/) and [the complete source code of the example app is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard).
 
 Congratulations on completing this guide! 🎉
 
