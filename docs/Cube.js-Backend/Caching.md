@@ -131,6 +131,7 @@ If you want to continously look for a new data you can use [Real Time Data Fetch
 Please note `renewQuery` also triggers pre-aggregations refresh as well.
 
 To keep pre-aggregations fresh Refresh Scheduler can be used.
+All pre-aggregations intended to be refreshed during scheduled refresh run should be marked with [scheduledRefresh](pre-aggregations#scheduled-refresh) parameter.
 There're `CubejsServerCore.runScheduledRefresh(context, queryingOptions)` and `CubejsServer.runScheduledRefresh(context, queryingOptions)` methods that should be invoked at least once a minute to populate queue for pre-aggregations refresh.
 You can do it by using simple timer for example:
 
