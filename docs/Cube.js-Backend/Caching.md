@@ -70,40 +70,6 @@ The `renewQuery` option applies to the `refreshKey` caching system mentioned abo
 
 For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately. For these situtations, you can mostly disable the `refreshKey` cache by setting the [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) to something very low, like `1`. This means Cube.js will always check the data freshness before executing a query, and notice any changed data underneath.
 
-### Keeping Cache Up-to-Date
-
-Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
-In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
-For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
-If you want to continously look for a new data you can use [Real Time Data Fetch](real-time-data-fetch) for that.
-Please note `renewQuery` also triggers pre-aggregations refresh as well.
-
-To keep pre-aggregations fresh Refresh Scheduler can be used.
-There're `CubejsServerCore.runScheduledRefresh(context, queryingOptions)` and `CubejsServer.runScheduledRefresh(context, queryingOptions)` methods that should be invoked at least once a minute to populate queue for pre-aggregations refresh.
-You can do it by using simple timer for example:
-
-```javascript
-setInterval(() => server.runScheduledRefresh(), 5000);
-```
-
-in your **index.js:**
-```javascript
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer();
-
-setInterval(() => server.runScheduledRefresh(), 5000);
-
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
-}).catch(e => {
-  console.error('Fatal error during server start: ');
-  console.error(e.stack || e);
-});
-```
-
-There's also [REST API](REST-API#api-reference-v-1-run-scheduled-refresh) available to trigger run.
-
 ## Pre-Aggregations
 
 The **pre-aggregation** engine builds a layer of aggregated data in your database during the runtime and maintains it to be up-to-date.
@@ -156,3 +122,36 @@ preAggregations: {
 }
 ```
 
+## Keeping Cache Up-to-Date
+
+Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
+In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
+For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
+If you want to continously look for a new data you can use [Real Time Data Fetch](real-time-data-fetch) for that.
+Please note `renewQuery` also triggers pre-aggregations refresh as well.
+
+To keep pre-aggregations fresh Refresh Scheduler can be used.
+There're `CubejsServerCore.runScheduledRefresh(context, queryingOptions)` and `CubejsServer.runScheduledRefresh(context, queryingOptions)` methods that should be invoked at least once a minute to populate queue for pre-aggregations refresh.
+You can do it by using simple timer for example:
+
+```javascript
+setInterval(() => server.runScheduledRefresh(), 5000);
+```
+
+in your **index.js:**
+```javascript
+const CubejsServer = require('@cubejs-backend/server');
+
+const server = new CubejsServer();
+
+setInterval(() => server.runScheduledRefresh(), 5000);
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+}).catch(e => {
+  console.error('Fatal error during server start: ');
+  console.error(e.stack || e);
+});
+```
+
+There's also [REST API](REST-API#api-reference-v-1-run-scheduled-refresh) available to trigger run.
