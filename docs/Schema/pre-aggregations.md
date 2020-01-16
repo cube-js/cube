@@ -294,3 +294,38 @@ cube(`Orders`, {
   }
 });
 ```
+
+## scheduledRefresh
+
+To keep pre-aggregations always up-to-date you can mark them as `scheduledRefresh: true`.
+This instructs `RefreshScheduler` to refresh this pre-aggregation every time it's run.
+`refreshKey` is used to determine if there's a need to update specific pre-aggregation on each scheduled refresh run.
+For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReference` are fetched to determine range for refresh.
+
+> **NOTE:** Refresh Scheduler isn't enabled by default. You should trigger it externally. [Learn how to do it here](caching#in-memory-cache-keeping-cache-up-to-date).
+
+Example usage:
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  segments: {
+    toys: {
+        sql: `category = 'toys'`
+    }
+  },
+
+  preAggregations: {
+    categoryAndDate: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      segmentReferences: [toys],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+      scheduledRefresh: true
+    }
+  }
+});
+```
+
