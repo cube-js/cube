@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Statsbot, Inc.",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -33,7 +33,7 @@
     "@babel/types": "^7.4.0",
     "@cubejs-backend/api-gateway": "^0.14.0",
     "@cubejs-backend/query-orchestrator": "^0.14.0",
-    "@cubejs-backend/schema-compiler": "^0.14.1",
+    "@cubejs-backend/schema-compiler": "^0.14.2",
     "codesandbox-import-utils": "^1.3.8",
     "cross-spawn": "^6.0.5",
     "fs-extra": "^7.0.1",
