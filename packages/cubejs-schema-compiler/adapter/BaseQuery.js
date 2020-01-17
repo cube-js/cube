@@ -1418,7 +1418,7 @@ class BaseQuery {
       return [
         this.evaluateSymbolSqlWithContext(
         () => this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
-        { preAggregationQuery: true }
+        { preAggregationQuery: true, originalSqlPreAggregation: true }
         ),
         []
       ];
@@ -1438,14 +1438,18 @@ class BaseQuery {
 
   preAggregationInvalidateKeyQueries(cube, preAggregation) {
     const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-    if (preAggregation.refreshKey) {
-      if (preAggregation.refreshKey.sql) {
-        return [this.paramAllocator.buildSqlAndParams(
-          preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
-        )];
-      }
+    if (preAggregation.refreshKey && preAggregation.refreshKey.sql) {
+      return [this.paramAllocator.buildSqlAndParams(
+        preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
+      )];
     }
-    if (preAggregation.partitionGranularity) {
+    if (
+      preAggregation.partitionGranularity &&
+      !preAggregationQueryForSql.collectCubeNames().find(c => {
+        const fromPath = this.cubeEvaluator.cubeFromPath(c);
+        return fromPath.refreshKey && fromPath.refreshKey.sql;
+      })
+    ) {
       const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
       return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
         () => preAggregationQueryForSql.cacheKeyQueries(
@@ -1549,7 +1553,12 @@ class BaseQuery {
               allFilters.find(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
-                if (filter && filter.filterParams() && filter.filterParams().length) {
+                if (
+                  filter &&
+                  filter.filterParams() &&
+                  filter.filterParams().length &&
+                  !this.safeEvaluateSymbolContext().originalSqlPreAggregation
+                ) {
                   if (typeof column === "function") {
                     return column.apply(
                       null,

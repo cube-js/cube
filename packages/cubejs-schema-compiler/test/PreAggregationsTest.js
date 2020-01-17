@@ -19,7 +19,7 @@ describe('PreAggregations', function test() {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     cube(\`visitors\`, {
       sql: \`
-      select * from visitors
+      select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
       \`,
       
       joins: {
