@@ -1,13 +1,17 @@
-const CompileError = require('../compiler/CompileError');
+/* globals it,describe */
+/* eslint-disable quote-props */
 const PostgresQuery = require('../adapter/PostgresQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 
-const prepareCompiler = PrepareCompiler.prepareCompiler;
+const { prepareCompiler } = PrepareCompiler;
 
 describe('Extensions', () => {
-  const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(`
+  const {
+    compiler, joinGraph, cubeEvaluator
+  } = prepareCompiler(`
     const Funnels = require('Funnels');
+    import { dynRef } from 'Reflection';
 
     cube(\`VisitorsFunnel\`, {
       extends: Funnels.eventFunnel({
@@ -49,7 +53,14 @@ describe('Extensions', () => {
     })
 
     cube(\`FooBar\`, {
-      extends: VisitorsFunnel
+      extends: VisitorsFunnel,
+      
+      measures: {
+        conversionsFraction: {
+          sql: dynRef('conversions', (c) => \`\${c} / 100.0\`),
+          type: 'number'
+        }
+      }
     })
     `);
 
@@ -61,6 +72,26 @@ describe('Extensions', () => {
         ],
         timeDimensions: [{
           dimension: 'VisitorsFunnel.time',
+          granularity: 'day',
+          dateRange: { from: '2017-01-01', to: '2017-01-30' }
+        }],
+        timezone: 'America/Los_Angeles'
+      });
+
+      console.log(query.buildSqlAndParams()[0]);
+    });
+
+    return result;
+  });
+
+  it('dyn ref', () => {
+    const result = compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'FooBar.conversionsFraction'
+        ],
+        timeDimensions: [{
+          dimension: 'FooBar.time',
           granularity: 'day',
           dateRange: { from: '2017-01-01', to: '2017-01-30' }
         }],
