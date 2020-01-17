@@ -1511,7 +1511,7 @@ class BaseQuery {
         const propValue = target[name];
         const methods = (paramValue) => ({
           filter: (column) => {
-            if (paramValue) {
+            if (paramValue && !this.safeEvaluateSymbolContext().originalSqlPreAggregation) {
               const value = Array.isArray(paramValue) ?
                 paramValue.map(this.paramAllocator.allocateParam.bind(this.paramAllocator)) :
                 this.paramAllocator.allocateParam(paramValue);
