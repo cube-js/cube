@@ -5,6 +5,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const LRUCache = require('lru-cache');
 const SqlString = require('sqlstring');
+const R = require('ramda');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const RefreshScheduler = require('./RefreshScheduler');
@@ -54,14 +55,21 @@ const devLogger = (level) => (type, message, error) => {
   };
 
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
-  const format = ({ queryKey, duration, ...json }) => {
+  const format = ({ queryKey, duration, allSqlLines, ...json }) => {
     const restParams = JSON.stringify(json, null, 2);
     // TODO pre-aggregations queryKey format
     if (queryKey && queryKey[0] && Array.isArray(queryKey[0]) && typeof queryKey[0][0] === 'string') {
       [queryKey] = queryKey;
     }
     if (queryKey && typeof queryKey[0] === 'string') {
-      return `${duration ? `(${duration}ms)` : ''}\n${SqlString.format(queryKey[0], queryKey[1]).replace(/\\s+/g, ' ')}\n${restParams}`;
+      const queryMaxLines = 50;
+      let formatted = SqlString.format(queryKey[0], queryKey[1]).split('\n');
+      if (formatted.length > queryMaxLines && !allSqlLines) {
+        formatted = R.take(queryMaxLines / 2, formatted)
+          .concat(['.....', '.....', '.....'])
+          .concat(R.takeLast(queryMaxLines / 2, formatted));
+      }
+      return `${duration ? `(${duration}ms)` : ''}\n${formatted.join('\n')}\n${restParams}`;
     }
     if (queryKey) {
       return `${duration ? `(${duration}ms)` : ''}\n${JSON.stringify(queryKey)}\n${restParams}`; // TODO format
@@ -69,7 +77,7 @@ const devLogger = (level) => (type, message, error) => {
     return restParams;
   };
 
-  const logError = () => console.log(`${withColor(type, colors.red)}: ${format(message)} \n${error}`);
+  const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true })} \n${error}`);
   const logType = () => console.log(`${withColor(type)}`);
   const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
 
