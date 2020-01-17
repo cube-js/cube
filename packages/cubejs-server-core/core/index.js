@@ -55,7 +55,9 @@ const devLogger = (level) => (type, message, error) => {
   };
 
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
-  const format = ({ queryKey, duration, allSqlLines, ...json }) => {
+  const format = ({
+    queryKey, duration, allSqlLines, ...json
+  }) => {
     const restParams = JSON.stringify(json, null, 2);
     // TODO pre-aggregations queryKey format
     if (queryKey && queryKey[0] && Array.isArray(queryKey[0]) && typeof queryKey[0][0] === 'string') {
