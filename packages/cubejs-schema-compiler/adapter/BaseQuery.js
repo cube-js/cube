@@ -1325,8 +1325,11 @@ class BaseQuery {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery) {
         return {
-          renewalThreshold: this.renewalThreshold(!!preAggregationForQuery.refreshKey),
-          queries: this.preAggregationInvalidateKeyQueries(preAggregationForQuery.cube, preAggregationForQuery)
+          renewalThreshold: this.renewalThreshold(!!preAggregationForQuery.preAggregation.refreshKey),
+          queries: this.preAggregationInvalidateKeyQueries(
+            preAggregationForQuery.cube,
+            preAggregationForQuery.preAggregation
+          )
         };
       }
     }

@@ -412,6 +412,8 @@ describe('PreAggregations', function test() {
       console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
       preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/>=/);
+      console.log(JSON.stringify(query.cacheKeyQueries().queries, null, 2));
+      query.cacheKeyQueries().queries[0][0].should.match(/max/);
 
       return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
         query.buildSqlAndParams()
