@@ -72,9 +72,14 @@ const BasePreAggregation = {
 const cubeSchema = Joi.object().keys({
   name: identifier,
   sql: Joi.func().required(),
-  refreshKey: Joi.object().keys({
-    sql: Joi.func().required()
-  }),
+  refreshKey: Joi.alternatives().try(
+    Joi.object().keys({
+      sql: Joi.func().required()
+    }),
+    Joi.object().keys({
+      immutable: Joi.boolean().required()
+    })
+  ),
   fileName: Joi.string().required(),
   extends: Joi.func(),
   allDefinitions: Joi.func(),

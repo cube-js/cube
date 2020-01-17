@@ -174,6 +174,9 @@ describe('PreAggregations', function test() {
     })
     
     cube('GoogleVisitors', {
+      refreshKey: {
+        immutable: true,
+      },
       extends: visitors,
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`
     })
@@ -331,6 +334,109 @@ describe('PreAggregations', function test() {
             {
               "google_visitors__created_at_day": "2017-01-05T00:00:00.000Z",
               "google_visitors__count": "1"
+            }
+          ]
+        );
+      });
+    });
+  });
+
+  it('immutable partition default refreshKey', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'GoogleVisitors.checkinsTotal'
+        ],
+        dimensions: [
+          'GoogleVisitors.source'
+        ],
+        timeDimensions: [{
+          dimension: 'GoogleVisitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'GoogleVisitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+      preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/NOW\(\) </)
+
+      return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
+        query.buildSqlAndParams()
+      ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => {
+        res.should.be.deepEqual(
+          [
+            {
+              "google_visitors__source": "google",
+              "google_visitors__created_at_day": "2017-01-05T00:00:00.000Z",
+              "google_visitors__checkins_total": "1"
+            }
+          ]
+        );
+      });
+    });
+  });
+
+  it('mutable partition default refreshKey', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.checkinsTotal'
+        ],
+        dimensions: [
+          'visitors.source'
+        ],
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+      preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/>=/);
+
+      return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
+        query.buildSqlAndParams()
+      ]).map(q => replaceTableName(q, preAggregationsDescription, 102))).then(res => {
+        res.should.be.deepEqual(
+          [
+            {
+              visitors__source: 'some',
+              visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+              visitors__checkins_total: '3'
+            },
+            {
+              visitors__source: 'some',
+              visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+              visitors__checkins_total: '2'
+            },
+            {
+              visitors__source: 'google',
+              visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+              visitors__checkins_total: '1'
+            },
+            {
+              visitors__source: null,
+              visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+              visitors__checkins_total: '0'
             }
           ]
         );
