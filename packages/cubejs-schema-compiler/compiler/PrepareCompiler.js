@@ -9,6 +9,7 @@ const ContextEvaluator = require('./ContextEvaluator');
 const DashboardTemplateEvaluator = require('./DashboardTemplateEvaluator');
 const JoinGraph = require('./JoinGraph');
 const Funnels = require('../extensions/Funnels');
+const RefreshKeys = require('../extensions/RefreshKeys');
 const CubeToMetaTransformer = require('./CubeToMetaTransformer');
 
 exports.compile = (repo, options) => {
@@ -36,7 +37,8 @@ exports.prepareCompiler = (repo, options) => {
     dashboardTemplateCompilers: [dashboardTemplateEvaluator],
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     extensions: {
-      Funnels
+      Funnels,
+      RefreshKeys
     }
   }, options));
   return {
