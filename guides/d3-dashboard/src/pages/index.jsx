@@ -29,7 +29,7 @@ class Index extends React.Component {
         <Header githubUrl={config.githubUrl} />
         <Hero
           title="D3 Dashboard Tutorial"
-          subtitle="Learn how to build a D3 dashboard with example in React, Material UI and Cube.js."
+          subtitle="Learn how to build a D3 dashboard with an example in React, Material UI, and Cube.js."
           demoUrl="https://d3-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
@@ -39,15 +39,15 @@ class Index extends React.Component {
           imageAlign='left'
           image={featureOneImg}
           metaTitle="d3 dashboard example"
-          title="Build Interactive Dashboard App with D3"
-          text="This guide shows how to build a dashboard application with React, D3.js and Material UI. You’ll learn how to set up a database, seed it with data, build an API endpoint on top of it, and then visualize data on the frontend with D3.js."
+          title="Build an Interactive Dashboard App with D3"
+          text="This guide shows how to build a dashboard application with React, D3.js, and Material UI. You’ll learn how to set up a database, seed it with data, build an API endpoint on top of it, and then visualize data on the frontend with D3.js."
         />
         <Feature
           imageAlign='right'
           image={featureOneTwo}
           metaTitle="data schema"
-          title="Build Analytics API with Cube.js"
-          text="You will learn how to model data with Cube.js data schema and build clean API interface to power your analytics dashboard. The guide shows how to create complex metrics and describe relationships in the data."
+          title="Build an Analytics API with Cube.js"
+          text="You will learn how to model data with Cube.js data schema and build a clean API interface to power your analytics dashboard. This guide shows how to create complex metrics and describe relationships in the data."
         />
         <PartsListing partsEdges={partsEdges} />
         <Footer />
