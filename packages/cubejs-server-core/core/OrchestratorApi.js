@@ -6,6 +6,7 @@ const ContinueWaitError = require('@cubejs-backend/query-orchestrator/orchestrat
 class OrchestratorApi {
   constructor(driverFactory, logger, options) {
     options = options || {};
+    this.options = options;
     this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
     this.driverFactory = driverFactory;
     const { externalDriverFactory } = options;
@@ -46,6 +47,16 @@ class OrchestratorApi {
           params: query.values,
           requestId: query.requestId
         });
+
+        const fromCache = await this.orchestrator.resultFromCacheIfExists(query);
+        if (!query.renewQuery && fromCache) {
+          this.logger('Slow Query Warning', {
+            query: queryForLog,
+            requestId: query.requestId,
+            warning: `Query is too slow to be renewed during the user request and was served from the cache. Please consider using low latency pre-aggregations.`
+          });
+          return fromCache;
+        }
 
         throw { error: 'Continue wait', stage: await this.orchestrator.queryStage(query) };
       }

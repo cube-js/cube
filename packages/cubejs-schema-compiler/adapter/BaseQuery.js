@@ -1463,7 +1463,7 @@ class BaseQuery {
   }
 
   parseSecondDuration(interval) {
-    const intervalMatch = interval.match(/^(\d+) (minute|hour|day|week)s?$/);
+    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }

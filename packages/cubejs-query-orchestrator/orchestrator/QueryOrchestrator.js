@@ -79,6 +79,10 @@ class QueryOrchestrator {
       return { ...preAggregationStage, stage: stageMessage };
     }
   }
+
+  resultFromCacheIfExists(queryBody) {
+    return this.queryCache.resultFromCacheIfExists(queryBody);
+  }
 }
 
 module.exports = QueryOrchestrator;

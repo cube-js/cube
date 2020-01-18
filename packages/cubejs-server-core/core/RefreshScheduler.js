@@ -82,25 +82,10 @@ class RefreshScheduler {
     });
     try {
       const compilerApi = this.serverCore.getCompilerApi(context);
-      const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
-      await Promise.all(scheduledPreAggregations.map(async preAggregation => {
-        const queries = await this.refreshQueriesForPreAggregation(
-          context, compilerApi, preAggregation, queryingOptions
-        );
-        await Promise.all(queries.map(async (query, i) => {
-          const sqlQuery = await compilerApi.getSql(query);
-          const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
-          await orchestratorApi.executeQuery({
-            ...sqlQuery,
-            preAggregations: sqlQuery.preAggregations.map(
-              (p) => ({ ...p, priority: i - queries.length })
-            ),
-            continueWait: true,
-            renewQuery: true,
-            requestId: context.requestId
-          });
-        }));
-      }));
+      await Promise.all([
+        this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
+        this.refreshPreAggregations(context, compilerApi, queryingOptions)
+      ]);
     } catch (e) {
       if (e.error !== 'Continue wait') {
         this.serverCore.logger('Refresh Scheduler Error', {
@@ -110,6 +95,62 @@ class RefreshScheduler {
         });
       }
     }
+  }
+
+  async refreshCubesRefreshKey(context, compilerApi, queryingOptions) {
+    const dbType = compilerApi.getDbType();
+    const compilers = await compilerApi.getCompilers();
+    const queryForEvaluation = compilerApi.createQuery(compilers, dbType, {});
+    await Promise.all(queryForEvaluation.cubeEvaluator.cubeNamesWithRefreshKeys().map(async cube => {
+      const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
+      const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
+      const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
+      if (measuresCount === 0 && dimensionsCount === 0) {
+        return;
+      }
+      const query = {
+        ...queryingOptions,
+        ...(
+          measuresCount &&
+          { measures: [`${cube}.${Object.keys(cubeFromPath.measures)[0]}`] }
+        ),
+        ...(
+          dimensionsCount &&
+          { dimensions: [`${cube}.${Object.keys(cubeFromPath.dimensions)[0]}`] }
+        )
+      };
+      const sqlQuery = await compilerApi.getSql(query);
+      const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
+      await orchestratorApi.executeQuery({
+        ...sqlQuery,
+        query: 'SELECT 1', // TODO get rid off it
+        continueWait: true,
+        renewQuery: true,
+        requestId: context.requestId
+      });
+    }));
+  }
+
+  async refreshPreAggregations(context, compilerApi, queryingOptions) {
+    const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
+    await Promise.all(scheduledPreAggregations.map(async preAggregation => {
+      const queries = await this.refreshQueriesForPreAggregation(
+        context, compilerApi, preAggregation, queryingOptions
+      );
+      await Promise.all(queries.map(async (query, i) => {
+        const sqlQuery = await compilerApi.getSql(query);
+        const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
+        await orchestratorApi.executeQuery({
+          ...sqlQuery,
+          preAggregations: sqlQuery.preAggregations.map(
+            (p) => ({ ...p, priority: i - queries.length })
+          ),
+          continueWait: true,
+          renewQuery: true,
+          requestId: context.requestId
+        });
+      }));
+    }));
   }
 }
 

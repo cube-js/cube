@@ -48,10 +48,11 @@ const checkEnvForPlaceholders = () => {
   }
 };
 
-const devLogger = (level) => (type, message, error) => {
+const devLogger = (level) => (type, { error, warning, ...message }) => {
   const colors = {
     red: '31', // ERROR
     green: '32', // INFO
+    yellow: '33', // WARNING
   };
 
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
@@ -79,8 +80,10 @@ const devLogger = (level) => (type, message, error) => {
     return restParams;
   };
 
+  const logWarning = () => console.log(
+    `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true })} \n${withColor(warning, colors.yellow)}`
+  );
   const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true })} \n${error}`);
-  const logType = () => console.log(`${withColor(type)}`);
   const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
 
   if (error) {
@@ -88,21 +91,37 @@ const devLogger = (level) => (type, message, error) => {
     return;
   }
 
-  switch (level) {
-    case "ERROR":
-      logType();
-      break;
-    case "TRACE":
-      logDetails();
-      break;
-    case "INFO":
-    default: {
-      if ([
+  // eslint-disable-next-line default-case
+  switch ((level || 'info').toLowerCase()) {
+    case "trace": {
+      if (!error && !warning) {
+        logDetails();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "info": {
+      if (!error && !warning && [
         'Load Request Success',
         'Performing query',
         'Performing query completed',
       ].includes(type)) {
         logDetails();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "warn": {
+      if (!error && warning) {
+        logWarning();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "error": {
+      if (error) {
+        logError();
+        break;
       }
     }
   }
@@ -133,9 +152,8 @@ class CubejsServerCore {
     this.schemaPath = options.schemaPath || 'schema';
     this.dbType = options.dbType;
     this.logger = options.logger || ((msg, params) => {
-      const { error, ...restParams } = params;
       if (process.env.NODE_ENV !== 'production') {
-        devLogger(process.env.CUBEJS_LOG_LEVEL)(msg, restParams, error);
+        devLogger(process.env.CUBEJS_LOG_LEVEL)(msg, params);
       } else {
         console.log(JSON.stringify({ message: msg, ...params }));
       }
@@ -164,6 +182,13 @@ class CubejsServerCore {
     // proactively free up old cache values occassionally
     if (options.maxCompilerCacheKeepAlive) {
       setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
+    }
+
+    if (options.scheduledRefreshTimer) {
+      setInterval(
+        () => this.runScheduledRefresh(),
+        typeof options.scheduledRefreshTimer === 'number' ? (options.scheduledRefreshTimer * 1000) : 5000
+      );
     }
 
     const { machineIdSync } = require('node-machine-id');
@@ -212,7 +237,8 @@ class CubejsServerCore {
           msg === 'Internal Server Error' ||
           msg === 'User Error' ||
           msg === 'Compiling schema' ||
-          msg === 'Recompiling schema'
+          msg === 'Recompiling schema' ||
+          msg === 'Slow Query Warning'
         ) {
           this.event(msg, { error: params.error });
         }

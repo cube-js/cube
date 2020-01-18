@@ -7,7 +7,7 @@ const timeInterval =
     Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
     Joi.any().valid('unbounded')
   ]);
-const everyInterval = Joi.string().regex(/^(\d+) (minute|hour|day|week)s?$/, 'refresh time interval');
+const everyInterval = Joi.string().regex(/^(\d+) (second|minute|hour|day|week)s?$/, 'refresh time interval');
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),

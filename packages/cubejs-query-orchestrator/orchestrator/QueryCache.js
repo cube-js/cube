@@ -350,6 +350,18 @@ class QueryCache {
     return cachedValue && new Date(cachedValue.time);
   }
 
+  async resultFromCacheIfExists(queryBody) {
+    const cacheKey = QueryCache.queryCacheKey(queryBody);
+    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    if (cachedValue) {
+      return {
+        data: cachedValue.result,
+        lastRefreshTime: new Date(cachedValue.time)
+      };
+    }
+    return null;
+  }
+
   queryRedisKey(cacheKey) {
     return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest("hex")}`;
   }
