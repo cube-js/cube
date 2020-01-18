@@ -7,6 +7,7 @@ const timeInterval =
     Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
     Joi.any().valid('unbounded')
   ]);
+const everyInterval = Joi.string().regex(/^(\d+) (minute|hour|day|week)s?$/, 'refresh time interval');
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
@@ -60,9 +61,15 @@ const BaseMeasure = {
 };
 
 const BasePreAggregation = {
-  refreshKey: Joi.object().keys({
-    sql: Joi.func().required()
-  }),
+  refreshKey: Joi.alternatives().try(
+    Joi.object().keys({
+      sql: Joi.func().required()
+    }),
+    Joi.object().keys({
+      every: everyInterval,
+      incremental: Joi.boolean()
+    })
+  ),
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   partitionGranularity: Joi.any().valid('day', 'week', 'month', 'year'),
@@ -78,6 +85,9 @@ const cubeSchema = Joi.object().keys({
     }),
     Joi.object().keys({
       immutable: Joi.boolean().required()
+    }),
+    Joi.object().keys({
+      every: everyInterval
     })
   ),
   fileName: Joi.string().required(),

@@ -109,7 +109,7 @@ class PreAggregationLoadCache {
     return this.versionEntries;
   }
 
-  async keyQueryResult(keyQuery, waitForRenew, priority) {
+  async keyQueryResult(keyQuery, waitForRenew, priority, renewalThreshold) {
     if (!this.queryResults[this.queryCache.queryRedisKey(keyQuery)]) {
       this.queryResults[this.queryCache.queryRedisKey(keyQuery)] = await this.queryCache.cacheQueryResult(
         Array.isArray(keyQuery) ? keyQuery[0] : keyQuery,
@@ -117,7 +117,10 @@ class PreAggregationLoadCache {
         keyQuery,
         60 * 60,
         {
-          renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold || 2 * 60,
+          renewalThreshold:
+            this.queryCache.options.refreshKeyRenewalThreshold ||
+            renewalThreshold ||
+            2 * 60,
           renewalKey: keyQuery,
           waitForRenew,
           priority
@@ -309,7 +312,14 @@ class PreAggregationLoader {
   getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || [])
-        .map(keyQuery => this.loadCache.keyQueryResult(keyQuery, this.waitForRenew, this.priority(10)))
+        .map(
+          (keyQuery, i) => this.loadCache.keyQueryResult(
+            keyQuery,
+            this.waitForRenew,
+            this.priority(10),
+            (this.preAggregation.refreshKeyRenewalThresholds || [])[i]
+          )
+        )
     );
   }
 

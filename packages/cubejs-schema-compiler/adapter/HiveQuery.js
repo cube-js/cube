@@ -92,6 +92,14 @@ class HiveQuery extends BaseQuery {
     }
     return this.escapeColumnName(this.aliasName(id));
   }
+
+  unixTimestampSql() {
+    return `unix_timestamp()`;
+  }
+
+  defaultRefreshKeyRenewalThreshold() {
+    return 120;
+  }
 }
 
 module.exports = HiveQuery;

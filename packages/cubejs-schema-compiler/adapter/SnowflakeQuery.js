@@ -22,6 +22,10 @@ class SnowflakeQuery extends BaseQuery {
   timeStampCast(value) {
     return `${value}::timestamp_tz`;
   }
+
+  defaultRefreshKeyRenewalThreshold() {
+    return 120;
+  }
 }
 
 module.exports = SnowflakeQuery;

@@ -37,6 +37,8 @@ class QueryCache {
       ).map(replacePreAggregationTableNames);
 
     const renewalThreshold = queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.renewalThreshold;
+    const refreshKeyRenewalThresholds = queryBody.cacheKeyQueries &&
+      queryBody.cacheKeyQueries.refreshKeyRenewalThresholds;
 
     const expireSecs = queryBody.expireSecs || 24 * 3600;
 
@@ -54,9 +56,29 @@ class QueryCache {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
-        requestId: queryBody.requestId
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds
       });
     }
+
+    if (!this.options.backgroundRenew) {
+      const resultPromise = this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds,
+        skipRefreshKeyWaitForRenew: true
+      });
+
+      this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds
+      });
+
+      return resultPromise;
+    }
+
+    this.logger('Background fetch', { cacheKey, requestId: queryBody.requestId });
 
     const mainPromise = this.cacheQueryResult(
       query, values,
@@ -73,7 +95,8 @@ class QueryCache {
     if (!forceNoCache) {
       this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
-        requestId: queryBody.requestId
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds
       });
     }
 
@@ -197,15 +220,18 @@ class QueryCache {
   renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
     options = options || {};
     return Promise.all(
-      cacheKeyQueries.map(q => this.cacheQueryResult(
+      cacheKeyQueries.map((q, i) => this.cacheQueryResult(
         Array.isArray(q) ? q[0] : q,
         Array.isArray(q) ? q[1] : [],
         q,
         expireSecs,
         {
-          renewalThreshold: this.options.refreshKeyRenewalThreshold || 2 * 60,
+          renewalThreshold:
+            this.options.refreshKeyRenewalThreshold ||
+            (options.refreshKeyRenewalThresholds || [])[i] ||
+            2 * 60,
           renewalKey: q,
-          waitForRenew: true,
+          waitForRenew: !options.skipRefreshKeyWaitForRenew,
           requestId: options.requestId
         }
       ))

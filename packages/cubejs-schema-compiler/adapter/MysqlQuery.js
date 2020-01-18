@@ -67,6 +67,9 @@ class MysqlQuery extends BaseQuery {
     return `CONCAT(${strings.join(", ")})`;
   }
 
+  unixTimestampSql() {
+    return `UNIX_TIMESTAMP()`;
+  }
 }
 
 module.exports = MysqlQuery;

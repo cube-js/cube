@@ -82,11 +82,13 @@ class PreAggregations {
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
+    const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
     return {
       preAggregationsSchema: this.query.preAggregationSchema(),
       tableName,
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
-      invalidateKeyQueries: this.query.preAggregationInvalidateKeyQueries(cube, preAggregation),
+      invalidateKeyQueries: refreshKeyQueries.queries,
+      refreshKeyRenewalThresholds: refreshKeyQueries.refreshKeyRenewalThresholds,
       external: preAggregation.external
     };
   }

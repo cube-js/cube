@@ -62,6 +62,10 @@ class SqliteQuery extends BaseQuery {
   nowTimestampSql() {
     return `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
   }
+
+  unixTimestampSql() {
+    return `strftime('%s','now')`;
+  }
 }
 
 module.exports = SqliteQuery;

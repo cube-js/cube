@@ -98,6 +98,10 @@ class BigqueryQuery extends BaseQuery {
     return `CURRENT_TIMESTAMP()`;
   }
 
+  unixTimestampSql() {
+    return `UNIX_SECONDS(${this.nowTimestampSql()})`;
+  }
+
   preAggregationLoadSql(cube, preAggregation, tableName) {
     return this.preAggregationSql(cube, preAggregation);
   }
@@ -116,6 +120,10 @@ class BigqueryQuery extends BaseQuery {
 
   concatStringsSql(strings) {
     return `CONCAT(${strings.join(", ")})`;
+  }
+
+  defaultRefreshKeyRenewalThreshold() {
+    return 120;
   }
 }
 

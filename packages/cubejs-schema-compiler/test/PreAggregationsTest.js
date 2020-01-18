@@ -180,6 +180,35 @@ describe('PreAggregations', function test() {
       extends: visitors,
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`
     })
+    
+    cube('EveryHourVisitors', {
+      refreshKey: {
+        immutable: true,
+      },
+      extends: visitors,
+      sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
+      
+      preAggregations: {
+        default: {
+          type: 'originalSql',
+          refreshKey: {
+            sql: 'select NOW()'
+          }
+        },
+        partitioned: {
+          type: 'rollup',
+          measureReferences: [checkinsTotal],
+          dimensionReferences: [source],
+          timeDimensionReference: createdAt,
+          granularity: 'day',
+          partitionGranularity: 'month',
+          refreshKey: {
+            every: '1 hour',
+            incremental: true
+          }
+        }
+      }
+    })
     `);
 
   function replaceTableName(query, preAggregation, suffix) {
@@ -385,6 +414,51 @@ describe('PreAggregations', function test() {
     });
   });
 
+  it('immutable every hour', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'EveryHourVisitors.checkinsTotal'
+        ],
+        dimensions: [
+          'EveryHourVisitors.source'
+        ],
+        timeDimensions: [{
+          dimension: 'EveryHourVisitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-25']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'EveryHourVisitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+      preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/NOW\(\) </);
+      preAggregationsDescription[0].invalidateKeyQueries[0][1][0].should.be.deepEqual("2017-02-01T07:59:59Z");
+
+      return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
+        query.buildSqlAndParams()
+      ]).map(q => replaceTableName(q, preAggregationsDescription, 103))).then(res => {
+        res.should.be.deepEqual(
+          [
+            {
+              "every_hour_visitors__source": "google",
+              "every_hour_visitors__created_at_day": "2017-01-05T00:00:00.000Z",
+              "every_hour_visitors__checkins_total": "1"
+            }
+          ]
+        );
+      });
+    });
+  });
+
   it('mutable partition default refreshKey', () => {
     return compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -412,8 +486,6 @@ describe('PreAggregations', function test() {
       console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
       preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/>=/);
-      console.log(JSON.stringify(query.cacheKeyQueries().queries, null, 2));
-      query.cacheKeyQueries().queries[0][0].should.match(/max/);
 
       return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
         query.buildSqlAndParams()

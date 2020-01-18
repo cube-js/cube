@@ -71,6 +71,14 @@ class PrestodbQuery extends BaseQuery {
     ).join(' UNION ALL ');
     return `SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to FROM (${values}) AS dates`;
   }
+
+  unixTimestampSql() {
+    return `to_unixtime(${this.nowTimestampSql()})`;
+  }
+
+  defaultRefreshKeyRenewalThreshold() {
+    return 120;
+  }
 }
 
 module.exports = PrestodbQuery;

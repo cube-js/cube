@@ -93,6 +93,10 @@ class MssqlQuery extends BaseQuery {
     return `CURRENT_TIMESTAMP`;
   }
 
+  unixTimestampSql() {
+    return `DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())`;
+  }
+
   preAggregationLoadSql(cube, preAggregation, tableName) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
