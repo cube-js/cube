@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mysql-driver",
   "description": "Cube.js Mysql database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "driver/MySqlDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.14.0",
+    "@cubejs-backend/query-orchestrator": "^0.15.0",
     "generic-pool": "^3.6.0",
     "mysql": "^2.16.0"
   },
