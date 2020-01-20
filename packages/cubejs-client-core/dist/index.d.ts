@@ -9,10 +9,16 @@ export type CubeJSApiOptions = {
   transport?: TransportInterface;
 };
 
-export enum QueryOrderOptions {
-  ASC = 'asc',
-  DESC = 'desc',
-}
+export type LoadMethodOptions = {
+  mutexKey?: string;
+  mutexObj?: {};
+  progressCallback(result: ProgressResult): void;
+  subscribe?: boolean;
+};
+
+export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
+
+export type QueryOrder = 'asc' | 'desc';
 
 export type Annotation = {
   title: string;
@@ -27,29 +33,38 @@ export type QueryAnnotations = {
   timeDimensions: Record<string, Annotation>;
 };
 
-export type LoadResponse = {
+export type LoadResponse<T> = {
   annotation: QueryAnnotations;
   lastRefreshTime: string;
   query: Query;
-  data: any[];
+  data: T[];
 };
 
 export type PivotConfig = {
   x?: string[];
   y?: string[];
-  fillMissingDates: boolean | null;
+  fillMissingDates?: boolean | null;
 };
+
+export type Column = {
+  key: string;
+  title: string;
+}
 
 export class ResultSet<T extends {} = {}> {
   static measureFromAxis(axisValues: string[]): string;
 
-  loadResponse: LoadResponse;
+  loadResponse: LoadResponse<T>;
 
-  new(loadResponse: LoadResponse): ResultSet;
+  new(loadResponse: LoadResponse<T>): ResultSet;
 
-  series(pivotConfig: PivotConfig): T[];
-  chartPivot(pivotConfig: PivotConfig): T[];
-  tablePivot(pivotConfig: PivotConfig): T[];
+  series(pivotConfig?: PivotConfig): T[];
+  seriesNames(pivotConfig?: PivotConfig): Column[];
+
+  chartPivot(pivotConfig?: PivotConfig): T[];
+
+  tablePivot(pivotConfig?: PivotConfig): T[];
+  tableColumns(pivotConfig?: PivotConfig): Column[];
 }
 
 export type Filter = {
@@ -82,24 +97,64 @@ export type Query = {
   limit?: number;
   offset?: number;
   order?: {
-    [key: string]: QueryOrderOptions;
+    [key: string]: QueryOrder;
   };
   timezone?: string;
   renewQuery?: boolean;
   ungrouped?: boolean;
 };
 
+export type ProgressResponse = {
+  stage: string;
+  timeElapsed: number;
+}
+
+export class ProgressResult {
+  new(progressResponse: ProgressResponse): ProgressResult;
+
+  stage(): string;
+  timeElapsed(): string;
+}
+
+type PrimitiveValue = boolean | string | number;
+export type SqlQueryTuple = [string, PrimitiveValue];
+
+export type SqlData = {
+  aliasNameToMember: Record<string, string>;
+  cacheKeyQueries: {
+    queries: SqlQueryTuple[];
+  };
+  dataSource: boolean;
+  external: boolean;
+  sql: SqlQueryTuple;
+};
+
+export type SqlApiResponse = {
+  sql: SqlData;
+}
+
+export class SqlQuery {
+  new(sqlQuery: SqlApiResponse): SqlQuery;
+
+  rawQuery(): SqlData;
+  sql(): string;
+}
+
+export class Meta {
+  new(metaResponse: {}): Meta;
+}
+
 export class CubejsApi {
   new(apiToken: string, options: CubeJSApiOptions): CubejsApi;
 
-  load(query: Query, options, callback): void;
-  load(query: Query, options): Promise<ResultSet>;
+  load(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+  load(query: Query, options?: LoadMethodOptions): Promise<ResultSet>;
 
-  sql(query: Query, options, callback): void;
-  sql(query: Query, options): Promise<ResultSet>;
+  sql(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
+  sql(query: Query, options?: LoadMethodOptions): Promise<SqlQuery>;
 
-  meta(options, callback): void;
-  meta(options): Promise<ResultSet>;
+  meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
+  meta(options?: LoadMethodOptions): Promise<Meta>;
 }
 
 declare function cubejs(
