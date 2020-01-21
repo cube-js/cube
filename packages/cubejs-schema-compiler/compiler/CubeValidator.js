@@ -67,7 +67,8 @@ const BasePreAggregation = {
     }),
     Joi.object().keys({
       every: everyInterval,
-      incremental: Joi.boolean()
+      incremental: Joi.boolean(),
+      updateWindow: timeInterval
     })
   ),
   useOriginalSqlPreAggregations: Joi.boolean(),

@@ -1479,7 +1479,9 @@ class BaseQuery {
     return `FLOOR(${numeric})`;
   }
 
-  incrementalRefreshKey(query, originalRefreshKey) {
+  incrementalRefreshKey(query, originalRefreshKey, options) {
+    options = options || {};
+    const updateWindow = options.window;
     return query.evaluateSql(
       null,
       (FILTER_PARAMS) => query.caseWhenStatement([{
@@ -1487,7 +1489,7 @@ class BaseQuery {
           query.timeDimensions[0].path()[0]
         ][
           query.timeDimensions[0].path()[1]
-        ].filter((from, to) => `${query.nowTimestampSql()} < ${this.timeStampCast(to)}`),
+        ].filter((from, to) => `${query.nowTimestampSql()} < ${updateWindow ? this.addInterval(this.timeStampCast(to), updateWindow) : this.timeStampCast(to)}`),
         label: originalRefreshKey
       }])
     );
@@ -1514,7 +1516,11 @@ class BaseQuery {
         if (!preAggregation.partitionGranularity) {
           throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations`);
         }
-        refreshKey = this.incrementalRefreshKey(preAggregationQueryForSql, refreshKey);
+        refreshKey = this.incrementalRefreshKey(
+          preAggregationQueryForSql,
+          refreshKey,
+          { window: preAggregation.refreshKey.updateWindow }
+        );
       }
       if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
         return {

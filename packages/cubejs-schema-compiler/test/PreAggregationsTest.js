@@ -204,7 +204,8 @@ describe('PreAggregations', function test() {
           partitionGranularity: 'month',
           refreshKey: {
             every: '1 hour',
-            incremental: true
+            incremental: true,
+            updateWindow: '1 day'
           }
         }
       }
