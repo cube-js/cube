@@ -141,15 +141,14 @@ If the `refreshKey` is not set, Cube.js will use the default strategy:
 3. Check the `max` of any existing time dimension, if none exist…
 4. Check the row count for this cube.
 
-The result of the `refreshKey` query itself is cached for 2 minutes by default. You can
-change it by passing the [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) option when configuring the Cube.js Server.
+The result of the default `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default. 
 
 You can use an existing timestamp from your tables. Make sure to select max
 timestamp in that case.
 
 ```javascript
 cube(`OrderFacts`, {
-  sql: `SELECT * FROM orders`
+  sql: `SELECT * FROM orders`,
 
   refreshKey: {
     sql: `SELECT MAX(created_at) FROM orders`
@@ -157,17 +156,25 @@ cube(`OrderFacts`, {
 });
 ```
 
-Or you can set it to be refreshed, for example every hour.
+You can use interval based `refreshKey`.
+For example:
 
 ```javascript
 cube(`OrderFacts`, {
-  sql: `SELECT * FROM orders`
+  sql: `SELECT * FROM orders`,
 
   refreshKey: {
-    sql: `SELECT date_trunc('hour', NOW())`
+    every: `1 hour`
   }
 });
 ```
+
+Available interval granularities are: `second`, `minute`, `hour`, `day` and `week`.
+Such `refreshKey` is just a syntactic sugar over `refreshKey` SQL. 
+It will be converted to appropriate SQL select which value will change over time based on interval value.
+Values of interval based `refreshKey` are tried to be checked ten times within defined interval but not more than once per `1 second` and not less than once per `5 minute`.
+For example if interval is `10 minute` it's `refreshKeyRenewalThreshold` will be 60 seconds.
+For `5 second` interval it'll be just 1 second. 
 
 ### dataSource
 

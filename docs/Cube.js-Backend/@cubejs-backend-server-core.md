@@ -36,7 +36,7 @@ await core.initApp(express);
 
 ## Options Reference
 
-Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-backend-server) `create` methods accept an object with the following configuration options for Cube.js.
+Both [CubejsServerCore](@cubejs-backend-server-core) `create` method and [CubejsServer](@cubejs-backend-server) constructor accept an object with the following configuration options for Cube.js.
 
 ```javascript
 {
@@ -65,6 +65,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) and [CubejsServer](@cubejs-
     redisPrefix: String,
     queryCacheOptions: {
       refreshKeyRenewalThreshold: number,
+      backgroundRenew: Boolean,
       queueOptions: QueueOptions
     }
     preAggregationsOptions: {
@@ -360,11 +361,11 @@ _Please note that this is advanced configuration._
 | ------ | ----------- | ------------- |
 | redisPrefix | Prefix to be set an all Redis keys | `STANDALONE` |
 | queryCacheOptions | Query cache options for DB queries | `{}`
+| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check | `defined by DB dialect`
+| queryCacheOptions.backgroundRenew | Immediately return values from cache if available without [refreshKey](cube#parameters-refresh-key) check to renew in foreground. Default value before 0.15.0 was `true` | `false`
 | preAggregationsOptions | Query cache options for pre-aggregations | `{}`
 
 To set options for `queryCache` and `preAggregations`, set an object with key queueOptions. `queryCacheOptions` are used while querying database tables, while `preAggregationsOptions` settings are used to query pre-aggregated tables.
-
-`queryCacheOptions` also has `refreshKeyRenewalThreshold` option to set time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check. The default value is `120`.
 
 ```javascript
 const queueOptions = {
@@ -375,6 +376,7 @@ CubejsServerCore.create({
   orchestratorOptions: {
     queryCacheOptions: {
       refreshKeyRenewalThreshold: 30,
+      backgroundRenew: true,
       queueOptions
     },
     preAggregationsOptions: { queueOptions }

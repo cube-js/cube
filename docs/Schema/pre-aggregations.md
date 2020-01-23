@@ -273,11 +273,11 @@ In order to make external pre-aggregations work you should set
 
 ## refreshKey
 
-Cube.js also takes care of keeping pre-aggregations up to date. Every two minutes on a new request Cube.js will initiate the refresh check.
+Cube.js also takes care of keeping pre-aggregations up to date.
 
-By default pre-aggregations are refreshed **every hour**.
+By default pre-aggregations use same `refreshKey` as it's cube defines.
 
-You can set up a custom refresh check strategy by using `refreshKey`.
+You can set up a custom refresh check strategy by using `refreshKey`:
 
 ```javascript
 cube(`Orders`, {
@@ -294,6 +294,56 @@ cube(`Orders`, {
   }
 });
 ```
+
+As in case of cube pre-aggregations `refreshKey` can define `every` parameter which can be used to refresh pre-aggregations based on time interval.
+For example:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  preAggregations: {
+    main: {
+      type: `originalSql`,
+      refreshKey: {
+        every: `1 day`
+      }
+    }
+  }
+});
+```
+
+For possible `every` parameter values please refer to [refreshKeys](cube#parameters-refresh-key).
+
+In case of partitioned rollups incremental `refreshKey` can be used as follows:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+  
+  // ...
+
+  preAggregations: {
+    main: {
+      type: `rollup`,
+      measureReference: [count],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      partitionGranularity: `day`,
+      refreshKey: {
+        every: `1 day`,
+        incremental: true,
+        updateWindow: `7 day`
+      }
+    }
+  }
+});
+```
+
+`incremental: true` flag generates special `refreshKey` SQL.
+It triggers refresh for partitions where end date lies within `updateWindow` from current time.
+In provided example it'll refresh today's and last 7 days of partitions.
+Partitions before `7 day` interval won't be refreshed once they built until rollup SQL is changed.
 
 ## scheduledRefresh
 
