@@ -147,6 +147,9 @@ asyncModule(async () => {
 })
 ```
 
+Each `asyncModule` call will be invoked only once per schema compilation.
+To trigger schema recompile based on changes of underlying input data, [schemaVersion](@cubejs-backend-server-core#options-reference-schema-version) value should change accordingly.
+
 ## Context symbols transpile
 
 Cube.js uses custom transpiler to optimize boilerplate code around referencing cubes and cube members.
