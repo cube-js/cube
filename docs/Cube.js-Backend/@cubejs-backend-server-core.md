@@ -56,6 +56,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) `create` method and [Cubejs
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
   extendContext: (req: ExpressRequest) => any,
+  scheduledRefreshTimer: Boolean | Number,
   compilerCacheSize: Number,
   maxCompilerCacheKeepAlive: Number,
   updateCompilerCacheKeepAlive: Boolean,
@@ -314,6 +315,25 @@ const tenantIdToDbVersion = {};
 
 CubejsServerCore.create({
   schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId]
+});
+```
+
+### scheduledRefreshTimer
+
+Pass `true` to enable default every 5 second scheduled refresh timer with default querying options.
+Each timer invocation will call `runScheduledRefresh()` method as in:
+
+```javascript
+setInterval(() => serverCore.runScheduledRefresh(), 5000);
+```
+
+Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date)
+
+You can also pass custom interval in seconds as value:
+
+```javascript
+CubejsServerCore.create({
+  scheduledRefreshTimer: 10
 });
 ```
 
