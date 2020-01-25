@@ -117,8 +117,10 @@ class ResultSet {
 
     const substituteTimeDimensionMembers = axis => axis.map(
       subDim => (
-        timeDimensions.find(td => td.dimension === subDim) &&
-        !dimensions.find(d => d === subDim) ?
+        (
+          timeDimensions.find(td => td.dimension === subDim) &&
+          !dimensions.find(d => d === subDim)
+        ) ?
           ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
           subDim
       )
@@ -128,7 +130,7 @@ class ResultSet {
     pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
 
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
-    const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(query.dimensions);
+    const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
     pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(d => allIncludedDimensions.indexOf(d) === -1));
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
@@ -159,7 +161,7 @@ class ResultSet {
             moment(row[ResultSet.timeDimensionMember(timeDimension)])
         ),
         filter(r => !!r)
-      )(this.loadResponse.data);
+      )(this.timeDimensionBackwardCompatibleData());
 
       dateRange = dates.length && [
         reduce(minBy(d => d.toDate()), dates[0], dates),
@@ -217,7 +219,7 @@ class ResultSet {
       unnest,
       groupByXAxis,
       toPairs
-    )(this.loadResponse.data);
+    )(this.timeDimensionBackwardCompatibleData());
 
     const allYValues = pipe(
       map(
@@ -413,7 +415,9 @@ class ResultSet {
    */
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(axisValues => ({
+    return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(
+      this.timeDimensionBackwardCompatibleData()
+    ).map(axisValues => ({
       title: this.axisValuesString(pivotConfig.y.find(d => d === 'measures') ?
         dropLast(1, axisValues)
           .concat(this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) :
@@ -428,6 +432,28 @@ class ResultSet {
 
   rawData() {
     return this.loadResponse.data;
+  }
+
+  timeDimensionBackwardCompatibleData() {
+    if (!this.backwardCompatibleData) {
+      const { query } = this.loadResponse;
+      const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+      this.backwardCompatibleData = this.loadResponse.data.map(row => (
+        {
+          ...row,
+          ...(
+            Object.keys(row)
+              .filter(
+                field => timeDimensions.find(d => d.dimension === field) &&
+                  !row[ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field))]
+              ).map(field => ({
+                [ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field))]: row[field]
+              })).reduce((a, b) => ({ ...a, ...b }), {})
+          )
+        }
+      ));
+    }
+    return this.backwardCompatibleData;
   }
 }
 

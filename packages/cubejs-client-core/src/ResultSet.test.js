@@ -132,6 +132,27 @@ describe('ResultSet', () => {
       });
     });
 
+    test('single time dimensions with granularity', () => {
+      const resultSet = new ResultSet({
+        "query": {
+          "measures": [],
+          "timeDimensions": [{
+            "dimension": "Orders.createdAt",
+            "granularity": "day",
+            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-09T23:59:59.999"]
+          }],
+          "filters": [],
+          "timezone": "UTC"
+        }
+      });
+
+      expect(resultSet.normalizePivotConfig(resultSet.normalizePivotConfig())).toEqual({
+        x: ['Orders.createdAt.day'],
+        y: [],
+        fillMissingDates: true
+      });
+    });
+
     test('double time dimensions with granularity', () => {
       const resultSet = new ResultSet({
         "query": {
@@ -457,6 +478,47 @@ describe('ResultSet', () => {
           "Orders.createdAt.day": "2020-01-14T00:00:00.000",
           "Orders.createdAt": "2020-01-14T20:16:23.000"
         }]);
+    });
+
+    test('time dimension backward compatibility', () => {
+      const resultSet = new ResultSet({
+        "query": {
+          "measures": [],
+          "timeDimensions": [{
+            "dimension": "Orders.createdAt",
+            "granularity": "day",
+            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-09T23:59:59.999"]
+          }],
+          "filters": [],
+          "timezone": "UTC"
+        },
+        "data": [{
+          "Orders.createdAt": "2020-01-08T00:00:00.000"
+        }, {
+          "Orders.createdAt": "2020-01-09T00:00:00.000"
+        }],
+        "annotation": {
+          "measures": {},
+          "dimensions": {},
+          "segments": {},
+          "timeDimensions": {
+            "Orders.createdAt": {
+              "title": "Orders Created at",
+              "shortTitle": "Created at",
+              "type": "time"
+            }
+          }
+        }
+      });
+
+      expect(resultSet.tablePivot()).toEqual([
+        {
+          "Orders.createdAt.day": "2020-01-08T00:00:00.000",
+        },
+        {
+          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
+        }
+      ]);
     });
 
     test('same dimension and time dimension without granularity', () => {

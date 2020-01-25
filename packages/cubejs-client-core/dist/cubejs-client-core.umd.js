@@ -675,7 +675,7 @@
         // Set @@toStringTag to native iterators
         _setToStringTag(IteratorPrototype, TAG, true);
         // fix for some old engines
-        if (!_library && typeof IteratorPrototype[ITERATOR] != 'function') _hide(IteratorPrototype, ITERATOR, returnThis);
+        if (typeof IteratorPrototype[ITERATOR] != 'function') _hide(IteratorPrototype, ITERATOR, returnThis);
       }
     }
     // fix Array#{values, @@iterator}.name in V8 / FF
@@ -684,7 +684,7 @@
       $default = function values() { return $native.call(this); };
     }
     // Define iterator
-    if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR])) {
+    if (BUGGY || VALUES_BUG || !proto[ITERATOR]) {
       _hide(proto, ITERATOR, $default);
     }
     // Plug for library
@@ -12774,7 +12774,7 @@
         var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
         var allDimensions = timeDimensions.map(function (td) {
           return ResultSet.timeDimensionMember(td);
-        }).concat(query.dimensions);
+        }).concat(dimensions);
         pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
           return allIncludedDimensions.indexOf(d) === -1;
         }));
@@ -12814,7 +12814,7 @@
             return row[ResultSet.timeDimensionMember(timeDimension)] && moment$1(row[ResultSet.timeDimensionMember(timeDimension)]);
           }), filter(function (r) {
             return !!r;
-          }))(this.loadResponse.data);
+          }))(this.timeDimensionBackwardCompatibleData());
           dateRange = dates.length && [reduce(minBy(function (d) {
             return d.toDate();
           }), dates[0], dates), reduce(maxBy(function (d) {
@@ -12889,7 +12889,7 @@
               row: row
             };
           });
-        }), unnest, groupByXAxis, toPairs)(this.loadResponse.data);
+        }), unnest, groupByXAxis, toPairs)(this.timeDimensionBackwardCompatibleData());
         var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
         function (_ref6) {
           var _ref7 = _slicedToArray(_ref6, 2),
@@ -13139,7 +13139,7 @@
         var _this5 = this;
 
         pivotConfig = this.normalizePivotConfig(pivotConfig);
-        return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(function (axisValues) {
+        return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.timeDimensionBackwardCompatibleData()).map(function (axisValues) {
           return {
             title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
               return d === 'measures';
@@ -13157,6 +13157,33 @@
       key: "rawData",
       value: function rawData() {
         return this.loadResponse.data;
+      }
+    }, {
+      key: "timeDimensionBackwardCompatibleData",
+      value: function timeDimensionBackwardCompatibleData() {
+        if (!this.backwardCompatibleData) {
+          var query = this.loadResponse.query;
+          var timeDimensions = (query.timeDimensions || []).filter(function (td) {
+            return !!td.granularity;
+          });
+          this.backwardCompatibleData = this.loadResponse.data.map(function (row) {
+            return _objectSpread({}, row, Object.keys(row).filter(function (field) {
+              return timeDimensions.find(function (d) {
+                return d.dimension === field;
+              }) && !row[ResultSet.timeDimensionMember(timeDimensions.find(function (d) {
+                return d.dimension === field;
+              }))];
+            }).map(function (field) {
+              return _defineProperty({}, ResultSet.timeDimensionMember(timeDimensions.find(function (d) {
+                return d.dimension === field;
+              })), row[field]);
+            }).reduce(function (a, b) {
+              return _objectSpread({}, a, b);
+            }, {}));
+          });
+        }
+
+        return this.backwardCompatibleData;
       }
     }], [{
       key: "timeDimensionMember",
