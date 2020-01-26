@@ -36,14 +36,23 @@ const prepareAnnotation = (metaConfig, query) => {
     }];
   };
 
+  const dimensions = (query.dimensions || []);
   return {
     measures: R.fromPairs((query.measures || []).map(annotation('measures')).filter(a => !!a)),
-    dimensions: R.fromPairs((query.dimensions || []).map(annotation('dimensions')).filter(a => !!a)),
+    dimensions: R.fromPairs(dimensions.map(annotation('dimensions')).filter(a => !!a)),
     segments: R.fromPairs((query.segments || []).map(annotation('segments')).filter(a => !!a)),
-    timeDimensions: R.fromPairs((query.timeDimensions || [])
-      .filter(td => !!td.granularity)
-      .map(td => annotation('dimensions')(`${td.dimension}.${td.granularity}`))
-      .filter(a => !!a)),
+    timeDimensions: R.fromPairs(
+      R.unnest(
+        (query.timeDimensions || [])
+          .filter(td => !!td.granularity)
+          .map(
+            td => [annotation('dimensions')(`${td.dimension}.${td.granularity}`)].concat(
+              // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
+              dimensions.indexOf(td.dimension) === -1 ? [annotation('dimensions')(td.dimension)] : []
+            ).filter(a => !!a)
+          )
+      )
+    ),
   };
 };
 
@@ -55,7 +64,7 @@ const transformValue = (value, type) => {
 };
 
 
-const transformData = (aliasToMemberNameMap, annotation, data) => (data.map(r => R.pipe(
+const transformData = (aliasToMemberNameMap, annotation, data, query) => (data.map(r => R.pipe(
   R.toPairs,
   R.map(p => {
     const memberName = aliasToMemberNameMap[p[0]];
@@ -72,7 +81,7 @@ const transformData = (aliasToMemberNameMap, annotation, data) => (data.map(r =>
 
     // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
     const memberNameWithoutGranularity = [path[0], path[1]].join('.');
-    if (path.length === 3 && !annotation[memberNameWithoutGranularity]) {
+    if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
       return [
         transformResult,
         [
@@ -389,7 +398,7 @@ class ApiGateway {
       };
       res({
         query: normalizedQuery,
-        data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data),
+        data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data, normalizedQuery),
         lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
         ...(process.env.NODE_ENV === 'production' ? undefined : {
           refreshKeyValues: response.refreshKeyValues,
