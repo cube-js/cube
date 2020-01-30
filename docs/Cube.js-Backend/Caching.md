@@ -35,7 +35,7 @@ When a query's result needs to be refreshed, Cube.js will re-execute the query i
 This means that cached results may still be served to users requesting them while `refreshKey` values aren't changed from Cube.js perspective. 
 The cache entry will be refreshed in the foreground if one of the two following conditions is met:
 
-- Query cache entry is expired. The default expiration time is 6 hours.
+- Query cache entry is expired. The default expiration time is 6 hours for cubes with default `refreshKey` and 24 hours where it was set.
 - The result of the `refreshKey` SQL query is different from the previous one. At this stage `refreshKey` won't be refreshed in foreground if it's available in cache. 
 
 ### Refresh Key Implementation
