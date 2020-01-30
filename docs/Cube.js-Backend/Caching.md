@@ -8,11 +8,11 @@ menuOrder: 4
 Cube.js provides a two-level caching system. The first level is **in-memory** cache and is active by default. In-memory cache
 requires [Redis](https://redis.io) in [production mode](deployment).
 
+Cube.js [in-memory cache](#in-memory-cache) suits mostly as a protection layer for your database when there's a burst of requests hitting the same data from multiple concurrent users while [pre-aggregations](#pre-aggregations) are designed to provide right balance between time to insight and querying performance.
+
 To reset **in-memory** cache in development mode just restart the server.
 
 The second in-database level is called **pre-aggregations** and requires explicit configuration to activate.
-
-Cube.js **in-memory** cache suits mostly as a protection layer for your database when there's a burst of requests hitting the same data from multiple concurrent users while **pre-aggregations** are designed to provide right balance between time to insight and querying performance.
 
 ## In-memory Cache
 
