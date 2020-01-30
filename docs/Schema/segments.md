@@ -68,3 +68,68 @@ After defining a segment, you can pass it in [query object](/query-format):
   segments: ['Users.sfUsers']
 }
 ```
+
+## Segments vs Dimension Filters
+
+As segments are just predefined filters there's a question when to use segments instead of dimension filters.
+
+Let's consider an example:
+
+```javascript
+cube(`Users`, {
+  // ...
+  
+  dimensions: {
+    location: {
+      sql: `location`,
+      type: `string`
+    }
+  },
+  
+  segments: {
+    sfUsers: {
+      sql: `${CUBE}.location = 'San Francisco'`
+    }
+  }
+});
+```
+
+In this case following queries are equivalent:
+
+```javascript
+{
+  measures: ['Users.count'],
+  filters: [{
+    member: 'Users.location',
+    operator: 'equals',
+    values: ['San Francisco']
+  }]
+}
+```
+
+and
+
+```javascript
+{
+  measures: ['Users.count'],
+  segments: ['Users.sfUsers']
+}
+```
+
+This case is a bad candidate for segment usage and dimension filter works better here. 
+`Users.location` filter value can change a lot for user queries and `Users.sfUsers` segment won't be used much in this case.
+
+Good candidate case for segment is when you have complex filtering expression which can be reused for a lot of user queries.
+For example:
+
+```javascript
+cube(`Users`, {
+  // ...
+  
+  segments: {
+    sfNyUsers: {
+      sql: `${CUBE}.location = 'San Francisco' OR ${CUBE}.location like '%New York%'`
+    }
+  }
+});
+```
