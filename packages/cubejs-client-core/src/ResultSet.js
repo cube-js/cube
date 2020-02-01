@@ -357,8 +357,8 @@ class ResultSet {
    *
    * // ResultSet.tableColumns() will return
    * [
-   *   { key: "Stories.time", title: "Stories Time" },
-   *   { key: "Stories.count", title: "Stories Count" },
+   *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
+   *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
    *   //...
    * ]
    * ```
@@ -369,13 +369,21 @@ class ResultSet {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const column = field => (
       field === 'measures' ?
-        (this.query().measures || []).map(m => ({ key: m, title: this.loadResponse.annotation.measures[m].title })) :
+        (this.query().measures || []).map(m => ({
+          key: m,
+          title: this.loadResponse.annotation.measures[m].title,
+          shortTitle: this.loadResponse.annotation.measures[m].shortTitle,
+        })) :
         [{
           key: field,
           title: (
             this.loadResponse.annotation.dimensions[field] ||
             this.loadResponse.annotation.timeDimensions[field]
-          ).title
+          ).title,
+          shortTitle: (
+            this.loadResponse.annotation.dimensions[field] ||
+            this.loadResponse.annotation.timeDimensions[field]
+          ).shortTitle
         }]
     );
     return normalizedPivotConfig.x.map(column)

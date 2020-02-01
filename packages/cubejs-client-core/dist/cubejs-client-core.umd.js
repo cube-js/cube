@@ -13087,11 +13087,13 @@
           return field === 'measures' ? (_this4.query().measures || []).map(function (m) {
             return {
               key: m,
-              title: _this4.loadResponse.annotation.measures[m].title
+              title: _this4.loadResponse.annotation.measures[m].title,
+              shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle
             };
           }) : [{
             key: field,
-            title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title
+            title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title,
+            shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle
           }];
         };
 
