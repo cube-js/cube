@@ -1305,6 +1305,75 @@ describe('SQL Generation', function test() {
     ])
   );
 
+  it(
+    'contains null filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.source',
+        operator: 'contains',
+        values: ['goo', null]
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    }, [
+      { "visitors__source": 'google' },
+      { "visitors__source": null }
+    ])
+  );
+
+  it(
+    'null filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.source',
+        operator: 'equals',
+        values: ['google', null]
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    }, [
+      { "visitors__source": 'google' },
+      { "visitors__source": null },
+    ])
+  );
+
+  it(
+    'not equals filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.source',
+        operator: 'notEquals',
+        values: ['google']
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    }, [
+      { "visitors__source": 'some' },
+      { "visitors__source": null },
+    ])
+  );
+
   it('year granularity', () =>
     runQueryTest({
       measures: [

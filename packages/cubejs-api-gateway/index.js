@@ -127,7 +127,7 @@ const querySchema = Joi.object().keys({
     dimension: id,
     member: id,
     operator: Joi.valid(operators).required(),
-    values: Joi.array().items(Joi.string().allow(''))
+    values: Joi.array().items(Joi.string().allow('', null))
   }).xor('dimension', 'member')),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
