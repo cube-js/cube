@@ -224,7 +224,7 @@ const normalizeQuery = (query) => {
       }
       return {
         ...td,
-        dateRange: dateRange.map(
+        dateRange: dateRange && dateRange.map(
           (d, i) => (
             i === 0 ?
               moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
