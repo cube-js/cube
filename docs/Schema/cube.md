@@ -192,6 +192,22 @@ cube(`OrderFacts`, {
 });
 ```
 
+### sqlAlias
+
+Use `sqlAlias` when auto-generated cube alias prefix is too long and truncated by DB such as Postgres:
+
+```javascript
+cube(`OrderFacts`, {
+  sql: `SELECT * FROM orders`,
+  
+  sqlAlias: `ofacts`,
+  
+  // ...
+});
+```
+
+It'll generate aliases for members such as `ofacts__count`.
+
 
 ## Context Variables
 
