@@ -675,7 +675,7 @@
         // Set @@toStringTag to native iterators
         _setToStringTag(IteratorPrototype, TAG, true);
         // fix for some old engines
-        if (typeof IteratorPrototype[ITERATOR] != 'function') _hide(IteratorPrototype, ITERATOR, returnThis);
+        if (!_library && typeof IteratorPrototype[ITERATOR] != 'function') _hide(IteratorPrototype, ITERATOR, returnThis);
       }
     }
     // fix Array#{values, @@iterator}.name in V8 / FF
@@ -684,7 +684,7 @@
       $default = function values() { return $native.call(this); };
     }
     // Define iterator
-    if (BUGGY || VALUES_BUG || !proto[ITERATOR]) {
+    if ((!_library || FORCED) && (BUGGY || VALUES_BUG || !proto[ITERATOR])) {
       _hide(proto, ITERATOR, $default);
     }
     // Plug for library
@@ -2834,6 +2834,38 @@
     }
   });
 
+  var _fixReWks = function (KEY, length, exec) {
+    var SYMBOL = _wks(KEY);
+    var fns = exec(_defined, SYMBOL, ''[KEY]);
+    var strfn = fns[0];
+    var rxfn = fns[1];
+    if (_fails(function () {
+      var O = {};
+      O[SYMBOL] = function () { return 7; };
+      return ''[KEY](O) != 7;
+    })) {
+      _redefine(String.prototype, KEY, strfn);
+      _hide(RegExp.prototype, SYMBOL, length == 2
+        // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
+        // 21.2.5.11 RegExp.prototype[@@split](string, limit)
+        ? function (string, arg) { return rxfn.call(string, this, arg); }
+        // 21.2.5.6 RegExp.prototype[@@match](string)
+        // 21.2.5.9 RegExp.prototype[@@search](string)
+        : function (string) { return rxfn.call(string, this); }
+      );
+    }
+  };
+
+  // @@match logic
+  _fixReWks('match', 1, function (defined, MATCH, $match) {
+    // 21.1.3.11 String.prototype.match(regexp)
+    return [function match(regexp) {
+      var O = defined(this);
+      var fn = regexp == undefined ? undefined : regexp[MATCH];
+      return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[MATCH](String(O));
+    }, $match];
+  });
+
   var $indexOf = _arrayIncludes(false);
   var $native = [].indexOf;
   var NEGATIVE_ZERO = !!$native && 1 / [1].indexOf(1, -0) < 0;
@@ -4616,28 +4648,6 @@
     return _arity(arguments[0].length, reduce(_pipe, arguments[0], tail(arguments)));
   }
 
-  var _fixReWks = function (KEY, length, exec) {
-    var SYMBOL = _wks(KEY);
-    var fns = exec(_defined, SYMBOL, ''[KEY]);
-    var strfn = fns[0];
-    var rxfn = fns[1];
-    if (_fails(function () {
-      var O = {};
-      O[SYMBOL] = function () { return 7; };
-      return ''[KEY](O) != 7;
-    })) {
-      _redefine(String.prototype, KEY, strfn);
-      _hide(RegExp.prototype, SYMBOL, length == 2
-        // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
-        // 21.2.5.11 RegExp.prototype[@@split](string, limit)
-        ? function (string, arg) { return rxfn.call(string, this, arg); }
-        // 21.2.5.6 RegExp.prototype[@@match](string)
-        // 21.2.5.9 RegExp.prototype[@@search](string)
-        : function (string) { return rxfn.call(string, this); }
-      );
-    }
-  };
-
   // @@split logic
   _fixReWks('split', 2, function (defined, SPLIT, $split) {
     var isRegExp = _isRegexp;
@@ -4817,16 +4827,6 @@
 
     return false;
   }
-
-  // @@match logic
-  _fixReWks('match', 1, function (defined, MATCH, $match) {
-    // 21.1.3.11 String.prototype.match(regexp)
-    return [function match(regexp) {
-      var O = defined(this);
-      var fn = regexp == undefined ? undefined : regexp[MATCH];
-      return fn !== undefined ? fn.call(regexp, O) : new RegExp(regexp)[MATCH](String(O));
-    }, $match];
-  });
 
   function _functionName(f) {
     // String(x => x) evaluates to "x => x", so the pattern may not match.
@@ -12632,6 +12632,7 @@
       });
     }
   };
+  var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
   /**
    * Provides a convenient interface for data manipulation.
    */
@@ -12826,7 +12827,9 @@
           return null;
         }
 
-        var padToDay = timeDimension.granularity !== 'minute' && timeDimension.granularity !== 'second';
+        var padToDay = timeDimension.dateRange ? timeDimension.dateRange.find(function (d) {
+          return d.match(DateRegex);
+        }) : ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
         var start = moment$1(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment$1.HTML5_FMT.DATETIME_LOCAL_MS);
         var end = moment$1(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment$1.HTML5_FMT.DATETIME_LOCAL_MS);
         var range$$1 = moment$1.range(start, end);
@@ -13067,8 +13070,8 @@
        *
        * // ResultSet.tableColumns() will return
        * [
-       *   { key: "Stories.time", title: "Stories Time" },
-       *   { key: "Stories.count", title: "Stories Count" },
+       *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
+       *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
        *   //...
        * ]
        * ```

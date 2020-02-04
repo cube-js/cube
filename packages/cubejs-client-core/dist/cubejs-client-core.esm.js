@@ -15,6 +15,7 @@ import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
 import 'core-js/modules/es6.object.assign';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import 'core-js/modules/es6.array.reduce';
+import 'core-js/modules/es6.regexp.match';
 import 'core-js/modules/es6.array.index-of';
 import 'core-js/modules/es6.array.find';
 import 'core-js/modules/es6.array.filter';
@@ -71,6 +72,7 @@ var TIME_SERIES = {
     });
   }
 };
+var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 /**
  * Provides a convenient interface for data manipulation.
  */
@@ -265,7 +267,9 @@ function () {
         return null;
       }
 
-      var padToDay = timeDimension.granularity !== 'minute' && timeDimension.granularity !== 'second';
+      var padToDay = timeDimension.dateRange ? timeDimension.dateRange.find(function (d) {
+        return d.match(DateRegex);
+      }) : ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
       var start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
       var end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
       var range = moment.range(start, end);
@@ -506,8 +510,8 @@ function () {
      *
      * // ResultSet.tableColumns() will return
      * [
-     *   { key: "Stories.time", title: "Stories Time" },
-     *   { key: "Stories.count", title: "Stories Count" },
+     *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
+     *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
      *   //...
      * ]
      * ```
