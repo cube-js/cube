@@ -23,13 +23,13 @@ describe('Extensions', () => {
         },
         steps: [
           {
-            name: 'application_installed',
+            name: 'Application Installed',
             eventsTable: {
               sql: 'application_installed'
             }
           },
           {
-            name: 'application_opened',
+            name: 'ApplicationOpened',
             eventsView: {
               sql: 'application_opened'
             },
@@ -79,6 +79,10 @@ describe('Extensions', () => {
       });
 
       console.log(query.buildSqlAndParams()[0]);
+
+      query.buildSqlAndParams()[0].should.match(/application_installed_events/);
+      query.buildSqlAndParams()[0].should.match(/application_opened_events/);
+      query.buildSqlAndParams()[0].should.match(/user_training_finish_first_events/);
     });
 
     return result;

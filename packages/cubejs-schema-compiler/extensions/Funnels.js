@@ -99,11 +99,15 @@ ${eventJoin.join("\nLEFT JOIN\n")}
   }
 
   eventsTableName(step) {
-    return `${inflection.underscore(step.name)}_events`;
+    return `${this.inflect(step)}_events`;
   }
 
   stepUserIdColumnName(step) {
-    return `${inflection.underscore(step.name)}_user_id`;
+    return `${this.inflect(step)}_user_id`;
+  }
+
+  inflect(step) {
+    return inflection.underscore(inflection.camelize(step.name.replace(/[^A-Za-z0-9]+/g, '_')));
   }
 
   stepSegmentSelect(funnelDefinition, step) {
