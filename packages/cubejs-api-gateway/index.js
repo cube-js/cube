@@ -146,6 +146,8 @@ const querySchema = Joi.object().keys({
   ungrouped: Joi.boolean()
 });
 
+const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
+
 const normalizeQuery = (query) => {
   // eslint-disable-next-line no-unused-vars
   const { error, value } = Joi.validate(query, querySchema);
@@ -222,7 +224,13 @@ const normalizeQuery = (query) => {
       }
       return {
         ...td,
-        dateRange
+        dateRange: dateRange.map(
+          (d, i) => (
+            i === 0 ?
+              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
+              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
+          )
+        )
       };
     }).concat(regularToTimeDimension)
   };

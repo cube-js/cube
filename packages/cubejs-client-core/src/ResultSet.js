@@ -27,6 +27,8 @@ const TIME_SERIES = {
     .map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
 };
 
+const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
+
 /**
  * Provides a convenient interface for data manipulation.
  */
@@ -171,7 +173,9 @@ class ResultSet {
     if (!dateRange) {
       return null;
     }
-    const padToDay = timeDimension.granularity !== 'minute' && timeDimension.granularity !== 'second';
+    const padToDay = timeDimension.dateRange ?
+      timeDimension.dateRange.find(d => d.match(DateRegex)) :
+      ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
     const start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
     const end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
     const range = moment.range(start, end);

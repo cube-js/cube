@@ -9,7 +9,8 @@ const compilerApi = jest.fn().mockImplementation(() => ({
     return {
       sql: ['SELECT * FROM test', []],
       aliasNameToMember: {
-        foo__bar: 'Foo.bar'
+        foo__bar: 'Foo.bar',
+        foo__time: 'Foo.time'
       }
     };
   },
@@ -23,6 +24,8 @@ const compilerApi = jest.fn().mockImplementation(() => ({
         }],
         dimensions: [{
           name: 'Foo.id'
+        }, {
+          name: 'Foo.time'
         }]
       }
     }];
@@ -74,5 +77,17 @@ describe(`API Gateway`, () => {
       .expect(200);
     console.log(res.body);
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+  });
+
+  test(`date range padding`, async () => {
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"],"timeDimensions":[{"dimension":"Foo.time","granularity":"hour","dateRange":["2020-01-01","2020-01-01"]}]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    console.log(res.body);
+    expect(res.body.query.timeDimensions[0].dateRange).toStrictEqual([
+      "2020-01-01T00:00:00.000",
+      "2020-01-01T23:59:59.999"
+    ]);
   });
 });

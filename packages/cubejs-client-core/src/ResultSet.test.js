@@ -72,6 +72,22 @@ describe('ResultSet', () => {
       ];
       expect(resultSet.timeSeries(timeDimension)).toEqual(output);
     });
+
+    test('it generates array of dates - granularity hour - not full day', () => {
+      const resultSet = new ResultSet({});
+      const timeDimension = {
+        dateRange: ['2015-01-01T10:30:00.000', '2015-01-01T13:59:00.000'],
+        granularity: 'hour',
+        timeDimension: 'Events.time'
+      };
+      const output = [
+        '2015-01-01T10:00:00.000',
+        '2015-01-01T11:00:00.000',
+        '2015-01-01T12:00:00.000',
+        '2015-01-01T13:00:00.000'
+      ];
+      expect(resultSet.timeSeries(timeDimension)).toEqual(output);
+    });
   });
 
   describe('normalizePivotConfig', () => {
