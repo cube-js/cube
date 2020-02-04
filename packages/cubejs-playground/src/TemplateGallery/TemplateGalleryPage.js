@@ -145,23 +145,23 @@ class TemplateGalleryPage extends Component {
 
     const recipes = [{
       name: 'Dynamic Dashboard with React, AntD, and Recharts',
-      description: 'Use this template to create a dynamic dashboard application with React, AntD, and Chart.js. It comes with a dynamic query builder and Apollo GraphQL client.',
+      description: 'Use this template to create a dynamic dashboard application with React, AntD, and Chart.js. It comes with a dynamic query builder and Apollo GraphQL client. Use it when you want to allow users to edit dashboards.',
       coverUrl: "https://cube.dev/downloads/template-react-dashboard.png",
       templatePackages: ['create-react-app', 'react-antd-dynamic', 'recharts-charts', 'antd-tables', 'credentials']
     }, {
       name: 'Real-Time Dashboard with React, AntD, and Chart.js',
-      description: 'Use this template to create a static dashboard application with real-time WebSocket transport.',
+      description: 'Use this template to create a static dashboard application with real-time WebSocket transport. Use it when users should not be allowed to edit dashboards and you want to provide them with real-time data refresh.',
       templatePackages: ['create-react-app', 'react-antd-static', 'chartjs-charts', 'antd-tables', 'credentials', 'web-socket-transport'],
       coverUrl: "https://cube.dev/downloads/template-real-time-dashboard.png"
     }, {
       name: 'Material UI React Dashboard',
       coverUrl: 'https://cube.dev/downloads/template-material-ui.jpg',
-      description: 'Use this template to create a Material UI–based static dashboard application and add charts to it by editing the source code or via Cube.js Playground.',
+      description: 'Use this template to create a Material UI–based static dashboard application and add charts to it by editing the source code or via Cube.js Playground. Use it when users should not be allowed to edit dashboards.',
       templatePackages: ['create-react-app', 'react-material-static', 'recharts-charts', 'material-tables', 'credentials']
     }, {
       name: 'Material UI D3 Dashboard',
       coverUrl: 'https://cube.dev/downloads/template-material-d3.png',
-      description: 'Use this template to create a Material UI–based dashboard with D3.js. Add charts to it by editing the source code or via Cube.js Playground.',
+      description: 'Use this template to create a Material UI–based dashboard with D3.js. Add charts to it by editing the source code or via Cube.js Playground. Use it when users should not be allowed to edit dashboards.',
       templatePackages: ['create-react-app', 'react-material-static', 'd3-charts', 'material-tables', 'credentials']
     }];
 
