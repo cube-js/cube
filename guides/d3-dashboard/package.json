@@ -26,6 +26,7 @@
     "gatsby-source-filesystem": "^2.1.28",
     "gatsby-transformer-remark": "^2.6.26",
     "gatsby-transformer-sharp": "^2.2.19",
+    "gatsby-plugin-snowplow-tracker": "^1.0.1",
     "guides-base": "file:../guides-base",
     "lodash": "^4.17.11",
     "moment": "^2.24.0",

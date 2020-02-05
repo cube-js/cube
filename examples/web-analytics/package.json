@@ -1,0 +1,12 @@
+{
+  "name": "web-analytics",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/athena-driver": "^0.15.0",
+    "@cubejs-backend/server": "^0.15.1"
+  }
+}

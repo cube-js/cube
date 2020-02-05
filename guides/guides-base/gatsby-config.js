@@ -63,6 +63,18 @@ module.exports = (config, dirname) => {
         }
       },
       {
+        resolve: "gatsby-plugin-snowplow-tracker",
+        options: {
+            snippetHost: "//d1fc8wv8zag5ca.cloudfront.net",
+            snippetVersion: "2.10.2",
+            namespace: "scalacoll",
+            collectorUri: "snowplow-collector.cube.dev",
+            config: {
+              appId: "d3-dashboard-guide"
+            }
+        }
+      },
+      {
         resolve: "gatsby-plugin-nprogress",
         options: {
           color: config.themeColor
