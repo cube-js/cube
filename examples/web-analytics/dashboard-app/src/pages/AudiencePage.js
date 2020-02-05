@@ -5,6 +5,7 @@ import moment from 'moment';
 import ChartRenderer from "../components/ChartRenderer";
 import DashboardItem from "../components/DashboardItem";
 import OverTimeChart from "../components/OverTimeChart";
+import Chart from "../components/Chart";
 import DateRangePicker from "../components/DateRangePicker";
 
 const queries = {
@@ -12,9 +13,9 @@ const queries = {
     chartType: 'line',
     legend: false,
     query: {
-      measures: ['PageViews.usersCount'],
+      measures: ['Sessions.usersCount'],
       timeDimensions: [{
-        dimension: 'PageViews.time',
+        dimension: 'Sessions.sessionStart',
         granularity: 'day'
       }]
     }
@@ -24,6 +25,13 @@ const queries = {
     chartType: 'number',
     query: {
       measures: ['Sessions.usersCount']
+    }
+  },
+
+  sessionsCount: {
+    chartType: 'number',
+    query: {
+      measures: ['Sessions.count']
     }
   },
 
@@ -48,6 +56,13 @@ const queries = {
     }
   },
 
+  averageNumberSessions: {
+    chartType: 'number',
+    query: {
+      measures: ['Users.averageNumberSessions']
+    }
+  },
+
   usersByType: {
     chartType: 'pie',
     query: {
@@ -57,21 +72,27 @@ const queries = {
   }
 };
 
-const withTime = ({ query, ...vizState }, begin, end) => ({
-  ...vizState,
-  query: {
-    ...query,
-    timeDimensions: [{
-      dimension: 'PageViews.time',
-      dateRange: [begin.format(moment.HTML5_FMT.DATE), end.format(moment.HTML5_FMT.DATE)],
-      granularity: 'day'
-    }]
+const withTimeFunc = ({ query, ...vizState }, begin, end) => {
+  const timeDimensionObj = (query.timeDimensions || [])[0] || {};
+  const timeDimension = timeDimensionObj.dimension || 'Sessions.sessionStart';
+  const granularity = timeDimensionObj.granularity || null;
+  return {
+    ...vizState,
+    query: {
+      ...query,
+      timeDimensions: [{
+        dimension: timeDimension,
+        dateRange: [begin.format(moment.HTML5_FMT.DATE), end.format(moment.HTML5_FMT.DATE)],
+        granularity: granularity
+      }]
+    }
   }
-});
+};
 
 const AudiencePage = () => {
   const [beginDate, setBeginDate] = useState(moment().subtract(7, 'days'));
   const [endDate, setEndDate] = useState(moment());
+  const withTime = (vizState) => withTimeFunc(vizState, beginDate, endDate);
   return (
     <Grid
       container
@@ -91,52 +112,28 @@ const AudiencePage = () => {
       <Grid item xs={12}>
         <OverTimeChart
           title="Users Over Time"
-          vizState={withTime(queries.usersOvertime, beginDate, endDate)}
+          vizState={withTime(queries.usersOvertime)}
         />
       </Grid>
         <Grid item xs={6}>
           <Grid container spacing={3}>
             <Grid item xs={6}>
-              <DashboardItem title="Users">
-                <ChartRenderer
-                  vizState={queries.usersCount}
-                />
-              </DashboardItem>
+              <Chart title="Users" vizState={withTime(queries.usersCount)} />
             </Grid>
             <Grid item xs={6}>
-              <DashboardItem title="New Users">
-                <ChartRenderer
-                  vizState={queries.newUsersCount}
-                />
-              </DashboardItem>
+              <Chart title="New Users" vizState={withTime(queries.newUsersCount)} />
             </Grid>
             <Grid item xs={6}>
-              <DashboardItem title="Avg. Session Duration">
-                <ChartRenderer
-                  vizState={queries.averageDuration}
-                />
-              </DashboardItem>
+              <Chart title="Sessions" vizState={withTime(queries.sessionsCount)} />
             </Grid>
             <Grid item xs={6}>
-              <DashboardItem title="Bounce Rate">
-                <ChartRenderer
-                  vizState={queries.bounceRate}
-                />
-              </DashboardItem>
+              <Chart title="Bounce Rate" vizState={withTime(queries.bounceRate)} />
             </Grid>
             <Grid item xs={6}>
-              <DashboardItem title="Avg. Session Duration">
-                <ChartRenderer
-                  vizState={queries.averageDuration}
-                />
-              </DashboardItem>
+              <Chart title="Avg. Session Duration" vizState={withTime(queries.averageDuration)} />
             </Grid>
             <Grid item xs={6}>
-              <DashboardItem title="Bounce Rate">
-                <ChartRenderer
-                  vizState={queries.bounceRate}
-                />
-              </DashboardItem>
+              <Chart title="# of Sessions per User" vizState={withTime(queries.averageNumberSessions)} />
             </Grid>
           </Grid>
         </Grid>

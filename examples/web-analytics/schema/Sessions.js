@@ -27,6 +27,13 @@ cube(`Sessions`, {
    WHERE e.event_in_session_index = 1
   `,
 
+  joins: {
+    Users: {
+      relationship: `belongsTo`,
+      sql: `${CUBE}.domain_userid = ${Users.id}`
+    }
+  },
+
   measures: {
     count: {
       type: `count`

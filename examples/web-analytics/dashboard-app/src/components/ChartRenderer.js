@@ -30,7 +30,10 @@ import moment from "moment";
 import numeral from "numeral";
 
 const numberFormatter = item => numeral(item).format("0,0");
+const percentFormatter = item => numeral(item/100.0).format('0.00%');
+const timeNumberFormatter = item => numeral(item).format('00:00:00');
 const dateFormatter = item => moment(item).format("MMM DD");
+
 const xAxisFormatter = (item) => {
   if (moment(item).isValid()) {
     return dateFormatter(item)
@@ -139,11 +142,25 @@ const TypeToChartComponent = {
       </PieChart>
     </ResponsiveContainer>
   ),
-  number: ({ resultSet }) => (
-    <Typography component="p" variant="h4">
-      {resultSet.seriesNames().map(s => resultSet.totalRow()[s.key])}
-    </Typography>
-  ),
+  number: ({ resultSet }) => {
+    const measureKey = resultSet.seriesNames()[0].key; // Ensure number can only render single measure
+    const format = resultSet.loadResponse.annotation.measures[measureKey].format;
+    const value = resultSet.totalRow()[measureKey];
+    let formattedValue;
+    if (format === 'percent') {
+      formattedValue = percentFormatter(value);
+    } else if (measureKey === 'Sessions.averageDurationSeconds') {
+      // special case, since format time is missing
+      formattedValue = timeNumberFormatter(value);
+    } else {
+      formattedValue = numberFormatter(value);
+    }
+    return (
+      <Typography component="p" variant="h4">
+        {formattedValue}
+      </Typography>
+    )
+  },
   table: ({ resultSet }) => (
     <Table aria-label="simple table">
       <TableHead>
