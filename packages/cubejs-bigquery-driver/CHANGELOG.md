@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.17.3](https://github.com/cube-js/cube.js/compare/v0.17.2...v0.17.3) (2020-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
 # [0.17.0](https://github.com/cube-js/cube.js/compare/v0.16.0...v0.17.0) (2020-02-04)
 
 **Note:** Version bump only for package @cubejs-backend/bigquery-driver
