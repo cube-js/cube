@@ -36,6 +36,49 @@ Multitenancy designed for cases where you need to serve different datasets for m
 On other hand multiple data sources can be used for a scenario where users need to access same data but from different databases.
 Multitenancy and multiple data sources features aren't mutually exclusive and can be used together.
 
+Typical multiple data sources configuration looks like:
+
+**index.js:**
+
+```javascript
+const CubejsServer = require('@cubejs-backend/server');
+const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const AthenaDriver = require('@cubejs-backend/athena-driver');
+const BigQueryDriver = require('@cubejs-backend/bigquery-driver');
+
+const server = new CubejsServer({
+  dbType: ({ dataSource } = {}) => {
+    if (dataSource === 'web') {
+      return 'athena';
+    } else if (dataSource === 'googleAnalytics') {
+      return 'bigquery';
+    } else {
+      return 'postgres';
+    }
+  },
+  driverFactory: ({ dataSource } = {}) => {
+    if (dataSource === 'web') {
+      return new AthenaDriver();
+    } else if (dataSource === 'googleAnalytics') {
+      return new BigQueryDriver();
+    } else if (dataSource === 'financials'){
+      return new PostgresDriver({ 
+        database: 'financials', 
+        host: 'financials-db.acme.com', 
+        user: process.env.FINANCIALS_DB_USER, 
+        password: process.env.FINANCIALS_DB_PASS 
+      });
+    } else {
+      return new PostgresDriver();
+    }
+  }
+});
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+});
+```
+
 
 ## Same DB Instance with per Tenant Row Level Security
 
