@@ -87,6 +87,11 @@ describe('PreAggregations', function test() {
           type: 'originalSql',
           refreshKey: {
             sql: 'select NOW()'
+          },
+          indexes: {
+            source: {
+              columns: ['source', 'created_at']
+            }
           }
         },
         googleRollup: {
@@ -225,10 +230,12 @@ describe('PreAggregations', function test() {
   }
 
   function tempTablePreAggregations(preAggregationsDescriptions) {
-    return R.unnest(preAggregationsDescriptions.map(desc =>
-      desc.invalidateKeyQueries.concat([
+    return R.unnest(preAggregationsDescriptions.map(
+      desc => desc.invalidateKeyQueries.concat([
         [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), desc.loadSql[1]]
-      ])
+      ]).concat(
+        (desc.indexesSql || []).map(({ sql }) => sql)
+      )
     ));
   }
 

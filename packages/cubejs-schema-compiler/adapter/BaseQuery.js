@@ -256,17 +256,21 @@ class BaseQuery {
   buildSqlAndParams() {
     if (!this.options.preAggregationQuery && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
-        const ExternalQuery = this.externalQueryClass;
-        return new ExternalQuery(this.compilers, {
-          ...this.options,
-          externalQueryClass: null
-        }).buildSqlAndParams();
+        return this.externalQuery().buildSqlAndParams();
       }
     }
     return this.compilers.compiler.withQuery(
       this,
       () => this.paramAllocator.buildSqlAndParams(this.buildParamAnnotatedSql())
     );
+  }
+
+  externalQuery() {
+    const ExternalQuery = this.externalQueryClass;
+    return new ExternalQuery(this.compilers, {
+      ...this.options,
+      externalQueryClass: null
+    });
   }
 
   runningTotalDateJoinCondition() {
@@ -1418,8 +1422,8 @@ class BaseQuery {
     return `EXTRACT(EPOCH FROM ${this.nowTimestampSql()})`;
   }
 
-  preAggregationTableName(cube, preAggregationName) {
-    return `${this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${this.aliasName(`${cube}_${preAggregationName}`)}`;
+  preAggregationTableName(cube, preAggregationName, skipSchema) {
+    return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${this.aliasName(`${cube}_${preAggregationName}`)}`;
   }
 
   preAggregationSchema() {
@@ -1429,6 +1433,37 @@ class BaseQuery {
   preAggregationLoadSql(cube, preAggregation, tableName) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+  }
+
+  indexSql(cube, preAggregation, index, indexName, tableName) {
+    if (preAggregation.external && this.externalQueryClass) {
+      return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
+    }
+    if (index.columns) {
+      const columns = this.cubeEvaluator.evaluateReferences(cube, index.columns, { originalSorting: true });
+      const escapedColumns = columns.map(column => {
+        const path = column.split('.');
+        if (path[0] &&
+          this.cubeEvaluator.cubeExists(path[0]) &&
+          (
+            this.cubeEvaluator.isMeasure(path) ||
+              this.cubeEvaluator.isDimension(path) ||
+              this.cubeEvaluator.isSegment(path)
+          )
+        ) {
+          return this.aliasName(column);
+        } else {
+          return column;
+        }
+      }).map(c => this.escapeColumnName(c));
+      return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
+    } else {
+      throw new Error(`Index SQL support is not implemented`);
+    }
+  }
+
+  createIndexSql(indexName, tableName, escapedColumns) {
+    return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
   }
 
   preAggregationSql(cube, preAggregation) {

@@ -4,7 +4,8 @@ const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
 const GenericTypeToMySql = {
-  'string': 'varchar(255)'
+  string: 'varchar(255)',
+  text: 'varchar(255)'
 };
 
 class MySqlDriver extends BaseDriver {

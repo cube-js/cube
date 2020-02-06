@@ -89,17 +89,34 @@ class PreAggregations {
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       invalidateKeyQueries: refreshKeyQueries.queries,
       refreshKeyRenewalThresholds: refreshKeyQueries.refreshKeyRenewalThresholds,
-      external: preAggregation.external
+      external: preAggregation.external,
+      indexesSql: Object.keys(preAggregation.indexes || {}).map(
+        index => {
+          const indexName = this.preAggregationTableName(cube, `${preAggregationName}_${index}`, preAggregation, true);
+          return {
+            indexName,
+            sql: this.query.indexSql(
+              cube,
+              preAggregation,
+              preAggregation.indexes[index],
+              indexName,
+              tableName
+            )
+          };
+        }
+      )
     };
   }
 
-  preAggregationTableName(cube, preAggregationName, preAggregation) {
+  preAggregationTableName(cube, preAggregationName, preAggregation, skipSchema) {
     return this.query.preAggregationTableName(
       cube, preAggregationName + (
-      preAggregation.partitionTimeDimensions ?
-        preAggregation.partitionTimeDimensions[0].dateRange[0].replace('T00:00:00.000', '').replace(/-/g, '') :
-        ''
-    ));
+        preAggregation.partitionTimeDimensions ?
+          preAggregation.partitionTimeDimensions[0].dateRange[0].replace('T00:00:00.000', '').replace(/-/g, '') :
+          ''
+      ),
+      skipSchema
+    );
   }
 
   findPreAggregationToUseForCube(cube) {
