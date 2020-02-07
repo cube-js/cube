@@ -260,11 +260,13 @@ class PreAggregationLoader {
 
     const mostRecentTargetTableName = async () => {
       await this.loadCache.reset(this.preAggregation);
-      return this.targetTableName(
-        getVersionEntryByContentVersion(
-          await this.loadCache.getVersionEntries(this.preAggregation)
-        )
+      const lastVersion = getVersionEntryByContentVersion(
+        await this.loadCache.getVersionEntries(this.preAggregation)
       );
+      if (!lastVersion) {
+        throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created. It usually means database silently truncates table names due to max name length.`);
+      }
+      return this.targetTableName(lastVersion);
     };
 
     if (versionEntry) {
