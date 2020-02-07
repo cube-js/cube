@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "start": "node index.js"
   },
   "dependencies": {
     "@cubejs-backend/athena-driver": "^0.15.0",

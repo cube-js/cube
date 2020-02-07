@@ -10,6 +10,7 @@ import ListItemText from '@material-ui/core/ListItemText';
 import PersonIcon from '@material-ui/icons/Person';
 import WebIcon from '@material-ui/icons/Web';
 import ShareIcon from '@material-ui/icons/Share';
+import AssignmentIcon from '@material-ui/icons/Assignment';
 
 import { Link } from "react-router-dom";
 
@@ -49,6 +50,12 @@ const mainListItems = (
         <ShareIcon />
       </ListItemIcon>
       <ListItemText primary="Acquisition" />
+    </ListItem>
+    <ListItem button to="/custom-reports" component={Link}>
+      <ListItemIcon>
+        <AssignmentIcon />
+      </ListItemIcon>
+      <ListItemText primary="Custom Reports" />
     </ListItem>
   </div>
 );
