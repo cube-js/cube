@@ -1138,8 +1138,10 @@ describe('SQL Generation', function test() {
         ],
         timeDimensions: [{
           dimension: 'visitors.created_at',
+          granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-30']
         }],
+        dimensions: ['visitor_checkins.source'],
         timezone: 'America/Los_Angeles',
         order: [],
         filters: [{
@@ -1164,11 +1166,11 @@ describe('SQL Generation', function test() {
       ])).then(res => {
         console.log(JSON.stringify(res));
         res.should.be.deepEqual(
-          [
-            {
-              "visitors__visitor_revenue": "100"
-            }
-          ]
+          [{
+            "visitor_checkins__source": "google",
+            "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
+            "visitors__visitor_revenue": "100"
+          }]
         );
       });
     });

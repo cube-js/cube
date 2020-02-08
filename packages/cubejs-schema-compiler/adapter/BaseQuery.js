@@ -330,26 +330,7 @@ class BaseQuery {
   }
 
   fullKeyQueryAggregate() {
-    const measureToHierarchy = this.collectRootMeasureToHieararchy();
-
-    const measuresToRender = (multiplied, cumulative) => R.pipe(
-      R.values,
-      R.flatten,
-      R.filter(
-        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative
-      ),
-      R.map(m => m.measure),
-      R.uniq,
-      R.map(m => this.newMeasure(m))
-    );
-
-    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
-    const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
-    const cumulativeMeasures =
-      R.pipe(
-        R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),
-        R.unnest
-      )([false, true]);
+    const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length) {
       return this.simpleQuery();
@@ -408,6 +389,30 @@ class BaseQuery {
       renderedReferenceContext
     );
     return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+  }
+
+  fullKeyQueryAggregateMeasures() {
+    const measureToHierarchy = this.collectRootMeasureToHieararchy();
+
+    const measuresToRender = (multiplied, cumulative) => R.pipe(
+      R.values,
+      R.flatten,
+      R.filter(
+        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative
+      ),
+      R.map(m => m.measure),
+      R.uniq,
+      R.map(m => this.newMeasure(m))
+    );
+
+    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
+    const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
+    const cumulativeMeasures =
+      R.pipe(
+        R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),
+        R.unnest
+      )([false, true]);
+    return { multipliedMeasures, regularMeasures, cumulativeMeasures };
   }
 
   dimensionsJoinCondition(leftAlias, rightAlias) {

@@ -165,6 +165,7 @@ class PreAggregations {
     const isAdditive = R.all(m => m.isAdditive(), query.measures);
     const leafMeasureAdditive = R.all(path => query.newMeasure(path).isAdditive(), leafMeasurePaths);
     const granularityHierarchies = query.granularityHierarchies();
+    const hasMultipliedMeasures = query.fullKeyQueryAggregateMeasures().multipliedMeasures.length > 0;
 
     return {
       sortedDimensions,
@@ -175,7 +176,8 @@ class PreAggregations {
       hasNoTimeDimensionsWithoutGranularity,
       allFiltersWithinSelectedDimensions,
       isAdditive,
-      granularityHierarchies
+      granularityHierarchies,
+      hasMultipliedMeasures
     };
   }
 
@@ -232,8 +234,7 @@ class PreAggregations {
     // [[TimeDimension]]
     const queryTimeDimensionsList = transformedQuery.sortedTimeDimensions.map(expandTimeDimension);
 
-    const canUsePreAggregationNotAdditive = (references) =>
-      transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
+    const canUsePreAggregationNotAdditive = (references) => transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
       transformedQuery.allFiltersWithinSelectedDimensions &&
       R.equals(references.sortedDimensions || references.dimensions, transformedQuery.sortedDimensions) &&
       (
@@ -245,35 +246,18 @@ class PreAggregations {
         references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions)
       );
 
-    const canUsePreAggregationLeafMeasureAdditive = (references) =>
-      R.all(
-        d => (references.sortedDimensions || references.dimensions).indexOf(d) !== -1,
-        transformedQuery.sortedDimensions
-      ) &&
+    const canUsePreAggregationLeafMeasureAdditive = (references) => R.all(
+      d => (references.sortedDimensions || references.dimensions).indexOf(d) !== -1,
+      transformedQuery.sortedDimensions
+    ) &&
       R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures) &&
       R.allPass(
         queryTimeDimensionsList.map(tds => R.anyPass(tds.map(td => R.contains(td))))
       )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
 
-    const canUsePreAggregationAdditive = (references) =>
-      R.all(
-        d => (references.sortedDimensions || references.dimensions).indexOf(d) !== -1,
-        transformedQuery.sortedDimensions
-      ) &&
-      (
-        R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
-        R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures)
-      ) &&
-      R.allPass(
-        queryTimeDimensionsList.map(tds => R.anyPass(tds.map(td => R.contains(td))))
-      )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
-
-
     let canUseFn;
-    if (transformedQuery.isAdditive) {
-      canUseFn = canUsePreAggregationAdditive;
-    } else if (transformedQuery.leafMeasureAdditive) {
-      canUseFn = canUsePreAggregationLeafMeasureAdditive;
+    if (transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures) {
+      canUseFn = (r) => canUsePreAggregationLeafMeasureAdditive(r) || canUsePreAggregationNotAdditive(r);
     } else {
       canUseFn = canUsePreAggregationNotAdditive;
     }
