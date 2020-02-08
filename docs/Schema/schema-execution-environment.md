@@ -15,7 +15,7 @@ Cube.js Schema JavaScript is standard JavaScript supported by Node.js starting v
 
 Being executed in VM data schema JavaScript code doesn't have access to [Node.js require](https://nodejs.org/api/modules.html#modules_require_id) directly.
 Instead `require()` is implemented by Schema Compiler to provide access to other data schema files and to regular Node.js modules.
-Besides that data schema `require()` can resolve Cube.js packages such as `Funnels`.
+Besides that data schema `require()` can resolve Cube.js packages such as `Funnels` unlike standard Node.js `require()`.
 
 ## Node.js globals (process.env and others)
 
