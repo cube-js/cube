@@ -4,12 +4,14 @@ import uuidv4 from 'uuid/v4';
 
 let flushPromise = null;
 let trackEvents = [];
+let baseProps = {};
 
 const track = async (event) => {
   if (!cookie('playground_anonymous')) {
     cookie('playground_anonymous', uuidv4());
   }
   trackEvents.push({
+    ...baseProps,
     ...event,
     id: uuidv4(),
     clientAnonymousId: cookie('playground_anonymous'),
@@ -55,6 +57,7 @@ const track = async (event) => {
 };
 
 export const setAnonymousId = (anonymousId, props) => {
+  baseProps = props;
   track({ event: 'identify', anonymousId, ...props });
 };
 
