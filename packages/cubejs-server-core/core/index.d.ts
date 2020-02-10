@@ -1,4 +1,10 @@
-declare module '@cubejs-backend/server-core' {
+import {
+  Request as ExpressRequest,
+  Response as ExpressResponse,
+  NextFunction as ExpressNextFunction
+} from "express";
+
+declare module "@cubejs-backend/server-core" {
   export function create(options?: CreateOptions): any;
 
   export interface CreateOptions {
@@ -14,11 +20,15 @@ declare module '@cubejs-backend/server-core' {
     contextToAppId?: (context: RequestContext) => string;
     contextToDataSourceId?: (context: RequestContext) => string;
     repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
-    checkAuthMiddleware?: (req: any, res: any, next: any) => any;
-    queryTransformer?: (query: any, context: RequestContext) => any;
+    checkAuthMiddleware?: (
+      req: Request,
+      res: Response,
+      next: NextFunction
+    ) => void;
+    queryTransformer?: (query: Query, context: RequestContext) => Query;
     preAggregationsSchema?: String | ((context: RequestContext) => string);
     schemaVersion?: (context: RequestContext) => string;
-    extendContext?: (req: any) => any;
+    extendContext?: (req: Request) => any;
     scheduledRefreshTimer?: boolean | number;
     compilerCacheSize?: number;
     maxCompilerCacheKeepAlive?: number;
@@ -88,4 +98,51 @@ declare module '@cubejs-backend/server-core' {
     | "redshift"
     | "snowflake"
     | "sqlite";
+
+  export interface QueryFilter {
+    member: string;
+    operator:
+      | "equals"
+      | "notEquals"
+      | "contains"
+      | "notContains"
+      | "gt"
+      | "gte"
+      | "lt"
+      | "lte"
+      | "set"
+      | "notSet"
+      | "inDateRange"
+      | "notInDateRange"
+      | "beforeDate"
+      | "afterDate";
+    values?: string[];
+  }
+
+  export type QueryTimeDimensionGranularity =
+    | "hour"
+    | "day"
+    | "week"
+    | "month"
+    | "year";
+
+  export interface QueryTimeDimension {
+    dimension: string;
+    dateRange?: string[];
+    granularity?: QueryTimeDimensionGranularity;
+  }
+
+  export interface Query {
+    measures: string[];
+    dimensions?: string[];
+    filters?: QueryFilter[];
+    timeDimensions?: QueryTimeDimension[];
+    segments?: string[];
+    limit?: number;
+    offset?: number;
+    order?: "asc" | "desc";
+    timezone?: Date;
+    renewQuery?: boolean;
+    ungrouped?: boolean;
+  }
 }
