@@ -127,6 +127,37 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
   }
 };
 
+const prodLogger = (level) => (msg, params) => {
+  const { error, warning } = params;
+
+  const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
+  // eslint-disable-next-line default-case
+  switch ((level || 'info').toLowerCase()) {
+    case "trace": {
+      if (!error && !warning) {
+        logMessage();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "info":
+    // eslint-disable-next-line no-fallthrough
+    case "warn": {
+      if (!error && warning) {
+        logMessage();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "error": {
+      if (error) {
+        logMessage();
+        break;
+      }
+    }
+  }
+};
+
 class CubejsServerCore {
   constructor(options) {
     options = options || {};
@@ -151,13 +182,11 @@ class CubejsServerCore {
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || 'schema';
     this.dbType = options.dbType;
-    this.logger = options.logger || ((msg, params) => {
-      if (process.env.NODE_ENV !== 'production') {
-        devLogger(process.env.CUBEJS_LOG_LEVEL)(msg, params);
-      } else {
-        console.log(JSON.stringify({ message: msg, ...params }));
-      }
-    });
+    this.logger = options.logger ||
+      (process.env.NODE_ENV !== 'production' ?
+        devLogger(process.env.CUBEJS_LOG_LEVEL) :
+        prodLogger(process.env.CUBEJS_LOG_LEVEL)
+      );
     this.repository = new FileRepository(this.schemaPath);
     this.repositoryFactory = options.repositoryFactory || (() => this.repository);
     this.contextToDbType = typeof options.dbType === 'function' ? options.dbType : () => options.dbType;
