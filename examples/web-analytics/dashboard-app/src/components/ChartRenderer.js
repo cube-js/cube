@@ -68,6 +68,11 @@ CartesianChart.defaultProps = {
 
 const colors = ["#4791db", "#e33371", "#e57373"];
 
+const durationMeasures = [
+  'PageViews.averageTimeOnPageSeconds',
+  'Sessions.averageDurationSeconds'
+];
+
 const stackedChartData = resultSet => {
   const data = resultSet
     .pivot()
@@ -127,6 +132,7 @@ const TypeToChartComponent = {
     <ResponsiveContainer width="100%" height={350}>
       <PieChart>
         <Pie
+          label={(value) => numeral(value.percent).format('0.00%')}
           isAnimationActive={false}
           data={resultSet.chartPivot()}
           nameKey="x"
@@ -149,7 +155,7 @@ const TypeToChartComponent = {
     let formattedValue;
     if (format === 'percent') {
       formattedValue = percentFormatter(value);
-    } else if (measureKey === 'Sessions.averageDurationSeconds') {
+    } else if (durationMeasures.includes(measureKey)) {
       // special case, since format time is missing
       formattedValue = timeNumberFormatter(value);
     } else {
@@ -162,7 +168,7 @@ const TypeToChartComponent = {
     )
   },
   table: ({ resultSet }) => (
-    <Table aria-label="simple table">
+    <Table size="small">
       <TableHead>
         <TableRow>
           {resultSet.tableColumns().map(c => (

@@ -98,7 +98,7 @@ const AudiencePage = ({ withTime }) => {
             <Chart title="Avg. Session Duration" vizState={withTime(queries.averageDuration)} />
           </Grid>
           <Grid item xs={6}>
-            <Chart title="# of Sessions per User" vizState={withTime(queries.averageNumberSessions)} />
+            <Chart title="Number of Sessions per User" vizState={withTime(queries.averageNumberSessions)} />
           </Grid>
         </Grid>
       </Grid>

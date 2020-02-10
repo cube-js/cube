@@ -34,7 +34,7 @@ const OverTimeChart = ({ title, vizState, granularityControls }) => {
       <CardContent>
         <Grid container justify="space-between">
           <Grid item>
-            <Typography component="h2" variant="h6" color="primary" gutterBottom>
+            <Typography component="p" color="primary" gutterBottom>
               {title}
             </Typography>
           </Grid>

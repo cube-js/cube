@@ -8,7 +8,7 @@ import ChartRenderer from "./ChartRenderer";
 const Chart = ({ title, vizState }) => (
   <Card>
     <CardContent>
-      <Typography component="h2" variant="h6" color="primary" gutterBottom>
+      <Typography component="p" color="primary" gutterBottom>
         {title}
       </Typography>
       <ChartRenderer vizState={vizState} />

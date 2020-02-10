@@ -1,8 +1,8 @@
 cube(`Users`, {
   sql: `
     SELECT
-     e.domain_userid
-   FROM ${Events.sql()} AS e
+     *
+   FROM ${Events.sql()}
    WHERE e.session_index = 1
   `,
 

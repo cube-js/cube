@@ -10,15 +10,9 @@ cube(`Sessions`, {
    )
 
    SELECT
-     e.session_id,
-     e.session_index,
-     e.derived_tstamp as session_start,
-     a.session_end as session_end,
-
-     e.br_lang,
-     e.br_name,
-
-     e.domain_userid
+    e.*,
+    e.derived_tstamp as session_start,
+    a.session_end as session_end
    FROM ${Events.sql()} AS e
 
    INNER JOIN aggregates AS a
@@ -134,6 +128,16 @@ cube(`Sessions`, {
         when: [ { sql: `${numberEvents} = 1`, label: `True` }],
         else: { label: `False` }
       }
+    },
+
+    referrerMedium: {
+      sql: `referrer_medium`,
+      type: `string`
+    },
+
+    referrerSource: {
+      sql: `referrer_source`,
+      type: `string`
     }
   }
 });
