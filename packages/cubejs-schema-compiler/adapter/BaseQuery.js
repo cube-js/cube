@@ -1308,7 +1308,7 @@ class BaseQuery {
     throw new Error('Not implemented');
   }
 
-  aliasName(name) {
+  aliasName(name, isPreAggregationName) {
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
       const cubeName = path[0];
@@ -1316,7 +1316,8 @@ class BaseQuery {
       path.unshift(this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias);
       name = this.cubeEvaluator.pathFromArray(path);
     }
-    return inflection.underscore(name).replace(/\./g, '__');
+    // use single underscore for pre-aggregations to avoid fail of pre-aggregation name replace
+    return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');
   }
 
   newSubQuery(options) {
@@ -1428,7 +1429,7 @@ class BaseQuery {
   }
 
   preAggregationTableName(cube, preAggregationName, skipSchema) {
-    return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${this.aliasName(`${cube}_${preAggregationName}`)}`;
+    return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${this.aliasName(`${cube}.${preAggregationName}`, true)}`;
   }
 
   preAggregationSchema() {

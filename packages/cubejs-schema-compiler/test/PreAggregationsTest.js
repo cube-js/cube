@@ -140,6 +140,8 @@ describe('PreAggregations', function test() {
       sql: \`
       select * from visitor_checkins
       \`,
+      
+      sqlAlias: 'vc',
 
       measures: {
         count: {
@@ -572,6 +574,7 @@ describe('PreAggregations', function test() {
       console.log(preAggregationsDescription);
 
       const queries = tempTablePreAggregations(preAggregationsDescription);
+      preAggregationsDescription[1].loadSql[0].should.match(/vc_main/);
 
       console.log(JSON.stringify(queries.concat(queryAndParams)));
 
