@@ -132,6 +132,9 @@ class MySqlDriver extends BaseDriver {
     if (genericType === 'text') {
       return value && value.replace(/[\u0800-\uFFFF]/g, '');
     }
+    if (genericType === 'timestamp' && typeof value === 'string') {
+      return value && value.replace('Z', '');
+    }
     return super.toColumnValue(value, genericType);
   }
 
