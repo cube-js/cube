@@ -12,6 +12,7 @@ const RefreshScheduler = require('./RefreshScheduler');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
 const track = require('./track');
+const agentCollect = require('./agentCollect');
 
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
@@ -255,6 +256,8 @@ class CubejsServerCore {
       }
     };
 
+    this.initAgent();
+
     if (this.options.devServer) {
       this.devServer = new DevServer(this);
       const oldLogger = this.logger;
@@ -308,6 +311,23 @@ class CubejsServerCore {
         loadRequestCount = 0;
       }, 60000);
       this.event('Server Start');
+    }
+  }
+
+  initAgent() {
+    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+      const oldLogger = this.logger;
+      this.logger = (msg, params) => {
+        oldLogger(msg, params);
+        agentCollect(
+          {
+            msg,
+            ...params
+          },
+          process.env.CUBEJS_AGENT_ENDPOINT_URL,
+          oldLogger
+        );
+      };
     }
   }
 
