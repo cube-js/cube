@@ -150,6 +150,45 @@ A unique key to identify users, moving through the funnel.
   }
 ```
 
+### nextStepUserId
+A unique key to join two adjacent steps when source of user id changes when moving from one step to another one.
+For exampe you can use it to build funnel that tracked by anonymous id at the first step and then by identified user id on subsequent steps.
+```javascript
+const Funnels = require(`Funnels`);
+
+cube(`OnboardingFunnel`, {
+  extends: Funnels.eventFunnel({
+    userId: {
+      sql: `id`
+    },
+    time: {
+      sql: `timestamp`
+    },
+    steps: [{
+      name: `View Page`,
+      eventsView: {
+        sql: `select anonymous_id as id, timestamp from pages`
+      }
+    }, {
+      name: `Sign Up`,
+      eventsView: {
+        sql: `select anonymous_id as id, user_id, timestamp from sign_ups`
+      },
+      nextStepUserId: {
+        sql: `user_id`
+      },
+      timeToConvert: '1 day'
+    }, {
+      name: `Action`,
+      eventsView: {
+        sql: `select user_id as id from actions`
+      },
+      timeToConvert: '1 day'
+    }]
+  })
+});
+```
+
 ### time
 A timestamp of the event.
 ```javascript
