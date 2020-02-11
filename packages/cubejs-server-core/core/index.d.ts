@@ -21,14 +21,14 @@ declare module "@cubejs-backend/server-core" {
     contextToDataSourceId?: (context: RequestContext) => string;
     repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
     checkAuthMiddleware?: (
-      req: Request,
-      res: Response,
-      next: NextFunction
+      req: ExpressRequest,
+      res: ExpressResponse,
+      next: ExpressNextFunction
     ) => void;
     queryTransformer?: (query: Query, context: RequestContext) => Query;
     preAggregationsSchema?: String | ((context: RequestContext) => string);
     schemaVersion?: (context: RequestContext) => string;
-    extendContext?: (req: Request) => any;
+    extendContext?: (req: ExpressRequest) => any;
     scheduledRefreshTimer?: boolean | number;
     compilerCacheSize?: number;
     maxCompilerCacheKeepAlive?: number;
@@ -141,7 +141,7 @@ declare module "@cubejs-backend/server-core" {
     limit?: number;
     offset?: number;
     order?: "asc" | "desc";
-    timezone?: Date;
+    timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
   }
