@@ -87,10 +87,18 @@ class BigqueryQuery extends BaseQuery {
   }
 
   subtractInterval(date, interval) {
-    return `TIMESTAMP_SUB(${date}, INTERVAL ${interval})`;
+    return `DATETIME_SUB(${date}, INTERVAL ${interval})`;
   }
 
   addInterval(date, interval) {
+    return `DATETIME_ADD(${date}, INTERVAL ${interval})`;
+  }
+
+  subtractTimestampInterval(date, interval) {
+    return `TIMESTAMP_SUB(${date}, INTERVAL ${interval})`;
+  }
+
+  addTimestampInterval(date, interval) {
     return `TIMESTAMP_ADD(${date}, INTERVAL ${interval})`;
   }
 

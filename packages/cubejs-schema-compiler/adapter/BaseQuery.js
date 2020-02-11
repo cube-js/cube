@@ -312,6 +312,14 @@ class BaseQuery {
     return `${date} + interval '${interval}'`;
   }
 
+  addTimestampInterval(timestamp, interval) {
+    return this.addInterval(timestamp, interval);
+  }
+
+  subtractTimestampInterval(timestamp, interval) {
+    return this.subtractInterval(timestamp, interval);
+  }
+
   cumulativeMeasures() {
     return this.measures.filter(m => m.isCumulative());
   }
@@ -1529,7 +1537,7 @@ class BaseQuery {
           query.timeDimensions[0].path()[0]
         ][
           query.timeDimensions[0].path()[1]
-        ].filter((from, to) => `${query.nowTimestampSql()} < ${updateWindow ? this.addInterval(this.timeStampCast(to), updateWindow) : this.timeStampCast(to)}`),
+        ].filter((from, to) => `${query.nowTimestampSql()} < ${updateWindow ? this.addTimestampInterval(this.timeStampCast(to), updateWindow) : this.timeStampCast(to)}`),
         label: originalRefreshKey
       }])
     );
