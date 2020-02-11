@@ -12,6 +12,7 @@
     "node": ">=8.11.1"
   },
   "main": "driver/SqliteDriver.js",
+  "typings": "driver/index.d.ts",
   "scripts": {
     "lint": "eslint **/*.js"
   },

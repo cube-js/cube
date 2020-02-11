@@ -12,6 +12,7 @@
     "node": ">=8.11.1"
   },
   "main": "driver/BigQueryDriver.js",
+  "types": "driver/index.d.ts",
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.17.5",
     "@google-cloud/bigquery": "^4.1.4",
