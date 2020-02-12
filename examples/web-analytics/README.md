@@ -11,9 +11,11 @@ replace any component with technology that better fits your needs. Additionally,
 
 ## Architecture
 
+TODO
+
 ## Online Demo
 
-Check out the online demo at [web-analytics-demo](https://web-analytics-demo.cube.dev)
+Check out the online demo at [web-analytics-demo.cube.dev](https://web-analytics-demo.cube.dev)
 
 ## Installation
 
@@ -30,7 +32,7 @@ Once you have data in the S3 or HDFS the next step is to setup Athena or Presto
 to query it. We'll describe only Athena with S3 setup here, but you can easily find a
 lot of materials online how to setup an alternative configuration.
 
-To query S3 data with Athena we need to create a table for Snowplow events. Copy and paste the following DDL statement into the Athena console. Modify the LOCATION for the S3 bucket that stores your enriched Snowplow events.
+To query S3 data with Athena we need to create a table for Snowplow events. Copy and paste the following DDL statement into the Athena console. Modify the `LOCATION` for the S3 bucket that stores your enriched Snowplow events.
 
 <details>
   <summary>Show DDL statement</summary>
@@ -170,3 +172,15 @@ STORED AS TEXTFILE
 LOCATION 's3://bucket-name/path/to/enriched/good';
 ```
 </details>
+
+### 3. Install MySQL for Cube.js External Pre-Aggregations
+
+### 4. Install Cube.js backend and React frontend applications
+Docker container
+Configure via env variables
+
+## Future Development
+
+## Contributing
+
+## License
