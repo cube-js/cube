@@ -74,7 +74,15 @@ const BasePreAggregation = {
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   partitionGranularity: Joi.any().valid('day', 'week', 'month', 'year'),
-  scheduledRefresh: Joi.boolean()
+  scheduledRefresh: Joi.boolean(),
+  indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
+    Joi.object().keys({
+      sql: Joi.func().required()
+    }),
+    Joi.object().keys({
+      columns: Joi.func().required()
+    })
+  )),
 };
 
 const cubeSchema = Joi.object().keys({

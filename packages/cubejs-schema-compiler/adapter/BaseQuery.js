@@ -256,17 +256,21 @@ class BaseQuery {
   buildSqlAndParams() {
     if (!this.options.preAggregationQuery && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
-        const ExternalQuery = this.externalQueryClass;
-        return new ExternalQuery(this.compilers, {
-          ...this.options,
-          externalQueryClass: null
-        }).buildSqlAndParams();
+        return this.externalQuery().buildSqlAndParams();
       }
     }
     return this.compilers.compiler.withQuery(
       this,
       () => this.paramAllocator.buildSqlAndParams(this.buildParamAnnotatedSql())
     );
+  }
+
+  externalQuery() {
+    const ExternalQuery = this.externalQueryClass;
+    return new ExternalQuery(this.compilers, {
+      ...this.options,
+      externalQueryClass: null
+    });
   }
 
   runningTotalDateJoinCondition() {
@@ -326,26 +330,7 @@ class BaseQuery {
   }
 
   fullKeyQueryAggregate() {
-    const measureToHierarchy = this.collectRootMeasureToHieararchy();
-
-    const measuresToRender = (multiplied, cumulative) => R.pipe(
-      R.values,
-      R.flatten,
-      R.filter(
-        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative
-      ),
-      R.map(m => m.measure),
-      R.uniq,
-      R.map(m => this.newMeasure(m))
-    );
-
-    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
-    const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
-    const cumulativeMeasures =
-      R.pipe(
-        R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),
-        R.unnest
-      )([false, true]);
+    const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length) {
       return this.simpleQuery();
@@ -404,6 +389,30 @@ class BaseQuery {
       renderedReferenceContext
     );
     return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+  }
+
+  fullKeyQueryAggregateMeasures() {
+    const measureToHierarchy = this.collectRootMeasureToHieararchy();
+
+    const measuresToRender = (multiplied, cumulative) => R.pipe(
+      R.values,
+      R.flatten,
+      R.filter(
+        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative
+      ),
+      R.map(m => m.measure),
+      R.uniq,
+      R.map(m => this.newMeasure(m))
+    );
+
+    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
+    const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
+    const cumulativeMeasures =
+      R.pipe(
+        R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),
+        R.unnest
+      )([false, true]);
+    return { multipliedMeasures, regularMeasures, cumulativeMeasures };
   }
 
   dimensionsJoinCondition(leftAlias, rightAlias) {
@@ -1299,7 +1308,7 @@ class BaseQuery {
     throw new Error('Not implemented');
   }
 
-  aliasName(name) {
+  aliasName(name, isPreAggregationName) {
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
       const cubeName = path[0];
@@ -1307,7 +1316,8 @@ class BaseQuery {
       path.unshift(this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias);
       name = this.cubeEvaluator.pathFromArray(path);
     }
-    return inflection.underscore(name).replace(/\./g, '__');
+    // use single underscore for pre-aggregations to avoid fail of pre-aggregation name replace
+    return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');
   }
 
   newSubQuery(options) {
@@ -1418,8 +1428,8 @@ class BaseQuery {
     return `EXTRACT(EPOCH FROM ${this.nowTimestampSql()})`;
   }
 
-  preAggregationTableName(cube, preAggregationName) {
-    return `${this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${this.aliasName(`${cube}_${preAggregationName}`)}`;
+  preAggregationTableName(cube, preAggregationName, skipSchema) {
+    return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${this.aliasName(`${cube}.${preAggregationName}`, true)}`;
   }
 
   preAggregationSchema() {
@@ -1429,6 +1439,37 @@ class BaseQuery {
   preAggregationLoadSql(cube, preAggregation, tableName) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+  }
+
+  indexSql(cube, preAggregation, index, indexName, tableName) {
+    if (preAggregation.external && this.externalQueryClass) {
+      return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
+    }
+    if (index.columns) {
+      const columns = this.cubeEvaluator.evaluateReferences(cube, index.columns, { originalSorting: true });
+      const escapedColumns = columns.map(column => {
+        const path = column.split('.');
+        if (path[0] &&
+          this.cubeEvaluator.cubeExists(path[0]) &&
+          (
+            this.cubeEvaluator.isMeasure(path) ||
+              this.cubeEvaluator.isDimension(path) ||
+              this.cubeEvaluator.isSegment(path)
+          )
+        ) {
+          return this.aliasName(column);
+        } else {
+          return column;
+        }
+      }).map(c => this.escapeColumnName(c));
+      return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
+    } else {
+      throw new Error(`Index SQL support is not implemented`);
+    }
+  }
+
+  createIndexSql(indexName, tableName, escapedColumns) {
+    return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
   }
 
   preAggregationSql(cube, preAggregation) {

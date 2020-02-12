@@ -40,7 +40,8 @@ class DevServer {
         cubejsToken: jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }),
         apiUrl: process.env.CUBEJS_API_URL,
         anonymousId: this.cubejsServer.anonymousId,
-        coreServerVersion: this.cubejsServer.coreServerVersion
+        coreServerVersion: this.cubejsServer.coreServerVersion,
+        projectFingerprint: this.cubejsServer.projectFingerprint
       });
     }));
 
@@ -69,7 +70,7 @@ class DevServer {
     app.post('/playground/generate-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Generate Schema');
       const driver = await this.cubejsServer.getDriver();
-      const tablesSchema = await driver.tablesSchema();
+      const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
       const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
       const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver);

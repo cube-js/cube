@@ -87,6 +87,11 @@ describe('PreAggregations', function test() {
           type: 'originalSql',
           refreshKey: {
             sql: 'select NOW()'
+          },
+          indexes: {
+            source: {
+              columns: ['source', 'created_at']
+            }
           }
         },
         googleRollup: {
@@ -135,6 +140,8 @@ describe('PreAggregations', function test() {
       sql: \`
       select * from visitor_checkins
       \`,
+      
+      sqlAlias: 'vc',
 
       measures: {
         count: {
@@ -225,10 +232,12 @@ describe('PreAggregations', function test() {
   }
 
   function tempTablePreAggregations(preAggregationsDescriptions) {
-    return R.unnest(preAggregationsDescriptions.map(desc =>
-      desc.invalidateKeyQueries.concat([
+    return R.unnest(preAggregationsDescriptions.map(
+      desc => desc.invalidateKeyQueries.concat([
         [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), desc.loadSql[1]]
-      ])
+      ]).concat(
+        (desc.indexesSql || []).map(({ sql }) => sql)
+      )
     ));
   }
 
@@ -565,6 +574,7 @@ describe('PreAggregations', function test() {
       console.log(preAggregationsDescription);
 
       const queries = tempTablePreAggregations(preAggregationsDescription);
+      preAggregationsDescription[1].loadSql[0].should.match(/vc_main/);
 
       console.log(JSON.stringify(queries.concat(queryAndParams)));
 

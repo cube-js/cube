@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.17.7](https://github.com/cube-js/cube.js/compare/v0.17.6...v0.17.7) (2020-02-12)
+
+
+### Bug Fixes
+
+* Wrong typings ([c32fb0e](https://github.com/cube-js/cube.js/commit/c32fb0e))
+
+
+### Features
+
+* Add more Typescript typings. Thanks to [@lvauvillier](https://github.com/lvauvillier)! ([fdd1141](https://github.com/cube-js/cube.js/commit/fdd1141))
+* Cube.js agent ([35366aa](https://github.com/cube-js/cube.js/commit/35366aa))
+* improve server-core typings ([9d59300](https://github.com/cube-js/cube.js/commit/9d59300))
+* Set warn to be default log level for production logging ([c4298ea](https://github.com/cube-js/cube.js/commit/c4298ea))
+
+
+
+
+
+## [0.17.6](https://github.com/cube-js/cube.js/compare/v0.17.5...v0.17.6) (2020-02-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.17.5](https://github.com/cube-js/cube.js/compare/v0.17.4...v0.17.5) (2020-02-07)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.17.4](https://github.com/cube-js/cube.js/compare/v0.17.3...v0.17.4) (2020-02-06)
+
+
+### Bug Fixes
+
+* Don't fetch schema twice when generating in Playground. Big schemas take a lot of time to fetch. ([3eeb73a](https://github.com/cube-js/cube.js/commit/3eeb73a))
+
+
+
+
+
+## [0.17.3](https://github.com/cube-js/cube.js/compare/v0.17.2...v0.17.3) (2020-02-06)
+
+
+### Bug Fixes
+
+* Fix typescript type definition ([66e2fe5](https://github.com/cube-js/cube.js/commit/66e2fe5))
+
+
+
+
+
 ## [0.17.2](https://github.com/cube-js/cube.js/compare/v0.17.1...v0.17.2) (2020-02-04)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

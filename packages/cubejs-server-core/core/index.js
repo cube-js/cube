@@ -12,6 +12,7 @@ const RefreshScheduler = require('./RefreshScheduler');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
 const track = require('./track');
+const agentCollect = require('./agentCollect');
 
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
@@ -127,6 +128,37 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
   }
 };
 
+const prodLogger = (level) => (msg, params) => {
+  const { error, warning } = params;
+
+  const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
+  // eslint-disable-next-line default-case
+  switch ((level || 'info').toLowerCase()) {
+    case "trace": {
+      if (!error && !warning) {
+        logMessage();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "info":
+    // eslint-disable-next-line no-fallthrough
+    case "warn": {
+      if (!error && warning) {
+        logMessage();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "error": {
+      if (error) {
+        logMessage();
+        break;
+      }
+    }
+  }
+};
+
 class CubejsServerCore {
   constructor(options) {
     options = options || {};
@@ -151,13 +183,11 @@ class CubejsServerCore {
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || 'schema';
     this.dbType = options.dbType;
-    this.logger = options.logger || ((msg, params) => {
-      if (process.env.NODE_ENV !== 'production') {
-        devLogger(process.env.CUBEJS_LOG_LEVEL)(msg, params);
-      } else {
-        console.log(JSON.stringify({ message: msg, ...params }));
-      }
-    });
+    this.logger = options.logger ||
+      (process.env.NODE_ENV !== 'production' ?
+        devLogger(process.env.CUBEJS_LOG_LEVEL) :
+        prodLogger(process.env.CUBEJS_LOG_LEVEL)
+      );
     this.repository = new FileRepository(this.schemaPath);
     this.repositoryFactory = options.repositoryFactory || (() => this.repository);
     this.contextToDbType = typeof options.dbType === 'function' ? options.dbType : () => options.dbType;
@@ -226,6 +256,8 @@ class CubejsServerCore {
       }
     };
 
+    this.initAgent();
+
     if (this.options.devServer) {
       this.devServer = new DevServer(this);
       const oldLogger = this.logger;
@@ -279,6 +311,23 @@ class CubejsServerCore {
         loadRequestCount = 0;
       }, 60000);
       this.event('Server Start');
+    }
+  }
+
+  initAgent() {
+    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+      const oldLogger = this.logger;
+      this.logger = (msg, params) => {
+        oldLogger(msg, params);
+        agentCollect(
+          {
+            msg,
+            ...params
+          },
+          process.env.CUBEJS_AGENT_ENDPOINT_URL,
+          oldLogger
+        );
+      };
     }
   }
 

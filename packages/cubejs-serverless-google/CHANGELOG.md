@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.17.7](https://github.com/cube-js/cube.js/compare/v0.17.6...v0.17.7) (2020-02-12)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.17.6](https://github.com/cube-js/cube.js/compare/v0.17.5...v0.17.6) (2020-02-10)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.17.5](https://github.com/cube-js/cube.js/compare/v0.17.4...v0.17.5) (2020-02-07)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.17.4](https://github.com/cube-js/cube.js/compare/v0.17.3...v0.17.4) (2020-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.17.3](https://github.com/cube-js/cube.js/compare/v0.17.2...v0.17.3) (2020-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
 ## [0.17.2](https://github.com/cube-js/cube.js/compare/v0.17.1...v0.17.2) (2020-02-04)
 
 **Note:** Version bump only for package @cubejs-backend/serverless-google

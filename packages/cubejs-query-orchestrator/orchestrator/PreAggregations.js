@@ -180,7 +180,7 @@ class PreAggregationLoader {
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
     if (notLoadedKey && !this.waitForRenew) {
-      const structureVersion = version(this.preAggregation.loadSql);
+      const structureVersion = this.structureVersion();
 
       const getVersionsStarted = new Date();
       const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation);
@@ -217,8 +217,8 @@ class PreAggregationLoader {
 
   async loadPreAggregationWithKeys() {
     const invalidationKeys = await this.getInvalidationKeyValues();
-    const contentVersion = version([this.preAggregation.loadSql, invalidationKeys]);
-    const structureVersion = version(this.preAggregation.loadSql);
+    const contentVersion = this.contentVersion(invalidationKeys);
+    const structureVersion = this.structureVersion();
 
     const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation);
 
@@ -260,11 +260,13 @@ class PreAggregationLoader {
 
     const mostRecentTargetTableName = async () => {
       await this.loadCache.reset(this.preAggregation);
-      return this.targetTableName(
-        getVersionEntryByContentVersion(
-          await this.loadCache.getVersionEntries(this.preAggregation)
-        )
+      const lastVersion = getVersionEntryByContentVersion(
+        await this.loadCache.getVersionEntries(this.preAggregation)
       );
+      if (!lastVersion) {
+        throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created. It usually means database silently truncates table names due to max name length.`);
+      }
+      return this.targetTableName(lastVersion);
     };
 
     if (versionEntry) {
@@ -303,6 +305,22 @@ class PreAggregationLoader {
       return mostRecentTargetTableName();
     }
     return this.targetTableName(versionEntry);
+  }
+
+  contentVersion(invalidationKeys) {
+    return version(
+      this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
+        [this.preAggregation.loadSql, this.preAggregation.indexesSql, invalidationKeys] :
+        [this.preAggregation.loadSql, invalidationKeys]
+    );
+  }
+
+  structureVersion() {
+    return version(
+      this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
+        [this.preAggregation.loadSql, this.preAggregation.indexesSql] :
+        this.preAggregation.loadSql
+    );
   }
 
   priority(defaultValue) {
@@ -388,6 +406,8 @@ class PreAggregationLoader {
         await queryPromise;
         if (this.preAggregation.external) {
           await this.loadExternalPreAggregation(client, newVersionEntry);
+        } else {
+          await this.createIndexes(client, newVersionEntry);
         }
         await this.loadCache.reset(this.preAggregation);
         await this.dropOrphanedTables(client, this.targetTableName(newVersionEntry));
@@ -422,8 +442,38 @@ class PreAggregationLoader {
       requestId: this.requestId
     });
     await externalDriver.uploadTable(table, columns, tableData);
+    await this.createIndexes(externalDriver, newVersionEntry);
     await this.loadCache.reset(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table);
+  }
+
+  async createIndexes(driver, newVersionEntry) {
+    if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
+      return;
+    }
+    for (let i = 0; i < this.preAggregation.indexesSql.length; i++) {
+      const { sql, indexName } = this.preAggregation.indexesSql[i];
+      const [query, params] = sql;
+      const indexVersionEntry = {
+        ...newVersionEntry,
+        table_name: indexName
+      };
+      this.logger('Creating pre-aggregation index', {
+        preAggregation: this.preAggregation,
+        requestId: this.requestId,
+        sql
+      });
+      await driver.query(
+        QueryCache.replacePreAggregationTableNames(
+          query,
+          this.preAggregationsTablesToTempTables.concat([
+            [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],
+            [indexName, { targetTableName: this.targetTableName(indexVersionEntry) }]
+          ])
+        ),
+        params
+      );
+    }
   }
 
   async dropOrphanedTables(client, justCreatedTable) {

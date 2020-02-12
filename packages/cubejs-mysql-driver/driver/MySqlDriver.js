@@ -4,7 +4,8 @@ const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
 const GenericTypeToMySql = {
-  'string': 'varchar(255)'
+  string: 'varchar(255)',
+  text: 'varchar(255)'
 };
 
 class MySqlDriver extends BaseDriver {
@@ -130,6 +131,9 @@ class MySqlDriver extends BaseDriver {
   toColumnValue(value, genericType) {
     if (genericType === 'text') {
       return value && value.replace(/[\u0800-\uFFFF]/g, '');
+    }
+    if (genericType === 'timestamp' && typeof value === 'string') {
+      return value && value.replace('Z', '');
     }
     return super.toColumnValue(value, genericType);
   }

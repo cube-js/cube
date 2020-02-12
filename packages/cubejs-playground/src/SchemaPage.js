@@ -95,7 +95,7 @@ class SchemaPage extends Component {
   }
 
   async generateSchema() {
-    const { checkedKeys } = this.state;
+    const { checkedKeys, tablesSchema } = this.state;
     const { history } = this.props;
     playgroundAction('Generate Schema');
     const res = await fetch('/playground/generate-schema', {
@@ -103,7 +103,10 @@ class SchemaPage extends Component {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ tables: checkedKeys.filter(k => k.split('.').length === 2) })
+      body: JSON.stringify({
+        tables: checkedKeys.filter(k => k.split('.').length === 2),
+        tablesSchema
+      })
     });
     if (res.status === 200) {
       playgroundAction('Generate Schema Success');
