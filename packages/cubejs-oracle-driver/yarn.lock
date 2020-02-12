@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/query-orchestrator@^0.13.9":
-  version "0.13.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.9.tgz#16bef231c1d74d451b0ae96c406708fdb321dd89"
-  integrity sha512-1Wbbnd0Q/cGclV9moJ+wLnTTmWiwJn4FZb6OrkLJx9GB8mTtPGW/l5N4O8y1ir93TLXbadoQ3hc3ED3WguV2Tw==
+"@cubejs-backend/query-orchestrator@^0.17.5":
+  version "0.17.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.5.tgz#d57d9e62e5895dedc2962f9828e27f286c66813a"
+  integrity sha512-PMzajns8xioMxIKjeIVC0pskIBLqbUQGxyiW/1lRplEt8+kJ9vqeJAPNJptHd8ucm1TUi7V2p9h+4eqVGZs9hQ==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
@@ -14,9 +14,10 @@ double-ended-queue@^2.1.0-0:
   version "2.1.0-0"
   resolved "https://registry.yarnpkg.com/double-ended-queue/-/double-ended-queue-2.1.0-0.tgz#103d3527fd31528f40188130c841efdd78264e5c"
 
-oracledb@^3.1.2:
-  version "3.1.2"
-  resolved "https://registry.yarnpkg.com/oracledb/-/oracledb-3.1.2.tgz#4d7df7b8eda161d4e645837cd43c530232d139e8"
+oracledb@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/oracledb/-/oracledb-4.2.0.tgz#b4d97957d206f7c2d1c2286cc80e91ff2d45fce8"
+  integrity sha512-07ZylNcUB9wknsiRa7dNqDWgGK3loP8eNWuoCjsiCOZ19PA1g8QLu+0gah7ty82VXl/MOQYFCMl5OpjD9Aqjcw==
 
 ramda@^0.24.1:
   version "0.24.1"
