@@ -1,8 +1,7 @@
 import { PoolConfig } from "pg";
 
 declare module "@cubejs-backend/postgres-driver" {
-  class PostgresDriver {
+  export default class PostgresDriver {
     constructor(options?: PoolConfig);
   }
-  export = PostgresDriver;
 }
