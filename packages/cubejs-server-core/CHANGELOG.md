@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.17.7](https://github.com/cube-js/cube.js/compare/v0.17.6...v0.17.7) (2020-02-12)
+
+
+### Bug Fixes
+
+* Wrong typings ([c32fb0e](https://github.com/cube-js/cube.js/commit/c32fb0e))
+
+
+### Features
+
+* Add more Typescript typings. Thanks to [@lvauvillier](https://github.com/lvauvillier)! ([fdd1141](https://github.com/cube-js/cube.js/commit/fdd1141))
+* Cube.js agent ([35366aa](https://github.com/cube-js/cube.js/commit/35366aa))
+* improve server-core typings ([9d59300](https://github.com/cube-js/cube.js/commit/9d59300))
+* Set warn to be default log level for production logging ([c4298ea](https://github.com/cube-js/cube.js/commit/c4298ea))
+
+
+
+
+
 ## [0.17.6](https://github.com/cube-js/cube.js/compare/v0.17.5...v0.17.6) (2020-02-10)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

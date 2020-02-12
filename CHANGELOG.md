@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.17.7](https://github.com/cube-js/cube.js/compare/v0.17.6...v0.17.7) (2020-02-12)
+
+
+### Bug Fixes
+
+* Invalid Date: Incorrect MySQL minutes granularity ([dc553b9](https://github.com/cube-js/cube.js/commit/dc553b9))
+* Respect MySQL TIMESTAMP strict mode on rollup downloads ([c72ab07](https://github.com/cube-js/cube.js/commit/c72ab07))
+* Wrong typings ([c32fb0e](https://github.com/cube-js/cube.js/commit/c32fb0e))
+
+
+### Features
+
+* add bigquery-driver typings ([0c5e0f7](https://github.com/cube-js/cube.js/commit/0c5e0f7))
+* add postgres-driver typings ([364d9bf](https://github.com/cube-js/cube.js/commit/364d9bf))
+* add sqlite-driver typings ([4446eba](https://github.com/cube-js/cube.js/commit/4446eba))
+* Cube.js agent ([35366aa](https://github.com/cube-js/cube.js/commit/35366aa))
+* improve server-core typings ([9d59300](https://github.com/cube-js/cube.js/commit/9d59300))
+* Set warn to be default log level for production logging ([c4298ea](https://github.com/cube-js/cube.js/commit/c4298ea))
+
+
+
+
+
 ## [0.17.6](https://github.com/cube-js/cube.js/compare/v0.17.5...v0.17.6) (2020-02-10)
 
 

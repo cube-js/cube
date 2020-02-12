@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.17.7](https://github.com/cube-js/cube.js/compare/v0.17.6...v0.17.7) (2020-02-12)
+
+
+### Features
+
+* add postgres-driver typings ([364d9bf](https://github.com/cube-js/cube.js/commit/364d9bf))
+
+
+
+
+
 ## [0.17.5](https://github.com/cube-js/cube.js/compare/v0.17.4...v0.17.5) (2020-02-07)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
