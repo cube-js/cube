@@ -34,9 +34,9 @@ const queries = {
   uniqPageviews: {
     chartType: 'number',
     query: {
-      measures: ['PageViews.uniqPageviews'],
+      measures: ['PageUsers.uniqPageviews'],
       timeDimensions: [{
-        dimension: 'PageViews.time'
+        dimension: 'PageUsers.time'
       }]
     }
   },
@@ -72,7 +72,10 @@ const queries = {
     chartType: 'table',
     query: {
       measures: ['PageViews.pageviews'],
-      dimensions: ['PageViews.pageUrlPath']
+      dimensions: ['PageViews.pageUrlPath'],
+      timeDimensions: [{
+        dimension: 'PageViews.time'
+      }]
     },
     order: { 'PageViews.pageviews': 'desc' }
   }

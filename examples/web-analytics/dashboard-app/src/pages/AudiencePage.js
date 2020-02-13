@@ -11,9 +11,9 @@ const queries = {
     chartType: 'line',
     legend: false,
     query: {
-      measures: ['Sessions.usersCount'],
+      measures: ['SessionUsers.usersCount'],
       timeDimensions: [{
-        dimension: 'Sessions.sessionStart',
+        dimension: 'SessionUsers.sessionStart',
         granularity: 'day'
       }]
     }
@@ -22,7 +22,10 @@ const queries = {
   usersCount: {
     chartType: 'number',
     query: {
-      measures: ['Sessions.usersCount']
+      measures: ['SessionUsers.usersCount'],
+      timeDimensions: [{
+        dimension: 'SessionUsers.sessionStart'
+      }]
     }
   },
 
@@ -36,7 +39,10 @@ const queries = {
   newUsersCount: {
     chartType: 'number',
     query: {
-      measures: ['Sessions.newUsersCount']
+      measures: ['SessionUsers.newUsersCount'],
+      timeDimensions: [{
+        dimension: 'SessionUsers.sessionStart'
+      }]
     }
   },
 
@@ -57,15 +63,21 @@ const queries = {
   averageNumberSessions: {
     chartType: 'number',
     query: {
-      measures: ['Users.averageNumberSessions']
+      measures: ['SessionUsers.sessionsPerUser'],
+      timeDimensions: [{
+        dimension: 'SessionUsers.sessionStart'
+      }]
     }
   },
 
   usersByType: {
     chartType: 'pie',
     query: {
-      measures: ['Sessions.usersCount'],
-      dimensions: ['Sessions.type']
+      measures: ['SessionUsers.usersCount'],
+      dimensions: ['SessionUsers.type'],
+      timeDimensions: [{
+        dimension: 'SessionUsers.sessionStart'
+      }]
     }
   }
 };

@@ -32,8 +32,13 @@ cube(`PageViews`, {
     },
 
     averageTimeOnPageSeconds: {
-      type: `avg`,
-      sql: `${timeOnPageSeconds}`
+      type: `number`,
+      sql: `${totalTimeOnPageSeconds} / NULLIF(${count}, 0)`
+    },
+
+    totalTimeOnPageSeconds: {
+      sql: `${timeOnPageSeconds}`,
+      type: `sum`
     }
   },
 
@@ -57,6 +62,39 @@ cube(`PageViews`, {
     pageUrlPath: {
       sql: `page_url_path`,
       type: `string`
+    }
+  },
+
+  preAggregations: {
+    additive: {
+      type: `rollup`,
+      measureReferences: [pageviews, exits, count, totalTimeOnPageSeconds],
+      timeDimensionReference: time,
+      dimensionReferences: [pageUrlPath],
+      granularity: `hour`,
+      refreshKey: {
+        every: `10 minutes`
+      },
+      external: true
+    }
+  }
+});
+
+cube(`PageUsers`, {
+  extends: PageViews,
+
+  sql: `select distinct 
+  date_trunc('hour', derived_tstamp) as derived_tstamp,
+  session_id
+  from ${Events.sql()}`,
+
+  preAggregations: {
+    main: {
+      type: `originalSql`,
+      refreshKey: {
+        every: `10 minutes`
+      },
+      external: true
     }
   }
 });

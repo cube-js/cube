@@ -13,16 +13,19 @@ const queries = {
   topSources: {
     chartType: 'pie',
     query: {
-      measures: ['Sessions.usersCount'],
-      dimensions: ['Sessions.referrerSource']
+      measures: ['SessionUsers.usersCount'],
+      dimensions: ['SessionUsers.referrerSource'],
+      timeDimensions: [{
+        dimension: 'SessionUsers.sessionStart'
+      }]
     }
   },
   usersOvertime: {
     chartType: 'line',
     query: {
-      measures: ['Sessions.usersCount'],
+      measures: ['SessionUsers.usersCount'],
       timeDimensions: [{
-        dimension: 'Sessions.sessionStart',
+        dimension: 'SessionUsers.sessionStart',
         granularity: 'day'
       }]
     }

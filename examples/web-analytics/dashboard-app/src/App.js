@@ -14,7 +14,7 @@ import SidePanel from "./components/SidePanel";
 
 const API_URL = "http://localhost:4000";
 const CUBEJS_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1Nzk3NTM4MzYsImV4cCI6MTU3OTg0MDIzNn0.XsmU4bwg6kas5OhRpJSUjye_mK87denNH2SWBMuH38Q";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1ODE0NzY4MjZ9.31_4J0M0oqqkwtur2_gaX7fhL6vOOLjKk_HvFEZjeq0";
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`
 });

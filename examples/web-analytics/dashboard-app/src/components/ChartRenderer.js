@@ -30,6 +30,7 @@ import moment from "moment";
 import numeral from "numeral";
 
 const numberFormatter = item => numeral(item).format("0,0");
+const decimalFormatter = item => numeral(item).format("0,0.00");
 const percentFormatter = item => numeral(item/100.0).format('0.00%');
 const timeNumberFormatter = item => numeral(item).format('00:00:00');
 const dateFormatter = item => moment(item).format("MMM DD");
@@ -158,8 +159,10 @@ const TypeToChartComponent = {
     } else if (durationMeasures.includes(measureKey)) {
       // special case, since format time is missing
       formattedValue = timeNumberFormatter(value);
-    } else {
+    } else if (Math.ceil(value) === value && Math.floor(value) === value) {
       formattedValue = numberFormatter(value);
+    } else {
+      formattedValue = decimalFormatter(value);
     }
     return (
       <Typography component="p" variant="h4">

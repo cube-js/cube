@@ -1,4 +1,8 @@
 cube(`Sessions`, {
+  refreshKey: {
+    every: `10 minutes`
+  },
+
   sql: `
    WITH aggregates AS (
      SELECT
@@ -46,6 +50,11 @@ cube(`Sessions`, {
       ]
     },
 
+    sessionsPerUser: {
+      sql: `1.000 * ${count} / NULLIF(${usersCount}, 0)`,
+      type: `number`
+    },
+
     // Engagement
     bouncedCount: {
       sql: `${id}`,
@@ -62,8 +71,13 @@ cube(`Sessions`, {
     },
 
     averageDurationSeconds: {
-      type: `avg`,
-      sql: `${durationSeconds}`
+      type: `number`,
+      sql: `${totalDuration} / NULLIF(${count}, 0)`
+    },
+
+    totalDuration: {
+      sql: `${durationSeconds}`,
+      type: `sum`
     }
   },
 
@@ -138,6 +152,41 @@ cube(`Sessions`, {
     referrerSource: {
       sql: `referrer_source`,
       type: `string`
+    }
+  },
+
+  preAggregations: {
+    additive: {
+      type: `rollup`,
+      measureReferences: [totalDuration, bouncedCount, count],
+      timeDimensionReference: sessionStart,
+      granularity: `hour`,
+      refreshKey: {
+        every: `10 minutes`
+      },
+      external: true
+    }
+  }
+});
+
+cube(`SessionUsers`, {
+  extends: Sessions,
+
+  sql: `select distinct 
+  date_trunc('hour', session_start) as session_start,
+  session_id,
+  domain_userid,
+  session_index,
+  referrer_source
+  from ${Sessions.sql()}`,
+
+  preAggregations: {
+    main: {
+      type: `originalSql`,
+      refreshKey: {
+        every: `10 minutes`
+      },
+      external: true
     }
   }
 });

@@ -1,4 +1,8 @@
 cube(`Events`, {
+  refreshKey: {
+    every: `10 minutes`
+  },
+
   sql: `
     select
       event_id,
