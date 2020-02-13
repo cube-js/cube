@@ -23,6 +23,7 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
+    "@types/pg": "^7.14.1",
     "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",

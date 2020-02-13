@@ -128,7 +128,7 @@ declare module "@cubejs-backend/server-core" {
 
   export interface QueryTimeDimension {
     dimension: string;
-    dateRange?: string[];
+    dateRange?: string[] | string;
     granularity?: QueryTimeDimensionGranularity;
   }
 
