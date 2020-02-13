@@ -3,7 +3,7 @@ version: 2
 jobs:
   test:
     docker:
-      - image: circleci/node:10.15
+      - image: circleci/node:10.16
         environment:
           TEST_PG_USER: root
           TEST_CLICKHOUSE_HOST: localhost
