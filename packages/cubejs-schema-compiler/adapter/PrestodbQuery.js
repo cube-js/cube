@@ -79,6 +79,18 @@ class PrestodbQuery extends BaseQuery {
   defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
+
+  hllInit(sql) {
+    return `cast(approx_set(${sql}) as varbinary)`;
+  }
+
+  hllMerge(sql) {
+    return `cardinality(merge(cast(${sql} as HyperLogLog)))`;
+  }
+
+  countDistinctApprox(sql) {
+    return `approx_distinct(${sql})`;
+  }
 }
 
 module.exports = PrestodbQuery;
