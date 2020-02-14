@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.17.0",
+  "version": "0.17.8",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@cubejs-client/core": "^0.17.0",
+    "@cubejs-client/core": "^0.17.8",
     "tslib": "^1.9.0"
   },
   "peerDependencies": {
