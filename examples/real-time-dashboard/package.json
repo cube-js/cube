@@ -8,8 +8,8 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@cubejs-backend/mongobi-driver": "^0.13.0",
-    "@cubejs-backend/server": "^0.13.11",
+    "@cubejs-backend/mongobi-driver": "^0.17.5",
+    "@cubejs-backend/server": "^0.17.7",
     "moment": "^2.24.0",
     "mongodb": "^3.3.3",
     "serve-static": "^1.14.1"
