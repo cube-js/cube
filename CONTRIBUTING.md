@@ -20,7 +20,7 @@ Cube.js works with Node.js 8+ and uses yarn as a package manager.
 ## Development Workflow
 ### Cube.js Client
 
-1. After cloning Cube.js repository run `$ yarn` in `packages/cubejs-client-core` and `packages/cubejs-react` to install dependencies.
+1. After cloning Cube.js repository run `$ yarn` in `packages/cubejs-client-core` and `packages/cubejs-client-react` to install dependencies.
 2. Use `$ yarn link` to add these packages to link registry.
 3. Perform required code changes.
 4. Use `$ yarn build` in the repository root to build CommonJS and UMD modules.
