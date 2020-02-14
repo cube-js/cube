@@ -20,7 +20,8 @@ const cubejsServer = CubejsServerCore.create({
     user: process.env.CUBEJS_EXT_DB_USER,
     password: process.env.CUBEJS_EXT_DB_PASS,
   }),
-  preAggregationsSchema: 'wa_pre_aggregations'
+  preAggregationsSchema: 'wa_pre_aggregations',
+  scheduledRefreshTimer: true
 });
 
 if (process.env.NODE_ENV === 'production') {

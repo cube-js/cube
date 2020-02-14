@@ -73,9 +73,10 @@ cube(`PageViews`, {
       dimensionReferences: [pageUrlPath],
       granularity: `hour`,
       refreshKey: {
-        every: `10 minutes`
+        every: `5 minutes`
       },
-      external: true
+      external: true,
+      scheduledRefresh: true
     }
   }
 });
@@ -92,9 +93,10 @@ cube(`PageUsers`, {
     main: {
       type: `originalSql`,
       refreshKey: {
-        every: `10 minutes`
+        every: `5 minutes`
       },
-      external: true
+      external: true,
+      scheduledRefresh: true
     }
   }
 });

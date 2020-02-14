@@ -1,6 +1,6 @@
 cube(`Sessions`, {
   refreshKey: {
-    every: `10 minutes`
+    every: `5 minutes`
   },
 
   sql: `
@@ -162,7 +162,7 @@ cube(`Sessions`, {
       timeDimensionReference: sessionStart,
       granularity: `hour`,
       refreshKey: {
-        every: `10 minutes`
+        every: `5 minutes`
       },
       external: true
     }
@@ -184,9 +184,10 @@ cube(`SessionUsers`, {
     main: {
       type: `originalSql`,
       refreshKey: {
-        every: `10 minutes`
+        every: `5 minutes`
       },
-      external: true
+      external: true,
+      scheduledRefresh: true
     }
   }
 });
