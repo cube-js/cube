@@ -771,10 +771,10 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@cubejs-backend/api-gateway@^0.13.9":
-  version "0.13.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.13.9.tgz#5e0e2f4ebcfe8cd9065b5a989d9542d6e4b953c1"
-  integrity sha512-3JBQs8fSqvHCM6QgwMXxVumj2nMEEv09FFjGZ3FJ39gX2Br3o5ZXxa8ehJPYDBvlObydf3Rz5Y33MOjscqJQlw==
+"@cubejs-backend/api-gateway@^0.17.1":
+  version "0.17.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.17.1.tgz#ac8fdc3928863a2a1713b533d649fb3dede1c2b8"
+  integrity sha512-8iP/vJV+tkB+7YqZfyeG17PbbSEDa89oorcNYm9Fd/HcOoemYD3EVzV/JWV0LHrmc9f3kVcYno6U10Ledd4P0Q==
   dependencies:
     "@hapi/joi" "^14.0.6"
     chrono-node "^1.3.11"
@@ -784,18 +784,18 @@
     ramda "^0.25.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.13.9":
-  version "0.13.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.9.tgz#16bef231c1d74d451b0ae96c406708fdb321dd89"
-  integrity sha512-1Wbbnd0Q/cGclV9moJ+wLnTTmWiwJn4FZb6OrkLJx9GB8mTtPGW/l5N4O8y1ir93TLXbadoQ3hc3ED3WguV2Tw==
+"@cubejs-backend/query-orchestrator@^0.17.5":
+  version "0.17.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.5.tgz#d57d9e62e5895dedc2962f9828e27f286c66813a"
+  integrity sha512-PMzajns8xioMxIKjeIVC0pskIBLqbUQGxyiW/1lRplEt8+kJ9vqeJAPNJptHd8ucm1TUi7V2p9h+4eqVGZs9hQ==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.13.7":
-  version "0.13.7"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.13.7.tgz#0d01ae455fc9ae97e27a7e60f21f7bdcfc04a1be"
-  integrity sha512-8AFO6JLoLKmv9KjDVPvqokIvHkVR6j4CB3TRyC2ZdO9p8/F6OfGtUujRSjAR7WgO5qcQua10e/jzbiW0ocuirQ==
+"@cubejs-backend/schema-compiler@^0.17.8":
+  version "0.17.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.17.8.tgz#079184f7df9934b1c28d5cbc485d3590e6c4930e"
+  integrity sha512-p2THZGBRA9imvKrIueUFb4pLoBHiG1eDDpXGcdainMnfvkQYcTEl36Tb13xVtW3+xRRhBlbk//wdC57V+MhF7Q==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -812,10 +812,10 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.13.11":
-  version "0.13.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.13.11.tgz#4a11f15ee1985f397a4293e00b04dc418caabf9d"
-  integrity sha512-d4SLVwQdQLk+41Uh2kWbkbAx6ClzfMeyIoEuY+/2HXz3xBA0aYDdJtd/zzkK2WB9+Cau/WuunXVhDF6U52D5YQ==
+"@cubejs-backend/server-core@^0.17.8":
+  version "0.17.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.17.8.tgz#d2bfc2ccd68798a45fd8b8a09ba1a0aba53e6363"
+  integrity sha512-72k83lgUsNxD7fS8ERLedmuKXDpk+r+3fOr8c56nZ38Pb9Zj2ZKh54WmaQtXjRl0xRGclB4yeRYlD17L42brwg==
   dependencies:
     "@babel/core" "^7.7.4"
     "@babel/generator" "^7.4.0"
@@ -825,9 +825,9 @@
     "@babel/standalone" "^7.3.4"
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
-    "@cubejs-backend/api-gateway" "^0.13.9"
-    "@cubejs-backend/query-orchestrator" "^0.13.9"
-    "@cubejs-backend/schema-compiler" "^0.13.7"
+    "@cubejs-backend/api-gateway" "^0.17.1"
+    "@cubejs-backend/query-orchestrator" "^0.17.5"
+    "@cubejs-backend/schema-compiler" "^0.17.8"
     codesandbox-import-utils "^1.3.8"
     cross-spawn "^6.0.5"
     fs-extra "^7.0.1"
@@ -841,13 +841,14 @@
     semver "^6.3.0"
     serve-static "^1.13.2"
     sqlstring "^2.3.1"
+    uuid "^3.3.3"
 
-"@cubejs-backend/serverless@^0.13.11":
-  version "0.13.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/serverless/-/serverless-0.13.11.tgz#4a59734707cdbeb5d0e427fbe408a0a8ba683c18"
-  integrity sha512-VbwfPw6eoh6rab49jz6/vi2+ew0Feq2WWdMf1/vpcgY0hKUkNKxnjJa5MUtPtWUK1N1tZ8KDXUwmJYV2/eWrqA==
+"@cubejs-backend/serverless@^0.17.8":
+  version "0.17.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/serverless/-/serverless-0.17.8.tgz#370fdebcb1e88fb7c9ed5a620b5ea6f6dd71dc2c"
+  integrity sha512-mAyA3KvL32H0PBaOjJF0T1f3f0B86BmbIEElYtPxRJ3x9uT7NzeyVBIl+gocyodfjI66dmUCbL4IztqmxnXUPw==
   dependencies:
-    "@cubejs-backend/server-core" "^0.13.11"
+    "@cubejs-backend/server-core" "^0.17.8"
     cors "^2.8.5"
     serverless-express "^2.0.11"
 
@@ -1088,10 +1089,10 @@ acorn@^7.0.0:
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-7.0.0.tgz#26b8d1cd9a9b700350b71c0905546f64d1284e7a"
   integrity sha512-PaF/MduxijYYt7unVGRuds1vBC9bFxbNf+VWqhOClfdgy7RlVkQqt610ig1/yxTgsDIfW1cWDel5EBbOy3jdtQ==
 
-agent-base@^4.1.0:
-  version "4.2.1"
-  resolved "https://registry.yarnpkg.com/agent-base/-/agent-base-4.2.1.tgz#d89e5999f797875674c07d87f260fc41e83e8ca9"
-  integrity sha512-JVwXMr9nHYTUXsBFKUqhJwvlcYU/blreOEUkhNR2eXZIvwd+c+o5V4MgDPKWnMS/56awN3TRzIP+KoPn+roQtg==
+agent-base@^4.3.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/agent-base/-/agent-base-4.3.0.tgz#8165f01c436009bccad0b1d122f05ed770efc6ee"
+  integrity sha512-salcGninV0nPrwpGNn4VTXBb1SOuXQBiqbrNXoeizJsHrsL6ERFM2Ne3JUSBWRE6aeNJI2ROP/WEEIDUiDe3cg==
   dependencies:
     es6-promisify "^5.0.0"
 
@@ -1675,9 +1676,9 @@ es6-iterator@~2.0.3:
     es6-symbol "^3.1.1"
 
 es6-promise@^4.0.3:
-  version "4.2.6"
-  resolved "https://registry.yarnpkg.com/es6-promise/-/es6-promise-4.2.6.tgz#b685edd8258886365ea62b57d30de28fadcd974f"
-  integrity sha512-aRVgGdnmW2OiySVPUC9e6m+plolMAJKjZnQlCwNSuK5yQ0JN61DZSO1X1Ufd1foqWRAlig0rhduTCHe7sVtK5Q==
+  version "4.2.8"
+  resolved "https://registry.yarnpkg.com/es6-promise/-/es6-promise-4.2.8.tgz#4eb21594c972bc40553d276e510539143db53e0a"
+  integrity sha512-HJDGx5daxeIvxdBxvG2cb9g4tEvwIk3i8+nhX0yGrYmZUzbkdg8QbDevheDB8gd0//uPj4c1EQua8Q+MViT0/w==
 
 es6-promisify@^5.0.0:
   version "5.0.0"
@@ -2190,11 +2191,11 @@ http-errors@~1.7.2:
     toidentifier "1.0.0"
 
 https-proxy-agent@^2.2.1:
-  version "2.2.1"
-  resolved "https://registry.yarnpkg.com/https-proxy-agent/-/https-proxy-agent-2.2.1.tgz#51552970fa04d723e04c56d04178c3f92592bbc0"
-  integrity sha512-HPCTS1LW51bcyMYbxUIOO4HEOlQ1/1qRaFWcyxvwaqUS9TY88aoEuHUY33kuAh1YhVVaDQhLZsnPd+XNARWZlQ==
+  version "2.2.4"
+  resolved "https://registry.yarnpkg.com/https-proxy-agent/-/https-proxy-agent-2.2.4.tgz#4ee7a737abd92678a293d9b34a1af4d0d08c787b"
+  integrity sha512-OmvfoQ53WLjtA9HeYP9RNrWMJzzAz1JGaSFr1nijg0PVR1JaD/xbJq1mdEIIlxGpXp9eSe/O2LgU9DJmTPd0Eg==
   dependencies:
-    agent-base "^4.1.0"
+    agent-base "^4.3.0"
     debug "^3.1.0"
 
 humps@^2.0.1:
@@ -2709,10 +2710,15 @@ ms@2.0.0:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.0.0.tgz#5608aeadfc00be6c2901df5f9861788de0d597c8"
   integrity sha1-VgiurfwAvmwpAd9fmGF4jeDVl8g=
 
-ms@2.1.1, ms@^2.1.1:
+ms@2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.1.tgz#30a5864eb3ebb0a66f2ebe6d727af06a09d86e0a"
   integrity sha512-tgp+dl5cGk28utYktBsrFqA7HKgrhgPsg6Z/EfhWI4gl1Hwq8B/GmY/0oXZ6nF8hDVesS/FpnYaD/kOWhYQvyg==
+
+ms@^2.1.1:
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
+  integrity sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==
 
 mute-stream@0.0.7:
   version "0.0.7"
