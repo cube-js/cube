@@ -814,10 +814,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.13.9":
-  version "0.13.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.13.9.tgz#5e0e2f4ebcfe8cd9065b5a989d9542d6e4b953c1"
-  integrity sha512-3JBQs8fSqvHCM6QgwMXxVumj2nMEEv09FFjGZ3FJ39gX2Br3o5ZXxa8ehJPYDBvlObydf3Rz5Y33MOjscqJQlw==
+"@cubejs-backend/api-gateway@^0.17.1":
+  version "0.17.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.17.1.tgz#ac8fdc3928863a2a1713b533d649fb3dede1c2b8"
+  integrity sha512-8iP/vJV+tkB+7YqZfyeG17PbbSEDa89oorcNYm9Fd/HcOoemYD3EVzV/JWV0LHrmc9f3kVcYno6U10Ledd4P0Q==
   dependencies:
     "@hapi/joi" "^14.0.6"
     chrono-node "^1.3.11"
@@ -827,18 +827,18 @@
     ramda "^0.25.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.13.9":
-  version "0.13.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.13.9.tgz#16bef231c1d74d451b0ae96c406708fdb321dd89"
-  integrity sha512-1Wbbnd0Q/cGclV9moJ+wLnTTmWiwJn4FZb6OrkLJx9GB8mTtPGW/l5N4O8y1ir93TLXbadoQ3hc3ED3WguV2Tw==
+"@cubejs-backend/query-orchestrator@^0.17.5":
+  version "0.17.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.5.tgz#d57d9e62e5895dedc2962f9828e27f286c66813a"
+  integrity sha512-PMzajns8xioMxIKjeIVC0pskIBLqbUQGxyiW/1lRplEt8+kJ9vqeJAPNJptHd8ucm1TUi7V2p9h+4eqVGZs9hQ==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.13.7":
-  version "0.13.7"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.13.7.tgz#0d01ae455fc9ae97e27a7e60f21f7bdcfc04a1be"
-  integrity sha512-8AFO6JLoLKmv9KjDVPvqokIvHkVR6j4CB3TRyC2ZdO9p8/F6OfGtUujRSjAR7WgO5qcQua10e/jzbiW0ocuirQ==
+"@cubejs-backend/schema-compiler@^0.17.8":
+  version "0.17.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.17.8.tgz#079184f7df9934b1c28d5cbc485d3590e6c4930e"
+  integrity sha512-p2THZGBRA9imvKrIueUFb4pLoBHiG1eDDpXGcdainMnfvkQYcTEl36Tb13xVtW3+xRRhBlbk//wdC57V+MhF7Q==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -855,10 +855,10 @@
     ramda "^0.24.1"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.13.11":
-  version "0.13.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.13.11.tgz#4a11f15ee1985f397a4293e00b04dc418caabf9d"
-  integrity sha512-d4SLVwQdQLk+41Uh2kWbkbAx6ClzfMeyIoEuY+/2HXz3xBA0aYDdJtd/zzkK2WB9+Cau/WuunXVhDF6U52D5YQ==
+"@cubejs-backend/server-core@^0.17.8":
+  version "0.17.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.17.8.tgz#d2bfc2ccd68798a45fd8b8a09ba1a0aba53e6363"
+  integrity sha512-72k83lgUsNxD7fS8ERLedmuKXDpk+r+3fOr8c56nZ38Pb9Zj2ZKh54WmaQtXjRl0xRGclB4yeRYlD17L42brwg==
   dependencies:
     "@babel/core" "^7.7.4"
     "@babel/generator" "^7.4.0"
@@ -868,9 +868,9 @@
     "@babel/standalone" "^7.3.4"
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
-    "@cubejs-backend/api-gateway" "^0.13.9"
-    "@cubejs-backend/query-orchestrator" "^0.13.9"
-    "@cubejs-backend/schema-compiler" "^0.13.7"
+    "@cubejs-backend/api-gateway" "^0.17.1"
+    "@cubejs-backend/query-orchestrator" "^0.17.5"
+    "@cubejs-backend/schema-compiler" "^0.17.8"
     codesandbox-import-utils "^1.3.8"
     cross-spawn "^6.0.5"
     fs-extra "^7.0.1"
@@ -884,6 +884,7 @@
     semver "^6.3.0"
     serve-static "^1.13.2"
     sqlstring "^2.3.1"
+    uuid "^3.3.3"
 
 "@hapi/hoek@6.x.x":
   version "6.2.4"
@@ -1289,7 +1290,7 @@ astral-regex@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/astral-regex/-/astral-regex-1.0.0.tgz#6c8c3fb827dd43ee3918f27b82782ab7658a6fd9"
 
-async-limiter@^1.0.0, async-limiter@~1.0.0:
+async-limiter@~1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/async-limiter/-/async-limiter-1.0.1.tgz#dd379e94f0db8310b08291f9d64c3209766617fd"
 
@@ -5163,11 +5164,9 @@ ws@^5.2.0:
     async-limiter "~1.0.0"
 
 ws@^7.1.2:
-  version "7.1.2"
-  resolved "https://registry.yarnpkg.com/ws/-/ws-7.1.2.tgz#c672d1629de8bb27a9699eb599be47aeeedd8f73"
-  integrity sha512-gftXq3XI81cJCgkUiAVixA0raD9IVmXqsylCrjRygw4+UOOGzPoxnQ6r/CnVL9i+mDncJo94tSkyrtuuQVBmrg==
-  dependencies:
-    async-limiter "^1.0.0"
+  version "7.2.1"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-7.2.1.tgz#03ed52423cd744084b2cf42ed197c8b65a936b8e"
+  integrity sha512-sucePNSafamSKoOqoNfBd8V0StlkzJKL2ZAhGQinCfNQ+oacw+Pk7lcdAElecBF2VkLNZRiIb5Oi1Q5lVUVt2A==
 
 xml-name-validator@^3.0.0:
   version "3.0.0"
