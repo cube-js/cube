@@ -1031,10 +1031,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.13.9":
-  version "0.13.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.13.9.tgz#0e6fef3562a65813cbeaba9f6aa70715d69fe859"
-  integrity sha512-pAQxZF8lep0uJ8PPreQTy71KNUwfTcyB2Z/6mVXKT/YH/jcNPKJyHRRQKCweaoB6CrRAtpj6dVtsjIUiKbUhyQ==
+"@cubejs-client/core@^0.17.8":
+  version "0.17.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.17.8.tgz#15912c40b06f69da10e354e9276c3b2c14529a8c"
+  integrity sha512-cEcXSjvwwe5NgEUCh5pmXXejevQ7ge1d4kfAqPwwC+qmvvo4EvkfPC9GlozkZiysrfXd+Xzz93SwpY5jGNiEDw==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -1044,10 +1044,10 @@
     ramda "^0.25.0"
     url-search-params-polyfill "^7.0.0"
 
-"@cubejs-client/react@^0.13.0":
-  version "0.13.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.13.0.tgz#675d0a71c190687e9a018068cf37b502b9f4fabf"
-  integrity sha512-eM4Ld66jqp9O5mZkv9hG8PcZiVkvKPdRS6D2Gdq3yWv+O/LeoUypMJlbGluSZZRZir+fZlpIhA18wkSVOUurwg==
+"@cubejs-client/react@^0.17.0":
+  version "0.17.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.17.0.tgz#b69a7bf545f7778d15a90e2429a51759327ded07"
+  integrity sha512-chyl31L1zRqIEqqTXqDoOaeJEzPkrobrm6da0lCM2JMLgvubd1I+MLG0ARlI/GK4QDpKsIeKbjZL2XOhBV9IzA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -9844,9 +9844,9 @@ react-error-overlay@^5.1.4:
   integrity sha512-X1Y+0jR47ImDVr54Ab6V9eGk0Hnu7fVWGeHQSOXHf/C2pF9c6uy3gef8QUeuUiWlNb0i08InPSE5a/KJzNzw1Q==
 
 react-is@^16.6.0, react-is@^16.7.0, react-is@^16.8.1, react-is@^16.8.4:
-  version "16.9.0"
-  resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.9.0.tgz#21ca9561399aad0ff1a7701c01683e8ca981edcb"
-  integrity sha512-tJBzzzIgnnRfEm046qRcURvwQnZVXmuCbscxUO5RWrGTXpon2d4c8mI0D8WE6ydVIm29JiLB6+RslkIvym9Rjw==
+  version "16.12.0"
+  resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.12.0.tgz#2cc0fe0fba742d97fd527c42a13bec4eeb06241c"
+  integrity sha512-rPCkf/mWBtKc97aLL9/txD8DZdemK0vkA3JMLShjlJB3Pj3s+lpf1KaBzMfQrAmhMQB0n1cU/SUGgKKBCe837Q==
 
 react-lazy-load@^3.0.13:
   version "3.0.13"
