@@ -10,7 +10,7 @@
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "core-js": "^2.5.3",
+    "core-js": "^3.6.4",
     "ramda": "^0.25.0"
   },
   "peerDependencies": {
