@@ -69,8 +69,8 @@ const QueryQueueTest = (name, options) => {
 
     it('stage reporting', async () => {
       delayCount = 0;
-      const resultPromise = queue.executeInQueue('delay', '1', { delay: 50, result: '1' }, 0, { stageQueryKey: '1' });
-      await delayFn(null, 10);
+      const resultPromise = queue.executeInQueue('delay', '1', { delay: 200, result: '1' }, 0, { stageQueryKey: '1' });
+      await delayFn(null, 50);
       should((await queue.getQueryStage('1')).stage).be.eql('Executing query');
       await resultPromise;
       should(await queue.getQueryStage('1')).be.eql(undefined);
@@ -78,10 +78,10 @@ const QueryQueueTest = (name, options) => {
 
     it('priority stage reporting', async () => {
       delayCount = 0;
-      const resultPromise = queue.executeInQueue('delay', '31', { delay: 100, result: '1' }, 20, { stageQueryKey: '12' });
-      await delayFn(null, 10);
-      const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 100, result: '1' }, 10, { stageQueryKey: '12' });
-      await delayFn(null, 10);
+      const resultPromise = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, { stageQueryKey: '12' });
+      await delayFn(null, 50);
+      const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, { stageQueryKey: '12' });
+      await delayFn(null, 50);
       should((await queue.getQueryStage('12', 10)).stage).be.eql('#1 in queue');
       await resultPromise;
       await resultPromise2;
