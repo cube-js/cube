@@ -103,6 +103,7 @@ class CubeToMetaTransformer {
       cumulativeTotal: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       type: 'number', // TODO
+      aggType: nameToMetric[1].type,
       drillMembers: drillMembers && this.cubeEvaluator.evaluateReferences(cubeName, drillMembers, { originalSorting: true })
     };
   }
