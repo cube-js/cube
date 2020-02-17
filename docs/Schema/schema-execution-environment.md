@@ -27,10 +27,6 @@ In order to access `process.env` variable helper service can be introduced outsi
 exports.tableSchema = () => process.env.TABLE_SCHEMA;
 ```
 
-## Cube.js globals (cube and others)
-
-Cube.js defines `cube()`, `context()` and `asyncModule()` global variable functions in order to provide API for schema configuration which aren't normally accessible outside of Cube.js schema.
-
 **schema/Users.js**:
 ```javascript
 import { tableSchema } from '../tablePrefix';
@@ -41,6 +37,10 @@ cube(`Users`, {
  // ...
 });
 ```
+
+## Cube.js globals (cube and others)
+
+Cube.js defines `cube()`, `context()` and `asyncModule()` global variable functions in order to provide API for schema configuration which aren't normally accessible outside of Cube.js schema.
 
 ## Import / Export
 
