@@ -45,6 +45,14 @@ class BaseDriver {
     throw 'Not implemented';
   }
 
+  downloadQueryResults() {
+    throw 'Not implemented';
+  }
+
+  readOnly() {
+    return false;
+  }
+
   tablesSchema() {
     const query = this.informationSchemaQuery();
 
@@ -134,7 +142,7 @@ class BaseDriver {
              columns.table_name,
              columns.table_schema,
              columns.data_type
-      FROM information_schema.columns 
+      FROM information_schema.columns
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name, schema]
     );
