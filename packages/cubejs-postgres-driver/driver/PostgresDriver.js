@@ -9,10 +9,11 @@ const GenericTypeToPostgres = {
   string: 'text'
 };
 
-const DataTypeMapping = {}
-for (let [key, value] of Object.entries(types.builtins)) {
+const DataTypeMapping = {};
+Object.entries(types.builtins).forEach(pair => {
+  const [key, value] = pair;
   DataTypeMapping[value] = key;
-}
+});
 
 const timestampDataTypes = [1114, 1184];
 
@@ -87,8 +88,7 @@ class PostgresDriver extends BaseDriver {
       types: res.fields.map(f => ({
         name: f.name,
         type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
-       })
-      ),
+      })),
     };
   }
 
