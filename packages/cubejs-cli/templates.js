@@ -51,7 +51,7 @@ const dotEnv = env => {
   }[env.dbType] || defaultDotEnvVars(env);
 };
 
-const gitIgnore = '.env'
+const gitIgnore = '.env';
 
 const serverlessYml = env => `service: ${env.projectName}
 
