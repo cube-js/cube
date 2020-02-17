@@ -212,6 +212,7 @@ Example response:
           shortTitle:"Count",
           aliasName:"users.count",
           type:"number",
+          aggType:"count"
           drillMembers:[
             "Users.id",
             "Users.city",
