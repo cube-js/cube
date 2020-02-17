@@ -61,6 +61,17 @@ In case you need to tweak it a little bit please follow [Implementing Driver](#i
 In order to run tests in `cubejs-schema-compiler` package you need to have running [Docker](https://docs.docker.com/install/) on your machine.
 When it's up and running just use `$ npm test` in `packages/cubejs-schema-compiler` to execute tests.
 
+### Linking Server Core for Development
+
+It's convenient to link `@cubejs-backend/server-core` into your project for manual tests of changes of backend code.
+Cube.js uses `yarn` as package manager instead of `npm`.
+In order to link `@cubejs-backend/server-core`:
+
+1. Install yarn: `npm install -g yarn`.
+2. Link server-core package: `yarn link` inside `packages/cubejs-server-core`.
+3. Link all drivers and dependent packages where you make changes in `packages/cubejs-server-core`.
+4. Run `yarn build` in `packages/cubejs-playground`.
+
 ## Style guides
 
 We're passionate about what code can do rather how it's formatted.
