@@ -393,13 +393,13 @@ class PreAggregationLoader {
       if (this.preAggregation.external) {
         refreshStrategy = client.readOnly() ? this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
       }
-      const resultPromise = refreshStrategy(client, loadSql, newVersionEntry);
+      const resultPromise = refreshStrategy.bind(this)(client, loadSql, params, newVersionEntry);
       resultPromise.cancel = () => {} // TODO implement cancel (loading rollup into table and external upload)
       return resultPromise;
     };
   }
 
-  async refreshImplStoreInSourceStrategy(client, loadSql, newVersionEntry) {
+  async refreshImplStoreInSourceStrategy(client, loadSql, params, newVersionEntry) {
     await client.loadPreAggregationIntoTable(
       this.targetTableName(newVersionEntry),
       QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
