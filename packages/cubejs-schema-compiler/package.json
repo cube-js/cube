@@ -44,7 +44,7 @@
     "request-promise": "^4.2.4",
     "should": "^11.2.1",
     "sqlstring": "^2.3.1",
-    "testcontainers": "^1.1.10",
+    "testcontainers": "^2.4.0",
     "uuid": "^3.3.2"
   },
   "license": "Apache-2.0"
