@@ -4,14 +4,15 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
+var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _typeof = _interopDefault(require('@babel/runtime/helpers/typeof'));
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
 require('core-js/modules/es6.promise');
+var uuid = _interopDefault(require('uuid/v4'));
 require('core-js/modules/es6.number.constructor');
 require('core-js/modules/es6.number.parse-float');
 require('core-js/modules/web.dom.iterable');
@@ -855,20 +856,25 @@ function () {
 
   _createClass(HttpTransport, [{
     key: "request",
-    value: function request(method, params) {
+    value: function request(method, _ref2) {
       var _this = this;
+
+      var baseRequestId = _ref2.baseRequestId,
+          params = _objectWithoutProperties(_ref2, ["baseRequestId"]);
 
       var searchParams = new URLSearchParams(params && Object.keys(params).map(function (k) {
         return _defineProperty({}, k, _typeof(params[k]) === 'object' ? JSON.stringify(params[k]) : params[k]);
       }).reduce(function (a, b) {
         return _objectSpread({}, a, b);
       }, {}));
+      var spanCounter = 1;
 
       var runRequest = function runRequest() {
         return fetch("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
-          headers: Object.assign({
+          headers: _objectSpread({
             Authorization: _this.authorization,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
           }, _this.headers)
         });
       };
@@ -958,7 +964,9 @@ function () {
   _createClass(CubejsApi, [{
     key: "request",
     value: function request(method, params) {
-      return this.transport.request(method, params);
+      return this.transport.request(method, _objectSpread({
+        baseRequestId: uuid()
+      }, params));
     }
   }, {
     key: "loadMethod",

@@ -1,11 +1,12 @@
-import _objectSpread from '@babel/runtime/helpers/objectSpread';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+import _objectSpread from '@babel/runtime/helpers/objectSpread';
 import _typeof from '@babel/runtime/helpers/typeof';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
 import _createClass from '@babel/runtime/helpers/createClass';
 import 'core-js/modules/es6.promise';
+import uuid from 'uuid/v4';
 import 'core-js/modules/es6.number.constructor';
 import 'core-js/modules/es6.number.parse-float';
 import 'core-js/modules/web.dom.iterable';
@@ -849,20 +850,25 @@ function () {
 
   _createClass(HttpTransport, [{
     key: "request",
-    value: function request(method, params) {
+    value: function request(method, _ref2) {
       var _this = this;
+
+      var baseRequestId = _ref2.baseRequestId,
+          params = _objectWithoutProperties(_ref2, ["baseRequestId"]);
 
       var searchParams = new URLSearchParams(params && Object.keys(params).map(function (k) {
         return _defineProperty({}, k, _typeof(params[k]) === 'object' ? JSON.stringify(params[k]) : params[k]);
       }).reduce(function (a, b) {
         return _objectSpread({}, a, b);
       }, {}));
+      var spanCounter = 1;
 
       var runRequest = function runRequest() {
         return fetch("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
-          headers: Object.assign({
+          headers: _objectSpread({
             Authorization: _this.authorization,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
           }, _this.headers)
         });
       };
@@ -952,7 +958,9 @@ function () {
   _createClass(CubejsApi, [{
     key: "request",
     value: function request(method, params) {
-      return this.transport.request(method, params);
+      return this.transport.request(method, _objectSpread({
+        baseRequestId: uuid()
+      }, params));
     }
   }, {
     key: "loadMethod",

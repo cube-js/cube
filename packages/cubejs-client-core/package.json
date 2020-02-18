@@ -17,10 +17,12 @@
     "moment": "^2.22.2",
     "moment-range": "^4.0.1",
     "ramda": "^0.25.0",
-    "url-search-params-polyfill": "^7.0.0"
+    "url-search-params-polyfill": "^7.0.0",
+    "uuid": "^3.4.0"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint src/*.js src/*.jsx"
   },
   "files": [
     "src",
