@@ -32,7 +32,7 @@
   "dependencies": {
     "chalk": "^2.4.2",
     "commander": "^2.19.0",
-    "cross-spawn": "^6.0.5",
+    "cross-spawn": "^7.0.1",
     "fs-extra": "^7.0.1",
     "jsonwebtoken": "^8.5.1",
     "node-fetch": "^2.6.0",
