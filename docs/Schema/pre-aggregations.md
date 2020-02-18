@@ -97,7 +97,7 @@ cube(`Orders`, {
       sql: `amount`,
       type: `sum`
     },
-    
+
     averageRevenue: {
       sql: `${revenue} / ${count}`,
       type: `number`
@@ -271,6 +271,28 @@ cube(`Orders`, {
 In order to make external pre-aggregations work you should set
 [externalDriverFactory](@cubejs-backend-server-core#external-driver-factory) and [externalDbType](@cubejs-backend-server-core#external-db-type) params while creating your server instance.
 
+Note that by default, Cube.js materializes the pre-aggregration query results as new tables in the source database. For external pre-aggregations, these source tables are temporary - once downloaded and uploaded to the external database, they are cleaned-up.
+
+However, it may not be possible to stage pre-aggregation query results in materialized tables in the source database like this - for example, if the driver doesn't support it, or if your source database is read-only. To fallback to a strategy where the pre-aggreation query results are downloaded without first being materialized, set the `readOnly` param of [driverFactory](@cubejs-backend-server-core#driver-factory) in your configuration:
+
+```javascript
+const CubejsServer = require('@cubejs-backend/server');
+const PostgresDriver = require('@cubejs-backend/postgres-driver');
+
+const options = {
+  driverFactory: () => new PostgresDriver({
+    readOnly: true
+  }),
+  externalDbType: 'postgres',
+  externalDriverFactory: () => new PostgresDriver({
+    host: 'my_host',
+    database: 'my_db',
+    user: 'my_user',
+    password: 'my_pw'
+  })
+};
+```
+
 ## refreshKey
 
 Cube.js also takes care of keeping pre-aggregations up to date.
@@ -320,7 +342,7 @@ In case of partitioned rollups incremental `refreshKey` can be used as follows:
 ```javascript
 cube(`Orders`, {
   sql: `select * from orders`,
-  
+
   // ...
 
   preAggregations: {
@@ -358,7 +380,7 @@ Example usage:
 ```javascript
 cube(`Orders`, {
   sql: `select * from orders`,
-  
+
   // ...
 
   preAggregations: {
@@ -373,4 +395,3 @@ cube(`Orders`, {
   }
 });
 ```
-
