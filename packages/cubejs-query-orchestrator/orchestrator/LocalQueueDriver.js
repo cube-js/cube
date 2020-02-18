@@ -61,7 +61,13 @@ class LocalQueueDriverConnection {
 
   addToQueue(keyScore, queryKey, time, queryHandler, query, priority, options) {
     const queryQueueObj = {
-      queryHandler, query, queryKey, stageQueryKey: options.stageQueryKey, priority, requestId: options.requestId
+      queryHandler,
+      query,
+      queryKey,
+      stageQueryKey: options.stageQueryKey,
+      priority,
+      requestId: options.requestId,
+      addedToQueueTime: new Date().getTime()
     };
     const key = this.redisHash(queryKey);
     if (!this.queryDef[key]) {
@@ -124,8 +130,8 @@ class LocalQueueDriverConnection {
     return this.queueArray(this.active, new Date().getTime() - this.heartBeatTimeout * 1000);
   }
 
-  async getQueryStageState() {
-    return [this.queueArray(this.active), this.queueArray(this.toProcess), R.clone(this.queryDef)];
+  async getQueryStageState(onlyKeys) {
+    return [this.queueArray(this.active), this.queueArray(this.toProcess), onlyKeys ? {} : R.clone(this.queryDef)];
   }
 
   async getQueryDef(queryKey) {

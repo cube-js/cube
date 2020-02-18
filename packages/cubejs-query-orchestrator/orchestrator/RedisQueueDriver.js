@@ -34,7 +34,13 @@ class RedisQueueDriverConnection {
         this.queriesDefKey(),
         this.redisHash(queryKey),
         JSON.stringify({
-          queryHandler, query, queryKey, stageQueryKey: options.stageQueryKey, priority, requestId: options.requestId
+          queryHandler,
+          query,
+          queryKey,
+          stageQueryKey: options.stageQueryKey,
+          priority,
+          requestId: options.requestId,
+          addedToQueueTime: new Date().getTime()
         })
       ])
       .zcard(this.toProcessRedisKey())
@@ -91,12 +97,14 @@ class RedisQueueDriverConnection {
     );
   }
 
-  async getQueryStageState() {
-    const [active, toProcess, allQueryDefs] = await this.redisClient.multi()
+  async getQueryStageState(onlyKeys) {
+    let request = this.redisClient.multi()
       .zrange([this.activeRedisKey(), 0, -1])
-      .zrange([this.toProcessRedisKey(), 0, -1])
-      .hgetall(this.queriesDefKey())
-      .execAsync();
+      .zrange([this.toProcessRedisKey(), 0, -1]);
+    if (!onlyKeys) {
+      request = request.hgetall(this.queriesDefKey());
+    }
+    const [active, toProcess, allQueryDefs] = await request.execAsync();
     return [active, toProcess, R.map(q => JSON.parse(q), allQueryDefs || {})];
   }
 

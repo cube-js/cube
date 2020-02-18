@@ -58,11 +58,25 @@ class QueryQueue {
           queueSize,
           queryKey,
           queuePrefix: this.redisQueuePrefix,
-          requestId: options.requestId
+          requestId: options.requestId,
         });
       }
 
       await this.reconcileQueue(redisClient);
+
+      const queryDef = await redisClient.getQueryDef(queryKey);
+      const [active, toProcess] = await redisClient.getQueryStageState(true);
+
+      this.logger('Waiting for query', {
+        queueSize,
+        queryKey: queryDef.queryKey,
+        queuePrefix: this.redisQueuePrefix,
+        requestId: options.requestId,
+        active: active.indexOf(redisClient.redisHash(queryKey)) !== -1,
+        queueIndex: toProcess.indexOf(redisClient.redisHash(queryKey)),
+        waitingForRequestId: queryDef.requestId
+      });
+
       result = await redisClient.getResultBlocking(queryKey);
       if (!result) {
         throw new ContinueWaitError();
@@ -178,11 +192,13 @@ class QueryQueue {
         if (query) {
           let executionResult;
           const startQueryTime = (new Date()).getTime();
+          const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
           this.logger('Performing query', {
             queueSize,
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            timeInQueue
           });
           await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime });
 
@@ -216,7 +232,8 @@ class QueryQueue {
               duration: ((new Date()).getTime() - startQueryTime),
               queryKey: query.queryKey,
               queuePrefix: this.redisQueuePrefix,
-              requestId: query.requestId
+              requestId: query.requestId,
+              timeInQueue
             });
           } catch (e) {
             executionResult = {
@@ -255,6 +272,12 @@ class QueryQueue {
 
         await this.reconcileQueue(redisClient);
       }
+    } catch (e) {
+      this.logger('Queue storage error', {
+        queryKey,
+        error: (e.stack || e).toString(),
+        queuePrefix: this.redisQueuePrefix
+      });
     } finally {
       redisClient.release();
     }
