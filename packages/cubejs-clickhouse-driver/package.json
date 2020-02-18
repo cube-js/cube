@@ -21,7 +21,7 @@
     "@cubejs-backend/query-orchestrator": "^0.17.9",
     "generic-pool": "^3.6.0",
     "sqlstring": "^2.3.1",
-    "uuidv4": "^4.0.0"
+    "uuidv4": "^6.0.2"
   },
   "license": "Apache-2.0",
   "devDependencies": {
