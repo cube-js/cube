@@ -38,15 +38,15 @@ class BaseDriver {
   }
 
   testConnection() {
-    throw 'Not implemented';
+    throw new Error('Not implemented');
   }
 
   query() {
-    throw 'Not implemented';
+    throw new Error('Not implemented');
   }
 
   downloadQueryResults() {
-    throw 'Not implemented';
+    throw new Error('Not implemented');
   }
 
   readOnly() {

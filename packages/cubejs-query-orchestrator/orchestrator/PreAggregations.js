@@ -448,7 +448,6 @@ class PreAggregationLoader {
     const tableData = await client.downloadQueryResults(sql, params);
     await this.uploadExternalPreAggregation(tableData, newVersionEntry);
     await this.loadCache.reset(this.preAggregation);
-    await this.dropOrphanedTables(client, this.targetTableName(newVersionEntry));
   }
 
   async downloadTempExternalPreAggregation(client, newVersionEntry) {
