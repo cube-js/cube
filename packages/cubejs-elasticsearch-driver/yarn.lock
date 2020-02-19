@@ -18,18 +18,18 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.17.5":
-  version "0.17.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.5.tgz#d57d9e62e5895dedc2962f9828e27f286c66813a"
-  integrity sha512-PMzajns8xioMxIKjeIVC0pskIBLqbUQGxyiW/1lRplEt8+kJ9vqeJAPNJptHd8ucm1TUi7V2p9h+4eqVGZs9hQ==
+"@cubejs-backend/query-orchestrator@^0.17.9":
+  version "0.17.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.9.tgz#5da93cc1a47712c1510d63a326a3615fa7c8aa4c"
+  integrity sha512-8VMxSPOp5XQbn3xsB9ncYDPyWIntTbFGPveDO3iwiQQEn2dBQm3JhcbRysxyq01IgdKRyJcHt01tFqtQOIKGvA==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
 
 "@elastic/elasticsearch@^7.5.0":
-  version "7.5.0"
-  resolved "https://registry.yarnpkg.com/@elastic/elasticsearch/-/elasticsearch-7.5.0.tgz#a54b07001e1a3912792bf9f34e6ec6a4fe0aef0c"
-  integrity sha512-ahzu451ppXepQMb3Zr8eFfWn8QR7yCcUWQjU1dS4X63Ctin0GNwwSPertt4WwDkm6MnZ25o932wAEgyMFLwzdA==
+  version "7.6.0"
+  resolved "https://registry.yarnpkg.com/@elastic/elasticsearch/-/elasticsearch-7.6.0.tgz#960e937b56826b53d4784bc48f3375ce4efc5377"
+  integrity sha512-mCS0gro7KM9fhPpRXf+X0Bxd2j688ONqhj2fibhU2E3vup6rmNgH0bw3Vuvv98D8MmFl2oCxwtv3a/Km/K8F6Q==
   dependencies:
     debug "^4.1.1"
     decompress-response "^4.2.0"
