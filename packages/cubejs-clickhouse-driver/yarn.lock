@@ -25,10 +25,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.17.5":
-  version "0.17.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.5.tgz#d57d9e62e5895dedc2962f9828e27f286c66813a"
-  integrity sha512-PMzajns8xioMxIKjeIVC0pskIBLqbUQGxyiW/1lRplEt8+kJ9vqeJAPNJptHd8ucm1TUi7V2p9h+4eqVGZs9hQ==
+"@cubejs-backend/query-orchestrator@^0.17.9":
+  version "0.17.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.9.tgz#5da93cc1a47712c1510d63a326a3615fa7c8aa4c"
+  integrity sha512-8VMxSPOp5XQbn3xsB9ncYDPyWIntTbFGPveDO3iwiQQEn2dBQm3JhcbRysxyq01IgdKRyJcHt01tFqtQOIKGvA==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
@@ -1629,15 +1629,17 @@ util-deprecate@^1.0.1, util-deprecate@~1.0.1:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
 
-uuid@3.3.2:
-  version "3.3.2"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.2.tgz#1b4af4955eb3077c501c23872fc6513811587131"
+uuid@3.4.0:
+  version "3.4.0"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.4.0.tgz#b23e4358afa8a202fe7a100af1f5f883f02007ee"
+  integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
 
-uuidv4@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/uuidv4/-/uuidv4-4.0.0.tgz#ac4b05ecf0efa62dda532d55b7a8de8f726f8f7c"
+uuidv4@^6.0.2:
+  version "6.0.2"
+  resolved "https://registry.yarnpkg.com/uuidv4/-/uuidv4-6.0.2.tgz#c0154f2592420c523062def3a84fc1cd235259f3"
+  integrity sha512-SHfZgAT2pz0TAXtclFMsTrT55U1/HTLg7xSZYDhX953sdcVIJ9lanIs8/BFSjxGmg4cEjc8P7HXPK7EPOD/nfA==
   dependencies:
-    uuid "3.3.2"
+    uuid "3.4.0"
 
 validate-npm-package-license@^3.0.1:
   version "3.0.4"
