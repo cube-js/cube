@@ -11,7 +11,7 @@
   "dependencies": {
     "@babel/runtime": "^7.1.2",
     "core-js": "^2.5.3",
-    "ramda": "^0.25.0"
+    "ramda": "^0.27.0"
   },
   "peerDependencies": {
     "prop-types": "^15.6.2",

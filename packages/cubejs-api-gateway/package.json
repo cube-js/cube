@@ -21,7 +21,7 @@
     "jsonwebtoken": "^8.3.0",
     "moment": "^2.24.0",
     "moment-timezone": "^0.5.27",
-    "ramda": "^0.25.0",
+    "ramda": "^0.27.0",
     "uuid": "^3.3.3"
   },
   "devDependencies": {

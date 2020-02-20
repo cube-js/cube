@@ -15,7 +15,7 @@
     "test": "mocha"
   },
   "dependencies": {
-    "ramda": "^0.24.1",
+    "ramda": "^0.27.0",
     "redis": "^2.8.0"
   },
   "devDependencies": {
