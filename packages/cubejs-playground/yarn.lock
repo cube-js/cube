@@ -1031,26 +1031,27 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.17.8":
-  version "0.17.8"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.17.8.tgz#15912c40b06f69da10e354e9276c3b2c14529a8c"
-  integrity sha512-cEcXSjvwwe5NgEUCh5pmXXejevQ7ge1d4kfAqPwwC+qmvvo4EvkfPC9GlozkZiysrfXd+Xzz93SwpY5jGNiEDw==
+"@cubejs-client/core@^0.17.9":
+  version "0.17.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.17.9.tgz#e91140a9ff8debdcc7da8145fd554bc400a5dac1"
+  integrity sha512-zgZIY3bZUfG8fbdy833kFZnxM44dvW/7qQ+R/94zaY4TaLqYNBvXJXYoEreEnBLMlV78DPfkEehKmb/b+jgqZA==
   dependencies:
     "@babel/runtime" "^7.1.2"
-    core-js "^2.5.3"
+    core-js "^3.6.4"
     cross-fetch "^3.0.2"
     moment "^2.22.2"
     moment-range "^4.0.1"
     ramda "^0.25.0"
     url-search-params-polyfill "^7.0.0"
+    uuid "^3.4.0"
 
-"@cubejs-client/react@^0.17.0":
-  version "0.17.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.17.0.tgz#b69a7bf545f7778d15a90e2429a51759327ded07"
-  integrity sha512-chyl31L1zRqIEqqTXqDoOaeJEzPkrobrm6da0lCM2JMLgvubd1I+MLG0ARlI/GK4QDpKsIeKbjZL2XOhBV9IzA==
+"@cubejs-client/react@^0.17.9":
+  version "0.17.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.17.9.tgz#5eda37d1940bed1cf5c5190438e6f1d1cdc8f697"
+  integrity sha512-BdHV4e05ahzbV5Kgf1KHa2tT2+lDqN/yUQKIHd5G/BubQhz67IXzshyqMJNwL5g7miRwcgkJPg5qrWTxCG3z4A==
   dependencies:
     "@babel/runtime" "^7.1.2"
-    core-js "^2.5.3"
+    core-js "^3.6.4"
     ramda "^0.25.0"
 
 "@emotion/is-prop-valid@^0.8.1":
@@ -3022,10 +3023,15 @@ core-js@^1.0.0:
   resolved "https://registry.yarnpkg.com/core-js/-/core-js-1.2.7.tgz#652294c14651db28fa93bd2d5ff2983a4f08c636"
   integrity sha1-ZSKUwUZR2yj6k70tX/KYOk8IxjY=
 
-core-js@^2.4.0, core-js@^2.5.0, core-js@^2.5.1, core-js@^2.5.3:
+core-js@^2.4.0, core-js@^2.5.0, core-js@^2.5.1:
   version "2.6.9"
   resolved "https://registry.yarnpkg.com/core-js/-/core-js-2.6.9.tgz#6b4b214620c834152e179323727fc19741b084f2"
   integrity sha512-HOpZf6eXmnl7la+cUdMnLvUxKNqLUzJvgIziQ0DiF3JwSImNphIqdGqzj6hIKyX04MmV0poclQ7+wjWvxQyR2A==
+
+core-js@^3.6.4:
+  version "3.6.4"
+  resolved "https://registry.yarnpkg.com/core-js/-/core-js-3.6.4.tgz#440a83536b458114b9cb2ac1580ba377dc470647"
+  integrity sha512-4paDGScNgZP2IXXilaffL9X7968RuvwlkK3xWtZRVqgd8SYNiVKRJvkFd1aqqEuPfN7E68ZHEp9hDj6lHj4Hyw==
 
 core-util-is@1.0.2, core-util-is@~1.0.0:
   version "1.0.2"
@@ -4067,11 +4073,6 @@ dotenv@6.0.0:
   version "6.0.0"
   resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-6.0.0.tgz#24e37c041741c5f4b25324958ebbc34bca965935"
   integrity sha512-FlWbnhgjtwD+uNLUGHbMykMOYQaTivdHEmYwAKFjn6GKe/CqY0fNae93ZHTd20snh9ZLr8mTzIL9m0APQ1pjQg==
-
-dotenv@^6.2.0:
-  version "6.2.0"
-  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-6.2.0.tgz#941c0410535d942c8becf28d3f357dbd9d476064"
-  integrity sha512-HygQCKUBSFl8wKQZBSemMywRWcEDNidvNbjGVyZu3nbZ8qq9ubiPoGLMdRDpfSrpkkm9BXYFkpKxxFX38o/76w==
 
 draft-js@^0.10.0, draft-js@~0.10.0:
   version "0.10.5"
@@ -9782,12 +9783,10 @@ react-app-polyfill@^0.2.1:
     whatwg-fetch "3.0.0"
 
 react-app-rewired@^2.1.0:
-  version "2.1.3"
-  resolved "https://registry.yarnpkg.com/react-app-rewired/-/react-app-rewired-2.1.3.tgz#5ae8583ecc9f9f968d40b735d2abbe871378a52f"
-  integrity sha512-NXC2EsQrnEMV7xD70rHcBq0B4PSEzjY/K2m/e+GRgit2jZO/uZApnpCZSKvIX2leLRN69Sqf2id0VXZ1F62CDw==
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/react-app-rewired/-/react-app-rewired-2.1.5.tgz#592ec2eae5c3c5cd96c80930b5dc3f6c34da1dc6"
+  integrity sha512-Gr8KfCeL9/PTQs8Vvxc7v8wQ9vCFMnYPhcAkrMlzkLiMFXS+BgSwm11MoERjZm7dpA2WjTi+Pvbu/w7rujAV+A==
   dependencies:
-    cross-spawn "^6.0.5"
-    dotenv "^6.2.0"
     semver "^5.6.0"
 
 react-chartjs-2@^2.7.4:
@@ -11837,6 +11836,11 @@ uuid@^3.0.1, uuid@^3.3.2, uuid@^3.3.3:
   version "3.3.3"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.3.tgz#4568f0216e78760ee1dbf3a4d2cf53e224112866"
   integrity sha512-pW0No1RGHgzlpHJO1nsVrHKpOEIxkGg1xB+v0ZmdNH5OAeAwzAVrCnI2/6Mtx+Uys6iaylxa+D3g4j63IKKjSQ==
+
+uuid@^3.4.0:
+  version "3.4.0"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.4.0.tgz#b23e4358afa8a202fe7a100af1f5f883f02007ee"
+  integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
 
 validate-npm-package-license@^3.0.1:
   version "3.0.4"
