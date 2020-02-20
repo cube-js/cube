@@ -37,7 +37,7 @@
     "http-server": "^0.11.1",
     "lerna": "^3.13.1",
     "rollup": "^0.68",
-    "rollup-plugin-alias": "^1.4.0",
+    "rollup-plugin-alias": "^2.2.0",
     "rollup-plugin-angular": "^0.5.3",
     "rollup-plugin-babel": "^4.0.3",
     "rollup-plugin-commonjs": "^9.1.6",
