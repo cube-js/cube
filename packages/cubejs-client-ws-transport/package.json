@@ -11,7 +11,7 @@
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "core-js": "^3.6.4",
+    "core-js": "^2.5.3",
     "isomorphic-ws": "^4.0.1"
   },
   "files": [
