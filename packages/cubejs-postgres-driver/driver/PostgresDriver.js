@@ -9,6 +9,12 @@ const GenericTypeToPostgres = {
   string: 'text'
 };
 
+const DataTypeMapping = {};
+Object.entries(types.builtins).forEach(pair => {
+  const [key, value] = pair;
+  DataTypeMapping[value] = key;
+});
+
 const timestampDataTypes = [1114, 1184];
 
 const timestampTypeParser = val => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
@@ -44,7 +50,7 @@ class PostgresDriver extends BaseDriver {
     }
   }
 
-  async query(query, values) {
+  async queryResponse(query, values) {
     const client = await this.pool.connect();
     try {
       await client.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
@@ -65,10 +71,29 @@ class PostgresDriver extends BaseDriver {
           },
         },
       });
-      return res && res.rows;
+      return res;
     } finally {
       await client.release();
     }
+  }
+
+  async query(query, values) {
+    return (await this.queryResponse(query, values)).rows;
+  }
+
+  async downloadQueryResults(query, values) {
+    const res = await this.queryResponse(query, values);
+    return {
+      rows: res.rows,
+      types: res.fields.map(f => ({
+        name: f.name,
+        type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+      })),
+    };
+  }
+
+  readOnly() {
+    return !!this.config.readOnly;
   }
 
   async uploadTable(table, columns, tableData) {

@@ -387,42 +387,70 @@ class PreAggregationLoader {
 
   refresh(newVersionEntry) {
     return (client) => {
-      const [loadSql, params] =
-        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
-      let queryPromise = null;
-      const refreshImpl = async () => {
-        if (this.preAggregation.external) { // TODO optimize
-          await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
-        }
-        queryPromise = client.loadPreAggregationIntoTable(
-          this.targetTableName(newVersionEntry),
-          QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
-            .replace(
-              this.preAggregation.tableName,
-              this.targetTableName(newVersionEntry)
-            ),
-          params
-        );
-        await queryPromise;
-        if (this.preAggregation.external) {
-          await this.loadExternalPreAggregation(client, newVersionEntry);
-        } else {
-          await this.createIndexes(client, newVersionEntry);
-        }
-        await this.loadCache.reset(this.preAggregation);
-        await this.dropOrphanedTables(client, this.targetTableName(newVersionEntry));
-        if (!this.preAggregation.external) {
-          await this.loadCache.reset(this.preAggregation);
-        }
-      };
-
-      const resultPromise = refreshImpl();
-      resultPromise.cancel = () => queryPromise.cancel(); // TODO cancel for external upload
+      let refreshStrategy = this.refreshImplStoreInSourceStrategy;
+      if (this.preAggregation.external) {
+        refreshStrategy = client.readOnly() ? this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
+      }
+      const resultPromise = refreshStrategy.bind(this)(client, newVersionEntry);
+      resultPromise.cancel = () => {} // TODO implement cancel (loading rollup into table and external upload)
       return resultPromise;
     };
   }
 
-  async loadExternalPreAggregation(client, newVersionEntry) {
+  async refreshImplStoreInSourceStrategy(client, newVersionEntry) {
+    const [loadSql, params] =
+        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+    await client.loadPreAggregationIntoTable(
+      this.targetTableName(newVersionEntry),
+      QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
+        .replace(
+          this.preAggregation.tableName,
+          this.targetTableName(newVersionEntry)
+        ),
+      params
+    );
+    await this.createIndexes(client, newVersionEntry);
+    await this.loadCache.reset(this.preAggregation);
+    await this.dropOrphanedTables(client, this.targetTableName(newVersionEntry));
+    await this.loadCache.reset(this.preAggregation);
+  }
+
+  async refreshImplTempTableExternalStrategy(client, newVersionEntry) {
+    const [loadSql, params] =
+        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+    await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
+    await client.loadPreAggregationIntoTable(
+      this.targetTableName(newVersionEntry),
+      QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
+        .replace(
+          this.preAggregation.tableName,
+          this.targetTableName(newVersionEntry)
+        ),
+      params
+    );
+    const tableData = await this.downloadTempExternalPreAggregation(client, newVersionEntry);
+    await this.uploadExternalPreAggregation(tableData, newVersionEntry);
+    await this.loadCache.reset(this.preAggregation);
+    await this.dropOrphanedTables(client, this.targetTableName(newVersionEntry));
+  }
+
+  async refreshImplStreamExternalStrategy(client, newVersionEntry) {
+    const [sql, params] =
+        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+    if (!client.downloadQueryResults) {
+      throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadQueryResults()`);
+    }
+
+    this.logger('Downloading external pre-aggregation via query', {
+      preAggregation: this.preAggregation,
+      requestId: this.requestId
+    });
+    const tableData = await client.downloadQueryResults(sql, params);
+    await this.uploadExternalPreAggregation(tableData, newVersionEntry);
+    await this.loadCache.reset(this.preAggregation);
+  }
+
+  async downloadTempExternalPreAggregation(client, newVersionEntry) {
     if (!client.downloadTable) {
       throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadTable()`);
     }
@@ -432,7 +460,12 @@ class PreAggregationLoader {
       requestId: this.requestId
     });
     const tableData = await client.downloadTable(table);
-    const columns = await client.tableColumnTypes(table);
+    tableData.types = await client.tableColumnTypes(table);
+    return tableData;
+  }
+
+  async uploadExternalPreAggregation(tableData, newVersionEntry) {
+    const table = this.targetTableName(newVersionEntry);
     const externalDriver = await this.externalDriverFactory();
     if (!externalDriver.uploadTable) {
       throw new Error(`Can't load external pre-aggregation: destination driver doesn't support uploadTable()`);
@@ -441,7 +474,7 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    await externalDriver.uploadTable(table, columns, tableData);
+    await externalDriver.uploadTable(table, tableData.types, tableData);
     await this.createIndexes(externalDriver, newVersionEntry);
     await this.loadCache.reset(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table);
