@@ -14,7 +14,7 @@
   "main": "driver/MSSqlDriver.js",
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.17.10",
-    "mssql": "^5.0.5"
+    "mssql": "^6.1.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
