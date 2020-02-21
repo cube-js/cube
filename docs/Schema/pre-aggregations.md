@@ -395,3 +395,31 @@ cube(`Orders`, {
   }
 });
 ```
+
+## Indexes
+
+In case of pre-aggregation table has quite significant cardinality you might want to create indexes for such pre-aggregation in databases which support it.
+This is can be done as following:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  // ...
+
+  preAggregations: {
+    categoryAndDate: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      dimensionReferences: [category],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      indexes: {
+        main: {
+          columns: [category]
+        }
+      }
+    }
+  }
+});
+```
