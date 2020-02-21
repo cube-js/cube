@@ -12,6 +12,7 @@ class CompilerApi {
     this.preAggregationsSchema = this.options.preAggregationsSchema;
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.schemaVersion = this.options.schemaVersion;
+    this.compileContext = options.compileContext;
   }
 
   async getCompilers() {
@@ -27,7 +28,8 @@ class CompilerApi {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', { version: compilerVersion });
       // TODO check if saving this promise can produce memory leak?
       this.compilers = PrepareCompiler.compile(this.repository, {
-        allowNodeRequire: this.allowNodeRequire
+        allowNodeRequire: this.allowNodeRequire,
+        compileContext: this.compileContext
       });
       this.compilerVersion = compilerVersion;
     }
