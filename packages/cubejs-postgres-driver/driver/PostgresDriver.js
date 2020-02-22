@@ -6,7 +6,8 @@ const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver
 const { Pool } = pg;
 
 const GenericTypeToPostgres = {
-  string: 'text'
+  string: 'text',
+  double: 'decimal'
 };
 
 const DataTypeMapping = {};
