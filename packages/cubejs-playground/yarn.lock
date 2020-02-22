@@ -2965,9 +2965,9 @@ codesandbox-import-util-types@^2.1.9:
   integrity sha512-Vc4qh+neVfHtS3RG+7wvaErMoEKdNTnLFnyj4Dcbn3NV7v9nlPj/z6MGhHp9S+vAjegWorFzxg9lKB1WGHTt5Q==
 
 codesandbox-import-utils@^2.1.1:
-  version "2.1.9"
-  resolved "https://registry.yarnpkg.com/codesandbox-import-utils/-/codesandbox-import-utils-2.1.9.tgz#8126c08e9ab509d00a164ef5583c549b9252c7c1"
-  integrity sha512-fsymevaFbWFhT0jYHwyDvJTaEz5kBzR5celw9vbqj3uIaqjdh1CLBbZS+FtiOnJisOu+xGV9ZndnKEn5y08JGA==
+  version "2.1.12"
+  resolved "https://registry.yarnpkg.com/codesandbox-import-utils/-/codesandbox-import-utils-2.1.12.tgz#0cc6b649ed8bc5ef57c9fcb1bc98b161389a4b83"
+  integrity sha512-eTP3TboAlFEZDblCf3uwnV0S3tZCKnoubDONibAE9rI2pdximDGFQdHUpHPU4509bQ6UF2w+DVExlhkxmLFenA==
   dependencies:
     codesandbox-import-util-types "^2.1.9"
     istextorbinary "^2.2.1"
