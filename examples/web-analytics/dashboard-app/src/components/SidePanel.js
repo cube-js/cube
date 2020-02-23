@@ -51,7 +51,7 @@ const mainListItems = (
       </ListItemIcon>
       <ListItemText primary="Acquisition" />
     </ListItem>
-    <ListItem button to="/custom-reports" component={Link}>
+    <ListItem button to="/custom-reports-overview" component={Link}>
       <ListItemIcon>
         <AssignmentIcon />
       </ListItemIcon>

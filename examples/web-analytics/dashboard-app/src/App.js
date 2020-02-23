@@ -1,14 +1,14 @@
 import React from "react";
-import logo from "./logo.svg";
 import "./App.css";
 import "./body.css";
 import { makeStyles } from "@material-ui/core/styles";
-import { Layout } from "antd";
 import cubejs from "@cubejs-client/core";
 import { CubeProvider } from "@cubejs-client/react";
 import { MuiPickersUtilsProvider } from "@material-ui/pickers";
+import { ApolloProvider } from '@apollo/react-hooks';
 import MomentUtils from '@date-io/moment';
 
+import client from "./graphql/client";
 import Header from "./components/Header";
 import SidePanel from "./components/SidePanel";
 
@@ -46,7 +46,9 @@ const AppLayout = ({ children }) => {
 const App = ({ children }) => (
   <MuiPickersUtilsProvider utils={MomentUtils}>
     <CubeProvider cubejsApi={cubejsApi}>
-      <AppLayout>{children}</AppLayout>
+      <ApolloProvider client={client}>
+        <AppLayout>{children}</AppLayout>
+      </ApolloProvider>
     </CubeProvider>
   </MuiPickersUtilsProvider>
 );
