@@ -27,7 +27,7 @@ ReactDOM.render(
         render={() => <ReportPage report={AcquisitionPage} />} />
       <Route key="index" exact path="/custom-reports-overview"
         component={CustomReportsOverviewPage} />
-      <Route key="index" exact path="/custom-reports-builder"
+      <Route key="index" exact path="/custom-reports-builder/:id?"
         component={CustomReportsBuilderPage} />
       <Route key="index" exact path="/custom-reports/:id"
         render={() => <ReportPage report={CustomReportPage} />} />

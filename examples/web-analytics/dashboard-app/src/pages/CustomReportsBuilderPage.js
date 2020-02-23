@@ -4,14 +4,15 @@ import TextField from '@material-ui/core/TextField';
 import Button from "@material-ui/core/Button";
 import FormControl from '@material-ui/core/FormControl';
 import FormLabel from '@material-ui/core/FormLabel';
+import { useParams } from "react-router-dom";
 
 import { QueryBuilder } from "@cubejs-client/react";
 import { Link } from "react-router-dom";
 import { makeStyles } from "@material-ui/core/styles";
-import { useMutation } from "@apollo/react-hooks";
+import { useMutation, useQuery } from "@apollo/react-hooks";
 
 import MemberSelect from "../components/MemberSelect";
-import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
+import { GET_DASHBOARD_ITEMS, GET_CUSTOM_REPORT } from "../graphql/queries";
 import {
   CREATE_DASHBOARD_ITEM,
   UPDATE_DASHBOARD_ITEM
@@ -30,7 +31,8 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-const CustomReportsBuilderPage = ({ cubejsApi, history, itemId }) => {
+const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
+  const { id } = useParams();
   const [addDashboardItem] = useMutation(CREATE_DASHBOARD_ITEM, {
     refetchQueries: [
       {
@@ -45,8 +47,19 @@ const CustomReportsBuilderPage = ({ cubejsApi, history, itemId }) => {
       }
     ]
   });
+  const { loading, error, data } = useQuery(GET_CUSTOM_REPORT, {
+    variables: {
+      id: id
+    },
+    skip: !id
+  });
   const classes = useStyles();
   const [title, setTitle] = useState(null);
+  const finalTitle = title || (data && data.dashboardItem.name);
+
+  if (loading || error) {
+    return "Loading";
+  }
   return (
     <div>
       <Typography variant="h6" id="tableTitle">
@@ -65,7 +78,7 @@ const CustomReportsBuilderPage = ({ cubejsApi, history, itemId }) => {
                 <TextField
                   onChange={(event) => setTitle(event.target.value) }
                   label="Title"
-                  value={title}
+                  value={finalTitle}
                 />
               </FormControl>
               <FormControl component="fieldset" className={classes.formControl}>
@@ -106,10 +119,9 @@ const CustomReportsBuilderPage = ({ cubejsApi, history, itemId }) => {
                   variant="contained"
                   color="primary"
                   onClick={async () => {
-                    debugger
-                    await (itemId ? updateDashboardItem : addDashboardItem)({
+                    await (id ? updateDashboardItem : addDashboardItem)({
                       variables: {
-                        id: itemId,
+                        id: id,
                         input: {
                           query: JSON.stringify(query),
                           name: title

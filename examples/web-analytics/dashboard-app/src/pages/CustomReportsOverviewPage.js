@@ -16,7 +16,7 @@ import { DELETE_CUSTOM_REPORT } from "../graphql/mutations";
 
 import DotsMenu from "../components/DotsMenu";
 
-const CustomReportsOverviewPage = () => {
+const CustomReportsOverviewPage = ({ history }) => {
   const [removeCustomReport] = useMutation(DELETE_CUSTOM_REPORT, {
     refetchQueries: [
       {
@@ -65,7 +65,8 @@ const CustomReportsOverviewPage = () => {
                               id: report.id
                             }
                           });
-                        }
+                        },
+                        "Edit": () => history.push(`/custom-reports-builder/${report.id}`)
                       }}
                     />
                   </TableCell>

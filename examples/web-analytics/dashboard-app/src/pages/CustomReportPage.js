@@ -18,12 +18,20 @@ const CustomReportPage = ({ withTime }) => {
   }
 
   const query = JSON.parse(data.dashboardItem.query);
+  const overTimeChartQuery = {
+    measures: [query.measures[0]],
+    timeDimensions: [{
+      dimension: query.timeDimensions[0].dimension,
+      granularity: 'day'
+    }]
+  };
+  const dataTableQuery = null;
   return (
     <>
       <Grid item xs={12}>
         <OverTimeChart
           title="Users Over Time"
-          vizState={withTime({ query, chartType: 'line' })}
+          vizState={withTime({ query: overTimeChartQuery, chartType: 'line' })}
         />
       </Grid>
       <Grid item xs={12}>
