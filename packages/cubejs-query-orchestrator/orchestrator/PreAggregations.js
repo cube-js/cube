@@ -389,7 +389,8 @@ class PreAggregationLoader {
     return (client) => {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
-        refreshStrategy = client.readOnly() ? this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
+        refreshStrategy = client.readOnly && client.readOnly() ?
+          this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
       }
       const resultPromise = refreshStrategy.bind(this)(client, newVersionEntry);
       resultPromise.cancel = () => {} // TODO implement cancel (loading rollup into table and external upload)
