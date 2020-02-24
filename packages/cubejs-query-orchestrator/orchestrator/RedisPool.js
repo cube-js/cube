@@ -29,6 +29,13 @@ class RedisPool {
       this.pool.release(client);
     }
   }
+
+  async cleanup() {
+    if (this.pool) {
+      await this.pool.drain();
+      this.pool.clear();
+    }
+  }
 }
 
 module.exports = RedisPool;

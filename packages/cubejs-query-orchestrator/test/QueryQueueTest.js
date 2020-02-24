@@ -126,5 +126,15 @@ const QueryQueueTest = (name, options) => {
 };
 
 QueryQueueTest('Local');
-QueryQueueTest('RedisPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool() });
-QueryQueueTest('RedisNoPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool(0, 0) });
+
+(async () => {
+  let redisPool = new RedisPool();
+  QueryQueueTest('RedisPool', { cacheAndQueueDriver: 'redis', redisPool });
+  await redisPool.cleanup();
+})();
+
+(async () => {
+  redisPool = new RedisPool(0, 0);
+  QueryQueueTest('RedisNoPool', { cacheAndQueueDriver: 'redis', redisPool });
+  await redisPool.cleanup();
+})();
