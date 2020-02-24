@@ -7,6 +7,7 @@ import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import OverTimeChart from "../components/OverTimeChart";
 import Chart from "../components/Chart";
+import ChartRenderer from "../components/ChartRenderer";
 
 const queries = {
   pageviewsOverTime: {
@@ -124,7 +125,7 @@ const BehaviorPage = ({ withTime }) => (
     </List>
       </Grid>
       <Grid item xs={9}>
-        <Chart vizState={withTime(queries.pageviewsTable)} />
+        <ChartRenderer vizState={withTime(queries.pageviewsTable)} />
       </Grid>
     </Grid>
   </Grid>

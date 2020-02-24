@@ -28,6 +28,7 @@ const typeDefs = `
     id: String!
     query: String
     name: String
+    createdAt: String
   }
 
   input DashboardItemInput {
@@ -63,7 +64,7 @@ const schema = makeExecutableSchema({
     Mutation: {
       createDashboardItem: (_, { input: { ...item } }) => {
         const dashboardItems = getDashboardItems();
-        item = { ...item, id: nextId(), layout: JSON.stringify({}) };
+        item = { ...item, id: nextId(), createdAt: new Date(), layout: JSON.stringify({}) };
         dashboardItems.push(item);
         setDashboardItems(dashboardItems);
         return toApolloItem(item);

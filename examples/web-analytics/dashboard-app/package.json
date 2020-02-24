@@ -4,8 +4,8 @@
   "private": true,
   "dependencies": {
     "@apollo/react-hooks": "^3.1.3",
-    "@cubejs-client/core": "^0.15.0",
-    "@cubejs-client/react": "^0.15.0",
+    "@cubejs-client/core": "^0.17.10",
+    "@cubejs-client/react": "^0.17.10",
     "@date-io/moment": "1.x",
     "@material-ui/core": "^4.9.0",
     "@material-ui/icons": "^4.5.1",
@@ -18,6 +18,7 @@
     "apollo-cache-inmemory": "^1.6.5",
     "apollo-client": "^2.6.8",
     "apollo-link-schema": "^1.2.4",
+    "formik": "^2.1.4",
     "graphql": "^14.6.0",
     "graphql-tag": "^2.10.3",
     "graphql-tools": "^4.0.7",
@@ -29,7 +30,9 @@
     "react-router": "^5.1.2",
     "react-router-dom": "^5.1.2",
     "react-scripts": "3.3.0",
-    "recharts": "^2.0.0-beta.1"
+    "recharts": "^2.0.0-beta.1",
+    "typeface-roboto": "^0.0.75",
+    "yup": "^0.28.1"
   },
   "scripts": {
     "start": "react-scripts start",

@@ -10,6 +10,8 @@ import { QueryBuilder } from "@cubejs-client/react";
 import { Link } from "react-router-dom";
 import { makeStyles } from "@material-ui/core/styles";
 import { useMutation, useQuery } from "@apollo/react-hooks";
+import * as Yup from "yup";
+import { Formik } from "formik";
 
 import MemberSelect from "../components/MemberSelect";
 import { GET_DASHBOARD_ITEMS, GET_CUSTOM_REPORT } from "../graphql/queries";
@@ -17,6 +19,8 @@ import {
   CREATE_DASHBOARD_ITEM,
   UPDATE_DASHBOARD_ITEM
 } from "../graphql/mutations";
+
+
 
 const useStyles = makeStyles(theme => ({
   formControl: {
@@ -55,17 +59,18 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
   });
   const classes = useStyles();
   const [title, setTitle] = useState(null);
-  const finalTitle = title || (data && data.dashboardItem.name);
 
   if (loading || error) {
     return "Loading";
   }
+
   return (
     <div>
       <Typography variant="h6" id="tableTitle">
         Create Custom Report
        </Typography>
         <QueryBuilder
+          query={(data && data.dashboardItem.query && JSON.parse(data.dashboardItem.query)) || {}}
           wrapWithQueryRenderer={false}
           cubejsApi={cubejsApi}
           render={({
@@ -73,71 +78,117 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
             dimensions, availableDimensions, updateDimensions,
             query
           }) => (
-            <form autoComplete="off">
-              <FormControl component="fieldset" className={classes.formControl}>
-                <TextField
-                  onChange={(event) => setTitle(event.target.value) }
-                  label="Title"
-                  value={finalTitle}
-                />
-              </FormControl>
-              <FormControl component="fieldset" className={classes.formControl}>
-                <FormLabel component="legend" className={classes.formLabel}>Metrics</FormLabel>
-                {measures.map(measure =>
-                  <MemberSelect
-                    onSelect={updateMeasures.update}
-                    member={measure}
-                    availableMembers={availableMeasures}
-                    onRemove={updateMeasures.remove}
-                  />
-                )}
-                <MemberSelect
-                  title="metric"
-                  onSelect={updateMeasures.add}
-                  availableMembers={availableMeasures}
-                />
-              </FormControl>
-              <FormControl component="fieldset" className={classes.formControl}>
-                <FormLabel component="legend" className={classes.formLabel}>Dimensions</FormLabel>
-                {dimensions.map(dimension =>
-                  <MemberSelect
-                    onSelect={updateDimensions.update}
-                    member={dimension}
-                    availableMembers={availableDimensions}
-                    onRemove={updateDimensions.remove}
-                  />
-                )}
-                <MemberSelect
-                  title="dimension"
-                  onSelect={updateDimensions.add}
-                  availableMembers={availableDimensions}
-                />
-              </FormControl>
-              <div>
-                <Button
-                  className={classes.button}
-                  variant="contained"
-                  color="primary"
-                  onClick={async () => {
-                    await (id ? updateDashboardItem : addDashboardItem)({
-                      variables: {
-                        id: id,
-                        input: {
-                          query: JSON.stringify(query),
-                          name: title
-                        }
-                      }
-                    });
-                    history.push("/custom-reports-overview");
-                  }}
-                >
-                  Save
-                </Button>
-                <Button className={classes.button} variant="contained" component={Link} to="/custom-reports-overview">
-                  Cancel
-                </Button>
-              </div>
-            </form>
+             <Formik
+              enableReinitialize
+              initialValues={{ title: title || (data && data.dashboardItem.name) || "", query: query }}
+              onSubmit={async values => {
+                await (id ? updateDashboardItem : addDashboardItem)({
+                  variables: {
+                    id: id,
+                    input: {
+                      query: JSON.stringify(values.query),
+                      name: values.title
+                    }
+                  }
+                });
+                history.push("/custom-reports-overview");
+              }}
+              validationSchema={Yup.object().shape({
+                title: Yup.string().required("Required"),
+                query: Yup.object().shape({
+                  measures: Yup.array().min(1).required(),
+                  dimensions: Yup.array().min(1).required()
+                })
+              })}
+            >
+              {props => {
+                const {
+                  values,
+                  touched,
+                  errors,
+                  isSubmitting,
+                  handleChange,
+                  handleBlur,
+                  handleSubmit,
+                } = props;
+                return (
+                  <form>
+                    <FormControl component="fieldset" className={classes.formControl}>
+                      <TextField
+                        id="title"
+                        onChange={(event) => {
+                          // because of the enableReinitialize
+                          setTitle(event.target.value);
+                          handleChange(event);
+                        }}
+                        onBlur={handleBlur}
+                        label="Title"
+                        value={values.title}
+                        error={errors.title && touched.title}
+                      />
+                    </FormControl>
+                    <FormControl component="fieldset" className={classes.formControl}>
+                      <FormLabel
+                        error={touched.query && errors.query && errors.query.measures }
+                        component="legend" className={classes.formLabel}>Metrics</FormLabel>
+                      {measures.map(measure =>
+                        <MemberSelect
+                          onSelect={updateMeasures.update}
+                          member={measure}
+                          availableMembers={availableMeasures}
+                          onRemove={updateMeasures.remove}
+                        />
+                      )}
+                      <MemberSelect
+                        title="metric"
+                        onSelect={updateMeasures.add}
+                        availableMembers={availableMeasures}
+                      />
+                    </FormControl>
+                    <FormControl component="fieldset" className={classes.formControl}>
+                      <FormLabel
+                        error={touched.query && errors.query && errors.query.dimensions }
+                        component="legend"
+                        className={classes.formLabel}
+                      >
+                          Dimensions
+                      </FormLabel>
+                      {dimensions.map(dimension =>
+                        <MemberSelect
+                          onSelect={updateDimensions.update}
+                          member={dimension}
+                          availableMembers={availableDimensions}
+                          onRemove={updateDimensions.remove}
+                        />
+                      )}
+                      <MemberSelect
+                        title="dimension"
+                        onSelect={updateDimensions.add}
+                        availableMembers={availableDimensions}
+                      />
+                    </FormControl>
+                    <div>
+                      <Button
+                        className={classes.button}
+                        variant="contained"
+                        color="primary"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        className={classes.button}
+                        variant="contained"
+                        component={Link}
+                        to="/custom-reports-overview">
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                );
+              }}
+            </Formik>
           )}
         />
       </div>

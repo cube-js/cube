@@ -6,6 +6,7 @@ export const GET_DASHBOARD_ITEMS = gql`
       id
       query
       name
+      createdAt
     }
   }
 `;
@@ -16,6 +17,7 @@ export const GET_CUSTOM_REPORT = gql`
       id
       query
       name
+      createdAt
     }
   }
 `;

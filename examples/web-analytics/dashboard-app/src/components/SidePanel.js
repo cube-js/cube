@@ -1,6 +1,9 @@
 import React from "react";
 import Drawer from '@material-ui/core/Drawer';
 import Divider from '@material-ui/core/Divider';
+import { useLocation } from "react-router-dom";
+import { matchPath } from "react-router";
+
 
 import List from '@material-ui/core/List';
 
@@ -30,35 +33,18 @@ const useStyles = makeStyles(theme => ({
   toolbar: theme.mixins.toolbar
 }));
 
-
-const mainListItems = (
-  <div>
-    <ListItem button to="/" component={Link}>
+const MenuItem = ({ to, title, icon, seletedPaths }) => {
+  const { pathname } = useLocation();
+  const selected = (seletedPaths || [to]).some(path => matchPath(pathname, {path: path, exact: true}))
+  return (
+    <ListItem button to={to} component={Link} selected={selected}>
       <ListItemIcon>
-        <PersonIcon />
+        {icon}
       </ListItemIcon>
-      <ListItemText primary="Audience" />
+      <ListItemText primary={title} />
     </ListItem>
-    <ListItem button to="/behavior" component={Link}>
-      <ListItemIcon>
-        <WebIcon />
-      </ListItemIcon>
-      <ListItemText primary="Behavior" />
-    </ListItem>
-    <ListItem button to="/acquisition" component={Link}>
-      <ListItemIcon>
-        <ShareIcon />
-      </ListItemIcon>
-      <ListItemText primary="Acquisition" />
-    </ListItem>
-    <ListItem button to="/custom-reports-overview" component={Link}>
-      <ListItemIcon>
-        <AssignmentIcon />
-      </ListItemIcon>
-      <ListItemText primary="Custom Reports" />
-    </ListItem>
-  </div>
-);
+  )
+};
 
 const SidePanel = () => {
   const classes = useStyles();
@@ -70,7 +56,21 @@ const SidePanel = () => {
       open={true}
     >
       <div className={classes.toolbar} />
-      <List>{mainListItems}</List>
+      <List>
+        <MenuItem to="/" icon={<PersonIcon />} title="Audience" />
+        <MenuItem to="/behavior" icon={<WebIcon />} title="Behavior" />
+        <MenuItem to="/acquisition" icon={<ShareIcon />} title="Acquisition" />
+        <MenuItem
+          to="/custom-reports-overview"
+          icon={<AssignmentIcon />}
+          title="Custom Reports"
+          seletedPaths={[
+            "/custom-reports-overview",
+            "/custom-reports/:id",
+            "/custom-reports-builder/:id?"
+          ]}
+        />
+      </List>
     </Drawer>
   );
 };

@@ -25,6 +25,8 @@ import TableBody from "@material-ui/core/TableBody";
 import TableCell from "@material-ui/core/TableCell";
 import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
+import TableContainer from '@material-ui/core/TableContainer';
+import Paper from '@material-ui/core/Paper';
 
 import moment from "moment";
 import numeral from "numeral";
@@ -171,24 +173,26 @@ const TypeToChartComponent = {
     )
   },
   table: ({ resultSet }) => (
-    <Table size="small">
-      <TableHead>
-        <TableRow>
-          {resultSet.tableColumns().map(c => (
-            <TableCell key={c.key}>{c.title}</TableCell>
-          ))}
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {resultSet.tablePivot().map((row, index) => (
-          <TableRow key={index}>
+    <TableContainer component={Paper}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
             {resultSet.tableColumns().map(c => (
-              <TableCell key={c.key}>{row[c.key]}</TableCell>
+              <TableCell key={c.key}>{c.shortTitle}</TableCell>
             ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHead>
+        <TableBody>
+          {resultSet.tablePivot().map((row, index) => (
+            <TableRow key={index}>
+              {resultSet.tableColumns().map(c => (
+                <TableCell key={c.key}>{row[c.key]}</TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
   )
 };
 const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)

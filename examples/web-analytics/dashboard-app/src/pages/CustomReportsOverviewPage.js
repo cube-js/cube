@@ -8,6 +8,7 @@ import TableCell from "@material-ui/core/TableCell";
 import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
 import Button from "@material-ui/core/Button";
+import moment from "moment";
 
 import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "@apollo/react-hooks";
@@ -26,7 +27,7 @@ const CustomReportsOverviewPage = ({ history }) => {
   });
   const { loading, error, data } = useQuery(GET_DASHBOARD_ITEMS);
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={3} justify="space-between">
       <Grid item>
         <Typography variant="h6" id="tableTitle">
           Custom Reports
@@ -39,34 +40,36 @@ const CustomReportsOverviewPage = ({ history }) => {
       </Grid>
      <Grid item xs={12}>
         <Paper>
-          <Table>
+          <Table aria-label="a dense table">
             <TableHead>
               <TableRow>
                 <TableCell key="title">Title</TableCell>
-                <TableCell key="creation-date">Creation Date</TableCell>
+                <TableCell align="right" key="creation-date">Creation Date</TableCell>
                 <TableCell key="actions"></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               { data && data.dashboardItems && data.dashboardItems.map(report => (
                 <TableRow>
-                  <TableCell key="title">
+                  <TableCell key="title" component="th" scope="row">
                     <Link to={`/custom-reports/${report.id}`}>
                       {report.name}
                     </Link>
                   </TableCell>
-                  <TableCell key="creation-date">Creation Date</TableCell>
-                  <TableCell key="actions">
+                  <TableCell align="right" key="creation-date">
+                    {moment(report.createdAt).format("MMM DD, YYYY")}
+                  </TableCell>
+                  <TableCell key="actions" align="right">
                     <DotsMenu
                       options={{
+                        "Edit": () => history.push(`/custom-reports-builder/${report.id}`),
                         "Delete": () => {
                           removeCustomReport({
                             variables: {
                               id: report.id
                             }
                           });
-                        },
-                        "Edit": () => history.push(`/custom-reports-builder/${report.id}`)
+                        }
                       }}
                     />
                   </TableCell>
