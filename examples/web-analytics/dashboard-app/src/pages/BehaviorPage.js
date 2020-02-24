@@ -1,13 +1,8 @@
 import React from "react";
 import Grid from "@material-ui/core/Grid";
-import ListSubheader from '@material-ui/core/ListSubheader';
-import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import ListItemText from '@material-ui/core/ListItemText';
 import OverTimeChart from "../components/OverTimeChart";
 import Chart from "../components/Chart";
-import ChartRenderer from "../components/ChartRenderer";
+import SwitchTable from "../components/SwitchTable";
 
 const queries = {
   pageviewsOverTime: {
@@ -106,27 +101,31 @@ const BehaviorPage = ({ withTime }) => (
       <Grid item xs={2}>
         <Chart title="% Exit" vizState={withTime(queries.exitPercent)} />
       </Grid>
-      <Grid item xs={3}>
-        <List
-      component="nav"
-      aria-labelledby="nested-list-subheader"
-      subheader={
-        <ListSubheader component="div" id="nested-list-subheader">
-          Site Content
-        </ListSubheader>
-      }
-    >
-      <ListItem selected button>
-        <ListItemText primary="Page" />
-      </ListItem>
-      <ListItem button>
-        <ListItemText primary="Page Title" />
-      </ListItem>
-    </List>
-      </Grid>
-      <Grid item xs={9}>
-        <ChartRenderer vizState={withTime(queries.pageviewsTable)} />
-      </Grid>
+      <SwitchTable
+        options={[
+          {
+            name: "Page",
+            fn: ({ query, ...vizState }) => ({
+              ...vizState,
+              query: {
+                ...query,
+                dimensions: ["PageViews.pageUrlPath"]
+              }
+            })
+          },
+          {
+            name: "Page Title",
+            fn: ({ query, ...vizState }) => ({
+              ...vizState,
+              query: {
+                ...query,
+                dimensions: ["PageViews.pageTitle"]
+              }
+            })
+          }
+        ]}
+        query={withTime(queries.pageviewsTable)}
+      />
     </Grid>
   </Grid>
 );

@@ -36,6 +36,14 @@ const decimalFormatter = item => numeral(item).format("0,0.00");
 const percentFormatter = item => numeral(item/100.0).format('0.00%');
 const timeNumberFormatter = item => numeral(item).format('00:00:00');
 const dateFormatter = item => moment(item).format("MMM DD");
+const resolveFormatter = (type) => {
+  if (type === "string") {
+    return (item) => item
+  } else if (type === "number") {
+    return numberFormatter;
+  }
+}
+
 
 const xAxisFormatter = (item) => {
   if (moment(item).isValid()) {
@@ -185,9 +193,10 @@ const TypeToChartComponent = {
         <TableBody>
           {resultSet.tablePivot().map((row, index) => (
             <TableRow key={index}>
-              {resultSet.tableColumns().map(c => (
-                <TableCell key={c.key}>{row[c.key]}</TableCell>
-              ))}
+              {resultSet.tableColumns().map(c => {
+                const type = (resultSet.loadResponse.annotation.measures[c.key] || resultSet.loadResponse.annotation.dimensions[c.key]).type
+                return (<TableCell align={type === 'number' ? 'right' : 'left'} key={c.key}>{resolveFormatter(type)(row[c.key])}</TableCell>)
+              })}
             </TableRow>
           ))}
         </TableBody>

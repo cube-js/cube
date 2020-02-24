@@ -22,6 +22,7 @@ cube(`Events`, {
 
       -- page
       page_urlpath AS page_url_path,
+      page_title as page_title,
 
       -- browser info
       br_lang,

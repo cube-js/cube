@@ -62,6 +62,11 @@ cube(`PageViews`, {
     pageUrlPath: {
       sql: `page_url_path`,
       type: `string`
+    },
+
+    pageTitle: {
+      sql: `page_title`,
+      type: `string`
     }
   },
 
