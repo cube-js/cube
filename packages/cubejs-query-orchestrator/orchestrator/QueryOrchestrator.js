@@ -1,6 +1,7 @@
 const R = require('ramda');
 const QueryCache = require('./QueryCache');
 const PreAggregations = require('./PreAggregations');
+const RedisPool = require('./RedisPool');
 
 class QueryOrchestrator {
   constructor(redisPrefix, driverFactory, logger, options) {
@@ -8,6 +9,7 @@ class QueryOrchestrator {
     this.redisPrefix = redisPrefix;
     this.driverFactory = driverFactory;
     this.logger = logger;
+    const redisPool = new RedisPool();
     const { externalDriverFactory } = options;
     const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
       process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
@@ -20,6 +22,7 @@ class QueryOrchestrator {
       this.redisPrefix, this.driverFactory, this.logger, {
         externalDriverFactory,
         cacheAndQueueDriver,
+        redisPool,
         ...options.queryCacheOptions,
       }
     );
@@ -27,6 +30,7 @@ class QueryOrchestrator {
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
         cacheAndQueueDriver,
+        redisPool,
         ...options.preAggregationsOptions
       }
     );

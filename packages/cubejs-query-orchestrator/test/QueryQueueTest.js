@@ -1,5 +1,6 @@
 /* globals describe,it */
 const QueryQueue = require('../orchestrator/QueryQueue');
+const RedisPool = require('../orchestrator/RedisPool');
 const should = require('should');
 
 const QueryQueueTest = (name, options) => {
@@ -125,4 +126,5 @@ const QueryQueueTest = (name, options) => {
 };
 
 QueryQueueTest('Local');
-QueryQueueTest('Redis', { cacheAndQueueDriver: 'redis' });
+QueryQueueTest('RedisPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool() });
+QueryQueueTest('RedisNoPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool(0, 0) });
