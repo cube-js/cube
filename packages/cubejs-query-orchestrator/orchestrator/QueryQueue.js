@@ -67,15 +67,17 @@ class QueryQueue {
       const queryDef = await redisClient.getQueryDef(queryKey);
       const [active, toProcess] = await redisClient.getQueryStageState(true);
 
-      this.logger('Waiting for query', {
-        queueSize,
-        queryKey: queryDef.queryKey,
-        queuePrefix: this.redisQueuePrefix,
-        requestId: options.requestId,
-        active: active.indexOf(redisClient.redisHash(queryKey)) !== -1,
-        queueIndex: toProcess.indexOf(redisClient.redisHash(queryKey)),
-        waitingForRequestId: queryDef.requestId
-      });
+      if (queryDef) {
+        this.logger('Waiting for query', {
+          queueSize,
+          queryKey: queryDef.queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: options.requestId,
+          active: active.indexOf(redisClient.redisHash(queryKey)) !== -1,
+          queueIndex: toProcess.indexOf(redisClient.redisHash(queryKey)),
+          waitingForRequestId: queryDef.requestId
+        });
+      }
 
       result = await redisClient.getResultBlocking(queryKey);
       if (!result) {
