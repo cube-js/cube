@@ -69,6 +69,9 @@ class DevServer {
 
     app.post('/playground/generate-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Generate Schema');
+      if (!req.body) {
+        throw new Error(`Your express app config is missing body-parser middleware. Typical config can look like: \`app.use(bodyParser.json({ limit: '50mb' }));\``);
+      }
       const driver = await this.cubejsServer.getDriver();
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
