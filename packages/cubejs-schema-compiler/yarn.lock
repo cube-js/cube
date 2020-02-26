@@ -2364,9 +2364,9 @@ mocha@^3.4.2:
     supports-color "3.1.2"
 
 moment-range@^4.0.1:
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/moment-range/-/moment-range-4.0.1.tgz#1ae8cf209dded0a5ce5e16603146265b3906a86f"
-  integrity sha1-GujPIJ3e0KXOXhZgMUYmWzkGqG8=
+  version "4.0.2"
+  resolved "https://registry.yarnpkg.com/moment-range/-/moment-range-4.0.2.tgz#f7c3863df2a1ed7fd1822ba5a7bcf53a78701be9"
+  integrity sha512-n8sceWwSTjmz++nFHzeNEUsYtDqjgXgcOBzsHi+BoXQU2FW+eU92LUaK8gqOiSu5PG57Q9sYj1Fz4LRDj4FtKA==
   dependencies:
     es6-symbol "^3.1.0"
 
