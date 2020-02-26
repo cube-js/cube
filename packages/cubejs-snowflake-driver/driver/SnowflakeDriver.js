@@ -8,6 +8,7 @@ class SnowflakeDriver extends BaseDriver {
       account: process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
       region: process.env.CUBEJS_DB_SNOWFLAKE_REGION,
       warehouse: process.env.CUBEJS_DB_SNOWFLAKE_WAREHOUSE,
+      role: process.env.CUBEJS_DB_SNOWFLAKE_ROLE,
       database: process.env.CUBEJS_DB_NAME,
       username: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
@@ -26,7 +27,8 @@ class SnowflakeDriver extends BaseDriver {
       'CUBEJS_DB_PASS',
       'CUBEJS_DB_SNOWFLAKE_ACCOUNT',
       'CUBEJS_DB_SNOWFLAKE_REGION',
-      'CUBEJS_DB_SNOWFLAKE_WAREHOUSE'
+      'CUBEJS_DB_SNOWFLAKE_WAREHOUSE',
+      'CUBEJS_DB_SNOWFLAKE_ROLE'
     ];
   }
 
