@@ -34,7 +34,7 @@
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-node": "^10.0.0",
     "flush-promises": "^1.0.2",
-    "http-server": "^0.11.1",
+    "http-server": "^0.12.1",
     "lerna": "^3.13.1",
     "rollup": "^0.68",
     "rollup-plugin-alias": "^2.2.0",
