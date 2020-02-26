@@ -3,10 +3,7 @@ module.exports = {
   properties: {
     name: { type: "string", pattern: "^[_a-zA-Z][_a-zA-Z0-9]*$" },
     sql: {
-      type: "object",
-      properties: {},
-      additionalProperties: true,
-      patterns: []
+      type: "object"
     },
     refreshKey: {
       oneOf: [
@@ -14,21 +11,16 @@ module.exports = {
           type: "object",
           properties: {
             sql: {
-              type: "object",
-              properties: {},
-              additionalProperties: true,
-              patterns: []
+              type: "object"
             }
           },
           additionalProperties: false,
-          patterns: [],
           required: ["sql"]
         },
         {
           type: "object",
           properties: { immutable: { type: "boolean" } },
           additionalProperties: false,
-          patterns: [],
           required: ["immutable"]
         },
         {
@@ -39,23 +31,16 @@ module.exports = {
               pattern: "^(\\d+) (second|minute|hour|day|week)s?$"
             }
           },
-          additionalProperties: false,
-          patterns: []
+          additionalProperties: false
         }
       ]
     },
     fileName: { type: "string" },
     extends: {
-      type: "object",
-      properties: {},
-      additionalProperties: true,
-      patterns: []
+      type: "object"
     },
     allDefinitions: {
-      type: "object",
-      properties: {},
-      additionalProperties: true,
-      patterns: []
+      type: "object"
     },
     title: { type: "string" },
     sqlAlias: { type: "string" },
@@ -63,19 +48,13 @@ module.exports = {
     description: { type: "string" },
     joins: {
       type: "object",
-      properties: {},
-      additionalProperties: true,
       patterns: [
         {
-          regex: {},
           rule: {
             type: "object",
             properties: {
               sql: {
-                type: "object",
-                properties: {},
-                additionalProperties: true,
-                patterns: []
+                type: "object"
               },
               relationship: {
                 enum: ["hasMany", "belongsTo", "hasOne"],
@@ -83,7 +62,6 @@ module.exports = {
               }
             },
             additionalProperties: false,
-            patterns: [],
             required: ["sql", "relationship"]
           }
         }
@@ -91,11 +69,8 @@ module.exports = {
     },
     measures: {
       type: "object",
-      properties: {},
-      additionalProperties: true,
       patterns: [
         {
-          regex: {},
           rule: {
             oneOf: [
               {
@@ -122,14 +97,10 @@ module.exports = {
                       type: "object",
                       properties: {
                         sql: {
-                          type: "object",
-                          properties: {},
-                          additionalProperties: true,
-                          patterns: []
+                          type: "object"
                         }
                       },
                       additionalProperties: false,
-                      patterns: [],
                       required: ["sql"]
                     }
                   },
@@ -190,20 +161,13 @@ module.exports = {
                         ]
                       }
                     },
-                    additionalProperties: false,
-                    patterns: []
+                    additionalProperties: false
                   },
                   drillMemberReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   drillMembers: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   drillFilters: {
                     type: "array",
@@ -211,22 +175,15 @@ module.exports = {
                       type: "object",
                       properties: {
                         sql: {
-                          type: "object",
-                          properties: {},
-                          additionalProperties: true,
-                          patterns: []
+                          type: "object"
                         }
                       },
                       additionalProperties: false,
-                      patterns: [],
                       required: ["sql"]
                     }
                   },
                   sql: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   type: {
                     enum: ["count"],
@@ -241,7 +198,6 @@ module.exports = {
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type"]
               },
               {
@@ -268,14 +224,10 @@ module.exports = {
                       type: "object",
                       properties: {
                         sql: {
-                          type: "object",
-                          properties: {},
-                          additionalProperties: true,
-                          patterns: []
+                          type: "object"
                         }
                       },
                       additionalProperties: false,
-                      patterns: [],
                       required: ["sql"]
                     }
                   },
@@ -336,20 +288,13 @@ module.exports = {
                         ]
                       }
                     },
-                    additionalProperties: false,
-                    patterns: []
+                    additionalProperties: false
                   },
                   drillMemberReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   drillMembers: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   drillFilters: {
                     type: "array",
@@ -357,22 +302,15 @@ module.exports = {
                       type: "object",
                       properties: {
                         sql: {
-                          type: "object",
-                          properties: {},
-                          additionalProperties: true,
-                          patterns: []
+                          type: "object"
                         }
                       },
                       additionalProperties: false,
-                      patterns: [],
                       required: ["sql"]
                     }
                   },
                   sql: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   type: {
                     enum: [
@@ -396,7 +334,6 @@ module.exports = {
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["sql", "type"]
               }
             ]
@@ -406,11 +343,8 @@ module.exports = {
     },
     dimensions: {
       type: "object",
-      properties: {},
-      additionalProperties: true,
       patterns: [
         {
-          regex: {},
           rule: {
             oneOf: [
               {
@@ -466,7 +400,6 @@ module.exports = {
                           label: { type: "string" }
                         },
                         additionalProperties: false,
-                        patterns: [],
                         required: ["label"]
                       }
                     ]
@@ -480,10 +413,7 @@ module.exports = {
                           type: "object",
                           properties: {
                             sql: {
-                              type: "object",
-                              properties: {},
-                              additionalProperties: true,
-                              patterns: []
+                              type: "object"
                             },
                             label: {
                               oneOf: [
@@ -492,21 +422,16 @@ module.exports = {
                                   type: "object",
                                   properties: {
                                     sql: {
-                                      type: "object",
-                                      properties: {},
-                                      additionalProperties: true,
-                                      patterns: []
+                                      type: "object"
                                     }
                                   },
                                   additionalProperties: false,
-                                  patterns: [],
                                   required: ["sql"]
                                 }
                               ]
                             }
                           },
                           additionalProperties: false,
-                          patterns: [],
                           required: ["sql"]
                         }
                       },
@@ -520,29 +445,22 @@ module.exports = {
                                 type: "object",
                                 properties: {
                                   sql: {
-                                    type: "object",
-                                    properties: {},
-                                    additionalProperties: true,
-                                    patterns: []
+                                    type: "object"
                                   }
                                 },
                                 additionalProperties: false,
-                                patterns: [],
                                 required: ["sql"]
                               }
                             ]
                           }
                         },
-                        additionalProperties: false,
-                        patterns: []
+                        additionalProperties: false
                       }
                     },
-                    additionalProperties: false,
-                    patterns: []
+                    additionalProperties: false
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type", "case"]
               },
               {
@@ -598,7 +516,6 @@ module.exports = {
                           label: { type: "string" }
                         },
                         additionalProperties: false,
-                        patterns: [],
                         required: ["label"]
                       }
                     ]
@@ -607,33 +524,24 @@ module.exports = {
                     type: "object",
                     properties: {
                       sql: {
-                        type: "object",
-                        properties: {},
-                        additionalProperties: true,
-                        patterns: []
+                        type: "object"
                       }
                     },
                     additionalProperties: false,
-                    patterns: [],
                     required: ["sql"]
                   },
                   longitude: {
                     type: "object",
                     properties: {
                       sql: {
-                        type: "object",
-                        properties: {},
-                        additionalProperties: true,
-                        patterns: []
+                        type: "object"
                       }
                     },
                     additionalProperties: false,
-                    patterns: [],
                     required: ["sql"]
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type"]
               },
               {
@@ -690,20 +598,15 @@ module.exports = {
                           label: { type: "string" }
                         },
                         additionalProperties: false,
-                        patterns: [],
                         required: ["label"]
                       }
                     ]
                   },
                   sql: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type", "sql"]
               }
             ]
@@ -713,26 +616,19 @@ module.exports = {
     },
     segments: {
       type: "object",
-      properties: {},
-      additionalProperties: true,
       patterns: [
         {
-          regex: {},
           rule: {
             type: "object",
             properties: {
               aliases: { type: "array", items: { type: "string" } },
               sql: {
-                type: "object",
-                properties: {},
-                additionalProperties: true,
-                patterns: []
+                type: "object"
               },
               title: { type: "string" },
               description: { type: "string" }
             },
             additionalProperties: false,
-            patterns: [],
             required: ["sql"]
           }
         }
@@ -740,11 +636,8 @@ module.exports = {
     },
     preAggregations: {
       type: "object",
-      properties: {},
-      additionalProperties: true,
       patterns: [
         {
-          regex: {},
           rule: {
             oneOf: [
               {
@@ -756,14 +649,10 @@ module.exports = {
                         type: "object",
                         properties: {
                           sql: {
-                            type: "object",
-                            properties: {},
-                            additionalProperties: true,
-                            patterns: []
+                            type: "object"
                           }
                         },
                         additionalProperties: false,
-                        patterns: [],
                         required: ["sql"]
                       },
                       {
@@ -795,8 +684,7 @@ module.exports = {
                             ]
                           }
                         },
-                        additionalProperties: false,
-                        patterns: []
+                        additionalProperties: false
                       }
                     ]
                   },
@@ -816,39 +704,28 @@ module.exports = {
                   scheduledRefresh: { type: "boolean" },
                   indexes: {
                     type: "object",
-                    properties: {},
-                    additionalProperties: true,
                     patterns: [
                       {
-                        regex: {},
                         rule: {
                           oneOf: [
                             {
                               type: "object",
                               properties: {
                                 sql: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["sql"]
                             },
                             {
                               type: "object",
                               properties: {
                                 columns: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["columns"]
                             }
                           ]
@@ -870,7 +747,6 @@ module.exports = {
                   maxPreAggregations: { type: "number" }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type"]
               },
               {
@@ -882,14 +758,10 @@ module.exports = {
                         type: "object",
                         properties: {
                           sql: {
-                            type: "object",
-                            properties: {},
-                            additionalProperties: true,
-                            patterns: []
+                            type: "object"
                           }
                         },
                         additionalProperties: false,
-                        patterns: [],
                         required: ["sql"]
                       },
                       {
@@ -921,8 +793,7 @@ module.exports = {
                             ]
                           }
                         },
-                        additionalProperties: false,
-                        patterns: []
+                        additionalProperties: false
                       }
                     ]
                   },
@@ -942,39 +813,28 @@ module.exports = {
                   scheduledRefresh: { type: "boolean" },
                   indexes: {
                     type: "object",
-                    properties: {},
-                    additionalProperties: true,
                     patterns: [
                       {
-                        regex: {},
                         rule: {
                           oneOf: [
                             {
                               type: "object",
                               properties: {
                                 sql: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["sql"]
                             },
                             {
                               type: "object",
                               properties: {
                                 columns: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["columns"]
                             }
                           ]
@@ -995,7 +855,6 @@ module.exports = {
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type"]
               },
               {
@@ -1007,14 +866,10 @@ module.exports = {
                         type: "object",
                         properties: {
                           sql: {
-                            type: "object",
-                            properties: {},
-                            additionalProperties: true,
-                            patterns: []
+                            type: "object"
                           }
                         },
                         additionalProperties: false,
-                        patterns: [],
                         required: ["sql"]
                       },
                       {
@@ -1046,8 +901,7 @@ module.exports = {
                             ]
                           }
                         },
-                        additionalProperties: false,
-                        patterns: []
+                        additionalProperties: false
                       }
                     ]
                   },
@@ -1067,39 +921,28 @@ module.exports = {
                   scheduledRefresh: { type: "boolean" },
                   indexes: {
                     type: "object",
-                    properties: {},
-                    additionalProperties: true,
                     patterns: [
                       {
-                        regex: {},
                         rule: {
                           oneOf: [
                             {
                               type: "object",
                               properties: {
                                 sql: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["sql"]
                             },
                             {
                               type: "object",
                               properties: {
                                 columns: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["columns"]
                             }
                           ]
@@ -1119,26 +962,16 @@ module.exports = {
                     ]
                   },
                   measureReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   dimensionReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   segmentReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type"]
               },
               {
@@ -1150,14 +983,10 @@ module.exports = {
                         type: "object",
                         properties: {
                           sql: {
-                            type: "object",
-                            properties: {},
-                            additionalProperties: true,
-                            patterns: []
+                            type: "object"
                           }
                         },
                         additionalProperties: false,
-                        patterns: [],
                         required: ["sql"]
                       },
                       {
@@ -1189,8 +1018,7 @@ module.exports = {
                             ]
                           }
                         },
-                        additionalProperties: false,
-                        patterns: []
+                        additionalProperties: false
                       }
                     ]
                   },
@@ -1210,39 +1038,28 @@ module.exports = {
                   scheduledRefresh: { type: "boolean" },
                   indexes: {
                     type: "object",
-                    properties: {},
-                    additionalProperties: true,
                     patterns: [
                       {
-                        regex: {},
                         rule: {
                           oneOf: [
                             {
                               type: "object",
                               properties: {
                                 sql: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["sql"]
                             },
                             {
                               type: "object",
                               properties: {
                                 columns: {
-                                  type: "object",
-                                  properties: {},
-                                  additionalProperties: true,
-                                  patterns: []
+                                  type: "object"
                                 }
                               },
                               additionalProperties: false,
-                              patterns: [],
                               required: ["columns"]
                             }
                           ]
@@ -1262,28 +1079,16 @@ module.exports = {
                     ]
                   },
                   measureReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   dimensionReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   segmentReferences: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   timeDimensionReference: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: true,
-                    patterns: []
+                    type: "object"
                   },
                   granularity: {
                     enum: [
@@ -1306,7 +1111,6 @@ module.exports = {
                   }
                 },
                 additionalProperties: false,
-                patterns: [],
                 required: ["type", "timeDimensionReference", "granularity"]
               }
             ]
@@ -1316,6 +1120,5 @@ module.exports = {
     }
   },
   additionalProperties: false,
-  patterns: [],
   required: ["sql", "fileName"]
 };
