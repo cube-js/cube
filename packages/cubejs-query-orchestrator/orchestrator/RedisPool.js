@@ -27,6 +27,10 @@ class RedisPool {
   release(client) {
     if (this.pool) {
       this.pool.release(client);
+    } else {
+      if (client) {
+        client.quit();
+      }
     }
   }
 
