@@ -85,7 +85,7 @@ describe('QueryOrchestrator', () => {
     const result = await queryOrchestrator.fetchQuery(query);
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_l3kvjcmu_khbemovd/);
-    expect(mockDriver.executedQueries).to.matchAny(/CREATE INDEX orders_number_and_count_week20191101_l3kvjcmu_khbemovd/);
+    expect(mockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_l3kvjcmu_khbemovd/);
   });
 
   test('silent truncate', async () => {
