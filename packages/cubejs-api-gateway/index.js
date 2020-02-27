@@ -125,7 +125,9 @@ const normalizeQuery = query => {
   if (err) {
     throw new UserError(
       `Invalid query format: ${
-        err.errors ? ajv.errorsText(validateSchema.errors) : err.toString()
+        validateSchema.errors
+          ? ajv.errorsText(validateSchema.errors)
+          : err.toString()
       }`
     );
   }
