@@ -1,5 +1,5 @@
 const ajv = require("ajv")();
-const validateSchema = ajv.compile(require("./CubeSchema"));
+const validateSchema = ajv.compile(require("./schema/cube"));
 
 class CubeValidator {
   constructor(cubeSymbols) {
