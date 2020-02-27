@@ -23,7 +23,7 @@ class QueryQueue {
       continueWaitTimeout: this.continueWaitTimeout,
       orphanedTimeout: this.orphanedTimeout,
       heartBeatTimeout: this.heartBeatInterval * 4,
-      createRedisClient: options.createRedisClient
+      redisPool: options.redisPool
     };
     this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :
@@ -32,7 +32,7 @@ class QueryQueue {
 
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
     options = options || {};
-    const redisClient = this.queueDriver.createConnection();
+    const redisClient = await this.queueDriver.createConnection();
     try {
       if (priority == null) {
         priority = 0;
@@ -85,7 +85,7 @@ class QueryQueue {
       }
       return this.parseResult(result);
     } finally {
-      redisClient.release();
+      this.queueDriver.release(redisClient);
     }
   }
 
@@ -152,11 +152,11 @@ class QueryQueue {
   }
 
   async fetchQueryStageState() {
-    const redisClient = this.queueDriver.createConnection();
+    const redisClient = await this.queueDriver.createConnection();
     try {
       return redisClient.getQueryStageState();
     } finally {
-      redisClient.release();
+      this.queueDriver.release(redisClient);
     }
   }
 
@@ -184,7 +184,7 @@ class QueryQueue {
   }
 
   async processQuery(queryKey) {
-    const redisClient = this.queueDriver.createConnection();
+    const redisClient = await this.queueDriver.createConnection();
     try {
       // eslint-disable-next-line no-unused-vars
       const [insertedCount, removedCount, activeKeys, queueSize] =
@@ -281,7 +281,7 @@ class QueryQueue {
         queuePrefix: this.redisQueuePrefix
       });
     } finally {
-      redisClient.release();
+      this.queueDriver.release(redisClient);
     }
   }
 

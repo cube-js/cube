@@ -1,11 +1,9 @@
 /* globals describe,it */
 const QueryQueue = require('../orchestrator/QueryQueue');
-const should = require('should');
+const RedisPool = require('../orchestrator/RedisPool');
 
 const QueryQueueTest = (name, options) => {
-  describe(`QueryQueue${name}`, function () {
-    this.timeout(5000);
-
+  describe(`QueryQueue${name}`, () => {
     let delayCount = 0;
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     let cancelledQuery;
@@ -32,23 +30,27 @@ const QueryQueueTest = (name, options) => {
       ...options
     });
 
-    it('gutter', async () => {
-      const query = ['select * from'];
-      const result = await queue.executeInQueue('foo', query, query);
-      should(result).be.eql('select * from bar');
+    afterAll(async () => {
+      await options.redisPool.cleanup();
     });
 
-    it('priority', async () => {
+    test('gutter', async () => {
+      const query = ['select * from'];
+      const result = await queue.executeInQueue('foo', query, query);
+      expect(result).toBe('select * from bar');
+    });
+
+    test('priority', async () => {
       delayCount = 0;
       const result = await Promise.all([
         queue.executeInQueue('delay', `11`, { delay: 200, result: '1' }, 1),
         queue.executeInQueue('delay', `12`, { delay: 300, result: '2' }, 0),
         queue.executeInQueue('delay', `13`, { delay: 400, result: '3' }, 10)
       ]);
-      should(result).be.eql(['11', '22', '30']);
+      expect(result).toEqual(['11', '22', '30']);
     });
 
-    it('timeout', async () => {
+    test('timeout', async () => {
       delayCount = 0;
       const query = ['select * from 2'];
       let errorString = '';
@@ -64,31 +66,31 @@ const QueryQueueTest = (name, options) => {
           break;
         }
       }
-      should(errorString.indexOf('timeout')).not.be.eql(-1);
+      expect(errorString.indexOf('timeout')).not.toEqual(-1);
     });
 
-    it('stage reporting', async () => {
+    test('stage reporting', async () => {
       delayCount = 0;
       const resultPromise = queue.executeInQueue('delay', '1', { delay: 200, result: '1' }, 0, { stageQueryKey: '1' });
       await delayFn(null, 50);
-      should((await queue.getQueryStage('1')).stage).be.eql('Executing query');
+      expect((await queue.getQueryStage('1')).stage).toBe('Executing query');
       await resultPromise;
-      should(await queue.getQueryStage('1')).be.eql(undefined);
+      expect(await queue.getQueryStage('1')).toEqual(undefined);
     });
 
-    it('priority stage reporting', async () => {
+    test('priority stage reporting', async () => {
       delayCount = 0;
       const resultPromise = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, { stageQueryKey: '12' });
       await delayFn(null, 50);
       const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, { stageQueryKey: '12' });
       await delayFn(null, 50);
-      should((await queue.getQueryStage('12', 10)).stage).be.eql('#1 in queue');
+      expect((await queue.getQueryStage('12', 10)).stage).toBe('#1 in queue');
       await resultPromise;
       await resultPromise2;
-      should(await queue.getQueryStage('12')).be.eql(undefined);
+      expect(await queue.getQueryStage('12')).toEqual(undefined);
     });
 
-    it('negative priority', async () => {
+    test('negative priority', async () => {
       delayCount = 0;
       const results = [];
       await Promise.all([
@@ -98,10 +100,10 @@ const QueryQueueTest = (name, options) => {
         queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => results.push(r))
       ]);
 
-      should(results).be.eql(['10', '21', '32', '43']);
+      expect(results).toEqual(['10', '21', '32', '43']);
     });
 
-    it('orphaned', async () => {
+    test('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11` + i, { delay: 50, result: `${i}` }, 0);
       }
@@ -113,16 +115,17 @@ const QueryQueueTest = (name, options) => {
       delayFn(null, 60).then(() => queue.executeInQueue('delay', `113`, { delay: 500, result: '3' }, 0)).catch(e => e);
       delayFn(null, 70).then(() => queue.executeInQueue('delay', `114`, { delay: 900, result: '4' }, 0)).catch(e => e);
 
-      should(await result).be.eql('10');
+      expect(await result).toBe('10');
       await queue.executeInQueue('delay', `112`, { delay: 800, result: '2' }, 0);
       result = await queue.executeInQueue('delay', `113`, { delay: 900, result: '3' }, 0);
-      should(result).be.eql('32');
+      expect(result).toBe('32');
       await delayFn(null, 200);
-      should(cancelledQuery).be.eql('114');
+      expect(cancelledQuery).toBe('114');
       await queue.executeInQueue('delay', `114`, { delay: 50, result: '4' }, 0);
     });
   });
 };
 
 QueryQueueTest('Local');
-QueryQueueTest('Redis', { cacheAndQueueDriver: 'redis' });
+QueryQueueTest('RedisPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool() });
+QueryQueueTest('RedisNoPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool(0, 0) });

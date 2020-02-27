@@ -543,7 +543,7 @@ class PreAggregations {
     this.queryCache = queryCache;
     this.refreshErrors = {}; // TODO should be in redis
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver() :
+      new RedisCacheDriver(options.redisPool) :
       new LocalCacheDriver();
     this.externalDriverFactory = options.externalDriverFactory;
   }
@@ -607,6 +607,7 @@ class PreAggregations {
         concurrency: 1,
         logger: this.logger,
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+        redisPool: this.options.redisPool,
         ...this.options.queueOptions
       });
     }

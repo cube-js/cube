@@ -204,6 +204,10 @@ class LocalQueueDriver extends BaseQueueDriver {
   createConnection() {
     return new LocalQueueDriverConnection(this, this.options);
   }
+
+  release(client) {
+    client.release();
+  }
 }
 
 module.exports = LocalQueueDriver;

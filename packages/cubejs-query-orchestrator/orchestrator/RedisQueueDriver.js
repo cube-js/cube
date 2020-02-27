@@ -1,12 +1,11 @@
 const R = require('ramda');
 
 const BaseQueueDriver = require('./BaseQueueDriver');
-const createRedisClient = require('./RedisFactory');
 
 class RedisQueueDriverConnection {
   constructor(driver, options) {
     this.driver = driver;
-    this.redisClient = options.createRedisClient();
+    this.redisClient = options.redisClient;
     this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.orphanedTimeout = options.orphanedTimeout;
@@ -186,15 +185,20 @@ class RedisQueueDriverConnection {
 class RedisQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
-    this.createRedisClient = options.createRedisClient || (() => createRedisClient(process.env.REDIS_URL));
+    this.redisPool = options.redisPool;
     this.options = options;
   }
 
-  createConnection() {
+  async createConnection() {
+    const redisClient = await this.redisPool.getClient();
     return new RedisQueueDriverConnection(this, {
-      ...this.options,
-      createRedisClient: this.createRedisClient
+      redisClient,
+      ...this.options
     });
+  }
+
+  release(connection) {
+    this.redisPool.release(connection.redisClient);
   }
 }
 
