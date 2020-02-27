@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const R = require("ramda");
 const moment = require("moment");
 const uuid = require("uuid/v4");
-const ajv = require("ajv")({ nullable: true });
+const ajv = require("ajv")();
 const validateSchema = ajv.compile(require("./querySchema"));
 
 const dateParser = require("./dateParser");

@@ -17,7 +17,6 @@ module.exports = {
       type: "array",
       items: {
         type: "object",
-        nullable: true,
         properties: {
           dimension: {
             type: "string",
@@ -52,7 +51,7 @@ module.exports = {
           values: {
             type: "array",
             items: {
-              anyOf: [{ type: "string", enum: ["", null] }, { type: "string" }]
+              type: ["string", "null"]
             }
           }
         },
