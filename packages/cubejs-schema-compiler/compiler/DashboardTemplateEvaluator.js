@@ -19,8 +19,8 @@ class DashboardTemplateEvaluator {
   }
 
   validateAndCompile(dashboardTemplate, errorReporter) {
-    const err = validateSchema(dashboardTemplate);
-    if (err) {
+    const valid = validateSchema(dashboardTemplate);
+    if (!valid) {
       errorReporter.error(ajv.errorsText(validateSchema.errors));
     } else {
       this.compiledTemplates.push(

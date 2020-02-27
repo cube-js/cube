@@ -121,8 +121,8 @@ const transformData = (aliasToMemberNameMap, annotation, data, query) =>
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 const normalizeQuery = query => {
-  const err = validateSchema(query);
-  if (err) {
+  const valid = validateSchema(query);
+  if (!valid) {
     throw new UserError(
       `Invalid query format: ${
         validateSchema.errors
