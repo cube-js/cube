@@ -19,7 +19,7 @@ class CubeValidator {
   validate(cube, errorReporter) {
     const err = validateSchema(cube);
     if (err) {
-      errorReporter.error(ajv.errorsText(err.errors));
+      errorReporter.error(ajv.errorsText(validateSchema.errors));
     } else {
       this.validCubes[cube.name] = true;
     }
