@@ -17,6 +17,7 @@ module.exports = {
       type: "array",
       items: {
         type: "object",
+        nullable: true,
         properties: {
           dimension: {
             type: "string",
