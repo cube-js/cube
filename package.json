@@ -26,7 +26,7 @@
     "@babel/preset-env": "^7.0.0",
     "@babel/preset-react": "^7.0.0",
     "@babel/runtime": "^7.0.0",
-    "@cubejs-client/core": "^0.10.0",
+    "@cubejs-client/core": "^0.17.10",
     "babel-runtime": "^6.26.0",
     "babelrc-rollup": "^3.0.0",
     "eslint": "5.12.0",
