@@ -12,7 +12,7 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "jest --runInBand"
+    "test": "jest --runInBand --verbose"
   },
   "dependencies": {
     "generic-pool": "^3.7.1",
