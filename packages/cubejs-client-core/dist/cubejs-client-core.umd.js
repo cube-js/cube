@@ -604,6 +604,59 @@
 	  }
 	}
 
+	// 21.2.5.3 get RegExp.prototype.flags
+
+	var _flags = function () {
+	  var that = _anObject(this);
+	  var result = '';
+	  if (that.global) result += 'g';
+	  if (that.ignoreCase) result += 'i';
+	  if (that.multiline) result += 'm';
+	  if (that.unicode) result += 'u';
+	  if (that.sticky) result += 'y';
+	  return result;
+	};
+
+	// 21.2.5.3 get RegExp.prototype.flags()
+	if (_descriptors && /./g.flags != 'g') _objectDp.f(RegExp.prototype, 'flags', {
+	  configurable: true,
+	  get: _flags
+	});
+
+	var TO_STRING = 'toString';
+	var $toString = /./[TO_STRING];
+
+	var define = function (fn) {
+	  _redefine(RegExp.prototype, TO_STRING, fn, true);
+	};
+
+	// 21.2.5.14 RegExp.prototype.toString()
+	if (_fails(function () { return $toString.call({ source: 'a', flags: 'b' }) != '/a/b'; })) {
+	  define(function toString() {
+	    var R = _anObject(this);
+	    return '/'.concat(R.source, '/',
+	      'flags' in R ? R.flags : !_descriptors && R instanceof RegExp ? _flags.call(R) : undefined);
+	  });
+	// FF44- RegExp#toString has a wrong name
+	} else if ($toString.name != TO_STRING) {
+	  define(function toString() {
+	    return $toString.call(this);
+	  });
+	}
+
+	var DateProto = Date.prototype;
+	var INVALID_DATE = 'Invalid Date';
+	var TO_STRING$1 = 'toString';
+	var $toString$1 = DateProto[TO_STRING$1];
+	var getTime = DateProto.getTime;
+	if (new Date(NaN) + '' != INVALID_DATE) {
+	  _redefine(DateProto, TO_STRING$1, function toString() {
+	    var value = getTime.call(this);
+	    // eslint-disable-next-line no-self-compare
+	    return value === value ? $toString$1.call(this) : INVALID_DATE;
+	  });
+	}
+
 	// getting tag from 19.1.3.6 Object.prototype.toString()
 
 	var TAG$1 = _wks('toStringTag');
@@ -1216,6 +1269,16 @@
 	    return capability.promise;
 	  }
 	});
+
+	// 19.1.3.6 Object.prototype.toString()
+
+	var test = {};
+	test[_wks('toStringTag')] = 'z';
+	if (test + '' != '[object z]') {
+	  _redefine(Object.prototype, 'toString', function toString() {
+	    return '[object ' + _classof(this) + ']';
+	  }, true);
+	}
 
 	function _typeof(obj) {
 	  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
@@ -2244,7 +2307,7 @@
 	        context.delegate = null;
 
 	        if (context.method === "throw") {
-	          if (delegate.iterator.return) {
+	          if (delegate.iterator["return"]) {
 	            // If the delegate iterator has a return method, give it a
 	            // chance to clean up.
 	            context.method = "return";
@@ -3525,59 +3588,6 @@
 	    };
 	  }
 	});
-
-	// 21.2.5.3 get RegExp.prototype.flags
-
-	var _flags = function () {
-	  var that = _anObject(this);
-	  var result = '';
-	  if (that.global) result += 'g';
-	  if (that.ignoreCase) result += 'i';
-	  if (that.multiline) result += 'm';
-	  if (that.unicode) result += 'u';
-	  if (that.sticky) result += 'y';
-	  return result;
-	};
-
-	// 21.2.5.3 get RegExp.prototype.flags()
-	if (_descriptors && /./g.flags != 'g') _objectDp.f(RegExp.prototype, 'flags', {
-	  configurable: true,
-	  get: _flags
-	});
-
-	var TO_STRING = 'toString';
-	var $toString = /./[TO_STRING];
-
-	var define = function (fn) {
-	  _redefine(RegExp.prototype, TO_STRING, fn, true);
-	};
-
-	// 21.2.5.14 RegExp.prototype.toString()
-	if (_fails(function () { return $toString.call({ source: 'a', flags: 'b' }) != '/a/b'; })) {
-	  define(function toString() {
-	    var R = _anObject(this);
-	    return '/'.concat(R.source, '/',
-	      'flags' in R ? R.flags : !_descriptors && R instanceof RegExp ? _flags.call(R) : undefined);
-	  });
-	// FF44- RegExp#toString has a wrong name
-	} else if ($toString.name != TO_STRING) {
-	  define(function toString() {
-	    return $toString.call(this);
-	  });
-	}
-
-	var DateProto = Date.prototype;
-	var INVALID_DATE = 'Invalid Date';
-	var TO_STRING$1 = 'toString';
-	var $toString$1 = DateProto[TO_STRING$1];
-	var getTime = DateProto.getTime;
-	if (new Date(NaN) + '' != INVALID_DATE) {
-	  _redefine(DateProto, TO_STRING$1, function toString() {
-	    var value = getTime.call(this);
-	    // eslint-disable-next-line no-self-compare
-	    return value === value ? $toString$1.call(this) : INVALID_DATE;
-	  });
-	}
 
 	/**
 	 * Convert array of 16 byte values to UUID string format of the form:
@@ -5725,14 +5735,14 @@
 	}
 
 	var $sort = [].sort;
-	var test = [1, 2, 3];
+	var test$1 = [1, 2, 3];
 
 	_export(_export.P + _export.F * (_fails(function () {
 	  // IE8-
-	  test.sort(undefined);
+	  test$1.sort(undefined);
 	}) || !_fails(function () {
 	  // V8 bug
-	  test.sort(null);
+	  test$1.sort(null);
 	  // Old WebKit
 	}) || !_strictMethod($sort)), 'Array', {
 	  // 22.1.3.25 Array.prototype.sort(comparefn)
@@ -8354,6 +8364,18 @@
 	var unnest =
 	/*#__PURE__*/
 	chain(_identity);
+
+	_export(_export.P + _export.F * _fails(function () {
+	  return new Date(NaN).toJSON() !== null
+	    || Date.prototype.toJSON.call({ toISOString: function () { return 1; } }) !== 1;
+	}), 'Date', {
+	  // eslint-disable-next-line no-unused-vars
+	  toJSON: function toJSON(key) {
+	    var O = _toObject(this);
+	    var pv = _toPrimitive(O);
+	    return typeof pv == 'number' && !isFinite(pv) ? null : O.toISOString();
+	  }
+	});
 
 	// 20.3.3.1 / 15.9.4.4 Date.now()
 
@@ -12895,7 +12917,7 @@
 	        });
 	      }, e.n = function (t) {
 	        var n = t && t.__esModule ? function () {
-	          return t.default;
+	          return t["default"];
 	        } : function () {
 	          return t;
 	        };
@@ -12919,7 +12941,7 @@
 
 	      function r(t) {
 	        return t && t.__esModule ? t : {
-	          default: t
+	          "default": t
 	        };
 	      }
 
@@ -12981,7 +13003,7 @@
 	            o = !0, i = t;
 	          } finally {
 	            try {
-	              !r && a.return && a.return();
+	              !r && a["return"] && a["return"]();
 	            } finally {
 	              if (o) throw i;
 	            }
@@ -13043,7 +13065,7 @@
 	                l = s(f, 2);
 	            r = l[0], o = l[1];
 	          }
-	          this.start = r || 0 === r ? (0, v.default)(r) : (0, v.default)(-864e13), this.end = o || 0 === o ? (0, v.default)(o) : (0, v.default)(864e13);
+	          this.start = r || 0 === r ? (0, v["default"])(r) : (0, v["default"])(-864e13), this.end = o || 0 === o ? (0, v["default"])(o) : (0, v["default"])(864e13);
 	        }
 
 	        return f(t, [{
@@ -13059,7 +13081,7 @@
 	            var e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : {
 	              adjacent: !1
 	            };
-	            return this.overlaps(t, e) ? new this.constructor(v.default.min(this.start, t.start), v.default.max(this.end, t.end)) : null;
+	            return this.overlaps(t, e) ? new this.constructor(v["default"].min(this.start, t.start), v["default"].max(this.end, t.end)) : null;
 	          }
 	        }, {
 	          key: "by",
@@ -13069,7 +13091,7 @@
 	              step: 1
 	            },
 	                n = this;
-	            return o({}, p.default.iterator, function () {
+	            return o({}, p["default"].iterator, function () {
 	              var r = e.step || 1,
 	                  o = Math.abs(n.start.diff(n.end, t)) / r,
 	                  i = e.excludeEnd || !1,
@@ -13099,12 +13121,12 @@
 	                u = Math.floor(i),
 	                a = e.excludeEnd || !1,
 	                s = 0;
-	            return e.hasOwnProperty("exclusive") && (a = e.exclusive), o({}, p.default.iterator, function () {
+	            return e.hasOwnProperty("exclusive") && (a = e.exclusive), o({}, p["default"].iterator, function () {
 	              return u === 1 / 0 ? {
 	                done: !0
 	              } : {
 	                next: function next() {
-	                  var e = (0, v.default)(n.start.valueOf() + t.valueOf() * s * r),
+	                  var e = (0, v["default"])(n.start.valueOf() + t.valueOf() * s * r),
 	                      o = u === i && a ? !(s < u) : !(s <= u);
 	                  return s++, {
 	                    done: o,
@@ -13118,7 +13140,7 @@
 	          key: "center",
 	          value: function value() {
 	            var t = this.start.valueOf() + this.diff() / 2;
-	            return (0, v.default)(t);
+	            return (0, v["default"])(t);
 	          }
 	        }, {
 	          key: "clone",
@@ -13202,7 +13224,7 @@
 	              step: 1
 	            },
 	                n = this;
-	            return o({}, p.default.iterator, function () {
+	            return o({}, p["default"].iterator, function () {
 	              var r = e.step || 1,
 	                  o = Math.abs(n.start.diff(n.end, t)) / r,
 	                  i = e.excludeStart || !1,
@@ -13232,12 +13254,12 @@
 	                u = Math.floor(i),
 	                a = e.excludeStart || !1,
 	                s = 0;
-	            return e.hasOwnProperty("exclusive") && (a = e.exclusive), o({}, p.default.iterator, function () {
+	            return e.hasOwnProperty("exclusive") && (a = e.exclusive), o({}, p["default"].iterator, function () {
 	              return u === 1 / 0 ? {
 	                done: !0
 	              } : {
 	                next: function next() {
-	                  var e = (0, v.default)(n.end.valueOf() - t.valueOf() * s * r),
+	                  var e = (0, v["default"])(n.end.valueOf() - t.valueOf() * s * r),
 	                      o = u === i && a ? !(s < u) : !(s <= u);
 	                  return s++, {
 	                    done: o,
@@ -13251,7 +13273,7 @@
 	          key: "snapTo",
 	          value: function value(t) {
 	            var e = this.clone();
-	            return e.start.isSame((0, v.default)(-864e13)) || (e.start = e.start.startOf(t)), e.end.isSame((0, v.default)(864e13)) || (e.end = e.end.endOf(t)), e;
+	            return e.start.isSame((0, v["default"])(-864e13)) || (e.start = e.start.startOf(t)), e.end.isSame((0, v["default"])(864e13)) || (e.end = e.end.endOf(t)), e;
 	          }
 	        }, {
 	          key: "subtract",
@@ -13484,7 +13506,7 @@
 	          __name__: a("", p(e))
 	        }));
 	      }, f(o, {
-	        for: a(function (t) {
+	        "for": a(function (t) {
 	          return d[t] ? d[t] : d[t] = o(String(t));
 	        }),
 	        keyFor: a(function (t) {
@@ -14113,7 +14135,7 @@
 	          return !!td.granularity;
 	        });
 	        this.backwardCompatibleData = this.loadResponse.data.map(function (row) {
-	          return _objectSpread({}, row, Object.keys(row).filter(function (field) {
+	          return _objectSpread({}, row, {}, Object.keys(row).filter(function (field) {
 	            return timeDimensions.find(function (d) {
 	              return d.dimension === field;
 	            }) && !row[ResultSet.timeDimensionMember(timeDimensions.find(function (d) {
@@ -14124,7 +14146,7 @@
 	              return d.dimension === field;
 	            })), row[field]);
 	          }).reduce(function (a, b) {
-	            return _objectSpread({}, a, b);
+	            return _objectSpread({}, a, {}, b);
 	          }, {}));
 	        });
 	      }
@@ -14891,7 +14913,7 @@
 	  delete __self__.fetch.polyfill;
 	  exports = __self__.fetch; // To enable: import fetch from 'cross-fetch'
 
-	  exports.default = __self__.fetch; // For TypeScript consumers without esModuleInterop.
+	  exports["default"] = __self__.fetch; // For TypeScript consumers without esModuleInterop.
 
 	  exports.fetch = __self__.fetch; // To enable: import {fetch} from 'cross-fetch'
 
@@ -15289,7 +15311,7 @@
 	      var searchParams = new URLSearchParams(params && Object.keys(params).map(function (k) {
 	        return _defineProperty({}, k, _typeof(params[k]) === 'object' ? JSON.stringify(params[k]) : params[k]);
 	      }).reduce(function (a, b) {
-	        return _objectSpread({}, a, b);
+	        return _objectSpread({}, a, {}, b);
 	      }, {}));
 	      var spanCounter = 1;
 
@@ -15304,12 +15326,12 @@
 	      };
 
 	      return {
-	        subscribe: function () {
-	          var _subscribe = _asyncToGenerator(
-	          /*#__PURE__*/
-	          regeneratorRuntime.mark(function _callee(callback) {
-	            var _this2 = this;
+	        subscribe: function subscribe(callback) {
+	          var _this2 = this;
 
+	          return _asyncToGenerator(
+	          /*#__PURE__*/
+	          regeneratorRuntime.mark(function _callee() {
 	            var result;
 	            return regeneratorRuntime.wrap(function _callee$(_context) {
 	              while (1) {
@@ -15329,13 +15351,9 @@
 	                    return _context.stop();
 	                }
 	              }
-	            }, _callee, this);
-	          }));
-
-	          return function subscribe(_x) {
-	            return _subscribe.apply(this, arguments);
-	          };
-	        }()
+	            }, _callee);
+	          }))();
+	        }
 	      };
 	    }
 	  }]);
@@ -15456,7 +15474,7 @@
 	                  return _context.stop();
 	              }
 	            }
-	          }, _callee, this);
+	          }, _callee);
 	        }));
 
 	        return function checkMutex() {
@@ -15522,7 +15540,7 @@
 	                              return _context2.stop();
 	                          }
 	                        }
-	                      }, _callee2, this);
+	                      }, _callee2);
 	                    }));
 
 	                    return function subscribeNext() {
@@ -15568,7 +15586,7 @@
 	                              return _context3.stop();
 	                          }
 	                        }
-	                      }, _callee3, this);
+	                      }, _callee3);
 	                    }));
 
 	                    return function continueWait(_x3) {
@@ -15685,7 +15703,7 @@
 	                  return _context4.stop();
 	              }
 	            }
-	          }, _callee4, this);
+	          }, _callee4);
 	        }));
 
 	        return function loadImpl(_x, _x2) {
@@ -15730,12 +15748,14 @@
 	                      return _context5.stop();
 	                  }
 	                }
-	              }, _callee5, this);
+	              }, _callee5);
 	            }));
 
-	            return function unsubscribe() {
+	            function unsubscribe() {
 	              return _unsubscribe.apply(this, arguments);
-	            };
+	            }
+
+	            return unsubscribe;
 	          }()
 	        };
 	      } else {
@@ -15776,9 +15796,11 @@
 	        }, _callee6, this);
 	      }));
 
-	      return function updateTransportAuthorization() {
+	      function updateTransportAuthorization() {
 	        return _updateTransportAuthorization.apply(this, arguments);
-	      };
+	      }
+
+	      return updateTransportAuthorization;
 	    }()
 	    /**
 	     * Fetch data for passed `query`.

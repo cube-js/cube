@@ -732,7 +732,12 @@ export const single = {
 
 export const sql = {};
 
-export default (body = {}, status = 200) => () => Promise.resolve({
-  status,
-  json: () => Promise.resolve(body),
+export default (body = {}, status = 200) => () => ({
+  async subscribe (callback) {
+    return callback({
+      status,
+      json: async () => body,
+    }, () => this.subscribe(callback));
+  }
 });
+

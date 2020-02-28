@@ -3,6 +3,7 @@ import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
 import 'core-js/modules/es6.promise';
 import 'core-js/modules/web.dom.iterable';
 import 'core-js/modules/es6.array.iterator';
+import 'core-js/modules/es6.object.to-string';
 import 'core-js/modules/es6.string.iterator';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
 import _possibleConstructorReturn from '@babel/runtime/helpers/possibleConstructorReturn';
@@ -13,7 +14,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { func, object, any, bool } from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import _extends from '@babel/runtime/helpers/extends';
-import _objectSpread from '@babel/runtime/helpers/objectSpread';
+import _objectSpread2 from '@babel/runtime/helpers/objectSpread';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import 'core-js/modules/es6.array.filter';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
@@ -129,7 +130,7 @@ function (_React$Component) {
               error: null,
               isLoading: false
             });
-          }).catch(function (error) {
+          })["catch"](function (error) {
             return _this2.setState({
               resultSet: null,
               error: error,
@@ -154,7 +155,7 @@ function (_React$Component) {
               error: null,
               isLoading: false
             });
-          }).catch(function (error) {
+          })["catch"](function (error) {
             return _this2.setState({
               resultSet: null,
               error: error,
@@ -171,7 +172,7 @@ function (_React$Component) {
               error: null,
               isLoading: false
             });
-          }).catch(function (error) {
+          })["catch"](function (error) {
             return _this2.setState({
               resultSet: null,
               error: error,
@@ -210,7 +211,7 @@ function (_React$Component) {
           error: null,
           isLoading: false
         });
-      }).catch(function (error) {
+      })["catch"](function (error) {
         return _this3.setState({
           resultSet: null,
           error: error,
@@ -271,10 +272,10 @@ var QueryRendererWithTotals = function QueryRendererWithTotals(_ref) {
 
   return React.createElement(QueryRenderer, _extends({
     queries: {
-      totals: _objectSpread({}, query, {
+      totals: _objectSpread2({}, query, {
         dimensions: [],
         timeDimensions: query.timeDimensions ? query.timeDimensions.map(function (td) {
-          return _objectSpread({}, td, {
+          return _objectSpread2({}, td, {
             granularity: null
           });
         }) : undefined
@@ -309,7 +310,7 @@ function (_React$Component) {
     _classCallCheck(this, QueryBuilder);
 
     _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props));
-    _this.state = _objectSpread({
+    _this.state = _objectSpread2({
       query: props.query,
       chartType: 'line'
     }, props.vizState);
@@ -344,9 +345,11 @@ function (_React$Component) {
         }, _callee, this);
       }));
 
-      return function componentDidMount() {
+      function componentDidMount() {
         return _componentDidMount.apply(this, arguments);
-      };
+      }
+
+      return componentDidMount;
     }()
   }, {
     key: "componentDidUpdate",
@@ -451,37 +454,37 @@ function (_React$Component) {
           meta = _this$state.meta,
           query = _this$state.query,
           chartType = _this$state.chartType;
-      return _objectSpread({
+      return _objectSpread2({
         meta: meta,
         query: query,
         validatedQuery: this.validatedQuery(),
         isQueryPresent: this.isQueryPresent(),
         chartType: chartType,
         measures: (meta && query.measures || []).map(function (m, i) {
-          return _objectSpread({
+          return _objectSpread2({
             index: i
           }, meta.resolveMember(m, 'measures'));
         }),
         dimensions: (meta && query.dimensions || []).map(function (m, i) {
-          return _objectSpread({
+          return _objectSpread2({
             index: i
           }, meta.resolveMember(m, 'dimensions'));
         }),
         segments: (meta && query.segments || []).map(function (m, i) {
-          return _objectSpread({
+          return _objectSpread2({
             index: i
           }, meta.resolveMember(m, 'segments'));
         }),
         timeDimensions: (meta && query.timeDimensions || []).map(function (m, i) {
-          return _objectSpread({}, m, {
-            dimension: _objectSpread({}, meta.resolveMember(m.dimension, 'dimensions'), {
+          return _objectSpread2({}, m, {
+            dimension: _objectSpread2({}, meta.resolveMember(m.dimension, 'dimensions'), {
               granularities: granularities
             }),
             index: i
           });
         }),
         filters: (meta && query.filters || []).map(function (m, i) {
-          return _objectSpread({}, m, {
+          return _objectSpread2({}, m, {
             dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
             operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
             index: i
@@ -510,7 +513,7 @@ function (_React$Component) {
     value: function updateQuery(queryUpdate) {
       var query = this.state.query;
       this.updateVizState({
-        query: _objectSpread({}, query, queryUpdate)
+        query: _objectSpread2({}, query, {}, queryUpdate)
       });
     }
   }, {
@@ -521,7 +524,7 @@ function (_React$Component) {
           setVizState = _this$props2.setVizState;
       var finalState = this.applyStateChangeHeuristics(state);
       this.setState(finalState);
-      finalState = _objectSpread({}, this.state, finalState);
+      finalState = _objectSpread2({}, this.state, {}, finalState);
 
       if (setQuery) {
         setQuery(finalState.query);
@@ -539,7 +542,7 @@ function (_React$Component) {
     key: "validatedQuery",
     value: function validatedQuery() {
       var query = this.state.query;
-      return _objectSpread({}, query, {
+      return _objectSpread2({}, query, {
         filters: (query.filters || []).filter(function (f) {
           return f.operator;
         })
@@ -559,59 +562,59 @@ function (_React$Component) {
         var meta = this.state.meta;
 
         if ((oldQuery.timeDimensions || []).length === 1 && (newQuery.timeDimensions || []).length === 1 && newQuery.timeDimensions[0].granularity && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity) {
-          newState = _objectSpread({}, newState, {
+          newState = _objectSpread2({}, newState, {
             sessionGranularity: newQuery.timeDimensions[0].granularity
           });
         }
 
         if ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0 || (oldQuery.measures || []).length === 1 && (newQuery.measures || []).length === 1 && oldQuery.measures[0] !== newQuery.measures[0]) {
           var defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
-          newQuery = _objectSpread({}, newQuery, {
+          newQuery = _objectSpread2({}, newQuery, {
             timeDimensions: defaultTimeDimension ? [{
               dimension: defaultTimeDimension,
               granularity: defaultGranularity
             }] : []
           });
-          return _objectSpread({}, newState, {
+          return _objectSpread2({}, newState, {
             query: newQuery,
             chartType: defaultTimeDimension ? 'line' : 'number'
           });
         }
 
         if ((oldQuery.dimensions || []).length === 0 && (newQuery.dimensions || []).length > 0) {
-          newQuery = _objectSpread({}, newQuery, {
+          newQuery = _objectSpread2({}, newQuery, {
             timeDimensions: (newQuery.timeDimensions || []).map(function (td) {
-              return _objectSpread({}, td, {
+              return _objectSpread2({}, td, {
                 granularity: undefined
               });
             })
           });
-          return _objectSpread({}, newState, {
+          return _objectSpread2({}, newState, {
             query: newQuery,
             chartType: 'table'
           });
         }
 
         if ((oldQuery.dimensions || []).length > 0 && (newQuery.dimensions || []).length === 0) {
-          newQuery = _objectSpread({}, newQuery, {
+          newQuery = _objectSpread2({}, newQuery, {
             timeDimensions: (newQuery.timeDimensions || []).map(function (td) {
-              return _objectSpread({}, td, {
+              return _objectSpread2({}, td, {
                 granularity: td.granularity || defaultGranularity
               });
             })
           });
-          return _objectSpread({}, newState, {
+          return _objectSpread2({}, newState, {
             query: newQuery,
             chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
           });
         }
 
         if (((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0) && (newQuery.dimensions || []).length === 0 && (newQuery.measures || []).length === 0) {
-          newQuery = _objectSpread({}, newQuery, {
+          newQuery = _objectSpread2({}, newQuery, {
             timeDimensions: [],
             filters: []
           });
-          return _objectSpread({}, newState, {
+          return _objectSpread2({}, newState, {
             query: newQuery,
             sessionGranularity: null
           });
@@ -627,9 +630,9 @@ function (_React$Component) {
           var _query$timeDimensions = _slicedToArray(query.timeDimensions, 1),
               td = _query$timeDimensions[0];
 
-          return _objectSpread({}, newState, {
-            query: _objectSpread({}, query, {
-              timeDimensions: [_objectSpread({}, td, {
+          return _objectSpread2({}, newState, {
+            query: _objectSpread2({}, query, {
+              timeDimensions: [_objectSpread2({}, td, {
                 granularity: defaultGranularity
               })]
             })
@@ -640,9 +643,9 @@ function (_React$Component) {
           var _query$timeDimensions2 = _slicedToArray(query.timeDimensions, 1),
               _td = _query$timeDimensions2[0];
 
-          return _objectSpread({}, newState, {
-            query: _objectSpread({}, query, {
-              timeDimensions: [_objectSpread({}, _td, {
+          return _objectSpread2({}, newState, {
+            query: _objectSpread2({}, query, {
+              timeDimensions: [_objectSpread2({}, _td, {
                 granularity: undefined
               })]
             })
@@ -857,7 +860,7 @@ var useCubeQuery = (function (query) {
                 return _context.stop();
             }
           }
-        }, _callee, this, [[3, 21]]);
+        }, _callee, null, [[3, 21]]);
       }));
       return _loadQuery.apply(this, arguments);
     }
