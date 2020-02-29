@@ -32,8 +32,10 @@
     "cors": "^2.8.4",
     "dotenv": "^8.1.0",
     "express": "^4.17.1",
+    "express-pino-logger": "^4.0.0",
     "jsonwebtoken": "^8.4.0",
     "node-machine-id": "^1.1.10",
+    "pino": "^5.17.0",
     "ws": "^7.1.2"
   },
   "devDependencies": {

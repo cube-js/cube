@@ -23,8 +23,19 @@ class CubejsServer {
       const https = require("https");
       const util = require("util");
       const express = require("express");
+      const pino = require("pino");
+      const expressPino = require("express-pino-logger");
+      const logger = pino({
+        level: process.env.CUBEJS_LOG_LEVEL || 'info',
+        redact: {
+          paths: ['req.headers', 'res.headers'],
+          remove: true
+        }
+      });
+      const expressLogger = expressPino({ logger });
       const app = express();
       const bodyParser = require("body-parser");
+      app.use(expressLogger);
       app.use(require("cors")());
       app.use(bodyParser.json({ limit: "50mb" }));
 
