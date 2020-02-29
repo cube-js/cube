@@ -264,42 +264,62 @@ class ApiGateway {
 
   initApp(app) {
     app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
-      await this.load({
+      const context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
+      const timings = await this.load({
         query: req.query.query,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context,
         res: this.resToResultFn(res)
       });
+      if (req.log) {
+        res.log = req.log = req.log.child({ context, timings });
+      }
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
       await this.load({
         query: req.query.query,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context,
         res: this.resToResultFn(res)
       });
+      if (req.log) {
+        res.log = req.log = req.log.child({ context });
+      }
     }));
 
     app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
       await this.sql({
         query: req.query.query,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context,
         res: this.resToResultFn(res)
       });
+      if (req.log) {
+        res.log = req.log = req.log.child({ context });
+      }
     }));
 
     app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
       await this.meta({
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context,
         res: this.resToResultFn(res)
       });
+      if (req.log) {
+        res.log = req.log = req.log.child({ context });
+      }
     }));
 
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, this.checkAuthMiddleware, (async (req, res) => {
+      const context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context,
         res: this.resToResultFn(res)
       });
+      if (req.log) {
+        res.log = req.log = req.log.child({ context });
+      }
     }));
   }
 
@@ -361,6 +381,7 @@ class ApiGateway {
   async load({
     query, context, res
   }) {
+    const timings = {};
     const requestStarted = new Date();
     try {
       query = this.parseQueryParam(query);
@@ -375,12 +396,15 @@ class ApiGateway {
         this.getCompilerApi(context).metaConfig()
       ]);
       const sqlQuery = compilerSqlResult;
-      this.log(context, {
+      const duration = this.duration(loadRequestSQLStarted);
+      const event = {
         type: 'Load Request SQL',
-        duration: this.duration(loadRequestSQLStarted),
+        duration,
         query,
         sqlQuery
-      });
+      };
+      timings[event.type] = duration;
+      this.log(context, event);
       const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
       const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
       const toExecute = {
@@ -391,9 +415,11 @@ class ApiGateway {
         renewQuery: normalizedQuery.renewQuery,
         requestId: context.requestId
       };
+      const executeStarted = new Date();
       const response = await this.getAdapterApi({
         ...context, dataSource: sqlQuery.dataSource
       }).executeQuery(toExecute);
+      timings["Query Execution"] = this.duration(executeStarted);
       this.log(context, {
         type: 'Load Request Success',
         query,
@@ -414,6 +440,7 @@ class ApiGateway {
         }),
         annotation
       });
+      return timings;
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
