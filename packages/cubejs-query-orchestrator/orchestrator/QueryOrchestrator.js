@@ -18,6 +18,7 @@ class QueryOrchestrator {
       throw new Error(`Only 'redis' or 'memory' are supported for cacheAndQueueDriver option`);
     }
 
+    this.redisPool = redisPool;
     this.queryCache = new QueryCache(
       this.redisPrefix, this.driverFactory, this.logger, {
         externalDriverFactory,
@@ -86,6 +87,10 @@ class QueryOrchestrator {
 
   resultFromCacheIfExists(queryBody) {
     return this.queryCache.resultFromCacheIfExists(queryBody);
+  }
+
+  async cleanup() {
+    await this.redisPool.cleanup();
   }
 }
 

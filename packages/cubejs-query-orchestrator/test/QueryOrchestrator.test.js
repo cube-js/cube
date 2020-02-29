@@ -32,14 +32,17 @@ class MockDriver {
 
 describe('QueryOrchestrator', () => {
   let mockDriver = null;
+  const queryOrchestrator = new QueryOrchestrator(
+    'TEST', async () => mockDriver, (msg, params) => console.log(msg, params)
+  );
 
   beforeAll(() => {
     mockDriver = new MockDriver();
   });
 
-  const queryOrchestrator = new QueryOrchestrator(
-    'TEST', async () => mockDriver, (msg, params) => console.log(msg, params)
-  );
+  afterAll(async () => {
+    await queryOrchestrator.cleanup();
+  });
 
   test('basic', async () => {
     const query = {
