@@ -286,14 +286,7 @@ class PreAggregationLoader {
           await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
           return mostRecentTargetTableName();
         } else {
-          if (
-            this.preAggregations.refreshErrors[newVersionEntry.table_name] &&
-            this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version] &&
-            this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].counter > 10) {
-            throw this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].error;
-          } else {
-            this.scheduleRefresh(invalidationKeys, newVersionEntry);
-          }
+          this.scheduleRefresh(invalidationKeys, newVersionEntry);
         }
       }
     } else {
@@ -347,18 +340,8 @@ class PreAggregationLoader {
       requestId: this.requestId
     });
     this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry)
-      .then(() => {
-        delete this.preAggregations.refreshErrors[newVersionEntry.table_name];
-      })
       .catch(e => {
         if (!(e instanceof ContinueWaitError)) {
-          this.preAggregations.refreshErrors[newVersionEntry.table_name] = this.preAggregations.refreshErrors[newVersionEntry.table_name] || {};
-          if (!this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version]) {
-            this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version] = { error: e, counter: 1 };
-          } else {
-            this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].error = e;
-            this.preAggregations.refreshErrors[newVersionEntry.table_name][newVersionEntry.content_version].counter += 1;
-          }
           this.logger('Error refreshing pre-aggregation', {
             error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId
           });
@@ -541,7 +524,6 @@ class PreAggregations {
     this.driverFactory = clientFactory;
     this.logger = logger;
     this.queryCache = queryCache;
-    this.refreshErrors = {}; // TODO should be in redis
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver(options.redisPool) :
       new LocalCacheDriver();
