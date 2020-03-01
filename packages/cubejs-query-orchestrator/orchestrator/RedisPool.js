@@ -3,8 +3,10 @@ const createRedisClient = require('./RedisFactory');
 
 class RedisPool {
   constructor(poolMin, poolMax, createClient, destroyClient) {
-    const min = (typeof poolMin !== 'undefined') ? poolMin : parseInt(process.env.CUBEJS_REDIS_POOL_MIN, 10) || 2;
-    const max = (typeof poolMax !== 'undefined') ? poolMax : parseInt(process.env.CUBEJS_REDIS_POOL_MAX, 10) || 1000;
+    const defaultMin = process.env.CUBEJS_REDIS_POOL_MIN ? parseInt(process.env.CUBEJS_REDIS_POOL_MIN, 10) : 2;
+    const defaultMax = process.env.CUBEJS_REDIS_POOL_MAX ? parseInt(process.env.CUBEJS_REDIS_POOL_MAX, 10) : 1000;
+    const min = (typeof poolMin !== 'undefined') ? poolMin : defaultMin;
+    const max = (typeof poolMax !== 'undefined') ? poolMax : defaultMax;
     const create = createClient || (() => createRedisClient(process.env.REDIS_URL));
     const destroy = destroyClient || (client => client.end(true));
     const opts = {
