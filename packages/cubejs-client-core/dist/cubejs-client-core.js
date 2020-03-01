@@ -4,14 +4,16 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
+var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _typeof = _interopDefault(require('@babel/runtime/helpers/typeof'));
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
 require('core-js/modules/es6.promise');
+require('core-js/modules/es6.object.to-string');
+var uuid = _interopDefault(require('uuid/v4'));
 require('core-js/modules/es6.number.constructor');
 require('core-js/modules/es6.number.parse-float');
 require('core-js/modules/web.dom.iterable');
@@ -428,7 +430,7 @@ function () {
       return this.pivot(pivotConfig).map(function (_ref15) {
         var xValues = _ref15.xValues,
             yValuesArray = _ref15.yValuesArray;
-        return _objectSpread({
+        return _objectSpread2({
           category: _this3.axisValuesString(xValues, ', '),
           // TODO deprecated
           x: _this3.axisValuesString(xValues, ', ')
@@ -618,7 +620,7 @@ function () {
           return !!td.granularity;
         });
         this.backwardCompatibleData = this.loadResponse.data.map(function (row) {
-          return _objectSpread({}, row, Object.keys(row).filter(function (field) {
+          return _objectSpread2({}, row, {}, Object.keys(row).filter(function (field) {
             return timeDimensions.find(function (d) {
               return d.dimension === field;
             }) && !row[ResultSet.timeDimensionMember(timeDimensions.find(function (d) {
@@ -629,7 +631,7 @@ function () {
               return d.dimension === field;
             })), row[field]);
           }).reduce(function (a, b) {
-            return _objectSpread({}, a, b);
+            return _objectSpread2({}, a, {}, b);
           }, {}));
         });
       }
@@ -855,31 +857,36 @@ function () {
 
   _createClass(HttpTransport, [{
     key: "request",
-    value: function request(method, params) {
+    value: function request(method, _ref2) {
       var _this = this;
+
+      var baseRequestId = _ref2.baseRequestId,
+          params = _objectWithoutProperties(_ref2, ["baseRequestId"]);
 
       var searchParams = new URLSearchParams(params && Object.keys(params).map(function (k) {
         return _defineProperty({}, k, _typeof(params[k]) === 'object' ? JSON.stringify(params[k]) : params[k]);
       }).reduce(function (a, b) {
-        return _objectSpread({}, a, b);
+        return _objectSpread2({}, a, {}, b);
       }, {}));
+      var spanCounter = 1;
 
       var runRequest = function runRequest() {
         return fetch("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
-          headers: Object.assign({
+          headers: _objectSpread2({
             Authorization: _this.authorization,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
           }, _this.headers)
         });
       };
 
       return {
-        subscribe: function () {
-          var _subscribe = _asyncToGenerator(
-          /*#__PURE__*/
-          _regeneratorRuntime.mark(function _callee(callback) {
-            var _this2 = this;
+        subscribe: function subscribe(callback) {
+          var _this2 = this;
 
+          return _asyncToGenerator(
+          /*#__PURE__*/
+          _regeneratorRuntime.mark(function _callee() {
             var result;
             return _regeneratorRuntime.wrap(function _callee$(_context) {
               while (1) {
@@ -899,13 +906,9 @@ function () {
                     return _context.stop();
                 }
               }
-            }, _callee, this);
-          }));
-
-          return function subscribe(_x) {
-            return _subscribe.apply(this, arguments);
-          };
-        }()
+            }, _callee);
+          }))();
+        }
       };
     }
   }]);
@@ -958,7 +961,9 @@ function () {
   _createClass(CubejsApi, [{
     key: "request",
     value: function request(method, params) {
-      return this.transport.request(method, params);
+      return this.transport.request(method, _objectSpread2({
+        baseRequestId: uuid()
+      }, params));
     }
   }, {
     key: "loadMethod",
@@ -1024,7 +1029,7 @@ function () {
                   return _context.stop();
               }
             }
-          }, _callee, this);
+          }, _callee);
         }));
 
         return function checkMutex() {
@@ -1090,7 +1095,7 @@ function () {
                               return _context2.stop();
                           }
                         }
-                      }, _callee2, this);
+                      }, _callee2);
                     }));
 
                     return function subscribeNext() {
@@ -1136,7 +1141,7 @@ function () {
                               return _context3.stop();
                           }
                         }
-                      }, _callee3, this);
+                      }, _callee3);
                     }));
 
                     return function continueWait(_x3) {
@@ -1253,7 +1258,7 @@ function () {
                   return _context4.stop();
               }
             }
-          }, _callee4, this);
+          }, _callee4);
         }));
 
         return function loadImpl(_x, _x2) {
@@ -1298,12 +1303,14 @@ function () {
                       return _context5.stop();
                   }
                 }
-              }, _callee5, this);
+              }, _callee5);
             }));
 
-            return function unsubscribe() {
+            function unsubscribe() {
               return _unsubscribe.apply(this, arguments);
-            };
+            }
+
+            return unsubscribe;
           }()
         };
       } else {
@@ -1344,9 +1351,11 @@ function () {
         }, _callee6, this);
       }));
 
-      return function updateTransportAuthorization() {
+      function updateTransportAuthorization() {
         return _updateTransportAuthorization.apply(this, arguments);
-      };
+      }
+
+      return updateTransportAuthorization;
     }()
     /**
      * Fetch data for passed `query`.
@@ -1439,7 +1448,7 @@ function () {
         });
       }, function (body) {
         return new ResultSet(body);
-      }, _objectSpread({}, options, {
+      }, _objectSpread2({}, options, {
         subscribe: true
       }), callback);
     }

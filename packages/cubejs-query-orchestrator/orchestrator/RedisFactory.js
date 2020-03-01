@@ -4,7 +4,7 @@ const { promisify } = require('util');
 module.exports = function createRedisClient(url) {
   redis.Multi.prototype.execAsync = promisify(redis.Multi.prototype.exec);
 
-  let options = {
+  const options = {
     url,
   };
 
@@ -18,7 +18,22 @@ module.exports = function createRedisClient(url) {
 
   const client = redis.createClient(options);
 
-  ['brpop', 'del', 'get', 'hget', 'rpop', 'set', 'zadd', 'zrange', 'zrangebyscore', 'keys'].forEach(
+  [
+    'brpop',
+    'del',
+    'get',
+    'hget',
+    'rpop',
+    'set',
+    'zadd',
+    'zrange',
+    'zrangebyscore',
+    'keys',
+    'watch',
+    'incr',
+    'decr',
+    'lpush'
+  ].forEach(
     k => {
       client[`${k}Async`] = promisify(client[k]);
     }

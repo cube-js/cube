@@ -1,25 +1,47 @@
-const createRedisClient = require('./RedisFactory');
-
 class RedisCacheDriver {
-  constructor() {
-    this.redisClient = createRedisClient(process.env.REDIS_URL);
+  constructor(pool) {
+    this.redisPool = pool;
+  }
+
+  async getClient() {
+    return await this.redisPool.getClient();
   }
 
   async get(key) {
-    const res = await this.redisClient.getAsync(key);
-    return res && JSON.parse(res);
+    const client = await this.getClient();
+    try {
+      const res = await client.getAsync(key);
+      return res && JSON.parse(res);
+    } finally {
+      this.redisPool.release(client);
+    }
   }
 
-  set(key, value, expiration) {
-    return this.redisClient.setAsync(key, JSON.stringify(value), 'EX', expiration);
+  async set(key, value, expiration) {
+    const client = await this.getClient();
+    try {
+      return await client.setAsync(key, JSON.stringify(value), 'EX', expiration);
+    } finally {
+      this.redisPool.release(client);
+    }
   }
 
-  remove(key) {
-    return this.redisClient.delAsync(key);
+  async remove(key) {
+    const client = await this.getClient();
+    try {
+      return await client.delAsync(key);
+    } finally {
+      this.redisPool.release(client);
+    }
   }
 
-  keysStartingWith(prefix) {
-    return this.redisClient.keysAsync(`${prefix}*`);
+  async keysStartingWith(prefix) {
+    const client = await this.getClient();
+    try {
+      return await client.keysAsync(`${prefix}*`);
+    } finally {
+      this.redisPool.release(client);
+    }
   }
 }
 

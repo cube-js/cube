@@ -1453,6 +1453,16 @@
     }
   }
 
+  // 19.1.3.6 Object.prototype.toString()
+
+  var test = {};
+  test[_wks('toStringTag')] = 'z';
+  if (test + '' != '[object z]') {
+    _redefine(Object.prototype, 'toString', function toString() {
+      return '[object ' + _classof(this) + ']';
+    }, true);
+  }
+
   // most Object methods by ES6 should accept primitives
 
 
@@ -1528,6 +1538,59 @@
 
 
   _export(_export.S + _export.F, 'Object', { assign: _objectAssign });
+
+  // 21.2.5.3 get RegExp.prototype.flags
+
+  var _flags = function () {
+    var that = _anObject(this);
+    var result = '';
+    if (that.global) result += 'g';
+    if (that.ignoreCase) result += 'i';
+    if (that.multiline) result += 'm';
+    if (that.unicode) result += 'u';
+    if (that.sticky) result += 'y';
+    return result;
+  };
+
+  // 21.2.5.3 get RegExp.prototype.flags()
+  if (_descriptors && /./g.flags != 'g') _objectDp.f(RegExp.prototype, 'flags', {
+    configurable: true,
+    get: _flags
+  });
+
+  var TO_STRING = 'toString';
+  var $toString = /./[TO_STRING];
+
+  var define = function (fn) {
+    _redefine(RegExp.prototype, TO_STRING, fn, true);
+  };
+
+  // 21.2.5.14 RegExp.prototype.toString()
+  if (_fails(function () { return $toString.call({ source: 'a', flags: 'b' }) != '/a/b'; })) {
+    define(function toString() {
+      var R = _anObject(this);
+      return '/'.concat(R.source, '/',
+        'flags' in R ? R.flags : !_descriptors && R instanceof RegExp ? _flags.call(R) : undefined);
+    });
+  // FF44- RegExp#toString has a wrong name
+  } else if ($toString.name != TO_STRING) {
+    define(function toString() {
+      return $toString.call(this);
+    });
+  }
+
+  var DateProto = Date.prototype;
+  var INVALID_DATE = 'Invalid Date';
+  var TO_STRING$1 = 'toString';
+  var $toString$1 = DateProto[TO_STRING$1];
+  var getTime = DateProto.getTime;
+  if (new Date(NaN) + '' != INVALID_DATE) {
+    _redefine(DateProto, TO_STRING$1, function toString() {
+      var value = getTime.call(this);
+      // eslint-disable-next-line no-self-compare
+      return value === value ? $toString$1.call(this) : INVALID_DATE;
+    });
+  }
 
   var gOPD = Object.getOwnPropertyDescriptor;
 
@@ -3162,59 +3225,6 @@
     };
   }
 
-  // 21.2.5.3 get RegExp.prototype.flags
-
-  var _flags = function () {
-    var that = _anObject(this);
-    var result = '';
-    if (that.global) result += 'g';
-    if (that.ignoreCase) result += 'i';
-    if (that.multiline) result += 'm';
-    if (that.unicode) result += 'u';
-    if (that.sticky) result += 'y';
-    return result;
-  };
-
-  // 21.2.5.3 get RegExp.prototype.flags()
-  if (_descriptors && /./g.flags != 'g') _objectDp.f(RegExp.prototype, 'flags', {
-    configurable: true,
-    get: _flags
-  });
-
-  var TO_STRING = 'toString';
-  var $toString = /./[TO_STRING];
-
-  var define = function (fn) {
-    _redefine(RegExp.prototype, TO_STRING, fn, true);
-  };
-
-  // 21.2.5.14 RegExp.prototype.toString()
-  if (_fails(function () { return $toString.call({ source: 'a', flags: 'b' }) != '/a/b'; })) {
-    define(function toString() {
-      var R = _anObject(this);
-      return '/'.concat(R.source, '/',
-        'flags' in R ? R.flags : !_descriptors && R instanceof RegExp ? _flags.call(R) : undefined);
-    });
-  // FF44- RegExp#toString has a wrong name
-  } else if ($toString.name != TO_STRING) {
-    define(function toString() {
-      return $toString.call(this);
-    });
-  }
-
-  var DateProto = Date.prototype;
-  var INVALID_DATE = 'Invalid Date';
-  var TO_STRING$1 = 'toString';
-  var $toString$1 = DateProto[TO_STRING$1];
-  var getTime = DateProto.getTime;
-  if (new Date(NaN) + '' != INVALID_DATE) {
-    _redefine(DateProto, TO_STRING$1, function toString() {
-      var value = getTime.call(this);
-      // eslint-disable-next-line no-self-compare
-      return value === value ? $toString$1.call(this) : INVALID_DATE;
-    });
-  }
-
   // 22.1.2.2 / 15.4.3.2 Array.isArray(arg)
 
 
@@ -3727,6 +3737,105 @@
     }
   }));
 
+  // 20.1.2.3 Number.isInteger(number)
+
+  var floor$1 = Math.floor;
+  var _isInteger = function isInteger(it) {
+    return !_isObject(it) && isFinite(it) && floor$1(it) === it;
+  };
+
+  // 20.1.2.3 Number.isInteger(number)
+
+
+  _export(_export.S, 'Number', { isInteger: _isInteger });
+
+  /**
+   * Determine if the passed argument is an integer.
+   *
+   * @private
+   * @param {*} n
+   * @category Type
+   * @return {Boolean}
+   */
+  var _isInteger$1 = Number.isInteger || function _isInteger(n) {
+    return n << 0 === n;
+  };
+
+  /**
+   * Returns the nth element of the given list or string. If n is negative the
+   * element at index length + n is returned.
+   *
+   * @func
+   * @memberOf R
+   * @since v0.1.0
+   * @category List
+   * @sig Number -> [a] -> a | Undefined
+   * @sig Number -> String -> String
+   * @param {Number} offset
+   * @param {*} list
+   * @return {*}
+   * @example
+   *
+   *      const list = ['foo', 'bar', 'baz', 'quux'];
+   *      R.nth(1, list); //=> 'bar'
+   *      R.nth(-1, list); //=> 'quux'
+   *      R.nth(-99, list); //=> undefined
+   *
+   *      R.nth(2, 'abc'); //=> 'c'
+   *      R.nth(3, 'abc'); //=> ''
+   * @symb R.nth(-1, [a, b, c]) = c
+   * @symb R.nth(0, [a, b, c]) = a
+   * @symb R.nth(1, [a, b, c]) = b
+   */
+
+  var nth =
+  /*#__PURE__*/
+  _curry2(function nth(offset, list) {
+    var idx = offset < 0 ? list.length + offset : offset;
+    return _isString(list) ? list.charAt(idx) : list[idx];
+  });
+
+  /**
+   * Retrieves the values at given paths of an object.
+   *
+   * @func
+   * @memberOf R
+   * @since v0.27.0
+   * @category Object
+   * @typedefn Idx = [String | Int]
+   * @sig [Idx] -> {a} -> [a | Undefined]
+   * @param {Array} pathsArray The array of paths to be fetched.
+   * @param {Object} obj The object to retrieve the nested properties from.
+   * @return {Array} A list consisting of values at paths specified by "pathsArray".
+   * @see R.path
+   * @example
+   *
+   *      R.paths([['a', 'b'], ['p', 0, 'q']], {a: {b: 2}, p: [{q: 3}]}); //=> [2, 3]
+   *      R.paths([['a', 'b'], ['p', 'r']], {a: {b: 2}, p: [{q: 3}]}); //=> [2, undefined]
+   */
+
+  var paths =
+  /*#__PURE__*/
+  _curry2(function paths(pathsArray, obj) {
+    return pathsArray.map(function (paths) {
+      var val = obj;
+      var idx = 0;
+      var p;
+
+      while (idx < paths.length) {
+        if (val == null) {
+          return;
+        }
+
+        p = paths[idx];
+        val = _isInteger$1(p) ? nth(p, val) : val[p];
+        idx += 1;
+      }
+
+      return val;
+    });
+  });
+
   /**
    * Retrieve the value at a given path.
    *
@@ -3739,29 +3848,19 @@
    * @param {Array} path The path to use.
    * @param {Object} obj The object to retrieve the nested property from.
    * @return {*} The data at `path`.
-   * @see R.prop
+   * @see R.prop, R.nth
    * @example
    *
    *      R.path(['a', 'b'], {a: {b: 2}}); //=> 2
    *      R.path(['a', 'b'], {c: {b: 2}}); //=> undefined
+   *      R.path(['a', 'b', 0], {a: {b: [1, 2, 3]}}); //=> 1
+   *      R.path(['a', 'b', -2], {a: {b: [1, 2, 3]}}); //=> 2
    */
 
   var path =
   /*#__PURE__*/
-  _curry2(function path(paths, obj) {
-    var val = obj;
-    var idx = 0;
-
-    while (idx < paths.length) {
-      if (val == null) {
-        return;
-      }
-
-      val = val[paths[idx]];
-      idx += 1;
-    }
-
-    return val;
+  _curry2(function path(pathAr, obj) {
+    return paths([pathAr], obj)[0];
   });
 
   /**
@@ -3772,15 +3871,17 @@
    * @memberOf R
    * @since v0.1.0
    * @category Object
-   * @sig s -> {s: a} -> a | Undefined
-   * @param {String} p The property name
+   * @typedefn Idx = String | Int
+   * @sig Idx -> {s: a} -> a | Undefined
+   * @param {String|Number} p The property name or array index
    * @param {Object} obj The object to query
    * @return {*} The value at `obj.p`.
-   * @see R.path
+   * @see R.path, R.nth
    * @example
    *
    *      R.prop('x', {x: 100}); //=> 100
    *      R.prop('x', {}); //=> undefined
+   *      R.prop(0, [100]); //=> 100
    *      R.compose(R.inc, R.prop('x'))({ x: 3 }) //=> 4
    */
 
@@ -3912,20 +4013,9 @@
     }, [], applyF);
   });
 
-  // 20.1.2.3 Number.isInteger(number)
-
-  var floor$1 = Math.floor;
-  var _isInteger = function isInteger(it) {
-    return !_isObject(it) && isFinite(it) && floor$1(it) === it;
-  };
-
-  // 20.1.2.3 Number.isInteger(number)
-
-
-  _export(_export.S, 'Number', { isInteger: _isInteger });
-
   function _isFunction(x) {
-    return Object.prototype.toString.call(x) === '[object Function]';
+    var type = Object.prototype.toString.call(x);
+    return type === '[object Function]' || type === '[object AsyncFunction]' || type === '[object GeneratorFunction]' || type === '[object AsyncGeneratorFunction]';
   }
 
   /**
@@ -4237,6 +4327,10 @@
 
   _setSpecies('RegExp');
 
+  function _cloneRegExp(pattern) {
+    return new RegExp(pattern.source, (pattern.global ? 'g' : '') + (pattern.ignoreCase ? 'i' : '') + (pattern.multiline ? 'm' : '') + (pattern.sticky ? 'y' : '') + (pattern.unicode ? 'u' : ''));
+  }
+
   /**
    * Gives a single-word string description of the (native) type of a value,
    * returning such answers as 'Object', 'Number', 'Array', or 'Null'. Does not
@@ -4268,6 +4362,58 @@
   _curry1(function type(val) {
     return val === null ? 'Null' : val === undefined ? 'Undefined' : Object.prototype.toString.call(val).slice(8, -1);
   });
+
+  /**
+   * Copies an object.
+   *
+   * @private
+   * @param {*} value The value to be copied
+   * @param {Array} refFrom Array containing the source references
+   * @param {Array} refTo Array containing the copied source references
+   * @param {Boolean} deep Whether or not to perform deep cloning.
+   * @return {*} The copied value.
+   */
+
+  function _clone(value, refFrom, refTo, deep) {
+    var copy = function copy(copiedValue) {
+      var len = refFrom.length;
+      var idx = 0;
+
+      while (idx < len) {
+        if (value === refFrom[idx]) {
+          return refTo[idx];
+        }
+
+        idx += 1;
+      }
+
+      refFrom[idx + 1] = value;
+      refTo[idx + 1] = copiedValue;
+
+      for (var key in value) {
+        copiedValue[key] = deep ? _clone(value[key], refFrom, refTo, true) : value[key];
+      }
+
+      return copiedValue;
+    };
+
+    switch (type(value)) {
+      case 'Object':
+        return copy({});
+
+      case 'Array':
+        return copy([]);
+
+      case 'Date':
+        return new Date(value.valueOf());
+
+      case 'RegExp':
+        return _cloneRegExp(value);
+
+      default:
+        return value;
+    }
+  }
 
   /**
    * A function that returns the `!` of its argument. It will return `true` when
@@ -4422,8 +4568,8 @@
   slice(1, Infinity)));
 
   /**
-   * Performs left-to-right function composition. The leftmost function may have
-   * any arity; the remaining functions must be unary.
+   * Performs left-to-right function composition. The first argument may have
+   * any arity; the remaining arguments must be unary.
    *
    * In some libraries this function is named `sequence`.
    *
@@ -4788,8 +4934,8 @@
   });
 
   /**
-   * Performs right-to-left function composition. The rightmost function may have
-   * any arity; the remaining functions must be unary.
+   * Performs right-to-left function composition. The last argument may have
+   * any arity; the remaining arguments must be unary.
    *
    * **Note:** The result of compose is not automatically curried.
    *
@@ -4819,40 +4965,6 @@
 
     return pipe.apply(this, reverse(arguments));
   }
-
-  /**
-   * Returns the nth element of the given list or string. If n is negative the
-   * element at index length + n is returned.
-   *
-   * @func
-   * @memberOf R
-   * @since v0.1.0
-   * @category List
-   * @sig Number -> [a] -> a | Undefined
-   * @sig Number -> String -> String
-   * @param {Number} offset
-   * @param {*} list
-   * @return {*}
-   * @example
-   *
-   *      const list = ['foo', 'bar', 'baz', 'quux'];
-   *      R.nth(1, list); //=> 'bar'
-   *      R.nth(-1, list); //=> 'quux'
-   *      R.nth(-99, list); //=> undefined
-   *
-   *      R.nth(2, 'abc'); //=> 'c'
-   *      R.nth(3, 'abc'); //=> ''
-   * @symb R.nth(-1, [a, b, c]) = c
-   * @symb R.nth(0, [a, b, c]) = a
-   * @symb R.nth(1, [a, b, c]) = b
-   */
-
-  var nth =
-  /*#__PURE__*/
-  _curry2(function nth(offset, list) {
-    var idx = offset < 0 ? list.length + offset : offset;
-    return _isString(list) ? list.charAt(idx) : list[idx];
-  });
 
   /**
    * Returns the first element of the given list or string. In some libraries
@@ -4909,14 +5021,14 @@
   _curry1(_identity);
 
   var $sort = [].sort;
-  var test = [1, 2, 3];
+  var test$1 = [1, 2, 3];
 
   _export(_export.P + _export.F * (_fails(function () {
     // IE8-
-    test.sort(undefined);
+    test$1.sort(undefined);
   }) || !_fails(function () {
     // V8 bug
-    test.sort(null);
+    test$1.sort(null);
     // Old WebKit
   }) || !_strictMethod($sort)), 'Array', {
     // 22.1.3.25 Array.prototype.sort(comparefn)
@@ -5817,7 +5929,7 @@
   _dispatchable([], _xreduceBy, function reduceBy(valueFn, valueAcc, keyFn, list) {
     return _reduce(function (acc, elt) {
       var key = keyFn(elt);
-      acc[key] = valueFn(_has$1(key, acc) ? acc[key] : valueAcc, elt);
+      acc[key] = valueFn(_has$1(key, acc) ? acc[key] : _clone(valueAcc, [], [], false), elt);
       return acc;
     }, {}, list);
   }));
@@ -6713,7 +6825,7 @@
    * @sig Number -> String -> (a -> b -> ... -> n -> Object -> *)
    * @param {Number} arity Number of arguments the returned function should take
    *        before the target object.
-   * @param {String} method Name of the method to call.
+   * @param {String} method Name of any of the target object's methods to call.
    * @return {Function} A new curried function.
    * @see R.construct
    * @example
@@ -6722,6 +6834,13 @@
    *      sliceFrom(6, 'abcdefghijklm'); //=> 'ghijklm'
    *      const sliceFrom6 = R.invoker(2, 'slice')(6);
    *      sliceFrom6(8, 'abcdefghijklm'); //=> 'gh'
+   *
+   *      const dog = {
+   *        speak: async () => 'Woof!'
+   *      };
+   *      const speak = R.invoker(0, 'speak');
+   *      speak(dog).then(console.log) //~> 'Woof!'
+   *
    * @symb R.invoker(0, 'method')(o) = o['method']()
    * @symb R.invoker(1, 'method')(a, o) = o['method'](a)
    * @symb R.invoker(2, 'method')(a, b, o) = o['method'](a, b)
@@ -7060,7 +7179,7 @@
    * @sig (String | RegExp) -> String -> [String]
    * @param {String|RegExp} sep The pattern.
    * @param {String} str The string to separate into an array.
-   * @return {Array} The array of strings from `str` separated by `str`.
+   * @return {Array} The array of strings from `str` separated by `sep`.
    * @see R.join
    * @example
    *
@@ -7293,7 +7412,7 @@
     props: {
       query: {
         type: Object,
-        default: function _default() {
+        "default": function _default() {
           return {};
         }
       },
@@ -7311,7 +7430,7 @@
       builderProps: {
         type: Object,
         required: false,
-        default: function _default() {
+        "default": function _default() {
           return {};
         }
       }
@@ -7325,8 +7444,10 @@
         sqlQuery: undefined
       };
     },
-    mounted: function () {
-      var _mounted = _asyncToGenerator(
+    mounted: function mounted() {
+      var _this = this;
+
+      return _asyncToGenerator(
       /*#__PURE__*/
       regeneratorRuntime.mark(function _callee() {
         var query, queries;
@@ -7334,7 +7455,7 @@
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                query = this.query, queries = this.queries;
+                query = _this.query, queries = _this.queries;
 
                 if (!query) {
                   _context.next = 4;
@@ -7342,7 +7463,7 @@
                 }
 
                 _context.next = 4;
-                return this.load();
+                return _this.load();
 
               case 4:
                 if (!queries) {
@@ -7351,20 +7472,16 @@
                 }
 
                 _context.next = 7;
-                return this.loadQueries(queries);
+                return _this.loadQueries(queries);
 
               case 7:
               case "end":
                 return _context.stop();
             }
           }
-        }, _callee, this);
-      }));
-
-      return function mounted() {
-        return _mounted.apply(this, arguments);
-      };
-    }(),
+        }, _callee);
+      }))();
+    },
     render: function render(createElement) {
       var $scopedSlots = this.$scopedSlots,
           resultSet = this.resultSet,
@@ -7394,7 +7511,7 @@
           }, this.builderProps));
         }
 
-        slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
+        slot = $scopedSlots["default"] ? $scopedSlots["default"](slotProps) : slot;
       } else if (error) {
         slot = $scopedSlots.error ? $scopedSlots.error({
           error: error,
@@ -7405,8 +7522,10 @@
       return createElement('div', {}, [controls, slot]);
     },
     methods: {
-      load: function () {
-        var _load = _asyncToGenerator(
+      load: function load() {
+        var _this2 = this;
+
+        return _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee2() {
           var query;
@@ -7414,113 +7533,109 @@
             while (1) {
               switch (_context2.prev = _context2.next) {
                 case 0:
-                  query = this.query;
+                  query = _this2.query;
                   _context2.prev = 1;
-                  this.loading = true;
-                  this.error = undefined;
+                  _this2.loading = true;
+                  _this2.error = undefined;
 
                   if (!(query && Object.keys(query).length > 0)) {
                     _context2.next = 23;
                     break;
                   }
 
-                  if (!(this.loadSql === 'only')) {
+                  if (!(_this2.loadSql === 'only')) {
                     _context2.next = 11;
                     break;
                   }
 
                   _context2.next = 8;
-                  return this.cubejsApi.sql(query, {
-                    mutexObj: this.mutexObj,
+                  return _this2.cubejsApi.sql(query, {
+                    mutexObj: _this2.mutexObj,
                     mutexKey: 'sql'
                   });
 
                 case 8:
-                  this.sqlQuery = _context2.sent;
+                  _this2.sqlQuery = _context2.sent;
                   _context2.next = 23;
                   break;
 
                 case 11:
-                  if (!this.loadSql) {
+                  if (!_this2.loadSql) {
                     _context2.next = 20;
                     break;
                   }
 
                   _context2.next = 14;
-                  return this.cubejsApi.sql(query, {
-                    mutexObj: this.mutexObj,
+                  return _this2.cubejsApi.sql(query, {
+                    mutexObj: _this2.mutexObj,
                     mutexKey: 'sql'
                   });
 
                 case 14:
-                  this.sqlQuery = _context2.sent;
+                  _this2.sqlQuery = _context2.sent;
                   _context2.next = 17;
-                  return this.cubejsApi.load(query, {
-                    mutexObj: this.mutexObj,
+                  return _this2.cubejsApi.load(query, {
+                    mutexObj: _this2.mutexObj,
                     mutexKey: 'query'
                   });
 
                 case 17:
-                  this.resultSet = _context2.sent;
+                  _this2.resultSet = _context2.sent;
                   _context2.next = 23;
                   break;
 
                 case 20:
                   _context2.next = 22;
-                  return this.cubejsApi.load(query, {
-                    mutexObj: this.mutexObj,
+                  return _this2.cubejsApi.load(query, {
+                    mutexObj: _this2.mutexObj,
                     mutexKey: 'query'
                   });
 
                 case 22:
-                  this.resultSet = _context2.sent;
+                  _this2.resultSet = _context2.sent;
 
                 case 23:
-                  this.loading = false;
+                  _this2.loading = false;
                   _context2.next = 31;
                   break;
 
                 case 26:
                   _context2.prev = 26;
                   _context2.t0 = _context2["catch"](1);
-                  this.error = _context2.t0;
-                  this.resultSet = undefined;
-                  this.loading = false;
+                  _this2.error = _context2.t0;
+                  _this2.resultSet = undefined;
+                  _this2.loading = false;
 
                 case 31:
                 case "end":
                   return _context2.stop();
               }
             }
-          }, _callee2, this, [[1, 26]]);
-        }));
+          }, _callee2, null, [[1, 26]]);
+        }))();
+      },
+      loadQueries: function loadQueries() {
+        var _this3 = this;
 
-        return function load() {
-          return _load.apply(this, arguments);
-        };
-      }(),
-      loadQueries: function () {
-        var _loadQueries = _asyncToGenerator(
+        return _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee3() {
-          var _this = this;
-
           var queries, resultPromises;
           return regeneratorRuntime.wrap(function _callee3$(_context3) {
             while (1) {
               switch (_context3.prev = _context3.next) {
                 case 0:
-                  queries = this.queries;
+                  queries = _this3.queries;
                   _context3.prev = 1;
-                  this.error = undefined;
-                  this.loading = true;
+                  _this3.error = undefined;
+                  _this3.loading = true;
                   resultPromises = Promise.all(toPairs(queries).map(function (_ref) {
                     var _ref2 = _slicedToArray(_ref, 2),
                         name = _ref2[0],
                         query = _ref2[1];
 
-                    return _this.cubejsApi.load(query, {
-                      mutexObj: _this.mutexObj,
+                    return _this3.cubejsApi.load(query, {
+                      mutexObj: _this3.mutexObj,
                       mutexKey: name
                     }).then(function (r) {
                       return [name, r];
@@ -7532,29 +7647,25 @@
 
                 case 8:
                   _context3.t1 = _context3.sent;
-                  this.resultSet = (0, _context3.t0)(_context3.t1);
-                  this.loading = false;
+                  _this3.resultSet = (0, _context3.t0)(_context3.t1);
+                  _this3.loading = false;
                   _context3.next = 17;
                   break;
 
                 case 13:
                   _context3.prev = 13;
                   _context3.t2 = _context3["catch"](1);
-                  this.error = _context3.t2;
-                  this.loading = false;
+                  _this3.error = _context3.t2;
+                  _this3.loading = false;
 
                 case 17:
                 case "end":
                   return _context3.stop();
               }
             }
-          }, _callee3, this, [[1, 13]]);
-        }));
-
-        return function loadQueries() {
-          return _loadQueries.apply(this, arguments);
-        };
-      }()
+          }, _callee3, null, [[1, 13]]);
+        }))();
+      }
     },
     watch: {
       query: {
@@ -7827,8 +7938,10 @@
         return validatedQuery;
       }
     },
-    mounted: function () {
-      var _mounted = _asyncToGenerator(
+    mounted: function mounted() {
+      var _this3 = this;
+
+      return _asyncToGenerator(
       /*#__PURE__*/
       regeneratorRuntime.mark(function _callee() {
         return regeneratorRuntime.wrap(function _callee$(_context) {
@@ -7836,27 +7949,24 @@
             switch (_context.prev = _context.next) {
               case 0:
                 _context.next = 2;
-                return this.cubejsApi.meta();
+                return _this3.cubejsApi.meta();
 
               case 2:
-                this.meta = _context.sent;
-                this.copyQueryFromProps();
+                _this3.meta = _context.sent;
+
+                _this3.copyQueryFromProps();
 
               case 4:
               case "end":
                 return _context.stop();
             }
           }
-        }, _callee, this);
-      }));
-
-      return function mounted() {
-        return _mounted.apply(this, arguments);
-      };
-    }(),
+        }, _callee);
+      }))();
+    },
     methods: {
       copyQueryFromProps: function copyQueryFromProps() {
-        var _this3 = this;
+        var _this4 = this;
 
         var _this$query = this.query,
             measures = _this$query.measures,
@@ -7871,30 +7981,30 @@
         this.measures = (measures || []).map(function (m, i) {
           return _objectSpread({
             index: i
-          }, _this3.meta.resolveMember(m, 'measures'));
+          }, _this4.meta.resolveMember(m, 'measures'));
         });
         this.dimensions = (dimensions || []).map(function (m, i) {
           return _objectSpread({
             index: i
-          }, _this3.meta.resolveMember(m, 'dimensions'));
+          }, _this4.meta.resolveMember(m, 'dimensions'));
         });
         this.segments = (segments || []).map(function (m, i) {
           return _objectSpread({
             index: i
-          }, _this3.meta.resolveMember(m, 'segments'));
+          }, _this4.meta.resolveMember(m, 'segments'));
         });
         this.timeDimensions = (timeDimensions || []).map(function (m, i) {
           return _objectSpread({}, m, {
-            dimension: _objectSpread({}, _this3.meta.resolveMember(m.dimension, 'dimensions'), {
-              granularities: _this3.granularities
+            dimension: _objectSpread({}, _this4.meta.resolveMember(m.dimension, 'dimensions'), {
+              granularities: _this4.granularities
             }),
             index: i
           });
         });
         this.filters = (filters || []).map(function (m, i) {
           return _objectSpread({}, m, {
-            member: _this3.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-            operators: _this3.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
+            member: _this4.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+            operators: _this4.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
             index: i
           });
         });
@@ -8018,37 +8128,37 @@
         }
       },
       setMembers: function setMembers(element, members) {
-        var _this4 = this;
+        var _this5 = this;
 
         var name = element.charAt(0).toUpperCase() + element.slice(1);
         var mem;
         var elements = [];
         members.forEach(function (m) {
           if (element === 'timeDimensions') {
-            mem = _this4["available".concat(name)].find(function (x) {
+            mem = _this5["available".concat(name)].find(function (x) {
               return x.name === m.dimension;
             });
 
             if (mem) {
-              var dimension = _objectSpread({}, _this4.meta.resolveMember(mem.name, 'dimensions'), {
-                granularities: _this4.granularities
+              var dimension = _objectSpread({}, _this5.meta.resolveMember(mem.name, 'dimensions'), {
+                granularities: _this5.granularities
               });
 
               mem = _objectSpread({}, mem, {
                 granularity: m.granularity,
                 dateRange: m.dateRange,
                 dimension: dimension,
-                index: _this4[element].length
+                index: _this5[element].length
               });
             }
           } else if (element === 'filters') {
-            var member = _objectSpread({}, _this4.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
+            var member = _objectSpread({}, _this5.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
 
             mem = _objectSpread({}, m, {
               member: member
             });
           } else {
-            mem = _this4["available".concat(name)].find(function (x) {
+            mem = _this5["available".concat(name)].find(function (x) {
               return x.name === m;
             });
           }

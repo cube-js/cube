@@ -87,6 +87,7 @@ class PreAggregations {
       preAggregationsSchema: this.query.preAggregationSchema(),
       tableName,
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
+      sql: this.query.preAggregationSql(cube, preAggregation),
       invalidateKeyQueries: refreshKeyQueries.queries,
       refreshKeyRenewalThresholds: refreshKeyQueries.refreshKeyRenewalThresholds,
       external: preAggregation.external,
@@ -462,7 +463,7 @@ class PreAggregations {
       preAggregationForQuery.preAggregation.measures :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures
     );
-    
+
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
 
     return this.query.evaluateSymbolSqlWithContext(

@@ -38,6 +38,10 @@ cube(`Users`, {
 });
 ```
 
+## Cube.js globals (cube and others)
+
+Cube.js defines `cube()`, `context()` and `asyncModule()` global variable functions in order to provide API for schema configuration which aren't normally accessible outside of Cube.js schema.
+
 ## Import / Export
 
 Data schema JavaScript files are transpiled to convert ES6 `import` and `export` expressions to corresponding Node.js calls.

@@ -41,7 +41,8 @@ exports.prepareCompiler = (repo, options) => {
       Funnels,
       RefreshKeys,
       Reflection
-    }
+    },
+    compileContext: options.compileContext
   }, options));
   return {
     compiler,

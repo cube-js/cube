@@ -44,7 +44,7 @@ ${eventJoin.join("\nLEFT JOIN\n")}
         },
         firstStepConversions: {
           sql: () => `first_step_user_id`,
-          type: `count`,
+          type: `countDistinct`,
           shown: false
         },
         conversionsPercent: {

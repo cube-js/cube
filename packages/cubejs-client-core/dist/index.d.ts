@@ -51,7 +51,7 @@ export type Column = {
   title: string;
 }
 
-export class ResultSet<T extends {} = {}> {
+export class ResultSet<T = any> {
   static measureFromAxis(axisValues: string[]): string;
 
   loadResponse: LoadResponse<T>;
@@ -147,14 +147,14 @@ export class Meta {
 export class CubejsApi {
   new(apiToken: string, options: CubeJSApiOptions): CubejsApi;
 
-  load(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
   load(query: Query, options?: LoadMethodOptions): Promise<ResultSet>;
+  load(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
 
-  sql(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
   sql(query: Query, options?: LoadMethodOptions): Promise<SqlQuery>;
+  sql(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
-  meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
   meta(options?: LoadMethodOptions): Promise<Meta>;
+  meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 }
 
 declare function cubejs(

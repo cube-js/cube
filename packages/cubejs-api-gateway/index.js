@@ -70,7 +70,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query) => (data.m
     const memberName = aliasToMemberNameMap[p[0]];
     const annotationForMember = annotation[memberName];
     if (!annotationForMember) {
-      throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\``);
+      throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
     }
     const transformResult = [
       memberName,
