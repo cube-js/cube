@@ -9,7 +9,6 @@ class QueryOrchestrator {
     this.redisPrefix = redisPrefix;
     this.driverFactory = driverFactory;
     this.logger = logger;
-    const redisPool = new RedisPool();
     const { externalDriverFactory } = options;
     const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
       process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
@@ -17,6 +16,7 @@ class QueryOrchestrator {
     if (cacheAndQueueDriver !== 'redis' && cacheAndQueueDriver !== 'memory') {
       throw new Error(`Only 'redis' or 'memory' are supported for cacheAndQueueDriver option`);
     }
+    const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool() : undefined;
 
     this.redisPool = redisPool;
     this.queryCache = new QueryCache(

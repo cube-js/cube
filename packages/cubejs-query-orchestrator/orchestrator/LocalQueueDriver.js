@@ -15,6 +15,9 @@ class LocalQueueDriverConnection {
     this.toProcess = driver.toProcess;
     this.recent = driver.recent;
     this.active = driver.active;
+    this.heartBeat = driver.heartBeat;
+    this.processingCounter = driver.processingCounter;
+    this.processingLocks = driver.processingLocks;
   }
 
   getResultPromise(resultListKey) {
@@ -30,12 +33,16 @@ class LocalQueueDriverConnection {
 
   async getResultBlocking(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
+    if (!this.queryDef[this.redisHash(queryKey)] && !this.resultPromises[resultListKey]) {
+      return null;
+    }
     const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
     const res = await Promise.race([
       this.getResultPromise(resultListKey),
       timeoutPromise(this.continueWaitTimeout * 1000),
     ]);
+
     if (res) {
       delete this.resultPromises[resultListKey];
     }
@@ -98,28 +105,33 @@ class LocalQueueDriverConnection {
     const key = this.redisHash(queryKey);
     const query = this.queryDef[key];
     delete this.active[key];
+    delete this.heartBeat[key];
     delete this.toProcess[key];
     delete this.recent[key];
     delete this.queryDef[key];
+    delete this.processingLocks[key];
     return [query];
   }
 
-  setResultAndRemoveQuery(queryKey, executionResult) {
+  async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
     const key = this.redisHash(queryKey);
+    if (this.processingLocks[key] !== processingId) {
+      return false;
+    }
     const promise = this.getResultPromise(this.resultListKey(queryKey));
     delete this.active[key];
+    delete this.heartBeat[key];
     delete this.toProcess[key];
     delete this.recent[key];
     delete this.queryDef[key];
+    delete this.processingLocks[key];
     promise.resolve(executionResult);
+    return true;
   }
 
-  removeQuery(queryKey) {
-    const key = this.redisHash(queryKey);
-    delete this.active[key];
-    delete this.toProcess[key];
-    delete this.recent[key];
-    delete this.queryDef[key];
+  getNextProcessingId() {
+    this.processingCounter.counter = this.processingCounter.counter ? this.processingCounter.counter + 1 : 1;
+    return this.processingCounter.counter;
   }
 
   getOrphanedQueries() {
@@ -127,7 +139,7 @@ class LocalQueueDriverConnection {
   }
 
   getStalledQueries() {
-    return this.queueArray(this.active, new Date().getTime() - this.heartBeatTimeout * 1000);
+    return this.queueArray(this.heartBeat, new Date().getTime() - this.heartBeatTimeout * 1000);
   }
 
   async getQueryStageState(onlyKeys) {
@@ -140,24 +152,43 @@ class LocalQueueDriverConnection {
 
   updateHeartBeat(queryKey) {
     const key = this.redisHash(queryKey);
-    if (this.active[key]) {
-      this.active[key] = { key, order: new Date().getTime() };
+    if (this.heartBeat[key]) {
+      this.heartBeat[key] = { key, order: new Date().getTime() };
     }
   }
 
-  retrieveForProcessing(queryKey) {
+  retrieveForProcessing(queryKey, processingId) {
     const key = this.redisHash(queryKey);
+    let lockAcquired = false;
+    if (!this.processingLocks[key]) {
+      this.processingLocks[key] = processingId;
+      lockAcquired = true;
+    }
     let added = 0;
     if (Object.keys(this.active).length < this.concurrency && !this.active[key]) {
-      this.active[key] = { key, order: new Date().getTime() };
+      this.active[key] = { key, order: processingId };
       added = 1;
     }
-    return [added, null, this.queueArray(this.active), Object.keys(this.toProcess).length]; // TODO nulls
+    this.heartBeat[key] = { key, order: new Date().getTime() };
+    return [
+      added, null, this.queueArray(this.active), Object.keys(this.toProcess).length, this.queryDef[key], lockAcquired
+    ]; // TODO nulls
   }
 
-  async optimisticQueryUpdate(queryKey, toUpdate) {
+  freeProcessingLock(queryKey, processingId) {
     const key = this.redisHash(queryKey);
+    if (this.processingLocks[key] === processingId) {
+      delete this.processingLocks[key];
+    }
+  }
+
+  async optimisticQueryUpdate(queryKey, toUpdate, processingId) {
+    const key = this.redisHash(queryKey);
+    if (this.processingLocks[key] !== processingId) {
+      return false;
+    }
     this.queryDef[key] = { ...this.queryDef[key], ...toUpdate };
+    return true;
   }
 
   release() {
@@ -182,6 +213,9 @@ const queryDef = {};
 const toProcess = {};
 const recent = {};
 const active = {};
+const heartBeat = {};
+const processingCounters = {};
+const processingLocks = {};
 
 class LocalQueueDriver extends BaseQueueDriver {
   constructor(options) {
@@ -193,12 +227,18 @@ class LocalQueueDriver extends BaseQueueDriver {
     toProcess[options.redisQueuePrefix] = toProcess[options.redisQueuePrefix] || {};
     recent[options.redisQueuePrefix] = recent[options.redisQueuePrefix] || {};
     active[options.redisQueuePrefix] = active[options.redisQueuePrefix] || {};
+    heartBeat[options.redisQueuePrefix] = heartBeat[options.redisQueuePrefix] || {};
+    processingCounters[options.redisQueuePrefix] = processingCounters[options.redisQueuePrefix] || {};
+    processingLocks[options.redisQueuePrefix] = processingLocks[options.redisQueuePrefix] || {};
     this.results = results[options.redisQueuePrefix];
     this.resultPromises = resultPromises[options.redisQueuePrefix];
     this.queryDef = queryDef[options.redisQueuePrefix];
     this.toProcess = toProcess[options.redisQueuePrefix];
     this.recent = recent[options.redisQueuePrefix];
     this.active = active[options.redisQueuePrefix];
+    this.heartBeat = heartBeat[options.redisQueuePrefix];
+    this.processingCounter = processingCounters[options.redisQueuePrefix];
+    this.processingLocks = processingLocks[options.redisQueuePrefix];
   }
 
   createConnection() {

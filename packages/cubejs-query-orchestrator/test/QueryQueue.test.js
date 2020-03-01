@@ -40,6 +40,14 @@ const QueryQueueTest = (name, options) => {
       expect(result).toBe('select * from bar');
     });
 
+    test('instant double wait resolve', async () => {
+      const results = await Promise.all([
+        queue.executeInQueue('delay', `instant`, { delay: 400, result: '2' }),
+        queue.executeInQueue('delay', `instant`, { delay: 400, result: '2' })
+      ]);
+      expect(results).toStrictEqual(['20', '20']);
+    });
+
     test('priority', async () => {
       delayCount = 0;
       const result = await Promise.all([
@@ -50,6 +58,7 @@ const QueryQueueTest = (name, options) => {
       expect(parseInt(result.find(f => f[0] === '3'), 10) % 10).toBeLessThan(2);
     });
 
+
     test('timeout', async () => {
       delayCount = 0;
       const query = ['select * from 2'];
@@ -57,6 +66,7 @@ const QueryQueueTest = (name, options) => {
       for (let i = 0; i < 5; i++) {
         try {
           await queue.executeInQueue('delay', query, { delay: 3000, result: '1' });
+          console.log(`Delay ${i}`);
         } catch (e) {
           if (e.message === 'Continue wait') {
             // eslint-disable-next-line no-continue
@@ -66,8 +76,9 @@ const QueryQueueTest = (name, options) => {
           break;
         }
       }
-      expect(errorString.indexOf('timeout')).not.toEqual(-1);
+      expect(errorString).toEqual(expect.stringContaining('timeout'));
     });
+
 
     test('stage reporting', async () => {
       delayCount = 0;

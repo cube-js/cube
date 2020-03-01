@@ -15,7 +15,14 @@ class RedisQueueDriverConnection {
 
   async getResultBlocking(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
+    if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]))) {
+      return this.getResult(queryKey);
+    }
     const result = await this.redisClient.brpopAsync([resultListKey, this.continueWaitTimeout]);
+    if (result) {
+      await this.redisClient.lpushAsync([resultListKey, result[1]]);
+      await this.redisClient.rpopAsync(resultListKey);
+    }
     return result && JSON.parse(result[1]);
   }
 
@@ -58,29 +65,30 @@ class RedisQueueDriverConnection {
     const [query, ...restResult] = await this.redisClient.multi()
       .hget([this.queriesDefKey(), this.redisHash(queryKey)])
       .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
+      .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
       .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
       .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
       .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
+      .del(this.queryProcessingLockKey(queryKey))
       .execAsync();
     return [JSON.parse(query), ...restResult];
   }
 
-  setResultAndRemoveQuery(queryKey, executionResult) {
+  async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
+    await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
+    const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
+    if (processingId !== currentProcessId) {
+      return false;
+    }
+
     return this.redisClient.multi()
       .lpush([this.resultListKey(queryKey), JSON.stringify(executionResult)])
       .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
+      .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
       .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
       .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
       .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
-      .execAsync();
-  }
-
-  removeQuery(queryKey) {
-    return this.redisClient.multi()
-      .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
-      .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
+      .del(this.queryProcessingLockKey(queryKey))
       .execAsync();
   }
 
@@ -92,7 +100,7 @@ class RedisQueueDriverConnection {
 
   getStalledQueries() {
     return this.redisClient.zrangebyscoreAsync(
-      [this.activeRedisKey(), 0, (new Date().getTime() - this.heartBeatTimeout * 1000)]
+      [this.heartBeatRedisKey(), 0, (new Date().getTime() - this.heartBeatTimeout * 1000)]
     );
   }
 
@@ -113,23 +121,49 @@ class RedisQueueDriverConnection {
   }
 
   updateHeartBeat(queryKey) {
-    return this.redisClient.zaddAsync([this.activeRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
+    return this.redisClient.zaddAsync([this.heartBeatRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
   }
 
-  retrieveForProcessing(queryKey) {
-    return this.redisClient.multi()
-      .zadd([this.activeRedisKey(), 'NX', new Date().getTime(), this.redisHash(queryKey)])
-      .zremrangebyrank([this.activeRedisKey(), this.concurrency, -1])
-      .zrange([this.activeRedisKey(), 0, this.concurrency - 1])
-      .zcard(this.toProcessRedisKey())
-      .execAsync();
+  async getNextProcessingId() {
+    const id = await this.redisClient.incrAsync(this.processingIdKey());
+    return id && id.toString();
   }
 
-  async optimisticQueryUpdate(queryKey, toUpdate) {
+  async retrieveForProcessing(queryKey, processingId) {
+    const [insertedCount, removedCount, activeKeys, queueSize, queryDef, processingLockAcquired] =
+      await this.redisClient.multi()
+        .zadd([this.activeRedisKey(), 'NX', processingId, this.redisHash(queryKey)])
+        .zremrangebyrank([this.activeRedisKey(), this.concurrency, -1])
+        .zrange([this.activeRedisKey(), 0, this.concurrency - 1])
+        .zcard(this.toProcessRedisKey())
+        .hget(([this.queriesDefKey(), this.redisHash(queryKey)]))
+        .set(this.queryProcessingLockKey(queryKey), processingId, 'NX')
+        .zadd([this.heartBeatRedisKey(), 'NX', new Date().getTime(), this.redisHash(queryKey)])
+        .execAsync();
+    return [insertedCount, removedCount, activeKeys, queueSize, JSON.parse(queryDef), processingLockAcquired];
+  }
+
+  async freeProcessingLock(queryKey, processingId) {
+    const lockKey = this.queryProcessingLockKey(queryKey);
+    await this.redisClient.watchAsync(lockKey);
+    const currentProcessId = await this.redisClient.getAsync(lockKey);
+    if (currentProcessId === processingId) {
+      await this.redisClient.multi()
+        .del(lockKey)
+        .execAsync();
+    }
+  }
+
+  async optimisticQueryUpdate(queryKey, toUpdate, processingId) {
     let query = await this.getQueryDef(queryKey);
     for (let i = 0; i < 10; i++) {
       if (query) {
         // eslint-disable-next-line no-await-in-loop
+        await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
+        const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
+        if (currentProcessId !== processingId) {
+          return false;
+        }
         let [beforeUpdate] = await this.redisClient
           .multi()
           .hget([this.queriesDefKey(), this.redisHash(queryKey)])
@@ -161,6 +195,10 @@ class RedisQueueDriverConnection {
     return this.queueRedisKey('ACTIVE');
   }
 
+  heartBeatRedisKey() {
+    return this.queueRedisKey('HEART_BEAT');
+  }
+
   queryRedisKey(queryKey, suffix) {
     return `${this.redisQueuePrefix}_${this.redisHash(queryKey)}_${suffix}`;
   }
@@ -173,8 +211,16 @@ class RedisQueueDriverConnection {
     return this.queueRedisKey('QUERIES');
   }
 
+  processingIdKey() {
+    return this.queueRedisKey('PROCESSING_COUNTER');
+  }
+
   resultListKey(queryKey) {
     return this.queryRedisKey(queryKey, 'RESULT');
+  }
+
+  queryProcessingLockKey(queryKey) {
+    return this.queryRedisKey(queryKey, 'LOCK');
   }
 
   redisHash(queryKey) {

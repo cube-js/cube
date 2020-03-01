@@ -7,7 +7,13 @@ class RedisPool {
     const max = (typeof poolMax !== 'undefined') ? poolMax : parseInt(process.env.CUBEJS_REDIS_POOL_MAX, 10) || 1000;
     const create = createClient || (() => createRedisClient(process.env.REDIS_URL));
     const destroy = destroyClient || (client => client.end(true));
-    const opts = { min, max, acquireTimeoutMillis: 5000, idleTimeoutMillis: 5000 }
+    const opts = {
+      min,
+      max,
+      acquireTimeoutMillis: 5000,
+      idleTimeoutMillis: 5000,
+      evictionRunIntervalMillis: 5000
+    };
     if (max > 0) {
       this.pool = genericPool.createPool({ create, destroy }, opts);
     } else {
@@ -18,7 +24,7 @@ class RedisPool {
 
   async getClient() {
     if (this.pool) {
-      return await this.pool.acquire();
+      return this.pool.acquire();
     } else {
       return this.create();
     }
@@ -27,10 +33,8 @@ class RedisPool {
   release(client) {
     if (this.pool) {
       this.pool.release(client);
-    } else {
-      if (client) {
-        client.quit();
-      }
+    } else if (client) {
+      client.quit();
     }
   }
 
