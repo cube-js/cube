@@ -65,6 +65,7 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
     if (queryKey && queryKey[0] && Array.isArray(queryKey[0]) && typeof queryKey[0][0] === 'string') {
       [queryKey] = queryKey;
     }
+    const durationStr = duration ? `(${duration}ms)` : '';
     if (queryKey && typeof queryKey[0] === 'string') {
       const queryMaxLines = 50;
       let formatted = SqlString.format(queryKey[0], queryKey[1]).split('\n');
@@ -73,12 +74,12 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
           .concat(['.....', '.....', '.....'])
           .concat(R.takeLast(queryMaxLines / 2, formatted));
       }
-      return `${duration ? `(${duration}ms)` : ''}\n${formatted.join('\n')}\n${restParams}`;
+      return `${durationStr}\n${formatted.join('\n')}\n${restParams}`;
     }
     if (queryKey) {
-      return `${duration ? `(${duration}ms)` : ''}\n${JSON.stringify(queryKey)}\n${restParams}`; // TODO format
+      return `${durationStr}\n${JSON.stringify(queryKey)}\n${restParams}`; // TODO format
     }
-    return restParams;
+    return `${durationStr}\n${restParams}`;
   };
 
   const logWarning = () => console.log(
