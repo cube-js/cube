@@ -21,7 +21,7 @@
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
-    "customize-cra": "^0.7.0",
+    "customize-cra": "^0.9.1",
     "d3": "^5.14.2",
     "history": "^4.9.0",
     "less": "^3.10.3",
