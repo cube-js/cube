@@ -1,8 +1,9 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import {
-  Menu, Icon
+  Menu
 } from 'antd';
+import { Icon } from "@ant-design/compatible";
 import ButtonDropdown from './ButtonDropdown';
 
 const ChartTypes = [
@@ -28,7 +29,7 @@ const SelectChartType = ({ chartType, updateChartType }) => {
 
   const foundChartType = ChartTypes.find(t => t.name === chartType);
   return (
-    <ButtonDropdown overlay={menu} icon={foundChartType.icon}>
+    <ButtonDropdown overlay={menu} icon={<Icon type={foundChartType.icon}/>}>
       {foundChartType.title}
     </ButtonDropdown>
   );

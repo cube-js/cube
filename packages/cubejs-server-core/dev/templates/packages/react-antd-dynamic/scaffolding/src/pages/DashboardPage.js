@@ -2,6 +2,7 @@ import React from "react";
 import { Spin, Button, Alert } from "antd";
 import { Link } from "react-router-dom";
 import { useQuery } from "@apollo/react-hooks";
+import { Icon } from "@ant-design/compatible";
 import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
 import ChartRenderer from "../components/ChartRenderer";
 import Dashboard from "../components/Dashboard";
@@ -56,7 +57,7 @@ const DashboardPage = () => {
     >
       <h2>There are no charts on this dashboard</h2>
       <Link to="/explore">
-        <Button type="primary" size="large" icon="plus">
+        <Button type="primary" size="large" icon={<Icon type="plus" />}>
           Add chart
         </Button>
       </Link>

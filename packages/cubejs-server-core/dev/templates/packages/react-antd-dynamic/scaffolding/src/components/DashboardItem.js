@@ -2,6 +2,7 @@ import React from "react";
 import { Card, Menu, Button, Dropdown, Modal } from "antd";
 import { useMutation } from "@apollo/react-hooks";
 import { Link } from "react-router-dom";
+import { Icon } from "@ant-design/compatible";
 import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
 import { DELETE_DASHBOARD_ITEM } from "../graphql/mutations";
 
@@ -46,7 +47,7 @@ const DashboardItemDropdown = ({ itemId }) => {
       placement="bottomLeft"
       trigger={["click"]}
     >
-      <Button shape="circle" icon="menu" />
+      <Button shape="circle" icon={<Icon type="menu"/>} />
     </Dropdown>
   );
 };

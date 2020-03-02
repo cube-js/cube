@@ -1,5 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
+import { Icon } from "@ant-design/compatible";
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 
@@ -14,7 +15,7 @@ const MemberGroup = ({
         </MemberDropdown>
       </RemoveButtonGroup>
     ))}
-    <MemberDropdown onClick={m => updateMethods.add(m)} availableMembers={availableMembers} type="dashed" icon="plus">
+    <MemberDropdown onClick={m => updateMethods.add(m)} availableMembers={availableMembers} type="dashed" icon={<Icon type="plus"/>}>
       {addMemberName}
     </MemberDropdown>
   </span>
