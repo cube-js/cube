@@ -25,7 +25,7 @@
     "uuid": "^3.3.3"
   },
   "devDependencies": {
-    "eslint": "^4.14.0",
+    "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
     "express": "^4.17.1",
     "jest": "^24.9.0",

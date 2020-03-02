@@ -29,7 +29,7 @@
     "@cubejs-client/core": "^0.17.10",
     "babel-runtime": "^6.26.0",
     "babelrc-rollup": "^3.0.0",
-    "eslint": "5.12.0",
+    "eslint": "6.8.0",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-node": "^10.0.0",
