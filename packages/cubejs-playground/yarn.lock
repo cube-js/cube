@@ -1155,9 +1155,9 @@
     regenerator-runtime "^0.13.2"
 
 "@babel/standalone@^7.3.4":
-  version "7.6.2"
-  resolved "https://registry.yarnpkg.com/@babel/standalone/-/standalone-7.6.2.tgz#484fb4fc7b9cec3dfbb6c012f0c81340596adb09"
-  integrity sha512-bfrGoJA6bHD3zJdTM8DANDKM2MjuhH7SLTeHuQMyfCn4VQgJlwe9MByqiTTKWZ1dAD0HrC7WDaL60WV+9HUXnQ==
+  version "7.8.6"
+  resolved "https://registry.yarnpkg.com/@babel/standalone/-/standalone-7.8.6.tgz#1364534775c83bf7b7988e4ca98823bef56a0a53"
+  integrity sha512-GkzSsxrnn3NbL0XwY7oVa1frbl71NmYf73C3xdpt59W056Sm9ohZghuoC2W1NLKAOVztghoyFmtQCKc/7qjSDg==
 
 "@babel/template@^7.1.0", "@babel/template@^7.2.2", "@babel/template@^7.6.0":
   version "7.6.0"
@@ -1221,28 +1221,28 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.17.10":
-  version "0.17.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.17.10.tgz#4c84338f15f690e62aa2f352f6597f462e1b74eb"
-  integrity sha512-EnjajYrw6krXIzxMDIwLeihrpu54pr2tV8j2kz0Zi/RhztS9uPVWEUKT34TmscZSJiIfEPOLJYliA/YSe2f+4g==
+"@cubejs-client/core@^0.18.0":
+  version "0.18.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.0.tgz#456911e90d18ab4d633dd1db12461bbe7cdf457e"
+  integrity sha512-Hgvv9fdBF69UtMNZNPCta4D8KWqoxJO/cKEDIn4kn2BDYWJ0xOEIMbUULwD+4FY5FHbGSSG4jkodjINRldRXBQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
     cross-fetch "^3.0.2"
     moment "^2.22.2"
     moment-range "^4.0.1"
-    ramda "^0.25.0"
+    ramda "^0.27.0"
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.17.10":
-  version "0.17.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.17.10.tgz#67b4482930f5589524f359b8be42033b878d4953"
-  integrity sha512-ycwOTcfrG0/497CWqmLkkernIZAInCr1HGF8es3ETOrLQm4GyuOqDnEuKR1EYCdn06UvaTzYTDaURN1+TUIh1w==
+"@cubejs-client/react@^0.18.0":
+  version "0.18.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.18.0.tgz#57e7411105733e9720eb0dc62fb7fc9220608b60"
+  integrity sha512-v1XbbKh4/+C66nWsEualNPG69t9oUs/xOda6VB8Svw/1l2iuW/wHrF5jdPVadXUkfee96vnE6wg/YW1ejV5S4w==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
-    ramda "^0.25.0"
+    ramda "^0.27.0"
 
 "@emotion/is-prop-valid@^0.8.1":
   version "0.8.5"
@@ -9548,11 +9548,6 @@ raf@3.4.1, raf@^3.4.0, raf@^3.4.1:
   integrity sha512-Sq4CW4QhwOHE8ucn6J34MqtZCeWFP2aQSmrlroYgqAV1PjStIhJXxYuTgUIfkEk7zTLjmIjLmU5q+fbD1NnOJA==
   dependencies:
     performance-now "^2.1.0"
-
-ramda@^0.25.0:
-  version "0.25.0"
-  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.25.0.tgz#8fdf68231cffa90bc2f9460390a0cb74a29b29a9"
-  integrity sha512-GXpfrYVPwx3K7RQ6aYT8KPS8XViSXUVJT1ONhoKPE9VAleW42YE+U+8VEyGWt41EnEQW7gwecYJriTI0pKoecQ==
 
 ramda@^0.27.0:
   version "0.27.0"
