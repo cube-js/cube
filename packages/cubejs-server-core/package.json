@@ -36,7 +36,7 @@
     "@cubejs-backend/schema-compiler": "^0.18.3",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
-    "fs-extra": "^7.0.1",
+    "fs-extra": "^8.1.0",
     "jsonwebtoken": "^8.4.0",
     "lru-cache": "^5.1.1",
     "node-fetch": "^2.6.0",
