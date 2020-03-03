@@ -141,4 +141,4 @@ const QueryQueueTest = (name, options) => {
 
 QueryQueueTest('Local');
 QueryQueueTest('RedisPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool() });
-QueryQueueTest('RedisNoPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool(0, 0) });
+QueryQueueTest('RedisNoPool', { cacheAndQueueDriver: 'redis', redisPool: new RedisPool({ poolMin: 0, poolMax: 0 }) });

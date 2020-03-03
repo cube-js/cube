@@ -1,10 +1,10 @@
 class RedisCacheDriver {
-  constructor(pool) {
+  constructor({ pool }) {
     this.redisPool = pool;
   }
 
   async getClient() {
-    return await this.redisPool.getClient();
+    return this.redisPool.getClient();
   }
 
   async get(key) {
