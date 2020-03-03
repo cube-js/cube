@@ -17,7 +17,7 @@
     "aws-sdk": "^2.404.0"
   },
   "devDependencies": {
-    "eslint": "^4.14.0",
+    "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
     "mocha": "^5.2.0",
     "should": "^13.2.3"
