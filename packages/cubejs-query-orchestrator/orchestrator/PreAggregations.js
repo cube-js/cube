@@ -523,7 +523,7 @@ class PreAggregations {
     this.logger = logger;
     this.queryCache = queryCache;
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver(options.redisPool) :
+      new RedisCacheDriver({ pool: options.redisPool }) :
       new LocalCacheDriver();
     this.externalDriverFactory = options.externalDriverFactory;
   }
