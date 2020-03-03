@@ -828,9 +828,9 @@
     "@babel/plugin-transform-react-jsx-source" "^7.0.0"
 
 "@babel/standalone@^7.3.4":
-  version "7.7.2"
-  resolved "https://registry.yarnpkg.com/@babel/standalone/-/standalone-7.7.2.tgz#b367e6b92ce6d4e145aa0430b623e80cb0fe4eaf"
-  integrity sha512-L2iWJ/5CFAiGng0LkK1YazxMV6/kBgBVi01wYhbxsjAlZPwzEWNaC3HStN8+mErppQe5+ZUsPGSXkrClZebDvQ==
+  version "7.8.6"
+  resolved "https://registry.yarnpkg.com/@babel/standalone/-/standalone-7.8.6.tgz#1364534775c83bf7b7988e4ca98823bef56a0a53"
+  integrity sha512-GkzSsxrnn3NbL0XwY7oVa1frbl71NmYf73C3xdpt59W056Sm9ohZghuoC2W1NLKAOVztghoyFmtQCKc/7qjSDg==
 
 "@babel/template@^7.4.0", "@babel/template@^7.7.0":
   version "7.7.0"
