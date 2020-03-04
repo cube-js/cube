@@ -804,17 +804,17 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@cubejs-client/core@^0.17.10":
-  version "0.17.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.17.10.tgz#4c84338f15f690e62aa2f352f6597f462e1b74eb"
-  integrity sha512-EnjajYrw6krXIzxMDIwLeihrpu54pr2tV8j2kz0Zi/RhztS9uPVWEUKT34TmscZSJiIfEPOLJYliA/YSe2f+4g==
+"@cubejs-client/core@^0.18.0":
+  version "0.18.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.0.tgz#456911e90d18ab4d633dd1db12461bbe7cdf457e"
+  integrity sha512-Hgvv9fdBF69UtMNZNPCta4D8KWqoxJO/cKEDIn4kn2BDYWJ0xOEIMbUULwD+4FY5FHbGSSG4jkodjINRldRXBQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
     cross-fetch "^3.0.2"
     moment "^2.22.2"
     moment-range "^4.0.1"
-    ramda "^0.25.0"
+    ramda "^0.27.0"
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
@@ -5388,10 +5388,10 @@ querystringify@^2.1.1:
   resolved "https://registry.yarnpkg.com/querystringify/-/querystringify-2.1.1.tgz#60e5a5fd64a7f8bfa4d2ab2ed6fdf4c85bad154e"
   integrity sha512-w7fLxIRCRT7U8Qu53jQnJyPkYZIaR4n5151KMfcJlO/A9397Wxb1amJvROTK6TOnp7PfoAmg/qXiNHI+08jRfA==
 
-ramda@^0.25.0:
-  version "0.25.0"
-  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.25.0.tgz#8fdf68231cffa90bc2f9460390a0cb74a29b29a9"
-  integrity sha512-GXpfrYVPwx3K7RQ6aYT8KPS8XViSXUVJT1ONhoKPE9VAleW42YE+U+8VEyGWt41EnEQW7gwecYJriTI0pKoecQ==
+ramda@^0.27.0:
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.27.0.tgz#915dc29865c0800bf3f69b8fd6c279898b59de43"
+  integrity sha512-pVzZdDpWwWqEVVLshWUHjNwuVP7SfcmPraYuqocJp1yo2U1R7P+5QAfDhdItkuoGqIBnBYrtPp7rEPqDn9HlZA==
 
 randombytes@^2.0.0, randombytes@^2.0.1, randombytes@^2.0.5:
   version "2.1.0"
@@ -6635,9 +6635,9 @@ tslib@1.10.0:
   integrity sha512-qOebF53frne81cf0S9B41ByenJ3/IuH8yJKngAX35CmiZySA0khhkovshKK+jGCaMnVomla7gVlIcc3EvKPbTQ==
 
 tslib@^1.9.0:
-  version "1.11.0"
-  resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.11.0.tgz#f1f3528301621a53220d58373ae510ff747a66bc"
-  integrity sha512-BmndXUtiTn/VDDrJzQE7Mm22Ix3PxgLltW9bSNLoeCY31gnG2OPx0QqJnuc9oMIKioYrz487i6K9o4Pdn0j+Kg==
+  version "1.11.1"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.11.1.tgz#eb15d128827fbee2841549e171f45ed338ac7e35"
+  integrity sha512-aZW88SY8kQbU7gpV19lN24LtXh/yD4ZZg6qieAJDDg+YBsJcSmLGK9QpnUjAKVG/xefmvJGd1WUmfpT/g6AJGA==
 
 tty-browserify@0.0.0:
   version "0.0.0"
