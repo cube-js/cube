@@ -143,6 +143,12 @@ const prodLogger = (level) => (msg, params) => {
     }
     // eslint-disable-next-line no-fallthrough
     case "info":
+      if ([
+        'API Request',
+      ].includes(msg)) {
+        logMessage();
+        break;
+      }
     // eslint-disable-next-line no-fallthrough
     case "warn": {
       if (!error && warning) {
