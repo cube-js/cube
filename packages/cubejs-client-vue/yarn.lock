@@ -1412,13 +1412,14 @@
   resolved "https://registry.yarnpkg.com/@vue/preload-webpack-plugin/-/preload-webpack-plugin-1.1.0.tgz#d768dba004261c029b53a77c5ea2d5f9ee4f3cce"
   integrity sha512-rcn2KhSHESBFMPj5vc5X2pI9bcBNQQixvJXhD5gZ4rN2iym/uH2qfDSQfUS5+qwiz0a85TCkeUs6w6jxFDudbw==
 
-"@vue/test-utils@1.0.0-beta.29":
-  version "1.0.0-beta.29"
-  resolved "https://registry.yarnpkg.com/@vue/test-utils/-/test-utils-1.0.0-beta.29.tgz#c942cf25e891cf081b6a03332b4ae1ef430726f0"
-  integrity sha512-yX4sxEIHh4M9yAbLA/ikpEnGKMNBCnoX98xE1RwxfhQVcn0MaXNSj1Qmac+ZydTj6VBSEVukchBogXBTwc+9iA==
+"@vue/test-utils@1.0.0-beta.31":
+  version "1.0.0-beta.31"
+  resolved "https://registry.yarnpkg.com/@vue/test-utils/-/test-utils-1.0.0-beta.31.tgz#580d6e45f07452e497d69807d80986e713949b73"
+  integrity sha512-IlhSx5hyEVnbvDZ3P98R1jNmy88QAd/y66Upn4EcvxSD5D4hwOutl3dIdfmSTSXs4b9DIMDnEVjX7t00cvOnvg==
   dependencies:
     dom-event-types "^1.0.0"
-    lodash "^4.17.4"
+    lodash "^4.17.15"
+    pretty "^2.0.0"
 
 "@vue/web-component-wrapper@^1.2.0":
   version "1.2.0"
@@ -8594,7 +8595,7 @@ pretty-format@^24.9.0:
     ansi-styles "^3.2.0"
     react-is "^16.8.4"
 
-pretty@2.0.0:
+pretty@2.0.0, pretty@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/pretty/-/pretty-2.0.0.tgz#adbc7960b7bbfe289a557dc5f737619a220d06a5"
   integrity sha1-rbx5YLe7/iiaVX3F9zdhmiINBqU=
