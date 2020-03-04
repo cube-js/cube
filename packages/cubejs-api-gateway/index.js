@@ -98,7 +98,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query) => (data.m
 )(r)));
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(hour|day|week|month|year))?$/);
+const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
 
 const operators = [
   'equals',
