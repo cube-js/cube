@@ -2043,10 +2043,10 @@ ecc-jsbn@~0.1.1:
     jsbn "~0.1.0"
     safer-buffer "^2.1.0"
 
-ecdsa-sig-formatter@1.0.10:
-  version "1.0.10"
-  resolved "https://registry.yarnpkg.com/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.10.tgz#1c595000f04a8897dfb85000892a0f4c33af86c3"
-  integrity sha1-HFlQAPBKiJffuFAAiSoPTDOvhsM=
+ecdsa-sig-formatter@1.0.11:
+  version "1.0.11"
+  resolved "https://registry.yarnpkg.com/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.11.tgz#ae0f0fa2d85045ef14a817daa3ce9acd0489e5bf"
+  integrity sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==
   dependencies:
     safe-buffer "^5.0.1"
 
@@ -3690,11 +3690,11 @@ jsonfile@^4.0.0:
     graceful-fs "^4.1.6"
 
 jsonwebtoken@^8.3.0, jsonwebtoken@^8.4.0:
-  version "8.4.0"
-  resolved "https://registry.yarnpkg.com/jsonwebtoken/-/jsonwebtoken-8.4.0.tgz#8757f7b4cb7440d86d5e2f3becefa70536c8e46a"
-  integrity sha512-coyXjRTCy0pw5WYBpMvWOMN+Kjaik2MwTUIq9cna/W7NpO9E+iYbumZONAz3hcr+tXFJECoQVrtmIoC3Oz0gvg==
+  version "8.5.1"
+  resolved "https://registry.yarnpkg.com/jsonwebtoken/-/jsonwebtoken-8.5.1.tgz#00e71e0b8df54c2121a1f26137df2280673bcc0d"
+  integrity sha512-XjwVfRS6jTMsqYs0EsuJ4LGxXV14zQybNd4L2r0UvbVnSF9Af8x7p5MzbJ90Ioz/9TI41/hTCvznF/loiSzn8w==
   dependencies:
-    jws "^3.1.5"
+    jws "^3.2.2"
     lodash.includes "^4.3.0"
     lodash.isboolean "^3.0.3"
     lodash.isinteger "^4.0.4"
@@ -3703,6 +3703,7 @@ jsonwebtoken@^8.3.0, jsonwebtoken@^8.4.0:
     lodash.isstring "^4.0.1"
     lodash.once "^4.0.0"
     ms "^2.1.1"
+    semver "^5.6.0"
 
 jsprim@^1.2.2:
   version "1.4.1"
@@ -3714,21 +3715,21 @@ jsprim@^1.2.2:
     json-schema "0.2.3"
     verror "1.10.0"
 
-jwa@^1.1.5:
-  version "1.1.6"
-  resolved "https://registry.yarnpkg.com/jwa/-/jwa-1.1.6.tgz#87240e76c9808dbde18783cf2264ef4929ee50e6"
-  integrity sha512-tBO/cf++BUsJkYql/kBbJroKOgHWEigTKBAjjBEmrMGYd1QMBC74Hr4Wo2zCZw6ZrVhlJPvoMrkcOnlWR/DJfw==
+jwa@^1.4.1:
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/jwa/-/jwa-1.4.1.tgz#743c32985cb9e98655530d53641b66c8645b039a"
+  integrity sha512-qiLX/xhEEFKUAJ6FiBMbes3w9ATzyk5W7Hvzpa/SLYdxNtng+gcurvrI7TbACjIXlsJyr05/S1oUhZrc63evQA==
   dependencies:
     buffer-equal-constant-time "1.0.1"
-    ecdsa-sig-formatter "1.0.10"
+    ecdsa-sig-formatter "1.0.11"
     safe-buffer "^5.0.1"
 
-jws@^3.1.5:
-  version "3.1.5"
-  resolved "https://registry.yarnpkg.com/jws/-/jws-3.1.5.tgz#80d12d05b293d1e841e7cb8b4e69e561adcf834f"
-  integrity sha512-GsCSexFADNQUr8T5HPJvayTjvPIfoyJPtLQBwn5a4WZQchcrPMPMAWcC1AzJVRDKyD6ZPROPAxgv6rfHViO4uQ==
+jws@^3.2.2:
+  version "3.2.2"
+  resolved "https://registry.yarnpkg.com/jws/-/jws-3.2.2.tgz#001099f3639468c9414000e99995fa52fb478304"
+  integrity sha512-YHlZCB6lMTllWDtSPHz/ZXTsi8S00usEV6v1tjq8tOUZzw7DpSDWVXjXDre6ed1w/pd495ODpHZYSdkRTsa0HA==
   dependencies:
-    jwa "^1.1.5"
+    jwa "^1.4.1"
     safe-buffer "^5.0.1"
 
 kind-of@^3.0.2, kind-of@^3.0.3, kind-of@^3.2.0:
