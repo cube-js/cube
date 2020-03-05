@@ -134,7 +134,7 @@ const prodLogger = (level) => (msg, params) => {
 
   const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
   // eslint-disable-next-line default-case
-  switch ((level || 'info').toLowerCase()) {
+  switch ((level || 'warn').toLowerCase()) {
     case "trace": {
       if (!error && !warning) {
         logMessage();
