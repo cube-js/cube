@@ -1,3 +1,7 @@
+/**
+ * @module @cubejs-client/core
+ */
+
 import { unnest, fromPairs } from 'ramda';
 
 const memberMap = (memberArray) => fromPairs(memberArray.map(m => [m.name, m]));
@@ -23,6 +27,9 @@ const operators = {
   ]
 };
 
+/**
+ * Contains information about available cubes and it's members.
+ */
 export default class Meta {
   constructor(metaResponse) {
     this.meta = metaResponse;
@@ -38,6 +45,23 @@ export default class Meta {
     return unnest(this.cubes.map(c => c[memberType]));
   }
 
+  /**
+   * Get meta information for member of a cube
+   * Member meta information contains:
+   * ```javascript
+   * {
+   *   name,
+   *   title,
+   *   shortTitle,
+   *   type,
+   *   description,
+   *   format
+   * }
+   * ```
+   * @param memberName - Fully qualified member name in a form `Cube.memberName`
+   * @param memberType - `measures`, `dimensions` or `segments`
+   * @return {Object} containing meta information about member
+   */
   resolveMember(memberName, memberType) {
     const [cube] = memberName.split('.');
     if (!this.cubesMap[cube]) {

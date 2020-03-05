@@ -32,8 +32,6 @@ Can be an async function without arguments that returns API token.
 - `options` - options object.
 - `options.apiUrl` - URL of your Cube.js Backend.
 By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
-- `options.headers` - optional object of additional headers to apply to requests
-
 
 **Returns:** [CubejsApi](#cubejs-api)
 
@@ -102,9 +100,71 @@ Get meta description of cubes available for querying.
 
 **Returns:** `Promise` for [Meta](#meta) if `callback` isn't passed
 
+### resolveMember
+
+`resolveMember(memberName, memberType)`
+
+Get meta information for member of a cube
+Member meta information contains:
+```javascript
+{
+  name,
+  title,
+  shortTitle,
+  type,
+  description,
+  format
+}
+```
+
+**Parameters:**
+
+- `memberName` - Fully qualified member name in a form `Cube.memberName`
+- `memberType` - `measures`, `dimensions` or `segments`
+
+**Returns:** `Object` containing meta information about member
+
 ## ResultSet
 
 Provides a convenient interface for data manipulation.
+
+### series
+
+`ResultSet#series(pivotConfig)`
+
+Returns an array of series with key, title and series data.
+
+```js
+// For query
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+}
+
+// ResultSet.series() will return
+[
+  {
+    "key":"Stories.count",
+    "title": "Stories Count",
+    "series": [
+      { "x":"2015-01-01T00:00:00", "value": 27120 },
+      { "x":"2015-02-01T00:00:00", "value": 25861 },
+      { "x": "2015-03-01T00:00:00", "value": 29661 },
+      //...
+    ]
+  }
+]
+```
+
+**Parameters:**
+
+- `pivotConfig`
+
+**Returns:** `Array`
 
 ### chartPivot
 
@@ -193,8 +253,8 @@ For example
 
 // ResultSet.tableColumns() will return
 [
-  { key: "Stories.time", title: "Stories Time" },
-  { key: "Stories.count", title: "Stories Count" },
+  { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
+  { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
   //...
 ]
 ```
