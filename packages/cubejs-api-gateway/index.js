@@ -5,6 +5,7 @@ const moment = require('moment');
 const uuid = require('uuid/v4');
 
 const dateParser = require('./dateParser');
+const requestParser = require('./requestParser');
 const UserError = require('./UserError');
 const CubejsHandlerError = require('./CubejsHandlerError');
 const SubscriptionServer = require('./SubscriptionServer');
@@ -602,9 +603,9 @@ class ApiGateway {
     }
   }
 
-  // extract and require this in
   async requestLogger(req, res, next) {
-    this.log(req.context, { type: 'API Request' });
+    const details = requestParser(req, res);
+    this.log(req.context, { type: 'REST API Request', ...details });
     if (next) {
       next();
     }
