@@ -30,7 +30,7 @@ const operators = {
 /**
  * Contains information about available cubes and it's members.
  */
-export default class Meta {
+class Meta {
   constructor(metaResponse) {
     this.meta = metaResponse;
     const { cubes } = this.meta;
@@ -91,3 +91,5 @@ export default class Meta {
     return operators[member.type] || operators.string;
   }
 }
+
+export default Meta;

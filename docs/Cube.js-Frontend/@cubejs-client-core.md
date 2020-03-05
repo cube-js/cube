@@ -100,9 +100,13 @@ Get meta description of cubes available for querying.
 
 **Returns:** `Promise` for [Meta](#meta) if `callback` isn't passed
 
+## Meta
+
+Contains information about available cubes and it's members.
+
 ### resolveMember
 
-`resolveMember(memberName, memberType)`
+`Meta#resolveMember(memberName, memberType)`
 
 Get meta information for member of a cube
 Member meta information contains:
