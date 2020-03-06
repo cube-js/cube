@@ -6,6 +6,7 @@
  * @menuOrder 2
  */
 
+import uuid from 'uuid/v4';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
@@ -45,7 +46,7 @@ class CubejsApi {
   }
 
   request(method, params) {
-    return this.transport.request(method, params);
+    return this.transport.request(method, { baseRequestId: uuid(), ...params });
   }
 
   loadMethod(request, toResult, options, callback) {
@@ -265,7 +266,7 @@ class CubejsApi {
  * @name cubejs
  * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
  * In the development mode, Cube.js Backend will print the API token to the console on on startup.
- * Can be an async function without arguments that returns API token.
+ * Can be an async function without arguments that returns API token. Optional.
  * @param options - options object.
  * @param options.apiUrl - URL of your Cube.js Backend.
  * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.

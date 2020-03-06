@@ -1,0 +1,41 @@
+{
+  "name": "@cubejs-client/react",
+  "version": "0.18.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-client-react"
+  },
+  "description": "React components for cube.js",
+  "author": "Statsbot, Inc.",
+  "dependencies": {
+    "@babel/runtime": "^7.1.2",
+    "core-js": "^2.5.3",
+    "ramda": "^0.27.0"
+  },
+  "peerDependencies": {
+    "prop-types": "^15.6.2",
+    "react": "^16.10.2"
+  },
+  "main": "dist/cubejs-client-react.js",
+  "module": "dist/cubejs-client-react.esm.js",
+  "scripts": {
+    "lint": "eslint src/*.js src/*.jsx"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^6.5.1",
+    "eslint-config-airbnb": "^18.0.1",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-react": "^7.15.1",
+    "prop-types": "^15.6.2",
+    "react": "^16.10.2"
+  }
+}

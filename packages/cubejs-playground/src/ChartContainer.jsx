@@ -1,7 +1,7 @@
 /* global navigator */
 import React from 'react';
 import {
-  Card, Button, Menu, Dropdown, Icon, notification, Modal
+  Card, Button, Menu, Dropdown, Icon, notification, Modal, Table
 } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
@@ -11,6 +11,7 @@ import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from "sql-formatter";
 import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
+import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 
 export const frameworks = [{
@@ -18,12 +19,12 @@ export const frameworks = [{
   title: 'Vanilla JavaScript',
   docsLink: 'https://cube.dev/docs/@cubejs-client-core'
 }, {
+  id: 'react',
+  title: 'React'
+}, {
   id: 'angular',
   title: 'Angular',
   docsLink: 'https://cube.dev/docs/@cubejs-client-ngx'
-}, {
-  id: 'react',
-  title: 'React'
 }, {
   id: 'vue',
   title: 'Vue.js',
@@ -234,6 +235,18 @@ class ChartContainer extends React.Component {
             SQL
           </Button>
           <Button
+            onClick={() => {
+              playgroundAction('Show Cache');
+              this.setState({ showCode: showCode === 'cache' ? null : 'cache' });
+            }}
+            icon="sync"
+            size="small"
+            type={showCode === 'cache' ? 'primary' : 'default'}
+            disabled={!!frameworkItem.docsLink}
+          >
+            Cache
+          </Button>
+          <Button
             icon="code-sandbox"
             size="small"
             onClick={() => playgroundAction('Open Code Sandbox')}
@@ -280,6 +293,13 @@ class ChartContainer extends React.Component {
             query={query}
             cubejsApi={cubejsApi}
             render={({ sqlQuery }) => <PrismCode code={sqlQuery && sqlFormatter.format(sqlQuery.sql())} />}
+          />
+        );
+      } else if (showCode === 'cache') {
+        return (
+          <CachePane
+            query={query}
+            cubejsApi={cubejsApi}
           />
         );
       }

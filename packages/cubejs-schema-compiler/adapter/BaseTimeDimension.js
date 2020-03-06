@@ -5,7 +5,7 @@ const BaseFilter = require('./BaseFilter');
 const UserError = require('../compiler/UserError');
 
 const TIME_SERIES = {
-  date: (range) =>
+  day: (range) =>
     Array.from(range.by('day'))
       .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.format('YYYY-MM-DDT23:59:59.999')]),
   month: (range) =>
@@ -17,6 +17,12 @@ const TIME_SERIES = {
   hour: (range) =>
     Array.from(range.by('hour'))
       .map(d => [d.format('YYYY-MM-DDTHH:00:00.000'), d.format('YYYY-MM-DDTHH:59:59.999')]),
+  minute: (range) =>
+    Array.from(range.by('minute'))
+      .map(d => [d.format('YYYY-MM-DDTHH:MM:00.000'), d.format('YYYY-MM-DDTHH:MM:59.999')]),
+  second: (range) =>
+    Array.from(range.by('second'))
+      .map(d => [d.format('YYYY-MM-DDTHH:MM:SS.000'), d.format('YYYY-MM-DDTHH:MM:SS.999')]),
   week: (range) =>
     Array.from(range.snapTo('isoweek').by('week'))
       .map(d => [d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoweek').format('YYYY-MM-DDT23:59:59.999')])
@@ -48,8 +54,10 @@ class BaseTimeDimension extends BaseFilter {
     return super.aliasName();
   }
 
-  unescapedAliasName() {
-    return `${this.query.aliasName(this.dimension)}_${this.granularity || 'date'}`; // TODO date here for rollups
+  unescapedAliasName(granularity) {
+    const actualGranularity = granularity || this.granularity || 'day';
+
+    return `${this.query.aliasName(this.dimension)}_${actualGranularity}`; // TODO date here for rollups
   }
 
   dateSeriesAliasName() {
@@ -64,16 +72,19 @@ class BaseTimeDimension extends BaseFilter {
   }
 
   dimensionSql() {
-    if (this.query.safeEvaluateSymbolContext().rollupQuery) {
-      return super.dimensionSql();
+    const context = this.query.safeEvaluateSymbolContext();
+    const granularity = context.granularityOverride || this.granularity;
+
+    if (context.rollupQuery) {
+      if (context.rollupGranularity === this.granularity) {
+        return super.dimensionSql();
+      }
+      return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
     }
-    if (this.query.safeEvaluateSymbolContext().ungrouped) {
+    if (context.ungrouped) {
       return this.convertedToTz();
     }
-    return this.query.timeGroupedColumn(
-      this.query.safeEvaluateSymbolContext().granularityOverride || this.granularity,
-      this.convertedToTz()
-    );
+    return this.query.timeGroupedColumn(granularity, this.convertedToTz());
   }
 
   convertedToTz() {

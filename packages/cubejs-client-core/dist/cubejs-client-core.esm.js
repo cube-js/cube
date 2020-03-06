@@ -1,11 +1,13 @@
-import _objectSpread from '@babel/runtime/helpers/objectSpread';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+import _objectSpread2 from '@babel/runtime/helpers/objectSpread';
 import _typeof from '@babel/runtime/helpers/typeof';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
 import _createClass from '@babel/runtime/helpers/createClass';
 import 'core-js/modules/es6.promise';
+import 'core-js/modules/es6.object.to-string';
+import uuid from 'uuid/v4';
 import 'core-js/modules/es6.number.constructor';
 import 'core-js/modules/es6.number.parse-float';
 import 'core-js/modules/web.dom.iterable';
@@ -15,6 +17,7 @@ import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
 import 'core-js/modules/es6.object.assign';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import 'core-js/modules/es6.array.reduce';
+import 'core-js/modules/es6.regexp.match';
 import 'core-js/modules/es6.array.index-of';
 import 'core-js/modules/es6.array.find';
 import 'core-js/modules/es6.array.filter';
@@ -55,12 +58,23 @@ var TIME_SERIES = {
       return d.format('YYYY-MM-DDTHH:00:00.000');
     });
   },
+  minute: function minute(range) {
+    return Array.from(range.by('minute')).map(function (d) {
+      return d.format('YYYY-MM-DDTHH:mm:00.000');
+    });
+  },
+  second: function second(range) {
+    return Array.from(range.by('second')).map(function (d) {
+      return d.format('YYYY-MM-DDTHH:mm:ss.000');
+    });
+  },
   week: function week(range) {
     return Array.from(range.snapTo('isoweek').by('week')).map(function (d) {
       return d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000');
     });
   }
 };
+var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 /**
  * Provides a convenient interface for data manipulation.
  */
@@ -73,6 +87,38 @@ function () {
 
     this.loadResponse = loadResponse;
   }
+  /**
+   * Returns an array of series with key, title and series data.
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-12-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.series() will return
+   * [
+   *   {
+   *     "key":"Stories.count",
+   *     "title": "Stories Count",
+   *     "series": [
+   *       { "x":"2015-01-01T00:00:00", "value": 27120 },
+   *       { "x":"2015-02-01T00:00:00", "value": 25861 },
+   *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+   *       //...
+   *     ]
+   *   }
+   * ]
+   * ```
+   * @param pivotConfig
+   * @returns {Array}
+   */
+
 
   _createClass(ResultSet, [{
     key: "series",
@@ -84,6 +130,7 @@ function () {
             key = _ref.key;
         return {
           title: title,
+          key: key,
           series: _this.chartPivot(pivotConfig).map(function (_ref2) {
             var category = _ref2.category,
                 x = _ref2.x,
@@ -142,21 +189,35 @@ function () {
       var timeDimensions = (query.timeDimensions || []).filter(function (td) {
         return !!td.granularity;
       });
+      var dimensions = query.dimensions || [];
       pivotConfig = pivotConfig || (timeDimensions.length ? {
         x: timeDimensions.map(function (td) {
-          return td.dimension;
+          return ResultSet.timeDimensionMember(td);
         }),
-        y: query.dimensions || []
+        y: dimensions
       } : {
-        x: query.dimensions || [],
+        x: dimensions,
         y: []
       });
-      pivotConfig.x = pivotConfig.x || [];
-      pivotConfig.y = pivotConfig.y || [];
+
+      var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
+        return axis.map(function (subDim) {
+          return timeDimensions.find(function (td) {
+            return td.dimension === subDim;
+          }) && !dimensions.find(function (d) {
+            return d === subDim;
+          }) ? ResultSet.timeDimensionMember(query.timeDimensions.find(function (td) {
+            return td.dimension === subDim;
+          })) : subDim;
+        });
+      };
+
+      pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
+      pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
       var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
       var allDimensions = timeDimensions.map(function (td) {
-        return td.dimension;
-      }).concat(query.dimensions);
+        return ResultSet.timeDimensionMember(td);
+      }).concat(dimensions);
       pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
         return allIncludedDimensions.indexOf(d) === -1;
       }));
@@ -193,10 +254,10 @@ function () {
 
       if (!dateRange) {
         var dates = pipe(map(function (row) {
-          return row[timeDimension.dimension] && moment(row[timeDimension.dimension]);
+          return row[ResultSet.timeDimensionMember(timeDimension)] && moment(row[ResultSet.timeDimensionMember(timeDimension)]);
         }), filter(function (r) {
           return !!r;
-        }))(this.loadResponse.data);
+        }))(this.timeDimensionBackwardCompatibleData());
         dateRange = dates.length && [reduce(minBy(function (d) {
           return d.toDate();
         }), dates[0], dates), reduce(maxBy(function (d) {
@@ -208,8 +269,11 @@ function () {
         return null;
       }
 
-      var start = moment(dateRange[0]).format('YYYY-MM-DD 00:00:00');
-      var end = moment(dateRange[1]).format('YYYY-MM-DD 23:59:59');
+      var padToDay = timeDimension.dateRange ? timeDimension.dateRange.find(function (d) {
+        return d.match(DateRegex);
+      }) : ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
+      var start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+      var end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
       var range = moment.range(start, end);
 
       if (!TIME_SERIES[timeDimension.granularity]) {
@@ -236,7 +300,7 @@ function () {
       if (pivotConfig.fillMissingDates && pivotConfig.x.length === 1 && equals(pivotConfig.x, (this.loadResponse.query.timeDimensions || []).filter(function (td) {
         return !!td.granularity;
       }).map(function (td) {
-        return td.dimension;
+        return ResultSet.timeDimensionMember(td);
       }))) {
         var series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
 
@@ -270,7 +334,7 @@ function () {
             row: row
           };
         });
-      }), unnest, groupByXAxis, toPairs)(this.loadResponse.data);
+      }), unnest, groupByXAxis, toPairs)(this.timeDimensionBackwardCompatibleData());
       var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
       function (_ref6) {
         var _ref7 = _slicedToArray(_ref6, 2),
@@ -360,7 +424,7 @@ function () {
       return this.pivot(pivotConfig).map(function (_ref15) {
         var xValues = _ref15.xValues,
             yValuesArray = _ref15.yValuesArray;
-        return _objectSpread({
+        return _objectSpread2({
           category: _this3.axisValuesString(xValues, ', '),
           // TODO deprecated
           x: _this3.axisValuesString(xValues, ', ')
@@ -406,7 +470,7 @@ function () {
   }, {
     key: "tablePivot",
     value: function tablePivot(pivotConfig) {
-      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
 
       var valueToObject = function valueToObject(valuesArray, measureValue) {
         return function (field, index) {
@@ -448,8 +512,8 @@ function () {
      *
      * // ResultSet.tableColumns() will return
      * [
-     *   { key: "Stories.time", title: "Stories Time" },
-     *   { key: "Stories.count", title: "Stories Count" },
+     *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
+     *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
      *   //...
      * ]
      * ```
@@ -468,11 +532,13 @@ function () {
         return field === 'measures' ? (_this4.query().measures || []).map(function (m) {
           return {
             key: m,
-            title: _this4.loadResponse.annotation.measures[m].title
+            title: _this4.loadResponse.annotation.measures[m].title,
+            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle
           };
         }) : [{
           key: field,
-          title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title
+          title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title,
+          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle
         }];
       };
 
@@ -520,7 +586,7 @@ function () {
       var _this5 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(function (axisValues) {
+      return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.timeDimensionBackwardCompatibleData()).map(function (axisValues) {
         return {
           title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
@@ -539,7 +605,39 @@ function () {
     value: function rawData() {
       return this.loadResponse.data;
     }
+  }, {
+    key: "timeDimensionBackwardCompatibleData",
+    value: function timeDimensionBackwardCompatibleData() {
+      if (!this.backwardCompatibleData) {
+        var query = this.loadResponse.query;
+        var timeDimensions = (query.timeDimensions || []).filter(function (td) {
+          return !!td.granularity;
+        });
+        this.backwardCompatibleData = this.loadResponse.data.map(function (row) {
+          return _objectSpread2({}, row, {}, Object.keys(row).filter(function (field) {
+            return timeDimensions.find(function (d) {
+              return d.dimension === field;
+            }) && !row[ResultSet.timeDimensionMember(timeDimensions.find(function (d) {
+              return d.dimension === field;
+            }))];
+          }).map(function (field) {
+            return _defineProperty({}, ResultSet.timeDimensionMember(timeDimensions.find(function (d) {
+              return d.dimension === field;
+            })), row[field]);
+          }).reduce(function (a, b) {
+            return _objectSpread2({}, a, {}, b);
+          }, {}));
+        });
+      }
+
+      return this.backwardCompatibleData;
+    }
   }], [{
+    key: "timeDimensionMember",
+    value: function timeDimensionMember(td) {
+      return "".concat(td.dimension, ".").concat(td.granularity);
+    }
+  }, {
     key: "measureFromAxis",
     value: function measureFromAxis(axisValues) {
       return axisValues[axisValues.length - 1];
@@ -753,31 +851,36 @@ function () {
 
   _createClass(HttpTransport, [{
     key: "request",
-    value: function request(method, params) {
+    value: function request(method, _ref2) {
       var _this = this;
+
+      var baseRequestId = _ref2.baseRequestId,
+          params = _objectWithoutProperties(_ref2, ["baseRequestId"]);
 
       var searchParams = new URLSearchParams(params && Object.keys(params).map(function (k) {
         return _defineProperty({}, k, _typeof(params[k]) === 'object' ? JSON.stringify(params[k]) : params[k]);
       }).reduce(function (a, b) {
-        return _objectSpread({}, a, b);
+        return _objectSpread2({}, a, {}, b);
       }, {}));
+      var spanCounter = 1;
 
       var runRequest = function runRequest() {
         return fetch("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
-          headers: Object.assign({
+          headers: _objectSpread2({
             Authorization: _this.authorization,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
           }, _this.headers)
         });
       };
 
       return {
-        subscribe: function () {
-          var _subscribe = _asyncToGenerator(
-          /*#__PURE__*/
-          _regeneratorRuntime.mark(function _callee(callback) {
-            var _this2 = this;
+        subscribe: function subscribe(callback) {
+          var _this2 = this;
 
+          return _asyncToGenerator(
+          /*#__PURE__*/
+          _regeneratorRuntime.mark(function _callee() {
             var result;
             return _regeneratorRuntime.wrap(function _callee$(_context) {
               while (1) {
@@ -797,13 +900,9 @@ function () {
                     return _context.stop();
                 }
               }
-            }, _callee, this);
-          }));
-
-          return function subscribe(_x) {
-            return _subscribe.apply(this, arguments);
-          };
-        }()
+            }, _callee);
+          }))();
+        }
       };
     }
   }]);
@@ -856,7 +955,9 @@ function () {
   _createClass(CubejsApi, [{
     key: "request",
     value: function request(method, params) {
-      return this.transport.request(method, params);
+      return this.transport.request(method, _objectSpread2({
+        baseRequestId: uuid()
+      }, params));
     }
   }, {
     key: "loadMethod",
@@ -922,7 +1023,7 @@ function () {
                   return _context.stop();
               }
             }
-          }, _callee, this);
+          }, _callee);
         }));
 
         return function checkMutex() {
@@ -988,7 +1089,7 @@ function () {
                               return _context2.stop();
                           }
                         }
-                      }, _callee2, this);
+                      }, _callee2);
                     }));
 
                     return function subscribeNext() {
@@ -1034,7 +1135,7 @@ function () {
                               return _context3.stop();
                           }
                         }
-                      }, _callee3, this);
+                      }, _callee3);
                     }));
 
                     return function continueWait(_x3) {
@@ -1151,7 +1252,7 @@ function () {
                   return _context4.stop();
               }
             }
-          }, _callee4, this);
+          }, _callee4);
         }));
 
         return function loadImpl(_x, _x2) {
@@ -1196,12 +1297,14 @@ function () {
                       return _context5.stop();
                   }
                 }
-              }, _callee5, this);
+              }, _callee5);
             }));
 
-            return function unsubscribe() {
+            function unsubscribe() {
               return _unsubscribe.apply(this, arguments);
-            };
+            }
+
+            return unsubscribe;
           }()
         };
       } else {
@@ -1242,9 +1345,11 @@ function () {
         }, _callee6, this);
       }));
 
-      return function updateTransportAuthorization() {
+      function updateTransportAuthorization() {
         return _updateTransportAuthorization.apply(this, arguments);
-      };
+      }
+
+      return updateTransportAuthorization;
     }()
     /**
      * Fetch data for passed `query`.
@@ -1337,7 +1442,7 @@ function () {
         });
       }, function (body) {
         return new ResultSet(body);
-      }, _objectSpread({}, options, {
+      }, _objectSpread2({}, options, {
         subscribe: true
       }), callback);
     }

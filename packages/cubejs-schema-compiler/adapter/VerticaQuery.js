@@ -1,9 +1,11 @@
 const BaseQuery = require('./BaseQuery');
 
 const GRANULARITY_TO_INTERVAL = {
-  date: 'DD',
+  day: 'DD',
   week: 'W',
   hour: 'HH24',
+  minute: 'mm',
+  second: 'ss',
   month: 'MM',
   year: 'YY'
 };

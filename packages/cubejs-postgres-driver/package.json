@@ -2,22 +2,29 @@
   "name": "@cubejs-backend/postgres-driver",
   "description": "Cube.js Postgres database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.11.11",
+  "version": "0.18.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-postgres-driver"
+  },
   "engines": {
     "node": ">=8.11.1"
   },
   "main": "driver/PostgresDriver.js",
+  "typings": "driver/index.d.ts",
   "scripts": {
     "lint": "eslint **/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.11.6",
+    "@cubejs-backend/query-orchestrator": "^0.18.3",
     "moment": "^2.24.0",
-    "pg": "^7.8.0"
+    "pg": "^7.10.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "eslint": "^5.16.0",
+    "@types/pg": "^7.14.1",
+    "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1"

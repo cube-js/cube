@@ -1,4 +1,4 @@
-const t = require('babel-types');
+const t = require('@babel/types');
 const R = require('ramda');
 
 class CubePropContextTranspiler {
@@ -34,8 +34,8 @@ class CubePropContextTranspiler {
 
   sqlAndReferencesFieldVisitor(cubeName) {
     return this.knownIdentifiersInjectVisitor(
-      /^(sql|measureReferences|dimensionReferences|segmentReferences|timeDimensionReference|drillMembers|drillMemberReferences|contextMembers)$/,
-        name => this.cubeSymbols.resolveSymbol(cubeName, name) || this.cubeSymbols.isCurrentCube(name)
+      /^(sql|measureReferences|dimensionReferences|segmentReferences|timeDimensionReference|drillMembers|drillMemberReferences|contextMembers|columns)$/,
+      name => this.cubeSymbols.resolveSymbol(cubeName, name) || this.cubeSymbols.isCurrentCube(name)
     );
   }
 

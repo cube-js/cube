@@ -38,11 +38,19 @@ class BaseDriver {
   }
 
   testConnection() {
-    throw 'Not implemented';
+    throw new Error('Not implemented');
   }
 
   query() {
-    throw 'Not implemented';
+    throw new Error('Not implemented');
+  }
+
+  downloadQueryResults() {
+    throw new Error('Not implemented');
+  }
+
+  readOnly() {
+    return false;
   }
 
   tablesSchema() {
@@ -134,7 +142,7 @@ class BaseDriver {
              columns.table_name,
              columns.table_schema,
              columns.data_type
-      FROM information_schema.columns 
+      FROM information_schema.columns
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name, schema]
     );

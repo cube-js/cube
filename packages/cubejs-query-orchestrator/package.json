@@ -2,22 +2,27 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Statsbot, Inc.",
-  "version": "0.11.6",
+  "version": "0.18.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-query-orchestrator"
+  },
   "engines": {
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "jest --runInBand --verbose"
   },
   "dependencies": {
-    "ramda": "^0.24.1",
+    "generic-pool": "^3.7.1",
+    "ramda": "^0.27.0",
     "redis": "^2.8.0"
   },
   "devDependencies": {
-    "eslint": "^4.14.0",
+    "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
-    "mocha": "^5.2.0",
-    "should": "^13.2.3"
+    "jest": "^25.1.0"
   },
   "license": "Apache-2.0"
 }

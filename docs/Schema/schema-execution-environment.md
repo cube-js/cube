@@ -15,6 +15,7 @@ Cube.js Schema JavaScript is standard JavaScript supported by Node.js starting v
 
 Being executed in VM data schema JavaScript code doesn't have access to [Node.js require](https://nodejs.org/api/modules.html#modules_require_id) directly.
 Instead `require()` is implemented by Schema Compiler to provide access to other data schema files and to regular Node.js modules.
+Besides that data schema `require()` can resolve Cube.js packages such as `Funnels` unlike standard Node.js `require()`.
 
 ## Node.js globals (process.env and others)
 
@@ -36,6 +37,10 @@ cube(`Users`, {
  // ...
 });
 ```
+
+## Cube.js globals (cube and others)
+
+Cube.js defines `cube()`, `context()` and `asyncModule()` global variable functions in order to provide API for schema configuration which aren't normally accessible outside of Cube.js schema.
 
 ## Import / Export
 
@@ -147,6 +152,9 @@ asyncModule(async () => {
 })
 ```
 
+Each `asyncModule` call will be invoked only once per schema compilation.
+To trigger schema recompile based on changes of underlying input data, [schemaVersion](@cubejs-backend-server-core#options-reference-schema-version) value should change accordingly.
+
 ## Context symbols transpile
 
 Cube.js uses custom transpiler to optimize boilerplate code around referencing cubes and cube members.
@@ -197,6 +205,27 @@ cube(`Users`, {
       sql: (CUBE, count) => `sum(${CUBE}.amount) / ${count}`,
       type: `number`
     }
+  }
+});
+```
+
+So for example if you want to pass definition of `ratio` outside of the cube you should define it as:
+
+```javascript
+const measureRatioDefinition = {
+  sql: (CUBE, count) => `sum(${CUBE}.amount) / ${count}`,
+  type: `number`
+}
+
+cube(`Users`, {
+  // ...
+  
+  measures: {
+    count: {
+      type: `count`
+    },
+    
+    ratio: measureRatioDefinition
   }
 });
 ```

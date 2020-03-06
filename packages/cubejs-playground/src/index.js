@@ -8,6 +8,7 @@ import SchemaPage from './SchemaPage';
 import DashboardPage from './DashboardPage';
 import App from './App';
 import { page } from './events';
+import TemplateGalleryPage from "./TemplateGallery/TemplateGalleryPage";
 
 const history = createHashHistory();
 history.listen((location) => {
@@ -37,6 +38,11 @@ ReactDOM.render(
         key="dashboard"
         path="/dashboard"
         component={DashboardPage}
+      />
+      <Route
+        key="template-gallery"
+        path="/template-gallery"
+        component={TemplateGalleryPage}
       />
     </App>
   </Router>,

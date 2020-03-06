@@ -11,11 +11,13 @@ class CompilerApi {
     this.logger = this.options.logger;
     this.preAggregationsSchema = this.options.preAggregationsSchema;
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
+    this.schemaVersion = this.options.schemaVersion;
+    this.compileContext = options.compileContext;
   }
 
   async getCompilers() {
     let compilerVersion = (
-      this.options.schemaVersion && this.options.schemaVersion() ||
+      this.schemaVersion && this.schemaVersion() ||
       'default_schema_version'
     ).toString();
     if (this.options.devServer) {
@@ -26,33 +28,65 @@ class CompilerApi {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', { version: compilerVersion });
       // TODO check if saving this promise can produce memory leak?
       this.compilers = PrepareCompiler.compile(this.repository, {
-        adapter: this.dbType,
-        allowNodeRequire: this.allowNodeRequire
+        allowNodeRequire: this.allowNodeRequire,
+        compileContext: this.compileContext
       });
       this.compilerVersion = compilerVersion;
     }
     return this.compilers;
   }
 
-  async getSql(query) {
-    const sqlGenerator = QueryBuilder.query(
-      await this.getCompilers(),
-      this.dbType, {
-        ...query,
-        externalDbType: this.options.externalDbType,
-        preAggregationsSchema: this.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
-      }
-    );
-    return (await this.getCompilers()).compiler.withQuery(sqlGenerator, () => ({
+  getDbType(dataSource) {
+    if (typeof this.dbType === 'function') {
+      return this.dbType({ dataSource: dataSource || 'default' });
+    }
+    return this.dbType;
+  }
+
+  async getSql(query, options) {
+    options = options || {};
+    const { includeDebugInfo } = options;
+    const dbType = this.getDbType('default');
+    const compilers = await this.getCompilers();
+    let sqlGenerator = this.createQuery(compilers, dbType, query);
+
+    const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
+
+    if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
+      // TODO consider more efficient way than instantiating query
+      sqlGenerator = this.createQuery(compilers, this.getDbType(dataSource), query);
+    }
+
+    return compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
       order: sqlGenerator.order,
       cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
-      preAggregations: sqlGenerator.preAggregations.preAggregationsDescription()
+      preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
+      dataSource: sqlGenerator.dataSource,
+      aliasNameToMember: sqlGenerator.aliasNameToMember,
+      rollupMatchResults: includeDebugInfo ?
+        sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined
     }));
+  }
+
+  async scheduledPreAggregations() {
+    const { cubeEvaluator } = await this.getCompilers();
+    return cubeEvaluator.scheduledPreAggregations();
+  }
+
+  createQuery(compilers, dbType, query) {
+    return QueryBuilder.query(
+      compilers,
+      dbType, {
+        ...query,
+        externalDbType: this.options.externalDbType,
+        preAggregationsSchema: this.preAggregationsSchema,
+        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
+      }
+    );
   }
 
   async metaConfig() {

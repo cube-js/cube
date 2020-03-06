@@ -12,21 +12,23 @@ class QueryCache {
     this.externalDriverFactory = options.externalDriverFactory;
     this.logger = logger;
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver() :
+      new RedisCacheDriver({ pool: options.redisPool }) :
       new LocalCacheDriver();
   }
 
-  cachedQueryResult (queryBody, preAggregationsTablesToTempTables) {
-    const replacePreAggregationTableNames = (queryAndParams) =>
-      QueryCache.replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables);
+  async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
+    const replacePreAggregationTableNames = (queryAndParams) => QueryCache.replacePreAggregationTableNames(
+      queryAndParams, preAggregationsTablesToTempTables
+    );
 
     const query = replacePreAggregationTableNames(queryBody.query);
     let queuePriority = 10;
     if (Number.isInteger(queryBody.queuePriority)) {
+      // eslint-disable-next-line prefer-destructuring
       queuePriority = queryBody.queuePriority;
     }
     const forceNoCache = queryBody.forceNoCache || false;
-    const values = queryBody.values;
+    const { values } = queryBody;
     const cacheKeyQueries =
       (
         queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.queries ||
@@ -35,20 +37,48 @@ class QueryCache {
       ).map(replacePreAggregationTableNames);
 
     const renewalThreshold = queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.renewalThreshold;
+    const refreshKeyRenewalThresholds = queryBody.cacheKeyQueries &&
+      queryBody.cacheKeyQueries.refreshKeyRenewalThresholds;
 
     const expireSecs = queryBody.expireSecs || 24 * 3600;
 
     if (!cacheKeyQueries) {
-      return this.queryWithRetryAndRelease(query, values, queryBody.external);
+      return {
+        data: await this.queryWithRetryAndRelease(query, values, {
+          external: queryBody.external,
+          requestId: queryBody.requestId
+        })
+      };
     }
     const cacheKey = QueryCache.queryCacheKey(queryBody);
 
     if (queryBody.renewQuery) {
-      this.logger('Requested renew', { cacheKey });
+      this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
-        external: queryBody.external
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds
       });
     }
+
+    if (!this.options.backgroundRenew) {
+      const resultPromise = this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds,
+        skipRefreshKeyWaitForRenew: true
+      });
+
+      this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds
+      });
+
+      return resultPromise;
+    }
+
+    this.logger('Background fetch', { cacheKey, requestId: queryBody.requestId });
 
     const mainPromise = this.cacheQueryResult(
       query, values,
@@ -57,17 +87,23 @@ class QueryCache {
       {
         priority: queuePriority,
         forceNoCache,
-        external: queryBody.external
+        external: queryBody.external,
+        requestId: queryBody.requestId
       }
     );
 
     if (!forceNoCache) {
       this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
-        external: queryBody.external
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        refreshKeyRenewalThresholds
       });
     }
 
-    return mainPromise;
+    return {
+      data: await mainPromise,
+      lastRefreshTime: await this.lastRefreshTime(cacheKey)
+    };
   }
 
   static queryCacheKey(queryBody) {
@@ -75,25 +111,30 @@ class QueryCache {
   }
 
   static replaceAll(replaceThis, withThis, inThis) {
-    withThis = withThis.replace(/\$/g,"$$$$");
+    withThis = withThis.replace(/\$/g, "$$$$");
     return inThis.replace(
-      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g,"\\$&"),"g"),
+      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, "\\$&"), "g"),
       withThis
     );
   }
 
-  static replacePreAggregationTableNames (queryAndParams, preAggregationsTablesToTempTables) {
+  static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
     const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, tempTable]) => QueryCache.replaceAll(tableName, tempTable, query),
+      (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
       keyQuery
     );
     return Array.isArray(queryAndParams) ? [replacedKeqQuery, params] : replacedKeqQuery;
   }
 
-  queryWithRetryAndRelease(query, values, priority, cacheKey, external) {
+  queryWithRetryAndRelease(query, values, {
+    priority, cacheKey, external, requestId
+  }) {
     const queue = external ? this.getExternalQueue() : this.getQueue();
-    return queue.executeInQueue('query', cacheKey, { query, values }, priority, { stageQueryKey: cacheKey });
+    return queue.executeInQueue('query', cacheKey, { query, values }, priority, {
+      stageQueryKey: cacheKey,
+      requestId
+    });
   }
 
   getQueue() {
@@ -104,6 +145,7 @@ class QueryCache {
         (client, q) => client.query(q.query, q.values), {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          redisPool: this.options.redisPool,
           ...this.options.queueOptions
         }
       );
@@ -120,6 +162,7 @@ class QueryCache {
         {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          redisPool: this.options.redisPool,
           ...this.options.externalQueueOptions
         }
       );
@@ -169,53 +212,70 @@ class QueryCache {
       query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
     ).catch(e => {
       if (!(e instanceof ContinueWaitError)) {
-        this.logger('Error while renew cycle', { query, query_values: values, error: e.stack || e })
+        this.logger('Error while renew cycle', {
+          query, query_values: values, error: e.stack || e, requestId: options.requestId
+        });
       }
-    })
+    });
   }
 
   renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
     options = options || {};
     return Promise.all(
-      cacheKeyQueries.map(q => this.cacheQueryResult(
+      cacheKeyQueries.map((q, i) => this.cacheQueryResult(
         Array.isArray(q) ? q[0] : q,
         Array.isArray(q) ? q[1] : [],
         q,
         expireSecs,
-        { renewalThreshold: this.options.refreshKeyRenewalThreshold || 2 * 60, renewalKey: q, waitForRenew: true }
+        {
+          renewalThreshold:
+            this.options.refreshKeyRenewalThreshold ||
+            (options.refreshKeyRenewalThresholds || [])[i] ||
+            2 * 60,
+          renewalKey: q,
+          waitForRenew: !options.skipRefreshKeyWaitForRenew,
+          requestId: options.requestId
+        }
       ))
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
           throw e;
         }
-        this.logger('Error fetching cache key queries', { error: e.stack || e });
+        this.logger('Error fetching cache key queries', { error: e.stack || e, requestId: options.requestId });
         return [];
       })
-      .then(cacheKeyQueryResults => {
-        return this.cacheQueryResult(
-          query, values,
-          cacheKey,
-          expireSecs,
-          {
-            renewalThreshold: renewalThreshold || 6 * 60 * 60,
-            renewalKey: cacheKeyQueryResults && [
-              cacheKeyQueries, cacheKeyQueryResults, this.queryRedisKey([query, values])
-            ],
-            waitForRenew: true,
-            external: options.external
-          }
-        );
-      });
+      .then(async cacheKeyQueryResults => (
+        {
+          data: await this.cacheQueryResult(
+            query, values,
+            cacheKey,
+            expireSecs,
+            {
+              renewalThreshold: renewalThreshold || 6 * 60 * 60,
+              renewalKey: cacheKeyQueryResults && [
+                cacheKeyQueries, cacheKeyQueryResults, this.queryRedisKey([query, values])
+              ],
+              waitForRenew: true,
+              external: options.external,
+              requestId: options.requestId
+            }
+          ),
+          refreshKeyValues: cacheKeyQueryResults,
+          lastRefreshTime: await this.lastRefreshTime(cacheKey)
+        }
+      ));
   }
 
   cacheQueryResult(query, values, cacheKey, expiration, options) {
     options = options || {};
-    const renewalThreshold = options.renewalThreshold;
+    const { renewalThreshold } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
-    const fetchNew = () => {
-      return this.queryWithRetryAndRelease(query, values, options.priority, cacheKey, options.external).then(res => {
+    const fetchNew = () => (
+      this.queryWithRetryAndRelease(query, values, {
+        priority: options.priority, cacheKey, external: options.external, requestId: options.requestId
+      }).then(res => {
         const result = {
           time: (new Date()).getTime(),
           result: res,
@@ -223,21 +283,25 @@ class QueryCache {
         };
         return this.cacheDriver.set(redisKey, result, expiration)
           .then(() => {
-            this.logger('Renewed', { cacheKey });
-            return res
+            this.logger('Renewed', { cacheKey, requestId: options.requestId });
+            return res;
           });
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
-          this.logger('Dropping Cache', { cacheKey, error: e.stack || e });
+          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId });
           this.cacheDriver.remove(redisKey)
-            .catch(e => this.logger('Error removing key', { cacheKey, error: e.stack || e }));
+            .catch(err => this.logger('Error removing key', {
+              cacheKey,
+              error: err.stack || err,
+              requestId: options.requestId
+            }));
         }
         throw e;
-      });
-    };
+      })
+    );
 
     if (options.forceNoCache) {
-      this.logger('Force no cache for', { cacheKey });
+      this.logger('Force no cache for', { cacheKey, requestId: options.requestId });
       return fetchNew();
     }
 
@@ -251,7 +315,8 @@ class QueryCache {
           renewedAgo,
           renewalKey: parsedResult.renewalKey,
           newRenewalKey: renewalKey,
-          renewalThreshold
+          renewalThreshold,
+          requestId: options.requestId
         });
         if (
           renewalKey && (
@@ -262,28 +327,45 @@ class QueryCache {
           )
         ) {
           if (options.waitForRenew) {
-            this.logger('Waiting for renew', { cacheKey, renewalThreshold });
+            this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId });
             return fetchNew();
           } else {
-            this.logger('Renewing existing key', { cacheKey, renewalThreshold });
+            this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId });
             fetchNew().catch(e => {
               if (!(e instanceof ContinueWaitError)) {
-                this.logger('Error renewing', {cacheKey, error: e.stack || e})
+                this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId });
               }
             });
           }
         }
-        this.logger('Using cache for', { cacheKey });
+        this.logger('Using cache for', { cacheKey, requestId: options.requestId });
         return parsedResult.result;
       } else {
-        this.logger('Missing cache for', { cacheKey });
+        this.logger('Missing cache for', { cacheKey, requestId: options.requestId });
         return fetchNew();
       }
     });
   }
 
+  async lastRefreshTime(cacheKey) {
+    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    return cachedValue && new Date(cachedValue.time);
+  }
+
+  async resultFromCacheIfExists(queryBody) {
+    const cacheKey = QueryCache.queryCacheKey(queryBody);
+    const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
+    if (cachedValue) {
+      return {
+        data: cachedValue.result,
+        lastRefreshTime: new Date(cachedValue.time)
+      };
+    }
+    return null;
+  }
+
   queryRedisKey(cacheKey) {
-    return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest("hex")}`
+    return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest("hex")}`;
   }
 }
 

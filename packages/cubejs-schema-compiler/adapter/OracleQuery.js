@@ -2,9 +2,11 @@ const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_VALUE = {
-  date: 'DD',
+  day: 'DD',
   week: 'IW',
   hour: 'HH24',
+  minute: 'mm',
+  second: 'ss',
   month: 'MM',
   year: 'YYYY'
 };
@@ -13,6 +15,7 @@ class OracleFilter extends BaseFilter {
   castParameter() {
     return ':"?"';
   }
+
   /**
    * "ILIKE" does't support
    */
@@ -43,7 +46,7 @@ class OracleQuery extends BaseQuery {
   }
 
   /**
-   * Oracle doesn't support group by index, 
+   * Oracle doesn't support group by index,
    * using forSelect dimensions for grouping
    */
   groupByClause() {
@@ -83,6 +86,10 @@ class OracleQuery extends BaseQuery {
   newFilter(filter) {
     return new OracleFilter(this, filter);
   }
-};
+
+  unixTimestampSql() {
+    return `((cast (systimestamp at time zone 'UTC' as date) - date '1970-01-01') * 86400)`;
+  }
+}
 
 module.exports = OracleQuery;

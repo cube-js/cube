@@ -2,9 +2,11 @@ const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_TO_INTERVAL = {
-  date: 'day',
+  day: 'day',
   week: 'week',
   hour: 'hour',
+  minute: 'minute',
+  second: 'second',
   month: 'month',
   year: 'year'
 };
@@ -68,6 +70,26 @@ class PrestodbQuery extends BaseQuery {
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to FROM (${values}) AS dates`;
+  }
+
+  unixTimestampSql() {
+    return `to_unixtime(${this.nowTimestampSql()})`;
+  }
+
+  defaultRefreshKeyRenewalThreshold() {
+    return 120;
+  }
+
+  hllInit(sql) {
+    return `cast(approx_set(${sql}) as varbinary)`;
+  }
+
+  hllMerge(sql) {
+    return `cardinality(merge(cast(${sql} as HyperLogLog)))`;
+  }
+
+  countDistinctApprox(sql) {
+    return `approx_distinct(${sql})`;
   }
 }
 

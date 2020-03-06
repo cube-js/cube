@@ -3,6 +3,388 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.18.3](https://github.com/cube-js/cube.js/compare/v0.18.2...v0.18.3) (2020-03-02)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.18.2](https://github.com/cube-js/cube.js/compare/v0.18.1...v0.18.2) (2020-03-01)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.18.1](https://github.com/cube-js/cube.js/compare/v0.18.0...v0.18.1) (2020-03-01)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.18.0](https://github.com/cube-js/cube.js/compare/v0.17.10...v0.18.0) (2020-03-01)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.10](https://github.com/cube-js/cube.js/compare/v0.17.9...v0.17.10) (2020-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.9](https://github.com/cube-js/cube.js/compare/v0.17.8...v0.17.9) (2020-02-18)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.8](https://github.com/cube-js/cube.js/compare/v0.17.7...v0.17.8) (2020-02-14)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.7](https://github.com/cube-js/cube.js/compare/v0.17.6...v0.17.7) (2020-02-12)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.6](https://github.com/cube-js/cube.js/compare/v0.17.5...v0.17.6) (2020-02-10)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.5](https://github.com/cube-js/cube.js/compare/v0.17.4...v0.17.5) (2020-02-07)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.4](https://github.com/cube-js/cube.js/compare/v0.17.3...v0.17.4) (2020-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.3](https://github.com/cube-js/cube.js/compare/v0.17.2...v0.17.3) (2020-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.2](https://github.com/cube-js/cube.js/compare/v0.17.1...v0.17.2) (2020-02-04)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.17.1](https://github.com/cube-js/cube.js/compare/v0.17.0...v0.17.1) (2020-02-04)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.17.0](https://github.com/cube-js/cube.js/compare/v0.16.0...v0.17.0) (2020-02-04)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.16.0](https://github.com/cube-js/cube.js/compare/v0.15.4...v0.16.0) (2020-02-04)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.15.3](https://github.com/cube-js/cube.js/compare/v0.15.2...v0.15.3) (2020-01-26)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.15.1](https://github.com/cube-js/cube.js/compare/v0.15.0...v0.15.1) (2020-01-21)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.15.0](https://github.com/cube-js/cube.js/compare/v0.14.3...v0.15.0) (2020-01-18)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.14.3](https://github.com/cube-js/cube.js/compare/v0.14.2...v0.14.3) (2020-01-17)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.14.2](https://github.com/cube-js/cube.js/compare/v0.14.1...v0.14.2) (2020-01-17)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.14.1](https://github.com/cube-js/cube.js/compare/v0.14.0...v0.14.1) (2020-01-17)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.14.0](https://github.com/cube-js/cube.js/compare/v0.13.12...v0.14.0) (2020-01-16)
+
+
+### Features
+
+* Scheduled refresh for pre-aggregations ([c87b525](https://github.com/cube-js/cube.js/commit/c87b525))
+
+
+
+
+
+## [0.13.12](https://github.com/cube-js/cube.js/compare/v0.13.11...v0.13.12) (2020-01-12)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.11](https://github.com/cube-js/cube.js/compare/v0.13.10...v0.13.11) (2020-01-03)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.10](https://github.com/cube-js/cube.js/compare/v0.13.9...v0.13.10) (2020-01-03)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.9](https://github.com/cube-js/cube.js/compare/v0.13.8...v0.13.9) (2020-01-03)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.8](https://github.com/cube-js/cube.js/compare/v0.13.7...v0.13.8) (2019-12-31)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.7](https://github.com/cube-js/cube.js/compare/v0.13.6...v0.13.7) (2019-12-31)
+
+
+### Features
+
+* Health check methods ([#308](https://github.com/cube-js/cube.js/issues/308)) Thanks to [@willhausman](https://github.com/willhausman)! ([49ca36b](https://github.com/cube-js/cube.js/commit/49ca36b))
+
+
+
+
+
+## [0.13.6](https://github.com/cube-js/cube.js/compare/v0.13.5...v0.13.6) (2019-12-19)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.5](https://github.com/cube-js/cube.js/compare/v0.13.4...v0.13.5) (2019-12-17)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.3](https://github.com/cube-js/cube.js/compare/v0.13.2...v0.13.3) (2019-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.2](https://github.com/cube-js/cube.js/compare/v0.13.1...v0.13.2) (2019-12-13)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.13.1](https://github.com/cube-js/cube.js/compare/v0.13.0...v0.13.1) (2019-12-10)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.13.0](https://github.com/cube-js/cube.js/compare/v0.12.3...v0.13.0) (2019-12-10)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.12.2](https://github.com/cube-js/cube.js/compare/v0.12.1...v0.12.2) (2019-12-02)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.12.1](https://github.com/cube-js/cube.js/compare/v0.12.0...v0.12.1) (2019-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.12.0](https://github.com/cube-js/cube.js/compare/v0.11.25...v0.12.0) (2019-11-25)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.25](https://github.com/cube-js/cube.js/compare/v0.11.24...v0.11.25) (2019-11-23)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.24](https://github.com/cube-js/cube.js/compare/v0.11.23...v0.11.24) (2019-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.22](https://github.com/cube-js/cube.js/compare/v0.11.21...v0.11.22) (2019-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.21](https://github.com/cube-js/cube.js/compare/v0.11.20...v0.11.21) (2019-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.20](https://github.com/cube-js/cube.js/compare/v0.11.19...v0.11.20) (2019-11-18)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.19](https://github.com/cube-js/cube.js/compare/v0.11.18...v0.11.19) (2019-11-16)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.18](https://github.com/cube-js/cube.js/compare/v0.11.17...v0.11.18) (2019-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.17](https://github.com/statsbotco/cubejs-client/compare/v0.11.16...v0.11.17) (2019-11-08)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.11.16](https://github.com/statsbotco/cubejs-client/compare/v0.11.15...v0.11.16) (2019-11-04)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
 ## [0.11.15](https://github.com/statsbotco/cubejs-client/compare/v0.11.14...v0.11.15) (2019-11-01)
 
 **Note:** Version bump only for package @cubejs-backend/server

@@ -4,22 +4,144 @@ permalink: /deployment
 category: Cube.js Backend
 menuOrder: 3
 ---
-When running Cube.js Backend in production make sure `NODE_ENV` is set to `production`. Such platforms, such as Heroku, do it by default.
-
-Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. It uses it for query caching
-and queue. Set `REDIS_URL` environment variable to provide Cube.js with Redis
-connection. Make sure, your Redis allows at least 15 concurrent connections.
-Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
-If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
-
-> *NOTE:* Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
 
 Below you can find guides for popular deployment environments:
 
+- [As a part of Express application](#express)
 - [AWS Lambda with Serverless Framework](#serverless)
 - [Heroku](#heroku)
 - [Docker](#docker)
 - [Docker Compose](#docker-compose)
+
+## Production Mode
+
+When running Cube.js Backend in production make sure `NODE_ENV` is set to `production`. 
+Such platforms, such as Heroku, do it by default.
+In this mode Cube.js unsecured development server and Playground will be disabled by default because there's a security risk serving those in production environments.
+Production Cube.js servers can be accessed only with [REST API](rest-api) and Cube.js frontend libraries. 
+
+### Redis
+
+Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. 
+It uses Redis for query caching and queue. 
+Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. In case your Redis instance has password, please set password via `REDIS_PASSWORD` environment variable. 
+Make sure, your Redis allows at least 15 concurrent connections.
+Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
+
+### Running without Redis
+
+If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
+
+> **NOTE:** Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
+
+## Express
+
+Cube.js server is an Express application itself and it can be served as part of an existing Express application.
+Minimal setup for such serving looks as following:
+
+**index.js**
+```javascript
+require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const CubejsServerCore = require('@cubejs-backend/server-core');
+
+const app = express();
+app.use(require('cors')());
+app.use(bodyParser.json({ limit: '50mb' }));
+
+const serverCore = CubejsServerCore.create();
+serverCore.initApp(app);
+
+const port = process.env.PORT || 4000;
+app.listen(port, (err) => {
+  if (err) {
+    console.error('Fatal error during server start: ');
+    console.error(e.stack || e);
+  }
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+});
+```
+
+## Express with Basic Passport Authentication
+
+To serve simple dashboard application with minimal basic authentication security following setup can be used:
+
+**index.js**
+```javascript
+require('dotenv').config();
+const http = require('http');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const passport = require('passport');
+const serveStatic = require('serve-static');
+const path = require('path');
+const { BasicStrategy } = require('passport-http');
+const CubejsServerCore = require('@cubejs-backend/server-core');
+
+const app = express();
+app.use(require('cors')());
+app.use(cookieParser());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(session({ secret: process.env.CUBEJS_API_SECRET }));
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.use(new BasicStrategy(
+  (user, password, done) => {
+    if (user === 'admin' && password === 'admin') {
+      done(null, { user });
+    } else {
+      done(null, false);
+    }
+  }
+));
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
+
+app.get('/login', passport.authenticate('basic'), (req, res) => {
+  res.redirect('/')
+});
+
+app.use((req, res, next) => {
+  if (!req.user) {
+    res.redirect('/login');
+    return;
+  }
+  next();
+});
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
+}
+
+const serverCore = CubejsServerCore.create({
+  checkAuth: (req, auth) => {
+    if (!req.user) {
+      throw new Error(`Unauthorized`);
+    }
+    req.authInfo = { u: req.user };
+  }
+});
+
+serverCore.initApp(app);
+
+const port = process.env.PORT || 4000;
+const server = http.createServer(app);
+
+server.listen(port, (err) => {
+  if (err) {
+    console.error('Fatal error during server start: ');
+    console.error(e.stack || e);
+  }
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+});
+```
+
+Use **admin / admin** as **user / password** to access the dashboard.
 
 ## Serverless
 
@@ -194,12 +316,11 @@ FROM node:10-alpine
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-
 RUN npm install
-
 COPY . .
-
 EXPOSE 4000
+
+CMD ["index.js"]
 ```
 
 Example .dockerignore
@@ -208,7 +329,6 @@ Example .dockerignore
 node_modules
 npm-debug.log
 .env
-schema
 ```
 
 ### Build Docker image
@@ -219,13 +339,11 @@ $ docker build -t <YOUR-USERNAME>/cubejs-docker-demo .
 
 ### Run Docker image
 
-To run docker image, you need to set environment variables required by Cube.js Backend.
+To test just built docker image, you need to set environment variables required by Cube.js Backend.
 Generate a secret for JWT Tokens as described in [Security](/security) section and fill in database credentials.
-Also you need to provide a path to the directory with [Data schema](/getting-started-cubejs-schema) files.
 
 ```bash
-$ docker run -p 49160:8080 \
-  -d \
+$ docker --rm \
   --name cubejs-docker-demo \
   -e CUBEJS_API_SECRET=<YOUR-API-SECRET> \
   -e CUBEJS_DB_HOST=<YOUR-DB-HOST-HERE> \
@@ -233,7 +351,6 @@ $ docker run -p 49160:8080 \
   -e CUBEJS_DB_USER=<YOUR-DB-USER-HERE> \
   -e CUBEJS_DB_PASS=<YOUR-DB-PASS-HERE> \
   -e CUBEJS_DB_TYPE=postgres \
-  -v <PATH-TO-SCHEMA>:/usr/src/app/schema \
   <YOUR-USERNAME>/cubejs-docker-demo
 ```
 

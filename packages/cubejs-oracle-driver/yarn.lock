@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/query-orchestrator@^0.10.16":
-  version "0.10.16"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.10.16.tgz#207e1bc69f8f7e3aed3db970fd450528f08e079b"
-  integrity sha512-g+SWhZVQF4ux/HJeRZQ0+lRm8+Iy0Ink19oFqDiLrv1AhDAZ66VpAUM/NXMb5AbRdHH76yB2rvb2ZdT7PfOtIg==
+"@cubejs-backend/query-orchestrator@^0.17.10":
+  version "0.17.10"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.17.10.tgz#44604f30acee7c65a4dde92af662aad605d195af"
+  integrity sha512-hmNWfaFapKZPS4ePIYvjxMelUKd2KIPdLh0vikcdhVCj++M9+0fyFnEUvpoPdYjc8jciksVEfA7ehId0C6xE3Q==
   dependencies:
     ramda "^0.24.1"
     redis "^2.8.0"
@@ -14,18 +14,19 @@ double-ended-queue@^2.1.0-0:
   version "2.1.0-0"
   resolved "https://registry.yarnpkg.com/double-ended-queue/-/double-ended-queue-2.1.0-0.tgz#103d3527fd31528f40188130c841efdd78264e5c"
 
-oracledb@^3.1.2:
-  version "3.1.2"
-  resolved "https://registry.yarnpkg.com/oracledb/-/oracledb-3.1.2.tgz#4d7df7b8eda161d4e645837cd43c530232d139e8"
+oracledb@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/oracledb/-/oracledb-4.2.0.tgz#b4d97957d206f7c2d1c2286cc80e91ff2d45fce8"
+  integrity sha512-07ZylNcUB9wknsiRa7dNqDWgGK3loP8eNWuoCjsiCOZ19PA1g8QLu+0gah7ty82VXl/MOQYFCMl5OpjD9Aqjcw==
 
 ramda@^0.24.1:
   version "0.24.1"
   resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.24.1.tgz#c3b7755197f35b8dc3502228262c4c91ddb6b857"
 
-ramda@^0.26.1:
-  version "0.26.1"
-  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.26.1.tgz#8d41351eb8111c55353617fc3bbffad8e4d35d06"
-  integrity sha512-hLWjpy7EnsDBb0p+Z3B7rPi3GDeRG5ZtiI33kJhTt+ORCd38AbAIjB/9zRIUoeTbE/AVX5ZkU7m6bznsvrf8eQ==
+ramda@^0.27.0:
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.27.0.tgz#915dc29865c0800bf3f69b8fd6c279898b59de43"
+  integrity sha512-pVzZdDpWwWqEVVLshWUHjNwuVP7SfcmPraYuqocJp1yo2U1R7P+5QAfDhdItkuoGqIBnBYrtPp7rEPqDn9HlZA==
 
 redis-commands@^1.2.0:
   version "1.4.0"

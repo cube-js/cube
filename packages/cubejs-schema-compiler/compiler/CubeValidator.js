@@ -7,6 +7,7 @@ const timeInterval =
     Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
     Joi.any().valid('unbounded')
   ]);
+const everyInterval = Joi.string().regex(/^(\d+) (second|minute|hour|day|week)s?$/, 'refresh time interval');
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
@@ -60,25 +61,50 @@ const BaseMeasure = {
 };
 
 const BasePreAggregation = {
-  refreshKey: Joi.object().keys({
-    sql: Joi.func().required()
-  }),
+  refreshKey: Joi.alternatives().try(
+    Joi.object().keys({
+      sql: Joi.func().required()
+    }),
+    Joi.object().keys({
+      every: everyInterval,
+      incremental: Joi.boolean(),
+      updateWindow: timeInterval
+    })
+  ),
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
-  partitionGranularity: Joi.any().valid('day', 'week', 'month', 'year')
+  partitionGranularity: Joi.any().valid('day', 'week', 'month', 'year'),
+  scheduledRefresh: Joi.boolean(),
+  indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
+    Joi.object().keys({
+      sql: Joi.func().required()
+    }),
+    Joi.object().keys({
+      columns: Joi.func().required()
+    })
+  )),
 };
 
 const cubeSchema = Joi.object().keys({
   name: identifier,
   sql: Joi.func().required(),
-  refreshKey: Joi.object().keys({
-    sql: Joi.func().required()
-  }),
+  refreshKey: Joi.alternatives().try(
+    Joi.object().keys({
+      sql: Joi.func().required()
+    }),
+    Joi.object().keys({
+      immutable: Joi.boolean().required()
+    }),
+    Joi.object().keys({
+      every: everyInterval
+    })
+  ),
   fileName: Joi.string().required(),
   extends: Joi.func(),
   allDefinitions: Joi.func(),
   title: Joi.string(),
   sqlAlias: Joi.string(),
+  dataSource: Joi.string(),
   description: Joi.string(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
@@ -114,7 +140,7 @@ const cubeSchema = Joi.object().keys({
             ])
           })),
           else: Joi.object().keys({
-          label: Joi.alternatives([
+            label: Joi.alternatives([
               Joi.string(),
               Joi.object().keys({
                 sql: Joi.func().required()
@@ -147,26 +173,28 @@ const cubeSchema = Joi.object().keys({
     description: Joi.string()
   })),
   preAggregations: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
-    Joi.object().keys(Object.assign(BasePreAggregation, {
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('autoRollup').required(),
       maxPreAggregations: Joi.number()
     })),
-    Joi.object().keys(Object.assign(BasePreAggregation, {
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required()
     })),
-    Joi.object().keys(Object.assign(BasePreAggregation, {
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func()
     })),
-    Joi.object().keys(Object.assign(BasePreAggregation, {
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
       timeDimensionReference: Joi.func().required(),
-      granularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year').required()
+      granularity: Joi.any().valid(
+        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+      ).required()
     }))
   ))
 });
@@ -178,8 +206,8 @@ class CubeValidator {
   }
 
   compile(cubes, errorReporter) {
-    return this.cubeSymbols.cubeList.map((v) =>
-        this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
+    return this.cubeSymbols.cubeList.map(
+      (v) => this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
     );
   }
 

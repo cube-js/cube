@@ -1,5 +1,6 @@
 const R = require('ramda');
 const UserError = require('./UserError');
+const DynamicReference = require('./DynamicReference');
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s+|\(?(\w+)\)?\s+=>\s/;
 const CONTEXT_SYMBOLS = {
@@ -92,7 +93,11 @@ class CubeSymbols {
     const oldContext = this.resolveSymbolsCallContext;
     this.resolveSymbolsCallContext = context;
     try {
-      return func.apply(null, this.funcArguments(func).map((id) => nameResolver(id.trim())));
+      let res = func.apply(null, this.funcArguments(func).map((id) => nameResolver(id.trim())));
+      if (res instanceof DynamicReference) {
+        res = res.fn.apply(null, res.memberNames.map((id) => nameResolver(id.trim())));
+      }
+      return res;
     } finally {
       this.resolveSymbolsCallContext = oldContext;
     }

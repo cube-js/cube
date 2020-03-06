@@ -1,15 +1,24 @@
 const pg = require('pg');
+const { types } = require('pg');
 const moment = require('moment');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
 const { Pool } = pg;
 
 const GenericTypeToPostgres = {
-  string: 'text'
+  string: 'text',
+  double: 'decimal'
 };
 
-pg.types.setTypeParser(1114, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
-pg.types.setTypeParser(1184, str => moment.utc(str).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+const DataTypeMapping = {};
+Object.entries(types.builtins).forEach(pair => {
+  const [key, value] = pair;
+  DataTypeMapping[value] = key;
+});
+
+const timestampDataTypes = [1114, 1184];
+
+const timestampTypeParser = val => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 
 class PostgresDriver extends BaseDriver {
   constructor(config) {
@@ -42,19 +51,50 @@ class PostgresDriver extends BaseDriver {
     }
   }
 
-  async query(query, values) {
+  async queryResponse(query, values) {
     const client = await this.pool.connect();
     try {
       await client.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
       await client.query("set statement_timeout to 600000");
       const res = await client.query({
         text: query,
-        values: values || []
+        values: values || [],
+        types: {
+          getTypeParser: (dataType, format) => {
+            const isTimestamp = timestampDataTypes.indexOf(dataType) > -1;
+            let parser = types.getTypeParser(dataType, format);
+
+            if (isTimestamp) {
+              parser = timestampTypeParser;
+            }
+
+            return val => parser(val);
+          },
+        },
       });
-      return res && res.rows;
+      return res;
     } finally {
       await client.release();
     }
+  }
+
+  async query(query, values) {
+    return (await this.queryResponse(query, values)).rows;
+  }
+
+  async downloadQueryResults(query, values) {
+    const res = await this.queryResponse(query, values);
+    return {
+      rows: res.rows,
+      types: res.fields.map(f => ({
+        name: f.name,
+        type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+      })),
+    };
+  }
+
+  readOnly() {
+    return !!this.config.readOnly;
   }
 
   async uploadTable(table, columns, tableData) {

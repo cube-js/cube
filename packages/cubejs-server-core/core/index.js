@@ -3,10 +3,16 @@ const ApiGateway = require('@cubejs-backend/api-gateway');
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
+const LRUCache = require('lru-cache');
+const SqlString = require('sqlstring');
+const R = require('ramda');
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
+const RefreshScheduler = require('./RefreshScheduler');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
+const track = require('./track');
+const agentCollect = require('./agentCollect');
 
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
@@ -22,6 +28,8 @@ const DriverDependencies = {
   snowflake: '@cubejs-backend/snowflake-driver',
   prestodb: '@cubejs-backend/prestodb-driver',
   oracle: '@cubejs-backend/oracle-driver',
+  sqlite: '@cubejs-backend/sqlite-driver',
+  odelasticsearch: '@cubejs-backend/elasticsearch-driver',
 };
 
 const checkEnvForPlaceholders = () => {
@@ -41,17 +49,43 @@ const checkEnvForPlaceholders = () => {
   }
 };
 
-const devLogger = (level) => (type, message, error) => {
+const devLogger = (level) => (type, { error, warning, ...message }) => {
   const colors = {
     red: '31', // ERROR
     green: '32', // INFO
+    yellow: '33', // WARNING
   };
 
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
-  const format = json => JSON.stringify(json, null, 2);
+  const format = ({
+    queryKey, duration, allSqlLines, ...json
+  }) => {
+    const restParams = JSON.stringify(json, null, 2);
+    // TODO pre-aggregations queryKey format
+    if (queryKey && queryKey[0] && Array.isArray(queryKey[0]) && typeof queryKey[0][0] === 'string') {
+      [queryKey] = queryKey;
+    }
+    const durationStr = duration ? `(${duration}ms)` : '';
+    if (queryKey && typeof queryKey[0] === 'string') {
+      const queryMaxLines = 50;
+      let formatted = SqlString.format(queryKey[0], queryKey[1]).split('\n');
+      if (formatted.length > queryMaxLines && !allSqlLines) {
+        formatted = R.take(queryMaxLines / 2, formatted)
+          .concat(['.....', '.....', '.....'])
+          .concat(R.takeLast(queryMaxLines / 2, formatted));
+      }
+      return `${durationStr}\n${formatted.join('\n')}\n${restParams}`;
+    }
+    if (queryKey) {
+      return `${durationStr}\n${JSON.stringify(queryKey)}\n${restParams}`; // TODO format
+    }
+    return `${durationStr}\n${restParams}`;
+  };
 
-  const logError = () => console.log(`${withColor(type, colors.red)}: ${format(message)} \n${error}`);
-  const logType = () => console.log(`${withColor(type)}`);
+  const logWarning = () => console.log(
+    `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true })} \n${withColor(warning, colors.yellow)}`
+  );
+  const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true })} \n${error}`);
   const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
 
   if (error) {
@@ -59,22 +93,74 @@ const devLogger = (level) => (type, message, error) => {
     return;
   }
 
-  switch (level) {
-    case "ERROR":
-      logType();
-      break;
-    case "TRACE":
-      logDetails();
-      break;
-    case "INFO":
-    default: {
-      if ([
-        'Load Request',
+  // eslint-disable-next-line default-case
+  switch ((level || 'info').toLowerCase()) {
+    case "trace": {
+      if (!error && !warning) {
+        logDetails();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "info": {
+      if (!error && !warning && [
         'Load Request Success',
         'Performing query',
         'Performing query completed',
       ].includes(type)) {
         logDetails();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "warn": {
+      if (!error && warning) {
+        logWarning();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "error": {
+      if (error) {
+        logError();
+        break;
+      }
+    }
+  }
+};
+
+const prodLogger = (level) => (msg, params) => {
+  const { error, warning } = params;
+
+  const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
+  // eslint-disable-next-line default-case
+  switch ((level || 'warn').toLowerCase()) {
+    case "trace": {
+      if (!error && !warning) {
+        logMessage();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "info":
+      if ([
+        'REST API Request',
+      ].includes(msg)) {
+        logMessage();
+        break;
+      }
+    // eslint-disable-next-line no-fallthrough
+    case "warn": {
+      if (!error && warning) {
+        logMessage();
+        break;
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case "error": {
+      if (error) {
+        logMessage();
+        break;
       }
     }
   }
@@ -104,14 +190,11 @@ class CubejsServerCore {
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || 'schema';
     this.dbType = options.dbType;
-    this.logger = options.logger || ((msg, params) => {
-      const { error, ...restParams } = params;
-      if (process.env.NODE_ENV !== 'production') {
-        devLogger(process.env.CUBEJS_LOG_LEVEL)(msg, restParams, error);
-      } else {
-        console.log(JSON.stringify({ message: msg, ...params }));
-      }
-    });
+    this.logger = options.logger ||
+      (process.env.NODE_ENV !== 'production' ?
+        devLogger(process.env.CUBEJS_LOG_LEVEL) :
+        prodLogger(process.env.CUBEJS_LOG_LEVEL)
+      );
     this.repository = new FileRepository(this.schemaPath);
     this.repositoryFactory = options.repositoryFactory || (() => this.repository);
     this.contextToDbType = typeof options.dbType === 'function' ? options.dbType : () => options.dbType;
@@ -120,18 +203,32 @@ class CubejsServerCore {
       () => options.externalDbType;
     this.preAggregationsSchema =
       typeof options.preAggregationsSchema === 'function' ? options.preAggregationsSchema : () => options.preAggregationsSchema;
-    this.appIdToCompilerApi = {};
-    this.appIdToOrchestratorApi = {};
+    this.compilerCache = new LRUCache({
+      max: options.compilerCacheSize || 250,
+      maxAge: options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+    });
+    this.dataSourceIdToOrchestratorApi = {};
     this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
+    this.contextToDataSourceId = options.contextToDataSourceId || this.defaultContextToDataSourceId.bind(this);
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
         options.orchestratorOptions :
         () => options.orchestratorOptions;
 
-    const Analytics = require('analytics-node');
-    const client = new Analytics('dSR8JiNYIGKyQHKid9OaLYugXLao18hA', { flushInterval: 100 });
+    // proactively free up old cache values occassionally
+    if (options.maxCompilerCacheKeepAlive) {
+      setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
+    }
+
+    if (options.scheduledRefreshTimer) {
+      setInterval(
+        () => this.runScheduledRefresh(),
+        typeof options.scheduledRefreshTimer === 'number' ? (options.scheduledRefreshTimer * 1000) : 5000
+      );
+    }
+
     const { machineIdSync } = require('node-machine-id');
-    const { promisify } = require('util');
     let anonymousId = 'unknown';
     try {
       anonymousId = machineIdSync();
@@ -154,20 +251,19 @@ class CubejsServerCore {
             // console.error(e);
           }
         }
-        await promisify(client.track.bind(client))({
+        await track({
           event: name,
           anonymousId,
-          properties: {
-            projectFingerprint: this.projectFingerprint,
-            coreServerVersion: this.coreServerVersion,
-            ...props
-          }
+          projectFingerprint: this.projectFingerprint,
+          coreServerVersion: this.coreServerVersion,
+          ...props
         });
-        await promisify(client.flush.bind(client))();
       } catch (e) {
         // console.error(e);
       }
     };
+
+    this.initAgent();
 
     if (this.options.devServer) {
       this.devServer = new DevServer(this);
@@ -180,7 +276,8 @@ class CubejsServerCore {
           msg === 'Internal Server Error' ||
           msg === 'User Error' ||
           msg === 'Compiling schema' ||
-          msg === 'Recompiling schema'
+          msg === 'Recompiling schema' ||
+          msg === 'Slow Query Warning'
         ) {
           this.event(msg, { error: params.error });
         }
@@ -224,6 +321,23 @@ class CubejsServerCore {
     }
   }
 
+  initAgent() {
+    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+      const oldLogger = this.logger;
+      this.logger = (msg, params) => {
+        oldLogger(msg, params);
+        agentCollect(
+          {
+            msg,
+            ...params
+          },
+          process.env.CUBEJS_AGENT_ENDPOINT_URL,
+          oldLogger
+        );
+      };
+    }
+  }
+
   static create(options) {
     return new CubejsServerCore(options);
   }
@@ -234,6 +348,11 @@ class CubejsServerCore {
     apiGateway.initApp(app);
     if (this.options.devServer) {
       this.devServer.initDevEnv(app);
+    } else {
+      app.get('/', (req, res) => {
+        res.status(200)
+          .send(`<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment#production-mode">Learn more about production mode</a>.</body></html>`);
+      });
     }
   }
 
@@ -253,7 +372,9 @@ class CubejsServerCore {
           basePath: this.options.basePath,
           checkAuthMiddleware: this.options.checkAuthMiddleware,
           checkAuth: this.options.checkAuth,
-          queryTransformer: this.options.queryTransformer
+          queryTransformer: this.options.queryTransformer,
+          extendContext: this.options.extendContext,
+          refreshScheduler: () => new RefreshScheduler(this)
         }
       );
     }
@@ -262,28 +383,38 @@ class CubejsServerCore {
 
   getCompilerApi(context) {
     const appId = this.contextToAppId(context);
-    if (!this.appIdToCompilerApi[appId]) {
-      this.appIdToCompilerApi[appId] = this.createCompilerApi(
+    let compilerApi = this.compilerCache.get(appId);
+    const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
+    if (!compilerApi) {
+      compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
-          dbType: this.contextToDbType(context),
+          dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
-          schemaVersion: this.options.schemaVersion && (() => this.options.schemaVersion(context)),
-          preAggregationsSchema: this.preAggregationsSchema(context)
+          schemaVersion: currentSchemaVersion,
+          preAggregationsSchema: this.preAggregationsSchema(context),
+          context
         }
       );
+      this.compilerCache.set(appId, compilerApi);
     }
-    return this.appIdToCompilerApi[appId];
+
+    compilerApi.schemaVersion = currentSchemaVersion;
+    return compilerApi;
+  }
+
+  defaultContextToDataSourceId(context) {
+    return `${this.contextToAppId(context)}_${context.dataSource}`;
   }
 
   getOrchestratorApi(context) {
-    const appId = this.contextToAppId(context);
-    if (!this.appIdToOrchestratorApi[appId]) {
+    const dataSourceId = this.contextToDataSourceId(context);
+    if (!this.dataSourceIdToOrchestratorApi[dataSourceId]) {
       let driverPromise;
       let externalPreAggregationsDriverPromise;
-      this.appIdToOrchestratorApi[appId] = this.createOrchestratorApi({
-        getDriver: () => {
+      this.dataSourceIdToOrchestratorApi[dataSourceId] = this.createOrchestratorApi({
+        getDriver: async () => {
           if (!driverPromise) {
-            const driver = this.driverFactory(context);
+            const driver = await this.driverFactory(context);
             driverPromise = driver.testConnection().then(() => driver).catch(e => {
               driverPromise = null;
               throw e;
@@ -291,9 +422,9 @@ class CubejsServerCore {
           }
           return driverPromise;
         },
-        getExternalDriverFactory: () => {
+        getExternalDriverFactory: async () => {
           if (!externalPreAggregationsDriverPromise) {
-            const driver = this.externalDriverFactory(context);
+            const driver = await this.externalDriverFactory(context);
             externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
               externalPreAggregationsDriverPromise = null;
               throw e;
@@ -301,11 +432,11 @@ class CubejsServerCore {
           }
           return externalPreAggregationsDriverPromise;
         },
-        redisPrefix: appId,
+        redisPrefix: dataSourceId,
         orchestratorOptions: this.orchestratorOptions(context)
       });
     }
-    return this.appIdToOrchestratorApi[appId];
+    return this.dataSourceIdToOrchestratorApi[dataSourceId];
   }
 
   createCompilerApi(repository, options) {
@@ -316,7 +447,8 @@ class CubejsServerCore {
       logger: this.logger,
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
-      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey
+      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey,
+      compileContext: options.context
     });
   }
 
@@ -327,6 +459,11 @@ class CubejsServerCore {
       externalDriverFactory: options.getExternalDriverFactory,
       ...(options.orchestratorOptions || this.options.orchestratorOptions)
     });
+  }
+
+  async runScheduledRefresh(context, queryingOptions) {
+    const scheduler = new RefreshScheduler(this);
+    await scheduler.runScheduledRefresh(context, queryingOptions);
   }
 
   async getDriver() {
@@ -349,6 +486,25 @@ class CubejsServerCore {
       throw new Error(`Unsupported db type: ${dbType}`);
     }
     return DriverDependencies[dbType];
+  }
+
+  testConnections() {
+    const tests = [];
+    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
+      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
+      tests.push(orchestratorApi.testConnection());
+    });
+    return Promise.all(tests);
+  }
+
+  async releaseConnections() {
+    const releases = [];
+    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
+      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
+      releases.push(orchestratorApi.release());
+    });
+    await Promise.all(releases);
+    this.dataSourceIdToOrchestratorApi = {};
   }
 }
 

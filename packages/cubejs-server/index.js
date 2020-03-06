@@ -83,6 +83,14 @@ class CubejsServer {
     }
   }
 
+  testConnections() {
+    return this.core.testConnections();
+  }
+
+  runScheduledRefresh(context, queryingOptions) {
+    return this.core.runScheduledRefresh(context, queryingOptions);
+  }
+
   async close() {
     try {
       if (this.socketServer) {
@@ -97,6 +105,7 @@ class CubejsServer {
         await this.redirector.close();
         this.redirector = null;
       }
+      await this.core.releaseConnections();
     } catch (e) {
       if (this.core.event) {
         await this.core.event("Dev Server Fatal Error", {

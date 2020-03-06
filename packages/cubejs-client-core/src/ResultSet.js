@@ -19,9 +19,15 @@ const TIME_SERIES = {
     .map(d => d.format('YYYY-01-01T00:00:00.000')),
   hour: (range) => Array.from(range.by('hour'))
     .map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
+  minute: (range) => Array.from(range.by('minute'))
+    .map(d => d.format('YYYY-MM-DDTHH:mm:00.000')),
+  second: (range) => Array.from(range.by('second'))
+    .map(d => d.format('YYYY-MM-DDTHH:mm:ss.000')),
   week: (range) => Array.from(range.snapTo('isoweek').by('week'))
     .map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
 };
+
+const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 /**
  * Provides a convenient interface for data manipulation.
@@ -31,9 +37,41 @@ class ResultSet {
     this.loadResponse = loadResponse;
   }
 
+  /**
+   * Returns an array of series with key, title and series data.
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-12-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.series() will return
+   * [
+   *   {
+   *     "key":"Stories.count",
+   *     "title": "Stories Count",
+   *     "series": [
+   *       { "x":"2015-01-01T00:00:00", "value": 27120 },
+   *       { "x":"2015-02-01T00:00:00", "value": 25861 },
+   *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+   *       //...
+   *     ]
+   *   }
+   * ]
+   * ```
+   * @param pivotConfig
+   * @returns {Array}
+   */
   series(pivotConfig) {
     return this.seriesNames(pivotConfig).map(({ title, key }) => ({
       title,
+      key,
       series: this.chartPivot(pivotConfig).map(({ category, x, ...obj }) => ({ value: obj[key], category, x }))
     }));
   }
@@ -63,20 +101,38 @@ class ResultSet {
     return axisValues.map(formatValue).join(delimiter || ', ');
   }
 
+  static timeDimensionMember(td) {
+    return `${td.dimension}.${td.granularity}`;
+  }
+
   normalizePivotConfig(pivotConfig) {
     const { query } = this.loadResponse;
     const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+    const dimensions = query.dimensions || [];
     pivotConfig = pivotConfig || (timeDimensions.length ? {
-      x: timeDimensions.map(td => td.dimension),
-      y: query.dimensions || []
+      x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
+      y: dimensions
     } : {
-      x: query.dimensions || [],
+      x: dimensions,
       y: []
     });
-    pivotConfig.x = pivotConfig.x || [];
-    pivotConfig.y = pivotConfig.y || [];
+
+    const substituteTimeDimensionMembers = axis => axis.map(
+      subDim => (
+        (
+          timeDimensions.find(td => td.dimension === subDim) &&
+          !dimensions.find(d => d === subDim)
+        ) ?
+          ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
+          subDim
+      )
+    );
+
+    pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
+    pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
+
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
-    const allDimensions = timeDimensions.map(td => td.dimension).concat(query.dimensions);
+    const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
     pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(d => allIncludedDimensions.indexOf(d) === -1));
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y = pivotConfig.y.concat(['measures']);
@@ -102,9 +158,12 @@ class ResultSet {
     let { dateRange } = timeDimension;
     if (!dateRange) {
       const dates = pipe(
-        map(row => row[timeDimension.dimension] && moment(row[timeDimension.dimension])),
+        map(
+          row => row[ResultSet.timeDimensionMember(timeDimension)] &&
+            moment(row[ResultSet.timeDimensionMember(timeDimension)])
+        ),
         filter(r => !!r)
-      )(this.loadResponse.data);
+      )(this.timeDimensionBackwardCompatibleData());
 
       dateRange = dates.length && [
         reduce(minBy(d => d.toDate()), dates[0], dates),
@@ -114,8 +173,11 @@ class ResultSet {
     if (!dateRange) {
       return null;
     }
-    const start = moment(dateRange[0]).format('YYYY-MM-DD 00:00:00');
-    const end = moment(dateRange[1]).format('YYYY-MM-DD 23:59:59');
+    const padToDay = timeDimension.dateRange ?
+      timeDimension.dateRange.find(d => d.match(DateRegex)) :
+      ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
+    const start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+    const end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
     const range = moment.range(start, end);
     if (!TIME_SERIES[timeDimension.granularity]) {
       throw new Error(`Unsupported time granularity: ${timeDimension.granularity}`);
@@ -135,7 +197,9 @@ class ResultSet {
       pivotConfig.x.length === 1 &&
       equals(
         pivotConfig.x,
-        (this.loadResponse.query.timeDimensions || []).filter(td => !!td.granularity).map(td => td.dimension)
+        (this.loadResponse.query.timeDimensions || [])
+          .filter(td => !!td.granularity)
+          .map(td => ResultSet.timeDimensionMember(td))
       )
     ) {
       const series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
@@ -159,7 +223,7 @@ class ResultSet {
       unnest,
       groupByXAxis,
       toPairs
-    )(this.loadResponse.data);
+    )(this.timeDimensionBackwardCompatibleData());
 
     const allYValues = pipe(
       map(
@@ -262,7 +326,7 @@ class ResultSet {
    * @returns {Array} of pivoted rows
    */
   tablePivot(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const valueToObject =
       (valuesArray, measureValue) => (
         (field, index) => ({
@@ -297,8 +361,8 @@ class ResultSet {
    *
    * // ResultSet.tableColumns() will return
    * [
-   *   { key: "Stories.time", title: "Stories Time" },
-   *   { key: "Stories.count", title: "Stories Count" },
+   *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
+   *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
    *   //...
    * ]
    * ```
@@ -309,13 +373,21 @@ class ResultSet {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const column = field => (
       field === 'measures' ?
-        (this.query().measures || []).map(m => ({ key: m, title: this.loadResponse.annotation.measures[m].title })) :
+        (this.query().measures || []).map(m => ({
+          key: m,
+          title: this.loadResponse.annotation.measures[m].title,
+          shortTitle: this.loadResponse.annotation.measures[m].shortTitle,
+        })) :
         [{
           key: field,
           title: (
             this.loadResponse.annotation.dimensions[field] ||
             this.loadResponse.annotation.timeDimensions[field]
-          ).title
+          ).title,
+          shortTitle: (
+            this.loadResponse.annotation.dimensions[field] ||
+            this.loadResponse.annotation.timeDimensions[field]
+          ).shortTitle
         }]
     );
     return normalizedPivotConfig.x.map(column)
@@ -355,7 +427,9 @@ class ResultSet {
    */
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.loadResponse.data).map(axisValues => ({
+    return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(
+      this.timeDimensionBackwardCompatibleData()
+    ).map(axisValues => ({
       title: this.axisValuesString(pivotConfig.y.find(d => d === 'measures') ?
         dropLast(1, axisValues)
           .concat(this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) :
@@ -370,6 +444,28 @@ class ResultSet {
 
   rawData() {
     return this.loadResponse.data;
+  }
+
+  timeDimensionBackwardCompatibleData() {
+    if (!this.backwardCompatibleData) {
+      const { query } = this.loadResponse;
+      const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+      this.backwardCompatibleData = this.loadResponse.data.map(row => (
+        {
+          ...row,
+          ...(
+            Object.keys(row)
+              .filter(
+                field => timeDimensions.find(d => d.dimension === field) &&
+                  !row[ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field))]
+              ).map(field => ({
+                [ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field))]: row[field]
+              })).reduce((a, b) => ({ ...a, ...b }), {})
+          )
+        }
+      ));
+    }
+    return this.backwardCompatibleData;
   }
 }
 

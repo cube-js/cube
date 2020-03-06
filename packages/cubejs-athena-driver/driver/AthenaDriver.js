@@ -41,7 +41,6 @@ class AthenaDriver extends BaseDriver {
         toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
       } : s))
     );
-    console.log(queryString);
     const { QueryExecutionId } = await this.athena.startQueryExecutionAsync({
       QueryString: queryString,
       ResultConfiguration: {

@@ -1,0 +1,50 @@
+{
+  "name": "dashboard-app",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@cubejs-client/core": "^0.13.5",
+    "@cubejs-client/react": "^0.13.0",
+    "@material-ui/core": "^4.7.2",
+    "@material-ui/icons": "^4.5.1",
+    "@testing-library/jest-dom": "^4.2.4",
+    "@testing-library/react": "^9.3.2",
+    "@testing-library/user-event": "^7.1.2",
+    "antd": "^3.26.2",
+    "d3": "^5.14.2",
+    "prop-types": "^15.7.2",
+    "react": "^16.12.0",
+    "react-dom": "^16.12.0",
+    "react-router": "^5.1.2",
+    "react-router-dom": "^5.1.2",
+    "react-scripts": "3.3.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "cubejsTemplates": {
+    "create-react-app": "0.0.1",
+    "react-material-static": "0.0.1",
+    "credentials": "0.0.1",
+    "d3-charts": "0.0.1",
+    "material-tables": "0.0.1"
+  }
+}

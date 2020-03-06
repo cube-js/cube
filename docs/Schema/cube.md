@@ -121,7 +121,7 @@ cube(`OrderFacts`, {
 cube(`ExtendedOrderFacts`, {
   extends: OrderFacts,
 
-  measure: {
+  measures: {
     doubleCount: {
       type: `number`,
       sql: `${count} * 2`
@@ -141,15 +141,14 @@ If the `refreshKey` is not set, Cube.js will use the default strategy:
 3. Check the `max` of any existing time dimension, if none exist…
 4. Check the row count for this cube.
 
-The result of the `refreshKey` query itself is cached for 2 minutes by default. You can
-change it by passing the [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) option when configuring the Cube.js Server.
+The result of the default `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default. 
 
 You can use an existing timestamp from your tables. Make sure to select max
 timestamp in that case.
 
 ```javascript
 cube(`OrderFacts`, {
-  sql: `SELECT * FROM orders`
+  sql: `SELECT * FROM orders`,
 
   refreshKey: {
     sql: `SELECT MAX(created_at) FROM orders`
@@ -157,17 +156,66 @@ cube(`OrderFacts`, {
 });
 ```
 
-Or you can set it to be refreshed, for example every hour.
+You can use interval based `refreshKey`.
+For example:
 
 ```javascript
 cube(`OrderFacts`, {
-  sql: `SELECT * FROM orders`
+  sql: `SELECT * FROM orders`,
 
   refreshKey: {
-    sql: `SELECT date_trunc('hour', NOW())`
+    every: `1 hour`
   }
 });
 ```
+
+Available interval granularities are: `second`, `minute`, `hour`, `day` and `week`.
+Such `refreshKey` is just a syntactic sugar over `refreshKey` SQL. 
+It's guaranteed that `refreshKey` change it's value at least once during `every` interval.
+It will be converted to appropriate SQL select which value will change over time based on interval value.
+Values of interval based `refreshKey` are tried to be checked ten times within defined interval but not more than once per `1 second` and not less than once per `5 minute`.
+For example if interval is `10 minute` it's `refreshKeyRenewalThreshold` will be 60 seconds and generated `refreshKey` SQL (Postgres) would be:
+```sql
+SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 600)
+```
+
+For `5 second` interval `refreshKeyRenewalThreshold` will be just 1 second and SQL will be
+```sql
+SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
+```
+
+### dataSource
+
+Each cube in schema can have it's own `dataSource` name to support scenarios where data should be fetched from multiple databases.
+Value of `dataSource` parameter will be passed to [dbType](@cubejs-backend-server-core#options-reference-db-type) and 
+[driverFactory](@cubejs-backend-server-core#options-reference-driver-factory) functions as part of context param.
+By default each cube has a `default` value for it's `dataSource`.
+To override it you can use:
+
+```javascript
+cube(`OrderFacts`, {
+  sql: `SELECT * FROM orders`,
+  
+  dataSource: `prod_db`
+});
+```
+
+### sqlAlias
+
+Use `sqlAlias` when auto-generated cube alias prefix is too long and truncated by DB such as Postgres:
+
+```javascript
+cube(`OrderFacts`, {
+  sql: `SELECT * FROM orders`,
+  
+  sqlAlias: `ofacts`,
+  
+  // ...
+});
+```
+
+It'll generate aliases for members such as `ofacts__count`.
+
 
 ## Context Variables
 
@@ -187,6 +235,12 @@ examples below.
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders WHERE ${FILTER_PARAMS.OrderFacts.date.filter('date')}`,
+  
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
 
   dimensions: {
     date: {
@@ -203,7 +257,18 @@ This will generate the following SQL:
 SELECT * FROM orders WHERE date >= '2018-01-01 00:00:00' and date <= '2018-12-31 23:59:59'
 ```
 
-for the `['2018-01-01', '2018-12-31']` date range passed for the `OrderFacts.date` dimension.
+for the `['2018-01-01', '2018-12-31']` date range passed for the `OrderFacts.date` dimension as in following query:
+
+```javascript
+{
+  measures: ['OrderFacts.count'],
+  timeDimensions: [{
+    dimension: 'OrderFacts.date',
+    granularity: 'day',
+    dateRange: ['2018-01-01', '2018-12-31']
+  }]
+}
+```
 
 You can also pass a function instead of an SQL expression as a `filter()` argument.
 This way you can add BigQuery sharding filtering for events, which will reduce your billing cost.
@@ -243,5 +308,62 @@ cube(`Orders`, {
       type: `time`
     }
   }
+});
+```
+
+### Unsafe Value
+
+> **NOTE:** Use of this feature entails SQL injection security risk. Use it with caution.
+
+You can access values of context variables directly in javascript in order to use it during your SQL generation.
+For example:
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM ${USER_CONTEXT.type.unsafeValue() === 'employee' ? 'employee' : 'public'}.orders`,
+
+  dimensions: {
+    date: {
+      sql: `date`,
+      type: `time`
+    }
+  }
+});
+```
+
+### SQL Utils
+#### convertTz
+
+In case you need to convert your timestamp to user request timezone in cube or member SQL you can use `SQL_UTILS.convertTz()` method:
+
+```javascript
+cube(`visitors`, {
+  // ...
+
+  dimensions: {
+    createdAtConverted: {
+      type: 'time',
+      sql: SQL_UTILS.convertTz(`created_at`)
+    },
+  }
+})
+```
+
+### Compile context
+
+There's global `COMPILE_CONTEXT` that captured as [RequestContext](@cubejs-backend-server-core#request-context) at the time of schema compilation.
+It contains `authInfo` and any other variables provided by [extendContext](@cubejs-backend-server-core#options-reference-extend-context).
+
+> **NOTE:** While `authInfo` defined in `COMPILE_CONTEXT` it doesn't change it's value for different users. It may change however for different tenants.
+
+```javascript
+const { authInfo: { deploymentId } } = COMPILE_CONTEXT;
+
+const schemaName = `user_${deploymentId}`;
+
+cube(`Users`, {
+  sql: `select * from ${schemaName}.users`,
+  
+  // ...
 });
 ```

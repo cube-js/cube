@@ -8,8 +8,9 @@ const CubeEvaluator = require('./CubeEvaluator');
 const ContextEvaluator = require('./ContextEvaluator');
 const DashboardTemplateEvaluator = require('./DashboardTemplateEvaluator');
 const JoinGraph = require('./JoinGraph');
-const QueryBuilder = require('../adapter/QueryBuilder');
 const Funnels = require('../extensions/Funnels');
+const RefreshKeys = require('../extensions/RefreshKeys');
+const Reflection = require('../extensions/Reflection');
 const CubeToMetaTransformer = require('./CubeToMetaTransformer');
 
 exports.compile = (repo, options) => {
@@ -27,12 +28,7 @@ exports.prepareCompiler = (repo, options) => {
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
   const dashboardTemplateEvaluator = new DashboardTemplateEvaluator(cubeEvaluator);
-  const query = QueryBuilder.query(
-    { cubeEvaluator, joinGraph },
-    options.adapter,
-    {}
-  );
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph, query);
+  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const compiler = new DataSchemaCompiler(repo, Object.assign({}, {
     cubeNameCompilers: [cubeDictionary],
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
@@ -42,8 +38,11 @@ exports.prepareCompiler = (repo, options) => {
     dashboardTemplateCompilers: [dashboardTemplateEvaluator],
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     extensions: {
-      Funnels
-    }
+      Funnels,
+      RefreshKeys,
+      Reflection
+    },
+    compileContext: options.compileContext
   }, options));
   return {
     compiler,

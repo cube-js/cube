@@ -2,9 +2,11 @@ const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_TO_INTERVAL = {
-  date: 'DAY',
+  day: 'DAY',
   week: 'WEEK(MONDAY)',
   hour: 'HOUR',
+  minute: 'MINUTE',
+  second: 'SECOND',
   month: 'MONTH',
   year: 'YEAR'
 };
@@ -92,8 +94,20 @@ class BigqueryQuery extends BaseQuery {
     return `DATETIME_ADD(${date}, INTERVAL ${interval})`;
   }
 
+  subtractTimestampInterval(date, interval) {
+    return `TIMESTAMP_SUB(${date}, INTERVAL ${interval})`;
+  }
+
+  addTimestampInterval(date, interval) {
+    return `TIMESTAMP_ADD(${date}, INTERVAL ${interval})`;
+  }
+
   nowTimestampSql() {
     return `CURRENT_TIMESTAMP()`;
+  }
+
+  unixTimestampSql() {
+    return `UNIX_SECONDS(${this.nowTimestampSql()})`;
   }
 
   preAggregationLoadSql(cube, preAggregation, tableName) {
@@ -114,6 +128,10 @@ class BigqueryQuery extends BaseQuery {
 
   concatStringsSql(strings) {
     return `CONCAT(${strings.join(", ")})`;
+  }
+
+  defaultRefreshKeyRenewalThreshold() {
+    return 120;
   }
 }
 

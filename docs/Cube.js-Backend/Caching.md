@@ -8,6 +8,8 @@ menuOrder: 4
 Cube.js provides a two-level caching system. The first level is **in-memory** cache and is active by default. In-memory cache
 requires [Redis](https://redis.io) in [production mode](deployment).
 
+Cube.js [in-memory cache](#in-memory-cache) suits mostly as a protection layer for your database when there's a burst of requests hitting the same data from multiple concurrent users while [pre-aggregations](#pre-aggregations) are designed to provide right balance between time to insight and querying performance.
+
 To reset **in-memory** cache in development mode just restart the server.
 
 The second in-database level is called **pre-aggregations** and requires explicit configuration to activate.
@@ -17,10 +19,11 @@ The second in-database level is called **pre-aggregations** and requires explici
 Cube.js caches the results of executed queries using in-memory cache. The cache
 key is generated SQL with any existing query dependent pre-aggregations.
 
-Upon incoming request Cube.js first checks the cache using this key. If nothing
-is found it executes the query in database, returns result back alongside writing to the cache.
-If Cube.js detects existing cache entry for the key it schedules a background cache refresh check.
-
+Upon incoming request Cube.js first checks the cache using this key. 
+If nothing is found it executes the query in database, returns result back alongside writing to the cache.
+Since 0.15.0 in case there's an existing value in cache it will be returned only if `refreshKey` value for query isn't changed.
+Otherwise [query renewal](#in-memory-cache-force-query-renewal) will be performed.
+If you want to revert to the background renew behavior that was a default one before 0.15.0 please see [backgroundRenew](@cubejs-backend-server-core#options-reference-orchestrator-options).
 
 ### Refresh Keys
 
@@ -30,10 +33,12 @@ So, Cube.js defines a `refreshKey` for each cube. [refreshKeys](cube#parameters-
 
 __Note__: Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
 
-When a query's result needs to be refreshed, Cube.js will re-execute the query in the background and repopulate the cache. This means that cached results may still be served to users requesting them while this query is being re-run. The cache entry will be refreshed in the background if one of the two following conditions is met:
+When a query's result needs to be refreshed, Cube.js will re-execute the query in the foreground and repopulate the cache. 
+This means that cached results may still be served to users requesting them while `refreshKey` values aren't changed from Cube.js perspective. 
+The cache entry will be refreshed in the foreground if one of the two following conditions is met:
 
-- Query cache entry is expired. The default expiration time is 6 hours.
-- The result of the `refreshKey` SQL query is different from the previous one.
+- Query cache entry is expired. The default expiration time is 6 hours for cubes with default `refreshKey` and 24 hours where it was set.
+- The result of the `refreshKey` SQL query is different from the previous one. At this stage `refreshKey` won't be refreshed in foreground if it's available in cache. 
 
 ### Refresh Key Implementation
 
@@ -52,7 +57,9 @@ You can set up a custom refresh check SQL by changing [refreshKey](cube#paramete
 
 In these instances, Cube.js needs a query crafted to detect updates to the rows that power the cubes. Often, a `MAX(updated_at_timestamp)` for OLTP data will accomplish this, or examining a metadata table for whatever system is managing the data to see when it last ran.
 
-Note that the result of `refreshKey` query itself is cached for 2 minutes by default. You can change it by passing [refreshKeyRenewalThreshold](@cubejs-backend-server-core#options-reference-orchestrator-options) option when configuring Cube.js Server. This cache is useful so that Cube.js can build query result cache keys without issuing database queries and respond to cached requests very quickly.
+Note that the result of `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default. 
+You can change it by passing [refreshKey every](cube#parameters-refresh-key) parameter. 
+This cache is useful so that Cube.js can build query result cache keys without issuing database queries and respond to cached requests very quickly.
 
 ### Force Query Renewal
 
@@ -68,15 +75,9 @@ If you need to force a specific query to load fresh data from the database (if i
 
 The `renewQuery` option applies to the `refreshKey` caching system mentioned above, *not* the actual query result cache. If `renewQuery` is passed, Cube.js will always re-execute the `refreshKey` query, skipping that layer of caching, but, if the result of the `refreshKey` query is the same as the last time it ran, that indicates any current query result cache entries are valid, and they will be served. This means that cached data may still be served by Cube.js even if `renewQuery` is passed. This is a good thing: if the underlying data hasn't changed, the expensive query doesn't need to be re-run, and the database doesn't have to work as hard. This does mean that the `refreshKey` SQL must accurately report data freshness for the `renewQuery` to actually work and renew the query.
 
-For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately. For these situtations, you can mostly disable the `refreshKey` cache by setting the [refreshKeyRenewalThreshold](@cubejs-backend-server-core#cubejs-server-core-create-options-orchestrator-options) to something very low, like `1`. This means Cube.js will always check the data freshness before executing a query, and notice any changed data underneath.
-
-### Keeping Cache Up-to-Date
-
-Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
-In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
-For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
-If you want to continously look for a new data you can use [Real Time Data Fetch](real-time-data-fetch) for that.
-Please note `renewQuery` also triggers pre-aggregations refresh as well.
+For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately. 
+For these situations, you can mostly disable the `refreshKey` cache by setting the [refreshKey every](cube#parameters-refresh-key) parameter to something very low, like `1 second`. 
+This means Cube.js will always check the data freshness before executing a query, and notice any changed data underneath.
 
 ## Pre-Aggregations
 
@@ -97,36 +98,99 @@ reference.](pre-aggregations)
 
 
 ```javascript
-preAggregations: {
-  amountByCreated: {
-    type: `rollup`,
-    measureReferences: [amount],
-    timeDimensionReference: createdAt,
-    granularity: `month`
+cube(`Orders`, {
+  // ...
+  
+  preAggregations: {
+    amountByCreated: {
+      type: `rollup`,
+      measureReferences: [amount],
+      timeDimensionReference: createdAt,
+      granularity: `month`
+    }
   }
-}
+});
 ```
 
 ### Refresh Strategy
+ 
+Refresh strategy can be customized by setting the [refreshKey](pre-aggregations#refresh-key) property for the pre-aggregation.
 
-If 2 minutes passed since last `refreshKey` query renew Cube.js will initiate the refresh check. 
-Refresh strategy could be customized by setting the `refreshKey` property
-for the pre-aggregation.
+The default value of the `refreshKey` is the same as for cube that defines pre-aggregation.
 
-The default value of the `refreshKey` is `select date_trunc('hour', now())`. It means
-that by default pre-aggregations would refresh **every hour**.
+It can be redefined either by providing SQL
 
 ```javascript
-preAggregations: {
-  amountByCreated: {
-    type: `rollup`,
-    measureReferences: [amount],
-    timeDimensionReference: createdAt,
-    granularity: `month`,
-    refreshKey: {
-      sql: `SELECT MAX(created_at) FROM orders`
+cube(`Orders`, {
+  // ...
+  
+  preAggregations: {
+    amountByCreated: {
+      type: `rollup`,
+      measureReferences: [amount],
+      timeDimensionReference: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
     }
   }
-}
+});
 ```
 
+or by providing refresh time interval
+
+```javascript
+cube(`Orders`, {
+  // ...
+  
+  preAggregations: {
+    amountByCreated: {
+      type: `rollup`,
+      measureReferences: [amount],
+      timeDimensionReference: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        every: `12 hour`
+      }
+    }
+  }
+});
+```
+
+## Keeping Cache Up-to-Date
+
+Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
+In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
+For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
+If you want to continously look for a new data you can use [Real Time Data Fetch](real-time-data-fetch) for that.
+Please note `renewQuery` also triggers pre-aggregations refresh as well.
+
+To keep pre-aggregations fresh Refresh Scheduler can be used.
+All pre-aggregations intended to be refreshed during scheduled refresh run should be marked with [scheduledRefresh](pre-aggregations#scheduled-refresh) parameter.
+There're `CubejsServerCore.runScheduledRefresh(context, queryingOptions)` and `CubejsServer.runScheduledRefresh(context, queryingOptions)` methods that should be invoked at least once a minute to populate queue for pre-aggregations refresh.
+You can do it by using simple timer for example:
+
+```javascript
+setInterval(() => server.runScheduledRefresh(), 5000);
+```
+
+in your **index.js:**
+```javascript
+const CubejsServer = require('@cubejs-backend/server');
+
+const server = new CubejsServer();
+
+setInterval(() => server.runScheduledRefresh(), 5000);
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+}).catch(e => {
+  console.error('Fatal error during server start: ');
+  console.error(e.stack || e);
+});
+```
+
+There's also [REST API](REST-API#api-reference-v-1-run-scheduled-refresh) available to trigger run.
+
+> **NOTE:** `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.

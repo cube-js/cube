@@ -4,7 +4,8 @@ const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
 const GenericTypeToMySql = {
-  'string': 'varchar(255)'
+  string: 'varchar(255)',
+  text: 'varchar(255)'
 };
 
 class MySqlDriver extends BaseDriver {
@@ -131,6 +132,9 @@ class MySqlDriver extends BaseDriver {
     if (genericType === 'text') {
       return value && value.replace(/[\u0800-\uFFFF]/g, '');
     }
+    if (genericType === 'timestamp' && typeof value === 'string') {
+      return value && value.replace('Z', '');
+    }
     return super.toColumnValue(value, genericType);
   }
 
@@ -140,7 +144,7 @@ class MySqlDriver extends BaseDriver {
     }
     await this.createTable(table, columns);
     try {
-      const batchSize = 100; // TODO make dynamic?
+      const batchSize = 1000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);

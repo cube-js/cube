@@ -55,10 +55,14 @@ class BaseMeasure {
   }
 
   aliasName() {
+    return this.query.escapeColumnName(this.unescapedAliasName());
+  }
+
+  unescapedAliasName() {
     if (this.expression) {
-      return this.query.escapeColumnName(this.query.aliasName(this.expressionName));
+      return this.query.aliasName(this.expressionName);
     }
-    return this.query.escapeColumnName(this.query.aliasName(this.measure));
+    return this.query.aliasName(this.measure);
   }
 
   isCumulative() {
@@ -114,7 +118,7 @@ class BaseMeasure {
       return undefined;
     }
     if (interval.match(/day/)) {
-      return 'date';
+      return 'day';
     } else if (interval.match(/month/)) {
       return 'month';
     } else if (interval.match(/year/)) {

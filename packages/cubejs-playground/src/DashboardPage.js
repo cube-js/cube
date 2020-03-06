@@ -3,6 +3,7 @@ import React, { Component } from 'react';
 import {
   Spin, Button, Alert, Menu, Dropdown, Icon, Form
 } from 'antd';
+import { Link, withRouter, Redirect } from 'react-router-dom';
 import DashboardSource from "./DashboardSource";
 import fetch from './playgroundFetch';
 import { frameworks } from "./ChartContainer";
@@ -36,17 +37,16 @@ class DashboardPage extends Component {
     await this.loadDashboard();
   }
 
-  async loadDashboard(createApp) {
-    const { chartLibrary, templatePackageName } = this.state;
+  async loadDashboard() {
     this.setState({
       appCode: null,
       loadError: null
     });
     try {
-      await this.dashboardSource.load(createApp, { chartLibrary, templatePackageName });
+      await this.dashboardSource.load();
       this.setState({
         dashboardStarting: false,
-        appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardAppCode(),
+        appCode: !this.dashboardSource.loadError && this.dashboardSource.dashboardCreated,
         loadError: this.dashboardSource.loadError
       });
       const dashboardStatus = await (await fetch('/playground/dashboard-app-status')).json();
@@ -55,9 +55,6 @@ class DashboardPage extends Component {
         dashboardPort: dashboardStatus.dashboardPort,
         dashboardAppPath: dashboardStatus.dashboardAppPath
       });
-      if (createApp) {
-        await this.startDashboardApp();
-      }
     } catch (e) {
       this.setState({
         dashboardStarting: false,
@@ -76,134 +73,26 @@ class DashboardPage extends Component {
   }
 
   render() {
-    const { chartLibrary, framework, templatePackageName } = this.state;
-    const currentLibraryItem = chartLibraries.find(m => m.value === chartLibrary);
-    const frameworkItem = frameworks.find(m => m.id === framework);
-    const templatePackage = this.dashboardSource && this.dashboardSource.templatePackages
-      .find(m => m.name === templatePackageName);
-
-    const chartLibrariesMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Chart Library', { chartLibrary: e.key });
-          this.setState({ chartLibrary: e.key });
-        }}
-      >
-        {
-          chartLibraries.map(library => (
-            <Menu.Item key={library.value}>
-              {library.title}
-            </Menu.Item>
-          ))
-        }
-      </Menu>
-    );
-
-    const frameworkMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Framework', { framework: e.key });
-          this.setState({ framework: e.key });
-        }}
-      >
-        {
-          frameworks.map(f => (
-            <Menu.Item key={f.id}>
-              {f.title}
-            </Menu.Item>
-          ))
-        }
-      </Menu>
-    );
-
-    const templatePackagesMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Template Package', { templatePackageName: e.key });
-          this.setState({ templatePackageName: e.key });
-        }}
-      >
-        {
-          (this.dashboardSource && this.dashboardSource.templatePackages || []).map(f => (
-            <Menu.Item key={f.name}>
-              {f.description}
-            </Menu.Item>
-          ))
-        }
-      </Menu>
-    );
-
     const {
       appCode, dashboardPort, loadError, dashboardRunning, dashboardStarting, dashboardAppPath
     } = this.state;
+    if (loadError && typeof loadError === 'string' && loadError.indexOf('Dashboard app not found') !== -1) {
+      return <Redirect to="/template-gallery" />;
+    }
     if (loadError) {
       return (
         <Frame>
           <h2>
             {loadError}
           </h2>
-          <Form layout="inline">
-            <Form.Item>
-              <Dropdown overlay={frameworkMenu}>
-                <Button>
-                  {frameworkItem && frameworkItem.title}
-                  <Icon type="down" />
-                </Button>
-              </Dropdown>
-            </Form.Item>
-            <Form.Item>
-              <Dropdown
-                overlay={templatePackagesMenu}
-                disabled={!!frameworkItem.docsLink}
-              >
-                <Button>
-                  {templatePackage && templatePackage.description}
-                  <Icon type="down" />
-                </Button>
-              </Dropdown>
-            </Form.Item>
-            <Form.Item>
-              <Dropdown
-                overlay={chartLibrariesMenu}
-                disabled={!!frameworkItem.docsLink}
-              >
-                <Button>
-                  {currentLibraryItem && currentLibraryItem.title}
-                  <Icon type="down" />
-                </Button>
-              </Dropdown>
-            </Form.Item>
-          </Form>
-          {
-            frameworkItem && frameworkItem.docsLink && (
-              <h2 style={{ paddingTop: 24, textAlign: 'center' }}>
-                We do not support&nbsp;
-                {frameworkItem.title}
-                &nbsp;dashboard scaffolding generation yet.
-                < br/>
-                Please refer to&nbsp;
-                <a
-                  href={frameworkItem.docsLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => playgroundAction('Unsupported Dashboard Framework Docs', { framework })}
-                >
-                  {frameworkItem.title}
-                  &nbsp;docs
-                </a>
-                &nbsp;to see on how to use it with Cube.js.
-              </h2>
-            )
-          }
           <p style={{ marginTop: 25 }}>
-            <Button
-              type="primary"
-              size="large"
-              onClick={() => this.loadDashboard(true)}
-              disabled={!!frameworkItem.docsLink}
-            >
-              Create dashboard app template in your project directory
-            </Button>
+            <Link to="/template-gallery">
+              <Button
+                type="primary"
+              >
+                Create dashboard app in your project directory
+              </Button>
+            </Link>
           </p>
           <Hint />
         </Frame>
@@ -290,4 +179,4 @@ class DashboardPage extends Component {
   }
 }
 
-export default DashboardPage;
+export default withRouter(DashboardPage);

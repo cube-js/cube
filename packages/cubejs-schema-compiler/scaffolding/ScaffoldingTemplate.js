@@ -92,7 +92,7 @@ class ScaffoldingTemplate {
   }
 
   memberName(member) {
-    return inflection.camelize(member.title.replace(/\s+|\./g, '_').toLowerCase(), true);
+    return inflection.camelize(member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase(), true);
   }
 
   renderFile(fileDescriptor) {

@@ -1,0 +1,36 @@
+{
+  "name": "@cubejs-backend/sqlite-driver",
+  "description": "Cube.js Sqlite database driver",
+  "author": "Statsbot, Inc.",
+  "version": "0.18.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-sqlite-driver"
+  },
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/SqliteDriver.js",
+  "typings": "driver/index.d.ts",
+  "scripts": {
+    "lint": "eslint **/*.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.18.3",
+    "sqlite3": "^4.1.0"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-node": "^5.2.1",
+    "mocha": "^5.2.0",
+    "should": "^13.2.3",
+    "testcontainers": "^2.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

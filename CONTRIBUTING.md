@@ -7,6 +7,12 @@ We're very welcoming community and while it's very much appreciated if you follo
 This project and everyone participating in it is governed by the [Cube.js Code of Conduct](./CODE_OF_CONDUCT.md).
 By participating, you are expected to uphold this code. Please report unacceptable behavior to info@statsbot.co.
 
+# Contributing Code Changes
+
+Please review the preceding section before proposing a code change. This section documents how to do so.
+
+**When you contribute code, you affirm that the contribution is your original work and that you license the work to the project under the project’s open source license. Whether or not you state this explicitly, by submitting any copyrighted material via pull request, email, or other means you agree to license the material under the project’s open source license and warrant that you have the legal authority to do so.**
+
 ## Contribution Prerequisites
 
 Cube.js works with Node.js 8+ and uses yarn as a package manager.
@@ -14,7 +20,7 @@ Cube.js works with Node.js 8+ and uses yarn as a package manager.
 ## Development Workflow
 ### Cube.js Client
 
-1. After cloning Cube.js repository run `$ yarn` in `packages/cubejs-client-core` and `packages/cubejs-react` to install dependencies.
+1. After cloning Cube.js repository run `$ yarn` in `packages/cubejs-client-core` and `packages/cubejs-client-react` to install dependencies.
 2. Use `$ yarn link` to add these packages to link registry.
 3. Perform required code changes.
 4. Use `$ yarn build` in the repository root to build CommonJS and UMD modules.
@@ -50,6 +56,21 @@ In case you need to tweak it a little bit please follow [Implementing Driver](#i
 2. Copy it and adjust SQL generation accordingly.
 3. Add `BaseQuery` implementation to `@cubejs-backend/schema-compiler/adapter/QueryBuilder.js` with same name as driver.
 
+### Testing Schema Compiler
+
+In order to run tests in `cubejs-schema-compiler` package you need to have running [Docker](https://docs.docker.com/install/) on your machine.
+When it's up and running just use `$ npm test` in `packages/cubejs-schema-compiler` to execute tests.
+
+### Linking Server Core for Development
+
+It's convenient to link `@cubejs-backend/server-core` into your project for manual tests of changes of backend code.
+Cube.js uses `yarn` as package manager instead of `npm`.
+In order to link `@cubejs-backend/server-core`:
+
+1. Install yarn: `npm install -g yarn`.
+2. Link server-core package: `yarn link` inside `packages/cubejs-server-core`.
+3. Link all drivers and dependent packages where you make changes in `packages/cubejs-server-core`.
+4. Run `yarn build` in `packages/cubejs-playground`.
 
 ## Style guides
 

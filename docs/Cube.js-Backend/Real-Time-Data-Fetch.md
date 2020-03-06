@@ -88,6 +88,5 @@ const Chart = ({ query, cubejsApi }) => {
 
 As in case of regular data fetch real-time data fetch obeys [refreshKey refresh rules](caching#refresh-keys).
 In order to provide desired refresh rate `refreshKey` should reflect changes of underlying data set as well it's querying time should be much less than desired refresh rate.
-Also [refreshKeyRenewalThreshold](@cubejs-backend-server-core#options-reference-orchestrator-options) should be adjusted accordingly.
-By default it renews `refreshKey` once in 2 minutes.
+Please use [refreshKey every](cube#parameters-refresh-key) parameter to adjust refresh interval.
 

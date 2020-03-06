@@ -1,7 +1,9 @@
 const inlection = require('inflection');
 const momentRange = require('moment-range');
 const moment = momentRange.extendMoment(require('moment-timezone'));
-const { repeat, join, map, contains } = require('ramda');
+const {
+  repeat, join, map, contains
+} = require('ramda');
 
 const BaseDimension = require('./BaseDimension');
 
@@ -40,8 +42,9 @@ class BaseFilter extends BaseDimension {
   }
 
   conditionSql(columnSql) {
-    const operatorMethod = `${inlection.camelize(this.operator).replace(/[A-Z]/, (c) =>
-      (c != null ? c : '').toLowerCase()
+    const operatorMethod = `${inlection.camelize(this.operator).replace(
+      /[A-Z]/,
+      (c) => (c != null ? c : '').toLowerCase()
     )}Where`;
     const sql = this[operatorMethod](columnSql);
     return this.query.paramAllocator.allocateParamsForQuestionString(sql, this.filterParams());
@@ -67,9 +70,7 @@ class BaseFilter extends BaseDimension {
 
   // noinspection JSMethodCanBeStatic
   escapeWildcardChars(param) {
-    return typeof param === 'string'
-      ? param.replace(/([_%])/gi, '\\$1')
-      : param;
+    return typeof param === 'string' ? param.replace(/([_%])/gi, '\\$1') : param;
   }
 
   isWildcardOperator() {
@@ -83,13 +84,21 @@ class BaseFilter extends BaseDimension {
     if (this.operator === 'set' || this.operator === 'not_set' || this.operator === 'expressionEquals') {
       return [];
     }
-    const params = Array.isArray(this.values) ? this.values : [this.values];
+    const params = this.valuesArray().filter(v => v != null);
 
     if (this.isWildcardOperator()) {
       return map(this.escapeWildcardChars, params);
     }
 
     return params;
+  }
+
+  valuesArray() {
+    return Array.isArray(this.values) ? this.values : [this.values];
+  }
+
+  valuesContainNull() {
+    return this.valuesArray().indexOf(null) !== -1;
   }
 
   castParameter() {
@@ -110,8 +119,15 @@ class BaseFilter extends BaseDimension {
 
   likeOr(column, not) {
     const basePart = this.likeIgnoreCase(column, not);
-    const nullCheck = `${not ? ` OR ${column} IS NULL` : ''}`;
-    return `${join(not ? ' AND ' : ' OR ', repeat(basePart, this.values.length))}${nullCheck}`;
+    return `${join(not ? ' AND ' : ' OR ', repeat(basePart, this.filterParams().length))}${this.orIsNullCheck(column, not)}`;
+  }
+
+  orIsNullCheck(column, not) {
+    return `${this.shouldAddOrIsNull(not) ? ` OR ${column} IS NULL` : ''}`;
+  }
+
+  shouldAddOrIsNull(not) {
+    return not ? !this.valuesContainNull() : this.valuesContainNull();
   }
 
   likeIgnoreCase(column, not) {
@@ -123,15 +139,19 @@ class BaseFilter extends BaseDimension {
       return this.inWhere(column);
     }
 
-    return `${column} = ${this.castParameter()}`;
+    if (this.valuesContainNull()) {
+      return this.notSetWhere(column);
+    }
+
+    return `${column} = ${this.castParameter()}${this.orIsNullCheck(column, false)}`;
   }
 
   inPlaceholders() {
-    return `(${join(', ', repeat(this.castParameter(), this.values.length || 1))})`;
+    return `(${join(', ', repeat(this.castParameter(), this.filterParams().length || 1))})`;
   }
 
   inWhere(column) {
-    return `${column} IN ${this.inPlaceholders()}`;
+    return `${column} IN ${this.inPlaceholders()}${this.orIsNullCheck(column, false)}`;
   }
 
   notEqualsWhere(column) {
@@ -139,11 +159,15 @@ class BaseFilter extends BaseDimension {
       return this.notInWhere(column);
     }
 
-    return `${column} <> ${this.castParameter()}`;
+    if (this.valuesContainNull()) {
+      return this.setWhere(column);
+    }
+
+    return `${column} <> ${this.castParameter()}${this.orIsNullCheck(column, true)}`;
   }
 
   notInWhere(column) {
-    return `${column} NOT IN ${this.inPlaceholders()}`;
+    return `${column} NOT IN ${this.inPlaceholders()}${this.orIsNullCheck(column, true)}`;
   }
 
   setWhere(column) {

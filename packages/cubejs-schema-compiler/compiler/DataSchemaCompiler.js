@@ -1,12 +1,13 @@
 const vm = require('vm');
 const syntaxCheck = require('syntax-error');
-const CompileError = require('./CompileError');
-const UserError = require('./UserError');
-const babylon = require("babylon");
-const babelGenerator = require("babel-generator").default;
-const babelTraverse = require("babel-traverse").default;
+const { parse } = require("@babel/parser");
+const babelGenerator = require("@babel/generator").default;
+const babelTraverse = require("@babel/traverse").default;
 const fs = require('fs');
 const path = require('path');
+const R = require('ramda');
+const CompileError = require('./CompileError');
+const UserError = require('./UserError');
 
 const moduleFileCache = {};
 
@@ -23,7 +24,9 @@ class ErrorReporter {
       return;
     }
     if (fileName) {
-      this.rootReporter().errors.push({ message, fileName, lineNumber, position });
+      this.rootReporter().errors.push({
+        message, fileName, lineNumber, position
+      });
     } else {
       this.rootReporter().errors.push(message);
     }
@@ -59,6 +62,7 @@ class DataSchemaCompiler {
     this.filesToCompile = options.filesToCompile;
     this.omitErrors = options.omitErrors;
     this.allowNodeRequire = options.allowNodeRequire;
+    this.compileContext = options.compileContext;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -85,8 +89,7 @@ class DataSchemaCompiler {
       // TODO: required in order to get pre transpile compilation work
       const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
 
-      const compilePhase = (compilers) =>
-        self.compileCubeFiles(compilers, transpile(), errorsReport);
+      const compilePhase = (compilers) => self.compileCubeFiles(compilers, transpile(), errorsReport);
 
       return compilePhase({ cubeCompilers: this.cubeNameCompilers })
         .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
@@ -105,8 +108,14 @@ class DataSchemaCompiler {
 
   transpileFile(file, errorsReport) {
     try {
-      babelTraverse.clearCache();
-      const ast = babylon.parse(file.content, { sourceFilename: file.fileName, sourceType: 'module' });
+      const ast = parse(
+        file.content,
+        {
+          sourceFilename: file.fileName,
+          sourceType: 'module',
+          plugins: ['objectRestSpread']
+        },
+      );
       this.transpilers.forEach((t) => babelTraverse(ast, t.traverseObject()));
       const content = babelGenerator(ast, {}, file.content).code;
       return Object.assign({}, file, { content });
@@ -225,7 +234,8 @@ class DataSchemaCompiler {
             exports[foundFile.fileName] = exports[foundFile.fileName] || {};
             return exports[foundFile.fileName];
           }
-        }
+        },
+        COMPILE_CONTEXT: R.clone(this.compileContext || {})
       }, { filename: file.fileName, timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);

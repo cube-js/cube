@@ -21,6 +21,7 @@ const defaultDotEnvVars = env => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
 CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
 CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
+CUBEJS_WEB_SOCKETS=true
 ${sharedDotEnvVars(env)}`;
 
 const athenaDotEnvVars = env => `CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
@@ -50,6 +51,10 @@ const dotEnv = env => {
   }[env.dbType] || defaultDotEnvVars(env);
 };
 
+const gitIgnore = `.env
+node_modules
+`;
+
 const serverlessYml = env => `service: ${env.projectName}
 
 provider:
@@ -59,13 +64,13 @@ provider:
     - Effect: "Allow"
       Action:
         - "sns:*"
-# Athena permissions        
+# Athena permissions
 #        - "athena:*"
 #        - "s3:*"
 #        - "glue:*"
       Resource:
         - "*"
-# When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12  
+# When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12
 #  vpc:
 #    securityGroupIds:
 #     - sg-12345678901234567 # Your DB and Redis security groups here
@@ -196,6 +201,7 @@ exports.express = {
   files: {
     'index.js': () => indexJs,
     '.env': dotEnv,
+    '.gitignore': () => gitIgnore,
     'schema/Orders.js': () => ordersJs
   }
 };
@@ -205,6 +211,7 @@ exports.serverless = {
     'cube.js': () => handlerJs,
     'serverless.yml': serverlessYml,
     '.env': dotEnv,
+    '.gitignore': () => gitIgnore,
     'schema/Orders.js': () => ordersJs
   },
   dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
@@ -216,6 +223,7 @@ exports['serverless-google'] = {
     'index.js': () => handlerJs,
     'serverless.yml': serverlessGoogleYml,
     '.env': dotEnv,
+    '.gitignore': () => gitIgnore,
     'schema/Orders.js': () => ordersJs
   },
   dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],

@@ -150,6 +150,45 @@ A unique key to identify users, moving through the funnel.
   }
 ```
 
+### nextStepUserId
+A unique key to join two adjacent steps when source of user id changes when moving from one step to another one.
+For exampe you can use it to build funnel that tracked by anonymous id at the first step and then by identified user id on subsequent steps.
+```javascript
+const Funnels = require(`Funnels`);
+
+cube(`OnboardingFunnel`, {
+  extends: Funnels.eventFunnel({
+    userId: {
+      sql: `id`
+    },
+    time: {
+      sql: `timestamp`
+    },
+    steps: [{
+      name: `View Page`,
+      eventsView: {
+        sql: `select anonymous_id as id, timestamp from pages`
+      }
+    }, {
+      name: `Sign Up`,
+      eventsView: {
+        sql: `select anonymous_id as id, user_id, timestamp from sign_ups`
+      },
+      nextStepUserId: {
+        sql: `user_id`
+      },
+      timeToConvert: '1 day'
+    }, {
+      name: `Action`,
+      eventsView: {
+        sql: `select user_id as id from actions`
+      },
+      timeToConvert: '1 day'
+    }]
+  })
+});
+```
+
 ### time
 A timestamp of the event.
 ```javascript
@@ -220,3 +259,28 @@ In the following example, we use measure `conversions` with dimension `steps`
 to display a classic bar chart showing the funnel's steps.
 
 <iframe src="https://codesandbox.io/embed/nw87w1nnjm?fontsize=14" style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;" sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
+
+## Performance considerations
+
+Funnel joins are extremely heavy for most of modern DBs and complexity grows non-linear with addition of steps.
+However in case of cardinality of the first event isn't too high very simple optimization can be applied: [originalSql pre-aggregation](pre-aggregations#original-sql).
+
+Just add it to `Funnel` cube as follows:
+
+```javascript
+cube(`PurchaseFunnel`, {
+  extends: Funnels.eventFunnel({
+    // ...
+  }),
+
+  preAggregations: {
+    main: {
+      type: `originalSql`
+    }
+  }
+});
+```
+
+In this case heavy Funnel join will be materialized and stored as a table which will save significant amount of time for subsequent Funnel queries.
+
+In case cardinality of first event is too high for `originalSql` pre-aggregation, [partitioned rollups](pre-aggregations#rollup-time-partitioning) can be used.

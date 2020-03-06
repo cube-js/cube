@@ -1,9 +1,11 @@
 const BaseQuery = require('./BaseQuery');
 
 const GRANULARITY_TO_INTERVAL = {
-  date: 'DAY',
+  day: 'DAY',
   week: 'WEEK',
   hour: 'HOUR',
+  minute: 'MINUTE',
+  second: 'SECOND',
   month: 'MONTH',
   year: 'YEAR'
 };
@@ -19,6 +21,10 @@ class SnowflakeQuery extends BaseQuery {
 
   timeStampCast(value) {
     return `${value}::timestamp_tz`;
+  }
+
+  defaultRefreshKeyRenewalThreshold() {
+    return 120;
   }
 }
 
