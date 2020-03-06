@@ -5,6 +5,7 @@ const moment = require('moment');
 const uuid = require('uuid/v4');
 
 const dateParser = require('./dateParser');
+const requestParser = require('./requestParser');
 const UserError = require('./UserError');
 const CubejsHandlerError = require('./CubejsHandlerError');
 const SubscriptionServer = require('./SubscriptionServer');
@@ -252,52 +253,60 @@ class ApiGateway {
     this.adapterApi = adapterApi;
     this.refreshScheduler = options.refreshScheduler;
     this.logger = logger;
-    this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
-    this.checkAuthFn = options.checkAuth || this.defaultCheckAuth.bind(this);
     this.basePath = options.basePath || '/cubejs-api';
     // eslint-disable-next-line no-unused-vars
     this.queryTransformer = options.queryTransformer || (async (query, context) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
+
+    this.initializeMiddleware(options);
+  }
+
+  initializeMiddleware(options) {
+    const checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
+    this.checkAuthFn = options.checkAuth || this.defaultCheckAuth.bind(this);
+    const requestContextMiddleware = this.requestContextMiddleware.bind(this);
+    const requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger.bind(this);
+    this.requestMiddleware = [checkAuthMiddleware, requestContextMiddleware, requestLoggerMiddleware];
   }
 
   initApp(app) {
-    app.get(`${this.basePath}/v1/load`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/load`, this.requestMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context: req.context,
         res: this.resToResultFn(res)
       });
     }));
 
-    app.get(`${this.basePath}/v1/subscribe`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/subscribe`, this.requestMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context: req.context,
         res: this.resToResultFn(res)
       });
     }));
 
-    app.get(`${this.basePath}/v1/sql`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/sql`, this.requestMiddleware, (async (req, res) => {
       await this.sql({
         query: req.query.query,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context: req.context,
         res: this.resToResultFn(res)
       });
     }));
 
-    app.get(`${this.basePath}/v1/meta`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/meta`, this.requestMiddleware, (async (req, res) => {
       await this.meta({
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context: req.context,
         res: this.resToResultFn(res)
       });
     }));
 
-    app.get(`${this.basePath}/v1/run-scheduled-refresh`, this.checkAuthMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/run-scheduled-refresh`, this.requestMiddleware, (async (req, res) => {
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
-        context: await this.contextByReq(req, req.authInfo, this.requestIdByReq(req)),
+        context: req.context,
         res: this.resToResultFn(res)
       });
     }));
@@ -584,6 +593,21 @@ class ApiGateway {
         });
         res.status(500).json({ error: e.toString() });
       }
+    }
+  }
+
+  async requestContextMiddleware(req, res, next) {
+    req.context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
+    if (next) {
+      next();
+    }
+  }
+
+  async requestLogger(req, res, next) {
+    const details = requestParser(req, res);
+    this.log(req.context, { type: 'REST API Request', ...details });
+    if (next) {
+      next();
     }
   }
 
