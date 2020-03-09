@@ -729,6 +729,9 @@ var operators = {
     title: '<='
   }]
 };
+/**
+ * Contains information about available cubes and it's members.
+ */
 
 var Meta =
 /*#__PURE__*/
@@ -755,6 +758,24 @@ function () {
         return c[memberType];
       }));
     }
+    /**
+     * Get meta information for member of a cube
+     * Member meta information contains:
+     * ```javascript
+     * {
+     *   name,
+     *   title,
+     *   shortTitle,
+     *   type,
+     *   description,
+     *   format
+     * }
+     * ```
+     * @param memberName - Fully qualified member name in a form `Cube.memberName`
+     * @param memberType - `measures`, `dimensions` or `segments`
+     * @return {Object} containing meta information about member
+     */
+
   }, {
     key: "resolveMember",
     value: function resolveMember(memberName, memberType) {
@@ -1471,7 +1492,7 @@ function () {
  * @name cubejs
  * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
  * In the development mode, Cube.js Backend will print the API token to the console on on startup.
- * Can be an async function without arguments that returns API token.
+ * Can be an async function without arguments that returns API token. Optional.
  * @param options - options object.
  * @param options.apiUrl - URL of your Cube.js Backend.
  * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.

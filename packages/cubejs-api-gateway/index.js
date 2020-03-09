@@ -450,7 +450,7 @@ class ApiGateway {
       // TODO subscribe to refreshKeys instead of constantly firing load
       await this.load({
         query,
-        context: { ...context, requestId: `${context.requestId}-${uuid()}` },
+        context,
         res: (message, opts) => {
           if (message.error) {
             error = { message, opts };
