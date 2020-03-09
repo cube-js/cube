@@ -367,6 +367,45 @@ It triggers refresh for partitions where end date lies within `updateWindow` fro
 In provided example it'll refresh today's and last 7 days of partitions.
 Partitions before `7 day` interval won't be refreshed once they built until rollup SQL is changed.
 
+## useOriginalSqlPreAggregations
+
+Cube.js supports multi-stage pre-aggregations by reusing original sql pre-aggregations in rollups through `useOriginalSqlPreAggregations` param.
+It's helpful in case you want to re-use some heavy SQL query calculation in multiple rollups.
+Without `useOriginalSqlPreAggregations` set to `true` Cube.js will always redo all underlying SQL calculations every time it builds new rollup table.
+
+```javascript
+cube(`Orders`, {
+  sql: `
+    select * from orders1
+    UNION ALL
+    select * from orders2
+    UNION ALL
+    select * from orders3
+    `,
+
+  // ...
+
+  preAggregations: {
+    main: {
+      type: `originalSql`
+    },
+    category: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      dimensionReferences: [category],
+      useOriginalSqlPreAggregations: true
+    },
+    date: {
+      type: `rollup`,
+      measureReferences: [Orders.count],
+      timeDimensionReference: date,
+      granularity: `day`
+      useOriginalSqlPreAggregations: true
+    }
+  }
+});
+```
+
 ## scheduledRefresh
 
 To keep pre-aggregations always up-to-date you can mark them as `scheduledRefresh: true`.
