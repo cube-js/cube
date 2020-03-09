@@ -3,12 +3,9 @@
 
 
 "@apla/clickhouse@^1.5.5":
-  version "1.5.5"
-  resolved "https://registry.yarnpkg.com/@apla/clickhouse/-/clickhouse-1.5.5.tgz#45cf5f9b662f123954ed804b5638f203ee8fb67e"
-  integrity sha512-Px7KczgL6REH3/WiBLiIxmDs3v8evpT/gFaWo/yoTaNs3ch2D70HtbfA8lkZUHO6gKndxLfgpWNFnJ9H+W/wEg==
-  dependencies:
-    buffer-indexof-polyfill "^1.0.1"
-    object-assign "^4.1.0"
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/@apla/clickhouse/-/clickhouse-1.6.1.tgz#27608fb1ec43c9df5f1d9cbf6222e33a87cba7ee"
+  integrity sha512-NMLyxv6vVFhQ7nW5soUVb1PUaQ0MtKMsDwuQN9RTJwEPZ6p/tOW+tG8Sr1axKQl1VJBuhHAKHxQrow/fFdlj/A==
 
 "@azure/ms-rest-azure-env@^1.1.2":
   version "1.1.2"
@@ -1108,11 +1105,6 @@ buffer-from@^1.0.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/buffer-from/-/buffer-from-1.1.1.tgz#32713bc028f75c02fdb710d7c7bcec1f2c6070ef"
   integrity sha512-MQcXEUbCKtEo7bhqEs6560Hyd4XaovZlO/k9V3hjVUF/zwW7KBVdSK4gIt/bzwS9MbR5qob+F5jusZsb0YQK2A==
-
-buffer-indexof-polyfill@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/buffer-indexof-polyfill/-/buffer-indexof-polyfill-1.0.1.tgz#a9fb806ce8145d5428510ce72f278bb363a638bf"
-  integrity sha1-qfuAbOgUXVQoUQznLyeLs2OmOL8=
 
 buffer-writer@1.0.1:
   version "1.0.1"
@@ -2518,11 +2510,6 @@ oauth-sign@~0.9.0:
   version "0.9.0"
   resolved "https://registry.yarnpkg.com/oauth-sign/-/oauth-sign-0.9.0.tgz#47a7b016baa68b5fa0ecf3dee08a85c679ac6455"
   integrity sha512-fexhUFFPTGV8ybAtSIGbV6gOkSv8UtRbDBnAyLQw4QPKkgNlsH2ByPGtMUqdWkos6YCRmAqViwgZrJc/mRDzZQ==
-
-object-assign@^4.1.0:
-  version "4.1.1"
-  resolved "https://registry.yarnpkg.com/object-assign/-/object-assign-4.1.1.tgz#2109adc7965887cfc05cbbd442cac8bfbb360863"
-  integrity sha1-IQmtx5ZYh8/AXLvUQsrIv7s2CGM=
 
 object-inspect@^1.7.0:
   version "1.7.0"
