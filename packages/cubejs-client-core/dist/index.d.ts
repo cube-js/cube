@@ -12,7 +12,7 @@ export type CubeJSApiOptions = {
 export type LoadMethodOptions = {
   mutexKey?: string;
   mutexObj?: {};
-  progressCallback(result: ProgressResult): void;
+  progressCallback?(result: ProgressResult): void;
   subscribe?: boolean;
 };
 
