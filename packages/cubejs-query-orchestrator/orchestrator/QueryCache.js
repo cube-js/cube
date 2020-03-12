@@ -12,7 +12,7 @@ class QueryCache {
     this.externalDriverFactory = options.externalDriverFactory;
     this.logger = logger;
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver() :
+      new RedisCacheDriver(options.redisPool) :
       new LocalCacheDriver();
   }
 
@@ -145,6 +145,7 @@ class QueryCache {
         (client, q) => client.query(q.query, q.values), {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          redisPool: this.options.redisPool,
           ...this.options.queueOptions
         }
       );
@@ -161,6 +162,7 @@ class QueryCache {
         {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          redisPool: this.options.redisPool,
           ...this.options.externalQueueOptions
         }
       );

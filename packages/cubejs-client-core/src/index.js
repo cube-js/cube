@@ -6,6 +6,7 @@
  * @menuOrder 2
  */
 
+import uuid from 'uuid/v4';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
@@ -45,7 +46,7 @@ class CubejsApi {
   }
 
   request(method, params) {
-    return this.transport.request(method, params);
+    return this.transport.request(method, { baseRequestId: uuid(), ...params });
   }
 
   loadMethod(request, toResult, options, callback) {

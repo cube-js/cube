@@ -29,7 +29,6 @@ GROUPD BY 1
 Cube.js makes subqueries easy and efficient. Subqueries are defined as regular dimensions with the parameter `subQuery` set to true.
 
 ```javascript
-
 cube(`Deals`, {
   sql: `select * from deals`,
 
@@ -50,8 +49,21 @@ cube(`SalesManagers`, {
       sql: `${SalesManagers}.id = ${Deals}.sales_manager_id`
     }
   },
+  
+  measures: {
+    averageDealAmount: {
+      sql: `${dealsAmount}`,
+      type: `avg`
+    }
+  },
 
   dimensions: {
+    id: {
+      sql: `id`,
+      type: `string`,
+      primaryKey: true
+    },
+
     dealsAmount: {
       sql: `${Deals.amount}`,
       type: `number`,
@@ -63,14 +75,44 @@ cube(`SalesManagers`, {
 You can **reference subquery dimensions in measures as usual dimensions**. The example below shows the definition of an average deal amount per sales manager:
 
 ```javascript
-
 cube(`SalesManagers`, {
-   measures: {
-      averageDealsAmount: {
-        sql: `${dealsAmount}`,
-        type: `avg`
-      }
-   }
+  measures: {
+    averageDealsAmount: {
+      sql: `${dealsAmount}`,
+      type: `avg`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `string`,
+      primaryKey: true
+    }
+  }
 });
 ```
 
+## Under the hood
+
+Based on sub query dimension definition, Cube.js will create a query that will include primary key dimension of main cube and all measures and dimensions included in sql definition of sub query dimension.
+This query will be joined as a left join to the main SQL query.
+For example for `SalesManagers.dealsAmount` sub query dimension following query will be generated:
+
+```javascript
+{
+  measures: ['SalesManagers.dealsAmount'],
+  dimensions: ['SalesManagers.id']
+}
+```
+
+In case of `{ measures: ['SalesManagers.averageDealAmount'] }` query following SQL will be generated:
+
+```javascript
+SELECT avg(sales_managers__average_deal_amount) FROM sales_managers
+LEFT JOIN (
+  SELECT sales_managers.id sales_managers__id, sum(deals.amount) sales_managers__average_deal_amount FROM sales_managers
+  LEFT JOIN deals ON sales_managers.id = deals.sales_manager_id
+  GROUP BY 1
+) sales_managers__average_deal_amount_subquery ON sales_managers__average_deal_amount_subquery.sales_managers__id = sales_managers.id
+```

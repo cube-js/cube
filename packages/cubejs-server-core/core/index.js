@@ -384,7 +384,8 @@ class CubejsServerCore {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
           schemaVersion: currentSchemaVersion,
-          preAggregationsSchema: this.preAggregationsSchema(context)
+          preAggregationsSchema: this.preAggregationsSchema(context),
+          context
         }
       );
       this.compilerCache.set(appId, compilerApi);
@@ -404,9 +405,9 @@ class CubejsServerCore {
       let driverPromise;
       let externalPreAggregationsDriverPromise;
       this.dataSourceIdToOrchestratorApi[dataSourceId] = this.createOrchestratorApi({
-        getDriver: () => {
+        getDriver: async () => {
           if (!driverPromise) {
-            const driver = this.driverFactory(context);
+            const driver = await this.driverFactory(context);
             driverPromise = driver.testConnection().then(() => driver).catch(e => {
               driverPromise = null;
               throw e;
@@ -414,9 +415,9 @@ class CubejsServerCore {
           }
           return driverPromise;
         },
-        getExternalDriverFactory: () => {
+        getExternalDriverFactory: async () => {
           if (!externalPreAggregationsDriverPromise) {
-            const driver = this.externalDriverFactory(context);
+            const driver = await this.externalDriverFactory(context);
             externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
               externalPreAggregationsDriverPromise = null;
               throw e;
@@ -439,7 +440,8 @@ class CubejsServerCore {
       logger: this.logger,
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
-      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey
+      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey,
+      compileContext: options.context
     });
   }
 

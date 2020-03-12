@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -24,7 +24,7 @@
   ],
   "dependencies": {
     "core-js": "^2.6.9",
-    "ramda": "^0.26.1"
+    "ramda": "^0.27.0"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.5.0",
@@ -36,7 +36,7 @@
     "babel-eslint": "^10.0.1",
     "babel-jest": "^23.6.0",
     "eslint": "^5.8.0",
-    "eslint-plugin-vue": "^5.0.0",
+    "eslint-plugin-vue": "^6.2.1",
     "vue": "^2.6.6",
     "vue-template-compiler": "^2.5.21"
   },

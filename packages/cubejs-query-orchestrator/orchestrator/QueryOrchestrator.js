@@ -1,6 +1,7 @@
 const R = require('ramda');
 const QueryCache = require('./QueryCache');
 const PreAggregations = require('./PreAggregations');
+const RedisPool = require('./RedisPool');
 
 class QueryOrchestrator {
   constructor(redisPrefix, driverFactory, logger, options) {
@@ -15,11 +16,14 @@ class QueryOrchestrator {
     if (cacheAndQueueDriver !== 'redis' && cacheAndQueueDriver !== 'memory') {
       throw new Error(`Only 'redis' or 'memory' are supported for cacheAndQueueDriver option`);
     }
+    const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool() : undefined;
 
+    this.redisPool = redisPool;
     this.queryCache = new QueryCache(
       this.redisPrefix, this.driverFactory, this.logger, {
         externalDriverFactory,
         cacheAndQueueDriver,
+        redisPool,
         ...options.queryCacheOptions,
       }
     );
@@ -27,6 +31,7 @@ class QueryOrchestrator {
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
         cacheAndQueueDriver,
+        redisPool,
         ...options.preAggregationsOptions
       }
     );
@@ -82,6 +87,10 @@ class QueryOrchestrator {
 
   resultFromCacheIfExists(queryBody) {
     return this.queryCache.resultFromCacheIfExists(queryBody);
+  }
+
+  async cleanup() {
+    await this.redisPool.cleanup();
   }
 }
 

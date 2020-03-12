@@ -1,8 +1,7 @@
 import { BigQueryOptions } from "@google-cloud/bigquery";
 
 declare module "@cubejs-backend/bigquery-driver" {
-  class BigQueryDriver {
+  export default class BigQueryDriver {
     constructor(options?: BigQueryOptions);
   }
-  export = BigQueryDriver;
 }

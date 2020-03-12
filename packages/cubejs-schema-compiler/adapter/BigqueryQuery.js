@@ -94,6 +94,14 @@ class BigqueryQuery extends BaseQuery {
     return `DATETIME_ADD(${date}, INTERVAL ${interval})`;
   }
 
+  subtractTimestampInterval(date, interval) {
+    return `TIMESTAMP_SUB(${date}, INTERVAL ${interval})`;
+  }
+
+  addTimestampInterval(date, interval) {
+    return `TIMESTAMP_ADD(${date}, INTERVAL ${interval})`;
+  }
+
   nowTimestampSql() {
     return `CURRENT_TIMESTAMP()`;
   }

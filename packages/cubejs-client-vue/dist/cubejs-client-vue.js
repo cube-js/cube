@@ -10,9 +10,10 @@ require('core-js/modules/es6.promise');
 require('core-js/modules/es6.string.iterator');
 require('core-js/modules/web.dom.iterable');
 require('core-js/modules/es6.array.iterator');
+require('core-js/modules/es6.object.to-string');
 require('core-js/modules/es6.object.keys');
 require('core-js/modules/es6.object.assign');
-var _objectSpread = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
+var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
@@ -27,7 +28,7 @@ var QueryRenderer = {
   props: {
     query: {
       type: Object,
-      default: function _default() {
+      "default": function _default() {
         return {};
       }
     },
@@ -45,7 +46,7 @@ var QueryRenderer = {
     builderProps: {
       type: Object,
       required: false,
-      default: function _default() {
+      "default": function _default() {
         return {};
       }
     }
@@ -59,8 +60,10 @@ var QueryRenderer = {
       sqlQuery: undefined
     };
   },
-  mounted: function () {
-    var _mounted = _asyncToGenerator(
+  mounted: function mounted() {
+    var _this = this;
+
+    return _asyncToGenerator(
     /*#__PURE__*/
     _regeneratorRuntime.mark(function _callee() {
       var query, queries;
@@ -68,7 +71,7 @@ var QueryRenderer = {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              query = this.query, queries = this.queries;
+              query = _this.query, queries = _this.queries;
 
               if (!query) {
                 _context.next = 4;
@@ -76,7 +79,7 @@ var QueryRenderer = {
               }
 
               _context.next = 4;
-              return this.load();
+              return _this.load();
 
             case 4:
               if (!queries) {
@@ -85,20 +88,16 @@ var QueryRenderer = {
               }
 
               _context.next = 7;
-              return this.loadQueries(queries);
+              return _this.loadQueries(queries);
 
             case 7:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, this);
-    }));
-
-    return function mounted() {
-      return _mounted.apply(this, arguments);
-    };
-  }(),
+      }, _callee);
+    }))();
+  },
   render: function render(createElement) {
     var $scopedSlots = this.$scopedSlots,
         resultSet = this.resultSet,
@@ -111,7 +110,7 @@ var QueryRenderer = {
     var onlyDefault = !('empty' in this.$slots) && !('error' in this.$scopedSlots);
 
     if ($scopedSlots.builder && this.builderProps.measures) {
-      controls = $scopedSlots.builder(_objectSpread({}, this.builderProps));
+      controls = $scopedSlots.builder(_objectSpread2({}, this.builderProps));
     }
 
     if (!loading && resultSet && !error || onlyDefault) {
@@ -122,13 +121,13 @@ var QueryRenderer = {
       };
 
       if (onlyDefault) {
-        Object.assign(slotProps, _objectSpread({
+        Object.assign(slotProps, _objectSpread2({
           loading: loading,
           error: error
         }, this.builderProps));
       }
 
-      slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
+      slot = $scopedSlots["default"] ? $scopedSlots["default"](slotProps) : slot;
     } else if (error) {
       slot = $scopedSlots.error ? $scopedSlots.error({
         error: error,
@@ -139,8 +138,10 @@ var QueryRenderer = {
     return createElement('div', {}, [controls, slot]);
   },
   methods: {
-    load: function () {
-      var _load = _asyncToGenerator(
+    load: function load() {
+      var _this2 = this;
+
+      return _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2() {
         var query;
@@ -148,113 +149,109 @@ var QueryRenderer = {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
-                query = this.query;
+                query = _this2.query;
                 _context2.prev = 1;
-                this.loading = true;
-                this.error = undefined;
+                _this2.loading = true;
+                _this2.error = undefined;
 
                 if (!(query && Object.keys(query).length > 0)) {
                   _context2.next = 23;
                   break;
                 }
 
-                if (!(this.loadSql === 'only')) {
+                if (!(_this2.loadSql === 'only')) {
                   _context2.next = 11;
                   break;
                 }
 
                 _context2.next = 8;
-                return this.cubejsApi.sql(query, {
-                  mutexObj: this.mutexObj,
+                return _this2.cubejsApi.sql(query, {
+                  mutexObj: _this2.mutexObj,
                   mutexKey: 'sql'
                 });
 
               case 8:
-                this.sqlQuery = _context2.sent;
+                _this2.sqlQuery = _context2.sent;
                 _context2.next = 23;
                 break;
 
               case 11:
-                if (!this.loadSql) {
+                if (!_this2.loadSql) {
                   _context2.next = 20;
                   break;
                 }
 
                 _context2.next = 14;
-                return this.cubejsApi.sql(query, {
-                  mutexObj: this.mutexObj,
+                return _this2.cubejsApi.sql(query, {
+                  mutexObj: _this2.mutexObj,
                   mutexKey: 'sql'
                 });
 
               case 14:
-                this.sqlQuery = _context2.sent;
+                _this2.sqlQuery = _context2.sent;
                 _context2.next = 17;
-                return this.cubejsApi.load(query, {
-                  mutexObj: this.mutexObj,
+                return _this2.cubejsApi.load(query, {
+                  mutexObj: _this2.mutexObj,
                   mutexKey: 'query'
                 });
 
               case 17:
-                this.resultSet = _context2.sent;
+                _this2.resultSet = _context2.sent;
                 _context2.next = 23;
                 break;
 
               case 20:
                 _context2.next = 22;
-                return this.cubejsApi.load(query, {
-                  mutexObj: this.mutexObj,
+                return _this2.cubejsApi.load(query, {
+                  mutexObj: _this2.mutexObj,
                   mutexKey: 'query'
                 });
 
               case 22:
-                this.resultSet = _context2.sent;
+                _this2.resultSet = _context2.sent;
 
               case 23:
-                this.loading = false;
+                _this2.loading = false;
                 _context2.next = 31;
                 break;
 
               case 26:
                 _context2.prev = 26;
                 _context2.t0 = _context2["catch"](1);
-                this.error = _context2.t0;
-                this.resultSet = undefined;
-                this.loading = false;
+                _this2.error = _context2.t0;
+                _this2.resultSet = undefined;
+                _this2.loading = false;
 
               case 31:
               case "end":
                 return _context2.stop();
             }
           }
-        }, _callee2, this, [[1, 26]]);
-      }));
+        }, _callee2, null, [[1, 26]]);
+      }))();
+    },
+    loadQueries: function loadQueries() {
+      var _this3 = this;
 
-      return function load() {
-        return _load.apply(this, arguments);
-      };
-    }(),
-    loadQueries: function () {
-      var _loadQueries = _asyncToGenerator(
+      return _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee3() {
-        var _this = this;
-
         var queries, resultPromises;
         return _regeneratorRuntime.wrap(function _callee3$(_context3) {
           while (1) {
             switch (_context3.prev = _context3.next) {
               case 0:
-                queries = this.queries;
+                queries = _this3.queries;
                 _context3.prev = 1;
-                this.error = undefined;
-                this.loading = true;
+                _this3.error = undefined;
+                _this3.loading = true;
                 resultPromises = Promise.all(ramda.toPairs(queries).map(function (_ref) {
                   var _ref2 = _slicedToArray(_ref, 2),
                       name = _ref2[0],
                       query = _ref2[1];
 
-                  return _this.cubejsApi.load(query, {
-                    mutexObj: _this.mutexObj,
+                  return _this3.cubejsApi.load(query, {
+                    mutexObj: _this3.mutexObj,
                     mutexKey: name
                   }).then(function (r) {
                     return [name, r];
@@ -266,29 +263,25 @@ var QueryRenderer = {
 
               case 8:
                 _context3.t1 = _context3.sent;
-                this.resultSet = (0, _context3.t0)(_context3.t1);
-                this.loading = false;
+                _this3.resultSet = (0, _context3.t0)(_context3.t1);
+                _this3.loading = false;
                 _context3.next = 17;
                 break;
 
               case 13:
                 _context3.prev = 13;
                 _context3.t2 = _context3["catch"](1);
-                this.error = _context3.t2;
-                this.loading = false;
+                _this3.error = _context3.t2;
+                _this3.loading = false;
 
               case 17:
               case "end":
                 return _context3.stop();
             }
           }
-        }, _callee3, this, [[1, 13]]);
-      }));
-
-      return function loadQueries() {
-        return _loadQueries.apply(this, arguments);
-      };
-    }()
+        }, _callee3, null, [[1, 13]]);
+      }))();
+    }
   },
   watch: {
     query: {
@@ -524,8 +517,10 @@ var QueryBuilder = {
       return validatedQuery;
     }
   },
-  mounted: function () {
-    var _mounted = _asyncToGenerator(
+  mounted: function mounted() {
+    var _this3 = this;
+
+    return _asyncToGenerator(
     /*#__PURE__*/
     _regeneratorRuntime.mark(function _callee() {
       return _regeneratorRuntime.wrap(function _callee$(_context) {
@@ -533,27 +528,24 @@ var QueryBuilder = {
           switch (_context.prev = _context.next) {
             case 0:
               _context.next = 2;
-              return this.cubejsApi.meta();
+              return _this3.cubejsApi.meta();
 
             case 2:
-              this.meta = _context.sent;
-              this.copyQueryFromProps();
+              _this3.meta = _context.sent;
+
+              _this3.copyQueryFromProps();
 
             case 4:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, this);
-    }));
-
-    return function mounted() {
-      return _mounted.apply(this, arguments);
-    };
-  }(),
+      }, _callee);
+    }))();
+  },
   methods: {
     copyQueryFromProps: function copyQueryFromProps() {
-      var _this3 = this;
+      var _this4 = this;
 
       var _this$query = this.query,
           measures = _this$query.measures,
@@ -566,32 +558,32 @@ var QueryBuilder = {
           renewQuery = _this$query.renewQuery,
           order = _this$query.order;
       this.measures = (measures || []).map(function (m, i) {
-        return _objectSpread({
+        return _objectSpread2({
           index: i
-        }, _this3.meta.resolveMember(m, 'measures'));
+        }, _this4.meta.resolveMember(m, 'measures'));
       });
       this.dimensions = (dimensions || []).map(function (m, i) {
-        return _objectSpread({
+        return _objectSpread2({
           index: i
-        }, _this3.meta.resolveMember(m, 'dimensions'));
+        }, _this4.meta.resolveMember(m, 'dimensions'));
       });
       this.segments = (segments || []).map(function (m, i) {
-        return _objectSpread({
+        return _objectSpread2({
           index: i
-        }, _this3.meta.resolveMember(m, 'segments'));
+        }, _this4.meta.resolveMember(m, 'segments'));
       });
       this.timeDimensions = (timeDimensions || []).map(function (m, i) {
-        return _objectSpread({}, m, {
-          dimension: _objectSpread({}, _this3.meta.resolveMember(m.dimension, 'dimensions'), {
-            granularities: _this3.granularities
+        return _objectSpread2({}, m, {
+          dimension: _objectSpread2({}, _this4.meta.resolveMember(m.dimension, 'dimensions'), {
+            granularities: _this4.granularities
           }),
           index: i
         });
       });
       this.filters = (filters || []).map(function (m, i) {
-        return _objectSpread({}, m, {
-          member: _this3.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-          operators: _this3.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
+        return _objectSpread2({}, m, {
+          member: _this4.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+          operators: _this4.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
           index: i
         });
       });
@@ -616,11 +608,11 @@ var QueryBuilder = {
         });
 
         if (mem) {
-          var dimension = _objectSpread({}, this.meta.resolveMember(mem.name, 'dimensions'), {
+          var dimension = _objectSpread2({}, this.meta.resolveMember(mem.name, 'dimensions'), {
             granularities: this.granularities
           });
 
-          mem = _objectSpread({}, mem, {
+          mem = _objectSpread2({}, mem, {
             granularity: member.granularity,
             dateRange: member.dateRange,
             dimension: dimension,
@@ -628,9 +620,9 @@ var QueryBuilder = {
           });
         }
       } else if (element === 'filters') {
-        var filterMember = _objectSpread({}, this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']));
+        var filterMember = _objectSpread2({}, this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']));
 
-        mem = _objectSpread({}, member, {
+        mem = _objectSpread2({}, member, {
           member: filterMember
         });
       } else {
@@ -680,11 +672,11 @@ var QueryBuilder = {
         });
 
         if (mem) {
-          var dimension = _objectSpread({}, this.meta.resolveMember(mem.name, 'dimensions'), {
+          var dimension = _objectSpread2({}, this.meta.resolveMember(mem.name, 'dimensions'), {
             granularities: this.granularities
           });
 
-          mem = _objectSpread({}, mem, {
+          mem = _objectSpread2({}, mem, {
             dimension: dimension,
             granularity: member.granularity,
             dateRange: member.dateRange,
@@ -696,9 +688,9 @@ var QueryBuilder = {
           return x.dimension === old;
         });
 
-        var filterMember = _objectSpread({}, this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']));
+        var filterMember = _objectSpread2({}, this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']));
 
-        mem = _objectSpread({}, member, {
+        mem = _objectSpread2({}, member, {
           member: filterMember
         });
       } else {
@@ -715,37 +707,37 @@ var QueryBuilder = {
       }
     },
     setMembers: function setMembers(element, members) {
-      var _this4 = this;
+      var _this5 = this;
 
       var name = element.charAt(0).toUpperCase() + element.slice(1);
       var mem;
       var elements = [];
       members.forEach(function (m) {
         if (element === 'timeDimensions') {
-          mem = _this4["available".concat(name)].find(function (x) {
+          mem = _this5["available".concat(name)].find(function (x) {
             return x.name === m.dimension;
           });
 
           if (mem) {
-            var dimension = _objectSpread({}, _this4.meta.resolveMember(mem.name, 'dimensions'), {
-              granularities: _this4.granularities
+            var dimension = _objectSpread2({}, _this5.meta.resolveMember(mem.name, 'dimensions'), {
+              granularities: _this5.granularities
             });
 
-            mem = _objectSpread({}, mem, {
+            mem = _objectSpread2({}, mem, {
               granularity: m.granularity,
               dateRange: m.dateRange,
               dimension: dimension,
-              index: _this4[element].length
+              index: _this5[element].length
             });
           }
         } else if (element === 'filters') {
-          var member = _objectSpread({}, _this4.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
+          var member = _objectSpread2({}, _this5.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
 
-          mem = _objectSpread({}, m, {
+          mem = _objectSpread2({}, m, {
             member: member
           });
         } else {
-          mem = _this4["available".concat(name)].find(function (x) {
+          mem = _this5["available".concat(name)].find(function (x) {
             return x.name === m;
           });
         }
