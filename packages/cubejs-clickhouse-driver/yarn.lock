@@ -3,11 +3,9 @@
 
 
 "@apla/clickhouse@^1.5.5":
-  version "1.5.5"
-  resolved "https://registry.yarnpkg.com/@apla/clickhouse/-/clickhouse-1.5.5.tgz#45cf5f9b662f123954ed804b5638f203ee8fb67e"
-  dependencies:
-    buffer-indexof-polyfill "^1.0.1"
-    object-assign "^4.1.0"
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/@apla/clickhouse/-/clickhouse-1.6.1.tgz#27608fb1ec43c9df5f1d9cbf6222e33a87cba7ee"
+  integrity sha512-NMLyxv6vVFhQ7nW5soUVb1PUaQ0MtKMsDwuQN9RTJwEPZ6p/tOW+tG8Sr1axKQl1VJBuhHAKHxQrow/fFdlj/A==
 
 "@babel/code-frame@^7.0.0":
   version "7.0.0"
@@ -25,10 +23,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.18.3":
-  version "0.18.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.3.tgz#a05825432699ace9987457779d64f1bae3e7b196"
-  integrity sha512-piqdLy2ni+x+B1WDydrM3FFWbS7Zc1ZkkaiRj9bHSPGyOaobuAnWZD/ps4/rRmgkE/57Dq9+I7lmkUQdbxDiJQ==
+"@cubejs-backend/query-orchestrator@^0.18.4":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.4.tgz#bbf62a5c73b01895954961d81732d579f8bd3af2"
+  integrity sha512-UNTYcGI2MGsh5SDauMXGE7pLNrz+Ung/QOQhQ2aOWCke/wYskxMpMv1pLGipPPIihlyIGDxAIXbzjoemGRPtFw==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
@@ -177,10 +175,6 @@ buffer-fill@^1.0.0:
 buffer-from@^1.0.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/buffer-from/-/buffer-from-1.1.1.tgz#32713bc028f75c02fdb710d7c7bcec1f2c6070ef"
-
-buffer-indexof-polyfill@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/buffer-indexof-polyfill/-/buffer-indexof-polyfill-1.0.1.tgz#a9fb806ce8145d5428510ce72f278bb363a638bf"
 
 byline@^5.0.0:
   version "5.0.0"
@@ -1116,10 +1110,6 @@ npm-run-path@^4.0.0:
   integrity sha512-S48WzZW777zhNIrn7gxOlISNAqi9ZC/uQFnRdbeIHhZhCA6UqpkOT8T1G7BvfdgP4Er8gF4sUbaS0i7QvIfCWw==
   dependencies:
     path-key "^3.0.0"
-
-object-assign@^4.1.0:
-  version "4.1.1"
-  resolved "https://registry.yarnpkg.com/object-assign/-/object-assign-4.1.1.tgz#2109adc7965887cfc05cbbd442cac8bfbb360863"
 
 object-inspect@^1.7.0:
   version "1.7.0"
