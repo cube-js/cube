@@ -11,9 +11,10 @@ import Chart from "../components/Chart";
 const queries = {
   topSources: {
     chartType: 'pie',
+    legend: 'vertical',
     query: {
       measures: ['SessionUsers.usersCount'],
-      dimensions: ['SessionUsers.referrerSource'],
+      dimensions: ['SessionUsers.sourceMedium'],
       timeDimensions: [{
         dimension: 'SessionUsers.sessionStart'
       }]

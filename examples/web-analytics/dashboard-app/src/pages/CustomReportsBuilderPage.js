@@ -82,7 +82,7 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
               enableReinitialize
               initialValues={{ title: title || (data && data.dashboardItem.name) || "", query: query }}
               onSubmit={async values => {
-                await (id ? updateDashboardItem : addDashboardItem)({
+                const { data } = await (id ? updateDashboardItem : addDashboardItem)({
                   variables: {
                     id: id,
                     input: {
@@ -91,7 +91,7 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
                     }
                   }
                 });
-                history.push("/custom-reports-overview");
+                history.push(`/custom-reports/${id || data.createDashboardItem.id}`);
               }}
               validationSchema={Yup.object().shape({
                 title: Yup.string().required("Required"),

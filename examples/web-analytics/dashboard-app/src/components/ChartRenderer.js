@@ -139,7 +139,7 @@ const TypeToChartComponent = {
       ))}
     </CartesianChart>
   ),
-  pie: ({ resultSet }) => (
+  pie: ({ resultSet, legend }) => (
     <ResponsiveContainer width="100%" height={350}>
       <PieChart>
         <Pie
@@ -154,7 +154,7 @@ const TypeToChartComponent = {
             <Cell key={index} fill={colors[index % colors.length]} />
           ))}
         </Pie>
-        <Legend />
+        { legend && <Legend layout={legend} align="right" /> }
         <Tooltip />
       </PieChart>
     </ResponsiveContainer>

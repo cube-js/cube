@@ -34,7 +34,8 @@ cube(`Sessions`, {
 
   measures: {
     count: {
-      type: `count`
+      type: `count`,
+      title: `Sessions`
     },
 
     usersCount: {
@@ -119,11 +120,23 @@ cube(`Sessions`, {
 
 
     // Audience
+    // Demographics
     language: {
       sql: `br_lang`,
       type: `string`
     },
 
+    country: {
+      sql: `geo_country`,
+      type: `string`
+    },
+
+    city: {
+      sql: `geo_city`,
+      type: `string`
+    },
+
+    // System
     browser: {
       sql: `br_name`,
       type: `string`
@@ -145,13 +158,28 @@ cube(`Sessions`, {
     },
 
     referrerMedium: {
-      sql: `referrer_medium`,
-      type: `string`
+      type: `string`,
+      case: {
+        when: [
+          { sql: `${CUBE}.referrer_medium != ''`, label: { sql: `${CUBE}.referrer_medium` } }
+        ],
+        else: { label: '(none)' }
+      }
     },
 
     referrerSource: {
-      sql: `referrer_source`,
-      type: `string`
+      type: `string`,
+      case: {
+        when: [
+          { sql: `${CUBE}.referrer_source != ''`, label: { sql: `${CUBE}.referrer_source` } }
+        ],
+        else: { label: '(none)' }
+      }
+    },
+
+    sourceMedium: {
+      type: `string`,
+      sql: `concat(${CUBE.referrerSource}, " / ", ${CUBE.referrerMedium})`
     }
   },
 
@@ -177,7 +205,8 @@ cube(`SessionUsers`, {
   session_id,
   domain_userid,
   session_index,
-  referrer_source
+  referrer_source,
+  referrer_medium
   from ${Sessions.sql()}`,
 
   preAggregations: {

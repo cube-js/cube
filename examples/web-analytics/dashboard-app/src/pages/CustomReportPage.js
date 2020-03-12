@@ -27,7 +27,12 @@ const CustomReportPage = ({ withTime }) => {
       granularity: 'day'
     }]
   };
-  const dataTableQuery = null;
+  const dataTableQuery = {
+    ...query,
+    timeDimensions: [{
+      dimension: query.timeDimensions[0].dimension,
+    }]
+  };
   return (
     <>
       <Grid item xs={12}>
@@ -44,7 +49,7 @@ const CustomReportPage = ({ withTime }) => {
         />
       </Grid>
       <Grid item xs={12}>
-        <DataTable query={query} />
+        <DataTable query={withTime({ query: dataTableQuery, chartType: 'table' })} />
       </Grid>
     </>
   )

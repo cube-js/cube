@@ -28,6 +28,15 @@ cube(`Events`, {
       br_lang,
       br_name,
 
+      -- Location
+      geo_country,
+      geo_region,
+      geo_city,
+      geo_zipcode,
+      geo_latitude,
+      geo_longitude,
+      geo_region_name,
+
       -- referrer
       refr_urlhost || refr_urlpath AS referrer_url,
       refr_urlscheme AS referrer_url_scheme,
