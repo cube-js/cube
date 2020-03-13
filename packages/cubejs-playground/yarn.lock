@@ -1239,10 +1239,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.18.0":
-  version "0.18.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.0.tgz#456911e90d18ab4d633dd1db12461bbe7cdf457e"
-  integrity sha512-Hgvv9fdBF69UtMNZNPCta4D8KWqoxJO/cKEDIn4kn2BDYWJ0xOEIMbUULwD+4FY5FHbGSSG4jkodjINRldRXBQ==
+"@cubejs-client/core@^0.18.4":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.4.tgz#3a2c303947a6029e7251a054b216325668541a7a"
+  integrity sha512-VGLeJNP0fSEkbhXbbOxu3N8kib1IwnnqeFrG4wCQq0wDKq6+0IduQ4Zsh7+xtcyWnINUT+B6DfKFmUIP9foFkw==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -1253,10 +1253,10 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.18.0":
-  version "0.18.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.18.0.tgz#57e7411105733e9720eb0dc62fb7fc9220608b60"
-  integrity sha512-v1XbbKh4/+C66nWsEualNPG69t9oUs/xOda6VB8Svw/1l2iuW/wHrF5jdPVadXUkfee96vnE6wg/YW1ejV5S4w==
+"@cubejs-client/react@^0.18.4":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.18.4.tgz#82637946d81d94dde16701f7759f10ff29e6be39"
+  integrity sha512-DVOs+UzQTte5bAGVnFJzNlYmPJLcGIap4jrsYIfaCBrf1D4QMgMg1jRU13Dg1AUH5IyKt/z4yxOjZ/OXXjAhGA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -1622,9 +1622,9 @@ acorn-walk@^6.0.1:
   integrity sha512-7evsyfH1cLOCdAzZAd43Cic04yKydNx0cF+7tiA19p1XnLLPU4dpCQOqpjqwokFe//vS0QqfqqjCS2JkiIs0cA==
 
 acorn@^5.0.0, acorn@^5.5.3, acorn@^5.6.2:
-  version "5.7.3"
-  resolved "https://registry.yarnpkg.com/acorn/-/acorn-5.7.3.tgz#67aa231bf8812974b85235a96771eb6bd07ea279"
-  integrity sha512-T/zvzYRfbVojPWahDsE5evJdHb3oJoQfFbsrKM7w5Zcs++Tr257tia3BmMP8XYVjp1S9RZXQMh7gao96BlqZOw==
+  version "5.7.4"
+  resolved "https://registry.yarnpkg.com/acorn/-/acorn-5.7.4.tgz#3e8d8a9947d0599a1796d10225d7432f4a4acf5e"
+  integrity sha512-1D++VG7BhrtvQpNbBzovKNc1FLGGEE/oGe7b9xJm/RFHMBeUaUGpluV9RLjZa47YFdPcDAenEYuq9pQPcMdLJg==
 
 acorn@^6.0.1, acorn@^6.0.7:
   version "6.3.0"
