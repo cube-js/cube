@@ -66,17 +66,16 @@ More dimensions and measures you select to roll-up more queries you can cover wi
 
 Rollup pre-aggregation defines a set of measures and dimensions used to construct the query for pre-aggregation table.
 Each query issued against cube where pre-aggregation is defined will be checked if specific rollup pre-aggregation can be used by following algorithm:
-1. Determine the type of a query as one of *Additive*, *Leaf Measure Additive*, *Not Additive*.
-2. If the query is *Additive* check if rollup contains all dimensions, filter dimensions and measures used in query.
-3. If query is *Leaf Measure Additive* check if rollup contains all dimensions, filter dimensions and *Leaf Measures* used in query.
-4. If query is *Not Additive* check if query time dimension granularity is set, all query filter dimensions are included in query dimensions, rollup defines exact set of dimensions used in query and rollup contains all measures used in query.
+1. Determine the type of a query as one of *Leaf Measure Additive* or *Not Additive*.
+2. If query is *Leaf Measure Additive* check if rollup contains all dimensions, filter dimensions and *Leaf Measures* are used in query and measures aren't multiplied.
+3. If query is *Not Additive* check if query time dimension granularity is set, all query filter dimensions are included in query dimensions, rollup defines exact set of dimensions used in query and rollup contains all measures used in query.
 
 Here:
-- Query is *Additive* if all of it's measures are either `count`, `sum`, `min`, `max` or `countDistinctApprox` type.
 - Query is *Leaf Measure Additive* if all of it's *Leaf Measures* are either `count`, `sum`, `min`, `max` or `countDistinctApprox` type.
 - Query is *Not Additive* if it's not *Additive* and not *Leaf Measure Additive*.
 - *Leaf Measures* are measures that do not reference any other measures in it's definition.
 - Time dimension together with granularity constitute dimension.
+- Multiplied measures are measures of cubes that define `hasMany` relation involved in pre-aggregation definition join.
 
 ### Rollup examples
 
