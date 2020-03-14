@@ -102,8 +102,9 @@ const BehaviorPage = ({ withTime }) => (
         <Chart title="% Exit" vizState={withTime(queries.exitPercent)} />
       </Grid>
       <SwitchTable
-        options={[
-          {
+        options={[{
+          title: "Site Content",
+          values: [{
             name: "Page",
             fn: ({ query, ...vizState }) => ({
               ...vizState,
@@ -122,8 +123,8 @@ const BehaviorPage = ({ withTime }) => (
                 dimensions: ["PageViews.pageTitle"]
               }
             })
-          }
-        ]}
+          }]
+        }]}
         query={withTime(queries.pageviewsTable)}
       />
     </Grid>

@@ -205,6 +205,9 @@ cube(`SessionUsers`, {
   session_id,
   domain_userid,
   session_index,
+  br_lang,
+  geo_country,
+  geo_city,
   referrer_source,
   referrer_medium
   from ${Sessions.sql()}`,

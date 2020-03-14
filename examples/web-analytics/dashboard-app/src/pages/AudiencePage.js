@@ -5,6 +5,7 @@ import ChartRenderer from "../components/ChartRenderer";
 import DashboardItem from "../components/DashboardItem";
 import OverTimeChart from "../components/OverTimeChart";
 import Chart from "../components/Chart";
+import SwitchTable from "../components/SwitchTable";
 
 const queries = {
   usersOvertime: {
@@ -119,6 +120,42 @@ const AudiencePage = ({ withTime }) => {
           <ChartRenderer vizState={queries.usersByType} />
         </DashboardItem>
       </Grid>
+      <SwitchTable
+        options={[{
+          title: "Demographics",
+          values: [{
+            name: "Language",
+            fn: ({ query, ...vizState }) => ({
+              ...vizState,
+              query: {
+                ...query,
+                dimensions: ["SessionUsers.language"]
+              }
+            })
+          },
+          {
+            name: "Country",
+            fn: ({ query, ...vizState }) => ({
+              ...vizState,
+              query: {
+                ...query,
+                dimensions: ["SessionUsers.country"]
+              }
+            })
+          },
+          {
+            name: "City",
+            fn: ({ query, ...vizState }) => ({
+              ...vizState,
+              query: {
+                ...query,
+                dimensions: ["SessionUsers.city"]
+              }
+            })
+          }]
+        }]}
+        query={withTime({ query: queries.usersCount.query, chartType: 'table' })}
+      />
     </>
   );
 }

@@ -8,25 +8,26 @@ import ListItemText from '@material-ui/core/ListItemText';
 import ChartRenderer from "../components/ChartRenderer";
 
 const SwitchTable = ({ options, query }) => {
-  const [option, setOption] = useState(options[0]);
-  debugger
+  const [option, setOption] = useState(options[0].values[0]);
   return ([
     <Grid item xs={3}>
-      <List
-        component="nav"
-        aria-labelledby="nested-list-subheader"
-        subheader={
-          <ListSubheader component="div" id="nested-list-subheader">
-            Site Content
-          </ListSubheader>
-        }
-      >
-        {options.map(opt => (
-          <ListItem onClick={() => setOption(opt)} selected={option.name === opt.name} button>
-            <ListItemText primary={opt.name} />
-          </ListItem>
-        ))}
-      </List>
+      {options.map(({ title, values }) => (
+        <List
+          component="nav"
+          aria-labelledby="nested-list-subheader"
+          subheader={
+            <ListSubheader component="div" id="nested-list-subheader">
+              { title }
+            </ListSubheader>
+          }
+        >
+        {values.map(opt => (
+            <ListItem onClick={() => setOption(opt)} selected={option.name === opt.name} button>
+              <ListItemText primary={opt.name} />
+            </ListItem>
+          ))}
+        </List>
+      ))}
     </Grid>,
     <Grid item xs={9}>
       <ChartRenderer vizState={option.fn(query)} />

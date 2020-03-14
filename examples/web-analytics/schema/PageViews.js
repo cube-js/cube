@@ -65,8 +65,13 @@ cube(`PageViews`, {
     },
 
     pageTitle: {
-      sql: `page_title`,
-      type: `string`
+      type: `string`,
+      case: {
+        when: [
+          { sql: `${CUBE}.page_title != ''`, label: { sql: `${CUBE}.page_title` } }
+        ],
+        else: { label: '(not set)' }
+      }
     }
   },
 
@@ -75,7 +80,7 @@ cube(`PageViews`, {
       type: `rollup`,
       measureReferences: [pageviews, exits, count, totalTimeOnPageSeconds],
       timeDimensionReference: time,
-      dimensionReferences: [pageUrlPath],
+      dimensionReferences: [pageUrlPath, pageTitle],
       granularity: `hour`,
       refreshKey: {
         every: `5 minutes`
