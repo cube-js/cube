@@ -921,10 +921,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.18.0":
-  version "0.18.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.18.0.tgz#42b93088d56849c860a481f424d3ccb2c949a167"
-  integrity sha512-fg/Dnn5nGgLYEyqiSJ7NQW/dF+7jybGeDiReSmaSo8dzkQWbTlVTJXXwaeXsOcxVmQz6aGlH7Xk2RzcGcEIuBw==
+"@cubejs-backend/api-gateway@^0.18.4":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.18.4.tgz#7eb5171fcc931ff0902b9afe2eb4fce2bd0f08a8"
+  integrity sha512-OP0GXYayWYsIZlb0D98IH0Kl5pYZlyyK1Vo69bAG5fMWmn3Mq8zw6reS2/RMZyzy1rMR6W052To/Z2lAmz7ixQ==
   dependencies:
     "@hapi/joi" "^15.1.1"
     chrono-node "^1.3.11"
@@ -934,19 +934,19 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.18.3":
-  version "0.18.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.3.tgz#a05825432699ace9987457779d64f1bae3e7b196"
-  integrity sha512-piqdLy2ni+x+B1WDydrM3FFWbS7Zc1ZkkaiRj9bHSPGyOaobuAnWZD/ps4/rRmgkE/57Dq9+I7lmkUQdbxDiJQ==
+"@cubejs-backend/query-orchestrator@^0.18.4":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.4.tgz#bbf62a5c73b01895954961d81732d579f8bd3af2"
+  integrity sha512-UNTYcGI2MGsh5SDauMXGE7pLNrz+Ung/QOQhQ2aOWCke/wYskxMpMv1pLGipPPIihlyIGDxAIXbzjoemGRPtFw==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^2.8.0"
 
-"@cubejs-backend/schema-compiler@^0.18.3":
-  version "0.18.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.18.3.tgz#1e397db9971e20e2a20e9a2ab1d818677501b046"
-  integrity sha512-Ud8Ml66CflnU71cr9ME1sbhhKlOuCbtSSDR8f6+m0LEve+6n2KNoV24bzclrUxbITQ75zZqapHr7o0iY+FrY0g==
+"@cubejs-backend/schema-compiler@^0.18.4":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.18.4.tgz#7f592855bd22f490a77f2cd42f0e572740e3362f"
+  integrity sha512-CgjKf0GuRhRgitUaec6svUNlEglWLRvhDqnf9Lgu35kQzgvetvmTEhOvpVxpZN9p2wUCzPK25CkXcNNI1ds/Zg==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -1267,19 +1267,14 @@ acorn-walk@^6.1.0:
   integrity sha512-OtUw6JUTgxA2QoqqmrmQ7F2NYqiBPi/L2jqHyFtllhOUvXYQXf0Z1CYUinIfyT4bTCGmrA7gX9FvHA81uzCoVw==
 
 acorn@^5.5.3:
-  version "5.7.3"
-  resolved "https://registry.yarnpkg.com/acorn/-/acorn-5.7.3.tgz#67aa231bf8812974b85235a96771eb6bd07ea279"
-  integrity sha512-T/zvzYRfbVojPWahDsE5evJdHb3oJoQfFbsrKM7w5Zcs++Tr257tia3BmMP8XYVjp1S9RZXQMh7gao96BlqZOw==
+  version "5.7.4"
+  resolved "https://registry.yarnpkg.com/acorn/-/acorn-5.7.4.tgz#3e8d8a9947d0599a1796d10225d7432f4a4acf5e"
+  integrity sha512-1D++VG7BhrtvQpNbBzovKNc1FLGGEE/oGe7b9xJm/RFHMBeUaUGpluV9RLjZa47YFdPcDAenEYuq9pQPcMdLJg==
 
-acorn@^6.0.1:
+acorn@^6.0.1, acorn@^6.0.2:
   version "6.3.0"
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-6.3.0.tgz#0087509119ffa4fc0a0041d1e93a417e68cb856e"
   integrity sha512-/czfa8BwS88b9gWQVhc8eknunSA2DoJpJyTQkhheIf5E48u1N0R4q/YxxsAeqRrmK9TQ/uYfgLDfZo91UlANIA==
-
-acorn@^6.0.2:
-  version "6.0.5"
-  resolved "https://registry.yarnpkg.com/acorn/-/acorn-6.0.5.tgz#81730c0815f3f3b34d8efa95cb7430965f4d887a"
-  integrity sha512-i33Zgp3XWtmZBMNvCr4azvOFeWVw1Rk6p3hfi3LUDvIFraOMywb1kAtrbi+med14m4Xfpqm3zRZMT+c0FNE7kg==
 
 acorn@^7.1.0:
   version "7.1.1"
