@@ -58,7 +58,8 @@ describe('QueryOrchestrator', () => {
         loadSql: ["CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc('week', (\"orders\".created_at::timestamptz AT TIME ZONE 'UTC')) \"orders__created_at_week\", count(\"orders\".id) \"orders__count\", sum(\"orders\".number) \"orders__number\"\n    FROM\n      public.orders AS \"orders\"\n  WHERE (\"orders\".created_at >= $1::timestamptz AND \"orders\".created_at <= $2::timestamptz) GROUP BY 1", ["2019-11-01T00:00:00Z", "2019-11-30T23:59:59Z"]],
         invalidateKeyQueries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]]
       }],
-      renewQuery: true
+      renewQuery: true,
+      requestId: 'basic'
     };
     const result = await queryOrchestrator.fetchQuery(query);
     console.log(result.data[0]);
@@ -83,7 +84,8 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_number_and_count_week20191101'
         }],
       }],
-      renewQuery: true
+      renewQuery: true,
+      requestId: 'indexes'
     };
     const result = await queryOrchestrator.fetchQuery(query);
     console.log(result.data[0]);
@@ -105,7 +107,8 @@ describe('QueryOrchestrator', () => {
         loadSql: ["CREATE TABLE stb_pre_aggregations.orders_number_and_count_and_very_very_very_very_very_very_long20191101 AS SELECT\n      date_trunc('week', (\"orders\".created_at::timestamptz AT TIME ZONE 'UTC')) \"orders__created_at_week\", count(\"orders\".id) \"orders__count\", sum(\"orders\".number) \"orders__number\"\n    FROM\n      public.orders AS \"orders\"\n  WHERE (\"orders\".created_at >= $1::timestamptz AND \"orders\".created_at <= $2::timestamptz) GROUP BY 1", ["2019-11-01T00:00:00Z", "2019-11-30T23:59:59Z"]],
         invalidateKeyQueries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]],
       }],
-      renewQuery: true
+      renewQuery: true,
+      requestId: 'silent truncate'
     };
     let thrown = true;
     try {
