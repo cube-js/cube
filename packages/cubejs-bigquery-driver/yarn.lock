@@ -2,19 +2,19 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/query-orchestrator@^0.18.3":
-  version "0.18.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.3.tgz#a05825432699ace9987457779d64f1bae3e7b196"
-  integrity sha512-piqdLy2ni+x+B1WDydrM3FFWbS7Zc1ZkkaiRj9bHSPGyOaobuAnWZD/ps4/rRmgkE/57Dq9+I7lmkUQdbxDiJQ==
+"@cubejs-backend/query-orchestrator@^0.18.5":
+  version "0.18.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.5.tgz#196b59fea6c46da28fbcf56b40e62e6415632f81"
+  integrity sha512-y9hiOTHR27i4ypGk3oLOB0100Aa05MV8q/E6q03gAAEQQH88h7V1TfXUsG64BDZLT9lxedN6PumCnw2q9ALXiQ==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^2.8.0"
 
 "@google-cloud/bigquery@^4.1.4":
-  version "4.1.5"
-  resolved "https://registry.yarnpkg.com/@google-cloud/bigquery/-/bigquery-4.1.5.tgz#e608c51ecfd3f5dacd1a34c9e91695f7139067db"
-  integrity sha512-dCUmc+KYdEl7naTV8MYVBCZvOchgk4rMa0aTjPhf17VJuTg8PKbl/lNDxhe7oe0CBBMPIPtFwe6clLPZhcsx7g==
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/@google-cloud/bigquery/-/bigquery-4.7.0.tgz#4e00624e5a163a22d1861cc3a8b46f023203b0fe"
+  integrity sha512-u3VN1VUWcbVaW2vH5v2t0Zn5RSC4Hj3VCpf6sUO5xqcNTcHQyrjSd21aIBk28HgQO1H+9Gd1E0tGBfknGNONHw==
   dependencies:
     "@google-cloud/common" "^2.0.0"
     "@google-cloud/paginator" "^2.0.0"
