@@ -51,7 +51,7 @@ class LocalQueueDriverConnection {
 
   async getResult(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
-    if (this.resultPromises[resultListKey]) {
+    if (this.resultPromises[resultListKey] && this.resultPromises[resultListKey].resolved) {
       return this.getResultBlocking(queryKey);
     }
     return null;
@@ -125,6 +125,7 @@ class LocalQueueDriverConnection {
     delete this.recent[key];
     delete this.queryDef[key];
     delete this.processingLocks[key];
+    promise.resolved = true;
     promise.resolve(executionResult);
     return true;
   }
