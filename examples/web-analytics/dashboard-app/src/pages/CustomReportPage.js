@@ -44,7 +44,7 @@ const CustomReportPage = ({ withTime }) => {
       </Grid>
       <Grid item xs={12}>
         <OverTimeChart
-          title="Users Over Time"
+          title=""
           vizState={withTime({ query: overTimeChartQuery, chartType: 'line' })}
         />
       </Grid>

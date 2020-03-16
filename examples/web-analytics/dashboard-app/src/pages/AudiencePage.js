@@ -116,9 +116,10 @@ const AudiencePage = ({ withTime }) => {
         </Grid>
       </Grid>
       <Grid item xs={6}>
-        <DashboardItem title="Users by Type">
-          <ChartRenderer vizState={queries.usersByType} />
-        </DashboardItem>
+        <Chart
+          title="Users by Type"
+          vizState={withTime(queries.usersByType)}
+        />
       </Grid>
       <SwitchTable
         options={[{

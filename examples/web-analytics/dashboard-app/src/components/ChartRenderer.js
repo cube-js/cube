@@ -53,8 +53,8 @@ const xAxisFormatter = (item) => {
   }
 }
 
-const CartesianChart = ({ resultSet, legend, children, ChartComponent }) => (
-  <ResponsiveContainer width="100%" height={250}>
+const CartesianChart = ({ resultSet, legend, children, ChartComponent, height }) => (
+  <ResponsiveContainer width="100%" height={height || 250}>
     <ChartComponent
       margin={{
             top: 16,
@@ -139,8 +139,8 @@ const TypeToChartComponent = {
       ))}
     </CartesianChart>
   ),
-  pie: ({ resultSet, legend }) => (
-    <ResponsiveContainer width="100%" height={350}>
+  pie: ({ resultSet, legend, height }) => (
+    <ResponsiveContainer width="100%" height={ height || 250}>
       <PieChart>
         <Pie
           label={(value) => numeral(value.percent).format('0.00%')}
@@ -159,7 +159,7 @@ const TypeToChartComponent = {
       </PieChart>
     </ResponsiveContainer>
   ),
-  number: ({ resultSet }) => {
+  number: ({ resultSet, height }) => {
     const measureKey = resultSet.seriesNames()[0].key; // Ensure number can only render single measure
     const format = resultSet.loadResponse.annotation.measures[measureKey].format;
     const value = resultSet.totalRow()[measureKey];
@@ -175,7 +175,7 @@ const TypeToChartComponent = {
       formattedValue = decimalFormatter(value);
     }
     return (
-      <Typography component="p" variant="h4">
+      <Typography component="p" variant="h4" style={{height: height}}>
         {formattedValue}
       </Typography>
     )
@@ -210,15 +210,27 @@ const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)
   }))
   .reduce((a, b) => ({ ...a, ...b }));
 
-const renderChart = Component => ({ resultSet, error, ...props }) =>
-  (resultSet && <Component resultSet={resultSet} {...props} />) ||
-  (error && error.toString()) || <Skeleton height={250} />;
+const Loader = ({ height }) => {
+  const skeletons = [];
+  for (let i = 0; i < height; i+=18) {
+    skeletons.push(<Skeleton key={i} />)
+  }
+  return (
+    <div style={{height: height}}>
+      { skeletons }
+    </div>
+  )
+};
 
-const ChartRenderer = ({ vizState }) => {
+const renderChart = Component => ({ resultSet, error, height, ...props }) =>
+  (resultSet && <Component resultSet={resultSet} height={height} {...props} />) ||
+  (error && error.toString()) || <Loader height={height} />;
+
+const ChartRenderer = ({ vizState, height }) => {
   const { query, chartType, ...options } = vizState;
   const component = TypeToMemoChartComponent[chartType];
   const renderProps = useCubeQuery(query);
-  return component && renderChart(component)({ ...options, ...renderProps });
+  return component && renderChart(component)({ ...options, height, ...renderProps });
 };
 
 ChartRenderer.propTypes = {

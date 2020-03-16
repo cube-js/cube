@@ -5,13 +5,19 @@ import Typography from "@material-ui/core/Typography";
 
 import ChartRenderer from "./ChartRenderer";
 
-const Chart = ({ title, vizState }) => (
+const heights = {
+  pie: 250,
+  line: 250,
+  number: 50
+}
+
+const Chart = ({ title, vizState, height }) => (
   <Card>
     <CardContent>
       <Typography component="p" color="primary" gutterBottom>
         {title}
       </Typography>
-      <ChartRenderer vizState={vizState} />
+      <ChartRenderer vizState={vizState} height={height || heights[vizState.chartType]} />
     </CardContent>
   </Card>
 );

@@ -183,6 +183,21 @@ cube(`Sessions`, {
     }
   },
 
+  segments: {
+    bouncedSessions: {
+      sql: `${isBounced} = 'True'`
+    },
+    directTraffic: {
+      sql: `${referrerMedium} = '(none)'`
+    },
+    searchTraffic: {
+      sql: `${referrerMedium} = 'search'`
+    },
+    newUsers: {
+      sql: `${type} = 'New'`
+    }
+  },
+
   preAggregations: {
     additive: {
       type: `rollup`,

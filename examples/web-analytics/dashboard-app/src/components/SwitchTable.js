@@ -10,7 +10,7 @@ import ChartRenderer from "../components/ChartRenderer";
 const SwitchTable = ({ options, query }) => {
   const [option, setOption] = useState(options[0].values[0]);
   return ([
-    <Grid item xs={3}>
+    <Grid item xs={3} style={{minHeight: 300}} >
       {options.map(({ title, values }) => (
         <List
           component="nav"

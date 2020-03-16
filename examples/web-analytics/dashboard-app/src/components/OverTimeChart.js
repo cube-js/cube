@@ -52,7 +52,7 @@ const OverTimeChart = ({ title, vizState, granularityControls }) => {
             </ButtonGroup>
           </Grid>
         </Grid>
-        <ChartRenderer vizState={withGranularity(vizState, granularity)} />
+        <ChartRenderer height={250} vizState={withGranularity(vizState, granularity)} />
       </CardContent>
     </Card>
   )

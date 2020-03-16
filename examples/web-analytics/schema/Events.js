@@ -76,6 +76,10 @@ cube(`Events`, {
     Sessions: {
       relationship: `belongsTo`,
       sql: `${CUBE}.session_id = ${Sessions.id}`
+    },
+    SessionUsers: {
+      relationship: `belongsTo`,
+      sql: `${CUBE}.session_id = ${SessionUsers.id}`
     }
   },
 

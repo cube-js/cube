@@ -15,6 +15,7 @@ import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import { makeStyles } from "@material-ui/core/styles";
 
 import { drawerWidth } from "./SidePanel";
+import { getUserPreference, setUserPreference } from "../utils.js";
 
 const useStyles = makeStyles(theme => ({
   appBar: {
@@ -32,15 +33,19 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
+const apps = [
+  { id: 1, title: "Demo app #1" },
+  { id: 2, title: "Demo app #2" }
+];
+
 const Header = ({ location }) => {
    const [appMenu, setAppMenu] = React.useState(null);
+   const [currentApp, setCurrentApp] = React.useState(apps[0]);
    const handleAppIconClick = event => {
     setAppMenu(event.currentTarget);
   };
-  const handleAppMenuClose = event => {
-    if (event.currentTarget.nodeName === 'A') {
-      // TODO
-    }
+  const handleAppMenuClose = (app) => {
+    setCurrentApp(app)
     setAppMenu(null);
   };
   const classes = useStyles();
@@ -61,7 +66,7 @@ const Header = ({ location }) => {
           >
             <AppsIcon />
             <span className={classes.appName}>
-              My Demo App
+              { currentApp.title }
             </span>
             <ExpandMoreIcon fontSize="small" />
           </Button>
@@ -72,15 +77,14 @@ const Header = ({ location }) => {
           open={Boolean(appMenu)}
           onClose={handleAppMenuClose}
         >
-          {["My Demo App", "My Demo App #2"].map(appName => (
+          {apps.map(({ id, title }) => (
            <MenuItem
               component="a"
               data-no-link="true"
-              href='/'
-              key={appName}
-              onClick={handleAppMenuClose}
+              key={id}
+              onClick={() => handleAppMenuClose({ id, title })}
             >
-              {appName}
+              {title}
             </MenuItem>
           ))}
         </Menu>
