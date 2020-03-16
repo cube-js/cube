@@ -11,7 +11,7 @@ The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension e
 
 In a case of dimension of type time granularity could be optionally added to the name, in the following format `CUBE_NAME.TIME_DIMENSION_NAME.GRANULARITY`, ex: `Stories.time.month`.
 
-Supported granularities: `hour`, `day`, `week`, `month`.
+Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`.
 
 ## Query Properties
 
@@ -304,7 +304,7 @@ Since grouping and filtering by a time dimension is quite a common case, Cube.js
 Dates in `YYYY-MM-DD` format padded to start and end of day if used in start and end of date range interval accordingly. 
 If only one date specified it's equivalent to passing two same dates as a date range.
 You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
-  - `granularity`: A granularity for a time dimension. It supports following values `hour`, `day`, `week`, `month`, `year`. If you pass `null` to the granularity, the Cube.js will only perform a filtering by specified time dimension, without grouping.
+  - `granularity`: A granularity for a time dimension. It supports following values `second`, `minute`, `hour`, `day`, `week`, `month`, `year`. If you pass `null` to the granularity, the Cube.js will only perform a filtering by specified time dimension, without grouping.
 
 ```js
 {
