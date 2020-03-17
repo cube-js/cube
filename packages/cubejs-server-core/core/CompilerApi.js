@@ -15,7 +15,8 @@ class CompilerApi {
     this.compileContext = options.compileContext;
   }
 
-  async getCompilers() {
+  async getCompilers(options) {
+    const { requestId } = options || {};
     let compilerVersion = (
       this.schemaVersion && this.schemaVersion() ||
       'default_schema_version'
@@ -25,7 +26,10 @@ class CompilerApi {
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest("hex")}`;
     }
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', { version: compilerVersion });
+      this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
+        version: compilerVersion,
+        requestId
+      });
       // TODO check if saving this promise can produce memory leak?
       this.compilers = PrepareCompiler.compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
@@ -47,7 +51,7 @@ class CompilerApi {
     options = options || {};
     const { includeDebugInfo } = options;
     const dbType = this.getDbType('default');
-    const compilers = await this.getCompilers();
+    const compilers = await this.getCompilers({ requestId: query.requestId });
     let sqlGenerator = this.createQuery(compilers, dbType, query);
 
     const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
@@ -89,8 +93,8 @@ class CompilerApi {
     );
   }
 
-  async metaConfig() {
-    return (await this.getCompilers()).metaTransformer.cubes;
+  async metaConfig(options) {
+    return (await this.getCompilers(options)).metaTransformer.cubes;
   }
 }
 

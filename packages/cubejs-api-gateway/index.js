@@ -242,7 +242,8 @@ const coerceForSqlQuery = (query, context) => ({
   timeDimensions: query.timeDimensions || [],
   contextSymbols: {
     userContext: context.authInfo && context.authInfo.u || {}
-  }
+  },
+  requestId: context.requestId
 });
 
 class ApiGateway {
@@ -336,7 +337,7 @@ class ApiGateway {
   async meta({ context, res }) {
     const requestStarted = new Date();
     try {
-      const metaConfig = await this.getCompilerApi(context).metaConfig();
+      const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
       const cubes = metaConfig.map(c => c.config);
       res({ cubes });
     } catch (e) {
@@ -381,7 +382,7 @@ class ApiGateway {
       const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
       const [compilerSqlResult, metaConfigResult] = await Promise.all([
         this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context)),
-        this.getCompilerApi(context).metaConfig()
+        this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
       ]);
       const sqlQuery = compilerSqlResult;
       this.log(context, {
