@@ -1239,10 +1239,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.18.4":
-  version "0.18.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.4.tgz#3a2c303947a6029e7251a054b216325668541a7a"
-  integrity sha512-VGLeJNP0fSEkbhXbbOxu3N8kib1IwnnqeFrG4wCQq0wDKq6+0IduQ4Zsh7+xtcyWnINUT+B6DfKFmUIP9foFkw==
+"@cubejs-client/core@^0.18.7":
+  version "0.18.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.7.tgz#57a984dba39d716653b70921e2fc3ad98407cd81"
+  integrity sha512-2I7xu5IO2ohAmXEg67fs5c08PIjCguCPiKWTo6ZoVGjG6641Xl+jTvc+xyoZYcTMsPCBdxT/g7RnfCfDq8jNEw==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -10286,9 +10286,9 @@ react-transition-group@^2.5.0:
     react-lifecycles-compat "^3.0.4"
 
 react@^16.8.3:
-  version "16.9.0"
-  resolved "https://registry.yarnpkg.com/react/-/react-16.9.0.tgz#40ba2f9af13bc1a38d75dbf2f4359a5185c4f7aa"
-  integrity sha512-+7LQnFBwkiw+BobzOF6N//BdoNw0ouwmSJTEm9cglOOmsg/TMiFHZLe2sEoN5M7LgJTj9oHH0gxklfnQe66S1w==
+  version "16.13.0"
+  resolved "https://registry.yarnpkg.com/react/-/react-16.13.0.tgz#d046eabcdf64e457bbeed1e792e235e1b9934cf7"
+  integrity sha512-TSavZz2iSLkq5/oiE7gnFzmURKZMltmi193rm5HEoUDAXpzT9Kzw6oNZnGoai/4+fUnm7FqS5dwgUL34TujcWQ==
   dependencies:
     loose-envify "^1.1.0"
     object-assign "^4.1.1"
