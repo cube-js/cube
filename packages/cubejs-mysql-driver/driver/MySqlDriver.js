@@ -129,7 +129,7 @@ class MySqlDriver extends BaseDriver {
   }
 
   toColumnValue(value, genericType) {
-    if (genericType === 'text') {
+    if (genericType === 'text' || genericType === 'string') {
       return value && value.replace(/[\u0800-\uFFFF]/g, '');
     }
     if (genericType === 'timestamp' && typeof value === 'string') {
