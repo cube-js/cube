@@ -5,6 +5,8 @@ const bodyParser = require("body-parser");
 const path = require("path");
 const http = require("http");
 const serveStatic = require('serve-static');
+const session = require('express-session');
+const passport = require('passport');
 require('dotenv').config();
 
 var app = express();
@@ -26,6 +28,58 @@ const cubejsServer = CubejsServerCore.create({
 
 if (process.env.NODE_ENV === 'production') {
   app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
+}
+
+app.use(session({ secret: process.env.CUBEJS_API_SECRET }));
+app.use(passport.initialize());
+app.use(passport.session());
+
+if (process.env.GOOGLE_AUTH_DOMAIN) {
+  const GoogleStrategy = require('passport-google-oauth20').Strategy;
+  passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: (
+        process.env.NODE_ENV === 'production' ?
+        `${GSUITE_AUTH_REDIRECT}` :
+        'http://localhost:4000'
+      ) + '/auth/google/callback'
+    },
+    (accessToken, refreshToken, profile, cb) => {
+      console.log(profile);
+      if (profile.emails && profile.emails.find(e => e.value.match(new RegExp(`@${process.env.GOOGLE_AUTH_DOMAIN}$`)) && e.verified)) {
+        return cb(null, profile);
+      }
+      return cb(`${profile.emails && profile.emails[0] && profile.emails[0].value} not within @${process.env.GOOGLE_AUTH_DOMAIN}`);
+    }
+  ));
+
+  passport.serializeUser(function(user, done) {
+    done(null, user);
+  });
+
+  passport.deserializeUser(function(user, done) {
+    done(null, user);
+  });
+
+  app.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+  app.get('/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/auth/google' }),
+    function(req, res) {
+      // Successful authentication, redirect home.
+      res.redirect('/');
+    }
+  );
+
+  app.use((req, res, next) => {
+    if (!req.user) {
+      res.redirect('/auth/google');
+      return;
+    }
+    next();
+  });
 }
 
 app.get('/healthy', (req, res) => {
