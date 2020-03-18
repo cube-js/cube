@@ -179,7 +179,7 @@ LOCATION 's3://bucket-name/path/to/enriched/good';
 Docker container
 Configure via env variables
 
-#### Enable Authentication via Google Oauth2 (Optional)
+### Enable Authentication via Google OAuth 2 (Optional)
 
 You can enable authentication to let only users with emails with specific domain
 to sign in. To enable it you need to define the following environment variables -
