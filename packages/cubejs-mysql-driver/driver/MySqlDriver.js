@@ -11,13 +11,14 @@ const GenericTypeToMySql = {
 class MySqlDriver extends BaseDriver {
   constructor(config) {
     super();
+    const { pool, ...restConfig } = config || {};
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ...config
+      ...restConfig
     };
     this.pool = genericPool.createPool({
       create: async () => {
@@ -50,7 +51,8 @@ class MySqlDriver extends BaseDriver {
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
       testOnBorrow: true,
-      acquireTimeoutMillis: 20000
+      acquireTimeoutMillis: 20000,
+      ...pool
     });
   }
 
