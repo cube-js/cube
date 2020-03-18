@@ -24,7 +24,8 @@ class LocalCacheDriver {
   }
 
   async keysStartingWith(prefix) {
-    return Object.keys(this.store).filter(k => k.indexOf(prefix) === 0);
+    return Object.keys(this.store)
+      .filter(k => k.indexOf(prefix) === 0 && this.store[k].exp > new Date().getTime());
   }
 }
 
