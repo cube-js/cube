@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Statsbot, Inc.",
-  "version": "0.18.7",
+  "version": "0.18.8",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
