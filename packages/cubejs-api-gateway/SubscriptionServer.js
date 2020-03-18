@@ -1,3 +1,4 @@
+const uuid = require('uuid/v4');
 const UserError = require('./UserError');
 
 const methodParams = {
@@ -61,7 +62,8 @@ class SubscriptionServer {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
-      const requestId = message.requestId || `${connectionId}-${message.messageId}`;
+      const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
+      const requestId = `${baseRequestId}-span-${uuid()}`;
       context = await this.apiGateway.contextByReq(message, authContext.authInfo, requestId);
 
       const allowedParams = methodParams[message.method];

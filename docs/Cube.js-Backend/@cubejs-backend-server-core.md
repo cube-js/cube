@@ -132,6 +132,8 @@ Path to schema files. The default value is `/schema`.
 
 Boolean to enable or disable a development server mode. The default value is based on `NODE_ENV` environment variable value. If the value of `NODE_ENV` is `production` it is `false`, otherwise it is `true`.
 
+**NOTE:** Using dev server in production is a security risk as there're unsecured routes which allows to get access to all data defined in Cube.js schema.
+
 ### logger
 
 A function to setup a custom logger. It accepts the following arguments:
@@ -382,7 +384,7 @@ _Please note that this is advanced configuration._
 | redisPrefix | Prefix to be set an all Redis keys | `STANDALONE` |
 | queryCacheOptions | Query cache options for DB queries | `{}`
 | queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check | `defined by DB dialect`
-| queryCacheOptions.backgroundRenew | Immediately return values from cache if available without [refreshKey](cube#parameters-refresh-key) check to renew in foreground. Default value before 0.15.0 was `true` | `false`
+| queryCacheOptions.backgroundRenew | Controls whether to wait in foreground for refreshed query data if `refreshKey` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [refreshKey](cube#parameters-refresh-key) check to renew in foreground. Default value before 0.15.0 was `true` | `false`
 | preAggregationsOptions | Query cache options for pre-aggregations | `{}`
 
 To set options for `queryCache` and `preAggregations`, set an object with key queueOptions. `queryCacheOptions` are used while querying database tables, while `preAggregationsOptions` settings are used to query pre-aggregated tables.

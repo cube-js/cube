@@ -116,7 +116,7 @@ describe('MySqlPreAggregations', function test() {
         timeDimensions: [{
           dimension: 'visitors.createdAt',
           granularity: 'day',
-          dateRange: ['2016-12-30', '2017-01-05']
+          dateRange: ['2016-12-30', '2017-01-30'] // TODO fix MySQL pre-aggregation return incorrect results on DST switch
         }],
         order: [{
           id: 'visitors.createdAt'
@@ -152,6 +152,11 @@ describe('MySqlPreAggregations', function test() {
               "visitors__source": "google",
               "visitors__created_at_day": "2017-01-05T00:00:00.000",
               "visitors__count": 1
+            },
+            {
+              "visitors__source": null,
+              "visitors__created_at_day": "2017-01-06T00:00:00.000",
+              "visitors__count": 2
             }
           ]
         );

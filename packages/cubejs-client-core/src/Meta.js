@@ -41,6 +41,12 @@ class Meta {
     ]));
   }
 
+  /**
+   * Get all members of specific type for a given query.
+   * If empty query is provided no filtering is done based on query context and all available members are retrieved.
+   * @param query - context query to provide filtering of members available to add to this query
+   * @param memberType - `measures`, `dimensions` or `segments`
+   */
   membersForQuery(query, memberType) {
     return unnest(this.cubes.map(c => c[memberType]));
   }

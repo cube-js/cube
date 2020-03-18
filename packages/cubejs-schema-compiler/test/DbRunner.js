@@ -65,7 +65,7 @@ class PostgresDBRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    return new GenericContainer('postgres')
+    return new GenericContainer('postgres', '9.6.8')
       .withEnv("POSTGRES_USER", 'root')
       .withEnv("POSTGRES_DB", 'model_test')
       .withExposedPorts(this.port())

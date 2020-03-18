@@ -126,6 +126,7 @@ class WebSocketTransport {
   request(method, { baseRequestId, ...params }) {
     const message = {
       messageId: this.messageCounter++,
+      requestId: baseRequestId,
       method,
       params
     };
@@ -150,14 +151,9 @@ class WebSocketTransport {
 
     const transport = this;
 
-    let spanCounter = 1;
-
     return {
       async subscribe(callback) {
-        transport.sendMessage({
-          requestId: baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
-          ...message
-        });
+        transport.sendMessage(message);
         const result = await new Promise((resolve) => {
           nextMessage = resolve;
           if (pendingResults.length) {
