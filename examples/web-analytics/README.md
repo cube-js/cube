@@ -179,6 +179,20 @@ LOCATION 's3://bucket-name/path/to/enriched/good';
 Docker container
 Configure via env variables
 
+#### Enable Authentication via Google Oauth2 (Optional)
+
+You can enable authentication to let only users with emails with specific domain
+to sign in. To enable it you need to define the following environment variables -
+
+```bash
+GOOGLE_AUTH_DOMAIN=DOMAIN-TO-ALLOW-SIGN-INS-FROM
+GOOGLE_AUTH_REDIRECT=URL-OF-YOUR-DEPLOYMENT (e.g.: https://analytics.myapp.com)
+GOOGLE_AUTH_CLIENT_ID=GOOGLE_CLIENT_ID
+GOOGLE_AUTH_CLIENT_SECRET=GOOGLE_CLIENT_SECRET
+```
+
+To obtain `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` you must register an application with Google. If you have not already done so, a new project can be created in the [Google Developers Console](https://console.developers.google.com/). Your application will be issued a client ID and client secret. You will also need to configure a redirect URI which should match the following patter - `GOOGLE_AUTH_REDIRECT/auth/google/callback`, where `GOOGLE_AUTH_REDIRECT` is an environment variable you defined before.
+
 ## Future Development
 
 ## Contributing

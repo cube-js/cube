@@ -26,9 +26,9 @@ const cubejsServer = CubejsServerCore.create({
   scheduledRefreshTimer: true
 });
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
-}
+app.get('/healthy', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 app.use(session({ secret: process.env.CUBEJS_API_SECRET }));
 app.use(passport.initialize());
@@ -37,16 +37,15 @@ app.use(passport.session());
 if (process.env.GOOGLE_AUTH_DOMAIN) {
   const GoogleStrategy = require('passport-google-oauth20').Strategy;
   passport.use(new GoogleStrategy({
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientID: process.env.GOOGLE_AUTH_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_AUTH_CLIENT_SECRET,
       callbackURL: (
         process.env.NODE_ENV === 'production' ?
-        `${GSUITE_AUTH_REDIRECT}` :
+        `${process.env.GOOGLE_AUTH_REDIRECT}` :
         'http://localhost:4000'
       ) + '/auth/google/callback'
     },
     (accessToken, refreshToken, profile, cb) => {
-      console.log(profile);
       if (profile.emails && profile.emails.find(e => e.value.match(new RegExp(`@${process.env.GOOGLE_AUTH_DOMAIN}$`)) && e.verified)) {
         return cb(null, profile);
       }
@@ -82,9 +81,9 @@ if (process.env.GOOGLE_AUTH_DOMAIN) {
   });
 }
 
-app.get('/healthy', (req, res) => {
-  res.json({ status: 'ok' });
-});
+if (process.env.NODE_ENV === 'production') {
+  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
+}
 
 cubejsServer.initApp(app);
 
