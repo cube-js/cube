@@ -17,6 +17,7 @@ class MySqlDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
+      charset: 'utf8mb4',
       ...config
     };
     this.pool = genericPool.createPool({
@@ -129,9 +130,6 @@ class MySqlDriver extends BaseDriver {
   }
 
   toColumnValue(value, genericType) {
-    if (genericType === 'text' || genericType === 'string') {
-      return value && value.toString().replace(/[\u0800-\uFFFF]/g, '');
-    }
     if (genericType === 'timestamp' && typeof value === 'string') {
       return value && value.replace('Z', '');
     }
