@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mssql-driver",
   "description": "Cube.js MS SQL database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.18.11",
+  "version": "0.18.12",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "driver/MSSqlDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.18.11",
+    "@cubejs-backend/query-orchestrator": "^0.18.12",
     "mssql": "^6.1.0"
   },
   "license": "Apache-2.0",
