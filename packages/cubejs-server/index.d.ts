@@ -1,4 +1,4 @@
-import { CreateOptions as CoreCreateOptions, CreateOptions } from "@cubejs-backend/server-core";
+import { CreateOptions as CoreCreateOptions } from "@cubejs-backend/server-core";
 import express from 'express';
 import https from 'https';
 import http from 'http';
@@ -15,4 +15,4 @@ declare class CubejsServer {
   testConnections(): Promise<void>;
 }
 
-export = CubejsServer;
+export default CubejsServer;
