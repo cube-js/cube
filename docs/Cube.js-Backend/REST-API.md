@@ -49,6 +49,13 @@ Cube.js REST API has basic errors and HTTP Error codes for all requests.
 | 403 | Invalid token | The auth token provided is not valid. It may be expired or have invalid signature. |
 | 500 | Error message | Cube.js internal server error. Check error message for details. |
 
+### Request Span Annotation
+
+For monitoring tools such as Cube Cloud proper request span annotation should be provided in `x-request-id` header of a request.
+Each request id should consist of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as whole: `${spanId}-span-${requestSequenceId}`.
+Values of `x-request-id` header should be unique for each separate request.
+`spanId` should define user interaction span such us `Continue wait` retry cycle and it's value shouldn't change during one single interaction.
+
 ## API Reference
 
 ### /v1/load
