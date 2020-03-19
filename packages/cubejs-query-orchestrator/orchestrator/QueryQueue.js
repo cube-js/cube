@@ -265,10 +265,13 @@ class QueryQueue {
           };
           this.logger('Error while querying', {
             processingId,
+            queueSize,
+            duration: ((new Date()).getTime() - startQueryTime),
             queryKey: query.queryKey,
-            error: (e.stack || e).toString(),
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            timeInQueue,
+            error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
             this.logger('Cancelling query due to timeout', {
