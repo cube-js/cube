@@ -83,6 +83,9 @@ cube(`Users`, {
 
 ## asyncModule
 
+> **NOTE:** Each `asyncModule` call will be invoked only once per schema compilation. 
+To trigger schema recompile based on changes of underlying input data, [schemaVersion](@cubejs-backend-server-core#options-reference-schema-version) value should change accordingly.
+
 If there's a need to generate schema based on values from external API or database `asyncModule` method can be used for such scenario.
 `asyncModule` method allows to register async function to be executed at the end of data schema file compile phase so additional definitions can be added during this function call.
 
@@ -151,9 +154,6 @@ asyncModule(async () => {
   });
 })
 ```
-
-Each `asyncModule` call will be invoked only once per schema compilation.
-To trigger schema recompile based on changes of underlying input data, [schemaVersion](@cubejs-backend-server-core#options-reference-schema-version) value should change accordingly.
 
 ## Context symbols transpile
 
