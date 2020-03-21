@@ -90,7 +90,9 @@ class QueryOrchestrator {
   }
 
   async cleanup() {
-    await this.redisPool.cleanup();
+    if (this.redisPool) {
+      await this.redisPool.cleanup();
+    }
   }
 }
 

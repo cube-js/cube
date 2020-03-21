@@ -422,7 +422,7 @@ class CubejsServerCore {
           }
           return driverPromise;
         },
-        getExternalDriverFactory: async () => {
+        getExternalDriverFactory: this.externalDriverFactory && (async () => {
           if (!externalPreAggregationsDriverPromise) {
             const driver = await this.externalDriverFactory(context);
             externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
@@ -431,7 +431,7 @@ class CubejsServerCore {
             });
           }
           return externalPreAggregationsDriverPromise;
-        },
+        }),
         redisPrefix: dataSourceId,
         orchestratorOptions: this.orchestratorOptions(context)
       });

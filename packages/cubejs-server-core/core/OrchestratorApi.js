@@ -89,7 +89,8 @@ class OrchestratorApi {
   release() {
     return Promise.all([
       this.releaseDriver(this.driverFactory),
-      this.releaseDriver(this.externalDriverFactory)
+      this.releaseDriver(this.externalDriverFactory),
+      this.orchestrator.cleanup()
     ]);
   }
 
