@@ -33,25 +33,46 @@ const processHandlers = {
 class Handlers {
   constructor(options) {
     options = {
+      ...options,
       orchestratorOptions: (context) => ({
+        ...(options && options.orchestratorOptions),
         queryCacheOptions: {
+          ...(options && options.orchestratorOptions && options.orchestratorOptions.queryCacheOptions),
           queueOptions: {
             sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'queryProcess', context),
-            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'queryCancel', context)
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'queryCancel', context),
+            ...(
+              options &&
+              options.orchestratorOptions &&
+              options.orchestratorOptions.queryCacheOptions &&
+              options.orchestratorOptions.queryCacheOptions.queueOptions
+            )
           },
           externalQueueOptions: {
             sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'externalQueryProcess', context),
-            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'externalQueryCancel', context)
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'externalQueryCancel', context),
+            ...(
+              options &&
+              options.orchestratorOptions &&
+              options.orchestratorOptions.queryCacheOptions &&
+              options.orchestratorOptions.queryCacheOptions.externalQueueOptions
+            )
           }
         },
         preAggregationsOptions: {
+          ...(options && options.orchestratorOptions && options.orchestratorOptions.preAggregationsOptions),
           queueOptions: {
             sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'preAggregationProcess', context),
-            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'preAggregationCancel', context)
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'preAggregationCancel', context),
+            ...(
+              options &&
+              options.orchestratorOptions &&
+              options.orchestratorOptions.preAggregationsOptions &&
+              options.orchestratorOptions.preAggregationsOptions.queueOptions
+            )
           }
         }
-      }),
-      ...options
+      })
     };
     this.serverCore = new ServerCore(options);
   }
