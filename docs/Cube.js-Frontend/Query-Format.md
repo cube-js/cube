@@ -29,7 +29,7 @@ Query has the following properties:
     their corresponding values are either `asc` or `desc`. The order of the
     fields to order is based on the order of the keys in the object.
 - `timezone`: All time based calculations performed within Cube.js are timezone-aware. Using this property you can set your desired timezone in [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.: `America/Los_Angeles`. The default value is `UTC`.
-- `renewQuery`: If `renewQuery` is set to `true`, query will renew all `refreshKey` and query result in foreground. However if `refreshKey` or `refreshKeyRenewalThreshold` don't indicate that there's update required this setting has no effect. The default value is `false`.
+- `renewQuery`: If `renewQuery` is set to `true`, Cube.js will renew all `refreshKey` for query and query result itself in foreground. However if `refreshKey` or `refreshKeyRenewalThreshold` don't indicate that there's a need for update this setting has no effect. The default value is `false`.
 - `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be added to the query and raw results after filtering and joining will be returned without grouping. 
 By default `ungrouped` query requires to pass primary key as a dimension of every cube involved in query for security purpose.
 To disable this behavior please see [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#options-reference-allow-ungrouped-without-primary-key) server option. 
