@@ -25,7 +25,7 @@ class PostgresDriver extends BaseDriver {
     super();
     this.config = config || {};
     this.pool = new Pool({
-      max: 8,
+      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
       idleTimeoutMillis: 30000,
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
