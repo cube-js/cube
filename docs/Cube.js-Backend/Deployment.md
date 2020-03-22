@@ -28,6 +28,12 @@ Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. I
 Make sure, your Redis allows at least 15 concurrent connections.
 Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
 
+### Redis Pool
+
+If `REDIS_URL` is provided Cube.js will create Redis pool with 2 min and 1000 max of concurrent connections by default.
+`CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be used to tweak pool size.
+No pool behavior with each connection created on demand can be achieved with `CUBEJS_REDIS_POOL_MAX=0` setting.
+
 ### Running without Redis
 
 If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
