@@ -37,7 +37,8 @@ const withTimeFunc = ({ query, ...vizState }, begin, end, segment) => {
   const timeDimensionObj = (query.timeDimensions || [])[0] || {};
   const timeDimension = timeDimensionObj.dimension || 'Sessions.sessionStart';
   const granularity = timeDimensionObj.granularity || null;
-  const segments = segment === 'all' ? [] : [`SessionUsers.${segment}`];
+  const segmentCube = (query) => query.measures[0].split(".")[0];
+  const segments = segment === 'all' ? [] : [`${segmentCube(query)}.${segment}`];
   return {
     ...vizState,
     query: {

@@ -1060,28 +1060,28 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.17.10":
-  version "0.17.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.17.10.tgz#4c84338f15f690e62aa2f352f6597f462e1b74eb"
-  integrity sha512-EnjajYrw6krXIzxMDIwLeihrpu54pr2tV8j2kz0Zi/RhztS9uPVWEUKT34TmscZSJiIfEPOLJYliA/YSe2f+4g==
+"@cubejs-client/core@^0.18.7":
+  version "0.18.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.7.tgz#57a984dba39d716653b70921e2fc3ad98407cd81"
+  integrity sha512-2I7xu5IO2ohAmXEg67fs5c08PIjCguCPiKWTo6ZoVGjG6641Xl+jTvc+xyoZYcTMsPCBdxT/g7RnfCfDq8jNEw==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
     cross-fetch "^3.0.2"
     moment "^2.22.2"
     moment-range "^4.0.1"
-    ramda "^0.25.0"
+    ramda "^0.27.0"
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.17.10":
-  version "0.17.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.17.10.tgz#67b4482930f5589524f359b8be42033b878d4953"
-  integrity sha512-ycwOTcfrG0/497CWqmLkkernIZAInCr1HGF8es3ETOrLQm4GyuOqDnEuKR1EYCdn06UvaTzYTDaURN1+TUIh1w==
+"@cubejs-client/react@^0.18.7":
+  version "0.18.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.18.4.tgz#82637946d81d94dde16701f7759f10ff29e6be39"
+  integrity sha512-DVOs+UzQTte5bAGVnFJzNlYmPJLcGIap4jrsYIfaCBrf1D4QMgMg1jRU13Dg1AUH5IyKt/z4yxOjZ/OXXjAhGA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
-    ramda "^0.25.0"
+    ramda "^0.27.0"
 
 "@date-io/core@1.x", "@date-io/core@^1.3.13":
   version "1.3.13"
@@ -9314,10 +9314,10 @@ raf@^3.4.0, raf@^3.4.1:
   dependencies:
     performance-now "^2.1.0"
 
-ramda@^0.25.0:
-  version "0.25.0"
-  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.25.0.tgz#8fdf68231cffa90bc2f9460390a0cb74a29b29a9"
-  integrity sha512-GXpfrYVPwx3K7RQ6aYT8KPS8XViSXUVJT1ONhoKPE9VAleW42YE+U+8VEyGWt41EnEQW7gwecYJriTI0pKoecQ==
+ramda@^0.27.0:
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.27.0.tgz#915dc29865c0800bf3f69b8fd6c279898b59de43"
+  integrity sha512-pVzZdDpWwWqEVVLshWUHjNwuVP7SfcmPraYuqocJp1yo2U1R7P+5QAfDhdItkuoGqIBnBYrtPp7rEPqDn9HlZA==
 
 randombytes@^2.0.0, randombytes@^2.0.1, randombytes@^2.0.5:
   version "2.1.0"

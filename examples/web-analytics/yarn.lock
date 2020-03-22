@@ -793,10 +793,10 @@
     aws-sdk "^2.403.0"
     sqlstring "^2.3.1"
 
-"@cubejs-backend/mysql-driver@^0.18.8":
-  version "0.18.8"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/mysql-driver/-/mysql-driver-0.18.8.tgz#b96ca1c248415f6cef116c07a2a92b26e5657038"
-  integrity sha512-b+C4O6MhzhlILco1zn01YsKCf60ScidikHUv5/3EWyg7GkkrZSSNPCGB4MbOuussXuxxdJGmL0FYBzCwm9qALw==
+"@cubejs-backend/mysql-driver@^0.18.9":
+  version "0.18.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/mysql-driver/-/mysql-driver-0.18.9.tgz#b13d5628d9716403f93edaece9bc87d0fd0b14f3"
+  integrity sha512-oBbSqlZ6DTXlEl0vFPDmRHqxvL09Ox8WGHbZh5kkDyJwImZSX+UYgnu8O2DU7TfVfvZxqJ1iWVE3XkJRN0Ab0g==
   dependencies:
     "@cubejs-backend/query-orchestrator" "^0.18.7"
     generic-pool "^3.6.0"
