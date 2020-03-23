@@ -17,7 +17,7 @@
   "dependencies": {
     "generic-pool": "^3.7.1",
     "ramda": "^0.27.0",
-    "redis": "^2.8.0"
+    "redis": "^3.0.2"
   },
   "devDependencies": {
     "eslint": "^6.8.0",
