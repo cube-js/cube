@@ -1,4 +1,5 @@
 cube(`Sessions`, {
+  sqlAlias: `ss`,
   refreshKey: {
     every: `5 minutes`
   },
@@ -8,7 +9,8 @@ cube(`Sessions`, {
      SELECT
        e.session_id,
 
-       MAX(e.derived_tstamp) AS session_end
+       MAX(e.derived_tstamp) AS session_end,
+       count(e.event_id) events_count
      FROM ${Events.sql()} e
      GROUP BY 1
    )
@@ -16,7 +18,9 @@ cube(`Sessions`, {
    SELECT
     e.*,
     e.derived_tstamp as session_start,
-    a.session_end as session_end
+
+    a.session_end as session_end,
+    a.events_count as events_count
    FROM ${Events.sql()} AS e
 
    INNER JOIN aggregates AS a
@@ -94,7 +98,6 @@ cube(`Sessions`, {
       type: `time`
     },
 
-    // TODO: can be done via subquery
     sessionEnd: {
       sql: `session_end`,
       type: `time`
@@ -144,9 +147,8 @@ cube(`Sessions`, {
 
     // Engagement
     numberEvents: {
-      sql: `${Events.count}`,
-      type: `number`,
-      subQuery: true
+      sql: `events_count`,
+      type: `number`
     },
 
     isBounced: {
@@ -185,7 +187,7 @@ cube(`Sessions`, {
 
   segments: {
     bouncedSessions: {
-      sql: `${isBounced} = 'True'`
+      sql: `${isBounced} = 'True'`,
     },
     directTraffic: {
       sql: `${referrerMedium} = '(none)'`
@@ -202,10 +204,16 @@ cube(`Sessions`, {
     additive: {
       type: `rollup`,
       measureReferences: [totalDuration, bouncedCount, count],
+      segmentReferences: [bouncedSessions, directTraffic, searchTraffic, newUsers],
       timeDimensionReference: sessionStart,
       granularity: `hour`,
       refreshKey: {
         every: `5 minutes`
+      },
+      indexes: {
+        bouncedSessions: {
+          columns: [bouncedSessions]
+        }
       },
       external: true
     }
@@ -214,8 +222,9 @@ cube(`Sessions`, {
 
 cube(`SessionUsers`, {
   extends: Sessions,
+  sqlAlias: `su`,
 
-  sql: `select distinct 
+  sql: `select distinct
   date_trunc('hour', session_start) as session_start,
   session_id,
   domain_userid,
@@ -224,7 +233,8 @@ cube(`SessionUsers`, {
   geo_country,
   geo_city,
   referrer_source,
-  referrer_medium
+  referrer_medium,
+  events_count
   from ${Sessions.sql()}`,
 
   preAggregations: {
@@ -234,7 +244,12 @@ cube(`SessionUsers`, {
         every: `5 minutes`
       },
       external: true,
-      scheduledRefresh: true
+      scheduledRefresh: true,
+      indexes: {
+        sessionId: {
+          columns: [`session_id`]
+        }
+      }
     }
   }
 });

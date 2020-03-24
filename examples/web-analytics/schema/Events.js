@@ -106,5 +106,16 @@ cube(`Events`, {
       sql: `derived_tstamp`,
       type: `time`
     }
+  },
+
+  preAggregations: {
+    original: {
+      type: `originalSql`,
+      refreshKey: {
+        every: `5 minutes`
+      },
+      external: true,
+      scheduledRefresh: true
+    }
   }
 });

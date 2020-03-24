@@ -37,7 +37,13 @@ const withTimeFunc = ({ query, ...vizState }, begin, end, segment) => {
   const timeDimensionObj = (query.timeDimensions || [])[0] || {};
   const timeDimension = timeDimensionObj.dimension || 'Sessions.sessionStart';
   const granularity = timeDimensionObj.granularity || null;
-  const segmentCube = (query) => query.measures[0].split(".")[0];
+  const segmentCube = (query) => {
+    const measureCube = query.measures[0].split(".")[0];
+    if (['PageViews', 'PageUsers'].indexOf(measureCube) !== -1) {
+      return 'Sessions';
+    }
+    return measureCube;
+  }
   const segments = segment === 'all' ? [] : [`${segmentCube(query)}.${segment}`];
   return {
     ...vizState,

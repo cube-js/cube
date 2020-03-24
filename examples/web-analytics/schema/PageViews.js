@@ -46,7 +46,7 @@ cube(`PageViews`, {
     // FIXME
     timeOnPageSeconds: {
       type: `number`,
-      sql: `date_diff('second', derived_tstamp, next_event_time)`
+      sql: `date_diff('second', ${CUBE}.derived_tstamp, ${CUBE}.next_event_time)`
     },
 
     exitPage: {
@@ -81,6 +81,12 @@ cube(`PageViews`, {
       measureReferences: [pageviews, exits, count, totalTimeOnPageSeconds],
       timeDimensionReference: time,
       dimensionReferences: [pageUrlPath, pageTitle],
+      segmentReferences: [
+        Sessions.bouncedSessions,
+        Sessions.directTraffic,
+        Sessions.searchTraffic,
+        Sessions.newUsers
+      ],
       granularity: `hour`,
       refreshKey: {
         every: `5 minutes`
