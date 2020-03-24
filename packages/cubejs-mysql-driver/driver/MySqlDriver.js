@@ -128,6 +128,14 @@ class MySqlDriver extends BaseDriver {
     if (genericType === 'timestamp' && typeof value === 'string') {
       return value && value.replace('Z', '');
     }
+    if (genericType === 'boolean' && typeof value === 'string') {
+      if (value.toLowerCase() === 'true') {
+        return true;
+      }
+      if (value.toLowerCase() === 'false') {
+        return false;
+      }
+    }
     return super.toColumnValue(value, genericType);
   }
 

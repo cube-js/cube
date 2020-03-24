@@ -28,6 +28,7 @@ describe('MySqlDriver', () => {
   });
 
   afterAll(async () => {
+    await mySqlDriver.release();
     if (container) {
       await container.stop();
     }
@@ -39,6 +40,22 @@ describe('MySqlDriver', () => {
     });
     expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.wrong_value'))))
       .toStrictEqual([{ value: "Tekirdağ" }]);
-    await mySqlDriver.release();
+  });
+
+  test('boolean field', async () => {
+    await mySqlDriver.uploadTable(`test.boolean`, [{ name: 'b_value', type: 'boolean' }], {
+      rows: [
+        { b_value: true },
+        { b_value: true },
+        { b_value: 'true' },
+        { b_value: false },
+        { b_value: 'false' },
+        { b_value: null }
+      ]
+    });
+    expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.boolean where b_value = ?', [true]))))
+      .toStrictEqual([{ b_value: 1 }, { b_value: 1 }, { b_value: 1 }]);
+    expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.boolean where b_value = ?', [false]))))
+      .toStrictEqual([{ b_value: 0 }, { b_value: 0 }]);
   });
 });
