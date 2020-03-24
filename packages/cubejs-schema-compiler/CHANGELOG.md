@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.18.14](https://github.com/cube-js/cube.js/compare/v0.18.13...v0.18.14) (2020-03-24)
+
+
+### Bug Fixes
+
+* MySQL segment references support ([be42298](https://github.com/cube-js/cube.js/commit/be42298))
+
+
+
+
+
 ## [0.18.6](https://github.com/cube-js/cube.js/compare/v0.18.5...v0.18.6) (2020-03-16)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
