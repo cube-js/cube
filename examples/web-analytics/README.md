@@ -195,6 +195,9 @@ To obtain `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` you must register an app
 
 ## Future Development
 
+* Support multiple tracking applications with [Cube.js multitenancy](https://cube.dev/docs/multitenancy-setup).
+* Support geo dimensions and map chart.
+
 ## Contributing
 
 ## License

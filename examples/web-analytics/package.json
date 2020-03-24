@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@cubejs-backend/athena-driver": "^0.18.2",
-    "@cubejs-backend/mysql-driver": "^0.18.13",
+    "@cubejs-backend/mysql-driver": "^0.18.15",
     "@cubejs-backend/server": "^0.18.14",
     "express-session": "^1.17.0",
     "passport": "^0.4.1",

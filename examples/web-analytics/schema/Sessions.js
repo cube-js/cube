@@ -201,6 +201,13 @@ cube(`Sessions`, {
   },
 
   preAggregations: {
+    original: {
+      type: `originalSql`,
+      refreshKey: {
+        every: `5 minutes`
+      },
+      external: true
+    },
     additive: {
       type: `rollup`,
       measureReferences: [totalDuration, bouncedCount, count],
