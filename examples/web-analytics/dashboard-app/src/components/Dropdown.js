@@ -1,12 +1,13 @@
 import React from 'react';
-import IconButton from '@material-ui/core/IconButton';
+import Button from '@material-ui/core/Button';
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 
 const ITEM_HEIGHT = 48;
 
-export default function DotsMenu({ options }) {
+export default function Dropdown({ value, options }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
 
@@ -21,14 +22,14 @@ export default function DotsMenu({ options }) {
 
   return (
     <div>
-      <IconButton
-        aria-label="more"
-        aria-controls="long-menu"
+      <Button
+        color="inherit"
         aria-haspopup="true"
         onClick={handleClick}
       >
-        <MoreVertIcon />
-      </IconButton>
+        { value }
+        <ExpandMoreIcon fontSize="small" />
+      </Button>
       <Menu
         id="long-menu"
         anchorEl={anchorEl}

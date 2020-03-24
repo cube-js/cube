@@ -6,9 +6,11 @@ import Grid from "@material-ui/core/Grid";
 import { GET_CUSTOM_REPORT } from "../graphql/queries";
 import OverTimeChart from "../components/OverTimeChart";
 import DataTable from "../components/DataTable";
+import Dropdown from "../components/Dropdown";
 import { Link } from "react-router-dom";
 
 const CustomReportPage = ({ withTime }) => {
+  const [activeMeasure, setActiveMeasure] = useState(null);
   const { id } = useParams();
   const { loading, error, data } = useQuery(GET_CUSTOM_REPORT, {
     variables: {
@@ -19,9 +21,10 @@ const CustomReportPage = ({ withTime }) => {
     return "Loading";
   }
 
-  const query = JSON.parse(data.customReport.query);
+  const { measures, ...query } = JSON.parse(data.customReport.query);
+  const finalActiveMeasure = activeMeasure || measures[0];
   const overTimeChartQuery = {
-    measures: [query.measures[0]],
+    measures: [finalActiveMeasure],
     timeDimensions: [{
       dimension: query.timeDimensions[0].dimension,
       granularity: 'day'
@@ -44,7 +47,18 @@ const CustomReportPage = ({ withTime }) => {
       </Grid>
       <Grid item xs={12}>
         <OverTimeChart
-          title=""
+          title={
+            measures.length > 1 ?
+              <Dropdown
+                value={finalActiveMeasure}
+                options={
+                  measures.reduce((out, measure) => {
+                    out[measure] = () => setActiveMeasure(measure)
+                    return out;
+                  }, {})
+                }
+              /> : finalActiveMeasure
+          }
           vizState={withTime({ query: overTimeChartQuery, chartType: 'line' })}
         />
       </Grid>
