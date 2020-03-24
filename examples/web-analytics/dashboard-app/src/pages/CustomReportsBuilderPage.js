@@ -14,10 +14,10 @@ import * as Yup from "yup";
 import { Formik } from "formik";
 
 import MemberSelect from "../components/MemberSelect";
-import { GET_DASHBOARD_ITEMS, GET_CUSTOM_REPORT } from "../graphql/queries";
+import { GET_CUSTOM_REPORTS, GET_CUSTOM_REPORT } from "../graphql/queries";
 import {
-  CREATE_DASHBOARD_ITEM,
-  UPDATE_DASHBOARD_ITEM
+  CREATE_CUSTOM_REPORT,
+  UPDATE_CUSTOM_REPORT
 } from "../graphql/mutations";
 
 
@@ -37,17 +37,17 @@ const useStyles = makeStyles(theme => ({
 
 const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
   const { id } = useParams();
-  const [addDashboardItem] = useMutation(CREATE_DASHBOARD_ITEM, {
+  const [addCustomReport] = useMutation(CREATE_CUSTOM_REPORT, {
     refetchQueries: [
       {
-        query: GET_DASHBOARD_ITEMS
+        query: GET_CUSTOM_REPORTS
       }
     ]
   });
-  const [updateDashboardItem] = useMutation(UPDATE_DASHBOARD_ITEM, {
+  const [updateCustomReport] = useMutation(UPDATE_CUSTOM_REPORT, {
     refetchQueries: [
       {
-        query: GET_DASHBOARD_ITEMS
+        query: GET_CUSTOM_REPORTS
       }
     ]
   });
@@ -70,7 +70,7 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
         Create Custom Report
        </Typography>
         <QueryBuilder
-          query={(data && data.dashboardItem.query && JSON.parse(data.dashboardItem.query)) || {}}
+          query={(data && data.customReport.query && JSON.parse(data.customReport.query)) || {}}
           wrapWithQueryRenderer={false}
           cubejsApi={cubejsApi}
           render={({
@@ -80,9 +80,9 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
           }) => (
              <Formik
               enableReinitialize
-              initialValues={{ title: title || (data && data.dashboardItem.name) || "", query: query }}
+              initialValues={{ title: title || (data && data.customReport.name) || "", query: query }}
               onSubmit={async values => {
-                const { data } = await (id ? updateDashboardItem : addDashboardItem)({
+                const { data } = await (id ? updateCustomReport : addCustomReport)({
                   variables: {
                     id: id,
                     input: {
@@ -91,7 +91,7 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
                     }
                   }
                 });
-                history.push(`/custom-reports/${id || data.createDashboardItem.id}`);
+                history.push(`/custom-reports/${id || data.createCustomReport.id}`);
               }}
               validationSchema={Yup.object().shape({
                 title: Yup.string().required("Required"),

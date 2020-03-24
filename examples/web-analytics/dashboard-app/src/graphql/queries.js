@@ -1,8 +1,8 @@
 import gql from "graphql-tag";
 
-export const GET_DASHBOARD_ITEMS = gql`
-  query GetDashboardItems {
-    dashboardItems {
+export const GET_CUSTOM_REPORTS = gql`
+  query GetCustomReports {
+    customReports {
       id
       query
       name
@@ -12,8 +12,8 @@ export const GET_DASHBOARD_ITEMS = gql`
 `;
 
 export const GET_CUSTOM_REPORT = gql`
-  query GetDashboardItem($id: String!) {
-    dashboardItem(id: $id) {
+  query GetCustomReport($id: String!) {
+    customReport(id: $id) {
       id
       query
       name

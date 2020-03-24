@@ -12,7 +12,7 @@ import moment from "moment";
 
 import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "@apollo/react-hooks";
-import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
+import { GET_CUSTOM_REPORTS } from "../graphql/queries";
 import { DELETE_CUSTOM_REPORT } from "../graphql/mutations";
 
 import DotsMenu from "../components/DotsMenu";
@@ -21,11 +21,11 @@ const CustomReportsOverviewPage = ({ history }) => {
   const [removeCustomReport] = useMutation(DELETE_CUSTOM_REPORT, {
     refetchQueries: [
       {
-        query: GET_DASHBOARD_ITEMS
+        query: GET_CUSTOM_REPORTS
       }
     ]
   });
-  const { loading, error, data } = useQuery(GET_DASHBOARD_ITEMS);
+  const { loading, error, data } = useQuery(GET_CUSTOM_REPORTS);
   return (
     <Grid container spacing={3} justify="space-between">
       <Grid item>
@@ -49,7 +49,7 @@ const CustomReportsOverviewPage = ({ history }) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              { data && data.dashboardItems && data.dashboardItems.map(report => (
+              { data && data.customReports && data.customReports.map(report => (
                 <TableRow>
                   <TableCell key="title" component="th" scope="row">
                     <Link to={`/custom-reports/${report.id}`}>

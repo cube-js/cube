@@ -19,7 +19,7 @@ const CustomReportPage = ({ withTime }) => {
     return "Loading";
   }
 
-  const query = JSON.parse(data.dashboardItem.query);
+  const query = JSON.parse(data.customReport.query);
   const overTimeChartQuery = {
     measures: [query.measures[0]],
     timeDimensions: [{

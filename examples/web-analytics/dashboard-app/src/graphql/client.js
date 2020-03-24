@@ -5,46 +5,43 @@ import { SchemaLink } from 'apollo-link-schema';
 import { makeExecutableSchema } from 'graphql-tools';
 
 const cache = new InMemoryCache();
-const defaultDashboardItems = [];
 
-const getDashboardItems = () => JSON.parse(window.localStorage.getItem("dashboardItems"))
-  || defaultDashboardItems;
-
-const setDashboardItems = items => window.localStorage.setItem("dashboardItems", JSON.stringify(items));
+const getCustomReports = () => JSON.parse(window.localStorage.getItem("customReports")) || [];
+const setCustomReports = items => window.localStorage.setItem("customReports", JSON.stringify(items));
 
 const nextId = () => {
-  const currentId = parseInt(window.localStorage.getItem("dashboardIdCounter"), 10) || 1;
-  window.localStorage.setItem("dashboardIdCounter", currentId + 1);
+  const currentId = parseInt(window.localStorage.getItem("customReportCounter"), 10) || 1;
+  window.localStorage.setItem("customReportCounter", currentId + 1);
   return currentId.toString();
 };
 
 const toApolloItem = i => ({
   ...i,
-  __typename: "DashboardItem"
+  __typename: "CustomReport"
 });
 
 const typeDefs = `
-  type DashboardItem {
+  type CustomReport {
     id: String!
     query: String
     name: String
     createdAt: String
   }
 
-  input DashboardItemInput {
+  input CustomReportInput {
     query: String
     name: String
   }
 
   type Query {
-    dashboardItems: [DashboardItem]
-    dashboardItem(id: String!): DashboardItem
+    customReports: [CustomReport]
+    customReport(id: String!): CustomReport
   }
 
   type Mutation {
-    createDashboardItem(input: DashboardItemInput): DashboardItem
-    updateDashboardItem(id: String!, input: DashboardItemInput): DashboardItem
-    deleteDashboardItem(id: String!): DashboardItem
+    createCustomReport(input: CustomReportInput): CustomReport
+    updateCustomReport(id: String!, input: CustomReportInput): CustomReport
+    deleteCustomReport(id: String!): CustomReport
   }
 `;
 
@@ -52,41 +49,41 @@ const schema = makeExecutableSchema({
   typeDefs,
   resolvers: {
     Query: {
-      dashboardItems() {
-        const dashboardItems = getDashboardItems();
-        return dashboardItems.map(toApolloItem);
+      customReports() {
+        const customReports = getCustomReports();
+        return customReports.map(toApolloItem);
       },
-      dashboardItem(_, { id }) {
-        const dashboardItems = getDashboardItems();
-        return toApolloItem(dashboardItems.find(i => i.id.toString() === id));
+      customReport(_, { id }) {
+        const customReports = getCustomReports();
+        return toApolloItem(customReports.find(i => i.id.toString() === id));
       }
     },
     Mutation: {
-      createDashboardItem: (_, { input: { ...item } }) => {
-        const dashboardItems = getDashboardItems();
+      createCustomReport: (_, { input: { ...item } }) => {
+        const customReports = getCustomReports();
         item = { ...item, id: nextId(), createdAt: new Date(), layout: JSON.stringify({}) };
-        dashboardItems.push(item);
-        setDashboardItems(dashboardItems);
+        customReports.push(item);
+        setCustomReports(customReports);
         return toApolloItem(item);
       },
-      updateDashboardItem: (_, { id, input: { ...item } }) => {
-        const dashboardItems = getDashboardItems();
+      updateCustomReport: (_, { id, input: { ...item } }) => {
+        const customReports = getCustomReports();
         item = Object.keys(item)
           .filter(k => !!item[k])
           .map(k => ({
             [k]: item[k]
           }))
           .reduce((a, b) => ({ ...a, ...b }), {});
-        const index = dashboardItems.findIndex(i => i.id.toString() === id);
-        dashboardItems[index] = { ...dashboardItems[index], ...item };
-        setDashboardItems(dashboardItems);
-        return toApolloItem(dashboardItems[index]);
+        const index = customReports.findIndex(i => i.id.toString() === id);
+        customReports[index] = { ...customReports[index], ...item };
+        setCustomReports(customReports);
+        return toApolloItem(customReports[index]);
       },
-      deleteDashboardItem: (_, { id }) => {
-        const dashboardItems = getDashboardItems();
-        const index = dashboardItems.findIndex(i => i.id.toString() === id);
-        const [removedItem] = dashboardItems.splice(index, 1);
-        setDashboardItems(dashboardItems);
+      deleteCustomReport: (_, { id }) => {
+        const customReports = getCustomReports();
+        const index = customReports.findIndex(i => i.id.toString() === id);
+        const [removedItem] = customReports.splice(index, 1);
+        setCustomReports(customReports);
         return toApolloItem(removedItem);
       }
     }
