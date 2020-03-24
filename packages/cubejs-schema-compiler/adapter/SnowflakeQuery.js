@@ -26,6 +26,10 @@ class SnowflakeQuery extends BaseQuery {
   defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
+
+  nowTimestampSql() {
+    return `CURRENT_TIMESTAMP`;
+  }
 }
 
 module.exports = SnowflakeQuery;
