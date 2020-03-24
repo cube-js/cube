@@ -374,11 +374,14 @@ class PreAggregationLoader {
     return (client) => {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
-        refreshStrategy = client.readOnly && client.readOnly() ?
+        const readOnly =
+          client.config && client.config.readOnly ||
+          client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
+        refreshStrategy = readOnly ?
           this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
       }
       const resultPromise = refreshStrategy.bind(this)(client, newVersionEntry);
-      resultPromise.cancel = () => {} // TODO implement cancel (loading rollup into table and external upload)
+      resultPromise.cancel = () => {}; // TODO implement cancel (loading rollup into table and external upload)
       return resultPromise;
     };
   }
