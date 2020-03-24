@@ -357,6 +357,10 @@ class PreAggregations {
     }));
   }
 
+  canUseTransformedQuery() {
+    return PreAggregations.transformQueryToCanUseForm(this.query);
+  }
+
   static hasCumulativeMeasures(query) {
     const measures = (query.measures.concat(query.measureFilters));
     return R.pipe(

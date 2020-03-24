@@ -72,7 +72,8 @@ class CompilerApi {
       dataSource: sqlGenerator.dataSource,
       aliasNameToMember: sqlGenerator.aliasNameToMember,
       rollupMatchResults: includeDebugInfo ?
-        sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined
+        sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
+      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
     }));
   }
 
