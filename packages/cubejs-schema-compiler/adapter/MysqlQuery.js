@@ -70,6 +70,10 @@ class MysqlQuery extends BaseQuery {
   unixTimestampSql() {
     return `UNIX_TIMESTAMP()`;
   }
+
+  wrapSegmentForDimensionSelect(sql) {
+    return `IF(${sql}, 1, 0)`;
+  }
 }
 
 module.exports = MysqlQuery;

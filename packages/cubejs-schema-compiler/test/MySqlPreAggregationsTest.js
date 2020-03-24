@@ -77,7 +77,14 @@ describe('MySqlPreAggregations', function test() {
           timeDimensionReference: createdAt,
           granularity: 'day',
           partitionGranularity: 'month'
-        }
+        },
+        googleRollup: {
+          type: 'rollup',
+          measureReferences: [count],
+          segmentReferences: [google],
+          timeDimensionReference: createdAt,
+          granularity: 'day',
+        },
       }
     })
     `);
@@ -163,4 +170,47 @@ describe('MySqlPreAggregations', function test() {
       });
     });
   });
+
+  it('segment', () => compiler.compile().then(() => {
+    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      dimensions: [],
+      segments: ['visitors.google'],
+      timezone: 'UTC',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2016-12-30', '2017-01-06']
+      }],
+      order: [{
+        id: 'visitors.createdAt'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+
+    const queries = tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.testQueries(
+      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 142))
+    ).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [
+          {
+            "visitors__created_at_day": "2017-01-06T00:00:00.000",
+            "visitors__count": 1
+          }
+        ]
+      );
+    });
+  }));
 });
