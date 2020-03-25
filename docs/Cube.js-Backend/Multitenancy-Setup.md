@@ -83,7 +83,7 @@ server.listen().then(({ port }) => {
 ## Same DB Instance with per Tenant Row Level Security
 
 Per tenant row level security can be achieved by providing [queryTransformer](@cubejs-backend-server-core#query-transformer) which adds tenant identifier filter to the original query.
-This way in fact every tenant start to see it's own data however all the resources like query queue and pre-aggregations are shared between all the tenants.
+This way in fact every tenant starts to see it's own data however all the resources like query queue and pre-aggregations are shared between all the tenants.
 
 **index.js:**
 ```javascript
