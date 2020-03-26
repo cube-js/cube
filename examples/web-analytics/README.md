@@ -1,4 +1,4 @@
-Modular and hackable open-source web analytics platform.
+Modular and hackable open source web analytics platform.
 
 ## How is it Different from Google Analytics or Matomo?
 
@@ -197,6 +197,7 @@ To obtain `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` you must register an app
 
 * Support multiple tracking applications with [Cube.js multitenancy](https://cube.dev/docs/multitenancy-setup).
 * Support geo dimensions and map chart.
+* Add filters to custom report builder.
 
 ## Contributing
 

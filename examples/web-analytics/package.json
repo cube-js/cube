@@ -9,7 +9,7 @@
   "dependencies": {
     "@cubejs-backend/athena-driver": "^0.18.2",
     "@cubejs-backend/mysql-driver": "^0.18.15",
-    "@cubejs-backend/server": "^0.18.14",
+    "@cubejs-backend/server": "^0.18.17",
     "express-session": "^1.17.0",
     "passport": "^0.4.1",
     "passport-google-oauth20": "^2.0.0"

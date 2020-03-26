@@ -20,7 +20,27 @@ import {
   UPDATE_CUSTOM_REPORT
 } from "../graphql/mutations";
 
+const allowedMembers = [
+  "SessionUsers.usersCount",
+  "SessionUsers.newUsersCount",
+  "SessionUsers.count",
+  "SessionUsers.bounceRate",
+  "SessionUsers.bouncedCount",
+  "SessionUsers.sessionsPerUser",
 
+  "SessionUsers.landingPage",
+  "SessionUsers.referrerMedium",
+  "SessionUsers.referrerSource",
+  "SessionUsers.sourceMedium",
+  "SessionUsers.type"
+];
+
+const whiteListMembers = (members, type, query) => {
+  return members.filter((member) => {
+      return allowedMembers.indexOf(member.name) !== -1
+      && (query[type] || []).indexOf(member.name) === -1;
+  })
+};
 
 const useStyles = makeStyles(theme => ({
   formControl: {
@@ -135,14 +155,14 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
                         <MemberSelect
                           onSelect={updateMeasures.update}
                           member={measure}
-                          availableMembers={availableMeasures}
+                          availableMembers={whiteListMembers(availableMeasures, 'measures', query)}
                           onRemove={updateMeasures.remove}
                         />
                       )}
                       <MemberSelect
                         title="metric"
                         onSelect={updateMeasures.add}
-                        availableMembers={availableMeasures}
+                        availableMembers={whiteListMembers(availableMeasures, 'measures', query)}
                       />
                     </FormControl>
                     <FormControl component="fieldset" className={classes.formControl}>
@@ -157,14 +177,14 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
                         <MemberSelect
                           onSelect={updateDimensions.update}
                           member={dimension}
-                          availableMembers={availableDimensions}
+                          availableMembers={whiteListMembers(availableDimensions, 'dimensions', query)}
                           onRemove={updateDimensions.remove}
                         />
                       )}
                       <MemberSelect
                         title="dimension"
                         onSelect={updateDimensions.add}
-                        availableMembers={availableDimensions}
+                        availableMembers={whiteListMembers(availableDimensions, 'dimensions', query)}
                       />
                     </FormControl>
                     <div>

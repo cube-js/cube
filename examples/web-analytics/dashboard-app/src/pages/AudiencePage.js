@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import Grid from "@material-ui/core/Grid";
 
 import ChartRenderer from "../components/ChartRenderer";
 import DashboardItem from "../components/DashboardItem";
 import OverTimeChart from "../components/OverTimeChart";
 import Chart from "../components/Chart";
+import Dropdown from "../components/Dropdown";
 import SwitchTable from "../components/SwitchTable";
 
 const queries = {
@@ -14,7 +15,6 @@ const queries = {
     query: {
       measures: ['SessionUsers.usersCount'],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart',
         granularity: 'day'
       }]
     }
@@ -83,14 +83,30 @@ const queries = {
   }
 };
 
+const measuresForSwitch = {
+  "Users": "SessionUsers.usersCount",
+  "Sessions": "Sessions.count",
+  "New Users": "SessionUsers.newUsersCount"
+};
 
 const AudiencePage = ({ withTime }) => {
+  const [overTimeMeasure, setOverTimeMeasure] = useState("Users");
   return (
     <>
       <Grid item xs={12}>
         <OverTimeChart
-          title="Users Over Time"
-          vizState={withTime(queries.usersOvertime)}
+          title={
+            <Dropdown
+              value={overTimeMeasure}
+              options={
+                Object.keys(measuresForSwitch).reduce((out, measure) => {
+                  out[measure] = () => setOverTimeMeasure(measure)
+                  return out;
+                }, {})
+              }
+            />
+          }
+          vizState={withTime({ ...queries.usersOvertime, query: { ...queries.usersOvertime.query, measures: [measuresForSwitch[overTimeMeasure]] } })}
         />
       </Grid>
       <Grid item xs={6}>

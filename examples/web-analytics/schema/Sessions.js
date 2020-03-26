@@ -44,7 +44,8 @@ cube(`Sessions`, {
 
     usersCount: {
       type: `countDistinct`,
-      sql: `domain_userid`
+      sql: `domain_userid`,
+      title: "Users"
     },
 
     newUsersCount: {
@@ -52,12 +53,14 @@ cube(`Sessions`, {
       sql: `domain_userid`,
       filters: [
         { sql: `${type} = 'New'` }
-      ]
+      ],
+      title: "New Users"
     },
 
     sessionsPerUser: {
       sql: `1.000 * ${count} / NULLIF(${usersCount}, 0)`,
-      type: `number`
+      type: `number`,
+      title: `Number of Sessions per User`
     },
 
     // Engagement
@@ -66,13 +69,15 @@ cube(`Sessions`, {
       type: `count`,
       filters:[{
         sql: `${isBounced} = 'True'`
-      }]
+      }],
+      title: `Bounces`
     },
 
     bounceRate: {
       sql: `100.00 * ${bouncedCount} / NULLIF(${count}, 0)`,
       type: `number`,
-      format: `percent`
+      format: `percent`,
+      title: `Bounce Rate`
     },
 
     averageDurationSeconds: {
@@ -118,9 +123,9 @@ cube(`Sessions`, {
       case: {
         when: [{ sql: `${CUBE.sessionIndex} = 1`, label: `New`}],
         else: { label: `Returning` }
-      }
+      },
+      title: `User Type`
     },
-
 
     // Audience
     // Demographics
@@ -159,6 +164,13 @@ cube(`Sessions`, {
       }
     },
 
+    // Acquisition
+    landingPage: {
+      type: `string`,
+      sql: `page_url_path`,
+      title: `Landing Page`
+    },
+
     referrerMedium: {
       type: `string`,
       case: {
@@ -166,7 +178,8 @@ cube(`Sessions`, {
           { sql: `${CUBE}.referrer_medium != ''`, label: { sql: `${CUBE}.referrer_medium` } }
         ],
         else: { label: '(none)' }
-      }
+      },
+      title: `Medium`
     },
 
     referrerSource: {
@@ -176,12 +189,14 @@ cube(`Sessions`, {
           { sql: `${CUBE}.referrer_source != ''`, label: { sql: `${CUBE}.referrer_source` } }
         ],
         else: { label: '(none)' }
-      }
+      },
+      title: `Source`
     },
 
     sourceMedium: {
       type: `string`,
-      sql: `concat(${CUBE.referrerSource}, " / ", ${CUBE.referrerMedium})`
+      sql: `concat(${CUBE.referrerSource}, " / ", ${CUBE.referrerMedium})`,
+      title: `Source / Medium`
     }
   },
 
@@ -206,23 +221,21 @@ cube(`Sessions`, {
       refreshKey: {
         every: `5 minutes`
       },
-      external: true
+      external: true,
+      scheduledRefresh: true
     },
     additive: {
       type: `rollup`,
       measureReferences: [totalDuration, bouncedCount, count],
       segmentReferences: [bouncedSessions, directTraffic, searchTraffic, newUsers],
+      dimensionReferences: [landingPage],
       timeDimensionReference: sessionStart,
       granularity: `hour`,
       refreshKey: {
         every: `5 minutes`
       },
-      indexes: {
-        bouncedSessions: {
-          columns: [bouncedSessions]
-        }
-      },
-      external: true
+      external: true,
+      scheduledRefresh: true
     }
   }
 });
@@ -237,6 +250,7 @@ cube(`SessionUsers`, {
   domain_userid,
   session_index,
   br_lang,
+  page_url_path,
   geo_country,
   geo_city,
   referrer_source,

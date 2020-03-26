@@ -32,6 +32,7 @@ const CustomReportPage = ({ withTime }) => {
   };
   const dataTableQuery = {
     ...query,
+    measures: measures,
     timeDimensions: [{
       dimension: query.timeDimensions[0].dimension,
     }]
