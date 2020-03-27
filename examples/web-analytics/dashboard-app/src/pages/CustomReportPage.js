@@ -68,7 +68,7 @@ const CustomReportPage = ({ withTime }) => {
                     return out;
                   }, {})
                 }
-              /> : finalActiveMeasure
+              /> : meta.resolveMember(finalActiveMeasure, "measures").shortTitle
           }
           vizState={withTime({ query: overTimeChartQuery, chartType: 'line' })}
         />
