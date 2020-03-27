@@ -28,6 +28,12 @@ Cube.js works with Node.js 8+ and uses yarn as a package manager.
 6. Use `$ yarn test` where available to test your changes.
 7. Ensure commit CommonJS and UMD modules as part of your commit.
 
+To get set up quickly, you can perform 1) and 2) with one line from the `cube.js` clone root folder:
+
+```
+cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/cubejs-client-react && yarn && yarn link && cd ../..
+```
+
 ### Implementing Driver
 
 1. Copy existing driver package structure and name it in `@cubejs-backend/<db-name>-driver` format.
