@@ -6,15 +6,13 @@ const BaseQuery = require("./BaseQuery");
 const BaseFilter = require("./BaseFilter");
 
 const GRANULARITY_TO_INTERVAL = {
-  day: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd 00:00:00.000')`,
-  week: date => {
-    throw new Error("Week is unsupported");
-  }, // TODO
-  hour: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:00:00.000')`,
-  minute: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:mm:00.000')`,
-  second: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:mm:ss.000')`,
-  month: date => `DATE_FORMAT(${date}, 'yyyy-MM-01 00:00:00.000')`,
-  year: date => `DATE_FORMAT(${date}, 'yyyy-01-01 00:00:00.000')`
+  day: date => `DATE_TRUNC('day', ${date}::datetime)`,
+  week: date => `DATE_TRUNC('week', ${date}::datetime)`,
+  hour: date => `DATE_TRUNC('hour', ${date}::datetime)`,
+  minute: date => `DATE_TRUNC('minute', ${date}::datetime)`,
+  second: date => `DATE_TRUNC('second', ${date}::datetime)`,
+  month: date => `DATE_TRUNC('month', ${date}::datetime)`,
+  year: date => `DATE_TRUNC('year', ${date}::datetime)`
 };
 
 class ElasticSearchCloudQueryFilter extends BaseFilter {
@@ -41,10 +39,12 @@ class ElasticSearchCloudQuery extends BaseQuery {
   }
 
   subtractInterval(date, interval) {
+    // TODO: Test this, note sure how value gets populated here
     return `${date} - INTERVAL ${interval}`;
   }
 
   addInterval(date, interval) {
+    // TODO: Test this, note sure how value gets populated here
     return `${date} + INTERVAL ${interval}`;
   }
 
