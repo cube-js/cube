@@ -3,6 +3,7 @@ import QueryRendererWithTotals from './QueryRendererWithTotals.jsx';
 import QueryBuilder from './QueryBuilder.jsx';
 import isQueryPresent from './isQueryPresent';
 import CubeProvider from './CubeProvider.jsx';
+import CubeContext from './CubeContext';
 import useCubeQuery from './useCubeQuery';
 
 export {
@@ -10,6 +11,7 @@ export {
   QueryRendererWithTotals,
   QueryBuilder,
   isQueryPresent,
+  CubeContext,
   CubeProvider,
   useCubeQuery
 };

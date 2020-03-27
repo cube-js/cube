@@ -880,4 +880,4 @@ var useCubeQuery = (function (query) {
   };
 });
 
-export { QueryRenderer, QueryRendererWithTotals, QueryBuilder, isQueryPresent, CubeProvider, useCubeQuery };
+export { QueryRenderer, QueryRendererWithTotals, QueryBuilder, isQueryPresent, CubeContext, CubeProvider, useCubeQuery };

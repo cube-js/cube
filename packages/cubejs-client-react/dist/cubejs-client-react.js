@@ -891,5 +891,6 @@ exports.QueryRenderer = QueryRenderer;
 exports.QueryRendererWithTotals = QueryRendererWithTotals;
 exports.QueryBuilder = QueryBuilder;
 exports.isQueryPresent = isQueryPresent;
+exports.CubeContext = CubeContext;
 exports.CubeProvider = CubeProvider;
 exports.useCubeQuery = useCubeQuery;
