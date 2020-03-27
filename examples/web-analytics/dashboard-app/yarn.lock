@@ -1074,7 +1074,7 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.18.7":
+"@cubejs-client/react@^0.18.4":
   version "0.18.4"
   resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.18.4.tgz#82637946d81d94dde16701f7759f10ff29e6be39"
   integrity sha512-DVOs+UzQTte5bAGVnFJzNlYmPJLcGIap4jrsYIfaCBrf1D4QMgMg1jRU13Dg1AUH5IyKt/z4yxOjZ/OXXjAhGA==

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@apollo/react-hooks";
 import Button from "@material-ui/core/Button";
+import { CubeContext } from "@cubejs-client/react";
 import Grid from "@material-ui/core/Grid";
 import { GET_CUSTOM_REPORT } from "../graphql/queries";
 import OverTimeChart from "../components/OverTimeChart";
@@ -11,13 +12,22 @@ import { Link } from "react-router-dom";
 
 const CustomReportPage = ({ withTime }) => {
   const [activeMeasure, setActiveMeasure] = useState(null);
+  const [meta, setMeta] = useState(null);
   const { id } = useParams();
+  const cubejsApi = useContext(CubeContext).cubejsApi;
   const { loading, error, data } = useQuery(GET_CUSTOM_REPORT, {
     variables: {
       id: id
     },
   });
-  if (loading || error) {
+  useEffect(() => {
+    (async function loadMeta() {
+      const meta = await cubejsApi.meta();
+      setMeta(meta);
+    })();
+  }, []);
+
+  if (loading || error || !meta) {
     return "Loading";
   }
 
@@ -51,10 +61,10 @@ const CustomReportPage = ({ withTime }) => {
           title={
             measures.length > 1 ?
               <Dropdown
-                value={finalActiveMeasure}
+                value={meta.resolveMember(finalActiveMeasure, "measures").shortTitle}
                 options={
                   measures.reduce((out, measure) => {
-                    out[measure] = () => setActiveMeasure(measure)
+                    out[meta.resolveMember(measure, "measures").shortTitle] = () => setActiveMeasure(measure)
                     return out;
                   }, {})
                 }

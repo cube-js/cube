@@ -71,7 +71,7 @@ const ReportPage = ({ report: Component }) => {
   useEffect(() => {
     setUserPreference('daterange', [beginDate, endDate]);
     setUserPreference('segment', segment);
-  })
+  }, [beginDate, endDate, segment])
 
   return (
     <Grid

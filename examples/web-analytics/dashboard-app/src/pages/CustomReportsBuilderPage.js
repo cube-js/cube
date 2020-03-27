@@ -55,7 +55,7 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
+const CustomReportsBuilderPage = ({ history }) => {
   const { id } = useParams();
   const [addCustomReport] = useMutation(CREATE_CUSTOM_REPORT, {
     refetchQueries: [
@@ -92,7 +92,6 @@ const CustomReportsBuilderPage = ({ cubejsApi, history }) => {
         <QueryBuilder
           query={(data && data.customReport.query && JSON.parse(data.customReport.query)) || {}}
           wrapWithQueryRenderer={false}
-          cubejsApi={cubejsApi}
           render={({
             measures, availableMeasures, updateMeasures,
             dimensions, availableDimensions, updateDimensions,
