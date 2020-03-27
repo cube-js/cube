@@ -5831,9 +5831,9 @@ rollup-plugin-commonjs@^9.1.6:
     rollup-pluginutils "^2.0.1"
 
 rollup-plugin-dts@^1.1.8:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/rollup-plugin-dts/-/rollup-plugin-dts-1.2.1.tgz#e96422f05aa85dbf547d6f2eaa44c063d083c34e"
-  integrity sha512-Gt1Tek1PcDccj+jNskFgUUTlW2B0bfDBzDBRocspCfBm/JBND1i8C8QvQ+d/KbF4rnSPI3o3kJivWmRSAEuzQQ==
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/rollup-plugin-dts/-/rollup-plugin-dts-1.3.0.tgz#34de28ea8c9464392f2b0d4cb8cd0fe7c51d482e"
+  integrity sha512-G08HZvwliQdRbAOwNb1VnyKuRSp1EXpKPW5FrvRcHbxsmPP2Co443zZ0p8tSCTjuC5xNYyZ9VMzjcwtqrPn6Ew==
   optionalDependencies:
     "@babel/code-frame" "^7.8.3"
 
