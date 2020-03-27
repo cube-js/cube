@@ -221,6 +221,8 @@ $ serverless logs -t -f cubejsProcess
 [Server core options](@cubejs-backend-server-core#options-reference) can be passed by instantiating appropriate `Handlers` class directly.
 For example:
 
+**cube.js:**
+
 ```javascript
 const AWSHandlers = require('@cubejs-backend/serverless-aws');
 const MySQLDriver = require('@cubejs-backend/mysql-driver');
