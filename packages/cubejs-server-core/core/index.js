@@ -58,34 +58,28 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
 
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
   const format = ({
-    queryKey, duration, allSqlLines, ...json
+    requestId, duration, allSqlLines, query, values, queryKey, showRestParams, ...json
   }) => {
     const restParams = JSON.stringify(json, null, 2);
-    // TODO pre-aggregations queryKey format
-    if (queryKey && queryKey[0] && Array.isArray(queryKey[0]) && typeof queryKey[0][0] === 'string') {
-      [queryKey] = queryKey;
-    }
     const durationStr = duration ? `(${duration}ms)` : '';
-    if (queryKey && typeof queryKey[0] === 'string') {
+    const prefix = `${requestId} ${durationStr}`;
+    if (query && values) {
       const queryMaxLines = 50;
-      let formatted = SqlString.format(queryKey[0], queryKey[1]).split('\n');
+      let formatted = SqlString.format(query, values).split('\n');
       if (formatted.length > queryMaxLines && !allSqlLines) {
         formatted = R.take(queryMaxLines / 2, formatted)
           .concat(['.....', '.....', '.....'])
           .concat(R.takeLast(queryMaxLines / 2, formatted));
       }
-      return `${durationStr}\n${formatted.join('\n')}\n${restParams}`;
+      return `${prefix}\n--\n  ${formatted.join('\n')}\n--${showRestParams ? `\n${restParams}` : ''}`;
     }
-    if (queryKey) {
-      return `${durationStr}\n${JSON.stringify(queryKey)}\n${restParams}`; // TODO format
-    }
-    return `${durationStr}\n${restParams}`;
+    return `${prefix}${showRestParams ? `\n${restParams}` : ''}`;
   };
 
   const logWarning = () => console.log(
-    `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true })} \n${withColor(warning, colors.yellow)}`
+    `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${withColor(warning, colors.yellow)}`
   );
-  const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true })} \n${error}`);
+  const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${error}`);
   const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
 
   if (error) {
@@ -104,6 +98,8 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
     // eslint-disable-next-line no-fallthrough
     case "info": {
       if (!error && !warning && [
+        'Executing SQL',
+        'Executing Load Pre Aggregation SQL',
         'Load Request Success',
         'Performing query',
         'Performing query completed',

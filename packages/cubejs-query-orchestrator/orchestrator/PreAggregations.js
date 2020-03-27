@@ -389,18 +389,27 @@ class PreAggregationLoader {
   async refreshImplStoreInSourceStrategy(client, newVersionEntry) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+    const targetTableName = this.targetTableName(newVersionEntry);
+    const query = QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
+      .replace(
+        this.preAggregation.tableName,
+        targetTableName
+      );
+    this.logger('Executing Load Pre Aggregation SQL', {
+      queryKey: this.preAggregation.loadSql,
+      query,
+      values: params,
+      targetTableName,
+      requestId: this.requestId
+    });
     await client.loadPreAggregationIntoTable(
-      this.targetTableName(newVersionEntry),
-      QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
-        .replace(
-          this.preAggregation.tableName,
-          this.targetTableName(newVersionEntry)
-        ),
+      targetTableName,
+      query,
       params
     );
     await this.createIndexes(client, newVersionEntry);
     await this.loadCache.reset(this.preAggregation);
-    await this.dropOrphanedTables(client, this.targetTableName(newVersionEntry));
+    await this.dropOrphanedTables(client, targetTableName);
     await this.loadCache.reset(this.preAggregation);
   }
 
@@ -408,19 +417,28 @@ class PreAggregationLoader {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
+    const targetTableName = this.targetTableName(newVersionEntry);
+    const query = QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
+      .replace(
+        this.preAggregation.tableName,
+        targetTableName
+      );
+    this.logger('Executing Load Pre Aggregation SQL', {
+      queryKey: this.preAggregation.loadSql,
+      query,
+      values: params,
+      targetTableName,
+      requestId: this.requestId
+    });
     await client.loadPreAggregationIntoTable(
-      this.targetTableName(newVersionEntry),
-      QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
-        .replace(
-          this.preAggregation.tableName,
-          this.targetTableName(newVersionEntry)
-        ),
+      targetTableName,
+      query,
       params
     );
     const tableData = await this.downloadTempExternalPreAggregation(client, newVersionEntry);
     await this.uploadExternalPreAggregation(tableData, newVersionEntry);
     await this.loadCache.reset(this.preAggregation);
-    await this.dropOrphanedTables(client, this.targetTableName(newVersionEntry));
+    await this.dropOrphanedTables(client, targetTableName);
   }
 
   async refreshImplStreamExternalStrategy(client, newVersionEntry) {

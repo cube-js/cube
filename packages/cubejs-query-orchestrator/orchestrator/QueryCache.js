@@ -131,7 +131,9 @@ class QueryCache {
     priority, cacheKey, external, requestId
   }) {
     const queue = external ? this.getExternalQueue() : this.getQueue();
-    return queue.executeInQueue('query', cacheKey, { query, values }, priority, {
+    return queue.executeInQueue('query', cacheKey, {
+      queryKey: cacheKey, query, values, requestId
+    }, priority, {
       stageQueryKey: cacheKey,
       requestId
     });
@@ -142,7 +144,12 @@ class QueryCache {
       this.queue = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}`,
         this.driverFactory,
-        (client, q) => client.query(q.query, q.values), {
+        (client, q) => {
+          this.logger('Executing SQL', {
+            ...q
+          });
+          return client.query(q.query, q.values);
+        }, {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
@@ -158,7 +165,12 @@ class QueryCache {
       this.externalQueue = QueryCache.createQueue(
         `SQL_QUERY_EXT_${this.redisPrefix}`,
         this.externalDriverFactory,
-        (client, q) => client.query(q.query, q.values),
+        (client, q) => {
+          this.logger('Executing SQL', {
+            ...q
+          });
+          return client.query(q.query, q.values);
+        },
         {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
