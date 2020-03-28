@@ -26,7 +26,7 @@ purchasesRatio: {
 }
 ```
 
-You can put any sql into `number` measure as soon as it's an aggregatable expression:
+You can put any sql into `number` measure as soon as it's an aggregate expression:
 
 ```javascript
 ratio: {
