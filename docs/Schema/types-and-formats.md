@@ -30,7 +30,7 @@ You can put any sql into `number` measure as soon as it's an aggregatable expres
 
 ```javascript
 ratio: {
-  sql: `sum(amount) / count(*)`,
+  sql: `sum(${CUBE}.amount) / count(*)`,
   type: `number`
 }
 ```
