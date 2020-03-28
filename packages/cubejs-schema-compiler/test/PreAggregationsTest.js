@@ -92,7 +92,9 @@ describe('PreAggregations', function test() {
             source: {
               columns: ['source', 'created_at']
             }
-          }
+          },
+          partitionGranularity: 'month',
+          timeDimensionReference: createdAt
         },
         googleRollup: {
           type: 'rollup',

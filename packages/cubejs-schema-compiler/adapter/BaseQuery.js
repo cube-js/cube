@@ -827,7 +827,7 @@ class BaseQuery {
       if (this.options.collectOriginalSqlPreAggregations) {
         this.options.collectOriginalSqlPreAggregations.push(foundPreAggregation);
       }
-      return this.preAggregationTableName(cube, foundPreAggregation.preAggregationName);
+      return this.preAggregations.originalSqlPreAggregationTable(foundPreAggregation);
     }
     const evaluatedSql = this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql);
     const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".]+)\s*$/i);
@@ -1521,24 +1521,23 @@ class BaseQuery {
     } else if (preAggregation.type === 'rollup') {
       return this.preAggregations.rollupPreAggregationQuery(cube, preAggregation).buildSqlAndParams();
     } else if (preAggregation.type === 'originalSql') {
-      return [
-        this.evaluateSymbolSqlWithContext(
-        () => this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
-        { preAggregationQuery: true, originalSqlPreAggregation: true }
-        ),
-        []
-      ];
+      const originalSqlPreAggregationQuery = this.preAggregations.originalSqlPreAggregationQuery(cube, preAggregation);
+      return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
+        () => originalSqlPreAggregationQuery.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
+        { preAggregationQuery: true }
+      ));
     }
     throw new UserError(`Unknown pre-aggregation type '${preAggregation.type}' in '${cube}'`);
   }
 
+  // eslint-disable-next-line consistent-return
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {
       return this.preAggregations.autoRollupPreAggregationQuery(cube, preAggregation);
     } else if (preAggregation.type === 'rollup') {
       return this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
     } else if (preAggregation.type === 'originalSql') {
-      return this;
+      return this.preAggregations.originalSqlPreAggregationQuery(cube, preAggregation);
     }
   }
 
@@ -1675,7 +1674,7 @@ class BaseQuery {
         const propValue = target[name];
         const methods = (paramValue) => ({
           filter: (column) => {
-            if (paramValue && !this.safeEvaluateSymbolContext().originalSqlPreAggregation) {
+            if (paramValue) {
               const value = Array.isArray(paramValue) ?
                 paramValue.map(this.paramAllocator.allocateParam.bind(this.paramAllocator)) :
                 this.paramAllocator.allocateParam(paramValue);
@@ -1720,8 +1719,7 @@ class BaseQuery {
                 if (
                   filter &&
                   filter.filterParams() &&
-                  filter.filterParams().length &&
-                  !this.safeEvaluateSymbolContext().originalSqlPreAggregation
+                  filter.filterParams().length
                 ) {
                   if (typeof column === "function") {
                     return column.apply(

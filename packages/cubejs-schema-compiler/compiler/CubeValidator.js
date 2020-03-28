@@ -179,7 +179,8 @@ const cubeSchema = Joi.object().keys({
       maxPreAggregations: Joi.number()
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('originalSql').required()
+      type: Joi.any().valid('originalSql').required(),
+      timeDimensionReference: Joi.func()
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),

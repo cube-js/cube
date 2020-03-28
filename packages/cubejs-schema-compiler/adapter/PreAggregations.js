@@ -23,10 +23,24 @@ class PreAggregations {
     if (preAggregationForQuery) {
       if (preAggregationForQuery.preAggregation.useOriginalSqlPreAggregations) {
         const { preAggregations, result } =
-          this.collectOriginalSqlPreAggregations(() =>
-            this.preAggregationDescriptionsFor(preAggregationForQuery.cube, preAggregationForQuery)
+          this.collectOriginalSqlPreAggregations(
+            () => this.preAggregationDescriptionsFor(preAggregationForQuery.cube, preAggregationForQuery)
           );
-        return R.unnest(preAggregations.map(p => this.preAggregationDescriptionsFor(p.cube, p))).concat(result);
+
+        const queryForEval = this.query.preAggregationQueryForSqlEvaluation(
+          preAggregationForQuery.cube,
+          preAggregationForQuery.preAggregation
+        );
+
+        // TODO consider recursive pre-aggregation descriptions instead of duplication of sub query logic
+        return R.unnest(preAggregations.map(
+          p => this.preAggregationDescriptionsFor(p.cube, p).concat(
+            R.unnest(
+              queryForEval.subQueryDimensions.map(d => queryForEval.subQueryDescription(d).subQuery)
+                .map(q => q.preAggregations.preAggregationDescriptionsFor(p.cube, p))
+            )
+          )
+        )).concat(result);
       }
       return this.preAggregationDescriptionsFor(preAggregationForQuery.cube, preAggregationForQuery);
     }
@@ -44,18 +58,28 @@ class PreAggregations {
   }
 
   preAggregationCubes() {
-    const join = this.query.join;
+    const { join } = this.query;
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }
 
   preAggregationDescriptionsFor(cube, foundPreAggregation) {
-    if (foundPreAggregation.preAggregation.partitionGranularity && this.query.timeDimensions.length) {
+    if (this.canPartitionsBeUsed(foundPreAggregation)) {
       const { dimension, partitionDimension } = this.partitionDimension(foundPreAggregation);
-      return partitionDimension.timeSeries().map(range =>
-        this.preAggregationDescriptionFor(cube, this.addPartitionRangeTo(foundPreAggregation, dimension, range))
+      return partitionDimension.timeSeries().map(
+        range => this.preAggregationDescriptionFor(
+          cube, this.addPartitionRangeTo(foundPreAggregation, dimension, range)
+        )
       );
     }
     return [this.preAggregationDescriptionFor(cube, foundPreAggregation)];
+  }
+
+  canPartitionsBeUsed(foundPreAggregation) {
+    return foundPreAggregation.preAggregation.partitionGranularity &&
+      this.query.timeDimensions.length &&
+      foundPreAggregation.references.timeDimensions &&
+      foundPreAggregation.references.timeDimensions.length &&
+      this.query.timeDimensions.find(td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension);
   }
 
   addPartitionRangeTo(foundPreAggregation, dimension, range) {
@@ -70,7 +94,7 @@ class PreAggregations {
   }
 
   partitionDimension(foundPreAggregation) {
-    const dimension = this.query.timeDimensions[0].dimension;
+    const { dimension } = this.query.timeDimensions[0];
     const partitionDimension = this.query.newTimeDimension({
       dimension,
       granularity: this.castGranularity(foundPreAggregation.preAggregation.partitionGranularity),
@@ -124,6 +148,7 @@ class PreAggregations {
     const preAggregates = this.query.cubeEvaluator.preAggregationsForCube(cube);
     const originalSqlPreAggregations = R.pipe(
       R.toPairs,
+      // eslint-disable-next-line no-unused-vars
       R.filter(([k, a]) => a.type === 'originalSql')
     )(preAggregates);
     if (originalSqlPreAggregations.length) {
@@ -131,7 +156,8 @@ class PreAggregations {
       return {
         preAggregationName,
         preAggregation,
-        cube
+        cube,
+        references: this.evaluateAllReferences(cube, preAggregation)
       };
     }
     return null;
@@ -198,11 +224,9 @@ class PreAggregations {
 
   canUsePreAggregationAndCheckIfRefValid(query) {
     const transformedQuery = PreAggregations.transformQueryToCanUseForm(query);
-    return (refs) => {
-      return PreAggregations.canUsePreAggregationForTransformedQueryFn(
-        transformedQuery, refs
-      );
-    };
+    return (refs) => PreAggregations.canUsePreAggregationForTransformedQueryFn(
+      transformedQuery, refs
+    );
   }
 
   checkAutoRollupPreAggregationValid(refs) {
@@ -275,6 +299,7 @@ class PreAggregations {
     );
   }
 
+  // eslint-disable-next-line no-unused-vars
   getCubeLattice(cube, preAggregationName, preAggregation) {
     throw new UserError('Auto rollups supported only in Enterprise version');
   }
@@ -294,6 +319,7 @@ class PreAggregations {
     ) {
       return R.pipe(
         R.toPairs,
+        // eslint-disable-next-line no-unused-vars
         R.filter(([k, a]) => a.type === 'autoRollup'),
         R.map(([preAggregationName, preAggregation]) => {
           const cubeLattice = this.getCubeLattice(cube, preAggregationName, preAggregation);
@@ -305,7 +331,8 @@ class PreAggregations {
               preAggregation
             ),
             cube,
-            canUsePreAggregation: true
+            canUsePreAggregation: true,
+            references: optimalPreAggregation
           };
         })
       )(preAggregations);
@@ -339,20 +366,25 @@ class PreAggregations {
   findRollupPreAggregationsForCube(cube, canUsePreAggregation, preAggregations) {
     return R.pipe(
       R.toPairs,
+      // eslint-disable-next-line no-unused-vars
       R.filter(([k, a]) => a.type === 'rollup'),
-      R.map(([preAggregationName, preAggregation]) => ({
-        preAggregationName,
-        preAggregation,
-        cube,
-        canUsePreAggregation: canUsePreAggregation(this.evaluateAllReferences(cube, preAggregation))
-      }))
+      R.map(([preAggregationName, preAggregation]) => {
+        const references = this.evaluateAllReferences(cube, preAggregation);
+        return {
+          preAggregationName,
+          preAggregation,
+          cube,
+          canUsePreAggregation: canUsePreAggregation(references),
+          references
+        };
+      })
     )(preAggregations);
   }
 
   rollupMatchResultDescriptions() {
     return this.rollupMatchResults().map(p => ({
       ...this.preAggregationDescriptionFor(p.cube, p),
-      references: this.evaluateAllReferences(p.cube, p.preAggregation),
+      references: p.references,
       canUsePreAggregation: p.canUsePreAggregation
     }));
   }
@@ -380,6 +412,15 @@ class PreAggregations {
     const preAggregations = [];
     const result = this.query.evaluateSymbolSqlWithContext(fn, { collectOriginalSqlPreAggregations: preAggregations });
     return { preAggregations, result };
+  }
+
+  originalSqlPreAggregationQuery(cube, aggregation) {
+    return this.query.newSubQuery({
+      rowLimit: null,
+      timeDimensions: aggregation.partitionTimeDimensions,
+      preAggregationQuery: true,
+      collectOriginalSqlPreAggregations: this.query.safeEvaluateSymbolContext().collectOriginalSqlPreAggregations
+    });
   }
 
   rollupPreAggregationQuery(cube, aggregation) {
@@ -421,27 +462,39 @@ class PreAggregations {
   }
 
   autoRollupNameSuffix(cube, aggregation) {
+    // eslint-disable-next-line prefer-template
     return '_' + aggregation.dimensions.concat(
       aggregation.timeDimensions.map(d => `${d.dimension}${d.granularity.substring(0, 1)}`)
     ).map(s => {
       const path = s.split('.');
       return `${path[0][0]}${path[1]}`;
-    }).map(s => s.replace(/_/g, '')).join("_").replace(/[.]/g, '').toLowerCase();
+    }).map(s => s.replace(/_/g, '')).join("_")
+      .replace(/[.]/g, '')
+      .toLowerCase();
   }
 
   evaluateAllReferences(cube, aggregation) {
     return this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
   }
 
+  originalSqlPreAggregationTable(preAggregation) {
+    return this.canPartitionsBeUsed(preAggregation) ?
+      this.partitionUnion(preAggregation, true) :
+      this.query.preAggregationTableName(
+        preAggregation.cube,
+        preAggregation.preAggregationName
+      );
+  }
+
   rollupPreAggregation(preAggregationForQuery) {
-    const table = preAggregationForQuery.preAggregation.partitionGranularity && this.query.timeDimensions.length ?
+    const table = this.canPartitionsBeUsed(preAggregationForQuery) ?
       this.partitionUnion(preAggregationForQuery) :
       this.query.preAggregationTableName(
         preAggregationForQuery.cube,
         preAggregationForQuery.preAggregationName
       );
-    let segmentFilters = this.query.segments.map(s =>
-      this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })
+    const segmentFilters = this.query.segments.map(
+      s => this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })
     );
     const filters =
       segmentFilters
@@ -465,12 +518,12 @@ class PreAggregations {
       R.fromPairs
     )(preAggregationForQuery.preAggregation.type === 'autoRollup' ?
       preAggregationForQuery.preAggregation.measures :
-      this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures
-    );
+      this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures);
 
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
 
     return this.query.evaluateSymbolSqlWithContext(
+      // eslint-disable-next-line prefer-template
       () => `SELECT ${this.query.baseSelect()} FROM ${table} ${this.query.baseWhere(filters)}` +
         this.query.groupByClause() +
         this.query.baseHaving(this.query.measureFilters) +
@@ -484,7 +537,7 @@ class PreAggregations {
     );
   }
 
-  partitionUnion(preAggregationForQuery) {
+  partitionUnion(preAggregationForQuery, withoutAlias) {
     const { dimension, partitionDimension } = this.partitionDimension(preAggregationForQuery);
 
     const union = partitionDimension.timeSeries().map(range => {
@@ -495,7 +548,7 @@ class PreAggregations {
         preAggregation.preAggregation
       );
     }).map(table => `SELECT * FROM ${table}`).join(" UNION ALL ");
-    return `(${union}) as partition_union`;
+    return `(${union})${withoutAlias ? '' : ' as partition_union'}`;
   }
 }
 
