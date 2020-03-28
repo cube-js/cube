@@ -30,7 +30,8 @@ const BaseDimensionWithoutSubQuery = {
 };
 
 const BaseDimension = Object.assign({
-  subQuery: Joi.boolean()
+  subQuery: Joi.boolean(),
+  propagateFiltersToSubQuery: Joi.boolean()
 }, BaseDimensionWithoutSubQuery);
 
 const BaseMeasure = {

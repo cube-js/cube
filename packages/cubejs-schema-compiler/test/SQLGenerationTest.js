@@ -129,6 +129,13 @@ describe('SQL Generation', function test() {
           subQuery: true
         },
         
+        checkinsWithPropagation: {
+          sql: \`\${visitor_checkins.visitor_checkins_count}\`,
+          type: \`number\`,
+          subQuery: true,
+          propagateFiltersToSubQuery: true
+        },
+        
         subQueryFail: {
           sql: '2',
           type: \`number\`,
@@ -919,6 +926,52 @@ describe('SQL Generation', function test() {
 
     return result;
   });
+
+  it('subquery with propagated filters', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.checkinsWithPropagation'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: [{
+        id: 'visitors.checkins'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          "visitors__checkins_with_propagation": "0",
+          "visitors__created_at_day": "2017-01-06T00:00:00.000Z",
+          "visitors__visitor_count": "2"
+        }, {
+          "visitors__checkins_with_propagation": "1",
+          "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
+          "visitors__visitor_count": "1"
+        }, {
+          "visitors__checkins_with_propagation": "2",
+          "visitors__created_at_day": "2017-01-04T00:00:00.000Z",
+          "visitors__visitor_count": "1"
+        }, {
+          "visitors__checkins_with_propagation": "3",
+          "visitors__created_at_day": "2017-01-02T00:00:00.000Z",
+          "visitors__visitor_count": "1"
+        }]
+      );
+    });
+  }));
 
   it('average subquery', () => {
     const result = compiler.compile().then(() => {

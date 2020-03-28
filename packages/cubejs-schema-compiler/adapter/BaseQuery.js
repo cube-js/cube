@@ -635,19 +635,54 @@ class BaseQuery {
     ON ${subQueryAlias}.${primaryKey.aliasName()} = ${this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName)}`;
   }
 
+  get filtersWithoutSubQueries() {
+    if (!this.filtersWithoutSubQueriesValue) {
+      this.filtersWithoutSubQueriesValue = this.allFilters.filter(
+        f => this.collectFrom([f], this.collectSubQueryDimensionsFor.bind(this)).length === 0
+      );
+    }
+    return this.filtersWithoutSubQueriesValue;
+  }
+
   subQueryDescription(dimension) {
     const symbol = this.cubeEvaluator.dimensionByPath(dimension);
     const [cubeName, name] = this.cubeEvaluator.parsePath('dimensions', dimension);
     const prefix = this.subQueryName(cubeName, name);
+    let filters;
+    let segments;
+    let timeDimensions;
+    if (symbol.propagateFiltersToSubQuery) {
+      filters = this.filtersWithoutSubQueries.filter(
+        f => f instanceof BaseFilter && !(f instanceof BaseTimeDimension)
+      ).map(f => ({
+        dimension: f.dimension,
+        operator: f.operator,
+        values: f.values
+      }));
+
+      timeDimensions = this.filtersWithoutSubQueries.filter(
+        f => f instanceof BaseTimeDimension
+      ).map(f => ({
+        dimension: f.dimension,
+        dateRange: f.dateRange
+      }));
+
+      segments = this.filtersWithoutSubQueries.filter(
+        f => f instanceof BaseSegment
+      ).map(f => f.segment);
+    }
     const subQuery = this.newSubQuery({
       cubeAliasPrefix: prefix,
       rowLimit: null,
       measures: [{
         expression: symbol.sql,
-        cubeName: cubeName,
+        cubeName,
         name
       }],
-      dimensions: [this.primaryKeyName(cubeName)]
+      dimensions: [this.primaryKeyName(cubeName)],
+      filters,
+      segments,
+      timeDimensions
     });
     return { prefix, subQuery, cubeName };
   }
