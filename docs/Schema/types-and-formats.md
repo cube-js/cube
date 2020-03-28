@@ -26,6 +26,15 @@ purchasesRatio: {
 }
 ```
 
+You can put any sql into `number` measure as soon as it's an aggregatable expression:
+
+```javascript
+ratio: {
+  sql: `sum(amount) / count(*)`,
+  type: `number`
+}
+```
+
 ### count
 
 Performs a table count, similar to SQL’s `COUNT` function. However, unlike
