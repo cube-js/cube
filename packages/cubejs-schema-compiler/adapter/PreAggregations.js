@@ -540,14 +540,18 @@ class PreAggregations {
   partitionUnion(preAggregationForQuery, withoutAlias) {
     const { dimension, partitionDimension } = this.partitionDimension(preAggregationForQuery);
 
-    const union = partitionDimension.timeSeries().map(range => {
+    const tables = partitionDimension.timeSeries().map(range => {
       const preAggregation = this.addPartitionRangeTo(preAggregationForQuery, dimension, range);
       return this.preAggregationTableName(
         preAggregationForQuery.cube,
         preAggregationForQuery.preAggregationName,
         preAggregation.preAggregation
       );
-    }).map(table => `SELECT * FROM ${table}`).join(" UNION ALL ");
+    });
+    if (tables.length === 1) {
+      return tables[0];
+    }
+    const union = tables.map(table => `SELECT * FROM ${table}`).join(" UNION ALL ");
     return `(${union})${withoutAlias ? '' : ' as partition_union'}`;
   }
 }
