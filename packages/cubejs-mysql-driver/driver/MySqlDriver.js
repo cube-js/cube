@@ -2,6 +2,7 @@ const mysql = require('mysql');
 const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const crypto = require('crypto');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
@@ -101,10 +102,13 @@ class MySqlDriver extends BaseDriver {
   }
 
   query(query, values) {
-    const self = this;
-    return this.withConnection(db => db.execute(`SET time_zone = '${self.config.storeTimezone || '+00:00'}'`, [])
+    return this.withConnection(db => this.setTimeZone(db)
       .then(() => db.execute(query, values))
       .then(res => res));
+  }
+
+  setTimeZone(db) {
+    return db.execute(`SET time_zone = '${this.config.storeTimezone || '+00:00'}'`, []);
   }
 
   async release() {
@@ -130,6 +134,27 @@ class MySqlDriver extends BaseDriver {
       return this.query(loadSql.replace(/^CREATE TABLE (\S+) AS/i, 'INSERT INTO $1'), params);
     }
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
+  }
+
+  async downloadQueryResults(query, values) {
+    if (!this.config.database) {
+      throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
+    }
+    const tableName = crypto.randomBytes(10).toString('hex');
+    const columns = await this.withConnection(async db => {
+      await this.setTimeZone(db);
+      await db.execute(`CREATE TEMPORARY TABLE ${this.config.database}.t_${tableName} AS ${query} LIMIT 0`, values);
+      const result = await db.execute(`DESCRIBE ${this.config.database}.t_${tableName}`);
+      await db.execute(`DROP TEMPORARY TABLE ${this.config.database}.t_${tableName}`);
+      return result;
+    });
+
+    const types = columns.map(c => ({ name: c.Field, type: this.toGenericType(c.Type) }));
+
+    return {
+      rows: await this.query(query, values),
+      types,
+    };
   }
 
   toColumnValue(value, genericType) {
