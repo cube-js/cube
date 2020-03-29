@@ -624,6 +624,9 @@ describe('PreAggregations', function test() {
       const desc = preAggregationsDescription.find(desc => desc.tableName === 'visitors_multi_stage20170101');
       desc.invalidateKeyQueries[0][1][0].should.be.equal("2017-01-02T07:59:59Z");
 
+      const vcMainDesc = preAggregationsDescription.find(desc => desc.tableName === 'vc_main');
+      vcMainDesc.invalidateKeyQueries.length.should.be.equal(1);
+
       console.log(JSON.stringify(queries.concat(queryAndParams)));
 
       return dbRunner.testQueries(

@@ -1537,7 +1537,7 @@ class BaseQuery {
     } else if (preAggregation.type === 'rollup') {
       return this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
     } else if (preAggregation.type === 'originalSql') {
-      return this.preAggregations.originalSqlPreAggregationQuery(cube, preAggregation);
+      return this;
     }
   }
 
