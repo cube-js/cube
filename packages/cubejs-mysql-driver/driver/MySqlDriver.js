@@ -124,6 +124,16 @@ class MySqlDriver extends BaseDriver {
     return GenericTypeToMySql[columnType] || super.fromGenericType(columnType);
   }
 
+  async loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx) {
+    if (this.config.loadPreAggregationWithoutMetaLock) {
+      console.log(`${loadSql} LIMIT 0`);
+      await this.query(`${loadSql} LIMIT 0`, params);
+      console.log(loadSql.replace(/^CREATE TABLE (\S+) AS/i, 'INSERT INTO $1'));
+      return this.query(loadSql.replace(/^CREATE TABLE (\S+) AS/i, 'INSERT INTO $1'), params);
+    }
+    return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
+  }
+
   toColumnValue(value, genericType) {
     if (genericType === 'timestamp' && typeof value === 'string') {
       return value && value.replace('Z', '');
