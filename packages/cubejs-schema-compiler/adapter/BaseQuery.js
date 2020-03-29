@@ -1625,12 +1625,13 @@ class BaseQuery {
           (originalRefreshKey, refreshKeyCube) => {
             if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
               return `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`;
-            } else {
+            } else if (!cubeFromPath.refreshKey) {
               // TODO handle WHERE while generating originalRefreshKey
               return refreshKeyCube === preAggregationQueryForSql.timeDimensions[0].path()[0] ?
                 `${originalRefreshKey} WHERE ${preAggregationQueryForSql.timeDimensions[0].filterToWhere()}` :
                 originalRefreshKey;
             }
+            return originalRefreshKey;
           }
         ),
         { preAggregationQuery: true }
