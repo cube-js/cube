@@ -91,6 +91,132 @@ describe('ResultSet', () => {
   });
 
   describe('chartPivot', () => {
+    test('String field', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.count'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.count': 'Some string',
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.count': {
+              title: 'Foo Count',
+              shortTitle: 'Count',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.count': 'Some string',
+      }]);
+    });
+
+    test('Null field', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.count'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.count': null,
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.count': {
+              title: 'Foo Count',
+              shortTitle: 'Count',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.count': null,
+      }]);
+    });
+
+    test('Empty field', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.count'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.count': undefined,
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.count': {
+              title: 'Foo Count',
+              shortTitle: 'Count',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.count': undefined,
+      }]);
+    });
+
     test('Number field', () => {
       const resultSet = new ResultSet({
         query: {

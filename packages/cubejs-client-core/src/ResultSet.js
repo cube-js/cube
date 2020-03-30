@@ -288,13 +288,23 @@ class ResultSet {
    * @param pivotConfig
    */
   chartPivot(pivotConfig) {
+    const validate = (value) => {
+      if (ISO8601_REGEX.test(value)) {
+        return new Date(value);
+      } else if (!Number.isNaN(Number.parseFloat(value))) {
+        return Number.parseFloat(value);
+      }
+
+      return value;
+    };
+
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ', '), // TODO deprecated
       x: this.axisValuesString(xValues, ', '),
       ...(
         yValuesArray
           .map(([yValues, m]) => ({
-            [this.axisValuesString(yValues, ', ')]: m && (ISO8601_REGEX.test(m) ? new Date(m) : Number.parseFloat(m)),
+            [this.axisValuesString(yValues, ', ')]: m && validate(m),
           }))
           .reduce((a, b) => Object.assign(a, b), {})
       )
