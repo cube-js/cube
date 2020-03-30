@@ -1189,10 +1189,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
   integrity sha512-5a6wqoJV/xEdbRNKVo6I4hO3VjyDq//8q2f9I6PBAvMesJHFauXDorcNCsr9RzvsZnaWi5NYCcfyqP1QeFHFbw==
 
-"@cubejs-client/core@^0.18.7":
-  version "0.18.7"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.7.tgz#57a984dba39d716653b70921e2fc3ad98407cd81"
-  integrity sha512-2I7xu5IO2ohAmXEg67fs5c08PIjCguCPiKWTo6ZoVGjG6641Xl+jTvc+xyoZYcTMsPCBdxT/g7RnfCfDq8jNEw==
+"@cubejs-client/core@^0.18.18":
+  version "0.18.18"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.18.tgz#1ee03cd04be491d24af9f1e0406f85580b178834"
+  integrity sha512-MgnCepldRhlK1wWygTJddPYrkfy3MzEWrnFPHKuadpIenQqdudkJ1fbvBFCCE7pkfXBqnjfyIJ2cVTjRWyTFZg==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -1203,10 +1203,10 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.18.4":
-  version "0.18.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.18.4.tgz#82637946d81d94dde16701f7759f10ff29e6be39"
-  integrity sha512-DVOs+UzQTte5bAGVnFJzNlYmPJLcGIap4jrsYIfaCBrf1D4QMgMg1jRU13Dg1AUH5IyKt/z4yxOjZ/OXXjAhGA==
+"@cubejs-client/react@^0.18.18":
+  version "0.18.18"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.18.18.tgz#b35d782a2d96f917026b1923075659668deff8b1"
+  integrity sha512-grNsP8TCcTleUDRxAuFuxtPqmIJTMM6Y3/OvIdEliLZ4uNCIb3OGQZJ4A5GY/qKmDdGY8aTSBgSJ/QzRhTo2vg==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^2.5.3"
@@ -9489,9 +9489,9 @@ pretty-format@^23.6.0:
     ansi-styles "^3.2.0"
 
 prismjs@^1.15.0:
-  version "1.17.1"
-  resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.17.1.tgz#e669fcbd4cdd873c35102881c33b14d0d68519be"
-  integrity sha512-PrEDJAFdUGbOP6xK/UsfkC5ghJsPJviKgnQOoxaDbBjwc8op68Quupwt1DeAFoG8GImPhiKXAvvsH7wDSLsu1Q==
+  version "1.19.0"
+  resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.19.0.tgz#713afbd45c3baca4b321569f2df39e17e729d4dc"
+  integrity sha512-IVFtbW9mCWm9eOIaEkNyo2Vl4NnEifis2GQ7/MLRG5TQe6t+4Sj9J5QWI9i3v+SS43uZBlCAOn+zYTVYQcPXJw==
   optionalDependencies:
     clipboard "^2.0.0"
 
