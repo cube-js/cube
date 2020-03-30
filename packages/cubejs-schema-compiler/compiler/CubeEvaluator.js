@@ -55,9 +55,7 @@ class CubeEvaluator extends CubeSymbols {
           preAggregationName,
           preAggregation: preAggregations[preAggregationName],
           cube,
-          references: preAggregations[preAggregationName].type === 'rollup' ?
-            this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]) :
-            null
+          references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName])
         }));
     }).reduce((a, b) => a.concat(b), []);
   }
