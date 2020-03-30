@@ -19,7 +19,6 @@ const GRANULARITY_TO_INTERVAL = {
 
 class ElasticSearchCloudQueryFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
-    // return `${column}${not ? " NOT" : ""} LIKE  ?`; // CONCAT(CONCAT('%', '?'), '%')
     return `${not ? " NOT" : ""} MATCH(${column}, ?, 'fuzziness=AUTO:1,5')`;
   }
 }
@@ -58,9 +57,8 @@ class ElasticSearchCloudQuery extends BaseQuery {
     const dimensionColumns = R.flatten(
       dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
     ).filter(s => !!s);
-    return dimensionColumns.length
-      ? ` GROUP BY ${dimensionColumns.join(", ")}`
-      : "";
+
+    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(", ")}` : "";
   }
 
   orderHashToString(hash) {
@@ -79,24 +77,20 @@ class ElasticSearchCloudQuery extends BaseQuery {
   }
 
   getFieldAlias(id) {
-    const equalIgnoreCase = (a, b) =>
-      typeof a === "string" &&
+    const equalIgnoreCase = (a, b) => typeof a === "string" &&
       typeof b === "string" &&
       a.toUpperCase() === b.toUpperCase();
 
     let field;
 
-    field = this.dimensionsForSelect().find(d =>
-      equalIgnoreCase(d.dimension, id)
-    );
+    field = this.dimensionsForSelect().find(d => equalIgnoreCase(d.dimension, id));
 
     if (field) {
       return field.dimensionSql();
     }
 
     field = this.measures.find(
-      d =>
-        equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
+      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
     );
 
     if (field) {
