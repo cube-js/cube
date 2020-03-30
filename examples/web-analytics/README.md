@@ -32,6 +32,7 @@ To query S3 data with Athena, we need to create a table for Snowplow events. Cop
 
 <details>
   <summary>Show DDL statement</summary>
+
 ```sql
 CREATE EXTERNAL TABLE atomic_events (
   app_id STRING,
