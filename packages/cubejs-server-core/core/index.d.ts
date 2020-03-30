@@ -92,6 +92,7 @@ declare module "@cubejs-backend/server-core" {
     | "mssql"
     | "mysql"
     | "odelasticsearch"
+    | "elasticsearchcloud"
     | "oracle"
     | "postgres"
     | "prestodb"

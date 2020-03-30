@@ -6,25 +6,26 @@ const BaseQuery = require("./BaseQuery");
 const BaseFilter = require("./BaseFilter");
 
 const GRANULARITY_TO_INTERVAL = {
-  day: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-dd 00:00:00.000')`,
-  // eslint-disable-next-line no-unused-vars
-  week: (date) => { throw new Error('Week is unsupported'); }, // TODO
-  hour: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:00:00.000')`,
-  minute: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:mm:00.000')`,
-  second: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:mm:ss.000')`,
-  month: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-01 00:00:00.000')`,
-  year: (date) => `DATE_FORMAT(${date}, 'yyyy-01-01 00:00:00.000')`
+  day: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd 00:00:00.000')`,
+  week: date => {
+    throw new Error("Week is unsupported");
+  }, // TODO
+  hour: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:00:00.000')`,
+  minute: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:mm:00.000')`,
+  second: date => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:mm:ss.000')`,
+  month: date => `DATE_FORMAT(${date}, 'yyyy-MM-01 00:00:00.000')`,
+  year: date => `DATE_FORMAT(${date}, 'yyyy-01-01 00:00:00.000')`
 };
 
-class OpenDistroElasticSearchQueryFilter extends BaseFilter {
+class ElasticSearchCloudQueryFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
     return `${column}${not ? " NOT" : ""} LIKE CONCAT('%', ?, '%')`;
   }
 }
 
-class OpenDistroElasticSearchQuery extends BaseQuery {
+class ElasticSearchCloudQuery extends BaseQuery {
   newFilter(filter) {
-    return new OpenDistroElasticSearchQueryFilter(this, filter);
+    return new ElasticSearchCloudQueryFilter(this, filter);
   }
 
   convertTz(field) {
@@ -109,4 +110,4 @@ class OpenDistroElasticSearchQuery extends BaseQuery {
   }
 }
 
-module.exports = OpenDistroElasticSearchQuery;
+module.exports = ElasticSearchCloudQuery;
