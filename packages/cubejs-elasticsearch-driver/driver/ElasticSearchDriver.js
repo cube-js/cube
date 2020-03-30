@@ -18,34 +18,33 @@ class ElasticSearchDriver extends BaseDriver {
       cloud: this.config.cloud
     });
 
-    this.sqlClient = this.config.openDistro
-      ? new Client({ node: `${this.config.url}/_opendistro` })
-      : this.client;
+    this.sqlClient = this.config.openDistro ? new Client({ node: `${this.config.url}/_opendistro` }) : this.client;
   }
 
   async testConnection() {
-    return this.client.cat.indices({
+    const results = await this.client.cat.indices({
       format: "json"
     });
+
+    return results;
   }
 
   async query(query, values) {
     try {
+      const queryString = SqlString.format(query, values);
+
       const result = (
         await this.sqlClient.sql.query({
           // TODO cursor
           body: {
-            query: SqlString.format(query, values)
+            query: queryString
           }
         })
       ).body;
 
       if (this.config.cloud) {
-        const compiled = result.rows.map(r =>
-          result.columns.reduce(
-            (prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }),
-            {}
-          )
+        const compiled = result.rows.map(
+          r => result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {})
         );
 
         return compiled;
@@ -89,11 +88,8 @@ class ElasticSearchDriver extends BaseDriver {
       );
     }
     return aggregations[dimension].buckets
-      .map(b =>
-        this.traverseAggregations(b).map(innerRow => ({
-          ...innerRow,
-          [dimension]: b.key
-        }))
+      .map(
+        b => this.traverseAggregations(b).map(innerRow => ({ ...innerRow, [dimension]: b.key }))
       )
       .reduce((a, b) => a.concat(b), []);
   }

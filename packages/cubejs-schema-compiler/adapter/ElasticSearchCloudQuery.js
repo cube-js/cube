@@ -19,7 +19,8 @@ const GRANULARITY_TO_INTERVAL = {
 
 class ElasticSearchCloudQueryFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
-    return `${column}${not ? " NOT" : ""} LIKE CONCAT('%', ?, '%')`;
+    // return `${column}${not ? " NOT" : ""} LIKE  ?`; // CONCAT(CONCAT('%', '?'), '%')
+    return `${not ? " NOT" : ""} MATCH(${column}, ?, 'fuzziness=AUTO:1,5')`;
   }
 }
 
