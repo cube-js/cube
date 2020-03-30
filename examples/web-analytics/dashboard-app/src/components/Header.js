@@ -2,6 +2,8 @@ import React from "react";
 import { withRouter } from "react-router";
 import AppBar from "@material-ui/core/AppBar";
 import Toolbar from "@material-ui/core/Toolbar";
+import Button from "@material-ui/core/Button";
+import GitHubIcon from '@material-ui/icons/GitHub';
 import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
 
@@ -19,10 +21,18 @@ const Header = ({ location }) => {
   return (
     <AppBar position="fixed" className={classes.appBar}>
       <Toolbar>
-        <Typography variant="h6" color="inherit">
-          Web Analytics
+        <Typography variant="h6" color="inherit" noWrap className={classes.title}>
+          Cube.js Web Analytics Template
         </Typography>
         <div className={classes.grow} />
+        <Button
+          component="a"
+          href="https://github.com/cube-js/cube.js/tree/master/examples/web-analytics"
+          endIcon={<GitHubIcon />}
+          color="inherit"
+        >
+          Source Code
+        </Button>
       </Toolbar>
     </AppBar>
   )

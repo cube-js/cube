@@ -53,6 +53,8 @@ const xAxisFormatter = (item) => {
   }
 }
 
+const getType = (resultSet, key) => (resultSet.loadResponse.annotation.measures[key] || resultSet.loadResponse.annotation.dimensions[key]).type
+
 const CartesianChart = ({ resultSet, legend, children, ChartComponent, height }) => (
   <ResponsiveContainer width="100%" height={height || 250}>
     <ChartComponent
@@ -186,7 +188,7 @@ const TypeToChartComponent = {
         <TableHead>
           <TableRow>
             {resultSet.tableColumns().map(c => (
-              <TableCell key={c.key}>{c.shortTitle}</TableCell>
+              <TableCell align={getType(resultSet, c.key) === 'number' ? 'right' : 'left'} key={c.key}>{c.shortTitle}</TableCell>
             ))}
           </TableRow>
         </TableHead>
@@ -194,8 +196,8 @@ const TypeToChartComponent = {
           {resultSet.tablePivot().map((row, index) => (
             <TableRow key={index}>
               {resultSet.tableColumns().map(c => {
-                const type = (resultSet.loadResponse.annotation.measures[c.key] || resultSet.loadResponse.annotation.dimensions[c.key]).type
-                return (<TableCell align={type === 'number' ? 'right' : 'left'} key={c.key}>{resolveFormatter(type)(row[c.key])}</TableCell>)
+                const type = getType(resultSet, c.key);
+                return (<TableCell align={getType(resultSet, c.key) === 'number' ? 'right' : 'left'} key={c.key}>{resolveFormatter(type)(row[c.key])}</TableCell>)
               })}
             </TableRow>
           ))}

@@ -266,6 +266,8 @@ cube(`SessionUsers`, {
       },
       external: true,
       scheduledRefresh: true,
+      partitionGranularity: `month`,
+      timeDimensionReference: sessionStart,
       indexes: {
         sessionId: {
           columns: [`session_id`]
