@@ -41,11 +41,11 @@ class ElasticSearchCloudQuery extends BaseQuery {
   }
 
   subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL ${interval})`;
+    return `${date} - INTERVAL ${interval}`;
   }
 
   addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL ${interval})`;
+    return `${date} + INTERVAL ${interval}`;
   }
 
   timeGroupedColumn(granularity, dimension) {
