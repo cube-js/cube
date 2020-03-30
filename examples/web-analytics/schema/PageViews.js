@@ -100,7 +100,7 @@ cube(`PageViews`, {
 cube(`PageUsers`, {
   extends: PageViews,
 
-  sql: `select distinct 
+  sql: `select distinct
   date_trunc('hour', derived_tstamp) as derived_tstamp,
   session_id
   from ${Events.sql()}`,
@@ -111,6 +111,8 @@ cube(`PageUsers`, {
       refreshKey: {
         every: `5 minutes`
       },
+      partitionGranularity: `month`,
+      timeDimensionReference: time,
       external: true,
       scheduledRefresh: true
     }
