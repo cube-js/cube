@@ -6,7 +6,7 @@ const UserError = require('../compiler/UserError');
 
 const TIME_SERIES = {
   day: (range) =>
-    Array.from(range.by('day'))
+    Array.from(range.snapTo('day').by('day'))
       .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.format('YYYY-MM-DDT23:59:59.999')]),
   month: (range) =>
     Array.from(range.snapTo('month').by('month'))
@@ -15,13 +15,13 @@ const TIME_SERIES = {
     Array.from(range.snapTo('year').by('year'))
       .map(d => [d.format('YYYY-01-01T00:00:00.000'), d.endOf('year').format('YYYY-MM-DDT23:59:59.999')]),
   hour: (range) =>
-    Array.from(range.by('hour'))
+    Array.from(range.snapTo('hour').by('hour'))
       .map(d => [d.format('YYYY-MM-DDTHH:00:00.000'), d.format('YYYY-MM-DDTHH:59:59.999')]),
   minute: (range) =>
-    Array.from(range.by('minute'))
+    Array.from(range.snapTo('minute').by('minute'))
       .map(d => [d.format('YYYY-MM-DDTHH:MM:00.000'), d.format('YYYY-MM-DDTHH:MM:59.999')]),
   second: (range) =>
-    Array.from(range.by('second'))
+    Array.from(range.snapTo('second').by('second'))
       .map(d => [d.format('YYYY-MM-DDTHH:MM:SS.000'), d.format('YYYY-MM-DDTHH:MM:SS.999')]),
   week: (range) =>
     Array.from(range.snapTo('isoweek').by('week'))
