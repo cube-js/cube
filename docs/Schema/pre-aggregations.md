@@ -461,3 +461,24 @@ cube(`Orders`, {
   }
 });
 ```
+
+For `originalSql` pre-aggregations original column names as strings can be used:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  // ...
+
+  preAggregations: {
+    main: {
+      type: `originalSql`,
+      indexes: {
+        time: {
+          columns: ['timestamp']
+        }
+      }
+    }
+  }
+});
+```
