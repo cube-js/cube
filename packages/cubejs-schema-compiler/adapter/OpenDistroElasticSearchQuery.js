@@ -1,9 +1,8 @@
-/* eslint-disable max-classes-per-file */
 // const moment = require('moment-timezone');
-const R = require("ramda");
+const R = require('ramda');
 
-const BaseQuery = require("./BaseQuery");
-const BaseFilter = require("./BaseFilter");
+const BaseQuery = require('./BaseQuery');
+const BaseFilter = require('./BaseFilter');
 
 const GRANULARITY_TO_INTERVAL = {
   day: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-dd 00:00:00.000')`,
@@ -18,7 +17,7 @@ const GRANULARITY_TO_INTERVAL = {
 
 class OpenDistroElasticSearchQueryFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
-    return `${column}${not ? " NOT" : ""} LIKE CONCAT('%', ?, '%')`;
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ?, '%')`;
   }
 }
 
@@ -53,12 +52,9 @@ class OpenDistroElasticSearchQuery extends BaseQuery {
 
   groupByClause() {
     const dimensionsForSelect = this.dimensionsForSelect();
-    const dimensionColumns = R.flatten(
-      dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
-    ).filter(s => !!s);
-    return dimensionColumns.length
-      ? ` GROUP BY ${dimensionColumns.join(", ")}`
-      : "";
+    const dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql()))
+      .filter(s => !!s);
+    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
   orderHashToString(hash) {
@@ -72,30 +68,24 @@ class OpenDistroElasticSearchQuery extends BaseQuery {
       return null;
     }
 
-    const direction = hash.desc ? "DESC" : "ASC";
+    const direction = hash.desc ? 'DESC' : 'ASC';
     return `${fieldAlias} ${direction}`;
   }
 
   getFieldAlias(id) {
-    const equalIgnoreCase = (a, b) =>
-      typeof a === "string" &&
-      typeof b === "string" &&
-      a.toUpperCase() === b.toUpperCase();
+    const equalIgnoreCase = (a, b) => (
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
+    );
 
     let field;
 
-    field = this.dimensionsForSelect().find(d =>
-      equalIgnoreCase(d.dimension, id)
-    );
+    field = this.dimensionsForSelect().find(d => equalIgnoreCase(d.dimension, id));
 
     if (field) {
       return field.dimensionSql();
     }
 
-    field = this.measures.find(
-      d =>
-        equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
-    );
+    field = this.measures.find(d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id));
 
     if (field) {
       return field.aliasName(); // TODO isn't supported
