@@ -94,3 +94,4 @@ Client packages has it's own `.eslintrc.js` files.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.
 All PRs are merged using squash so only PR name matters.
+4. Do not reformat code you aren't really changing unless it's absolutely necessary (e.g. fixing linter). Such changes make it really hard to use git blame feature when we need to find a commit where line change of interest was introduced.
