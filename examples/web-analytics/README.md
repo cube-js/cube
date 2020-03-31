@@ -213,10 +213,10 @@ Now, you can run the Cube.js server with the following command:
 $ npm start
 ```
 
-It will start the Cube.js server on [http://localhost:3000](http://localhost:3000). By default, it starts in the development environment and serves Cube.js
+It will start the Cube.js server on [http://localhost:4000](http://localhost:4000). By default, it starts in the development environment and serves Cube.js
 Playground on the root route. To start the frontend app in the development you can navigate
 into `dashboard-app` folder, install dependencies, and run `yarn start`.
-It will start serving the frontend app from [http://localhost:4000](http://localhost:4000).
+It will start serving the frontend app from [http://localhost:3000](http://localhost:3000).
 
 To run it in the production mode you need first to build the frontend. To do that navigate into
 `dashboard-app` folder, install dependencies, and run
