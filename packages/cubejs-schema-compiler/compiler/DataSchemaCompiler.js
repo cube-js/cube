@@ -192,13 +192,15 @@ class DataSchemaCompiler {
     try {
       vm.runInNewContext(file.content, {
         view: (name, cube) => cubes.push(Object.assign({}, cube, { name, fileName: file.fileName })),
-        cube: (name, cube) =>
-          !cube ?
-            this.cubeFactory({ ...name, fileName: file.fileName }) :
-            cubes.push(Object.assign({}, cube, { name, fileName: file.fileName })),
+        cube:
+          (name, cube) => (
+            !cube ?
+              this.cubeFactory({ ...name, fileName: file.fileName }) :
+              cubes.push(Object.assign({}, cube, { name, fileName: file.fileName }))
+          ),
         context: (name, context) => contexts.push(Object.assign({}, context, { name, fileName: file.fileName })),
-        dashboardTemplate: (name, template) =>
-          dashboardTemplates.push(Object.assign({}, template, { name, fileName: file.fileName })),
+        dashboardTemplate:
+          (name, template) => dashboardTemplates.push(Object.assign({}, template, { name, fileName: file.fileName })),
         addExport: (obj) => {
           exports[file.fileName] = exports[file.fileName] || {};
           exports[file.fileName] = Object.assign(exports[file.fileName], obj);
@@ -284,11 +286,13 @@ class DataSchemaCompiler {
         absPath = path.resolve(absPath, 'index.js');
       }
     }
+    // eslint-disable-next-line prefer-template
     absPath = path.extname(absPath) !== '.js' ? absPath + '.js' : absPath;
     if (!fs.existsSync(absPath)) {
       if (this.allowNodeRequire) {
         return null;
       }
+      // eslint-disable-next-line prefer-template
       throw new UserError(`Path '${absPath.replace(nodeModulesPath + '/', '')}' not found`);
     }
     return this.readModuleFile(absPath, errorsReport);
@@ -298,6 +302,7 @@ class DataSchemaCompiler {
     const nodeModulesPath = path.resolve('node_modules');
     if (!moduleFileCache[absPath]) {
       const content = fs.readFileSync(absPath, 'utf-8');
+      // eslint-disable-next-line prefer-template
       const fileName = absPath.replace(nodeModulesPath + '/', '');
       const transpiled = this.transpileFile(
         { fileName, content, isModule: true },

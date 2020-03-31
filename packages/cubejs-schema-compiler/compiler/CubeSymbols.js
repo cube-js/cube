@@ -24,7 +24,7 @@ class CubeSymbols {
       R.map(c => [c.name, c]),
       R.fromPairs
     )(cubes);
-    this.cubeList = cubes.map(c => c.name ? this.getCubeDefinition(c.name) : this.createCube(c));
+    this.cubeList = cubes.map(c => (c.name ? this.getCubeDefinition(c.name) : this.createCube(c)));
     this.symbols = R.pipe(
       R.map((c) => [c.name, this.transform(c.name, errorReporter.inContext(`${c.name} cube`))]),
       R.fromPairs
@@ -51,21 +51,28 @@ class CubeSymbols {
       get measures() {
         return this.allDefinitions('measures');
       },
+      // eslint-disable-next-line no-empty-function
       set measures(v) {},
 
       get dimensions() {
         return this.allDefinitions('dimensions');
       },
+      // eslint-disable-next-line no-empty-function
       set dimensions(v) {},
 
       get segments() {
         return this.allDefinitions('segments');
       },
+      // eslint-disable-next-line no-empty-function
       set segments(v) {}
     }, cubeDefinition);
     if (cubeDefinition.extends) {
       const superCube = this.resolveSymbolsCall(cubeDefinition.extends, (name) => this.cubeReferenceProxy(name));
-      Object.setPrototypeOf(cubeObject, superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube);
+      Object.setPrototypeOf(
+        cubeObject,
+        // eslint-disable-next-line no-underscore-dangle
+        superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube
+      );
     }
     return cubeObject;
   }
@@ -93,6 +100,7 @@ class CubeSymbols {
     const oldContext = this.resolveSymbolsCallContext;
     this.resolveSymbolsCallContext = context;
     try {
+      // eslint-disable-next-line prefer-spread
       let res = func.apply(null, this.funcArguments(func).map((id) => nameResolver(id.trim())));
       if (res instanceof DynamicReference) {
         res = res.fn.apply(null, res.memberNames.map((id) => nameResolver(id.trim())));
@@ -115,10 +123,12 @@ class CubeSymbols {
   }
 
   resolveSymbol(cubeName, name) {
+    // eslint-disable-next-line no-unused-vars
     const { sqlResolveFn, contextSymbols, query } = this.resolveSymbolsCallContext || {};
     if (CONTEXT_SYMBOLS[name]) {
       // always resolves if contextSymbols aren't passed for transpile step
       const symbol = contextSymbols && contextSymbols[CONTEXT_SYMBOLS[name]] || {};
+      // eslint-disable-next-line no-underscore-dangle
       symbol._objectWithResolvedProperties = true;
       return symbol;
     }
@@ -137,15 +147,16 @@ class CubeSymbols {
         let cube = self.symbols[cubeName];
         // first phase of compilation
         if (!cube) {
-          return { toString() { return cubeName } };
+          return { toString() { return cubeName; } };
         }
-        let originalCube = cube;
+        const originalCube = cube;
         cube = R.pipe(
           R.reject(v => v instanceof Function),
           R.toPairs,
           R.map(([n, symbol]) => [n, Object.assign({}, symbol, { toString: () => sqlResolveFn(symbol, cubeName, n) })]),
           R.fromPairs
         )(cube);
+        // eslint-disable-next-line no-underscore-dangle
         cube._objectWithResolvedProperties = true;
         cube.toString = () => cubeAliasFn && cubeAliasFn(originalCube.cubeName()) || originalCube.cubeName();
         cube.sql = () => query.cubeSql(originalCube.cubeName());

@@ -4,6 +4,8 @@ module.exports = {
     "import"
   ],
   "rules": {
+    "max-classes-per-file": 0,
+    "prefer-object-spread": 0,
     "import/no-unresolved": 0,
     "comma-dangle": 0,
     "no-console": 0,

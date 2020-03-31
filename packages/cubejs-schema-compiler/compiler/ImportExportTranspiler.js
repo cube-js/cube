@@ -1,10 +1,6 @@
 const t = require('@babel/types');
-const R = require('ramda');
 
 class ImportExportTranspiler {
-  constructor() {
-  }
-
   traverseObject() {
     return {
       ImportDeclaration(path) {
@@ -17,14 +13,14 @@ class ImportExportTranspiler {
                 t.callExpression(t.identifier('require'), [path.get('source').node]),
                 specifier.get('imported').node
               )
-            )
+            );
           } else if (specifier.node.type === 'ImportDefaultSpecifier') {
             return t.variableDeclarator(
               specifier.get('local').node,
               t.callExpression(t.identifier('require'), [path.get('source').node])
-            )
+            );
           } else {
-            throw new Error(`'${specifier.node.type}' import not supported`)
+            throw new Error(`'${specifier.node.type}' import not supported`);
           }
         });
         path.replaceWith(t.variableDeclaration('const', declarations));
@@ -36,9 +32,9 @@ class ImportExportTranspiler {
             return t.objectProperty(
               specifier.get('exported').node,
               specifier.get('local').node
-            )
+            );
           } else {
-            throw new Error(`'${specifier.node.type}' export not supported`)
+            throw new Error(`'${specifier.node.type}' export not supported`);
           }
         });
         const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(declarations)]);
@@ -59,7 +55,7 @@ class ImportExportTranspiler {
         }
       },
       ExportDefaultDeclaration(path) {
-        path.replaceWith(t.callExpression(t.identifier('setExport'), [path.get('declaration').node]))
+        path.replaceWith(t.callExpression(t.identifier('setExport'), [path.get('declaration').node]));
       }
     };
   }

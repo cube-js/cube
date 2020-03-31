@@ -15,6 +15,7 @@ class VerticaQuery extends BaseQuery {
     return `${field} AT TIME ZONE '${this.timezone}'`;
   }
 
+  // eslint-disable-next-line no-unused-vars
   timeStampParam(timeDimension) {
     return this.timeStampCast(`?`);
   }

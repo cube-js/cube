@@ -12,7 +12,7 @@ const abbrs = {
   PDT: 'Pacific Standard Time',
 };
 
-moment.fn.zoneName = function () {
+moment.fn.zoneName = () => {
   const abbr = this.zoneAbbr();
   return abbrs[abbr] || abbr;
 };

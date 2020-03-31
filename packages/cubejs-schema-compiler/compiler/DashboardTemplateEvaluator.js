@@ -46,9 +46,9 @@ const dashboardItemSchema = Joi.object().keys({
     y: Joi.array()
   }),
   layout: Joi.object().keys({
-    w: Joi.any().valid(...Array(19).fill(0).map((_,i) => i + 6)).required(),
-    h: Joi.any().valid(...Array(47).fill(0).map((_,i) => i + 4)).required(),
-    x: Joi.any().valid(...Array(24).fill(0).map((_,i) => i)).required(),
+    w: Joi.any().valid(...Array(19).fill(0).map((_, i) => i + 6)).required(),
+    h: Joi.any().valid(...Array(47).fill(0).map((_, i) => i + 4)).required(),
+    x: Joi.any().valid(...Array(24).fill(0).map((_, i) => i)).required(),
     y: Joi.number().required()
   }).required()
 });
@@ -68,8 +68,8 @@ class DashboardTemplateEvaluator {
   }
 
   compile(dashboardTemplates, errorReporter) {
-    return dashboardTemplates.forEach((template) =>
-      this.validateAndCompile(template, errorReporter.inContext(`${template.name} dashboard template`))
+    return dashboardTemplates.forEach(
+      (template) => this.validateAndCompile(template, errorReporter.inContext(`${template.name} dashboard template`))
     );
   }
 
@@ -88,13 +88,13 @@ class DashboardTemplateEvaluator {
       ...dashboardTemplate,
       title: dashboardTemplate.title || inlection.titleize(dashboardTemplate.name),
       items: (dashboardTemplate.items || []).map(item => this.compileItem(item, errorReporter))
-    }
+    };
   }
 
   compileItem(itemTemplate, errorReporter) {
     if (!itemTemplate.measures && !itemTemplate.dimensions) {
       errorReporter.error(`Either measures or dimensions should be declared for valid query`);
-      return;
+      return null;
     }
     const { type, ...restVisualizationParams } = itemTemplate.visualization;
     const config = {

@@ -79,6 +79,7 @@ class BaseQuery {
           return undefined;
         }
 
+        // eslint-disable-next-line prefer-destructuring
         dimension.dimension = this.cubeEvaluator.timeDimensionPathsForCube(join.root)[0];
         if (!dimension.dimension) {
           return undefined;
@@ -151,9 +152,12 @@ class BaseQuery {
   }
 
   get subQueryDimensions() {
+    // eslint-disable-next-line no-underscore-dangle
     if (!this._subQueryDimensions) {
+      // eslint-disable-next-line no-underscore-dangle
       this._subQueryDimensions = this.collectFromMembers(false, this.collectSubQueryDimensionsFor.bind(this));
     }
+    // eslint-disable-next-line no-underscore-dangle
     return this._subQueryDimensions;
   }
 
@@ -274,17 +278,18 @@ class BaseQuery {
   }
 
   runningTotalDateJoinCondition() {
-    return this.timeDimensions.map(d =>
-      [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) =>
-        `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+    return this.timeDimensions.map(
+      d => [
+        d,
+        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
       ]
     );
   }
 
   rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
     offset = offset || 'end';
-    return this.timeDimensions.map(d =>
-      [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+    return this.timeDimensions.map(
+      d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
         // dateFrom based window
         const conditions = [];
         if (trailingInterval !== 'unbounded') {
@@ -356,37 +361,33 @@ class BaseQuery {
         this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(regularMeasures))
       ] : [])
         .concat(
-        R.pipe(
-          R.groupBy(m => m.cube().name),
-          R.toPairs,
+          R.pipe(
+            R.groupBy(m => m.cube().name),
+            R.toPairs,
+            R.map(
+              ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+            )
+          )(multipliedMeasures)
+        ).concat(
           R.map(
-            ([keyCubeName, measures]) =>
-              this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
-          )
-        )(multipliedMeasures)
-      ).concat(
-        R.map(
-          ([multiplied, measure]) =>
-            this.withCubeAliasPrefix(
+            ([multiplied, measure]) => this.withCubeAliasPrefix(
               `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
               () => this.overTimeSeriesQuery(
                 multiplied ?
-                  (measures, filters) =>
-                    this.aggregateSubQuery(measures[0].cube().name, measures, filters)
-                  : this.regularMeasuresSubQuery.bind(this),
+                  (measures, filters) => this.aggregateSubQuery(measures[0].cube().name, measures, filters) :
+                  this.regularMeasuresSubQuery.bind(this),
                 measure
               )
             )
-        )(cumulativeMeasures)
-      );
+          )(cumulativeMeasures)
+        );
 
     const join = R.drop(1, toJoin)
-      .map((q, i) =>
-        (this.dimensionAliasNames().length ?
+      .map(
+        (q, i) => (this.dimensionAliasNames().length ?
           `INNER JOIN (${q}) as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
           `, (${q}) as q_${i + 1}`)
-      )
-      .join("\n");
+      ).join("\n");
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
       () => this.dimensionColumns('q_0').concat(this.measures.map(m => m.selectColumns())).join(', '),
@@ -489,11 +490,11 @@ class BaseQuery {
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure) {
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
     const cumulativeMeasures = [cumulativeMeasure];
-    const dateFromStartToEndConditionSql = (isFromStartToEnd) =>
-      dateJoinCondition.map(([d, f]) =>
+    const dateFromStartToEndConditionSql =
+      (isFromStartToEnd) => dateJoinCondition.map(
         // TODO these weird conversions to be strict typed for big query.
         // TODO Consider adding strict definitions of local and UTC time type
-        ({
+        ([d, f]) => ({
           filterToWhere: () => {
             const timeSeries = d.timeSeries();
             return f(
@@ -526,8 +527,8 @@ class BaseQuery {
     );
     const baseQueryAlias = this.cubeAlias('base');
     const dateJoinConditionSql =
-      dateJoinCondition.map(([d, f]) =>
-        f(
+      dateJoinCondition.map(
+        ([d, f]) => f(
           `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`,
           `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_to')}`,
           `${baseQueryAlias}.${d.aliasName()}`,
@@ -619,8 +620,8 @@ class BaseQuery {
   }
 
   joinQuery(join, subQueryDimensions) {
-    const joins = join.joins.map(j =>
-      `LEFT JOIN ${this.cubeSql(j.originalTo)} ${this.asSyntaxJoin} ${this.cubeAlias(j.originalTo)}
+    const joins = join.joins.map(
+      j => `LEFT JOIN ${this.cubeSql(j.originalTo)} ${this.asSyntaxJoin} ${this.cubeAlias(j.originalTo)}
       ON ${this.evaluateSql(j.originalFrom, j.join.sql)}`
     ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
 
@@ -770,8 +771,7 @@ class BaseQuery {
         const columns = [primaryKeyDimension.selectColumns()].concat(measures.map(m => m.selectColumns()))
           .filter(s => !!s).join(', ');
         return `SELECT ${columns} FROM ${this.joinQuery(measuresJoin, measureSubQueryDimensions)}`;
-      }
-    ));
+      }));
   }
 
   groupedUngroupedSelect(select, ungrouped, granularityOverride) {
@@ -859,9 +859,7 @@ class BaseQuery {
 
   collectFrom(membersToCollectFrom, fn) {
     return R.pipe(
-      R.map(s =>
-          fn(() => this.traverseSymbol(s))
-      ),
+      R.map(s => fn(() => this.traverseSymbol(s))),
       R.unnest,
       R.uniq,
       R.filter(R.identity)
@@ -889,22 +887,21 @@ class BaseQuery {
 
   getFieldIndex(id) {
     const equalIgnoreCase = (a, b) => (
-      typeof a === 'string' && typeof b === 'string'
-      && a.toUpperCase() === b.toUpperCase()
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
 
     let index;
 
-    index = this.dimensionsForSelect().findIndex(d =>
-      equalIgnoreCase(d.dimension, id)
+    index = this.dimensionsForSelect().findIndex(
+      d => equalIgnoreCase(d.dimension, id)
     );
 
     if (index > -1) {
       return index + 1;
     }
 
-    index = this.measures.findIndex(d =>
-      equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
+    index = this.measures.findIndex(
+      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
     );
 
     if (index > -1) {
@@ -1031,8 +1028,8 @@ class BaseQuery {
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures) {
           if (parentMeasure &&
             (
-            this.cubeEvaluator.cubeNameFromPath(parentMeasure) !== cubeName ||
-            this.newMeasure(this.cubeEvaluator.pathFromArray([cubeName, name])).isCumulative()
+              this.cubeEvaluator.cubeNameFromPath(parentMeasure) !== cubeName ||
+              this.newMeasure(this.cubeEvaluator.pathFromArray([cubeName, name])).isCumulative()
             )
           ) {
             this.safeEvaluateSymbolContext().compositeCubeMeasures[parentMeasure] = true;
@@ -1077,15 +1074,15 @@ class BaseQuery {
         return this.escapeColumnName(this.aliasName(dimensionPath));
       }
       if (symbol.case) {
-        return this.renderDimensionCase(symbol, cubeName)
+        return this.renderDimensionCase(symbol, cubeName);
       } else if (symbol.type === 'geo') {
         return this.concatStringsSql([
           this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
           "','",
           this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
-        ])
+        ]);
       } else {
-        return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql)
+        return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
       }
     } else if (this.cubeEvaluator.isSegment([cubeName, name])) {
       return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
@@ -1111,7 +1108,7 @@ class BaseQuery {
 
   evaluateSql(cubeName, sql) {
     const self = this;
-    const cubeEvaluator = this.cubeEvaluator;
+    const { cubeEvaluator } = this;
     this.pushCubeNameForCollectionIfNecessary(cubeName);
     return cubeEvaluator.resolveSymbolsCall(sql, (name) => {
       const nextCubeName = cubeEvaluator.symbols[name] && name || cubeName;
@@ -1121,6 +1118,7 @@ class BaseQuery {
           cubeName,
           name
         );
+      // eslint-disable-next-line no-underscore-dangle
       if (resolvedSymbol._objectWithResolvedProperties) {
         return resolvedSymbol;
       }
@@ -1281,20 +1279,20 @@ class BaseQuery {
 
   renderDimensionCase(symbol, cubeName) {
     const when = symbol.case.when.map(w => ({
-        sql: this.evaluateSql(cubeName, w.sql),
-        label: this.renderDimensionCaseLabel(w.label, cubeName)
+      sql: this.evaluateSql(cubeName, w.sql),
+      label: this.renderDimensionCaseLabel(w.label, cubeName)
     }));
     return this.caseWhenStatement(
-        when,
-        symbol.case.else && this.renderDimensionCaseLabel(symbol.case.else.label, cubeName)
+      when,
+      symbol.case.else && this.renderDimensionCaseLabel(symbol.case.else.label, cubeName)
     );
   }
 
   renderDimensionCaseLabel(label, cubeName) {
-    if (typeof label === 'object' && label.sql){
-      return this.evaluateSql(cubeName, label.sql)
+    if (typeof label === 'object' && label.sql) {
+      return this.evaluateSql(cubeName, label.sql);
     }
-    return `'${label}'`
+    return `'${label}'`;
   }
 
   caseWhenStatement(when, elseLabel) {
@@ -1455,8 +1453,7 @@ class BaseQuery {
       .map(cube => [
         cube,
         this.paramAllocator.buildSqlAndParams(`select count(*) as ${this.escapeColumnName('total_count')} from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`)
-      ])
-    );
+      ]));
   }
 
   renewalThreshold(refreshKeyAllSetManually) {
@@ -1704,7 +1701,7 @@ class BaseQuery {
   }
 
   filtersProxy() {
-    const allFilters = this.allFilters;
+    const { allFilters } = this;
     return new Proxy({}, {
       get: (target, name) => {
         if (name === '_objectWithResolvedProperties') {
@@ -1723,6 +1720,7 @@ class BaseQuery {
                   filter.filterParams().length
                 ) {
                   if (typeof column === "function") {
+                    // eslint-disable-next-line prefer-spread
                     return column.apply(
                       null,
                       filter.filterParams().map(this.paramAllocator.allocateParam.bind(this.paramAllocator))

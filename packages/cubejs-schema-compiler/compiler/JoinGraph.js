@@ -39,14 +39,14 @@ class JoinGraph {
       R.filter(R.identity),
       R.map(join => {
         const multipliedMeasures = R.compose(
-          R.filter(m =>
-            m.sql && this.cubeEvaluator.funcArguments(m.sql).length === 0 && m.sql() === 'count(*)' ||
+          R.filter(
+            m => m.sql && this.cubeEvaluator.funcArguments(m.sql).length === 0 && m.sql() === 'count(*)' ||
             ['sum', 'avg', 'count', 'number'].indexOf(m.type) !== -1
           ),
           R.values
         );
-        const joinRequired = (v) =>
-          `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
+        const joinRequired =
+          (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
         if (
           !this.cubeEvaluator.primaryKeys[join[1].from] &&
           multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].from)).length > 0
@@ -96,8 +96,8 @@ class JoinGraph {
       return null;
     }
     const join = R.pipe(
-      R.map(cube =>
-        this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
+      R.map(
+        cube => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
       ),
       R.filter(R.identity),
       R.sortBy(joinTree => joinTree.joins.length)
@@ -158,13 +158,13 @@ class JoinGraph {
         return nextJoin.from === currentCube ? nextJoin.to : nextJoin.from;
       }
       const nextJoins = joins.filter(j => j.from === currentCube || j.to === currentCube);
-      if (nextJoins.find(nextJoin =>
-        self.checkIfCubeMultiplied(currentCube, nextJoin) && !visited[nextNode(nextJoin)]
-        )) {
+      if (nextJoins.find(
+        nextJoin => self.checkIfCubeMultiplied(currentCube, nextJoin) && !visited[nextNode(nextJoin)]
+      )) {
         return true;
       }
-      return !!nextJoins.find(nextJoin =>
-        findIfMultipliedRecursive(nextNode(nextJoin))
+      return !!nextJoins.find(
+        nextJoin => findIfMultipliedRecursive(nextNode(nextJoin))
       );
     }
     return findIfMultipliedRecursive(cube);

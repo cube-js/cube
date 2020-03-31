@@ -5,6 +5,7 @@ class CubeDictionary {
     this.byId = {};
   }
 
+  // eslint-disable-next-line no-unused-vars
   compile(cubes, errorReporter) {
     this.byId = R.fromPairs(cubes.map(v => [v.name, v]));
   }

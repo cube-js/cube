@@ -151,11 +151,13 @@ class CubeEvaluator extends CubeSymbols {
           cube,
           name
         );
+      // eslint-disable-next-line no-underscore-dangle
       if (resolvedSymbol._objectWithResolvedProperties) {
         return resolvedSymbol;
       }
       return cubeEvaluator.pathFromArray([referencedCube, name]);
     }, {
+      // eslint-disable-next-line no-shadow
       sqlResolveFn: (symbol, cube, n) => cubeEvaluator.pathFromArray([cube, n])
     });
     if (!Array.isArray(arrayOrSingle)) {

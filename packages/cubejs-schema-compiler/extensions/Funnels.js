@@ -1,4 +1,3 @@
-const R = require('ramda');
 const inflection = require('inflection');
 
 class Funnels {
@@ -32,10 +31,10 @@ class Funnels {
     ${userIdColumnsAndTime}
     FROM
 ${eventJoin.join("\nLEFT JOIN\n")}
-	)
-	select user_id, first_step_user_id, step, max(t) t from (
-  	${funnelDefinition.steps.map(s => this.stepSegmentSelect(funnelDefinition, s)).join("\nUNION ALL\n")}
-	) as event_steps GROUP BY 1, 2, 3`
+  )
+  select user_id, first_step_user_id, step, max(t) t from (
+    ${funnelDefinition.steps.map(s => this.stepSegmentSelect(funnelDefinition, s)).join("\nUNION ALL\n")}
+  ) as event_steps GROUP BY 1, 2, 3`;
       },
       measures: {
         conversions: {
@@ -83,7 +82,10 @@ ${eventJoin.join("\nLEFT JOIN\n")}
   }
 
   eventCubeJoin(funnelDefinition, step, prevStep) {
-    const sql = this.compiler.contextQuery().evaluateSql(null, (step.eventsCube || step.eventsView || step.eventsTable).sql);
+    const sql = this.compiler.contextQuery().evaluateSql(
+      null,
+      (step.eventsCube || step.eventsView || step.eventsTable).sql
+    );
     const fromSql = (sql.indexOf('select') !== -1 ? `(${sql}) e` : sql);
     const timeToConvertCondition =
       step.timeToConvert ?

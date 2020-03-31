@@ -89,7 +89,7 @@ class BaseMeasure {
     if (this.measureDefinition().type === 'runningTotal') {
       return this.query.runningTotalDateJoinCondition();
     }
-    const rollingWindow = this.measureDefinition().rollingWindow;
+    const { rollingWindow } = this.measureDefinition();
     if (rollingWindow) {
       return this.query.rollingWindowDateJoinCondition(
         rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset
@@ -99,7 +99,7 @@ class BaseMeasure {
   }
 
   windowGranularity() {
-    const rollingWindow = this.measureDefinition().rollingWindow;
+    const { rollingWindow } = this.measureDefinition();
     if (rollingWindow) {
       return this.minGranularity(
         this.granularityFromInterval(rollingWindow.leading),

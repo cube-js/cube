@@ -7,9 +7,10 @@ class ContextEvaluator {
     this.contextDefinitions = {};
   }
 
+  // eslint-disable-next-line no-unused-vars
   compile(contexts, errorReporter) {
     if (contexts.length === 0) {
-      return
+      return;
     }
 
     // TODO: handle duplications, context names must be uniq

@@ -70,8 +70,7 @@ class BigqueryQuery extends BaseQuery {
     const outerSeriesAlias = this.cubeAlias('outer_series');
     const outerBase = this.cubeAlias('outer_base');
     const timeDimensionAlias = this.timeDimensions.map(d => d.aliasName()).filter(d => !!d)[0];
-    const aliasesForSelect = this.timeDimensions.map(d => d.dateSeriesSelectColumn(outerSeriesAlias))
-      .concat(
+    const aliasesForSelect = this.timeDimensions.map(d => d.dateSeriesSelectColumn(outerSeriesAlias)).concat(
       this.dimensions.concat(cumulativeMeasures).map(s => s.aliasName())
     ).filter(c => !!c).join(', ');
     const dateSeriesAlias = this.timeDimensions.map(d => `${d.dateSeriesAliasName()}`).filter(c => !!c)[0];
@@ -110,6 +109,7 @@ class BigqueryQuery extends BaseQuery {
     return `UNIX_SECONDS(${this.nowTimestampSql()})`;
   }
 
+  // eslint-disable-next-line no-unused-vars
   preAggregationLoadSql(cube, preAggregation, tableName) {
     return this.preAggregationSql(cube, preAggregation);
   }

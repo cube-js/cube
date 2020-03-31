@@ -13,12 +13,14 @@ class CubeToMetaTransformer {
   }
 
   compile(cubes, errorReporter) {
+    // eslint-disable-next-line no-multi-assign
     this.cubes = this.queries = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)))
       .filter(c => !!c);
   }
 
+  // eslint-disable-next-line no-unused-vars
   transform(cube, errorReporter) {
     const cubeTitle = cube.title || this.titleize(cube.name);
     return {
@@ -43,8 +45,8 @@ class CubeToMetaTransformer {
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format
           })),
-          R.filter(nameToDimension =>
-            this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+          R.filter(
+            nameToDimension => this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
           ),
           R.toPairs
         )(cube.dimensions || {}),
@@ -67,7 +69,7 @@ class CubeToMetaTransformer {
       return this.queries;
     }
 
-    const context = this.contextEvaluator.contextDefinitions[contextId]
+    const context = this.contextEvaluator.contextDefinitions[contextId];
 
     // If contextId is wrong
     if (R.isNil(context)) {
@@ -75,8 +77,8 @@ class CubeToMetaTransformer {
     }
 
     // As for now context works on the cubes level
-    return R.filter((query) =>
-      R.contains(query.config.name, context.contextMembers)
+    return R.filter(
+      (query) => R.contains(query.config.name, context.contextMembers)
     )(this.queries);
   }
 
@@ -104,11 +106,14 @@ class CubeToMetaTransformer {
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       type: 'number', // TODO
       aggType: nameToMetric[1].type,
-      drillMembers: drillMembers && this.cubeEvaluator.evaluateReferences(cubeName, drillMembers, { originalSorting: true })
+      drillMembers: drillMembers && this.cubeEvaluator.evaluateReferences(
+        cubeName, drillMembers, { originalSorting: true }
+      )
     };
   }
 
   title(cubeTitle, nameToDef, short) {
+    // eslint-disable-next-line prefer-template
     return `${short ? '' : cubeTitle + ' '}${nameToDef[1].title || this.titleize(nameToDef[0])}`;
   }
 

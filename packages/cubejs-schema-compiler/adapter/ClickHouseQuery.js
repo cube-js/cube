@@ -1,6 +1,3 @@
-const moment = require('moment-timezone');
-const R = require('ramda');
-
 const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 
@@ -16,13 +13,12 @@ const GRANULARITY_TO_INTERVAL = {
 
 class ClickHouseFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
-    return `lower(${column}) ${not ? 'NOT':''} LIKE CONCAT('%', lower(?), '%')`;
+    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('%', lower(?), '%')`;
   }
 }
 
 
 class ClickHouseQuery extends BaseQuery {
-
   newFilter(filter) {
     return new ClickHouseFilter(this, filter);
   }
@@ -44,27 +40,27 @@ class ClickHouseQuery extends BaseQuery {
   }
 
   timeGroupedColumn(granularity, dimension) {
-    if (granularity == 'week') {
-      return `toDateTime(toMonday(${dimension}, '${this.timezone}'), '${this.timezone}')`
-    }
-    else {
-      let interval = GRANULARITY_TO_INTERVAL[granularity]
+    if (granularity === 'week') {
+      return `toDateTime(toMonday(${dimension}, '${this.timezone}'), '${this.timezone}')`;
+    } else {
+      const interval = GRANULARITY_TO_INTERVAL[granularity];
       return `toDateTime(toStartOf${interval}(${dimension}, '${this.timezone}'), '${this.timezone}')`;
     }
   }
-  
-  _calcInterval(operation, date, interval) {
+
+  calcInterval(operation, date, interval) {
     const [intervalValue, intervalUnit] = interval.split(" ");
-    let fn = operation + intervalUnit[0].toUpperCase() + intervalUnit.substring(1) + "s"
+    // eslint-disable-next-line prefer-template
+    const fn = operation + intervalUnit[0].toUpperCase() + intervalUnit.substring(1) + "s";
     return `${fn}(${date}, ${intervalValue})`;
   }
 
   subtractInterval(date, interval) {
-    return this._calcInterval("subtract", date, interval)
+    return this.calcInterval("subtract", date, interval);
   }
 
   addInterval(date, interval) {
-    return this._calcInterval("add", date, interval)
+    return this.calcInterval("add", date, interval);
   }
 
   timeStampCast(value) {
@@ -75,11 +71,10 @@ class ClickHouseQuery extends BaseQuery {
     //
     // However parseDateTimeBestEffort works with ISO8601
     //
-    return `parseDateTimeBestEffort(${value})`
+    return `parseDateTimeBestEffort(${value})`;
   }
 
   dateTimeCast(value) {
-
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
 
     //
@@ -87,27 +82,26 @@ class ClickHouseQuery extends BaseQuery {
     //
     // However parseDateTimeBestEffort works with ISO8601
     //
-    return `parseDateTimeBestEffort(${value})`
+    return `parseDateTimeBestEffort(${value})`;
   }
 
   getFieldAlias(id) {
     const equalIgnoreCase = (a, b) => (
-      typeof a === 'string' && typeof b === 'string'
-      && a.toUpperCase() === b.toUpperCase()
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
 
     let field;
 
-    field = this.dimensionsForSelect().find(d =>
-      equalIgnoreCase(d.dimension, id)
+    field = this.dimensionsForSelect().find(
+      d => equalIgnoreCase(d.dimension, id)
     );
 
     if (field) {
       return field.aliasName();
     }
 
-    field = this.measures.find(d =>
-      equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
+    field = this.measures.find(
+      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
     );
 
     if (field) {
@@ -118,7 +112,6 @@ class ClickHouseQuery extends BaseQuery {
   }
 
   orderHashToString(hash) {
-
     //
     // ClickHouse doesn't support order by index column, so map these to the alias names
     //
@@ -138,7 +131,6 @@ class ClickHouseQuery extends BaseQuery {
   }
 
   groupByClause() {
-
     //
     // ClickHouse doesn't support group by index column, so map these to the alias names
     //
@@ -151,10 +143,9 @@ class ClickHouseQuery extends BaseQuery {
   primaryKeyCount(cubeName, distinct) {
     const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
     if (distinct) {
-      return `uniqExact(${primaryKeySql})`
-    }
-    else {
-      return `count(${primaryKeySql})`
+      return `uniqExact(${primaryKeySql})`;
+    } else {
+      return `count(${primaryKeySql})`;
     }
   }
 
@@ -163,9 +154,9 @@ class ClickHouseQuery extends BaseQuery {
     /*
     postgres uses :
 
-    SELECT parseDateTimeBestEffort(date_from), parseDateTimeBestEffort(date_to) FROM 
+    SELECT parseDateTimeBestEffort(date_from), parseDateTimeBestEffort(date_to) FROM
     (
-        VALUES 
+        VALUES
           ('2017-01-01T00:00:00.000', '2017-01-01T23:59:59.999'),
           ('2017-01-02T00:00:00.000', '2017-01-02T23:59:59.999'),
           ('2017-01-03T00:00:00.000', '2017-01-03T23:59:59.999'),
@@ -180,7 +171,7 @@ class ClickHouseQuery extends BaseQuery {
       ) AS `visitors.created_at_series`
 
     */
-   /*
+    /*
 
    ClickHouse uses :
 
@@ -191,21 +182,19 @@ class ClickHouseQuery extends BaseQuery {
    )
    */
 
-    let dates_from = []
-    let dates_to = []
+    const datesFrom = [];
+    const datesTo = [];
     timeDimension.timeSeries().forEach(([from, to]) => {
-      dates_from.push(from)
-      dates_to.push(to)
-    }
-
-  );
-    return `SELECT parseDateTimeBestEffort(arrayJoin(['${dates_from.join("','")}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${dates_to.join("','")}'])) as date_to`;
+      datesFrom.push(from);
+      datesTo.push(to);
+    });
+    return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join("','")}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join("','")}'])) as date_to`;
   }
 
   concatStringsSql(strings) {
+    // eslint-disable-next-line prefer-template
     return "toString(" + strings.join(") || toString(") + ")";
   }
-
 }
 
 module.exports = ClickHouseQuery;

@@ -2,6 +2,12 @@ const inflection = require('inflection');
 const ScaffoldingSchema = require('./ScaffoldingSchema');
 const UserError = require('../compiler/UserError');
 
+class MemberReference {
+  constructor(member) {
+    this.member = member;
+  }
+}
+
 class ScaffoldingTemplate {
   constructor(dbSchema, driver) {
     this.dbSchema = dbSchema;
@@ -23,25 +29,30 @@ class ScaffoldingTemplate {
   generateFilesByTableNames(tableNames) {
     const schemaForTables = this.scaffoldingSchema.generateForTables(tableNames.map(n => this.resolveTableName(n)));
     return schemaForTables.map(tableSchema => ({
+      // eslint-disable-next-line prefer-template
       fileName: tableSchema.cube + '.js',
       content: this.renderFile(this.schemaDescriptorForTable(tableSchema))
     }));
   }
 
+  // eslint-disable-next-line consistent-return
   resolveTableName(tableName) {
     const tableParts = tableName.split('.');
     if (tableParts.length === 2) {
       this.scaffoldingSchema.resolveTableDefinition(tableName);
       return tableName;
     } else if (tableParts.length === 1) {
-      const schema = Object.keys(this.dbSchema).find(schema => this.dbSchema[schema][tableName] || this.dbSchema[schema][inflection.tableize(tableName)]);
+      const schema = Object.keys(this.dbSchema).find(
+        tableSchema => this.dbSchema[tableSchema][tableName] ||
+          this.dbSchema[tableSchema][inflection.tableize(tableName)]
+      );
       if (!schema) {
         throw new UserError(`Can't find any table with '${tableName}' name`);
       }
-      if (this.dbSchema[schema][tableName]){
+      if (this.dbSchema[schema][tableName]) {
         return `${schema}.${tableName}`;
       }
-      if (this.dbSchema[schema][inflection.tableize(tableName)]){
+      if (this.dbSchema[schema][inflection.tableize(tableName)]) {
         return `${schema}.${inflection.tableize(tableName)}`;
       }
     } else {
@@ -101,6 +112,7 @@ class ScaffoldingTemplate {
   }
 
   render(descriptor, level) {
+    // eslint-disable-next-line prefer-template
     const lineSeparator = ',\n' + (level < 2 ? '\n' : '');
     if (Array.isArray(descriptor)) {
       const items = descriptor.map(desc => this.render(desc, level + 1)).join(', ');
@@ -113,17 +125,12 @@ class ScaffoldingTemplate {
       let entries = Object.keys(descriptor)
         .filter(k => descriptor[k] != null)
         .map(key => `${key}: ${this.render(descriptor[key], level + 1)}`).join(lineSeparator);
+      // eslint-disable-next-line prefer-template
       entries = entries.split('\n').map(l => '  ' + l).join('\n');
-      return `{\n${entries}\n}`
+      return `{\n${entries}\n}`;
     } else {
       return descriptor.toString();
     }
-  }
-}
-
-class MemberReference {
-  constructor(member) {
-    this.member = member;
   }
 }
 

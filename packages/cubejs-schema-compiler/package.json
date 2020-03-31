@@ -12,7 +12,9 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js"
+
   },
   "dependencies": {
     "@babel/generator": "^7.4.0",

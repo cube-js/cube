@@ -22,6 +22,7 @@ class ParamAllocator {
     }), paramsInSqlOrder];
   }
 
+  // eslint-disable-next-line no-unused-vars
   paramPlaceHolder(paramIndex) {
     return '?';
   }
