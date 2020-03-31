@@ -16,6 +16,14 @@ The example application uses Cube.js as the analytics backend, Snowplow for data
 
 **Performance first.** The response time is under 50 ms by using Cube.js pre-aggregations. It scales well for tracking up to several million daily active users. To achieve this performance, Cube.js stores and manages aggregated tables in MySQL with a 5-minute refresh rate. You can learn more about performance optimization with external pre-aggregations in [this blog post](https://cube.dev/blog/when-mysql-is-faster-than-bigquery/).
 
+## Architecture
+
+Below you can find the architecture of the example application. It relies on
+some AWS services, which can be partially or fully substituted by open-source
+tools: Kafka, MinIO and PrestoDB instead of Kinesis, S3 and Athena respectively.
+
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/examples/web-analytics/web-analytics-schema.png)
+
 ## Installation
 
 ### 1. Configure Data Collection with Snowplow
