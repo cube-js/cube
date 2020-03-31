@@ -1,4 +1,4 @@
-# Cube.js Web Analytics Template
+# Cube.js Web Analytics
 
 Use this template to build your own open-source Google Analytics alternative. It’s developer friendly, hackable, and embeddable. It is easy to install the full working application and then customize every part of it from data collection to metrics definitions and visualizations. By self-hosting and managing the full lifecycle of the data you fully control the privacy and don’t need to send your users’ data to 3rd parties.
 
