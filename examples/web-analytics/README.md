@@ -28,13 +28,11 @@ tools: Kafka, MinIO and PrestoDB instead of Kinesis, S3 and Athena respectively.
 
 ### 1. Configure Data Collection with Snowplow
 
-The data collection part is handled by Snowplow. Follow Snowplow’s [Setup Guide](https://github.com/snowplow/snowplow/wiki/Setting-up-SnowPlow) to install the tracker, collector, and Enrich.
-
-Snowplow comes with an S3 Loader and we recommend using it. Alternatively you can load your data in HDFS.
+The data collection part is handled by Snowplow. Follow Snowplow’s [Setup Guide](https://github.com/snowplow/snowplow/wiki/Setting-up-SnowPlow) to install the Tracker, Collector, Enrich, and S3 Loader.
 
 ### 2. Set up Athena (S3 only) or Presto
 
-Once you have data in the S3 or HDFS the next step is to set up Athena or Presto to query it. We’ll describe only Athena with an S3 setup here, but you can easily find a lot of materials online on how to set up an alternative configuration.
+Once you have data in the S3 the next step is to set up Athena or Presto to query it. We’ll describe only Athena with an S3 setup here, but you can easily find a lot of materials online on how to set up an alternative configuration.
 
 To query S3 data with Athena, we need to create a table for Snowplow events. Copy and paste the following DDL statement into the Athena console. Modify the `LOCATION` for the S3 bucket that stores your enriched Snowplow events.
 
