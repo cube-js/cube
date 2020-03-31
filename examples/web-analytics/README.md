@@ -179,13 +179,52 @@ LOCATION 's3://bucket-name/path/to/enriched/good';
 
 ### 3. Install MySQL for Cube.js External Pre-Aggregations
 
-This template uses MySQL as an external pre-aggregations database for performance optimization. Cube.js builds pre-aggregations from data stored in the main data warehouse, Athena in this example, and then uploads them into MySQL. Cube.js handles the refresh and partitioning of the pre-aggregations as well. 
-
-You need to provide the following environment variables for Cube.js to connect to MySQL: `CUBEJS_EXT_DB_HOST`, `CUBEJS_EXT_DB_NAME`, `CUBEJS_EXT_DB_PORT`, `CUBEJS_EXT_DB_USER`, `CUBEJS_EXT_DB_PASS`. You can learn more about [external pre-aggregations in the documentation here.](https://cube.dev/docs/pre-aggregations#external-pre-aggregations)
+This template uses MySQL as an external pre-aggregations database for performance optimization. Cube.js builds pre-aggregations from data stored in the main data warehouse, Athena in this example, and then uploads them into MySQL. Cube.js handles the refresh and partitioning of the pre-aggregations as well. You need to install MySQL and let Cube.js to connect to it.  You can learn more about [external pre-aggregations in the documentation here.](https://cube.dev/docs/pre-aggregations#external-pre-aggregations)
 
 ### 4. Install Cube.js backend and React frontend applications
 
-Docker container Configure via env variables
+First, you need to download or clone the code inside `examples/web-analytics`
+folder and install all the dependencies by running the following command:
+
+```bash
+$ npm install
+```
+
+The next step is to set environment variables required to run Cube.js backend.
+You can use `.env` file to store your credentials or provide them in any other way
+you'd prefer. Here the list of env variables you need to provide -
+
+```
+CUBEJS_AWS_REGION=Your Athena region (e.g. us-east-1)
+CUBEJS_AWS_S3_OUTPUT_LOCATION=Your S3 Output location
+# You can find the Athena S3 Output location here: https://docs.aws.amazon.com/athena/latest/ug/querying.html
+CUBEJS_JDBC_DRIVER=athena
+CUBEJS_DB_TYPE=athena
+CUBEJS_API_SECRET=SECRET-SECURE-STRING
+CUBEJS_EXT_DB_HOST=Your MySQL host
+CUBEJS_EXT_DB_NAME=Table name for pre-aggregations (e.g. cubejs_pre_aggregations)
+CUBEJS_EXT_DB_USER=MySQL username
+CUBEJS_EXT_DB_PASS=Password for MySQl user
+```
+
+Now, you can run the Cube.js server with the following command:
+
+```bash
+$ npm start
+```
+
+By default, it starts in the development environment and serves Cube.js
+Playground on the root route. You can run it in the production mode by setting
+`NODE_ENV=production` env variable, in that case it will serve the frontend app from the root
+route.
+
+In development you can run the frontend app as a seprate process by navigating
+into `dashboard-app` folder, installing dependencies and running `yarn start`.
+
+You can easily build a docker image from the provided Dockerfile. Before doing
+this you need to build a frontend application. To do that navigate into
+`dashboard-app` folder, install all the dependencies via NPM or Yarn, and run
+`yarn build`.
 
 ### 5. Enable Authentication via Google OAuth 2 (Optional)
 
