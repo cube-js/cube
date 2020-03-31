@@ -213,18 +213,17 @@ Now, you can run the Cube.js server with the following command:
 $ npm start
 ```
 
-By default, it starts in the development environment and serves Cube.js
-Playground on the root route. You can run it in the production mode by setting
-`NODE_ENV=production` env variable, in that case it will serve the frontend app from the root
-route.
+It will start the Cube.js server on [http://localhost:3000](http://localhost:3000). By default, it starts in the development environment and serves Cube.js
+Playground on the root route. To start the frontend app in the development you can navigate
+into `dashboard-app` folder, install dependencies, and run `yarn start`.
+It will start serving the frontend app from [http://localhost:4000](http://localhost:4000).
 
-In development you can run the frontend app as a seprate process by navigating
-into `dashboard-app` folder, installing dependencies and running `yarn start`.
+To run it in the production mode you need first to build the frontend. To do that navigate into
+`dashboard-app` folder, install dependencies, and run
+`yarn build`. Then start the Cube.js server in the production mode by setting `NODE_ENV=production` env variable.
+It will serve the frontend app on the root route in the production mode.
 
-You can easily build a docker image from the provided Dockerfile. Before doing
-this you need to build a frontend application. To do that navigate into
-`dashboard-app` folder, install all the dependencies via NPM or Yarn, and run
-`yarn build`.
+For deployment, you can easily build a docker image from the provided Dockerfile.
 
 ### 5. Enable Authentication via Google OAuth 2 (Optional)
 
