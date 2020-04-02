@@ -12,7 +12,7 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "istanbul cover ./node_modules/mocha/bin/_mocha --report lcovonly -- -R spec && codecov",
+    "test": "nyc --reporter=lcov mocha",
     "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js"
   },
   "dependencies": {
@@ -42,6 +42,7 @@
     "mocha": "^3.4.2",
     "mssql": "^6.1.0",
     "mysql": "^2.17.1",
+    "nyc": "^15.0.0",
     "pg-promise": "^7.3.2",
     "request": "^2.88.0",
     "request-promise": "^4.2.4",

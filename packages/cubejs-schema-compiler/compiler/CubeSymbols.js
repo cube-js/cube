@@ -2,7 +2,7 @@ const R = require('ramda');
 const UserError = require('./UserError');
 const DynamicReference = require('./DynamicReference');
 
-const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s+|\(?(\w+)\)?\s+=>\s/;
+const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
   USER_CONTEXT: 'userContext',
   FILTER_PARAMS: 'filterParams',
