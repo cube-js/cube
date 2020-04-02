@@ -11,6 +11,7 @@ const BaseFilter = require('./BaseFilter');
 const BaseTimeDimension = require('./BaseTimeDimension');
 const ParamAllocator = require('./ParamAllocator');
 const PreAggregations = require('./PreAggregations');
+const SqlParser = require('../parser/SqlParser');
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = `stb_pre_aggregations`;
 
@@ -335,7 +336,10 @@ class BaseQuery {
 
   simpleQuery() {
     // eslint-disable-next-line prefer-template
-    return `${this.commonQuery()} ${this.baseWhere(this.allFilters)}` +
+    const inlineWhereConditions = [];
+    const commonQuery = this.rewriteInlineWhere(() => this.commonQuery(), inlineWhereConditions);
+    const inlineFilters = inlineWhereConditions.map(f => ({ filterToWhere: () => f }));
+    return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineFilters))}` +
       this.groupByClause() +
       this.baseHaving(this.measureFilters) +
       this.orderBy() +
@@ -619,13 +623,33 @@ class BaseQuery {
     return this.joinQuery(this.join, this.collectFromMembers(false, this.collectSubQueryDimensionsFor.bind(this)));
   }
 
+  rewriteInlineCubeSql(cube) {
+    const sql = this.cubeSql(cube);
+    const parser = new SqlParser(sql);
+    const cubeAlias = this.cubeAlias(cube);
+    if (
+      this.safeEvaluateSymbolContext().inlineWhereConditions &&
+      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
+      parser.isSimpleAsteriskQuery()
+    ) {
+      this.safeEvaluateSymbolContext().inlineWhereConditions.push(parser.extractWhereConditions(cubeAlias));
+      return [parser.extractTableFrom(), cubeAlias];
+    } else {
+      return [sql, cubeAlias];
+    }
+  }
+
   joinQuery(join, subQueryDimensions) {
     const joins = join.joins.map(
-      j => `LEFT JOIN ${this.cubeSql(j.originalTo)} ${this.asSyntaxJoin} ${this.cubeAlias(j.originalTo)}
-      ON ${this.evaluateSql(j.originalFrom, j.join.sql)}`
+      j => {
+        const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(j.originalTo);
+        return `LEFT JOIN ${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}
+      ON ${this.evaluateSql(j.originalFrom, j.join.sql)}`;
+      }
     ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
 
-    return `${this.cubeSql(join.root)} ${this.asSyntaxJoin} ${this.cubeAlias(join.root)}\n${joins.join("\n")}`;
+    const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(join.root);
+    return `${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}\n${joins.join("\n")}`;
   }
 
   subQueryJoin(dimension) {
@@ -875,6 +899,14 @@ class BaseQuery {
       context
     );
     return R.uniq(context.subQueryDimensions);
+  }
+
+  rewriteInlineWhere(fn, inlineWhereConditions) {
+    const context = { inlineWhereConditions };
+    return this.evaluateSymbolSqlWithContext(
+      fn,
+      context
+    );
   }
 
   groupByClause() {

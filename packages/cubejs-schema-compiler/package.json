@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "mocha",
-    "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js"
+    "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js"
   },
   "dependencies": {
     "@babel/generator": "^7.4.0",
@@ -23,6 +23,7 @@
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
     "@hapi/joi": "^15.1.1",
+    "antlr4": "^4.8.0",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
     "moment-range": "^4.0.1",

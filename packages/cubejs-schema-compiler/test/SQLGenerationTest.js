@@ -28,6 +28,8 @@ describe('SQL Generation', function test() {
       \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
       
+      rewriteQueries: true,
+      
       refreshKey: {
         sql: 'SELECT 1',
       },

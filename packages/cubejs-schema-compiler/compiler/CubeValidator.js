@@ -107,6 +107,7 @@ const cubeSchema = Joi.object().keys({
   sqlAlias: Joi.string(),
   dataSource: Joi.string(),
   description: Joi.string(),
+  rewriteQueries: Joi.boolean(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
     relationship: Joi.any().valid('hasMany', 'belongsTo', 'hasOne').required()

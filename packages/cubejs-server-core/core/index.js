@@ -58,7 +58,7 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
 
   const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
   const format = ({
-    requestId, duration, allSqlLines, query, values, queryKey, showRestParams, ...json
+    requestId, duration, allSqlLines, query, values, showRestParams, ...json
   }) => {
     const restParams = JSON.stringify(json, null, 2);
     const durationStr = duration ? `(${duration}ms)` : '';
