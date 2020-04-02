@@ -178,6 +178,19 @@ describe('PreAggregations', function test() {
         auto: {
           type: 'autoRollup',
           maxPreAggregations: 20
+        },
+        partitioned: {
+          type: 'rollup',
+          measureReferences: [count],
+          timeDimensionReference: EveryHourVisitors.createdAt,
+          granularity: 'day',
+          partitionGranularity: 'month',
+          scheduledRefresh: true,
+          refreshKey: {
+            every: '1 hour',
+            incremental: true,
+            updateWindow: '1 day'
+          }
         }
       }
     })
@@ -468,6 +481,40 @@ describe('PreAggregations', function test() {
           ]
         );
       });
+    });
+  });
+
+  it('partitioned scheduled refresh', () => {
+    return compiler.compile().then(async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitor_checkins.count'
+        ],
+        timeDimensions: [{
+          dimension: 'EveryHourVisitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-25']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'EveryHourVisitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const preAggregations = cubeEvaluator.scheduledPreAggregations();
+      const partitionedPreAgg =
+        preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitor_checkins');
+
+      const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg.preAggregation);
+
+      console.log(minMaxQueries);
+
+      const res = await dbRunner.testQueries(minMaxQueries);
+
+      res.should.be.deepEqual(
+        [{ max: '2017-01-06T00:00:00.000Z' }]
+      );
     });
   });
 

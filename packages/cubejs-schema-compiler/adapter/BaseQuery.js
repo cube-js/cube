@@ -1681,8 +1681,8 @@ class BaseQuery {
     const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
 
     return this.evaluateSymbolSqlWithContext(() => [
-      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(timeDimension.cube(), timeDimension, 'min')),
-      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(timeDimension.cube(), timeDimension, 'max'))
+      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(timeDimension.path()[0], timeDimension, 'min')),
+      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(timeDimension.path()[0], timeDimension, 'max'))
     ], { preAggregationQuery: true });
   }
 
