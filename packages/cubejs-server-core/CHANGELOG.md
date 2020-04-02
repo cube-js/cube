@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.18.25](https://github.com/cube-js/cube.js/compare/v0.18.24...v0.18.25) (2020-04-02)
+
+
+### Features
+
+* Basic query rewrites ([af07865](https://github.com/cube-js/cube.js/commit/af07865))
+
+
+
+
+
 ## [0.18.24](https://github.com/cube-js/cube.js/compare/v0.18.23...v0.18.24) (2020-04-01)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
