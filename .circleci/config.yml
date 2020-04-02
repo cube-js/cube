@@ -44,6 +44,7 @@ jobs:
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
+      - run: bash <(curl -s https://codecov.io/bash)
 
   lint:
     docker:
