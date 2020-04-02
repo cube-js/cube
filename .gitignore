@@ -10,3 +10,5 @@ yarn-error.log
 .gh-token
 .serverless/
 .rpt2_cache/
+**/.nyc_output
+**/coverage
