@@ -12,7 +12,7 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "mocha",
+    "test": "istanbul cover ./node_modules/mocha/bin/_mocha --report lcovonly -- -R spec && codecov",
     "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js"
   },
   "dependencies": {
@@ -38,6 +38,7 @@
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
+    "istanbul": "^0.4.5",
     "mocha": "^3.4.2",
     "mssql": "^6.1.0",
     "mysql": "^2.17.1",
