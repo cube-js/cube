@@ -100,7 +100,7 @@ declare module "@cubejs-backend/server-core" {
     | "sqlite";
 
   export interface QueryFilter {
-    dimension: string;
+    member: string;
     operator:
       | "equals"
       | "notEquals"
