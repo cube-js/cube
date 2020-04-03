@@ -22,9 +22,9 @@ aliasField:
 
 boolExp:
     exp |
-    exp AND exp |
-    exp OR exp |
-    NOT exp
+    boolExp AND boolExp |
+    boolExp OR boolExp |
+    NOT boolExp
     ;
 
 exp:
