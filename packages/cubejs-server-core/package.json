@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Statsbot, Inc.",
-  "version": "0.18.26",
+  "version": "0.18.27",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
