@@ -15,15 +15,15 @@ const GRANULARITY_TO_INTERVAL = {
   year: date => `DATE_TRUNC('year', ${date}::datetime)`
 };
 
-class ElasticSearchCloudQueryFilter extends BaseFilter {
+class ElasticSearchQueryFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
     return `${not ? " NOT" : ""} MATCH(${column}, ?, 'fuzziness=AUTO:1,5')`;
   }
 }
 
-class ElasticSearchCloudQuery extends BaseQuery {
+class ElasticSearchQuery extends BaseQuery {
   newFilter(filter) {
-    return new ElasticSearchCloudQueryFilter(this, filter);
+    return new ElasticSearchQueryFilter(this, filter);
   }
 
   convertTz(field) {
@@ -105,4 +105,4 @@ class ElasticSearchCloudQuery extends BaseQuery {
   }
 }
 
-module.exports = ElasticSearchCloudQuery;
+module.exports = ElasticSearchQuery;

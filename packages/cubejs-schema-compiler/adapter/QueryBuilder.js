@@ -12,7 +12,7 @@ const hive = require('./HiveQuery');
 const oracle = require('./OracleQuery');
 const sqlite = require('./SqliteQuery');
 const odelasticsearch = require('./OpenDistroElasticSearchQuery');
-const elasticsearchcloud = require('./ElasticSearchCloudQuery');
+const elasticsearch = require('./ElasticSearchQuery');
 
 const ADAPTERS = {
   postgres,
@@ -31,7 +31,7 @@ const ADAPTERS = {
   oracle,
   sqlite,
   odelasticsearch,
-  elasticsearchcloud
+  elasticsearch
 };
 exports.query = (compilers, dbType, queryOptions) => {
   if (!ADAPTERS[dbType]) {
