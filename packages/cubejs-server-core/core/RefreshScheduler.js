@@ -25,7 +25,11 @@ class RefreshScheduler {
             }))
         );
 
-      const extractDate = ({ data }) => data[0] && data[0][Object.keys(data[0])[0]].toString();
+      const extractDate = ({ data }) => {
+        // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
+        data = JSON.parse(JSON.stringify(data));
+        return data[0] && data[0][Object.keys(data[0])[0]];
+      };
 
       const baseQuery = {
         ...queryingOptions,

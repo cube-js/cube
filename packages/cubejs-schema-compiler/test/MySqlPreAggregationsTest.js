@@ -76,7 +76,8 @@ describe('MySqlPreAggregations', function test() {
           dimensionReferences: [source],
           timeDimensionReference: createdAt,
           granularity: 'day',
-          partitionGranularity: 'month'
+          partitionGranularity: 'month',
+          scheduledRefresh: true
         },
         googleRollup: {
           type: 'rollup',
@@ -168,6 +169,45 @@ describe('MySqlPreAggregations', function test() {
           ]
         );
       });
+    });
+  });
+
+  it('partitioned scheduled refresh', () => {
+    return compiler.compile().then(async () => {
+      const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.count'
+        ],
+        dimensions: [
+          'visitors.source'
+        ],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2016-12-30', '2017-01-30']
+        }],
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+      });
+
+      const preAggregations = cubeEvaluator.scheduledPreAggregations();
+      const partitionedPreAgg =
+        preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitors');
+
+      const minMaxQueries = query.preAggregationStartEndQueries('visitors', partitionedPreAgg.preAggregation);
+
+      console.log(minMaxQueries);
+
+      const res = await dbRunner.testQueries(minMaxQueries);
+
+      console.log(res);
+
+      res.should.be.deepEqual(
+        [{ 'max(`visitors`.created_at)': '2017-01-07T08:00:00.000Z' }]
+      );
     });
   });
 
