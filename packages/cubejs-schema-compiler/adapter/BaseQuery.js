@@ -1475,7 +1475,7 @@ class BaseQuery {
     );
     if (cubeNamesForTimeDimension.length === 1 && cubeNamesForTimeDimension[0] === cube) {
       const dimensionSql = this.dimensionSql(dimension);
-      return `select ${aggFunction}(${dimensionSql}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
+      return `select ${aggFunction}(${this.convertTz(dimensionSql)}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
     }
     return null;
   }

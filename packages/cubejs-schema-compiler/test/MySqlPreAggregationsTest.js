@@ -181,7 +181,7 @@ describe('MySqlPreAggregations', function test() {
         dimensions: [
           'visitors.source'
         ],
-        timezone: 'America/Los_Angeles',
+        timezone: 'UTC',
         preAggregationsSchema: '',
         timeDimensions: [{
           dimension: 'visitors.createdAt',
@@ -205,9 +205,7 @@ describe('MySqlPreAggregations', function test() {
 
       console.log(res);
 
-      res.should.be.deepEqual(
-        [{ 'max(`visitors`.created_at)': '2017-01-07T08:00:00.000Z' }]
-      );
+      res[0][Object.keys(res[0])[0]].should.be.deepEqual('2017-01-07 00:00:00');
     });
   });
 

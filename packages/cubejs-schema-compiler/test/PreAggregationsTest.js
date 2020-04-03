@@ -495,7 +495,7 @@ describe('PreAggregations', function test() {
           granularity: 'day',
           dateRange: ['2017-01-01', '2017-01-25']
         }],
-        timezone: 'America/Los_Angeles',
+        timezone: 'UTC',
         order: [{
           id: 'EveryHourVisitors.createdAt'
         }],
