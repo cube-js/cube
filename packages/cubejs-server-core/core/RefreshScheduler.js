@@ -25,7 +25,7 @@ class RefreshScheduler {
             }))
         );
 
-      const extractDate = ({ data }) => data[0] && data[0][Object.keys(data[0])[0]];
+      const extractDate = ({ data }) => data[0] && data[0][Object.keys(data[0])[0]].toString();
 
       const baseQuery = {
         ...queryingOptions,
