@@ -168,8 +168,10 @@ describe('SQL Generation', function test() {
 
     cube('visitor_checkins', {
       sql: \`
-      select * from visitor_checkins
+      select * from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')}
       \`,
+      
+      rewriteQueries: true,
 
       joins: {
         cards: {

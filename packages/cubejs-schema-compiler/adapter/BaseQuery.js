@@ -622,18 +622,19 @@ class BaseQuery {
     return this.joinQuery(this.join, this.collectFromMembers(false, this.collectSubQueryDimensionsFor.bind(this)));
   }
 
-  rewriteInlineCubeSql(cube) {
+  rewriteInlineCubeSql(cube, isLeftJoinCondition) {
     const sql = this.cubeSql(cube);
-    const parser = new SqlParser(sql);
     const cubeAlias = this.cubeAlias(cube);
+    const parser = new SqlParser(sql);
     if (
-      this.safeEvaluateSymbolContext().inlineWhereConditions &&
       this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
       parser.isSimpleAsteriskQuery()
     ) {
       const conditions = parser.extractWhereConditions(cubeAlias);
-      this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
-      return [parser.extractTableFrom(), cubeAlias];
+      if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
+        this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+      }
+      return [parser.extractTableFrom(), cubeAlias, conditions];
     } else {
       return [sql, cubeAlias];
     }
@@ -642,9 +643,9 @@ class BaseQuery {
   joinQuery(join, subQueryDimensions) {
     const joins = join.joins.map(
       j => {
-        const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(j.originalTo);
+        const [cubeSql, cubeAlias, conditions] = this.rewriteInlineCubeSql(j.originalTo, true);
         return `LEFT JOIN ${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}
-      ON ${this.evaluateSql(j.originalFrom, j.join.sql)}`;
+      ON ${this.evaluateSql(j.originalFrom, j.join.sql)}${conditions ? ` AND ${conditions}` : ''}`;
       }
     ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
 
@@ -740,7 +741,8 @@ class BaseQuery {
     const shouldBuildJoinForMeasureSelect = this.checkShouldBuildJoinForMeasureSelect(measures, keyCubeName);
 
     let keyCubeSql;
-    const inlineWhereConditionsForKeyCube = [];
+    let keyCubeAlias;
+    let keyCubeInlineLeftJoinConditions;
     const measureSubQueryDimensions = this.collectFrom(measures, this.collectSubQueryDimensionsFor.bind(this));
 
     if (shouldBuildJoinForMeasureSelect) {
@@ -752,11 +754,9 @@ class BaseQuery {
         );
       }
       keyCubeSql = `(${this.aggregateSubQueryMeasureJoin(keyCubeName, measures, measuresJoin, primaryKeyDimension, measureSubQueryDimensions)})`;
+      keyCubeAlias = this.cubeAlias(keyCubeName);
     } else {
-      [keyCubeSql] = this.rewriteInlineWhere(
-        () => this.rewriteInlineCubeSql(keyCubeName),
-        inlineWhereConditionsForKeyCube
-      );
+      [keyCubeSql, keyCubeAlias, keyCubeInlineLeftJoinConditions] = this.rewriteInlineCubeSql(keyCubeName);
     }
 
     const measureSelectFn = () => measures.map(m => m.selectColumns());
@@ -774,10 +774,10 @@ class BaseQuery {
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? '' : measureSubQueryDimensions.map(d => this.subQueryJoin(d)).join("\n");
     return `SELECT ${columnsForSelect} FROM (${this.keysQuery(primaryKeyDimension, filters)}) ${this.asSyntaxTable} ${this.escapeColumnName('keys')} ` +
-      `LEFT OUTER JOIN ${keyCubeSql} ${this.asSyntaxJoin} ${this.cubeAlias(keyCubeName)} ON
-      ${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect} ` +
+      `LEFT OUTER JOIN ${keyCubeSql} ${this.asSyntaxJoin} ${keyCubeAlias} ON
+      ${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect}
+      ${keyCubeInlineLeftJoinConditions ? ` AND ${keyCubeInlineLeftJoinConditions}` : ''}` +
       subQueryJoins +
-      this.baseWhere(inlineWhereConditionsForKeyCube) +
       (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
