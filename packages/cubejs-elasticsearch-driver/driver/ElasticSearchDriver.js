@@ -5,6 +5,9 @@ const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver
 class ElasticSearchDriver extends BaseDriver {
   constructor(config) {
     super();
+
+    // TODO: This config applies to AWS ES, Native ES and OpenDistro ES
+    // All 3 have different dialects according to their respective documentation
     this.config = {
       url: process.env.CUBEJS_DB_URL,
       openDistro:
@@ -12,7 +15,7 @@ class ElasticSearchDriver extends BaseDriver {
         process.env.CUBEJS_DB_TYPE === 'odelasticsearch',
       ...config
     };
-    this.client = new Client({ node: this.config.url });
+    this.client = new Client({ node: this.config.url, cloud: this.config.cloud });
     this.sqlClient = this.config.openDistro ? new Client({ node: `${this.config.url}/_opendistro` }) : this.client;
   }
 
@@ -29,6 +32,15 @@ class ElasticSearchDriver extends BaseDriver {
           query: SqlString.format(query, values)
         }
       })).body;
+
+      // TODO: Clean this up, will need a better identifier than the cloud setting
+      if (this.config.cloud) {
+        const compiled = result.rows.map(
+          r => result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {})
+        );
+
+        return compiled;
+      }
 
       return result && result.aggregations && this.traverseAggregations(result.aggregations);
     } catch (e) {
