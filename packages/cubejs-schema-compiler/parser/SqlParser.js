@@ -73,13 +73,9 @@ class SqlParser {
         return sql.slice(start, stop + 1);
       }
     };
-    const lexer = new GenericSqlLexer(chars);
-    const tokens = new antlr4.CommonTokenStream(lexer);
-    const parser = new GenericSqlParser(tokens);
-    parser.buildParseTrees = true;
+
     const errors = [];
     this.errors = errors;
-    parser.removeErrorListeners();
 
     class ExprErrorListener extends antlr4.error.ErrorListener {
       syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
@@ -89,6 +85,13 @@ class SqlParser {
       }
     }
 
+    const lexer = new GenericSqlLexer(chars);
+    lexer.removeErrorListeners();
+    lexer.addErrorListener(new ExprErrorListener());
+    const tokens = new antlr4.CommonTokenStream(lexer);
+    const parser = new GenericSqlParser(tokens);
+    parser.buildParseTrees = true;
+    parser.removeErrorListeners();
     parser.addErrorListener(new ExprErrorListener());
 
     return parser.statement();

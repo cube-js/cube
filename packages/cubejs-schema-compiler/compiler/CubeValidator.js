@@ -74,7 +74,7 @@ const BasePreAggregation = {
   ),
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
-  partitionGranularity: Joi.any().valid('day', 'week', 'month', 'year'),
+  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year'),
   scheduledRefresh: Joi.boolean(),
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({

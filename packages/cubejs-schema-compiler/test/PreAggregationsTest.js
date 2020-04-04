@@ -1,4 +1,5 @@
 /* eslint-disable quote-props */
+/* globals it, describe, after */
 const R = require('ramda');
 
 const PostgresQuery = require('../adapter/PostgresQuery');
@@ -6,7 +7,7 @@ const BigqueryQuery = require('../adapter/BigqueryQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 
-const prepareCompiler = PrepareCompiler.prepareCompiler;
+const { prepareCompiler } = PrepareCompiler;
 const dbRunner = require('./DbRunner');
 
 describe('PreAggregations', function test() {
@@ -127,6 +128,14 @@ describe('PreAggregations', function test() {
           timeDimensionReference: createdAt,
           granularity: 'day',
           partitionGranularity: 'month'
+        },
+        partitionedHourly: {
+          type: 'rollup',
+          measureReferences: [checkinsTotal],
+          dimensionReferences: [source],
+          timeDimensionReference: createdAt,
+          granularity: 'hour',
+          partitionGranularity: 'hour'
         },
         ratio: {
           type: 'rollup',
@@ -742,6 +751,58 @@ describe('PreAggregations', function test() {
               "visitors__source": "google",
               "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
               "visitors__checkins_total": "1"
+            }
+          ]
+        );
+      });
+    });
+  });
+
+  it('partitioned hourly', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.checkinsTotal'
+        ],
+        dimensions: [
+          'visitors.source'
+        ],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'hour',
+          dateRange: ['2017-01-02', '2017-01-05']
+        }],
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+
+      const queries = tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.testQueries(
+        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 242))
+      ).then(res => {
+        console.log(JSON.stringify(res));
+        res.should.be.deepEqual(
+          [
+            {
+              "visitors__source": "some",
+              "visitors__created_at_hour": "2017-01-03T00:00:00.000Z",
+              "visitors__checkins_total": "3"
+            },
+            {
+              "visitors__source": "some",
+              "visitors__created_at_hour": "2017-01-05T00:00:00.000Z",
+              "visitors__checkins_total": "2"
             }
           ]
         );

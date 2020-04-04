@@ -134,12 +134,17 @@ class PreAggregations {
   }
 
   preAggregationTableName(cube, preAggregationName, preAggregation, skipSchema) {
+    let partitionSuffix = '';
+    if (preAggregation.partitionTimeDimensions) {
+      const partitionTimeDimension = preAggregation.partitionTimeDimensions[0];
+      partitionSuffix = partitionTimeDimension.dateRange[0].substring(
+        0,
+        preAggregation.partitionGranularity === 'hour' ? 13 : 10
+      ).replace(/[-T:]/g, '');
+    }
     return this.query.preAggregationTableName(
-      cube, preAggregationName + (
-        preAggregation.partitionTimeDimensions ?
-          preAggregation.partitionTimeDimensions[0].dateRange[0].replace('T00:00:00.000', '').replace(/-/g, '') :
-          ''
-      ),
+      cube,
+      preAggregationName + partitionSuffix,
       skipSchema
     );
   }
