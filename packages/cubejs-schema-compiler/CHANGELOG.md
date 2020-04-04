@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.18.29](https://github.com/cube-js/cube.js/compare/v0.18.28...v0.18.29) (2020-04-04)
+
+
+### Features
+
+* Hour partition granularity support ([5f78974](https://github.com/cube-js/cube.js/commit/5f78974))
+* Rewrite SQL for more places ([2412821](https://github.com/cube-js/cube.js/commit/2412821))
+
+
+
+
+
 ## [0.18.28](https://github.com/cube-js/cube.js/compare/v0.18.27...v0.18.28) (2020-04-03)
 
 
