@@ -645,7 +645,7 @@ class BaseQuery {
       j => {
         const [cubeSql, cubeAlias, conditions] = this.rewriteInlineCubeSql(j.originalTo, true);
         return `LEFT JOIN ${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}
-      ON ${this.evaluateSql(j.originalFrom, j.join.sql)}${conditions ? ` AND ${conditions}` : ''}`;
+      ON ${this.evaluateSql(j.originalFrom, j.join.sql)}${conditions ? ` AND (${conditions})` : ''}`;
       }
     ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
 
@@ -776,7 +776,7 @@ class BaseQuery {
     return `SELECT ${columnsForSelect} FROM (${this.keysQuery(primaryKeyDimension, filters)}) ${this.asSyntaxTable} ${this.escapeColumnName('keys')} ` +
       `LEFT OUTER JOIN ${keyCubeSql} ${this.asSyntaxJoin} ${keyCubeAlias} ON
       ${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect}
-      ${keyCubeInlineLeftJoinConditions ? ` AND ${keyCubeInlineLeftJoinConditions}` : ''}` +
+      ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}` +
       subQueryJoins +
       (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
