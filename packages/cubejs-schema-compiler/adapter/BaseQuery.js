@@ -338,8 +338,7 @@ class BaseQuery {
     // eslint-disable-next-line prefer-template
     const inlineWhereConditions = [];
     const commonQuery = this.rewriteInlineWhere(() => this.commonQuery(), inlineWhereConditions);
-    const inlineFilters = inlineWhereConditions.map(f => ({ filterToWhere: () => f }));
-    return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineFilters))}` +
+    return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}` +
       this.groupByClause() +
       this.baseHaving(this.measureFilters) +
       this.orderBy() +
@@ -632,7 +631,8 @@ class BaseQuery {
       this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
       parser.isSimpleAsteriskQuery()
     ) {
-      this.safeEvaluateSymbolContext().inlineWhereConditions.push(parser.extractWhereConditions(cubeAlias));
+      const conditions = parser.extractWhereConditions(cubeAlias);
+      this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
       return [parser.extractTableFrom(), cubeAlias];
     } else {
       return [sql, cubeAlias];
@@ -719,15 +719,18 @@ class BaseQuery {
   regularMeasuresSubQuery(measures, filters) {
     filters = filters || this.allFilters;
 
-    return `SELECT ${this.selectAllDimensionsAndMeasures(measures)} FROM ${
-      this.joinQuery(
-        this.join,
-        this.collectFrom(
-          this.dimensionsForSelect().concat(measures).concat(this.allFilters),
-          this.collectSubQueryDimensionsFor.bind(this)
-        )
+    const inlineWhereConditions = [];
+
+    const query = this.rewriteInlineWhere(() => this.joinQuery(
+      this.join,
+      this.collectFrom(
+        this.dimensionsForSelect().concat(measures).concat(this.allFilters),
+        this.collectSubQueryDimensionsFor.bind(this)
       )
-    } ${this.baseWhere(filters)}` +
+    ), inlineWhereConditions);
+    return `SELECT ${this.selectAllDimensionsAndMeasures(measures)} FROM ${
+      query
+    } ${this.baseWhere(filters.concat(inlineWhereConditions))}` +
     (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
@@ -736,8 +739,8 @@ class BaseQuery {
     const primaryKeyDimension = this.newDimension(this.primaryKeyName(keyCubeName));
     const shouldBuildJoinForMeasureSelect = this.checkShouldBuildJoinForMeasureSelect(measures, keyCubeName);
 
-    let keyCubeSql = this.cubeSql(keyCubeName);
-
+    let keyCubeSql;
+    const inlineWhereConditionsForKeyCube = [];
     const measureSubQueryDimensions = this.collectFrom(measures, this.collectSubQueryDimensionsFor.bind(this));
 
     if (shouldBuildJoinForMeasureSelect) {
@@ -749,6 +752,11 @@ class BaseQuery {
         );
       }
       keyCubeSql = `(${this.aggregateSubQueryMeasureJoin(keyCubeName, measures, measuresJoin, primaryKeyDimension, measureSubQueryDimensions)})`;
+    } else {
+      [keyCubeSql] = this.rewriteInlineWhere(
+        () => this.rewriteInlineCubeSql(keyCubeName),
+        inlineWhereConditionsForKeyCube
+      );
     }
 
     const measureSelectFn = () => measures.map(m => m.selectColumns());
@@ -769,6 +777,7 @@ class BaseQuery {
       `LEFT OUTER JOIN ${keyCubeSql} ${this.asSyntaxJoin} ${this.cubeAlias(keyCubeName)} ON
       ${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect} ` +
       subQueryJoins +
+      this.baseWhere(inlineWhereConditionsForKeyCube) +
       (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
@@ -817,12 +826,14 @@ class BaseQuery {
   }
 
   keysQuery(primaryKeyDimension, filters) {
+    const inlineWhereConditions = [];
+    const query = this.rewriteInlineWhere(() => this.joinQuery(
+      this.join,
+      this.collectFrom(this.keyDimensions(primaryKeyDimension), this.collectSubQueryDimensionsFor.bind(this))
+    ), inlineWhereConditions);
     return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
-      this.joinQuery(
-        this.join,
-        this.collectFrom(this.keyDimensions(primaryKeyDimension), this.collectSubQueryDimensionsFor.bind(this))
-      )
-    } ${this.baseWhere(filters)}`;
+      query
+    } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
   }
 
   keysSelect(primaryKeyDimension) {
