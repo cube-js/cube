@@ -813,11 +813,11 @@ chownr@^1.1.1:
   integrity sha512-i70fVHhmV3DtTl6nqvZOnIjbY0Pe4kAUjwHj8z0zAdgBtYrJyYwLKCCuRBQ5ppkyL0AkN7HKRnETdmdp1zqNXw==
 
 chrono-node@^1.3.11:
-  version "1.3.11"
-  resolved "https://registry.yarnpkg.com/chrono-node/-/chrono-node-1.3.11.tgz#b86a26b7e3157edcc4fe3374e1b6f90caedc8e39"
-  integrity sha512-jDWRnY6nYvzfV3HPYBqo+tot7tcsUs9i3arGbMdI0TouPSXP2C2y/Ctp27rxKTQDi6yuTxAB2cw+Q6igGhOhdQ==
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/chrono-node/-/chrono-node-1.4.4.tgz#a6248257d3198996ea3d023b2bd20a268545350f"
+  integrity sha512-vwsQ2Z6RhkfIsFYvcZtifa0eSQC6pl08fgXkcZXkfGAJk/OkdYAuGqM2yLhPzsuK3N+BmaKFBie/jGvLsiYMbA==
   dependencies:
-    moment "2.21.0"
+    dayjs "^1.8.19"
 
 ci-info@^2.0.0:
   version "2.0.0"
@@ -1011,6 +1011,11 @@ data-urls@^1.0.0:
     abab "^2.0.0"
     whatwg-mimetype "^2.2.0"
     whatwg-url "^7.0.0"
+
+dayjs@^1.8.19:
+  version "1.8.23"
+  resolved "https://registry.yarnpkg.com/dayjs/-/dayjs-1.8.23.tgz#07b5a8e759c4d75ae07bdd0ad6977f851c01e510"
+  integrity sha512-NmYHMFONftoZbeOhVz6jfiXI4zSiPN6NoVWJgC0aZQfYVwzy/ZpESPHuCcI0B8BUMpSJQ08zenHDbofOLKq8hQ==
 
 debug@2.6.9, debug@^2.2.0, debug@^2.3.3:
   version "2.6.9"
@@ -3012,11 +3017,6 @@ moment-timezone@^0.5.27:
   integrity sha512-TDJkZvAyKIVWg5EtVqRzU97w0Rb0YVbfpqyjgu6GwXCAohVRqwZjf4fOzDE6p1Ch98Sro/8hQQi65WDXW5STPw==
   dependencies:
     moment ">= 2.9.0"
-
-moment@2.21.0:
-  version "2.21.0"
-  resolved "https://registry.yarnpkg.com/moment/-/moment-2.21.0.tgz#2a114b51d2a6ec9e6d83cf803f838a878d8a023a"
-  integrity sha512-TCZ36BjURTeFTM/CwRcViQlfkMvL1/vFISuNLO5GkcVm1+QHfbSiNqZuWeMFjj1/3+uAjXswgRk30j1kkLYJBQ==
 
 "moment@>= 2.9.0", moment@^2.24.0:
   version "2.24.0"
