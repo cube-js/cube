@@ -8,7 +8,7 @@ class RefreshScheduler {
   async refreshQueriesForPreAggregation(context, compilerApi, preAggregation, queryingOptions) {
     const dbType = compilerApi.getDbType();
     const compilers = await compilerApi.getCompilers();
-    const query = compilerApi.createQuery(compilers, dbType, {});
+    const query = compilerApi.createQuery(compilers, dbType, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity) {
       const dataSource = query.cubeDataSource(preAggregation.cube);
 
