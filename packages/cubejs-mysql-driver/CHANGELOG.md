@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.18.32](https://github.com/cube-js/cube.js/compare/v0.18.31...v0.18.32) (2020-04-07)
+
+
+### Bug Fixes
+
+* **mysql-driver:** Special characters in database name for readOnly database lead to Error: ER_PARSE_ERROR: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ([1464326](https://github.com/cube-js/cube.js/commit/1464326))
+
+
+
+
+
 ## [0.18.22](https://github.com/cube-js/cube.js/compare/v0.18.21...v0.18.22) (2020-03-29)
 
 
