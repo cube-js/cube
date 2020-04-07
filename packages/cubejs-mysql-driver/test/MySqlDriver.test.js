@@ -20,7 +20,8 @@ describe('MySqlDriver', () => {
       host: 'localhost',
       user: 'root',
       password: process.env.TEST_DB_PASSWORD || "Test1test",
-      port: container && container.getMappedPort(3306) || 3306
+      port: container && container.getMappedPort(3306) || 3306,
+      database: 'mysql'
     });
     await mySqlDriver.createSchemaIfNotExists('test');
     await mySqlDriver.query('DROP SCHEMA test');
@@ -39,6 +40,8 @@ describe('MySqlDriver', () => {
       rows: [{ value: "Tekirdağ" }]
     });
     expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.wrong_value'))))
+      .toStrictEqual([{ value: "Tekirdağ" }]);
+    expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.wrong_value')).rows)))
       .toStrictEqual([{ value: "Tekirdağ" }]);
   });
 

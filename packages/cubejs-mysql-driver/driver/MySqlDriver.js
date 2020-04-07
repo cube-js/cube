@@ -143,9 +143,9 @@ class MySqlDriver extends BaseDriver {
     const tableName = crypto.randomBytes(10).toString('hex');
     const columns = await this.withConnection(async db => {
       await this.setTimeZone(db);
-      await db.execute(`CREATE TEMPORARY TABLE ${this.config.database}.t_${tableName} AS ${query} LIMIT 0`, values);
-      const result = await db.execute(`DESCRIBE ${this.config.database}.t_${tableName}`);
-      await db.execute(`DROP TEMPORARY TABLE ${this.config.database}.t_${tableName}`);
+      await db.execute(`CREATE TEMPORARY TABLE \`${this.config.database}\`.t_${tableName} AS ${query} LIMIT 0`, values);
+      const result = await db.execute(`DESCRIBE \`${this.config.database}\`.t_${tableName}`);
+      await db.execute(`DROP TEMPORARY TABLE \`${this.config.database}\`.t_${tableName}`);
       return result;
     });
 
