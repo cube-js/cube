@@ -29,7 +29,7 @@ const DriverDependencies = {
   prestodb: '@cubejs-backend/prestodb-driver',
   oracle: '@cubejs-backend/oracle-driver',
   sqlite: '@cubejs-backend/sqlite-driver',
-  odelasticsearch: '@cubejs-backend/elasticsearch-driver',
+  awselasticsearch: '@cubejs-backend/elasticsearch-driver',
   elasticsearch: '@cubejs-backend/elasticsearch-driver',
 };
 

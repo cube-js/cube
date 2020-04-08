@@ -15,15 +15,15 @@ const GRANULARITY_TO_INTERVAL = {
   year: (date) => `DATE_FORMAT(${date}, 'yyyy-01-01 00:00:00.000')`
 };
 
-class OpenDistroElasticSearchQueryFilter extends BaseFilter {
+class AWSElasticSearchQueryFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ?, '%')`;
   }
 }
 
-class OpenDistroElasticSearchQuery extends BaseQuery {
+class AWSElasticSearchQuery extends BaseQuery {
   newFilter(filter) {
-    return new OpenDistroElasticSearchQueryFilter(this, filter);
+    return new AWSElasticSearchQueryFilter(this, filter);
   }
 
   convertTz(field) {
@@ -99,4 +99,4 @@ class OpenDistroElasticSearchQuery extends BaseQuery {
   }
 }
 
-module.exports = OpenDistroElasticSearchQuery;
+module.exports = AWSElasticSearchQuery;
