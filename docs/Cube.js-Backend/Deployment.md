@@ -394,18 +394,16 @@ redis_db:
     - "6379"
 
 cube:
-  build: ./cube
+  build: .
   env_file: .env
   expose:
     - "4000"
-  volumes:
-    - ./cube/schema:/usr/src/app/schema
   command: node index.js
   links:
     - redis_db
 ```
 
-`./cube` is te path to your cube js main folder, `./cube/schema` is the path to your schema folder and the `.env` file should be at the same level of the docker-compose file.
+`docker-compose` file should be in your Cube.js app main folder which contains `Dockerfile` and the `.env` file should be at the same level of the `docker-compose` file.
 
 Build the containers
 
