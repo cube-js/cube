@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "0.18.18",
+  "version": "0.19.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
