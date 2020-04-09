@@ -1760,11 +1760,15 @@ class BaseQuery {
             if (!preAggregation.partitionGranularity) {
               throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations`);
             }
-            refreshKey = this.incrementalRefreshKey(
-              preAggregationQueryForSql,
-              refreshKey,
-              { window: preAggregation.refreshKey.updateWindow }
-            );
+            // TOOD Case when partitioned originalSql is resolved for query without time dimension.
+            // Consider fallback to not using such originalSql for consistency?
+            if (preAggregationQueryForSql.timeDimensions.length) {
+              refreshKey = this.incrementalRefreshKey(
+                preAggregationQueryForSql,
+                refreshKey,
+                { window: preAggregation.refreshKey.updateWindow }
+              );
+            }
           }
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
             return {

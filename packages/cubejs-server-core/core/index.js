@@ -73,6 +73,8 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
           .concat(R.takeLast(queryMaxLines / 2, formatted));
       }
       return `${prefix}\n--\n  ${formatted.join('\n')}\n--${showRestParams ? `\n${restParams}` : ''}`;
+    } else if (query) {
+      return `${prefix}\n--\n${JSON.stringify(query, null, 2)}\n--${showRestParams ? `\n${restParams}` : ''}`;
     }
     return `${prefix}${showRestParams ? `\n${restParams}` : ''}`;
   };
