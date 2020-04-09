@@ -16,6 +16,7 @@ class CubeSymbols {
     this.symbols = {};
     this.builtCubes = {};
     this.cubeDefinitions = {};
+    this.funcArgumentsValues = {};
     this.cubeList = [];
   }
 
@@ -113,13 +114,17 @@ class CubeSymbols {
 
   funcArguments(func) {
     const funcDefinition = func.toString();
-    const match = funcDefinition.match(FunctionRegex);
-    if (match && (match[1] || match[2] || match[3])) {
-      return (match[1] || match[2] || match[3]).split(',').map(s => s.trim());
-    } else if (match) {
-      return [];
+    if (!this.funcArgumentsValues[funcDefinition]) {
+      const match = funcDefinition.match(FunctionRegex);
+      if (match && (match[1] || match[2] || match[3])) {
+        this.funcArgumentsValues[funcDefinition] = (match[1] || match[2] || match[3]).split(',').map(s => s.trim());
+      } else if (match) {
+        this.funcArgumentsValues[funcDefinition] = [];
+      } else {
+        throw new Error(`Can't match args for: ${func.toString()}`);
+      }
     }
-    throw new Error(`Can't match args for: ${func.toString()}`);
+    return this.funcArgumentsValues[funcDefinition];
   }
 
   resolveSymbol(cubeName, name) {
@@ -141,37 +146,36 @@ class CubeSymbols {
 
   cubeReferenceProxy(cubeName) {
     const self = this;
-    return new Proxy({
-      cube() {
-        const { sqlResolveFn, cubeAliasFn, query } = self.resolveSymbolsCallContext || {};
-        let cube = self.symbols[cubeName];
-        // first phase of compilation
-        if (!cube) {
-          return { toString() { return cubeName; } };
-        }
-        const originalCube = cube;
-        cube = R.pipe(
-          R.reject(v => v instanceof Function),
-          R.toPairs,
-          R.map(([n, symbol]) => [n, Object.assign({}, symbol, { toString: () => sqlResolveFn(symbol, cubeName, n) })]),
-          R.fromPairs
-        )(cube);
-        // eslint-disable-next-line no-underscore-dangle
-        cube._objectWithResolvedProperties = true;
-        cube.toString = () => cubeAliasFn && cubeAliasFn(originalCube.cubeName()) || originalCube.cubeName();
-        cube.sql = () => query.cubeSql(originalCube.cubeName());
-        return cube;
-      }
-    }, {
+    return new Proxy({}, {
       get: (v, propertyName) => {
         if (propertyName === '__cubeName') {
           return cubeName;
         }
-        const cube = v.cube();
-        if (typeof propertyName === 'string' && !cube[propertyName]) {
+        const cube = self.symbols[cubeName];
+        // first phase of compilation
+        if (!cube) {
+          if (propertyName === 'toString') {
+            return cubeName;
+          }
+          return undefined;
+        }
+        const { sqlResolveFn, cubeAliasFn, query } = self.resolveSymbolsCallContext || {};
+        if (propertyName === 'toString') {
+          return () => cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
+        }
+        if (propertyName === 'sql') {
+          return () => query.cubeSql(cube.cubeName());
+        }
+        if (propertyName === '_objectWithResolvedProperties') {
+          return true;
+        }
+        if (cube[propertyName]) {
+          return { toString: () => sqlResolveFn(cube[propertyName], cubeName, propertyName) };
+        }
+        if (typeof propertyName === 'string') {
           throw new UserError(`${cubeName}.${propertyName} cannot be resolved`);
         }
-        return cube[propertyName];
+        return undefined;
       }
     });
   }

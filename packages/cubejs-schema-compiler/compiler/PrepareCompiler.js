@@ -12,6 +12,7 @@ const Funnels = require('../extensions/Funnels');
 const RefreshKeys = require('../extensions/RefreshKeys');
 const Reflection = require('../extensions/Reflection');
 const CubeToMetaTransformer = require('./CubeToMetaTransformer');
+const CompilerCache = require('./CompilerCache');
 
 exports.compile = (repo, options) => {
   const compilers = exports.prepareCompiler(repo, options);
@@ -29,6 +30,8 @@ exports.prepareCompiler = (repo, options) => {
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
   const dashboardTemplateEvaluator = new DashboardTemplateEvaluator(cubeEvaluator);
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
+  const { maxQueryCacheSize, maxQueryCacheAge } = options;
+  const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const compiler = new DataSchemaCompiler(repo, Object.assign({}, {
     cubeNameCompilers: [cubeDictionary],
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
@@ -37,6 +40,7 @@ exports.prepareCompiler = (repo, options) => {
     contextCompilers: [contextEvaluator],
     dashboardTemplateCompilers: [dashboardTemplateEvaluator],
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
+    compilerCache,
     extensions: {
       Funnels,
       RefreshKeys,
@@ -51,6 +55,7 @@ exports.prepareCompiler = (repo, options) => {
     contextEvaluator,
     dashboardTemplateEvaluator,
     joinGraph,
+    compilerCache,
     headCommitId: options.headCommitId
   };
 };

@@ -99,11 +99,17 @@ class BaseTimeDimension extends BaseFilter {
   }
 
   dateFromFormatted() {
-    return this.formatFromDate(this.dateRange[0]);
+    if (!this.dateFromFormattedValue) {
+      this.dateFromFormattedValue = this.formatFromDate(this.dateRange[0]);
+    }
+    return this.dateFromFormattedValue;
   }
 
   dateFrom() {
-    return this.inDbTimeZoneDateFrom(this.dateRange[0]);
+    if (!this.dateFromValue) {
+      this.dateFromValue = this.inDbTimeZoneDateFrom(this.dateRange[0]);
+    }
+    return this.dateFromValue;
   }
 
   dateFromParam() {
@@ -113,11 +119,17 @@ class BaseTimeDimension extends BaseFilter {
   }
 
   dateToFormatted() {
-    return this.formatToDate(this.dateRange[1]);
+    if (!this.dateToFormattedValue) {
+      this.dateToFormattedValue = this.formatToDate(this.dateRange[1]);
+    }
+    return this.dateToFormattedValue;
   }
 
   dateTo() {
-    return this.inDbTimeZoneDateTo(this.dateRange[1]);
+    if (!this.dateToValue) {
+      this.dateToValue = this.inDbTimeZoneDateTo(this.dateRange[1]);
+    }
+    return this.dateToValue;
   }
 
   dateToParam() {

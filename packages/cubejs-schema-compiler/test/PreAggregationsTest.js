@@ -725,7 +725,7 @@ describe('PreAggregations', function test() {
       const queryAndParams = query.buildSqlAndParams();
       console.log(queryAndParams);
       const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-      console.log(preAggregationsDescription);
+      console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
       const queries = tempTablePreAggregations(preAggregationsDescription);
 
@@ -888,6 +888,73 @@ describe('PreAggregations', function test() {
             { "visitors__source": "some", "visitors__checkins_total": "5" },
             { "visitors__source": "google", "visitors__checkins_total": "1" },
             { "visitors__source": null, "visitors__checkins_total": "0" }
+          ]
+        );
+      });
+    });
+  });
+
+  it('partitioned huge span', () => {
+    return compiler.compile().then(() => {
+      let queryAndParams;
+      let preAggregationsDescription;
+
+      for (let i = 0; i < 10; i++) {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: [
+            'visitors.checkinsTotal'
+          ],
+          dimensions: [
+            'visitors.source'
+          ],
+          timezone: 'UTC',
+          preAggregationsSchema: '',
+          timeDimensions: [{
+            dimension: 'visitors.createdAt',
+            granularity: 'day',
+            dateRange: ['2000-12-30', '2017-01-06']
+          }],
+          order: [{
+            id: 'visitors.createdAt'
+          }],
+        });
+        queryAndParams = query.buildSqlAndParams();
+        preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      }
+
+      console.log(queryAndParams);
+      console.log(preAggregationsDescription);
+
+      const queries = tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.testQueries(
+        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1142))
+      ).then(res => {
+        console.log(JSON.stringify(res));
+        res.should.be.deepEqual(
+          [
+            {
+              "visitors__source": null,
+              "visitors__created_at_day": "2016-09-07T00:00:00.000Z",
+              "visitors__checkins_total": "0"
+            },
+            {
+              "visitors__source": "some",
+              "visitors__created_at_day": "2017-01-03T00:00:00.000Z",
+              "visitors__checkins_total": "3"
+            },
+            {
+              "visitors__source": "some",
+              "visitors__created_at_day": "2017-01-05T00:00:00.000Z",
+              "visitors__checkins_total": "2"
+            },
+            {
+              "visitors__source": "google",
+              "visitors__created_at_day": "2017-01-06T00:00:00.000Z",
+              "visitors__checkins_total": "1"
+            }
           ]
         );
       });

@@ -172,9 +172,10 @@ class PreAggregations {
     const sortedDimensions = this.squashDimensions(query);
     const measures = (query.measures.concat(query.measureFilters));
     const measurePaths = R.uniq(measures.map(m => m.measure));
+    const collectLeafMeasures = query.collectLeafMeasures.bind(query);
     const leafMeasurePaths =
       R.pipe(
-        R.map(m => query.collectLeafMeasures(() => query.traverseSymbol(m))),
+        R.map(m => query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures')),
         R.unnest,
         R.uniq
       )(measures);
@@ -400,8 +401,9 @@ class PreAggregations {
 
   static hasCumulativeMeasures(query) {
     const measures = (query.measures.concat(query.measureFilters));
+    const collectLeafMeasures = query.collectLeafMeasures.bind(query);
     return R.pipe(
-      R.map(m => query.collectLeafMeasures(() => query.traverseSymbol(m))),
+      R.map(m => query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures')),
       R.unnest,
       R.uniq,
       R.map(p => query.newMeasure(p)),
@@ -424,7 +426,6 @@ class PreAggregations {
       rowLimit: null,
       timeDimensions: aggregation.partitionTimeDimensions,
       preAggregationQuery: true,
-      collectOriginalSqlPreAggregations: this.query.safeEvaluateSymbolContext().collectOriginalSqlPreAggregations
     });
   }
 
@@ -437,7 +438,6 @@ class PreAggregations {
       timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
       preAggregationQuery: true,
       useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-      collectOriginalSqlPreAggregations: this.query.safeEvaluateSymbolContext().collectOriginalSqlPreAggregations
     });
   }
 
@@ -450,7 +450,6 @@ class PreAggregations {
         this.mergePartitionTimeDimensions(aggregation, aggregation.partitionTimeDimensions),
       preAggregationQuery: true,
       useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-      collectOriginalSqlPreAggregations: this.query.safeEvaluateSymbolContext().collectOriginalSqlPreAggregations
     });
   }
 

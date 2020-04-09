@@ -9,6 +9,7 @@ class JoinGraph {
     this.cubeEvaluator = cubeEvaluator;
     this.nodes = {};
     this.edges = {};
+    this.builtJoins = {};
   }
 
   compile(cubes, errorReporter) {
@@ -95,22 +96,26 @@ class JoinGraph {
     if (!cubesToJoin.length) {
       return null;
     }
-    const join = R.pipe(
-      R.map(
-        cube => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
-      ),
-      R.filter(R.identity),
-      R.sortBy(joinTree => joinTree.joins.length)
-    )(cubesToJoin)[0];
-    if (!join) {
-      throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+    const key = JSON.stringify(cubesToJoin);
+    if (!this.builtJoins[key]) {
+      const join = R.pipe(
+        R.map(
+          cube => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
+        ),
+        R.filter(R.identity),
+        R.sortBy(joinTree => joinTree.joins.length)
+      )(cubesToJoin)[0];
+      if (!join) {
+        throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+      }
+      this.builtJoins[key] = Object.assign(join, {
+        multiplicationFactor: R.compose(
+          R.fromPairs,
+          R.map(v => [v, this.findMultiplicationFactorFor(v, join.joins)])
+        )(cubesToJoin)
+      });
     }
-    return Object.assign(join, {
-      multiplicationFactor: R.compose(
-        R.fromPairs,
-        R.map(v => [v, this.findMultiplicationFactorFor(v, join.joins)])
-      )(cubesToJoin)
-    });
+    return this.builtJoins[key];
   }
 
   buildJoinTreeForRoot(root, cubesToJoin) {

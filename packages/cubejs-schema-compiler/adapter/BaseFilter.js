@@ -8,6 +8,8 @@ const {
 const BaseDimension = require('./BaseDimension');
 
 const DATE_OPERATORS = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'];
+const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
+const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 class BaseFilter extends BaseDimension {
   constructor(query, filter) {
@@ -219,7 +221,13 @@ class BaseFilter extends BaseDimension {
   }
 
   formatFromDate(date) {
-    if (!date || date.match(/^\d\d\d\d-\d\d-\d\d$/)) {
+    if (date && date.match(dateTimeLocalMsRegex)) {
+      return date;
+    }
+    if (date && date.match(dateRegex)) {
+      return `${date}T00:00:00.000`;
+    }
+    if (!date) {
       return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 00:00:00');
     }
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
@@ -230,7 +238,13 @@ class BaseFilter extends BaseDimension {
   }
 
   formatToDate(date) {
-    if (!date || date.match(/^\d\d\d\d-\d\d-\d\d$/)) {
+    if (date && date.match(dateTimeLocalMsRegex)) {
+      return date;
+    }
+    if (date && date.match(dateRegex)) {
+      return `${date}T23:59:59.999`;
+    }
+    if (!date) {
       return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 23:59:59');
     }
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);

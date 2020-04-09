@@ -63,6 +63,7 @@ class DataSchemaCompiler {
     this.omitErrors = options.omitErrors;
     this.allowNodeRequire = options.allowNodeRequire;
     this.compileContext = options.compileContext;
+    this.compilerCache = options.compilerCache;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -81,29 +82,32 @@ class DataSchemaCompiler {
 
   compile() {
     const self = this;
-    return this.repository.dataSchemaFiles().then((files) => {
-      const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
+    if (!this.compilePromise) {
+      this.compilePromise = this.repository.dataSchemaFiles().then((files) => {
+        const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
 
-      const errorsReport = new ErrorReporter();
-      this.errorsReport = errorsReport;
-      // TODO: required in order to get pre transpile compilation work
-      const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
+        const errorsReport = new ErrorReporter();
+        this.errorsReport = errorsReport;
+        // TODO: required in order to get pre transpile compilation work
+        const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
 
-      const compilePhase = (compilers) => self.compileCubeFiles(compilers, transpile(), errorsReport);
+        const compilePhase = (compilers) => self.compileCubeFiles(compilers, transpile(), errorsReport);
 
-      return compilePhase({ cubeCompilers: this.cubeNameCompilers })
-        .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
-        .then(() => compilePhase({
-          cubeCompilers: this.cubeCompilers,
-          contextCompilers: this.contextCompilers,
-          dashboardTemplateCompilers: this.dashboardTemplateCompilers
-        }));
-    }).then((res) => {
-      if (!this.omitErrors) {
-        this.throwIfAnyErrors();
-      }
-      return res;
-    });
+        return compilePhase({ cubeCompilers: this.cubeNameCompilers })
+          .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
+          .then(() => compilePhase({
+            cubeCompilers: this.cubeCompilers,
+            contextCompilers: this.contextCompilers,
+            dashboardTemplateCompilers: this.dashboardTemplateCompilers
+          }));
+      }).then((res) => {
+        if (!this.omitErrors) {
+          this.throwIfAnyErrors();
+        }
+        return res;
+      });
+    }
+    return this.compilePromise;
   }
 
   transpileFile(file, errorsReport) {

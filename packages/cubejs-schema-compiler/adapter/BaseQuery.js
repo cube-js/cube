@@ -50,6 +50,27 @@ class BaseQuery {
   initFromOptions() {
     this.contextSymbols = Object.assign({ userContext: {} }, this.options.contextSymbols || {});
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
+    this.compilerCache = this.compilers.compiler.compilerCache;
+    this.queryCache = this.compilerCache.getQueryCache({
+      measures: this.options.measures,
+      dimensions: this.options.dimensions,
+      timeDimensions: this.options.timeDimensions,
+      filters: this.options.filters,
+      segments: this.options.segments,
+      order: this.options.order,
+      contextSymbols: this.options.contextSymbols,
+      timezone: this.options.timezone,
+      limit: this.options.limit,
+      rowLimit: this.options.rowLimit,
+      preAggregationsSchema: this.options.preAggregationsSchema,
+      className: this.constructor.name,
+      externalClassName: this.options.externalQueryClass && this.options.externalQueryClass.name,
+      preAggregationQuery: this.options.preAggregationQuery,
+      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
+      cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
+      historyQueries: this.options.historyQueries, // TODO too heavy for key
+      ungrouped: this.options.ungrouped
+    });
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
     this.offset = this.options.offset;
@@ -100,6 +121,42 @@ class BaseQuery {
 
     this.externalQueryClass = this.options.externalQueryClass;
     this.initUngrouped();
+  }
+
+  cacheValue(key, fn, { contextPropNames, inputProps, cache }) {
+    const currentContext = this.safeEvaluateSymbolContext();
+    if (contextPropNames) {
+      const contextKey = {};
+      for (let i = 0; i < contextPropNames.length; i++) {
+        contextKey[contextPropNames[i]] = currentContext[contextPropNames[i]];
+      }
+      key = key.concat([JSON.stringify(contextKey)]);
+    }
+    const { value, resultProps } = (cache || this.compilerCache).cache(
+      key,
+      () => {
+        if (inputProps) {
+          return {
+            value: this.evaluateSymbolSqlWithContext(fn, inputProps),
+            resultProps: inputProps
+          };
+        }
+        return { value: fn() };
+      }
+    );
+    if (resultProps) {
+      Object.keys(resultProps).forEach(k => {
+        if (Array.isArray(currentContext[k])) {
+          // eslint-disable-next-line prefer-spread
+          currentContext[k].push.apply(currentContext[k], resultProps[k]);
+        } else if (currentContext[k]) {
+          Object.keys(currentContext[k]).forEach(innerKey => {
+            currentContext[k][innerKey] = resultProps[k][innerKey];
+          });
+        }
+      });
+    }
+    return value;
   }
 
   get allCubeNames() {
@@ -156,7 +213,11 @@ class BaseQuery {
     // eslint-disable-next-line no-underscore-dangle
     if (!this._subQueryDimensions) {
       // eslint-disable-next-line no-underscore-dangle
-      this._subQueryDimensions = this.collectFromMembers(false, this.collectSubQueryDimensionsFor.bind(this));
+      this._subQueryDimensions = this.collectFromMembers(
+        false,
+        this.collectSubQueryDimensionsFor.bind(this),
+        'collectSubQueryDimensionsFor'
+      );
     }
     // eslint-disable-next-line no-underscore-dangle
     return this._subQueryDimensions;
@@ -266,7 +327,11 @@ class BaseQuery {
     }
     return this.compilers.compiler.withQuery(
       this,
-      () => this.paramAllocator.buildSqlAndParams(this.buildParamAnnotatedSql())
+      () => this.cacheValue(
+        ['buildSqlAndParams'],
+        () => this.paramAllocator.buildSqlAndParams(this.buildParamAnnotatedSql()),
+        { cache: this.queryCache }
+      )
     );
   }
 
@@ -610,8 +675,13 @@ class BaseQuery {
   collectRootMeasureToHieararchy() {
     const notAddedMeasureFilters = this.measureFilters.filter(f => R.none(m => m.measure === f.measure, this.measures));
     return R.fromPairs(this.measures.concat(notAddedMeasureFilters).map(m => {
-      const collectedMeasures = this.collectMultipliedMeasures(() => this.traverseSymbol(m));
-      if (m.expressionName && collectedMeasures.length === 1 && !collectedMeasures[0]) {
+      const collectedMeasures = this.collectFrom(
+        [m],
+        this.collectMultipliedMeasures.bind(this),
+        'collectMultipliedMeasures',
+        this.queryCache
+      );
+      if (m.expressionName && !collectedMeasures.length) {
         throw new UserError(`Subquery dimension ${m.expressionName} should reference at least one measure`);
       }
       return [m.measure, collectedMeasures];
@@ -619,13 +689,18 @@ class BaseQuery {
   }
 
   query() {
-    return this.joinQuery(this.join, this.collectFromMembers(false, this.collectSubQueryDimensionsFor.bind(this)));
+    return this.joinQuery(this.join, this.collectFromMembers(
+      false,
+      this.collectSubQueryDimensionsFor.bind(this),
+      'collectSubQueryDimensionsFor'
+    ));
   }
 
   rewriteInlineCubeSql(cube, isLeftJoinCondition) {
     const sql = this.cubeSql(cube);
     const cubeAlias = this.cubeAlias(cube);
-    const parser = new SqlParser(sql);
+    // TODO params independent sql caching
+    const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
     if (
       this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
       parser.isSimpleAsteriskQuery()
@@ -657,14 +732,19 @@ class BaseQuery {
     const { prefix, subQuery, cubeName } = this.subQueryDescription(dimension);
     const primaryKey = this.newDimension(this.primaryKeyName(cubeName));
     const subQueryAlias = this.escapeColumnName(this.aliasName(prefix));
-    return `LEFT JOIN (${subQuery.buildParamAnnotatedSql()}) ${this.asSyntaxJoin} ${subQueryAlias}
+
+    const { collectOriginalSqlPreAggregations } = this.safeEvaluateSymbolContext();
+    const sql = subQuery.evaluateSymbolSqlWithContext(() => subQuery.buildParamAnnotatedSql(), {
+      collectOriginalSqlPreAggregations
+    });
+    return `LEFT JOIN (${sql}) ${this.asSyntaxJoin} ${subQueryAlias}
     ON ${subQueryAlias}.${primaryKey.aliasName()} = ${this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName)}`;
   }
 
   get filtersWithoutSubQueries() {
     if (!this.filtersWithoutSubQueriesValue) {
       this.filtersWithoutSubQueriesValue = this.allFilters.filter(
-        f => this.collectFrom([f], this.collectSubQueryDimensionsFor.bind(this)).length === 0
+        f => this.collectFrom([f], this.collectSubQueryDimensionsFor.bind(this), 'collectSubQueryDimensionsFor').length === 0
       );
     }
     return this.filtersWithoutSubQueriesValue;
@@ -726,7 +806,8 @@ class BaseQuery {
       this.join,
       this.collectFrom(
         this.dimensionsForSelect().concat(measures).concat(this.allFilters),
-        this.collectSubQueryDimensionsFor.bind(this)
+        this.collectSubQueryDimensionsFor.bind(this),
+        'collectSubQueryDimensionsFor'
       )
     ), inlineWhereConditions);
     return `SELECT ${this.selectAllDimensionsAndMeasures(measures)} FROM ${
@@ -743,10 +824,14 @@ class BaseQuery {
     let keyCubeSql;
     let keyCubeAlias;
     let keyCubeInlineLeftJoinConditions;
-    const measureSubQueryDimensions = this.collectFrom(measures, this.collectSubQueryDimensionsFor.bind(this));
+    const measureSubQueryDimensions = this.collectFrom(
+      measures,
+      this.collectSubQueryDimensionsFor.bind(this),
+      'collectSubQueryDimensionsFor'
+    );
 
     if (shouldBuildJoinForMeasureSelect) {
-      const cubes = this.collectCubeNamesFor(() => measures.map(m => this.traverseSymbol(m)));
+      const cubes = this.collectFrom(measures, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
       const measuresJoin = this.joinGraph.buildJoin(cubes);
       if (measuresJoin.multiplicationFactor[keyCubeName]) {
         throw new UserError(
@@ -783,10 +868,9 @@ class BaseQuery {
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
     return measures.map(measure => {
-      const cubeNames = this.collectCubeNamesFor(() => this.traverseSymbol(measure));
+      const cubeNames = this.collectFrom([measure], this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
       if (R.any(cubeName => keyCubeName !== cubeName, cubeNames)) {
-        const cubes = this.collectCubeNamesFor(() => this.traverseSymbol(measure));
-        const measuresJoin = this.joinGraph.buildJoin(cubes);
+        const measuresJoin = this.joinGraph.buildJoin(cubeNames);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
           throw new UserError(
             `'${measure.measure}' references cubes that lead to row multiplication. Please rewrite it using sub query.`
@@ -829,7 +913,11 @@ class BaseQuery {
     const inlineWhereConditions = [];
     const query = this.rewriteInlineWhere(() => this.joinQuery(
       this.join,
-      this.collectFrom(this.keyDimensions(primaryKeyDimension), this.collectSubQueryDimensionsFor.bind(this))
+      this.collectFrom(
+        this.keyDimensions(primaryKeyDimension),
+        this.collectSubQueryDimensionsFor.bind(this),
+        'collectSubQueryDimensionsFor'
+      )
     ), inlineWhereConditions);
     return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
       query
@@ -859,8 +947,8 @@ class BaseQuery {
       (!this.options.preAggregationQuery || this.options.useOriginalSqlPreAggregationsInPreAggregation) &&
       !this.safeEvaluateSymbolContext().preAggregationQuery
     ) {
-      if (this.options.collectOriginalSqlPreAggregations) {
-        this.options.collectOriginalSqlPreAggregations.push(foundPreAggregation);
+      if (this.safeEvaluateSymbolContext().collectOriginalSqlPreAggregations) {
+        this.safeEvaluateSymbolContext().collectOriginalSqlPreAggregations.push(foundPreAggregation);
       }
       return this.preAggregations.originalSqlPreAggregationTable(foundPreAggregation);
     }
@@ -879,22 +967,33 @@ class BaseQuery {
   }
 
   collectCubeNames(excludeTimeDimensions) {
-    return this.collectFromMembers(excludeTimeDimensions, this.collectCubeNamesFor.bind(this));
+    return this.collectFromMembers(
+      excludeTimeDimensions,
+      this.collectCubeNamesFor.bind(this),
+      'collectCubeNamesFor'
+    );
   }
 
-  collectFromMembers(excludeTimeDimensions, fn) {
+  collectFromMembers(excludeTimeDimensions, fn, methodName) {
     const membersToCollectFrom = this.measures
       .concat(this.dimensions)
       .concat(this.segments)
       .concat(this.filters)
       .concat(this.measureFilters)
       .concat(excludeTimeDimensions ? [] : this.timeDimensions);
-    return this.collectFrom(membersToCollectFrom, fn);
+    return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
-  collectFrom(membersToCollectFrom, fn) {
+  collectFrom(membersToCollectFrom, fn, methodName, cache) {
     return R.pipe(
-      R.map(s => fn(() => this.traverseSymbol(s))),
+      R.map(s => (
+        (cache || this.compilerCache).cache(
+          ['collectFrom', methodName].concat(
+            s.path() ? [s.path().join('.')] : [s.cube().name, s.expressionName || s.definition().sql]
+          ),
+          () => fn(() => this.traverseSymbol(s))
+        )
+      )),
       R.unnest,
       R.uniq,
       R.filter(R.identity)
@@ -1193,19 +1292,22 @@ class BaseQuery {
   }
 
   collectMultipliedMeasures(fn) {
-    const context = { compositeCubeMeasures: {} };
+    const foundCompositeCubeMeasures = {};
     this.evaluateSymbolSqlWithContext(
       fn,
-      context
+      { compositeCubeMeasures: foundCompositeCubeMeasures }
     );
-    const foundCompositeCubeMeasures = context.compositeCubeMeasures;
 
-    const renderContext = { measuresToRender: [], foundCompositeCubeMeasures, compositeCubeMeasures: {} };
+    const renderContext = {
+      measuresToRender: [], foundCompositeCubeMeasures, compositeCubeMeasures: {}, rootMeasure: {}
+    };
     this.evaluateSymbolSqlWithContext(
       fn,
       renderContext
     );
-    return renderContext.measuresToRender.length ? R.uniq(renderContext.measuresToRender) : [renderContext.rootMeasure];
+    return renderContext.measuresToRender.length ?
+      R.uniq(renderContext.measuresToRender) :
+      [renderContext.rootMeasure.value];
   }
 
   collectLeafMeasures(fn) {
@@ -1251,7 +1353,7 @@ class BaseQuery {
       this.safeEvaluateSymbolContext().measuresToRender.push({ multiplied: resultMultiplied, measure: measurePath });
     }
     if (this.safeEvaluateSymbolContext().foundCompositeCubeMeasures && !parentMeasure) {
-      this.safeEvaluateSymbolContext().rootMeasure = { multiplied: resultMultiplied, measure: measurePath };
+      this.safeEvaluateSymbolContext().rootMeasure.value = { multiplied: resultMultiplied, measure: measurePath };
     }
     if (((this.evaluateSymbolContext || {}).renderedReference || {})[measurePath]) {
       return this.evaluateSymbolContext.renderedReference[measurePath];
@@ -1413,7 +1515,6 @@ class BaseQuery {
         timezone: this.timezone,
         preAggregationQuery: this.options.preAggregationQuery,
         useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
-        collectOriginalSqlPreAggregations: this.options.collectOriginalSqlPreAggregations,
         contextSymbols: this.contextSymbols,
         preAggregationsSchema: this.preAggregationsSchemaOption,
         cubeLatticeCache: this.options.cubeLatticeCache,
@@ -1461,7 +1562,7 @@ class BaseQuery {
         { preAggregationQuery: true }
       );
     };
-    const cubeNames = this.collectCubeNames();
+    const cubeNames = this.allCubeNames;
     const queries = cubeNames
       .map(cube => [cube, refreshKeyQueryByCube(cube)])
       .map(([cube, sql]) => (transformFn ? transformFn(sql, cube) : sql))
@@ -1482,7 +1583,8 @@ class BaseQuery {
   aggSelectForDimension(cube, dimension, aggFunction) {
     const cubeNamesForTimeDimension = this.collectFrom(
       [dimension],
-      this.collectCubeNamesFor.bind(this)
+      this.collectCubeNamesFor.bind(this),
+      'collectCubeNamesFor'
     );
     if (cubeNamesForTimeDimension.length === 1 && cubeNamesForTimeDimension[0] === cube) {
       const dimensionSql = this.dimensionSql(dimension);
@@ -1492,7 +1594,7 @@ class BaseQuery {
   }
 
   cubeCardinalityQueries() { // TODO collect sub queries
-    return R.fromPairs(this.collectCubeNames()
+    return R.fromPairs(this.allCubeNames
       .map(cube => [
         cube,
         this.paramAllocator.buildSqlAndParams(`select count(*) as ${this.escapeColumnName('total_count')} from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`)
@@ -1556,18 +1658,34 @@ class BaseQuery {
   }
 
   preAggregationSql(cube, preAggregation) {
-    if (preAggregation.type === 'autoRollup') {
-      return this.preAggregations.autoRollupPreAggregationQuery(cube, preAggregation).buildSqlAndParams();
-    } else if (preAggregation.type === 'rollup') {
-      return this.preAggregations.rollupPreAggregationQuery(cube, preAggregation).buildSqlAndParams();
-    } else if (preAggregation.type === 'originalSql') {
-      const originalSqlPreAggregationQuery = this.preAggregations.originalSqlPreAggregationQuery(cube, preAggregation);
-      return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
-        () => originalSqlPreAggregationQuery.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
-        { preAggregationQuery: true }
-      ));
-    }
-    throw new UserError(`Unknown pre-aggregation type '${preAggregation.type}' in '${cube}'`);
+    return this.cacheValue(
+      ['preAggregationSql', cube, JSON.stringify(preAggregation)],
+      () => {
+        const { collectOriginalSqlPreAggregations } = this.safeEvaluateSymbolContext();
+        if (preAggregation.type === 'autoRollup') {
+          const query = this.preAggregations.autoRollupPreAggregationQuery(cube, preAggregation);
+          return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
+            collectOriginalSqlPreAggregations
+          });
+        } else if (preAggregation.type === 'rollup') {
+          const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
+          return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
+            collectOriginalSqlPreAggregations
+          });
+        } else if (preAggregation.type === 'originalSql') {
+          const originalSqlPreAggregationQuery = this.preAggregations.originalSqlPreAggregationQuery(
+            cube,
+            preAggregation
+          );
+          return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
+            () => originalSqlPreAggregationQuery.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
+            { preAggregationQuery: true, collectOriginalSqlPreAggregations }
+          ));
+        }
+        throw new UserError(`Unknown pre-aggregation type '${preAggregation.type}' in '${cube}'`);
+      },
+      { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
+    );
   }
 
   // eslint-disable-next-line consistent-return
@@ -1623,63 +1741,69 @@ class BaseQuery {
   }
 
   preAggregationInvalidateKeyQueries(cube, preAggregation) {
-    const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-    if (preAggregation.refreshKey) {
-      if (preAggregation.refreshKey.sql) {
-        return {
-          queries: [this.paramAllocator.buildSqlAndParams(
-            preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
-          )],
-          refreshKeyRenewalThresholds: [this.defaultRefreshKeyRenewalThreshold()]
-        };
-      }
-      const interval = preAggregation.refreshKey.every || `1 hour`;
-      let refreshKey = this.everyRefreshKeySql(interval);
-      if (preAggregation.refreshKey.incremental) {
-        if (!preAggregation.partitionGranularity) {
-          throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations`);
-        }
-        refreshKey = this.incrementalRefreshKey(
-          preAggregationQueryForSql,
-          refreshKey,
-          { window: preAggregation.refreshKey.updateWindow }
-        );
-      }
-      if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
-        return {
-          queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`)],
-          refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(interval)]
-        };
-      }
-    }
-    if (
-      preAggregation.partitionGranularity &&
-      !preAggregationQueryForSql.collectCubeNames().find(c => {
-        const fromPath = this.cubeEvaluator.cubeFromPath(c);
-        return fromPath.refreshKey && fromPath.refreshKey.sql;
-      })
-    ) {
-      const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
-      return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
-        () => preAggregationQueryForSql.cacheKeyQueries(
-          (originalRefreshKey, refreshKeyCube) => {
-            if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
-              return `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`;
-            } else if (!cubeFromPath.refreshKey) {
-              // TODO handle WHERE while generating originalRefreshKey
-              return refreshKeyCube === preAggregationQueryForSql.timeDimensions[0].path()[0] ?
-                `${originalRefreshKey} WHERE ${preAggregationQueryForSql.timeDimensions[0].filterToWhere()}` :
-                originalRefreshKey;
-            }
-            return originalRefreshKey;
+    return this.cacheValue(
+      ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
+      () => {
+        const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+        if (preAggregation.refreshKey) {
+          if (preAggregation.refreshKey.sql) {
+            return {
+              queries: [this.paramAllocator.buildSqlAndParams(
+                preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
+              )],
+              refreshKeyRenewalThresholds: [this.defaultRefreshKeyRenewalThreshold()]
+            };
           }
-        ),
-        { preAggregationQuery: true }
-      );
-    }
-    return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
-      () => preAggregationQueryForSql.cacheKeyQueries(),
-      { preAggregationQuery: true }
+          const interval = preAggregation.refreshKey.every || `1 hour`;
+          let refreshKey = this.everyRefreshKeySql(interval);
+          if (preAggregation.refreshKey.incremental) {
+            if (!preAggregation.partitionGranularity) {
+              throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations`);
+            }
+            refreshKey = this.incrementalRefreshKey(
+              preAggregationQueryForSql,
+              refreshKey,
+              { window: preAggregation.refreshKey.updateWindow }
+            );
+          }
+          if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
+            return {
+              queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`)],
+              refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(interval)]
+            };
+          }
+        }
+        if (
+          preAggregation.partitionGranularity &&
+          !preAggregationQueryForSql.allCubeNames.find(c => {
+            const fromPath = this.cubeEvaluator.cubeFromPath(c);
+            return fromPath.refreshKey && fromPath.refreshKey.sql;
+          })
+        ) {
+          const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
+          return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
+            () => preAggregationQueryForSql.cacheKeyQueries(
+              (originalRefreshKey, refreshKeyCube) => {
+                if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
+                  return `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`;
+                } else if (!cubeFromPath.refreshKey) {
+                  // TODO handle WHERE while generating originalRefreshKey
+                  return refreshKeyCube === preAggregationQueryForSql.timeDimensions[0].path()[0] ?
+                    `${originalRefreshKey} WHERE ${preAggregationQueryForSql.timeDimensions[0].filterToWhere()}` :
+                    originalRefreshKey;
+                }
+                return originalRefreshKey;
+              }
+            ),
+            { preAggregationQuery: true }
+          );
+        }
+        return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
+          () => preAggregationQueryForSql.cacheKeyQueries(),
+          { preAggregationQuery: true }
+        );
+      },
+      { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
     );
   }
 
@@ -1698,15 +1822,18 @@ class BaseQuery {
   }
 
   parametrizedContextSymbols() {
-    return Object.assign({
-      filterParams: this.filtersProxy(),
-      sqlUtils: {
-        convertTz: this.convertTz.bind(this)
-      }
-    }, R.map(
-      (symbols) => this.contextSymbolsProxy(symbols),
-      this.contextSymbols
-    ));
+    if (!this.parametrizedContextSymbolsValue) {
+      this.parametrizedContextSymbolsValue = Object.assign({
+        filterParams: this.filtersProxy(),
+        sqlUtils: {
+          convertTz: this.convertTz.bind(this)
+        }
+      }, R.map(
+        (symbols) => this.contextSymbolsProxy(symbols),
+        this.contextSymbols
+      ));
+    }
+    return this.parametrizedContextSymbolsValue;
   }
 
   contextSymbolsProxy(symbols) {
@@ -1757,16 +1884,15 @@ class BaseQuery {
               allFilters.find(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
+                const filterParams = filter && filter.filterParams();
                 if (
-                  filter &&
-                  filter.filterParams() &&
-                  filter.filterParams().length
+                  filterParams && filterParams.length
                 ) {
                   if (typeof column === "function") {
                     // eslint-disable-next-line prefer-spread
                     return column.apply(
                       null,
-                      filter.filterParams().map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
+                      filterParams.map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
                     );
                   } else {
                     return filter.conditionSql(column);
