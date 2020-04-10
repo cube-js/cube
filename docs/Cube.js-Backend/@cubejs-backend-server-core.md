@@ -44,6 +44,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) `create` method and [Cubejs
   externalDbType: String | (context: RequestContext) => String,
   schemaPath: String,
   basePath: String,
+  webSocketsBasePath: String,
   devServer: Boolean,
   logger: (msg: String, params: Object) => any,
   driverFactory: (context: DriverContext) => BaseDriver,
@@ -127,6 +128,10 @@ Path to schema files. The default value is `/schema`.
 ### basePath
 
 [REST API](/rest-api) base path. The default value is `/cubejs-api`.
+
+### webSocketsBasePath
+
+base path for the websockets server. By default the websocket server will run on the root path.
 
 ### devServer
 

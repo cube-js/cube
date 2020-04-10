@@ -7,10 +7,11 @@ class WebSocketServer {
     options = options || {};
     this.serverCore = serverCore;
     this.processSubscriptionsInterval = options.processSubscriptionsInterval || 5;
+    this.webSocketsBasePath = options.webSocketsBasePath || '';
   }
 
   initServer(server) {
-    this.wsServer = new WebSocket.Server({ server });
+    this.wsServer = new WebSocket.Server({ server, path: this.webSocketsBasePath });
 
     const connectionIdToSocket = {};
 
