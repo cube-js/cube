@@ -53,6 +53,9 @@ class CompilerApi {
     const dbType = this.getDbType('default');
     const compilers = await this.getCompilers({ requestId: query.requestId });
     let sqlGenerator = this.createQuery(compilers, dbType, query);
+    if (!sqlGenerator) {
+      throw new Error(`Unknown dbType: ${dbType}`);
+    }
 
     const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
 
