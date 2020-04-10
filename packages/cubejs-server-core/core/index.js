@@ -377,10 +377,10 @@ class CubejsServerCore {
     return this.apiGatewayInstance;
   }
 
-  getCompilerApi(context) {
+  async getCompilerApi(context) {
     const appId = this.contextToAppId(context);
     let compilerApi = this.compilerCache.get(appId);
-    const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
+    const currentSchemaVersion = this.options.schemaVersion && (async () => this.options.schemaVersion(context));
     if (!compilerApi) {
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
