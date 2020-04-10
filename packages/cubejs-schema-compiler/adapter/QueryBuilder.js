@@ -11,7 +11,7 @@ const clickhouse = require('./ClickHouseQuery');
 const hive = require('./HiveQuery');
 const oracle = require('./OracleQuery');
 const sqlite = require('./SqliteQuery');
-const odelasticsearch = require('./OpenDistroElasticSearchQuery');
+const awselasticsearch = require('./AWSElasticSearchQuery');
 const elasticsearch = require('./ElasticSearchQuery');
 
 const ADAPTERS = {
@@ -30,7 +30,7 @@ const ADAPTERS = {
   hive,
   oracle,
   sqlite,
-  odelasticsearch,
+  awselasticsearch,
   elasticsearch
 };
 exports.query = (compilers, dbType, queryOptions) => {
