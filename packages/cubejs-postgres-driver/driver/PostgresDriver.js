@@ -1,6 +1,5 @@
 const pg = require('pg');
 const { types } = require('pg');
-const fs = require('fs');
 const moment = require('moment');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 
@@ -39,7 +38,6 @@ class PostgresDriver extends BaseDriver {
       process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
       sslOptions.find(o => !!process.env[o.value])
     ) {
-  
       ssl = sslOptions.reduce(
         (agg, { name, value }) => ({
           ...agg,
@@ -47,12 +45,6 @@ class PostgresDriver extends BaseDriver {
         }),
         {}
       );
-      if(ssl.ca){
-        ssl.ca = fs
-        .readFileSync(process.env.CUBEJS_DB_SSL_CA)
-        .toString()
-      }
-
       if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
         ssl.rejectUnauthorized =
           process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
