@@ -24,6 +24,33 @@ class PostgresDriver extends BaseDriver {
   constructor(config) {
     super();
     this.config = config || {};
+    let ssl;
+
+    const sslOptions = [
+      { name: 'ca', value: 'CUBEJS_DB_SSL_CA' },
+      { name: 'cert', value: 'CUBEJS_DB_SSL_CERT' },
+      { name: 'ciphers', value: 'CUBEJS_DB_SSL_CIPHERS' },
+      { name: 'passphrase', value: 'CUBEJS_DB_SSL_PASSPHRASE' },
+    ];
+
+    if (
+      process.env.CUBEJS_DB_SSL ||
+      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
+      sslOptions.find(o => !!process.env[o.value])
+    ) {
+      ssl = sslOptions.reduce(
+        (agg, { name, value }) => ({
+          ...agg,
+          ...(process.env[value] ? { [name]: process.env[value] } : {}),
+        }),
+        {}
+      );
+      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
+        ssl.rejectUnauthorized =
+          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
+      }
+    }
+
     this.pool = new Pool({
       max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
       idleTimeoutMillis: 30000,
@@ -32,7 +59,7 @@ class PostgresDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ssl: (process.env.CUBEJS_DB_SSL || 'false').toLowerCase() === 'true' ? { rejectUnauthorized: true } : undefined,
+      ssl,
       ...config
     });
     this.pool.on('error', (err) => {
