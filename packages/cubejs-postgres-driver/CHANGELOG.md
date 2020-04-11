@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.1](https://github.com/cube-js/cube.js/compare/v0.19.0...v0.19.1) (2020-04-11)
+
+
+### Features
+
+* **postgres-driver:** Allow usage of CUBEJS_DB_SSL_CA parameter in postgres Driver. ([#582](https://github.com/cube-js/cube.js/issues/582)) Thanks to [@gauravlanjekar](https://github.com/gauravlanjekar)! ([158bd10](https://github.com/cube-js/cube.js/commit/158bd10))
+
+
+
+
+
 # [0.19.0](https://github.com/cube-js/cube.js/compare/v0.18.32...v0.19.0) (2020-04-09)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
