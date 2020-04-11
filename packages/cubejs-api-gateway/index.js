@@ -382,6 +382,9 @@ class ApiGateway {
       });
       const loadRequestSQLStarted = new Date();
       const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
+      if (!normalizedQuery) {
+        throw new Error(`queryTransformer returned null query. Please check your queryTransformer implementation`);
+      }
       const [compilerSqlResult, metaConfigResult] = await Promise.all([
         this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context)),
         this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
