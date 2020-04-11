@@ -462,7 +462,7 @@ class CubejsServerCore {
 
   async runScheduledRefresh(context, queryingOptions) {
     const scheduler = new RefreshScheduler(this);
-    await scheduler.runScheduledRefresh(context, queryingOptions);
+    return scheduler.runScheduledRefresh(context, queryingOptions);
   }
 
   async getDriver() {

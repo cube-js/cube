@@ -79,6 +79,7 @@ class RefreshScheduler {
 
   async runScheduledRefresh(context, queryingOptions) {
     queryingOptions = { timezone: 'UTC', ...queryingOptions };
+    const { throwErrors, ...restOptions } = queryingOptions;
     context = { requestId: `scheduler-${uuid()}`, ...context };
     this.serverCore.logger('Refresh Scheduler Run', {
       authInfo: context.authInfo,
@@ -87,9 +88,12 @@ class RefreshScheduler {
     try {
       const compilerApi = this.serverCore.getCompilerApi(context);
       await Promise.all([
-        this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
-        this.refreshPreAggregations(context, compilerApi, queryingOptions)
+        this.refreshCubesRefreshKey(context, compilerApi, restOptions),
+        this.refreshPreAggregations(context, compilerApi, restOptions)
       ]);
+      return {
+        finished: true
+      };
     } catch (e) {
       if (e.error !== 'Continue wait') {
         this.serverCore.logger('Refresh Scheduler Error', {
@@ -98,7 +102,11 @@ class RefreshScheduler {
           requestId: context.requestId
         });
       }
+      if (throwErrors) {
+        throw e;
+      }
     }
+    return { finished: false };
   }
 
   async refreshCubesRefreshKey(context, compilerApi, queryingOptions) {

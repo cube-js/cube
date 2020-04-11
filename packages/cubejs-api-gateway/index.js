@@ -325,8 +325,10 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       const refreshScheduler = this.refreshScheduler();
-      await refreshScheduler.runScheduledRefresh(context, this.parseQueryParam(queryingOptions || {}));
-      res({}); // TODO status
+      res(await refreshScheduler.runScheduledRefresh(context, {
+        ...this.parseQueryParam(queryingOptions || {}),
+        throwErrors: true
+      }));
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
