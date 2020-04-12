@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const R = require('ramda');
+const { cancelCombinator } = require('../driver/utils');
 const RedisCacheDriver = require('./RedisCacheDriver');
 const LocalCacheDriver = require('./LocalCacheDriver');
 
@@ -380,13 +381,13 @@ class PreAggregationLoader {
         refreshStrategy = readOnly ?
           this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
       }
-      const resultPromise = refreshStrategy.bind(this)(client, newVersionEntry);
-      resultPromise.cancel = () => {}; // TODO implement cancel (loading rollup into table and external upload)
-      return resultPromise;
+      return cancelCombinator(
+        saveCancelFn => refreshStrategy.bind(this)(client, newVersionEntry, saveCancelFn)
+      );
     };
   }
 
-  async refreshImplStoreInSourceStrategy(client, newVersionEntry) {
+  async refreshImplStoreInSourceStrategy(client, newVersionEntry, saveCancelFn) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     const targetTableName = this.targetTableName(newVersionEntry);
@@ -402,18 +403,18 @@ class PreAggregationLoader {
       targetTableName,
       requestId: this.requestId
     });
-    await client.loadPreAggregationIntoTable(
+    await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
       params
-    );
-    await this.createIndexes(client, newVersionEntry);
+    ));
+    await this.createIndexes(client, newVersionEntry, saveCancelFn);
     await this.loadCache.reset(this.preAggregation);
-    await this.dropOrphanedTables(client, targetTableName);
+    await this.dropOrphanedTables(client, targetTableName, saveCancelFn);
     await this.loadCache.reset(this.preAggregation);
   }
 
-  async refreshImplTempTableExternalStrategy(client, newVersionEntry) {
+  async refreshImplTempTableExternalStrategy(client, newVersionEntry, saveCancelFn) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
@@ -430,18 +431,18 @@ class PreAggregationLoader {
       targetTableName,
       requestId: this.requestId
     });
-    await client.loadPreAggregationIntoTable(
+    await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
       params
-    );
-    const tableData = await this.downloadTempExternalPreAggregation(client, newVersionEntry);
-    await this.uploadExternalPreAggregation(tableData, newVersionEntry);
+    ));
+    const tableData = await this.downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn);
+    await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
     await this.loadCache.reset(this.preAggregation);
-    await this.dropOrphanedTables(client, targetTableName);
+    await this.dropOrphanedTables(client, targetTableName, saveCancelFn);
   }
 
-  async refreshImplStreamExternalStrategy(client, newVersionEntry) {
+  async refreshImplStreamExternalStrategy(client, newVersionEntry, saveCancelFn) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
     if (!client.downloadQueryResults) {
@@ -452,12 +453,12 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    const tableData = await client.downloadQueryResults(sql, params);
-    await this.uploadExternalPreAggregation(tableData, newVersionEntry);
+    const tableData = await saveCancelFn(client.downloadQueryResults(sql, params));
+    await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
     await this.loadCache.reset(this.preAggregation);
   }
 
-  async downloadTempExternalPreAggregation(client, newVersionEntry) {
+  async downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn) {
     if (!client.downloadTable) {
       throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadTable()`);
     }
@@ -466,12 +467,12 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    const tableData = await client.downloadTable(table);
-    tableData.types = await client.tableColumnTypes(table);
+    const tableData = await saveCancelFn(client.downloadTable(table));
+    tableData.types = await saveCancelFn(client.tableColumnTypes(table));
     return tableData;
   }
 
-  async uploadExternalPreAggregation(tableData, newVersionEntry) {
+  async uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn) {
     const table = this.targetTableName(newVersionEntry);
     const externalDriver = await this.externalDriverFactory();
     if (!externalDriver.uploadTable) {
@@ -481,13 +482,13 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    await externalDriver.uploadTable(table, tableData.types, tableData);
-    await this.createIndexes(externalDriver, newVersionEntry);
+    await saveCancelFn(externalDriver.uploadTable(table, tableData.types, tableData));
+    await this.createIndexes(externalDriver, newVersionEntry, saveCancelFn);
     await this.loadCache.reset(this.preAggregation);
-    await this.dropOrphanedTables(externalDriver, table);
+    await this.dropOrphanedTables(externalDriver, table, saveCancelFn);
   }
 
-  async createIndexes(driver, newVersionEntry) {
+  async createIndexes(driver, newVersionEntry, saveCancelFn) {
     if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
       return;
     }
@@ -503,7 +504,7 @@ class PreAggregationLoader {
         requestId: this.requestId,
         sql
       });
-      await driver.query(
+      await saveCancelFn(driver.query(
         QueryCache.replacePreAggregationTableNames(
           query,
           this.preAggregationsTablesToTempTables.concat([
@@ -512,11 +513,11 @@ class PreAggregationLoader {
           ])
         ),
         params
-      );
+      ));
     }
   }
 
-  async dropOrphanedTables(client, justCreatedTable) {
+  async dropOrphanedTables(client, justCreatedTable, saveCancelFn) {
     await this.preAggregations.addTableUsed(justCreatedTable);
     const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
     const versionEntries = tablesToVersionEntries(this.preAggregation.preAggregationsSchema, actualTables);
@@ -536,7 +537,7 @@ class PreAggregationLoader {
       tablesToDrop: JSON.stringify(toDrop),
       requestId: this.requestId
     });
-    await Promise.all(toDrop.map(table => client.dropTable(table)));
+    await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
   }
 }
 

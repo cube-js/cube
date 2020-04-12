@@ -63,13 +63,12 @@ class MySqlDriver extends BaseDriver {
 
     let cancelled = false;
     const cancelObj = {};
-    const promise = connectionPromise.then(conn => {
+    const promise = connectionPromise.then(async conn => {
+      const [{ connectionId }] = await conn.execute('select connection_id() as connectionId');
       cancelObj.cancel = async () => {
         cancelled = true;
         await self.withConnection(async processConnection => {
-          const processRows = await processConnection.execute('SHOW PROCESSLIST');
-          await Promise.all(processRows.filter(row => row.Time >= 599)
-            .map(row => processConnection.execute(`KILL ${row.Id}`)));
+          await processConnection.execute(`KILL ${connectionId}`);
         });
       };
       return fn(conn)
@@ -128,10 +127,12 @@ class MySqlDriver extends BaseDriver {
     return GenericTypeToMySql[columnType] || super.fromGenericType(columnType);
   }
 
-  async loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx) {
+  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx) {
     if (this.config.loadPreAggregationWithoutMetaLock) {
-      await this.query(`${loadSql} LIMIT 0`, params);
-      return this.query(loadSql.replace(/^CREATE TABLE (\S+) AS/i, 'INSERT INTO $1'), params);
+      return this.cancelCombinator(async saveCancelFn => {
+        await saveCancelFn(this.query(`${loadSql} LIMIT 0`, params));
+        await saveCancelFn(this.query(loadSql.replace(/^CREATE TABLE (\S+) AS/i, 'INSERT INTO $1'), params));
+      });
     }
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }

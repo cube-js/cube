@@ -1,15 +1,23 @@
-/* globals describe, it, should, before */
+/* globals describe, beforeAll, afterAll, test, expect */
 const QueryOrchestrator = require('../orchestrator/QueryOrchestrator');
 
 class MockDriver {
   constructor() {
     this.tables = [];
     this.executedQueries = [];
+    this.cancelledQueries = [];
   }
 
-  async query(query) {
+  query(query) {
     this.executedQueries.push(query);
-    return [query];
+    let promise = Promise.resolve([query]);
+    if (query.match(`orders_too_big`)) {
+      promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 3000)));
+    }
+    promise.cancel = async () => {
+      this.cancelledQueries.push(query);
+    };
+    return promise;
   }
 
   async getTablesQuery(schema) {
@@ -21,19 +29,29 @@ class MockDriver {
     return null;
   }
 
-  async loadPreAggregationIntoTable(preAggregationTableName) {
+  loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
     this.tables.push(preAggregationTableName.substring(0, 100));
+    return this.query(loadSql);
   }
 
   async dropTable(tableName) {
     this.tables = this.tables.filter(t => t !== tableName.split('.')[1]);
+    return this.query(`DROP TABLE ${tableName}`);
   }
 }
 
 describe('QueryOrchestrator', () => {
   let mockDriver = null;
   const queryOrchestrator = new QueryOrchestrator(
-    'TEST', async () => mockDriver, (msg, params) => console.log(msg, params)
+    'TEST',
+    async () => mockDriver,
+    (msg, params) => console.log(msg, params), {
+      preAggregationsOptions: {
+        queueOptions: {
+          executionTimeout: 1
+        }
+      }
+    }
   );
 
   beforeAll(() => {
@@ -118,5 +136,30 @@ describe('QueryOrchestrator', () => {
       expect(e.message).toMatch(/Pre-aggregation table is not found/);
     }
     expect(thrown).toBe(true);
+  });
+
+  test('cancel pre-aggregation', async () => {
+    const query = {
+      query: "SELECT \"orders__created_at_week\" \"orders__created_at_week\", sum(\"orders__count\") \"orders__count\" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20181101) as partition_union  WHERE (\"orders__created_at_week\" >= ($1::timestamptz::timestamptz AT TIME ZONE 'UTC') AND \"orders__created_at_week\" <= ($2::timestamptz::timestamptz AT TIME ZONE 'UTC')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000",
+      values: ["2018-11-01T00:00:00Z", "2018-11-30T23:59:59Z"],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: "stb_pre_aggregations",
+        tableName: "stb_pre_aggregations.orders_number_and_count20181101",
+        loadSql: ["CREATE TABLE stb_pre_aggregations.orders_number_and_count20181101 AS SELECT\n      date_trunc('week', (\"orders\".created_at::timestamptz AT TIME ZONE 'UTC')) \"orders__created_at_week\", count(\"orders\".id) \"orders__count\", sum(\"orders\".number) \"orders__number\"\n    FROM\n      public.orders_too_big AS \"orders\"\n  WHERE (\"orders\".created_at >= $1::timestamptz AND \"orders\".created_at <= $2::timestamptz) GROUP BY 1", ["2018-11-01T00:00:00Z", "2018-11-30T23:59:59Z"]],
+        invalidateKeyQueries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]]
+      }],
+      renewQuery: true,
+      requestId: 'cancel pre-aggregation'
+    };
+    try {
+      await queryOrchestrator.fetchQuery(query);
+    } catch (e) {
+      expect(e.toString()).toMatch(/timeout/);
+    }
+    expect(mockDriver.cancelledQueries[0]).toMatch(/orders_too_big/);
   });
 });

@@ -274,13 +274,16 @@ class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            this.logger('Cancelling query due to timeout', {
-              processingId,
-              queryKey: query.queryKey,
-              queuePrefix: this.redisQueuePrefix,
-              requestId: query.requestId
-            });
-            await this.sendCancelMessageFn(query);
+            const queryWithCancelHandle = await redisClient.getQueryDef(queryKey);
+            if (queryWithCancelHandle) {
+              this.logger('Cancelling query due to timeout', {
+                processingId,
+                queryKey: queryWithCancelHandle.queryKey,
+                queuePrefix: this.redisQueuePrefix,
+                requestId: queryWithCancelHandle.requestId
+              });
+              await this.sendCancelMessageFn(queryWithCancelHandle);
+            }
           }
         }
 

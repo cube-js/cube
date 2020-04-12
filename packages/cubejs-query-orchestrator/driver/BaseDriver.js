@@ -1,4 +1,5 @@
 const { reduce } = require('ramda');
+const { cancelCombinator } = require('./utils');
 
 const sortByKeys = (unordered) => {
   const ordered = {};
@@ -168,6 +169,10 @@ class BaseDriver {
 
   quoteIdentifier(identifier) {
     return `"${identifier}"`;
+  }
+
+  cancelCombinator(fn) {
+    return cancelCombinator(fn);
   }
 }
 
