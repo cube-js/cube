@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.4](https://github.com/cube-js/cube.js/compare/v0.19.3...v0.19.4) (2020-04-12)
+
+
+### Bug Fixes
+
+* **serverless-aws:** cubejsProcess agent doesn't collect all events after process has been finished ([939e25a](https://github.com/cube-js/cube.js/commit/939e25a))
+
+
+
+
+
 ## [0.19.3](https://github.com/cube-js/cube.js/compare/v0.19.2...v0.19.3) (2020-04-12)
 
 
