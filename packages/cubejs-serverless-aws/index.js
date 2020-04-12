@@ -29,6 +29,7 @@ class AWSHandlers extends Handlers {
         const message = JSON.parse(record.Sns.Message);
         await this.processMessage(message);
       }));
+      await this.serverCore.flushAgent();
     } else {
       this.serverCore.logger('Invalid Lambda Process Message', {
         warning: `Event doesn't contain Records field. Skipping.`,

@@ -323,6 +323,7 @@ class CubejsServerCore {
   initAgent() {
     if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
       const oldLogger = this.logger;
+      this.preAgentLogger = oldLogger;
       this.logger = (msg, params) => {
         oldLogger(msg, params);
         agentCollect(
@@ -334,6 +335,16 @@ class CubejsServerCore {
           oldLogger
         );
       };
+    }
+  }
+
+  async flushAgent() {
+    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+      await agentCollect(
+        { msg: 'Flush Agent' },
+        process.env.CUBEJS_AGENT_ENDPOINT_URL,
+        this.preAgentLogger
+      );
     }
   }
 
