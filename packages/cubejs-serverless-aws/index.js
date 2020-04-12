@@ -24,10 +24,17 @@ class AWSHandlers extends Handlers {
   }
 
   async process(event) {
-    await Promise.all(event.Records.map(async record => {
-      const message = JSON.parse(record.Sns.Message);
-      await this.processMessage(message);
-    }));
+    if (event.Records) {
+      await Promise.all(event.Records.map(async record => {
+        const message = JSON.parse(record.Sns.Message);
+        await this.processMessage(message);
+      }));
+    } else {
+      this.serverCore.logger('Invalid Lambda Process Message', {
+        warning: `Event doesn't contain Records field. Skipping.`,
+        lambdaEvent: event
+      });
+    }
 
     return {
       statusCode: 200
