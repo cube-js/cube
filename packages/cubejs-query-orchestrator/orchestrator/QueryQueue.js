@@ -73,6 +73,8 @@ class QueryQueue {
           queryKey: queryDef.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
+          activeQueryKeys: active,
+          toProcessQueryKeys: toProcess,
           active: active.indexOf(redisClient.redisHash(queryKey)) !== -1,
           queueIndex: toProcess.indexOf(redisClient.redisHash(queryKey)),
           waitingForRequestId: queryDef.requestId
