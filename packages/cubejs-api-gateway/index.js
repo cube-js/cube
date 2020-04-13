@@ -409,17 +409,12 @@ class ApiGateway {
       const response = await this.getAdapterApi({
         ...context, dataSource: sqlQuery.dataSource
       }).executeQuery(toExecute);
-      this.log(context, {
-        type: 'Load Request Success',
-        query,
-        duration: this.duration(requestStarted)
-      });
       const flattenAnnotation = {
         ...annotation.measures,
         ...annotation.dimensions,
         ...annotation.timeDimensions
       };
-      res({
+      const result = {
         query: normalizedQuery,
         data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data, normalizedQuery),
         lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
@@ -428,7 +423,13 @@ class ApiGateway {
           usedPreAggregations: response.usedPreAggregations
         }),
         annotation
+      };
+      this.log(context, {
+        type: 'Load Request Success',
+        query,
+        duration: this.duration(requestStarted)
       });
+      res(result);
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
