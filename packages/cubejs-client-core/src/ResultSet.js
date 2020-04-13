@@ -361,8 +361,8 @@ class ResultSet {
    *
    * // ResultSet.tableColumns() will return
    * [
-   *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
-   *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
+   *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time", type: "time", format: undefined },
+   *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count", type: "count", format: undefined },
    *   //...
    * ]
    * ```
