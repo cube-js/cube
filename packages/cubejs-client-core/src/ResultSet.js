@@ -377,6 +377,8 @@ class ResultSet {
           key: m,
           title: this.loadResponse.annotation.measures[m].title,
           shortTitle: this.loadResponse.annotation.measures[m].shortTitle,
+          format: this.loadResponse.annotation.measures[m].format,
+          type: this.loadResponse.annotation.measures[m].type,
         })) :
         [{
           key: field,
@@ -387,7 +389,15 @@ class ResultSet {
           shortTitle: (
             this.loadResponse.annotation.dimensions[field] ||
             this.loadResponse.annotation.timeDimensions[field]
-          ).shortTitle
+          ).shortTitle,
+          format: (
+            this.loadResponse.annotation.dimensions[field] ||
+            this.loadResponse.annotation.timeDimensions[field]
+          ).format,
+          type: (
+            this.loadResponse.annotation.dimensions[field] ||
+            this.loadResponse.annotation.timeDimensions[field]
+          ).type
         }]
     );
     return normalizedPivotConfig.x.map(column)
