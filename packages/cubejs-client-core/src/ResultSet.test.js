@@ -597,4 +597,84 @@ describe('ResultSet', () => {
       ]);
     });
   });
+
+  describe('tableColumns', () => {
+    test('returns array of column definitions for tablePivot', () => {
+      const resultSet = new ResultSet({
+        "query": {
+          "measures": ["Orders.count", "Orders.totalAmount"],
+          "timeDimensions": [{
+            "dimension": "Orders.createdAt",
+            "granularity": "day",
+            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+          }],
+          "dimensions": ["Orders.createdAt"],
+          "filters": [],
+          "timezone": "UTC"
+        },
+        "data": [],
+        "annotation": {
+          "measures": {
+            "Orders.count": {
+              "title": "Orders Count",
+              "shortTitle": "Count",
+              "type": "count",
+            },
+            "Orders.totalAmount": {
+              "title": "Orders Total Amount",
+              "shortTitle": "Total Amount",
+              "type": "number",
+              "format": "currency"
+            }
+          },
+          "dimensions": {
+            "Orders.createdAt": {
+              "title": "Orders Created at",
+              "shortTitle": "Created at",
+              "type": "time"
+            }
+          },
+          "segments": {},
+          "timeDimensions": {
+            "Orders.createdAt.day": {
+              "title": "Orders Created at",
+              "shortTitle": "Created at",
+              "type": "time"
+            }
+          }
+        }
+      });
+
+      expect(resultSet.tableColumns()).toEqual([
+        {
+          "format": undefined,
+          "key": "Orders.createdAt.day",
+          "shortTitle": "Created at",
+          "title": "Orders Created at",
+          "type": "time",
+        },
+        {
+          "format": undefined,
+          "key": "Orders.createdAt",
+          "shortTitle": "Created at",
+          "title": "Orders Created at",
+          "type": "time",
+        },
+        {
+          "format": undefined,
+          "key": "Orders.count",
+          "shortTitle": "Count",
+          "title": "Orders Count",
+          "type": "count",
+        },
+        {
+          "format": "currency",
+          "key": "Orders.totalAmount",
+          "shortTitle": "Total Amount",
+          "title": "Orders Total Amount",
+          "type": "number",
+        }
+      ]);
+    });
+  });
 });
