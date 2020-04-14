@@ -208,10 +208,16 @@ class QueryQueue {
 
   async processQuery(queryKey) {
     const redisClient = await this.queueDriver.createConnection();
+    let insertedCount;
+    // eslint-disable-next-line no-unused-vars
+    let removedCount;
+    let activeKeys;
+    let queueSize;
+    let query;
+    let processingLockAcquired;
     try {
       const processingId = await redisClient.getNextProcessingId();
-      // eslint-disable-next-line no-unused-vars
-      const [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] =
+      [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] =
         await redisClient.retrieveForProcessing(queryKey, processingId);
       if (query && insertedCount && activeKeys.indexOf(this.redisHash(queryKey)) !== -1 && processingLockAcquired) {
         let executionResult;
@@ -317,7 +323,8 @@ class QueryQueue {
       }
     } catch (e) {
       this.logger('Queue storage error', {
-        queryKey,
+        queryKey: query && query.queryKey || queryKey,
+        requestId: query && query.requestId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });
