@@ -86,13 +86,9 @@ class MssqlQuery extends BaseQuery {
     const dimensionsForSelect = this.dimensionsForSelect();
     let dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql()))
       .filter(s => !!s);
-    
-    if(dimensionColumns.find(d=>d.indexOf("_key___")>0))
-    {
-        dimensionColumns = this.dimensionColumns(this.escapeColumnName('keys'));          
-    }
-
-    
+    if(dimensionColumns.find(d => d.indexOf("_key___") > 0)){
+      dimensionColumns = this.dimensionColumns(this.escapeColumnName('keys'));          
+    } 
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
