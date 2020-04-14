@@ -241,7 +241,7 @@ class QueryQueue {
                     return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
                   } catch (e) {
                     this.logger(`Error while query update`, {
-                      queryKey,
+                      queryKey: query.queryKey,
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
                       requestId: query.requestId
@@ -305,7 +305,8 @@ class QueryQueue {
       } else {
         this.logger('Skip processing', {
           processingId,
-          queryKey,
+          queryKey: query && query.queryKey || queryKey,
+          requestId: query && query.requestId,
           queuePrefix: this.redisQueuePrefix,
           processingLockAcquired,
           query,
