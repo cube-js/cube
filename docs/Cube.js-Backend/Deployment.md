@@ -34,6 +34,8 @@ If `REDIS_URL` is provided Cube.js will create Redis pool with 2 min and 1000 ma
 `CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be used to tweak pool size.
 No pool behavior with each connection created on demand can be achieved with `CUBEJS_REDIS_POOL_MAX=0` setting.
 
+If you are using Google Memorystore try to set `CUBEJS_REDIS_POOL_MAX=100` in order to avoid Google blocking your connections. (Still trying to find out why but this will help you to start using Memorystore without issues.) 
+
 ### Running without Redis
 
 If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
