@@ -512,8 +512,8 @@ function () {
      *
      * // ResultSet.tableColumns() will return
      * [
-     *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
-     *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
+     *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time", type: "time", format: undefined },
+     *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count", type: "count", format: undefined },
      *   //...
      * ]
      * ```
@@ -533,12 +533,16 @@ function () {
           return {
             key: m,
             title: _this4.loadResponse.annotation.measures[m].title,
-            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle
+            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle,
+            format: _this4.loadResponse.annotation.measures[m].format,
+            type: _this4.loadResponse.annotation.measures[m].type
           };
         }) : [{
           key: field,
           title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title,
-          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle
+          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle,
+          format: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).format,
+          type: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).type
         }];
       };
 
@@ -744,6 +748,13 @@ function () {
       }];
     }));
   }
+  /**
+   * Get all members of specific type for a given query.
+   * If empty query is provided no filtering is done based on query context and all available members are retrieved.
+   * @param query - context query to provide filtering of members available to add to this query
+   * @param memberType - `measures`, `dimensions` or `segments`
+   */
+
 
   _createClass(Meta, [{
     key: "membersForQuery",
