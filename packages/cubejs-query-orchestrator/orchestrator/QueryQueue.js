@@ -219,7 +219,8 @@ class QueryQueue {
       const processingId = await redisClient.getNextProcessingId();
       [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] =
         await redisClient.retrieveForProcessing(queryKey, processingId);
-      if (query && insertedCount && activeKeys.indexOf(this.redisHash(queryKey)) !== -1 && processingLockAcquired) {
+      const activated = activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
+      if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
         const startQueryTime = (new Date()).getTime();
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
@@ -319,7 +320,7 @@ class QueryQueue {
           insertedCount,
           activeKeys
         });
-        await redisClient.freeProcessingLock(queryKey, processingId);
+        await redisClient.freeProcessingLock(queryKey, processingId, activated);
       }
     } catch (e) {
       this.logger('Queue storage error', {

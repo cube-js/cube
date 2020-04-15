@@ -176,10 +176,13 @@ class LocalQueueDriverConnection {
     ]; // TODO nulls
   }
 
-  freeProcessingLock(queryKey, processingId) {
+  freeProcessingLock(queryKey, processingId, activated) {
     const key = this.redisHash(queryKey);
     if (this.processingLocks[key] === processingId) {
       delete this.processingLocks[key];
+      if (activated) {
+        delete this.active[key];
+      }
     }
   }
 
