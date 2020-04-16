@@ -3633,15 +3633,6 @@
 
 	var v4_1 = v4;
 
-	var setPrototypeOf = _setProto.set;
-	var _inheritIfRequired = function (that, target, C) {
-	  var S = target.constructor;
-	  var P;
-	  if (S !== C && typeof S == 'function' && (P = S.prototype) !== C.prototype && _isObject(P) && setPrototypeOf) {
-	    setPrototypeOf(that, P);
-	  } return that;
-	};
-
 	var _stringWs = '\x09\x0A\x0B\x0C\x0D\x20\xA0\u1680\u180E\u2000\u2001\u2002\u2003' +
 	  '\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028\u2029\uFEFF';
 
@@ -3672,10 +3663,31 @@
 
 	var _stringTrim = exporter;
 
+	var $parseFloat = _global.parseFloat;
+	var $trim = _stringTrim.trim;
+
+	var _parseFloat = 1 / $parseFloat(_stringWs + '-0') !== -Infinity ? function parseFloat(str) {
+	  var string = $trim(String(str), 3);
+	  var result = $parseFloat(string);
+	  return result === 0 && string.charAt(0) == '-' ? -0 : result;
+	} : $parseFloat;
+
+	// 20.1.2.12 Number.parseFloat(string)
+	_export(_export.S + _export.F * (Number.parseFloat != _parseFloat), 'Number', { parseFloat: _parseFloat });
+
+	var setPrototypeOf = _setProto.set;
+	var _inheritIfRequired = function (that, target, C) {
+	  var S = target.constructor;
+	  var P;
+	  if (S !== C && typeof S == 'function' && (P = S.prototype) !== C.prototype && _isObject(P) && setPrototypeOf) {
+	    setPrototypeOf(that, P);
+	  } return that;
+	};
+
 	var gOPN$2 = _objectGopn.f;
 	var gOPD$2 = _objectGopd.f;
 	var dP$3 = _objectDp.f;
-	var $trim = _stringTrim.trim;
+	var $trim$1 = _stringTrim.trim;
 	var NUMBER = 'Number';
 	var $Number = _global[NUMBER];
 	var Base = $Number;
@@ -3688,7 +3700,7 @@
 	var toNumber = function (argument) {
 	  var it = _toPrimitive(argument, false);
 	  if (typeof it == 'string' && it.length > 2) {
-	    it = TRIM ? it.trim() : $trim(it, 3);
+	    it = TRIM ? it.trim() : $trim$1(it, 3);
 	    var first = it.charCodeAt(0);
 	    var third, radix, maxCode;
 	    if (first === 43 || first === 45) {
@@ -3735,17 +3747,15 @@
 	  _redefine(_global, NUMBER, $Number);
 	}
 
-	var $parseFloat = _global.parseFloat;
-	var $trim$1 = _stringTrim.trim;
+	// 20.1.2.4 Number.isNaN(number)
 
-	var _parseFloat = 1 / $parseFloat(_stringWs + '-0') !== -Infinity ? function parseFloat(str) {
-	  var string = $trim$1(String(str), 3);
-	  var result = $parseFloat(string);
-	  return result === 0 && string.charAt(0) == '-' ? -0 : result;
-	} : $parseFloat;
 
-	// 20.1.2.12 Number.parseFloat(string)
-	_export(_export.S + _export.F * (Number.parseFloat != _parseFloat), 'Number', { parseFloat: _parseFloat });
+	_export(_export.S, 'Number', {
+	  isNaN: function isNaN(number) {
+	    // eslint-disable-next-line no-self-compare
+	    return number != number;
+	  }
+	});
 
 	// most Object methods by ES6 should accept primitives
 
@@ -13589,6 +13599,7 @@
 	  }
 	};
 	var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
+	var ISO8601_REGEX = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
 	/**
 	 * Provides a convenient interface for data manipulation.
 	 */
@@ -13935,6 +13946,16 @@
 	    value: function chartPivot(pivotConfig) {
 	      var _this3 = this;
 
+	      var validate = function validate(value) {
+	        if (ISO8601_REGEX.test(value)) {
+	          return new Date(value);
+	        } else if (!Number.isNaN(Number.parseFloat(value))) {
+	          return Number.parseFloat(value);
+	        }
+
+	        return value;
+	      };
+
 	      return this.pivot(pivotConfig).map(function (_ref15) {
 	        var xValues = _ref15.xValues,
 	            yValuesArray = _ref15.yValuesArray;
@@ -13947,7 +13968,7 @@
 	              yValues = _ref17[0],
 	              m = _ref17[1];
 
-	          return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && Number.parseFloat(m));
+	          return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && validate(m));
 	        }).reduce(function (a, b) {
 	          return Object.assign(a, b);
 	        }, {}));
