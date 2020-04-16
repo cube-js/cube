@@ -35,7 +35,7 @@ class MockDriver {
   }
 
   async dropTable(tableName) {
-    this.tables = this.tables.filter(t => t !== tableName.split('.')[1]);
+    this.tables = this.tables.filter(t => t !== tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
 }
@@ -49,7 +49,8 @@ describe('QueryOrchestrator', () => {
       preAggregationsOptions: {
         queueOptions: {
           executionTimeout: 1
-        }
+        },
+        usedTablePersistTime: 1
       }
     }
   );
@@ -161,5 +162,65 @@ describe('QueryOrchestrator', () => {
       expect(e.toString()).toMatch(/timeout/);
     }
     expect(mockDriver.cancelledQueries[0]).toMatch(/orders_too_big/);
+  });
+
+  test('save structure versions', async () => {
+    mockDriver.tables = [];
+    await queryOrchestrator.fetchQuery({
+      query: `SELECT * FROM stb_pre_aggregations.orders`,
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: "stb_pre_aggregations",
+        tableName: "stb_pre_aggregations.orders",
+        loadSql: ["CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders", []],
+        invalidateKeyQueries: [["SELECT 1", []]]
+      }],
+      renewQuery: true,
+      requestId: 'save structure versions'
+    });
+
+    await queryOrchestrator.fetchQuery({
+      query: `SELECT * FROM stb_pre_aggregations.orders`,
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: "stb_pre_aggregations",
+        tableName: "stb_pre_aggregations.orders",
+        loadSql: ["CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders1", []],
+        invalidateKeyQueries: [["SELECT 1", []]]
+      }],
+      renewQuery: true,
+      requestId: 'save structure versions'
+    });
+
+    await new Promise(resolve => setTimeout(() => resolve(), 1000));
+
+    for (let i = 0; i < 5; i++) {
+      await queryOrchestrator.fetchQuery({
+        query: `SELECT * FROM stb_pre_aggregations.orders`,
+        values: [],
+        cacheKeyQueries: {
+          renewalThreshold: 21600,
+          queries: []
+        },
+        preAggregations: [{
+          preAggregationsSchema: "stb_pre_aggregations",
+          tableName: "stb_pre_aggregations.orders",
+          loadSql: ["CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders", []],
+          invalidateKeyQueries: [["SELECT 2", []]]
+        }],
+        renewQuery: true,
+        requestId: 'save structure versions'
+      });
+    }
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
   });
 });

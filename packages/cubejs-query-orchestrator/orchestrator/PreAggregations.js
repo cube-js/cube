@@ -17,10 +17,13 @@ function version(cacheKey) {
   for (let i = 0; i < 5; i++) {
     const byte = digestBuffer.readUInt8(i);
     shiftCounter += 8;
+    // eslint-disable-next-line operator-assignment,no-bitwise
     residue = (byte << (shiftCounter - 8)) | residue;
+    // eslint-disable-next-line no-bitwise
     while (residue >> 5) {
       result += hashCharset.charAt(residue % 32);
       shiftCounter -= 5;
+      // eslint-disable-next-line operator-assignment,no-bitwise
       residue = residue >> 5;
     }
   }
@@ -28,22 +31,21 @@ function version(cacheKey) {
   return result;
 }
 
-const tablesToVersionEntries = (schema, tables) => {
-  return R.sortBy(
-    table => -table.last_updated_at,
-    tables.map(table => {
-      const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
-      if (match) {
-        return {
-          table_name: `${schema}.${match[1]}`,
-          content_version: match[2],
-          structure_version: match[3],
-          last_updated_at: parseInt(match[4], 10)
-        }
-      }
-    }).filter(R.identity)
-  )
-};
+const tablesToVersionEntries = (schema, tables) => R.sortBy(
+  table => -table.last_updated_at,
+  tables.map(table => {
+    const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
+    if (match) {
+      return {
+        table_name: `${schema}.${match[1]}`,
+        content_version: match[2],
+        structure_version: match[3],
+        last_updated_at: parseInt(match[4], 10)
+      };
+    }
+    return null;
+  }).filter(R.identity)
+);
 
 class PreAggregationLoadCache {
   constructor(redisPrefix, clientFactory, queryCache, preAggregations, options) {
@@ -177,6 +179,7 @@ class PreAggregationLoader {
     this.waitForRenew = options.waitForRenew;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
+    this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
   }
 
   async loadPreAggregation() {
@@ -225,7 +228,7 @@ class PreAggregationLoader {
 
     const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation);
 
-    const getVersionEntryByContentVersion = (versionEntries) => versionEntries.find(
+    const getVersionEntryByContentVersion = (entries) => entries.find(
       v => v.table_name === this.preAggregation.tableName && v.content_version === contentVersion
     );
 
@@ -237,6 +240,7 @@ class PreAggregationLoader {
     // TODO this check can be redundant due to structure version is already checked in loadPreAggregation()
     if (
       !this.waitForRenew &&
+      // eslint-disable-next-line no-use-before-define
       await this.loadCache.getQueryStage(PreAggregations.preAggregationQueryCacheKey(this.preAggregation))
     ) {
       const versionEntryByStructureVersion = versionEntries.find(
@@ -253,7 +257,8 @@ class PreAggregationLoader {
         await this.driverFactory();
       await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     }
-    const versionEntry = versionEntries.find(e => e.table_name === this.preAggregation.tableName); // TODO can be array instead of last
+    // TODO can be array instead of last
+    const versionEntry = versionEntries.find(e => e.table_name === this.preAggregation.tableName);
     const newVersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
@@ -363,6 +368,7 @@ class PreAggregationLoader {
         requestId: this.requestId
       },
       priority,
+      // eslint-disable-next-line no-use-before-define
       { stageQueryKey: PreAggregations.preAggregationQueryCacheKey(this.preAggregation), requestId: this.requestId }
     );
   }
@@ -526,8 +532,17 @@ class PreAggregationLoader {
       R.toPairs,
       R.map(p => p[1][0])
     )(versionEntries);
+
+    const structureVersionsToSave = R.pipe(
+      R.filter(v => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000),
+      R.groupBy(v => `${v.table_name}_${v.structure_version}`),
+      R.toPairs,
+      R.map(p => p[1][0])
+    )(versionEntries);
+
     const tablesToSave =
       (await this.preAggregations.tablesUsed())
+        .concat(structureVersionsToSave.map(v => this.targetTableName(v)))
         .concat(versionEntriesToSave.map(v => this.targetTableName(v)))
         .concat([justCreatedTable]);
     const toDrop = actualTables
@@ -552,6 +567,8 @@ class PreAggregations {
       new RedisCacheDriver({ pool: options.redisPool }) :
       new LocalCacheDriver();
     this.externalDriverFactory = options.externalDriverFactory;
+    this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
+    this.usedTablePersistTime = options.usedTablePersistTime || 600;
   }
 
   tablesUsedRedisKey(tableName) {
@@ -559,7 +576,7 @@ class PreAggregations {
   }
 
   async addTableUsed(tableName) {
-    return this.cacheDriver.set(this.tablesUsedRedisKey(tableName), true, 600);
+    return this.cacheDriver.set(this.tablesUsedRedisKey(tableName), true, this.usedTablePersistTime);
   }
 
   async tablesUsed() {

@@ -4,7 +4,7 @@ const { cancelCombinator } = require('./utils');
 const sortByKeys = (unordered) => {
   const ordered = {};
 
-  Object.keys(unordered).sort().forEach(function(key) {
+  Object.keys(unordered).sort().forEach((key) => {
     ordered[key] = unordered[key];
   });
 
@@ -13,16 +13,16 @@ const sortByKeys = (unordered) => {
 
 const DbTypeToGenericType = {
   'timestamp without time zone': 'timestamp',
-  'integer': 'int',
+  integer: 'int',
   'character varying': 'text',
-  'varchar': 'text',
-  'text': 'text',
-  'string': 'text',
-  'boolean': 'boolean',
-  'bigint': 'bigint',
-  'time': 'string',
-  'datetime': 'timestamp',
-  'date': 'date',
+  varchar: 'text',
+  text: 'text',
+  string: 'text',
+  boolean: 'boolean',
+  bigint: 'bigint',
+  time: 'string',
+  datetime: 'timestamp',
+  date: 'date',
   'double precision': 'decimal'
 };
 
@@ -59,7 +59,7 @@ class BaseDriver {
 
     const reduceCb = (result, i) => {
       let schema = (result[i.table_schema] || {});
-      let tables = (schema[i.table_name] || []);
+      const tables = (schema[i.table_name] || []);
 
       tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
 
@@ -79,10 +79,11 @@ class BaseDriver {
       `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
       [schemaName]
     ).then((schemas) => {
-        if (schemas.length === 0) {
-          return this.query("CREATE SCHEMA IF NOT EXISTS " + schemaName);
-        }
-      });
+      if (schemas.length === 0) {
+        return this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
+      }
+      return null;
+    });
   }
 
   getTablesQuery(schemaName) {
@@ -132,6 +133,7 @@ class BaseDriver {
     }
   }
 
+  // eslint-disable-next-line no-unused-vars
   toColumnValue(value, genericType) {
     return value;
   }

@@ -12,7 +12,8 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "jest --runInBand --verbose"
+    "test": "jest --runInBand --verbose",
+    "lint": "eslint orchestrator/*.js driver/*.js"
   },
   "dependencies": {
     "generic-pool": "^3.7.1",
@@ -21,6 +22,8 @@
   },
   "devDependencies": {
     "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
     "jest": "^25.1.0"
   },
