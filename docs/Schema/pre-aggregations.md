@@ -77,6 +77,13 @@ Here:
 - Time dimension together with granularity constitute dimension.
 - Multiplied measures are measures of cubes that define `hasMany` relation involved in pre-aggregation definition join.
 
+Also order of pre-aggregations definition in cube matters.
+First matched pre-aggregation wins. 
+Cubes of a measures and then cubes of dimensions are checked to find a matching `rollup`.
+However `rollup` pre-aggregations always have priority over `originalSql`.
+Thus if you have both `originalSql` and `rollup` defined, Cube.js will try to find matching `rollup` first before trying to find matching `originalSql`.
+More over you can instruct Cube.js to use original sql pre-aggregations using (useOriginalSqlPreAggregations)[#use-original-sql-pre-aggregations].
+
 ### Rollup examples
 
 There're two types of definitions allowed for rollup pre-aggregation: with or without time dimension.
