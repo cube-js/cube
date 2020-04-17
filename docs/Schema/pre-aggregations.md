@@ -82,7 +82,7 @@ First matched pre-aggregation wins.
 Cubes of a measures and then cubes of dimensions are checked to find a matching `rollup`.
 However `rollup` pre-aggregations always have priority over `originalSql`.
 Thus if you have both `originalSql` and `rollup` defined, Cube.js will try to find matching `rollup` before trying to find matching `originalSql`.
-More over you can instruct Cube.js to use original sql pre-aggregations using (useOriginalSqlPreAggregations)[#use-original-sql-pre-aggregations].
+More over you can instruct Cube.js to use original sql pre-aggregations using [useOriginalSqlPreAggregations](#use-original-sql-pre-aggregations).
 
 ### Rollup examples
 
