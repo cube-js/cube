@@ -73,7 +73,8 @@ describe('PreAggregations', function test() {
         checkinsCount: {
           type: 'number',
           sql: \`\${visitor_checkins.count}\`,
-          subQuery: true
+          subQuery: true,
+          propagateFiltersToSubQuery: true
         }
       },
       
@@ -248,8 +249,11 @@ describe('PreAggregations', function test() {
     console.log(toReplace);
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
-      preAggregation.reduce((replacedQuery, desc) =>
-        replacedQuery.replace(new RegExp(desc.tableName, 'g'), desc.tableName + '_' + suffix), toReplace
+      preAggregation.reduce(
+        (replacedQuery, desc) => replacedQuery
+          .replace(new RegExp(desc.tableName, 'g'), desc.tableName + '_' + suffix)
+          .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`),
+        toReplace
       ),
       params
     ];

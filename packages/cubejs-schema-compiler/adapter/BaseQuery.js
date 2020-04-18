@@ -1533,6 +1533,11 @@ class BaseQuery {
         };
       }
     }
+
+    return this.refreshKeysByCubes(this.allCubeNames, transformFn);
+  }
+
+  refreshKeysByCubes(cubes, transformFn) {
     let refreshKeyAllSetManually = true;
     const refreshKeyQueryByCube = cube => {
       const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
@@ -1562,15 +1567,14 @@ class BaseQuery {
         { preAggregationQuery: true }
       );
     };
-    const cubeNames = this.allCubeNames;
-    const queries = cubeNames
+    const queries = cubes
       .map(cube => [cube, refreshKeyQueryByCube(cube)])
       .map(([cube, sql]) => (transformFn ? transformFn(sql, cube) : sql))
       .map(paramAnnotatedSql => this.paramAllocator.buildSqlAndParams(paramAnnotatedSql));
     return {
       queries,
       renewalThreshold: this.renewalThreshold(refreshKeyAllSetManually),
-      refreshKeyRenewalThresholds: cubeNames.map(c => {
+      refreshKeyRenewalThresholds: cubes.map(c => {
         const cubeFromPath = this.cubeEvaluator.cubeFromPath(c);
         if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
           return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey.every);
@@ -1760,7 +1764,7 @@ class BaseQuery {
             if (!preAggregation.partitionGranularity) {
               throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations`);
             }
-            // TOOD Case when partitioned originalSql is resolved for query without time dimension.
+            // TODO Case when partitioned originalSql is resolved for query without time dimension.
             // Consider fallback to not using such originalSql for consistency?
             if (preAggregationQueryForSql.timeDimensions.length) {
               refreshKey = this.incrementalRefreshKey(
@@ -1776,6 +1780,12 @@ class BaseQuery {
               refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(interval)]
             };
           }
+        }
+        if (preAggregation.type === 'originalSql') {
+          return this.evaluateSymbolSqlWithContext(
+            () => this.refreshKeysByCubes([cube]),
+            { preAggregationQuery: true }
+          );
         }
         if (
           preAggregation.partitionGranularity &&
