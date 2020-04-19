@@ -29,6 +29,19 @@ class PostgresQuery extends BaseQuery {
   timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
+
+  hllInit(sql) {
+    return `hll_add_agg(hll_hash_any(${sql}))`;
+  }
+
+  hllMerge(sql) {
+    return `hll_cardinality(hll_union_agg(${sql}))`;
+    return sql;
+  }
+
+  countDistinctApprox(sql) {
+    return  `hll_cardinality(${sql})` 
+  }
 }
 
 module.exports = PostgresQuery;
