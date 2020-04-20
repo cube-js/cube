@@ -73,7 +73,8 @@ describe('PreAggregations', function test() {
         checkinsCount: {
           type: 'number',
           sql: \`\${visitor_checkins.count}\`,
-          subQuery: true
+          subQuery: true,
+          propagateFiltersToSubQuery: true
         }
       },
       
@@ -248,8 +249,11 @@ describe('PreAggregations', function test() {
     console.log(toReplace);
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
-      preAggregation.reduce((replacedQuery, desc) =>
-        replacedQuery.replace(new RegExp(desc.tableName, 'g'), desc.tableName + '_' + suffix), toReplace
+      preAggregation.reduce(
+        (replacedQuery, desc) => replacedQuery
+          .replace(new RegExp(desc.tableName, 'g'), desc.tableName + '_' + suffix)
+          .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`),
+        toReplace
       ),
       params
     ];
@@ -663,7 +667,7 @@ describe('PreAggregations', function test() {
         timeDimensions: [{
           dimension: 'visitors.createdAt',
           granularity: 'month',
-          dateRange: ['2017-01-01', '2017-01-30']
+          dateRange: ['2017-01-01', '2017-01-31']
         }],
         order: [{
           id: 'visitors.createdAt'
@@ -810,6 +814,59 @@ describe('PreAggregations', function test() {
     });
   });
 
+  it('not aligned time dimension', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.checkinsTotal'
+        ],
+        dimensions: [
+          'visitors.source'
+        ],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'hour',
+          dateRange: ['2017-01-02T00:00:00.000', '2017-01-05T00:15:59.999']
+        }],
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+      preAggregationsDescription.length.should.be.equal(2);
+
+      const queries = tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.testQueries(
+        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 342))
+      ).then(res => {
+        console.log(JSON.stringify(res));
+        res.should.be.deepEqual(
+          [
+            {
+              "visitors__source": "some",
+              "visitors__created_at_hour": "2017-01-03T00:00:00.000Z",
+              "visitors__checkins_total": "3"
+            },
+            {
+              "visitors__source": "some",
+              "visitors__created_at_hour": "2017-01-05T00:00:00.000Z",
+              "visitors__checkins_total": "2"
+            }
+          ]
+        );
+      });
+    });
+  });
+
   it('segment', () => {
     return compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -823,7 +880,7 @@ describe('PreAggregations', function test() {
         timeDimensions: [{
           dimension: 'visitors.createdAt',
           granularity: 'week',
-          dateRange: ['2016-12-30', '2017-01-05']
+          dateRange: ['2016-12-26', '2017-01-08']
         }],
         order: [{
           id: 'visitors.createdAt'
@@ -1037,7 +1094,7 @@ describe('PreAggregations in time hierarchy', function test() {
         timeDimensions: [{
           dimension: 'visitors.createdAt',
           granularity: 'year',
-          dateRange: ['2016-12-30', '2018-12-30']
+          dateRange: ['2016-12-01', '2018-12-31']
         }],
         preAggregationsSchema: '',
         order: [],

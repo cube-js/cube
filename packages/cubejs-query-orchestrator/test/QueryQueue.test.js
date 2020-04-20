@@ -136,6 +136,13 @@ const QueryQueueTest = (name, options) => {
       expect(cancelledQuery).toBe('114');
       await queue.executeInQueue('delay', `114`, { delay: 50, result: '4' }, 0);
     });
+
+    test('removed before reconciled', async () => {
+      const query = ['select * from'];
+      await queue.processQuery(query);
+      const result = await queue.executeInQueue('foo', query, query);
+      expect(result).toBe('select * from bar');
+    });
   });
 };
 

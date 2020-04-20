@@ -245,7 +245,7 @@ class BaseFilter extends BaseDimension {
       return `${date}T23:59:59.999`;
     }
     if (!date) {
-      return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 23:59:59');
+      return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT23:59:59.999');
     }
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }

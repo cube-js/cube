@@ -123,7 +123,7 @@ class BaseQuery {
     this.initUngrouped();
   }
 
-  cacheValue(key, fn, { contextPropNames, inputProps, cache }) {
+  cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
       const contextKey = {};
@@ -538,6 +538,9 @@ class BaseQuery {
       return granularityB;
     }
     if (!granularityB) {
+      return granularityA;
+    }
+    if (granularityA === granularityB) {
       return granularityA;
     }
     const aHierarchy = R.reverse(this.granularityParentHierarchy(granularityA));
@@ -1533,6 +1536,11 @@ class BaseQuery {
         };
       }
     }
+
+    return this.refreshKeysByCubes(this.allCubeNames, transformFn);
+  }
+
+  refreshKeysByCubes(cubes, transformFn) {
     let refreshKeyAllSetManually = true;
     const refreshKeyQueryByCube = cube => {
       const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
@@ -1562,15 +1570,14 @@ class BaseQuery {
         { preAggregationQuery: true }
       );
     };
-    const cubeNames = this.allCubeNames;
-    const queries = cubeNames
+    const queries = cubes
       .map(cube => [cube, refreshKeyQueryByCube(cube)])
       .map(([cube, sql]) => (transformFn ? transformFn(sql, cube) : sql))
       .map(paramAnnotatedSql => this.paramAllocator.buildSqlAndParams(paramAnnotatedSql));
     return {
       queries,
       renewalThreshold: this.renewalThreshold(refreshKeyAllSetManually),
-      refreshKeyRenewalThresholds: cubeNames.map(c => {
+      refreshKeyRenewalThresholds: cubes.map(c => {
         const cubeFromPath = this.cubeEvaluator.cubeFromPath(c);
         if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
           return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey.every);
@@ -1703,6 +1710,60 @@ class BaseQuery {
     return this.floorSql(`${this.unixTimestampSql()} / ${this.parseSecondDuration(interval)}`);
   }
 
+  granularityFor(momentDate) {
+    const obj = momentDate.toObject();
+    const weekDay = momentDate.isoWeekday();
+    if (
+      obj.months === 0 &&
+      obj.date === 1 &&
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'year';
+    } else if (
+      obj.date === 1 &&
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'month';
+    } else if (
+      weekDay === 1 &&
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'week';
+    } else if (
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'day';
+    } else if (
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'hour';
+    } else if (
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'minute';
+    } else if (
+      obj.milliseconds === 0
+    ) {
+      return 'second';
+    }
+    return 'second'; // TODO return 'millisecond';
+  }
+
   parseSecondDuration(interval) {
     const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
     if (!intervalMatch) {
@@ -1760,7 +1821,7 @@ class BaseQuery {
             if (!preAggregation.partitionGranularity) {
               throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations`);
             }
-            // TOOD Case when partitioned originalSql is resolved for query without time dimension.
+            // TODO Case when partitioned originalSql is resolved for query without time dimension.
             // Consider fallback to not using such originalSql for consistency?
             if (preAggregationQueryForSql.timeDimensions.length) {
               refreshKey = this.incrementalRefreshKey(
@@ -1776,6 +1837,12 @@ class BaseQuery {
               refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(interval)]
             };
           }
+        }
+        if (preAggregation.type === 'originalSql') {
+          return this.evaluateSymbolSqlWithContext(
+            () => this.refreshKeysByCubes([cube]),
+            { preAggregationQuery: true }
+          );
         }
         if (
           preAggregation.partitionGranularity &&

@@ -3,6 +3,132 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.11](https://github.com/cube-js/cube.js/compare/v0.19.10...v0.19.11) (2020-04-20)
+
+
+### Bug Fixes
+
+* Strict date range and rollup granularity alignment check ([deb62b6](https://github.com/cube-js/cube.js/commit/deb62b6)), closes [#103](https://github.com/cube-js/cube.js/issues/103)
+
+
+
+
+
+## [0.19.10](https://github.com/cube-js/cube.js/compare/v0.19.9...v0.19.10) (2020-04-18)
+
+
+### Bug Fixes
+
+* Recursive pre-aggregation description generation: support propagateFiltersToSubQuery with partitioned originalSql ([6a2b9dd](https://github.com/cube-js/cube.js/commit/6a2b9dd))
+
+
+
+
+
+## [0.19.9](https://github.com/cube-js/cube.js/compare/v0.19.8...v0.19.9) (2020-04-16)
+
+
+### Features
+
+* add await when invoking schemaVersion -- support async schemaVersion ([#557](https://github.com/cube-js/cube.js/issues/557)) Thanks to [@barakcoh](https://github.com/barakcoh)! ([964c6d8](https://github.com/cube-js/cube.js/commit/964c6d8))
+* Added support for websocketsBasePath ([#584](https://github.com/cube-js/cube.js/issues/584)) Thanks to [@gauravlanjekar](https://github.com/gauravlanjekar)! ([0fa7349](https://github.com/cube-js/cube.js/commit/0fa7349)), closes [#583](https://github.com/cube-js/cube.js/issues/583)
+* Allow persisting multiple pre-aggregation structure versions to support staging pre-aggregation warm-up environments and multiple timezones ([ab9539a](https://github.com/cube-js/cube.js/commit/ab9539a))
+* Parse dates on client side ([#522](https://github.com/cube-js/cube.js/issues/522)) Thanks to [@richipargo](https://github.com/richipargo)! ([11c1106](https://github.com/cube-js/cube.js/commit/11c1106))
+
+
+
+
+
+## [0.19.8](https://github.com/cube-js/cube.js/compare/v0.19.7...v0.19.8) (2020-04-15)
+
+
+### Bug Fixes
+
+* Dead queries added to queue in serverless ([eca3d0c](https://github.com/cube-js/cube.js/commit/eca3d0c))
+
+
+
+
+
+## [0.19.7](https://github.com/cube-js/cube.js/compare/v0.19.6...v0.19.7) (2020-04-14)
+
+
+### Bug Fixes
+
+* Associate Queue storage error with requestId ([ec2750e](https://github.com/cube-js/cube.js/commit/ec2750e))
+
+
+### Features
+
+* Including format and type in tableColumns ([#587](https://github.com/cube-js/cube.js/issues/587)) Thanks to [@danpanaite](https://github.com/danpanaite)! ([3f7d74f](https://github.com/cube-js/cube.js/commit/3f7d74f)), closes [#585](https://github.com/cube-js/cube.js/issues/585)
+
+
+
+
+
+## [0.19.6](https://github.com/cube-js/cube.js/compare/v0.19.5...v0.19.6) (2020-04-14)
+
+
+### Bug Fixes
+
+* Consistent queryKey logging ([5f1a632](https://github.com/cube-js/cube.js/commit/5f1a632))
+
+
+
+
+
+## [0.19.5](https://github.com/cube-js/cube.js/compare/v0.19.4...v0.19.5) (2020-04-13)
+
+
+### Bug Fixes
+
+* Broken query and pre-aggregation cancel ([aa82256](https://github.com/cube-js/cube.js/commit/aa82256))
+* Include data transformation in Load Request time ([edf2461](https://github.com/cube-js/cube.js/commit/edf2461))
+* RefreshScheduler refreshes pre-aggregations during cache key refresh ([51d1214](https://github.com/cube-js/cube.js/commit/51d1214))
+
+
+### Features
+
+* Log queue state on Waiting for query ([395c63c](https://github.com/cube-js/cube.js/commit/395c63c))
+
+
+
+
+
+## [0.19.4](https://github.com/cube-js/cube.js/compare/v0.19.3...v0.19.4) (2020-04-12)
+
+
+### Bug Fixes
+
+* **serverless-aws:** cubejsProcess agent doesn't collect all events after process has been finished ([939e25a](https://github.com/cube-js/cube.js/commit/939e25a))
+
+
+
+
+
+## [0.19.3](https://github.com/cube-js/cube.js/compare/v0.19.2...v0.19.3) (2020-04-12)
+
+
+### Bug Fixes
+
+* Handle invalid lambda process events ([37fc43f](https://github.com/cube-js/cube.js/commit/37fc43f))
+
+
+
+
+
+## [0.19.2](https://github.com/cube-js/cube.js/compare/v0.19.1...v0.19.2) (2020-04-12)
+
+
+### Bug Fixes
+
+* Do not DoS agent with huge payloads ([7886130](https://github.com/cube-js/cube.js/commit/7886130))
+* TypeError: Cannot read property 'timeDimensions' of null ([7d3329b](https://github.com/cube-js/cube.js/commit/7d3329b))
+
+
+
+
+
 ## [0.19.1](https://github.com/cube-js/cube.js/compare/v0.19.0...v0.19.1) (2020-04-11)
 
 

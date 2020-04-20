@@ -129,3 +129,91 @@ cube('Customers', {
   }
 });
 ```
+
+## Transitive Join Pitfall
+
+Let's consider an example where we have many to many relationship between `A-C` through `B` cube:
+
+```javascript
+cube(`A`, {
+  // ...
+  measures: {
+    type: `count`
+  }
+});
+
+cube(`B`, {
+  // ...
+  joins: {
+    A: {
+      sql: `${B}.a_id = ${A}.id`,
+      relationship: `hasMany`
+    },
+    C: {
+      sql: `${B}.c_id = ${C}.id`,
+      relationship: `hasMany`
+    }
+  }
+});
+
+cube(`C`, {
+  // ...
+  dimensions: {
+    category: {
+      sql: `category`,
+      type: `string`
+    }
+  }
+});
+```
+
+And we want to build the query:
+
+```javascript
+{
+  measures: ['A.count'],
+  dimensions: ['C.category']
+}
+```
+
+You'll get an error: `Error: Can't find join path to join 'A', 'C'`.
+The problem is joins are directed and if we try to connect `A` and `C` there's no path from `A` to `C` or either from `C` to `A`.
+On possible solution is to move `A-B` join from `B` cube to `A`:
+
+> **NOTE:** Moving the join affects semantics and results of a join which are discussed in previous section.
+
+```javascript
+cube(`A`, {
+  // ...
+  joins: {
+    B: {
+      sql: `${B}.a_id = ${A}.id`,
+      relationship: `hasMany`
+    },
+  },
+  
+  measures: {
+    type: `count`
+  }
+});
+
+cube(`B`, {
+  // ...
+  joins: {
+    C: {
+      sql: `${B}.c_id = ${C}.id`,
+      relationship: `hasMany`
+    }
+  }
+});
+
+cube(`C`, {
+  // ...
+  dimensions: {
+    category: {
+      sql: `category`,
+      type: `string`
+    }
+  }
+});
+```

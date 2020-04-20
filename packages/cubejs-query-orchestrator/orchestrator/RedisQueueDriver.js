@@ -143,13 +143,17 @@ class RedisQueueDriverConnection {
     return [insertedCount, removedCount, activeKeys, queueSize, JSON.parse(queryDef), processingLockAcquired];
   }
 
-  async freeProcessingLock(queryKey, processingId) {
+  async freeProcessingLock(queryKey, processingId, activated) {
     const lockKey = this.queryProcessingLockKey(queryKey);
     await this.redisClient.watchAsync(lockKey);
     const currentProcessId = await this.redisClient.getAsync(lockKey);
     if (currentProcessId === processingId) {
-      await this.redisClient.multi()
-        .del(lockKey)
+      let removeCommand = this.redisClient.multi()
+        .del(lockKey);
+      if (activated) {
+        removeCommand = removeCommand.zrem([this.activeRedisKey(), this.redisHash(queryKey)]);
+      }
+      await removeCommand
         .execAsync();
     }
   }

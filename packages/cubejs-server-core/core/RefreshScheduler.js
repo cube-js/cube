@@ -135,6 +135,7 @@ class RefreshScheduler {
       const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
       await orchestratorApi.executeQuery({
         ...sqlQuery,
+        preAggregations: [],
         query: 'SELECT 1', // TODO get rid off it
         continueWait: true,
         renewQuery: true,

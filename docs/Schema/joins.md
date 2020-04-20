@@ -162,3 +162,60 @@ dimensions: {
   }
 }
 ```
+
+## Transitive joins
+
+> **NOTE:** Join graph is directed and `A-B` join is different from `B-A`. [Learn more about it here](direction-of-joins).
+
+Cube.js automatically takes care of transitive joins. For example if you have following schema:
+
+```javascript
+cube(`A`, {
+  // ...
+  joins: {
+    B: {
+      sql: `${A}.b_id = ${B}.id`,
+      relationship: `belongsTo`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+});
+
+cube(`B`, {
+  // ...
+  joins: {
+    C: {
+      sql: `${B}.c_id = ${C}.id`,
+      relationship: `belongsTo`
+    }
+  }
+});
+
+cube(`C`, {
+  // ...
+  
+  dimensions: {
+    category: {
+      sql: `category`,
+      type: `string`
+    }
+  }
+});
+```
+
+And following query:
+
+```javascript
+{
+  measures: ['A.count'],
+  dimensions: ['C.category']
+}
+```
+
+Joins `A-B` and `B-C` will be resolved automatically.
+Cube.js uses [Dijkstra algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) to find join path between cubes given requested members.

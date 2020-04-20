@@ -138,6 +138,29 @@ class BaseTimeDimension extends BaseFilter {
     );
   }
 
+  dateRangeGranularity() {
+    if (!this.dateRange) {
+      return null;
+    }
+    const msFrom = moment.tz(this.dateFromFormatted(), this.query.timezone);
+    const msTo = moment.tz(this.dateToFormatted(), this.query.timezone).add(1, 'ms');
+    return this.query.minGranularity(
+      this.query.granularityFor(msFrom),
+      this.query.granularityFor(msTo),
+    );
+  }
+
+  rollupGranularity() {
+    if (!this.rollupGranularityValue) {
+      this.rollupGranularityValue =
+        this.query.cacheValue(
+          ['rollupGranularity', this.granularity].concat(this.dateRange),
+          () => this.query.minGranularity(this.granularity, this.dateRangeGranularity())
+        );
+    }
+    return this.rollupGranularityValue;
+  }
+
   timeSeries() {
     if (!this.dateRange) {
       throw new UserError(`Time series queries without dateRange aren't supported`);

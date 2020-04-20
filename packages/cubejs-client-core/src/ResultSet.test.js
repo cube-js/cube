@@ -90,6 +90,218 @@ describe('ResultSet', () => {
     });
   });
 
+  describe('chartPivot', () => {
+    test('String field', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.count'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.count': 'Some string',
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.count': {
+              title: 'Foo Count',
+              shortTitle: 'Count',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.count': 'Some string',
+      }]);
+    });
+
+    test('Null field', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.count'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.count': null,
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.count': {
+              title: 'Foo Count',
+              shortTitle: 'Count',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.count': null,
+      }]);
+    });
+
+    test('Empty field', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.count'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.count': undefined,
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.count': {
+              title: 'Foo Count',
+              shortTitle: 'Count',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.count': undefined,
+      }]);
+    });
+
+    test('Number field', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.count'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.count': 10,
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.count': {
+              title: 'Foo Count',
+              shortTitle: 'Count',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.count': 10,
+      }]);
+    });
+
+    test('time field results', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Foo.latestRun'],
+          dimensions: ['Foo.name'],
+          filters: [],
+          timezone: 'UTC',
+          timeDimensions: [],
+        },
+        data: [{
+          'Foo.name': 'Name 1',
+          'Foo.latestRun': '2020-03-11T18:06:09.403Z',
+        }],
+        lastRefreshTime: '2020-03-18T13:41:04.436Z',
+        usedPreAggregations: {},
+        annotation: {
+          measures: {
+            'Foo.latestRun': {
+              title: 'Foo Latest Run',
+              shortTitle: 'Latest Run',
+              type: 'number',
+            },
+          },
+          dimensions: {
+            'Foo.name': {
+              title: 'Foo Name',
+              shortTitle: 'Name',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {},
+        },
+      });
+
+      expect(resultSet.chartPivot()).toEqual([{
+        x: 'Name 1',
+        category: 'Name 1',
+        'Foo.latestRun': new Date('2020-03-11T18:06:09.403Z'),
+      }]);
+    });
+  });
+
   describe('normalizePivotConfig', () => {
     test('fills missing x, y', () => {
       const resultSet = new ResultSet({
@@ -594,6 +806,86 @@ describe('ResultSet', () => {
         { "Orders.createdAt": "2020-01-09T23:49:37.000" },
         { "Orders.createdAt": "2020-01-10T09:07:20.000" },
         { "Orders.createdAt": "2020-01-10T13:50:05.000" }
+      ]);
+    });
+  });
+
+  describe('tableColumns', () => {
+    test('returns array of column definitions for tablePivot', () => {
+      const resultSet = new ResultSet({
+        "query": {
+          "measures": ["Orders.count", "Orders.totalAmount"],
+          "timeDimensions": [{
+            "dimension": "Orders.createdAt",
+            "granularity": "day",
+            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+          }],
+          "dimensions": ["Orders.createdAt"],
+          "filters": [],
+          "timezone": "UTC"
+        },
+        "data": [],
+        "annotation": {
+          "measures": {
+            "Orders.count": {
+              "title": "Orders Count",
+              "shortTitle": "Count",
+              "type": "count",
+            },
+            "Orders.totalAmount": {
+              "title": "Orders Total Amount",
+              "shortTitle": "Total Amount",
+              "type": "number",
+              "format": "currency"
+            }
+          },
+          "dimensions": {
+            "Orders.createdAt": {
+              "title": "Orders Created at",
+              "shortTitle": "Created at",
+              "type": "time"
+            }
+          },
+          "segments": {},
+          "timeDimensions": {
+            "Orders.createdAt.day": {
+              "title": "Orders Created at",
+              "shortTitle": "Created at",
+              "type": "time"
+            }
+          }
+        }
+      });
+
+      expect(resultSet.tableColumns()).toEqual([
+        {
+          "format": undefined,
+          "key": "Orders.createdAt.day",
+          "shortTitle": "Created at",
+          "title": "Orders Created at",
+          "type": "time",
+        },
+        {
+          "format": undefined,
+          "key": "Orders.createdAt",
+          "shortTitle": "Created at",
+          "title": "Orders Created at",
+          "type": "time",
+        },
+        {
+          "format": undefined,
+          "key": "Orders.count",
+          "shortTitle": "Count",
+          "title": "Orders Count",
+          "type": "count",
+        },
+        {
+          "format": "currency",
+          "key": "Orders.totalAmount",
+          "shortTitle": "Total Amount",
+          "title": "Orders Total Amount",
+          "type": "number",
+        }
       ]);
     });
   });
