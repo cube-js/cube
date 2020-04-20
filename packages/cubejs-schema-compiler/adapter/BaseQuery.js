@@ -123,7 +123,7 @@ class BaseQuery {
     this.initUngrouped();
   }
 
-  cacheValue(key, fn, { contextPropNames, inputProps, cache }) {
+  cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
       const contextKey = {};
@@ -538,6 +538,9 @@ class BaseQuery {
       return granularityB;
     }
     if (!granularityB) {
+      return granularityA;
+    }
+    if (granularityA === granularityB) {
       return granularityA;
     }
     const aHierarchy = R.reverse(this.granularityParentHierarchy(granularityA));
@@ -1705,6 +1708,60 @@ class BaseQuery {
 
   everyRefreshKeySql(interval) {
     return this.floorSql(`${this.unixTimestampSql()} / ${this.parseSecondDuration(interval)}`);
+  }
+
+  granularityFor(momentDate) {
+    const obj = momentDate.toObject();
+    const weekDay = momentDate.isoWeekday();
+    if (
+      obj.months === 0 &&
+      obj.date === 1 &&
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'year';
+    } else if (
+      obj.date === 1 &&
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'month';
+    } else if (
+      weekDay === 1 &&
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'week';
+    } else if (
+      obj.hours === 0 &&
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'day';
+    } else if (
+      obj.minutes === 0 &&
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'hour';
+    } else if (
+      obj.seconds === 0 &&
+      obj.milliseconds === 0
+    ) {
+      return 'minute';
+    } else if (
+      obj.milliseconds === 0
+    ) {
+      return 'second';
+    }
+    return 'second'; // TODO return 'millisecond';
   }
 
   parseSecondDuration(interval) {

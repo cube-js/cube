@@ -176,7 +176,7 @@ class PreAggregations {
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         R.prop(0),
-        timeDimensions.map(d => [d.dimension, d.granularity || 'day'])
+        timeDimensions.map(d => [d.dimension, d.rollupGranularity()])
       ) || [];
     }
 
@@ -245,7 +245,7 @@ class PreAggregations {
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         d => d.join('.'),
-        timeDimensions.map(d => [d.dimension, d.granularity || 'day'])
+        timeDimensions.map(d => [d.dimension, d.granularity || 'day']) // TODO granularity shouldn't be null?
       ) || [];
     }
     // TimeDimension :: [Dimension, Granularity]
@@ -517,6 +517,7 @@ class PreAggregations {
       preAggregationForQuery.preAggregation.measures :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures);
 
+    // TODO granularity shouldn't be null?
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
 
     return this.query.evaluateSymbolSqlWithContext(
