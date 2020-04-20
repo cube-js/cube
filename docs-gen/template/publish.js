@@ -4,7 +4,7 @@ const inflection = require('inflection');
 
 let knownClassNames = [];
 
-const anchorName = (link) => inflection.dasherize(inflection.underscore(link));
+const anchorName = (link) => inflection.dasherize(inflection.underscore(link.replace(/#/g, '-')));
 
 const resolveInlineLinks = str => {
   return inline.replaceInlineTags(str, {
@@ -25,13 +25,25 @@ const renderLinks = (p) => {
   return p;
 };
 
+function generateParams(doclet) {
+  const params = doclet.params.map(
+    p => {
+      const optional = p.optional ? `**Optional**` : null;
+      const defaultValue = p.defaultvalue ? `**Default:** \`${p.defaultvalue}\`` : null;
+      const options = [optional, defaultValue].filter(f => !!f);
+      return `- \`${p.name}\`${options.length ? ` (${options.join(', ')})` : ''}${p.description ? ` - ${resolveInlineLinks(p.description)}` : ''}`;
+    }
+  );
+  return `**Parameters:**\n\n${params.join('\n')}\n`;
+}
+
 const generateFunctionDocletSection = (doclet) => {
   const title = doclet.name;
   const header = `##${doclet.longname.indexOf('#') !== -1 ? '#' : ''} ${title}\n`;
   const signature = `\`${doclet.meta.code.name || doclet.name}(${doclet.params && doclet.params.filter(p => p.name.indexOf('.') === -1).map(p => p.name).join(', ') || ''})\`\n`;
-  const params = doclet.params ? `**Parameters:**\n\n${doclet.params.map(p => `- \`${p.name}\`${p.description ? ` - ${p.description}` : ''}`).join('\n')}\n` : ``;
+  const params = doclet.params ? generateParams(doclet) : ``;
   const returns = doclet.returns ? `**Returns:** ${doclet.returns.map(p => `${p.type ? renderLinks(p) : ''}${p.description ? ` ${resolveInlineLinks(p.description)}` : ''}`)}` : ``;
-  return [header, signature, `${doclet.description}\n`, params, returns, '\n'].join('\n');
+  return [header, signature, `${resolveInlineLinks(doclet.description)}\n`, params, returns, '\n'].join('\n');
 };
 
 const generateClassSection = (doclet) => {
