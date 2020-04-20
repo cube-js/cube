@@ -39,10 +39,8 @@ class PostgresQuery extends BaseQuery {
   }
 
   countDistinctApprox(sql) {
-    return  `hll_cardinality(hll_add_agg(hll_hash_any(${sql})))`;
+    return `hll_cardinality(hll_add_agg(hll_hash_any(${sql})))`;
   }
-
-
 }
 
 module.exports = PostgresQuery;
