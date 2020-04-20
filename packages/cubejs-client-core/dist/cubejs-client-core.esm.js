@@ -76,7 +76,7 @@ var TIME_SERIES = {
   }
 };
 var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
-var ISO8601_REGEX = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
+var LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 /**
  * Provides a convenient interface for data manipulation.
  */
@@ -84,10 +84,12 @@ var ISO8601_REGEX = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1
 var ResultSet =
 /*#__PURE__*/
 function () {
-  function ResultSet(loadResponse) {
+  function ResultSet(loadResponse, options) {
     _classCallCheck(this, ResultSet);
 
+    options = options || {};
     this.loadResponse = loadResponse;
+    this.parseDateMeasures = options.parseDateMeasures;
   }
   /**
    * Returns an array of series with key, title and series data.
@@ -424,7 +426,7 @@ function () {
       var _this3 = this;
 
       var validate = function validate(value) {
-        if (ISO8601_REGEX.test(value)) {
+        if (_this3.parseDateMeasures && LocalDateRegex.test(value)) {
           return new Date(value);
         } else if (!Number.isNaN(Number.parseFloat(value))) {
           return Number.parseFloat(value);
@@ -994,6 +996,7 @@ function () {
       headers: this.headers
     });
     this.pollInterval = options.pollInterval || 5;
+    this.parseDateMeasures = options.parseDateMeasures;
   }
 
   _createClass(CubejsApi, [{
@@ -1433,7 +1436,9 @@ function () {
           query: query
         });
       }, function (body) {
-        return new ResultSet(body);
+        return new ResultSet(body, {
+          parseDateMeasures: _this2.parseDateMeasures
+        });
       }, options, callback);
     }
     /**
@@ -1485,7 +1490,9 @@ function () {
           query: query
         });
       }, function (body) {
-        return new ResultSet(body);
+        return new ResultSet(body, {
+          parseDateMeasures: _this5.parseDateMeasures
+        });
       }, _objectSpread2({}, options, {
         subscribe: true
       }), callback);

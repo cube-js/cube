@@ -43,6 +43,7 @@ class CubejsApi {
       headers: this.headers
     });
     this.pollInterval = options.pollInterval || 5;
+    this.parseDateMeasures = options.parseDateMeasures;
   }
 
   request(method, params) {
@@ -204,7 +205,7 @@ class CubejsApi {
   load(query, options, callback) {
     return this.loadMethod(
       () => this.request(`load`, { query }),
-      (body) => new ResultSet(body),
+      (body) => new ResultSet(body, { parseDateMeasures: this.parseDateMeasures }),
       options,
       callback
     );
@@ -244,7 +245,7 @@ class CubejsApi {
   subscribe(query, options, callback) {
     return this.loadMethod(
       () => this.request(`subscribe`, { query }),
-      (body) => new ResultSet(body),
+      (body) => new ResultSet(body, { parseDateMeasures: this.parseDateMeasures }),
       { ...options, subscribe: true },
       callback
     );
