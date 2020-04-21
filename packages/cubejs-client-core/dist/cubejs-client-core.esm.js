@@ -119,7 +119,7 @@ function () {
    *   }
    * ]
    * ```
-   * @param pivotConfig
+   * @param pivotConfig - See {@link ResultSet#pivot}.
    * @returns {Array}
    */
 
@@ -286,6 +286,53 @@ function () {
 
       return TIME_SERIES[timeDimension.granularity](range);
     }
+    /**
+     * Base method for pivoting {@link ResultSet} data.
+     * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot} or {@link ResultSet#tablePivot}
+     * should be used instead.
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-03-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.pivot({ x: ['Stories.time'], y: ['measures'] }) will return
+     * [
+     *   {
+     *     xValues: ["2015-01-01T00:00:00"],
+     *     yValuesArray: [
+     *       ['Stories.count', 27120]
+     *     ]
+     *   },
+     *   {
+     *     xValues: ["2015-02-01T00:00:00"],
+     *     yValuesArray: [
+     *       ['Stories.count', 25861]
+     *     ]
+     *   },
+     *   {
+     *     xValues: ["2015-03-01T00:00:00"],
+     *     yValuesArray: [
+     *       ['Stories.count', 29661]
+     *     ]
+     *   }
+     * ]
+     * ```
+     * @param [pivotConfig] - Configuration object that contains information about pivot axes and other options
+     * @param {Array} pivotConfig.x - dimensions to put on **x** or **rows** axis. Put `measures` at the end of array here
+     * to show measures in rows instead of columns.
+     * @param {Array} pivotConfig.y - dimensions to put on **y** or **columns** axis.
+     * @param {Boolean} [pivotConfig.fillMissingDates=true] - if `true` missing dates on time dimensions will be filled
+     * with `0` for all measures.
+     * @returns {Array} of pivoted rows.
+     */
+
   }, {
     key: "pivot",
     value: function pivot(pivotConfig) {
@@ -417,7 +464,7 @@ function () {
      *   //...
      * ]
      * ```
-     * @param pivotConfig
+     * @param pivotConfig - See {@link ResultSet#pivot}.
      */
 
   }, {
@@ -477,7 +524,7 @@ function () {
      *   //...
      * ]
      * ```
-     * @param pivotConfig
+     * @param pivotConfig - See {@link ResultSet#pivot}
      * @returns {Array} of pivoted rows
      */
 
@@ -531,7 +578,7 @@ function () {
      *   //...
      * ]
      * ```
-     * @param pivotConfig
+     * @param pivotConfig - See {@link ResultSet#pivot}.
      * @returns {Array} of columns
      */
 
@@ -594,7 +641,7 @@ function () {
      * { "key":"Stories.count", "title": "Stories Count" }
      * ]
      * ```
-     * @param pivotConfig
+     * @param pivotConfig - See {@link ResultSet#pivot}.
      * @returns {Array} of series names
      */
 
