@@ -50,6 +50,22 @@ class CubejsApi {
     return this.transport.request(method, { baseRequestId: uuid(), ...params });
   }
 
+  /**
+   * Base method used to perform all API calls.
+   * Shouldn't be used directly.
+   * @param request - function that invoked to perform actual request using `transport.request()` method.
+   * @param toResult - function that maps results of invocation to method return result
+   * @param [options] - options object
+   * @param options.mutexObj - object to use to store MUTEX
+   * @param [options.mutexKey='default'] - key to use to store current request MUTEX inside `mutexObj`.
+   * MUTEX object is used to reject orphaned queries results when new queries are sent.
+   * For example if two queries are sent with same `mutexKey` only last one will return results.
+   * @param options.subscribe - pass `true` to use continuous fetch behavior.
+   * @param {Function} options.progressCallback - function that receives `ProgressResult` on each
+   * `Continue wait` message.
+   * @param [callback] - if passed `callback` function will be called instead of `Promise` returned
+   * @return {{unsubscribe: function()}}
+   */
   loadMethod(request, toResult, options, callback) {
     const mutexValue = ++mutexCounter;
     if (typeof options === 'function' && !callback) {
@@ -198,8 +214,8 @@ class CubejsApi {
    * new Chart(context, chartjsConfig(resultSet));
    * ```
    * @param query - [Query object](query-format)
-   * @param [options]
-   * @param [callback]
+   * @param [options] - See {@link CubejsApi#loadMethod}
+   * @param [callback] - See {@link CubejsApi#loadMethod}
    * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
    */
   load(query, options, callback) {
@@ -214,8 +230,8 @@ class CubejsApi {
   /**
    * Get generated SQL string for given `query`.
    * @param query - [Query object](query-format)
-   * @param [options]
-   * @param [callback]
+   * @param [options] - See {@link CubejsApi#loadMethod}
+   * @param [callback] - See {@link CubejsApi#loadMethod}
    * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
    */
   sql(query, options, callback) {
@@ -229,8 +245,8 @@ class CubejsApi {
 
   /**
    * Get meta description of cubes available for querying.
-   * @param [options]
-   * @param [callback]
+   * @param [options] - See {@link CubejsApi#loadMethod}
+   * @param [callback] - See {@link CubejsApi#loadMethod}
    * @return {Promise} for {@link Meta} if `callback` isn't passed
    */
   meta(options, callback) {
