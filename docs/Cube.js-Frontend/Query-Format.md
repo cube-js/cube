@@ -301,6 +301,7 @@ Since grouping and filtering by a time dimension is quite a common case, Cube.js
 
   - `dimension`: Time dimension name.
   - `dateRange`: An array of dates with the following format `YYYY-MM-DD` or in `YYYY-MM-DDTHH:mm:ss.SSS` format.
+Values should always be local and in query `timezone`.
 Dates in `YYYY-MM-DD` format padded to start and end of day if used in start and end of date range interval accordingly. 
 If only one date specified it's equivalent to passing two same dates as a date range.
 You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
