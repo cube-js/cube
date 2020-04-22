@@ -74,7 +74,7 @@ Here:
 - Query is *Leaf Measure Additive* if all of it's *Leaf Measures* are either `count`, `sum`, `min`, `max` or `countDistinctApprox` type.
 - Query is *Not Additive* if it's not *Additive* and not *Leaf Measure Additive*.
 - *Leaf Measures* are measures that do not reference any other measures in it's definition.
-- Time dimension together with granularity constitute dimension.
+- Time dimension together with granularity constitute dimension. If date range isn't aligned with granularity common granularity is used. To match granularity date range should match it's start and end. For example for month it's `['2020-01-01T00:00:00.000', '2020-01-31T23:59:59.999']` and for day it's `['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']`. Date ranges are inclusive. Minimum granularity is `second`.
 - Multiplied measures are measures of cubes that define `hasMany` relation involved in pre-aggregation definition join.
 
 Also order of pre-aggregations definition in cube matters.
