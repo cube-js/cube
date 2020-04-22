@@ -39,7 +39,7 @@ class PostgresQuery extends BaseQuery {
   }
 
   countDistinctApprox(sql) {
-    return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`; 
+    return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }
 }
 
