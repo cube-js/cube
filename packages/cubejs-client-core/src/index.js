@@ -198,8 +198,8 @@ class CubejsApi {
    * new Chart(context, chartjsConfig(resultSet));
    * ```
    * @param query - [Query object](query-format)
-   * @param options
-   * @param callback
+   * @param [options]
+   * @param [callback]
    * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
    */
   load(query, options, callback) {
@@ -214,8 +214,8 @@ class CubejsApi {
   /**
    * Get generated SQL string for given `query`.
    * @param query - [Query object](query-format)
-   * @param options
-   * @param callback
+   * @param [options]
+   * @param [callback]
    * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
    */
   sql(query, options, callback) {
@@ -229,8 +229,8 @@ class CubejsApi {
 
   /**
    * Get meta description of cubes available for querying.
-   * @param options
-   * @param callback
+   * @param [options]
+   * @param [callback]
    * @return {Promise} for {@link Meta} if `callback` isn't passed
    */
   meta(options, callback) {
@@ -265,12 +265,13 @@ class CubejsApi {
  );
  ```
  * @name cubejs
- * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
+ * @param [apiToken] - [API token](security) is used to authorize requests and determine SQL database you're accessing.
  * In the development mode, Cube.js Backend will print the API token to the console on on startup.
- * Can be an async function without arguments that returns API token. Optional.
- * @param options - options object.
+ * Can be an async function without arguments that returns API token.
+ * @param [options] - options object.
  * @param options.apiUrl - URL of your Cube.js Backend.
  * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
+ * @param options.transport - transport implementation to use. {@link HttpTransport} will be used by default.
  * @returns {CubejsApi}
  * @order -10
  */

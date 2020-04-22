@@ -1,7 +1,20 @@
+/**
+ * @module @cubejs-client/core
+ */
+
 import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
+/**
+ * Default transport implementation.
+ */
 class HttpTransport {
+  /**
+   * @param options - mandatory options object
+   * @param options.authorization - [jwt auth token](security)
+   * @param options.apiUrl - path to `/cubejs-api/v1`
+   * @param [options.headers] - object of custom headers
+   */
   constructor({ authorization, apiUrl, headers = {} }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
