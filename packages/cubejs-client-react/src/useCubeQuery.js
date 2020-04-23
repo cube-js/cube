@@ -12,6 +12,7 @@ export default (query, options = {}) => {
   const [resultSet, setResultSet] = useState(null);
   const [error, setError] = useState(null);
   const context = useContext(CubeContext);
+  const { resetResultSetOnChange } = options;
 
   let subscribeRequest = null;
 
@@ -19,7 +20,9 @@ export default (query, options = {}) => {
     async function loadQuery() {
       if (query && isQueryPresent(query)) {
         if (!equals(currentQuery, query)) {
-          setResultSet(null);
+          if (resetResultSetOnChange == null || resetResultSetOnChange) {
+            setResultSet(null);
+          }
           setError(null);
           setCurrentQuery(query);
         }

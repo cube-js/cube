@@ -13599,7 +13599,7 @@
 	  }
 	};
 	var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
-	var ISO8601_REGEX = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
+	var LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 	/**
 	 * Provides a convenient interface for data manipulation.
 	 */
@@ -13607,10 +13607,12 @@
 	var ResultSet =
 	/*#__PURE__*/
 	function () {
-	  function ResultSet(loadResponse) {
+	  function ResultSet(loadResponse, options) {
 	    _classCallCheck(this, ResultSet);
 
+	    options = options || {};
 	    this.loadResponse = loadResponse;
+	    this.parseDateMeasures = options.parseDateMeasures;
 	  }
 	  /**
 	   * Returns an array of series with key, title and series data.
@@ -13640,7 +13642,7 @@
 	   *   }
 	   * ]
 	   * ```
-	   * @param pivotConfig
+	   * @param pivotConfig - See {@link ResultSet#pivot}.
 	   * @returns {Array}
 	   */
 
@@ -13807,6 +13809,53 @@
 
 	      return TIME_SERIES[timeDimension.granularity](range$$1);
 	    }
+	    /**
+	     * Base method for pivoting {@link ResultSet} data.
+	     * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot} or {@link ResultSet#tablePivot}
+	     * should be used instead.
+	     *
+	     * ```js
+	     * // For query
+	     * {
+	     *   measures: ['Stories.count'],
+	     *   timeDimensions: [{
+	     *     dimension: 'Stories.time',
+	     *     dateRange: ['2015-01-01', '2015-03-31'],
+	     *     granularity: 'month'
+	     *   }]
+	     * }
+	     *
+	     * // ResultSet.pivot({ x: ['Stories.time'], y: ['measures'] }) will return
+	     * [
+	     *   {
+	     *     xValues: ["2015-01-01T00:00:00"],
+	     *     yValuesArray: [
+	     *       ['Stories.count', 27120]
+	     *     ]
+	     *   },
+	     *   {
+	     *     xValues: ["2015-02-01T00:00:00"],
+	     *     yValuesArray: [
+	     *       ['Stories.count', 25861]
+	     *     ]
+	     *   },
+	     *   {
+	     *     xValues: ["2015-03-01T00:00:00"],
+	     *     yValuesArray: [
+	     *       ['Stories.count', 29661]
+	     *     ]
+	     *   }
+	     * ]
+	     * ```
+	     * @param [pivotConfig] - Configuration object that contains information about pivot axes and other options
+	     * @param {Array} pivotConfig.x - dimensions to put on **x** or **rows** axis. Put `measures` at the end of array here
+	     * to show measures in rows instead of columns.
+	     * @param {Array} pivotConfig.y - dimensions to put on **y** or **columns** axis.
+	     * @param {Boolean} [pivotConfig.fillMissingDates=true] - if `true` missing dates on time dimensions will be filled
+	     * with `0` for all measures.
+	     * @returns {Array} of pivoted rows.
+	     */
+
 	  }, {
 	    key: "pivot",
 	    value: function pivot(pivotConfig) {
@@ -13938,7 +13987,7 @@
 	     *   //...
 	     * ]
 	     * ```
-	     * @param pivotConfig
+	     * @param pivotConfig - See {@link ResultSet#pivot}.
 	     */
 
 	  }, {
@@ -13947,7 +13996,7 @@
 	      var _this3 = this;
 
 	      var validate = function validate(value) {
-	        if (ISO8601_REGEX.test(value)) {
+	        if (_this3.parseDateMeasures && LocalDateRegex.test(value)) {
 	          return new Date(value);
 	        } else if (!Number.isNaN(Number.parseFloat(value))) {
 	          return Number.parseFloat(value);
@@ -13998,7 +14047,7 @@
 	     *   //...
 	     * ]
 	     * ```
-	     * @param pivotConfig
+	     * @param pivotConfig - See {@link ResultSet#pivot}
 	     * @returns {Array} of pivoted rows
 	     */
 
@@ -14052,7 +14101,7 @@
 	     *   //...
 	     * ]
 	     * ```
-	     * @param pivotConfig
+	     * @param pivotConfig - See {@link ResultSet#pivot}.
 	     * @returns {Array} of columns
 	     */
 
@@ -14115,7 +14164,7 @@
 	     * { "key":"Stories.count", "title": "Stories Count" }
 	     * ]
 	     * ```
-	     * @param pivotConfig
+	     * @param pivotConfig - See {@link ResultSet#pivot}.
 	     * @returns {Array} of series names
 	     */
 
@@ -15448,6 +15497,7 @@
 	      headers: this.headers
 	    });
 	    this.pollInterval = options.pollInterval || 5;
+	    this.parseDateMeasures = options.parseDateMeasures;
 	  }
 
 	  _createClass(CubejsApi, [{
@@ -15887,7 +15937,9 @@
 	          query: query
 	        });
 	      }, function (body) {
-	        return new ResultSet(body);
+	        return new ResultSet(body, {
+	          parseDateMeasures: _this2.parseDateMeasures
+	        });
 	      }, options, callback);
 	    }
 	    /**
@@ -15939,7 +15991,9 @@
 	          query: query
 	        });
 	      }, function (body) {
-	        return new ResultSet(body);
+	        return new ResultSet(body, {
+	          parseDateMeasures: _this5.parseDateMeasures
+	        });
 	      }, _objectSpread({}, options, {
 	        subscribe: true
 	      }), callback);

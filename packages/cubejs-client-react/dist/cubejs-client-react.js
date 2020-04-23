@@ -11,6 +11,7 @@ require('core-js/modules/web.dom.iterable');
 require('core-js/modules/es6.array.iterator');
 require('core-js/modules/es6.object.to-string');
 require('core-js/modules/es6.string.iterator');
+var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _possibleConstructorReturn = _interopDefault(require('@babel/runtime/helpers/possibleConstructorReturn'));
 var _getPrototypeOf = _interopDefault(require('@babel/runtime/helpers/getPrototypeOf'));
@@ -21,7 +22,6 @@ var React__default = _interopDefault(React);
 var PropTypes = require('prop-types');
 var ramda = require('ramda');
 var _extends = _interopDefault(require('@babel/runtime/helpers/extends'));
-var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
 require('core-js/modules/es6.array.filter');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
@@ -117,12 +117,14 @@ function (_React$Component) {
     value: function load(query) {
       var _this2 = this;
 
-      this.setState({
+      var resetResultSetOnChange = this.props.resetResultSetOnChange;
+      this.setState(_objectSpread2({
         isLoading: true,
-        resultSet: null,
         error: null,
         sqlQuery: null
-      });
+      }, resetResultSetOnChange ? {
+        resultSet: null
+      } : {}));
       var loadSql = this.props.loadSql;
       var cubejsApi = this.cubejsApi();
 
@@ -138,11 +140,12 @@ function (_React$Component) {
               isLoading: false
             });
           })["catch"](function (error) {
-            return _this2.setState({
-              resultSet: null,
+            return _this2.setState(_objectSpread2({}, resetResultSetOnChange ? {
+              resultSet: null
+            } : {}, {
               error: error,
               isLoading: false
-            });
+            }));
           });
         } else if (loadSql) {
           Promise.all([cubejsApi.sql(query, {
@@ -163,11 +166,12 @@ function (_React$Component) {
               isLoading: false
             });
           })["catch"](function (error) {
-            return _this2.setState({
-              resultSet: null,
+            return _this2.setState(_objectSpread2({}, resetResultSetOnChange ? {
+              resultSet: null
+            } : {}, {
               error: error,
               isLoading: false
-            });
+            }));
           });
         } else {
           cubejsApi.load(query, {
@@ -180,11 +184,12 @@ function (_React$Component) {
               isLoading: false
             });
           })["catch"](function (error) {
-            return _this2.setState({
-              resultSet: null,
+            return _this2.setState(_objectSpread2({}, resetResultSetOnChange ? {
+              resultSet: null
+            } : {}, {
               error: error,
               isLoading: false
-            });
+            }));
           });
         }
       }
@@ -195,11 +200,14 @@ function (_React$Component) {
       var _this3 = this;
 
       var cubejsApi = this.cubejsApi();
-      this.setState({
-        isLoading: true,
-        resultSet: null,
+      var resetResultSetOnChange = this.props.resetResultSetOnChange;
+      this.setState(_objectSpread2({
+        isLoading: true
+      }, resetResultSetOnChange ? {
+        resultSet: null
+      } : {}, {
         error: null
-      });
+      }));
       var resultPromises = Promise.all(ramda.toPairs(queries).map(function (_ref3) {
         var _ref4 = _slicedToArray(_ref3, 2),
             name = _ref4[0],
@@ -219,11 +227,12 @@ function (_React$Component) {
           isLoading: false
         });
       })["catch"](function (error) {
-        return _this3.setState({
-          resultSet: null,
+        return _this3.setState(_objectSpread2({}, resetResultSetOnChange ? {
+          resultSet: null
+        } : {}, {
           error: error,
           isLoading: false
-        });
+        }));
       });
     }
   }, {
@@ -262,6 +271,7 @@ QueryRenderer.propTypes = {
   query: PropTypes.object,
   queries: PropTypes.object,
   loadSql: PropTypes.any,
+  resetResultSetOnChange: PropTypes.bool,
   updateOnlyOnStateChange: PropTypes.bool
 };
 QueryRenderer.defaultProps = {
@@ -270,7 +280,8 @@ QueryRenderer.defaultProps = {
   render: null,
   queries: null,
   loadSql: null,
-  updateOnlyOnStateChange: false
+  updateOnlyOnStateChange: false,
+  resetResultSetOnChange: true
 };
 
 var QueryRendererWithTotals = function QueryRendererWithTotals(_ref) {
@@ -776,6 +787,7 @@ var useCubeQuery = (function (query) {
       setError = _useState10[1];
 
   var context = React.useContext(CubeContext);
+  var resetResultSetOnChange = options.resetResultSetOnChange;
   var subscribeRequest = null;
   React.useEffect(function () {
     function loadQuery() {
@@ -797,7 +809,10 @@ var useCubeQuery = (function (query) {
                 }
 
                 if (!ramda.equals(currentQuery, query)) {
-                  setResultSet(null);
+                  if (resetResultSetOnChange == null || resetResultSetOnChange) {
+                    setResultSet(null);
+                  }
+
                   setError(null);
                   setCurrentQuery(query);
                 }

@@ -228,7 +228,7 @@ describe('ResultSet', () => {
         },
         data: [{
           'Foo.name': 'Name 1',
-          'Foo.count': 10,
+          'Foo.count': '10',
         }],
         lastRefreshTime: '2020-03-18T13:41:04.436Z',
         usedPreAggregations: {},
@@ -292,7 +292,7 @@ describe('ResultSet', () => {
           segments: {},
           timeDimensions: {},
         },
-      });
+      }, { parseDateMeasures: true });
 
       expect(resultSet.chartPivot()).toEqual([{
         x: 'Name 1',

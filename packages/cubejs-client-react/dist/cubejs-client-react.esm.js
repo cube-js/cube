@@ -5,6 +5,7 @@ import 'core-js/modules/web.dom.iterable';
 import 'core-js/modules/es6.array.iterator';
 import 'core-js/modules/es6.object.to-string';
 import 'core-js/modules/es6.string.iterator';
+import _objectSpread2 from '@babel/runtime/helpers/objectSpread';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
 import _possibleConstructorReturn from '@babel/runtime/helpers/possibleConstructorReturn';
 import _getPrototypeOf from '@babel/runtime/helpers/getPrototypeOf';
@@ -14,7 +15,6 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { func, object, any, bool } from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import _extends from '@babel/runtime/helpers/extends';
-import _objectSpread2 from '@babel/runtime/helpers/objectSpread';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import 'core-js/modules/es6.array.filter';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
@@ -110,12 +110,14 @@ function (_React$Component) {
     value: function load(query) {
       var _this2 = this;
 
-      this.setState({
+      var resetResultSetOnChange = this.props.resetResultSetOnChange;
+      this.setState(_objectSpread2({
         isLoading: true,
-        resultSet: null,
         error: null,
         sqlQuery: null
-      });
+      }, resetResultSetOnChange ? {
+        resultSet: null
+      } : {}));
       var loadSql = this.props.loadSql;
       var cubejsApi = this.cubejsApi();
 
@@ -131,11 +133,12 @@ function (_React$Component) {
               isLoading: false
             });
           })["catch"](function (error) {
-            return _this2.setState({
-              resultSet: null,
+            return _this2.setState(_objectSpread2({}, resetResultSetOnChange ? {
+              resultSet: null
+            } : {}, {
               error: error,
               isLoading: false
-            });
+            }));
           });
         } else if (loadSql) {
           Promise.all([cubejsApi.sql(query, {
@@ -156,11 +159,12 @@ function (_React$Component) {
               isLoading: false
             });
           })["catch"](function (error) {
-            return _this2.setState({
-              resultSet: null,
+            return _this2.setState(_objectSpread2({}, resetResultSetOnChange ? {
+              resultSet: null
+            } : {}, {
               error: error,
               isLoading: false
-            });
+            }));
           });
         } else {
           cubejsApi.load(query, {
@@ -173,11 +177,12 @@ function (_React$Component) {
               isLoading: false
             });
           })["catch"](function (error) {
-            return _this2.setState({
-              resultSet: null,
+            return _this2.setState(_objectSpread2({}, resetResultSetOnChange ? {
+              resultSet: null
+            } : {}, {
               error: error,
               isLoading: false
-            });
+            }));
           });
         }
       }
@@ -188,11 +193,14 @@ function (_React$Component) {
       var _this3 = this;
 
       var cubejsApi = this.cubejsApi();
-      this.setState({
-        isLoading: true,
-        resultSet: null,
+      var resetResultSetOnChange = this.props.resetResultSetOnChange;
+      this.setState(_objectSpread2({
+        isLoading: true
+      }, resetResultSetOnChange ? {
+        resultSet: null
+      } : {}, {
         error: null
-      });
+      }));
       var resultPromises = Promise.all(toPairs(queries).map(function (_ref3) {
         var _ref4 = _slicedToArray(_ref3, 2),
             name = _ref4[0],
@@ -212,11 +220,12 @@ function (_React$Component) {
           isLoading: false
         });
       })["catch"](function (error) {
-        return _this3.setState({
-          resultSet: null,
+        return _this3.setState(_objectSpread2({}, resetResultSetOnChange ? {
+          resultSet: null
+        } : {}, {
           error: error,
           isLoading: false
-        });
+        }));
       });
     }
   }, {
@@ -255,6 +264,7 @@ QueryRenderer.propTypes = {
   query: object,
   queries: object,
   loadSql: any,
+  resetResultSetOnChange: bool,
   updateOnlyOnStateChange: bool
 };
 QueryRenderer.defaultProps = {
@@ -263,7 +273,8 @@ QueryRenderer.defaultProps = {
   render: null,
   queries: null,
   loadSql: null,
-  updateOnlyOnStateChange: false
+  updateOnlyOnStateChange: false,
+  resetResultSetOnChange: true
 };
 
 var QueryRendererWithTotals = function QueryRendererWithTotals(_ref) {
@@ -769,6 +780,7 @@ var useCubeQuery = (function (query) {
       setError = _useState10[1];
 
   var context = useContext(CubeContext);
+  var resetResultSetOnChange = options.resetResultSetOnChange;
   var subscribeRequest = null;
   useEffect(function () {
     function loadQuery() {
@@ -790,7 +802,10 @@ var useCubeQuery = (function (query) {
                 }
 
                 if (!equals(currentQuery, query)) {
-                  setResultSet(null);
+                  if (resetResultSetOnChange == null || resetResultSetOnChange) {
+                    setResultSet(null);
+                  }
+
                   setError(null);
                   setCurrentQuery(query);
                 }

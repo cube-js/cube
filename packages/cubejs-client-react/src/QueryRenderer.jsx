@@ -58,8 +58,12 @@ export default class QueryRenderer extends React.Component {
   }
 
   load(query) {
+    const { resetResultSetOnChange } = this.props;
     this.setState({
-      isLoading: true, resultSet: null, error: null, sqlQuery: null
+      isLoading: true,
+      error: null,
+      sqlQuery: null,
+      ...(resetResultSetOnChange ? { resultSet: null } : {})
     });
     const { loadSql } = this.props;
     const cubejsApi = this.cubejsApi();
@@ -67,7 +71,11 @@ export default class QueryRenderer extends React.Component {
       if (loadSql === 'only') {
         cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
           .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))
-          .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
+          .catch(error => this.setState({
+            ...(resetResultSetOnChange ? { resultSet: null } : {}),
+            error,
+            isLoading: false
+          }));
       } else if (loadSql) {
         Promise.all([
           cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
@@ -75,18 +83,31 @@ export default class QueryRenderer extends React.Component {
         ]).then(([sqlQuery, resultSet]) => this.setState({
           sqlQuery, resultSet, error: null, isLoading: false
         }))
-          .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
+          .catch(error => this.setState({
+            ...(resetResultSetOnChange ? { resultSet: null } : {}),
+            error,
+            isLoading: false
+          }));
       } else {
         cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
           .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
-          .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
+          .catch(error => this.setState({
+            ...(resetResultSetOnChange ? { resultSet: null } : {}),
+            error,
+            isLoading: false
+          }));
       }
     }
   }
 
   loadQueries(queries) {
     const cubejsApi = this.cubejsApi();
-    this.setState({ isLoading: true, resultSet: null, error: null });
+    const { resetResultSetOnChange } = this.props;
+    this.setState({
+      isLoading: true,
+      ...(resetResultSetOnChange ? { resultSet: null } : {}),
+      error: null
+    });
 
     const resultPromises = Promise.all(toPairs(queries).map(
       ([name, query]) => cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
@@ -98,7 +119,11 @@ export default class QueryRenderer extends React.Component {
         error: null,
         isLoading: false
       }))
-      .catch(error => this.setState({ resultSet: null, error, isLoading: false }));
+      .catch(error => this.setState({
+        ...(resetResultSetOnChange ? { resultSet: null } : {}),
+        error,
+        isLoading: false
+      }));
   }
 
   render() {
@@ -127,6 +152,7 @@ QueryRenderer.propTypes = {
   query: PropTypes.object,
   queries: PropTypes.object,
   loadSql: PropTypes.any,
+  resetResultSetOnChange: PropTypes.bool,
   updateOnlyOnStateChange: PropTypes.bool
 };
 
@@ -136,5 +162,6 @@ QueryRenderer.defaultProps = {
   render: null,
   queries: null,
   loadSql: null,
-  updateOnlyOnStateChange: false
+  updateOnlyOnStateChange: false,
+  resetResultSetOnChange: true
 };
