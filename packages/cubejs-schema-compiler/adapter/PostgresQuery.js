@@ -35,11 +35,11 @@ class PostgresQuery extends BaseQuery {
   }
 
   hllMerge(sql) {
-    return `hll_cardinality(hll_union_agg(${sql}))`;
+    return `round(hll_cardinality(hll_union_agg(${sql})))`;
   }
 
   countDistinctApprox(sql) {
-    return `hll_cardinality(hll_add_agg(hll_hash_any(${sql})))`;
+    return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }
 }
 
