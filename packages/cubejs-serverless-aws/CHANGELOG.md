@@ -3,6 +3,92 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.11](https://github.com/cube-js/cube.js/compare/v0.19.10...v0.19.11) (2020-04-20)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.10](https://github.com/cube-js/cube.js/compare/v0.19.9...v0.19.10) (2020-04-18)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.9](https://github.com/cube-js/cube.js/compare/v0.19.8...v0.19.9) (2020-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.8](https://github.com/cube-js/cube.js/compare/v0.19.7...v0.19.8) (2020-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.7](https://github.com/cube-js/cube.js/compare/v0.19.6...v0.19.7) (2020-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.6](https://github.com/cube-js/cube.js/compare/v0.19.5...v0.19.6) (2020-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.5](https://github.com/cube-js/cube.js/compare/v0.19.4...v0.19.5) (2020-04-13)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.4](https://github.com/cube-js/cube.js/compare/v0.19.3...v0.19.4) (2020-04-12)
+
+
+### Bug Fixes
+
+* **serverless-aws:** cubejsProcess agent doesn't collect all events after process has been finished ([939e25a](https://github.com/cube-js/cube.js/commit/939e25a))
+
+
+
+
+
+## [0.19.3](https://github.com/cube-js/cube.js/compare/v0.19.2...v0.19.3) (2020-04-12)
+
+
+### Bug Fixes
+
+* Handle invalid lambda process events ([37fc43f](https://github.com/cube-js/cube.js/commit/37fc43f))
+
+
+
+
+
+## [0.19.2](https://github.com/cube-js/cube.js/compare/v0.19.1...v0.19.2) (2020-04-12)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
 ## [0.19.1](https://github.com/cube-js/cube.js/compare/v0.19.0...v0.19.1) (2020-04-11)
 
 **Note:** Version bump only for package @cubejs-backend/serverless-aws

@@ -55,22 +55,25 @@ const Subtitle = styled.div`
 `
 
 const MediaContainer = styled.div`
-  //background-image: url(${browserControls});
-  //background-position: 11px 6px;
-  //background-repeat: no-repeat;
-  //background-color: white;
-  //box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.15);
-  //padding: 5px;
-  //border-radius: 10px;
-  padding-top: 20px;
-  padding-bottom: 2px;
+  ${props => props.withFrame &&
+  `
+    background-image: url(${browserControls});
+    background-position: 11px 6px;
+    background-repeat: no-repeat;
+    background-color: white;
+    box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.15);
+    padding: 5px;
+    border-radius: 10px;
+    padding-top: 20px;
+    padding-bottom: 2px;
+  `}
   ${media.greaterThan("medium")`
     margin-left: 15px;
   `}
   img, video {
     max-width: 630px;
     width: 100%;
-    //border: 10px solid #F3F3FB;
+    ${props => props.withFrame && `border: 10px solid #F3F3FB;`}
     border-radius: 10px;
     box-sizing: border-box;
   }
@@ -130,7 +133,8 @@ const Hero = ({
   media,
   title,
   subtitle,
-  demoUrl
+  demoUrl,
+  withFrame
 }) => (
   <Container>
     <InnerContainer>
@@ -143,11 +147,15 @@ const Hero = ({
         </ButtonsContainer>
         { socialButtons }
       </CopyContainer>
-      <MediaContainer>
+      <MediaContainer withFrame={withFrame}>
         { media }
       </MediaContainer>
     </InnerContainer>
   </Container>
 );
+
+Hero.defaultProps = {
+  withFrame: false
+}
 
 export default Hero;

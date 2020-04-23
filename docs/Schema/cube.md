@@ -311,6 +311,21 @@ cube(`Orders`, {
 });
 ```
 
+To ensure filter value presents for all requests `requiredFilter` can be used:
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM orders WHERE ${USER_CONTEXT.email.requiredFilter('email')}`,
+
+  dimensions: {
+    date: {
+      sql: `date`,
+      type: `time`
+    }
+  }
+});
+```
+
 ### Unsafe Value
 
 > **NOTE:** Use of this feature entails SQL injection security risk. Use it with caution.

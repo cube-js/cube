@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 const crypto = require('crypto');
 
 let flushPromise = null;
-let trackEvents = [];
+const trackEvents = [];
 
 module.exports = async (event, endpointUrl, logger) => {
   trackEvents.push({
@@ -12,8 +12,7 @@ module.exports = async (event, endpointUrl, logger) => {
   });
   const flush = async (toFlush, retries) => {
     if (!toFlush) {
-      toFlush = trackEvents;
-      trackEvents = [];
+      toFlush = trackEvents.splice(0, 20);
     }
     if (!toFlush.length) {
       return null;

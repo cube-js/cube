@@ -73,6 +73,8 @@ class QueryQueue {
           queryKey: queryDef.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
+          activeQueryKeys: active,
+          toProcessQueryKeys: toProcess,
           active: active.indexOf(redisClient.redisHash(queryKey)) !== -1,
           queueIndex: toProcess.indexOf(redisClient.redisHash(queryKey)),
           waitingForRequestId: queryDef.requestId
@@ -206,12 +208,19 @@ class QueryQueue {
 
   async processQuery(queryKey) {
     const redisClient = await this.queueDriver.createConnection();
+    let insertedCount;
+    // eslint-disable-next-line no-unused-vars
+    let removedCount;
+    let activeKeys;
+    let queueSize;
+    let query;
+    let processingLockAcquired;
     try {
       const processingId = await redisClient.getNextProcessingId();
-      // eslint-disable-next-line no-unused-vars
-      const [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] =
+      [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] =
         await redisClient.retrieveForProcessing(queryKey, processingId);
-      if (query && insertedCount && activeKeys.indexOf(this.redisHash(queryKey)) !== -1 && processingLockAcquired) {
+      const activated = activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
+      if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
         const startQueryTime = (new Date()).getTime();
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
@@ -239,7 +248,7 @@ class QueryQueue {
                     return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
                   } catch (e) {
                     this.logger(`Error while query update`, {
-                      queryKey,
+                      queryKey: query.queryKey,
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
                       requestId: query.requestId
@@ -274,13 +283,16 @@ class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            this.logger('Cancelling query due to timeout', {
-              processingId,
-              queryKey: query.queryKey,
-              queuePrefix: this.redisQueuePrefix,
-              requestId: query.requestId
-            });
-            await this.sendCancelMessageFn(query);
+            const queryWithCancelHandle = await redisClient.getQueryDef(queryKey);
+            if (queryWithCancelHandle) {
+              this.logger('Cancelling query due to timeout', {
+                processingId,
+                queryKey: queryWithCancelHandle.queryKey,
+                queuePrefix: this.redisQueuePrefix,
+                requestId: queryWithCancelHandle.requestId
+              });
+              await this.sendCancelMessageFn(queryWithCancelHandle);
+            }
           }
         }
 
@@ -300,18 +312,20 @@ class QueryQueue {
       } else {
         this.logger('Skip processing', {
           processingId,
-          queryKey,
+          queryKey: query && query.queryKey || queryKey,
+          requestId: query && query.requestId,
           queuePrefix: this.redisQueuePrefix,
           processingLockAcquired,
           query,
           insertedCount,
           activeKeys
         });
-        await redisClient.freeProcessingLock(queryKey, processingId);
+        await redisClient.freeProcessingLock(queryKey, processingId, activated);
       }
     } catch (e) {
       this.logger('Queue storage error', {
-        queryKey,
+        queryKey: query && query.queryKey || queryKey,
+        requestId: query && query.requestId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });

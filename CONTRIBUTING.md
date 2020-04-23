@@ -77,6 +77,7 @@ In order to link `@cubejs-backend/server-core`:
 2. Link server-core package: `yarn link` inside `packages/cubejs-server-core`.
 3. Link all drivers and dependent packages where you make changes in `packages/cubejs-server-core`.
 4. Run `yarn build` in `packages/cubejs-playground`.
+5. Install dependencies in all linked packages using `yarn`.
 
 ## Style guides
 

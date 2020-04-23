@@ -14,8 +14,9 @@ var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass')
 require('core-js/modules/es6.promise');
 require('core-js/modules/es6.object.to-string');
 var uuid = _interopDefault(require('uuid/v4'));
-require('core-js/modules/es6.number.constructor');
 require('core-js/modules/es6.number.parse-float');
+require('core-js/modules/es6.number.constructor');
+require('core-js/modules/es6.number.is-nan');
 require('core-js/modules/web.dom.iterable');
 require('core-js/modules/es6.array.iterator');
 require('core-js/modules/es6.object.keys');
@@ -81,6 +82,7 @@ var TIME_SERIES = {
   }
 };
 var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
+var ISO8601_REGEX = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
 /**
  * Provides a convenient interface for data manipulation.
  */
@@ -427,6 +429,16 @@ function () {
     value: function chartPivot(pivotConfig) {
       var _this3 = this;
 
+      var validate = function validate(value) {
+        if (ISO8601_REGEX.test(value)) {
+          return new Date(value);
+        } else if (!Number.isNaN(Number.parseFloat(value))) {
+          return Number.parseFloat(value);
+        }
+
+        return value;
+      };
+
       return this.pivot(pivotConfig).map(function (_ref15) {
         var xValues = _ref15.xValues,
             yValuesArray = _ref15.yValuesArray;
@@ -439,7 +451,7 @@ function () {
               yValues = _ref17[0],
               m = _ref17[1];
 
-          return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && Number.parseFloat(m));
+          return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && validate(m));
         }).reduce(function (a, b) {
           return Object.assign(a, b);
         }, {}));
@@ -518,8 +530,8 @@ function () {
      *
      * // ResultSet.tableColumns() will return
      * [
-     *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time" },
-     *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count" },
+     *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time", type: "time", format: undefined },
+     *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count", type: "count", format: undefined },
      *   //...
      * ]
      * ```
@@ -539,12 +551,16 @@ function () {
           return {
             key: m,
             title: _this4.loadResponse.annotation.measures[m].title,
-            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle
+            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle,
+            format: _this4.loadResponse.annotation.measures[m].format,
+            type: _this4.loadResponse.annotation.measures[m].type
           };
         }) : [{
           key: field,
           title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title,
-          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle
+          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle,
+          format: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).format,
+          type: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).type
         }];
       };
 
@@ -750,6 +766,13 @@ function () {
       }];
     }));
   }
+  /**
+   * Get all members of specific type for a given query.
+   * If empty query is provided no filtering is done based on query context and all available members are retrieved.
+   * @param query - context query to provide filtering of members available to add to this query
+   * @param memberType - `measures`, `dimensions` or `segments`
+   */
+
 
   _createClass(Meta, [{
     key: "membersForQuery",

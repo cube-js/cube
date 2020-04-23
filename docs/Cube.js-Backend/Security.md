@@ -74,6 +74,7 @@ app.use((req, res, next) => {
 
 app.get('/auth/cubejs-token', (req, res) => {
   res.json({
+    // Take note: cubejs expects the JWT payload to contain an object!
     token: jwt.sign({ u: req.user }, process.env.CUBEJS_API_SECRET, { expiresIn: '1d' })
   })
 })
@@ -106,6 +107,8 @@ For example if you want to pass user id in security context you can create token
 ```
 
 In this case `{ "id": 42 }` object will be accessible as [USER_CONTEXT](cube#context-variables-user-context) in the Cube.js Data Schema.
+
+The Cube.js server expects the context to be an object. If you don't provide an object as the JWT payload, you will see an error like `Cannot create proxy with a non-object as target or handler`.
 
 Consider the following example. We want to show orders only for
 customers, who owns these orders. `orders` table has a `user_id` column, which we

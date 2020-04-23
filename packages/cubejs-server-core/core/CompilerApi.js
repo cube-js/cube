@@ -18,7 +18,7 @@ class CompilerApi {
   async getCompilers(options) {
     const { requestId } = options || {};
     let compilerVersion = (
-      this.schemaVersion && this.schemaVersion() ||
+      this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
     ).toString();
     if (this.options.devServer) {

@@ -19,42 +19,29 @@ class PreAggregations {
   }
 
   preAggregationsDescriptionLocal() {
-    const preAggregationForQuery = this.findPreAggregationForQuery();
-    if (preAggregationForQuery) {
-      if (preAggregationForQuery.preAggregation.useOriginalSqlPreAggregations) {
-        const { preAggregations, result } =
-          this.collectOriginalSqlPreAggregations(
-            () => this.preAggregationDescriptionsFor(preAggregationForQuery.cube, preAggregationForQuery)
-          );
-
-        const queryForEval = this.query.preAggregationQueryForSqlEvaluation(
-          preAggregationForQuery.cube,
-          preAggregationForQuery.preAggregation
-        );
-
-        // TODO consider recursive pre-aggregation descriptions instead of duplication of sub query logic
-        return R.unnest(preAggregations.map(
-          p => this.preAggregationDescriptionsFor(p.cube, p).concat(
-            R.unnest(
-              queryForEval.subQueryDimensions.map(d => queryForEval.subQueryDescription(d).subQuery)
-                .map(q => q.preAggregations.preAggregationDescriptionsFor(p.cube, p))
-            )
-          )
-        )).concat(result);
+    const isInPreAggregationQuery = this.query.options.preAggregationQuery;
+    if (!isInPreAggregationQuery) {
+      const preAggregationForQuery = this.findPreAggregationForQuery();
+      if (preAggregationForQuery) {
+        return this.preAggregationDescriptionsFor(preAggregationForQuery.cube, preAggregationForQuery);
       }
-      return this.preAggregationDescriptionsFor(preAggregationForQuery.cube, preAggregationForQuery);
     }
-    return R.pipe(
-      R.map(cube => {
-        const foundPreAggregation = this.findPreAggregationToUseForCube(cube);
-        if (foundPreAggregation) {
-          return this.preAggregationDescriptionsFor(cube, foundPreAggregation);
-        }
-        return null;
-      }),
-      R.filter(R.identity),
-      R.unnest
-    )(this.preAggregationCubes());
+    if (
+      !isInPreAggregationQuery ||
+      isInPreAggregationQuery && this.query.options.useOriginalSqlPreAggregationsInPreAggregation) {
+      return R.pipe(
+        R.map(cube => {
+          const foundPreAggregation = this.findPreAggregationToUseForCube(cube);
+          if (foundPreAggregation) {
+            return this.preAggregationDescriptionsFor(cube, foundPreAggregation);
+          }
+          return null;
+        }),
+        R.filter(R.identity),
+        R.unnest
+      )(this.preAggregationCubes());
+    }
+    return [];
   }
 
   preAggregationCubes() {
@@ -65,13 +52,13 @@ class PreAggregations {
   preAggregationDescriptionsFor(cube, foundPreAggregation) {
     if (this.canPartitionsBeUsed(foundPreAggregation)) {
       const { dimension, partitionDimension } = this.partitionDimension(foundPreAggregation);
-      return partitionDimension.timeSeries().map(
-        range => this.preAggregationDescriptionFor(
+      return R.unnest(partitionDimension.timeSeries().map(
+        range => this.preAggregationDescriptionsForRecursive(
           cube, this.addPartitionRangeTo(foundPreAggregation, dimension, range)
         )
-      );
+      ));
     }
-    return [this.preAggregationDescriptionFor(cube, foundPreAggregation)];
+    return this.preAggregationDescriptionsForRecursive(cube, foundPreAggregation);
   }
 
   canPartitionsBeUsed(foundPreAggregation) {
@@ -101,6 +88,12 @@ class PreAggregations {
       dateRange: this.query.timeDimensions[0].dateRange
     });
     return { dimension, partitionDimension };
+  }
+
+  preAggregationDescriptionsForRecursive(cube, foundPreAggregation) {
+    const query = this.query.preAggregationQueryForSqlEvaluation(cube, foundPreAggregation.preAggregation);
+    const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
+    return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation));
   }
 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
@@ -183,7 +176,7 @@ class PreAggregations {
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         R.prop(0),
-        timeDimensions.map(d => [d.dimension, d.granularity || 'day'])
+        timeDimensions.map(d => [d.dimension, d.rollupGranularity()])
       ) || [];
     }
 
@@ -252,7 +245,7 @@ class PreAggregations {
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         d => d.join('.'),
-        timeDimensions.map(d => [d.dimension, d.granularity || 'day'])
+        timeDimensions.map(d => [d.dimension, d.granularity || 'day']) // TODO granularity shouldn't be null?
       ) || [];
     }
     // TimeDimension :: [Dimension, Granularity]
@@ -524,6 +517,7 @@ class PreAggregations {
       preAggregationForQuery.preAggregation.measures :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures);
 
+    // TODO granularity shouldn't be null?
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
 
     return this.query.evaluateSymbolSqlWithContext(
