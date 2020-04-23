@@ -28,14 +28,16 @@ const TIME_SERIES = {
 };
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
-const ISO8601_REGEX = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
+const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
 /**
  * Provides a convenient interface for data manipulation.
  */
 class ResultSet {
-  constructor(loadResponse) {
+  constructor(loadResponse, options) {
+    options = options || {};
     this.loadResponse = loadResponse;
+    this.parseDateMeasures = options.parseDateMeasures;
   }
 
   /**
@@ -66,7 +68,7 @@ class ResultSet {
    *   }
    * ]
    * ```
-   * @param pivotConfig
+   * @param pivotConfig - See {@link ResultSet#pivot}.
    * @returns {Array}
    */
   series(pivotConfig) {
@@ -186,6 +188,52 @@ class ResultSet {
     return TIME_SERIES[timeDimension.granularity](range);
   }
 
+  /**
+   * Base method for pivoting {@link ResultSet} data.
+   * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot} or {@link ResultSet#tablePivot}
+   * should be used instead.
+   *
+   * ```js
+   * // For query
+   * {
+   *   measures: ['Stories.count'],
+   *   timeDimensions: [{
+   *     dimension: 'Stories.time',
+   *     dateRange: ['2015-01-01', '2015-03-31'],
+   *     granularity: 'month'
+   *   }]
+   * }
+   *
+   * // ResultSet.pivot({ x: ['Stories.time'], y: ['measures'] }) will return
+   * [
+   *   {
+   *     xValues: ["2015-01-01T00:00:00"],
+   *     yValuesArray: [
+   *       ['Stories.count', 27120]
+   *     ]
+   *   },
+   *   {
+   *     xValues: ["2015-02-01T00:00:00"],
+   *     yValuesArray: [
+   *       ['Stories.count', 25861]
+   *     ]
+   *   },
+   *   {
+   *     xValues: ["2015-03-01T00:00:00"],
+   *     yValuesArray: [
+   *       ['Stories.count', 29661]
+   *     ]
+   *   }
+   * ]
+   * ```
+   * @param [pivotConfig] - Configuration object that contains information about pivot axes and other options
+   * @param {Array} pivotConfig.x - dimensions to put on **x** or **rows** axis. Put `measures` at the end of array here
+   * to show measures in rows instead of columns.
+   * @param {Array} pivotConfig.y - dimensions to put on **y** or **columns** axis.
+   * @param {Boolean} [pivotConfig.fillMissingDates=true] - if `true` missing dates on time dimensions will be filled
+   * with `0` for all measures.
+   * @returns {Array} of pivoted rows.
+   */
   pivot(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     let groupByXAxis = groupBy(({ xValues }) => this.axisValuesString(xValues));
@@ -285,11 +333,11 @@ class ResultSet {
    *   //...
    * ]
    * ```
-   * @param pivotConfig
+   * @param pivotConfig - See {@link ResultSet#pivot}.
    */
   chartPivot(pivotConfig) {
     const validate = (value) => {
-      if (ISO8601_REGEX.test(value)) {
+      if (this.parseDateMeasures && LocalDateRegex.test(value)) {
         return new Date(value);
       } else if (!Number.isNaN(Number.parseFloat(value))) {
         return Number.parseFloat(value);
@@ -335,7 +383,7 @@ class ResultSet {
    *   //...
    * ]
    * ```
-   * @param pivotConfig
+   * @param pivotConfig - See {@link ResultSet#pivot}
    * @returns {Array} of pivoted rows
    */
   tablePivot(pivotConfig) {
@@ -379,7 +427,7 @@ class ResultSet {
    *   //...
    * ]
    * ```
-   * @param pivotConfig
+   * @param pivotConfig - See {@link ResultSet#pivot}.
    * @returns {Array} of columns
    */
   tableColumns(pivotConfig) {
@@ -445,7 +493,7 @@ class ResultSet {
    * { "key":"Stories.count", "title": "Stories Count" }
    * ]
    * ```
-   * @param pivotConfig
+   * @param pivotConfig - See {@link ResultSet#pivot}.
    * @returns {Array} of series names
    */
   seriesNames(pivotConfig) {

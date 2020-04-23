@@ -6880,12 +6880,14 @@
 	    value: function load(query) {
 	      var _this2 = this;
 
-	      this.setState({
+	      var resetResultSetOnChange = this.props.resetResultSetOnChange;
+	      this.setState(_objectSpread({
 	        isLoading: true,
-	        resultSet: null,
 	        error: null,
 	        sqlQuery: null
-	      });
+	      }, resetResultSetOnChange ? {
+	        resultSet: null
+	      } : {}));
 	      var loadSql = this.props.loadSql;
 	      var cubejsApi = this.cubejsApi();
 
@@ -6901,11 +6903,12 @@
 	              isLoading: false
 	            });
 	          })["catch"](function (error) {
-	            return _this2.setState({
-	              resultSet: null,
+	            return _this2.setState(_objectSpread({}, resetResultSetOnChange ? {
+	              resultSet: null
+	            } : {}, {
 	              error: error,
 	              isLoading: false
-	            });
+	            }));
 	          });
 	        } else if (loadSql) {
 	          Promise.all([cubejsApi.sql(query, {
@@ -6926,11 +6929,12 @@
 	              isLoading: false
 	            });
 	          })["catch"](function (error) {
-	            return _this2.setState({
-	              resultSet: null,
+	            return _this2.setState(_objectSpread({}, resetResultSetOnChange ? {
+	              resultSet: null
+	            } : {}, {
 	              error: error,
 	              isLoading: false
-	            });
+	            }));
 	          });
 	        } else {
 	          cubejsApi.load(query, {
@@ -6943,11 +6947,12 @@
 	              isLoading: false
 	            });
 	          })["catch"](function (error) {
-	            return _this2.setState({
-	              resultSet: null,
+	            return _this2.setState(_objectSpread({}, resetResultSetOnChange ? {
+	              resultSet: null
+	            } : {}, {
 	              error: error,
 	              isLoading: false
-	            });
+	            }));
 	          });
 	        }
 	      }
@@ -6958,11 +6963,14 @@
 	      var _this3 = this;
 
 	      var cubejsApi = this.cubejsApi();
-	      this.setState({
-	        isLoading: true,
-	        resultSet: null,
+	      var resetResultSetOnChange = this.props.resetResultSetOnChange;
+	      this.setState(_objectSpread({
+	        isLoading: true
+	      }, resetResultSetOnChange ? {
+	        resultSet: null
+	      } : {}, {
 	        error: null
-	      });
+	      }));
 	      var resultPromises = Promise.all(toPairs(queries).map(function (_ref3) {
 	        var _ref4 = _slicedToArray(_ref3, 2),
 	            name = _ref4[0],
@@ -6982,11 +6990,12 @@
 	          isLoading: false
 	        });
 	      })["catch"](function (error) {
-	        return _this3.setState({
-	          resultSet: null,
+	        return _this3.setState(_objectSpread({}, resetResultSetOnChange ? {
+	          resultSet: null
+	        } : {}, {
 	          error: error,
 	          isLoading: false
-	        });
+	        }));
 	      });
 	    }
 	  }, {
@@ -7025,6 +7034,7 @@
 	  query: PropTypes.object,
 	  queries: PropTypes.object,
 	  loadSql: PropTypes.any,
+	  resetResultSetOnChange: PropTypes.bool,
 	  updateOnlyOnStateChange: PropTypes.bool
 	};
 	QueryRenderer.defaultProps = {
@@ -7033,7 +7043,8 @@
 	  render: null,
 	  queries: null,
 	  loadSql: null,
-	  updateOnlyOnStateChange: false
+	  updateOnlyOnStateChange: false,
+	  resetResultSetOnChange: true
 	};
 
 	var QueryRendererWithTotals = function QueryRendererWithTotals(_ref) {
@@ -8269,6 +8280,7 @@
 	      setError = _useState10[1];
 
 	  var context = React.useContext(CubeContext);
+	  var resetResultSetOnChange = options.resetResultSetOnChange;
 	  var subscribeRequest = null;
 	  React.useEffect(function () {
 	    function loadQuery() {
@@ -8290,7 +8302,10 @@
 	                }
 
 	                if (!equals(currentQuery, query)) {
-	                  setResultSet(null);
+	                  if (resetResultSetOnChange == null || resetResultSetOnChange) {
+	                    setResultSet(null);
+	                  }
+
 	                  setError(null);
 	                  setCurrentQuery(query);
 	                }

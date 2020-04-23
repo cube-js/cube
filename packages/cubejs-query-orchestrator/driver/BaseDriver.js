@@ -153,7 +153,11 @@ class BaseDriver {
   }
 
   createTable(quotedTableName, columns) {
-    return this.query(this.createTableSql(quotedTableName, columns), []);
+    const createTableSql = this.createTableSql(quotedTableName, columns);
+    return this.query(createTableSql, []).catch(e => {
+      e.message = `Error during create table: ${createTableSql}: ${e.message}`;
+      throw e;
+    });
   }
 
   createTableSql(quotedTableName, columns) {
