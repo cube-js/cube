@@ -51,6 +51,60 @@ Names should always start with a letter.
 As a convention cube names start with upper case letters and member names with lower case letters.
 As in case of JavaScript camel case is used for multi-word cube and member names.
 
+## Members and Referencing
+
+Cubes have three types of members: measures, dimensions and segments.
+Each member can be referenced by either fully qualified name `<CubeName>.<memberName>` or by short version `<memberName>` if member within same cube is referenced.
+There's also handy `CUBE` context variable which references to the current cube.
+Important difference between same cube references is `CUBE.<memberName>` references are resolved runtime as opposed to compile time `<memberName>` references.
+
+Referencing cubes directly renders it's alias. For example it's handy to avoid name ambiguity in complex expressions:
+
+```javascript
+cube(`Users`, {
+  sql: `select * from users`,
+  
+  joins: {
+    Contacts: {
+      sql: `${CUBE}.contact_id = ${Contacts}.id`,
+      relationship: `hasOne`
+    }
+  }
+  
+  dimensions: {
+    // primary key,
+    
+    name: {
+      sql: `COALESCE(${CUBE}.name, ${Contacts}.name)`,
+      type: `string`
+    }
+  }
+});
+
+cube(`Contacts`, {
+  sql: `select * from contacts`
+  
+  // primary key
+});
+```
+
+Referencing foreign cube in sql parameter instructs Cube.js to build implicit join to this cube.
+For previous example following query
+
+```javascript
+{
+  dimensions: ['Users.name']
+}
+```
+
+leads to a join
+
+```sql
+select COALESCE("users".name, "contacts".name) "users__name" 
+FROM users "users"
+LEFT JOIN contacts "contacts" ON "users".contact_id = "contacts".id
+```
+
 ## Parameters
 
 ### sql
