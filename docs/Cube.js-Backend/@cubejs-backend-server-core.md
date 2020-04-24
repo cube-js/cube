@@ -14,9 +14,9 @@ menuOrder: 6
 `CubejsServerCore.create` is an entry point for a Cube.js server application. It creates an instance of `CubejsServerCore`, which could be embedded for example into Express application.
 
 ```javascript
-import * as CubejsServerCore from "@cubejs-backend/server-core";
-import * as express from 'express';
-import * as path from 'path';
+const CubejsServerCore = require('@cubejs-backend/server-core');
+const express = require('express');
+const path = require('path');
 
 const express = express();
 
