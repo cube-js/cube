@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.14](https://github.com/cube-js/cube.js/compare/v0.19.13...v0.19.14) (2020-04-24)
+
+
+### Bug Fixes
+
+* More descriptive errors for download errors ([e834aba](https://github.com/cube-js/cube.js/commit/e834aba))
+* Show Postgres params in logs ([a678ca7](https://github.com/cube-js/cube.js/commit/a678ca7))
+
+
+### Features
+
+* Postgres HLL improvements: always round to int ([#611](https://github.com/cube-js/cube.js/issues/611)) Thanks to [@milanbella](https://github.com/milanbella)! ([680a613](https://github.com/cube-js/cube.js/commit/680a613))
+
+
+
+
+
 ## [0.19.13](https://github.com/cube-js/cube.js/compare/v0.19.12...v0.19.13) (2020-04-21)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.14](https://github.com/cube-js/cube.js/compare/v0.19.13...v0.19.14) (2020-04-24)
+
+
+### Bug Fixes
+
+* More descriptive errors for download errors ([e834aba](https://github.com/cube-js/cube.js/commit/e834aba))
+
+
+
+
+
 ## [0.19.9](https://github.com/cube-js/cube.js/compare/v0.19.8...v0.19.9) (2020-04-16)
 
 
