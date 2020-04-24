@@ -66,6 +66,7 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
     const prefix = `${requestId} ${durationStr}`;
     if (query && values) {
       const queryMaxLines = 50;
+      query = query.replace(/\$(\d+)/g, '?');
       let formatted = SqlString.format(query, values).split('\n');
       if (formatted.length > queryMaxLines && !allSqlLines) {
         formatted = R.take(queryMaxLines / 2, formatted)
