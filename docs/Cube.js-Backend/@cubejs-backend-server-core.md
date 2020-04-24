@@ -52,6 +52,7 @@ Both [CubejsServerCore](@cubejs-backend-server-core) `create` method and [Cubejs
   contextToAppId: (context: RequestContext) => String,
   contextToDataSourceId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => SchemaFileRepository,
+  checkAuth: (req: ExpressRequest, authorization: String) => any,
   checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
@@ -248,9 +249,10 @@ CubejsServerCore.create({
 });
 ```
 
-### checkAuthMiddleware
+### checkAuth
 
-This is an [Express Middleware](https://expressjs.com/en/guide/using-middleware.html) for authentication.
+Used in both REST and Websocket API.
+Can be `async` functon.
 Default implementation parses [JSON Web Tokens (JWT)](https://jwt.io/) in `Authorization` and sets payload to `req.authInfo` if it's verified.
 More info on how to generate such tokens is [here](security#security-context).
 
@@ -258,15 +260,20 @@ You can set `req.authInfo = { u: { ...userContextObj } }` inside the middleware 
 
 Called on each request.
 
-Also, you can use `checkAuthMiddleware` to disable built-in security. See an example below.
+Also, you can use empty `checkAuth` function to disable built-in security. See an example below.
 
 ```javascript
 CubejsServerCore.create({
-  checkAuthMiddleware: (req, res, next) => {
-    return next && next();
-  }
+  checkAuth: (req, auth) => {}
 });
 ```
+
+### checkAuthMiddleware
+
+This is an [Express Middleware](https://expressjs.com/en/guide/using-middleware.html) for authentication.
+Default implementation calls [checkAuth](#options-reference-check-auth).
+
+Called on each request.
 
 ### queryTransformer
 
