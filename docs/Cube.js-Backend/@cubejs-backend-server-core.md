@@ -31,7 +31,7 @@ const options = {
 };
 
 const core = CubejsServerCore.create(options);
-await core.initApp(express);
+core.initApp(express);
 ```
 
 ## Options Reference
