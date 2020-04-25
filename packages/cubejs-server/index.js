@@ -2,6 +2,7 @@
 require('dotenv').config();
 const CubejsServerCore = require('@cubejs-backend/server-core');
 const WebSocketServer = require('./WebSocketServer');
+const { version } = require('./package.json');
 
 class CubejsServer {
   constructor(config) {
@@ -11,6 +12,7 @@ class CubejsServer {
     this.webSockets = config.webSockets;
     this.redirector = null;
     this.server = null;
+    this.version = version;
   }
 
   async listen(options = {}) {
