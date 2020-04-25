@@ -71,7 +71,8 @@ class CubejsServer {
             app,
             port: PORT,
             tlsPort: process.env.CUBEJS_ENABLE_TLS === "true" ? TLS_PORT : undefined,
-            server: this.server
+            server: this.server,
+            version
           });
         });
       });
