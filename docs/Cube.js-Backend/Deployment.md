@@ -15,16 +15,16 @@ Below you can find guides for popular deployment environments:
 
 ## Production Mode
 
-When running Cube.js Backend in production make sure `NODE_ENV` is set to `production`. 
+When running Cube.js Backend in production make sure `NODE_ENV` is set to `production`.
 Such platforms, such as Heroku, do it by default.
 In this mode Cube.js unsecured development server and Playground will be disabled by default because there's a security risk serving those in production environments.
-Production Cube.js servers can be accessed only with [REST API](rest-api) and Cube.js frontend libraries. 
+Production Cube.js servers can be accessed only with [REST API](rest-api) and Cube.js frontend libraries.
 
 ### Redis
 
-Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production. 
-It uses Redis for query caching and queue. 
-Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. In case your Redis instance has password, please set password via `REDIS_PASSWORD` environment variable. 
+Also, Cube.js requires [Redis](https://redis.io/), in-memory data structure store, to run in production.
+It uses Redis for query caching and queue.
+Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. In case your Redis instance has password, please set password via `REDIS_PASSWORD` environment variable.
 Make sure, your Redis allows at least 15 concurrent connections.
 Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
 
@@ -65,7 +65,7 @@ app.listen(port, (err) => {
     console.error('Fatal error during server start: ');
     console.error(e.stack || e);
   }
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
 });
 ```
 
@@ -143,7 +143,7 @@ server.listen(port, (err) => {
     console.error('Fatal error during server start: ');
     console.error(e.stack || e);
   }
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
 });
 ```
 
@@ -370,7 +370,7 @@ $ docker stop cubejs-docker-demo
 
 ## Docker Compose
 
-To run the server in docker-compose we need to add a redis server and a .env file to include the environment variables needed to connect to the database, the secret api secret and redis hostname. 
+To run the server in docker-compose we need to add a redis server and a .env file to include the environment variables needed to connect to the database, the secret api secret and redis hostname.
 
 Example .env file
 
@@ -411,7 +411,7 @@ Build the containers
 $ docker-compose build
 ```
 
-### Start/Stop the containers 
+### Start/Stop the containers
 
 ```bash
 $ docker-compose up
@@ -420,5 +420,3 @@ $ docker-compose up
 ```bash
 $ docker-compose stop
 ```
-
-

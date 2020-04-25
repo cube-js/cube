@@ -25,8 +25,8 @@ const CubejsServer = require('@cubejs-backend/server');
 
 const server = new CubejsServer();
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
@@ -62,8 +62,8 @@ const { createTerminus } = require('@godaddy/terminus');
 
 const cubejsServer = new CubejsServer();
 
-cubejsServer.listen().then(({ port, server }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+cubejsServer.listen().then(({ version, port, server }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 
     createTerminus(server, {
     healthChecks: {
