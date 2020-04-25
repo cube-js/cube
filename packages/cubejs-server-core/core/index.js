@@ -216,7 +216,6 @@ class CubejsServerCore {
       typeof options.orchestratorOptions === 'function' ?
         options.orchestratorOptions :
         () => options.orchestratorOptions;
-    this.version = version;
 
     // proactively free up old cache values occassionally
     if (options.maxCompilerCacheKeepAlive) {
@@ -518,6 +517,10 @@ class CubejsServerCore {
     });
     await Promise.all(releases);
     this.dataSourceIdToOrchestratorApi = {};
+  }
+
+  static version() {
+    return version;
   }
 }
 

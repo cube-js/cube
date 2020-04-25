@@ -12,7 +12,6 @@ class CubejsServer {
     this.webSockets = config.webSockets;
     this.redirector = null;
     this.server = null;
-    this.version = version;
   }
 
   async listen(options = {}) {
@@ -129,6 +128,10 @@ class CubejsServer {
 
   static apiSecret() {
     return process.env.CUBEJS_API_SECRET;
+  }
+
+  static version() {
+    return version;
   }
 }
 
