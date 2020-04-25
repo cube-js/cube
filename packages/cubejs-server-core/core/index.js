@@ -13,6 +13,7 @@ const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
 const track = require('./track');
 const agentCollect = require('./agentCollect');
+const { version } = require('../package.json');
 
 const DriverDependencies = {
   postgres: '@cubejs-backend/postgres-driver',
@@ -215,6 +216,7 @@ class CubejsServerCore {
       typeof options.orchestratorOptions === 'function' ?
         options.orchestratorOptions :
         () => options.orchestratorOptions;
+    this.version = version;
 
     // proactively free up old cache values occassionally
     if (options.maxCompilerCacheKeepAlive) {
