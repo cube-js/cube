@@ -11,7 +11,7 @@
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
-    "core-js": "^2.5.3",
+    "core-js": "^3.6.5",
     "ramda": "^0.27.0",
     "rollup-plugin-dts": "^1.1.8",
     "whatwg-fetch": "^3.0.0"
