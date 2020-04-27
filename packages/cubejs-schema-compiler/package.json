@@ -44,7 +44,7 @@
     "mssql": "^6.1.0",
     "mysql": "^2.18.1",
     "nyc": "^15.0.0",
-    "pg-promise": "^7.3.2",
+    "pg-promise": "^10.5.2",
     "request": "^2.88.0",
     "request-promise": "^4.2.4",
     "should": "^11.2.1",
