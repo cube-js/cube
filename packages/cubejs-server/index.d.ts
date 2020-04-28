@@ -10,7 +10,7 @@ export interface CreateOptions extends CoreCreateOptions {
 declare class CubejsServer {
   constructor(options: CreateOptions);
 
-  listen(): Promise<{ server: http.Server | https.Server, port: number, tlsPort?: number, app: express.Application }>;
+  listen(options?: https.ServerOptions | http.ServerOptions): Promise<{ server: http.Server | https.Server, port: number, tlsPort?: number, app: express.Application }>;
   close(): Promise<void>;
   testConnections(): Promise<void>;
 }

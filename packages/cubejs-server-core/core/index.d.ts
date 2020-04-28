@@ -39,27 +39,27 @@ declare module "@cubejs-backend/server-core" {
   }
 
   export interface OrchestratorOptions {
-    redisPrefix: string;
-    queryCacheOptions: QueryCacheOptions;
-    preAggregationsOptions: PreAggregationsOptions;
+    redisPrefix?: string;
+    queryCacheOptions?: QueryCacheOptions;
+    preAggregationsOptions?: PreAggregationsOptions;
   }
 
   export interface QueryCacheOptions {
-    refreshKeyRenewalThreshold: number;
-    backgroundRenew: boolean;
-    queueOptions: QueueOptions;
+    refreshKeyRenewalThreshold?: number;
+    backgroundRenew?: boolean;
+    queueOptions?: QueueOptions;
   }
 
   export interface PreAggregationsOptions {
-    queueOptions: QueueOptions;
+    queueOptions?: QueueOptions;
   }
 
   export interface QueueOptions {
-    concurrency: number;
-    continueWaitTimeout: number;
-    executionTimeout: number;
-    orphanedTimeout: number;
-    heartBeatInterval: number;
+    concurrency?: number;
+    continueWaitTimeout?: number;
+    executionTimeout?: number;
+    orphanedTimeout?: number;
+    heartBeatInterval?: number;
   }
 
   export interface RequestContext {
