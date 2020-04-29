@@ -52,6 +52,6 @@ declare module "@cubejs-backend/api-gateway" {
   }
 
   export interface NormalizedQueryFilter extends QueryFilter {
-    dimension: string;
+    dimension?: string;
   }
 }
