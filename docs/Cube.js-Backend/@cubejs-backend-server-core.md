@@ -195,7 +195,6 @@ CubejsServerCore.create({
 })
 ```
 
-
 ### contextToAppId
 
 It is a [Multitenancy Setup](multitenancy-setup) option.
@@ -319,7 +318,7 @@ It is usually used in [Multitenancy Setup](multitenancy-setup).
 
 ### schemaVersion
 
-Schema version can be used to tell Cube.js schema should be recompiled in case schema code depends on dynamic definitions fetched from some external database or API. 
+Schema version can be used to tell Cube.js schema should be recompiled in case schema code depends on dynamic definitions fetched from some external database or API.
 This method is called on each request however `RequestContext` parameter is reused per application id returned by [contextToAppId](#options-reference-context-to-app-id).
 If returned string has been changed, schema will be recompiled.
 It can be used in both multitenant and single tenant environments.
@@ -369,7 +368,7 @@ Providing `updateCompilerCacheKeepAlive: true` keeps frequently used schemas in 
 
 ### allowUngroupedWithoutPrimaryKey
 
-Providing `allowUngroupedWithoutPrimaryKey: true` disables primary key inclusion check for `ungrouped` queries. 
+Providing `allowUngroupedWithoutPrimaryKey: true` disables primary key inclusion check for `ungrouped` queries.
 
 ### telemetry
 
@@ -454,4 +453,14 @@ class ApiFileRepository {
 CubejsServerCore.create({
   repositoryFactory: ({authInfo}) => new ApiFileRepository()
 });
+```
+
+## Version
+
+`CubejsServerCore.version` is a method that returns the semantic package version of `@cubejs-backend/server`.
+
+```javascript
+const CubejsServerCore = require('@cubejs-backend/server-core');
+
+console.log(CubejsServerCore.version());
 ```

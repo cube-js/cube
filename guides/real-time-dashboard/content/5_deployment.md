@@ -28,23 +28,23 @@ $ heroku config:set \
 ```
 
 Next, we need to make some changes to our `index.js` file to make it serve
-static files from the `dashboard-app/build` folder. Update the content of 
+static files from the `dashboard-app/build` folder. Update the content of
 `index.js` with the following.
 
 ```javascript
 const CubejsServerCore = require('@cubejs-backend/server-core');
 const WebSocketServer = require('@cubejs-backend/server/WebSocketServer');
 const express = require('express');
-const bodyParser = require("body-parser");
-const http = require("http");
-const path = require("path");
+const bodyParser = require('body-parser');
+const http = require('http');
+const path = require('path');
 const serveStatic = require('serve-static');
 require('dotenv').config();
 
-var app = express();
+const app = express();
 
-app.use(require("cors")());
-app.use(bodyParser.json({ limit: "50mb" }));
+app.use(require('cors')());
+app.use(bodyParser.json({ limit: '50mb' }));
 
 const cubejsServer = CubejsServerCore.create({
   orchestratorOptions: {
@@ -69,7 +69,7 @@ if (process.env.NODE_ENV === 'production') {
 
 const port = process.env.PORT || 4000;
 server.listen(port, () => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
 });
 ```
 
