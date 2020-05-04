@@ -1676,7 +1676,7 @@ class BaseQuery {
       );
     } else if (index.clustered && index.compression === "columnstore") {
       return this.paramAllocator.buildSqlAndParams(
-        this.createIndexSql(indexName, tableName, undefined, undefined, {clustered: true, compression: "columnstore"})
+        this.createIndexSql(indexName, tableName, undefined, undefined, { clustered: true, compression: "columnstore" })
       );
     } else {
       throw new Error(`Index SQL support is not implemented`);
@@ -1684,7 +1684,7 @@ class BaseQuery {
   }
 
   createIndexSql(indexName, tableName, escapedColumns) {
-       return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
+    return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
   }
 
   preAggregationSql(cube, preAggregation) {

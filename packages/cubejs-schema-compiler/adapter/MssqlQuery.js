@@ -103,7 +103,7 @@ class MssqlQuery extends BaseQuery {
   }
 
   createIndexSql(indexName, tableName, escapedColumns, escapedInclude, indexOptions) {
-    const {clustered, compression, unique} = indexOptions;
+    const { clustered, compression, unique } = indexOptions;
 
     if (compression === "columnstore") {
       return this.createColumnstoreIndexSql(indexName, tableName, clustered, escapedColumns);
