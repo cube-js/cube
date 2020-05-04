@@ -11,7 +11,9 @@ const Connection = require('jshs2/lib/Connection');
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
 
 const newIDL = [
-  '2.3.4'
+  "2.1.1",
+  "2.2.3",
+  '2.3.4',
 ];
 
 const oldExtractConfig = IDLFactory.extractConfig;
