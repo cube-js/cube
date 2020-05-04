@@ -172,7 +172,8 @@ describe('MSSqlPreAggregations', function test() {
             clustered: {
               columns: ['id'],
               clustered: true,
-              compression: 'row'
+              compression: 'row',
+              unique: true
             },
             columnstore: {
               columns: ['created_at'],
@@ -200,7 +201,7 @@ describe('MSSqlPreAggregations', function test() {
     return [
       preAggregation.reduce(
         (replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`)
-          .replace(/CREATE( CLUSTERED)?( COLUMNSTORE)? INDEX (?!i_)/, `CREATE$1$2 INDEX i_${suffix}_`), toReplace
+          .replace(/CREATE( UNIQUE)?( CLUSTERED)?( COLUMNSTORE)? INDEX (?!i_)/, `CREATE$1$2$3 INDEX i_${suffix}_`), toReplace
       ),
       params
     ];

@@ -1665,12 +1665,18 @@ class BaseQuery {
         include.map(escapeColumn).map(c => this.escapeColumnName(c)) :
         undefined;
 
+      const indexOptions = {
+        clustered: index.clustered,
+        unique: index.unique,
+        compression: index.compression
+      };
+
       return this.paramAllocator.buildSqlAndParams(
-        this.createIndexSql(indexName, tableName, escapedColumns, escapedInclude, index.clustered, index.compression)
+        this.createIndexSql(indexName, tableName, escapedColumns, escapedInclude, indexOptions)
       );
     } else if (index.clustered && index.compression === "columnstore") {
       return this.paramAllocator.buildSqlAndParams(
-        this.createIndexSql(indexName, tableName, undefined, undefined, index.clustered, index.compression)
+        this.createIndexSql(indexName, tableName, undefined, undefined, {clustered: true, compression: "columnstore"})
       );
     } else {
       throw new Error(`Index SQL support is not implemented`);

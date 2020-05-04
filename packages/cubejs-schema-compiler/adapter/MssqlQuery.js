@@ -102,13 +102,15 @@ class MssqlQuery extends BaseQuery {
     return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
   }
 
-  createIndexSql(indexName, tableName, escapedColumns, escapedInclude, clustered, compression) {
+  createIndexSql(indexName, tableName, escapedColumns, escapedInclude, indexOptions) {
+    const {clustered, compression, unique} = indexOptions;
+
     if (compression === "columnstore") {
       return this.createColumnstoreIndexSql(indexName, tableName, clustered, escapedColumns);
     } else if (clustered) {
-      return this.createClusteredRowstoreIndexSql(indexName, tableName, escapedColumns, compression);
+      return this.createClusteredRowstoreIndexSql(indexName, tableName, escapedColumns, compression, unique);
     } else {
-      return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(", ")}) ${
+      return `CREATE ${unique ? "UNIQUE " : ""}INDEX ${indexName} ON ${tableName} (${escapedColumns.join(", ")}) ${
         escapedInclude ? `INCLUDE (${escapedInclude.join(", ")})` : ""} ${
         compression ? `WITH (DATA_COMPRESSION = ${compression})` : ""}`;
     }
@@ -119,9 +121,9 @@ class MssqlQuery extends BaseQuery {
       escapedColumns ? `(${escapedColumns.join(", ")})` : ""}`;
   }
 
-  createClusteredRowstoreIndexSql(indexName, tableName, escapedColumns, compression) {
-    return `CREATE CLUSTERED INDEX ${indexName} ON ${tableName}(${escapedColumns.join(", ")})${
-      compression ? ` WITH (DATA_COMPRESSION = ${compression})` : ""}`;
+  createClusteredRowstoreIndexSql(indexName, tableName, escapedColumns, compression, unique) {
+    return `CREATE ${unique ? "UNIQUE " : ""}CLUSTERED INDEX ${indexName} ON ${tableName}(
+      ${escapedColumns.join(", ")})${compression ? ` WITH (DATA_COMPRESSION = ${compression})` : ""}`;
   }
 
   wrapSegmentForDimensionSelect(sql) {
