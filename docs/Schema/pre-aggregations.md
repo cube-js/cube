@@ -511,8 +511,8 @@ cube(`Orders`, {
       type: `originalSql`,
       indexes: {
         clustered: {
-          columnstore: true,
-          clustered: true
+          clustered: true,
+          compression: 'columnstore'
         },
         orders: {
           columns: ['id'],
