@@ -58,7 +58,7 @@ const prepareAnnotation = (metaConfig, query) => {
 };
 
 const transformValue = (value, type) => {
-  if (value && type === 'time') {
+  if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
     return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
   return value && value.value ? value.value : value; // TODO move to sql adapter
