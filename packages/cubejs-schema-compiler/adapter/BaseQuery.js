@@ -1637,9 +1637,9 @@ class BaseQuery {
     if (preAggregation.external && this.externalQueryClass) {
       return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
     }
+
     if (index.columns) {
-      const columns = this.cubeEvaluator.evaluateReferences(cube, index.columns, { originalSorting: true });
-      const escapedColumns = columns.map(column => {
+      const escapeColumn = column => {
         const path = column.split('.');
         if (path[0] &&
           this.cubeEvaluator.cubeExists(path[0]) &&
@@ -1653,15 +1653,32 @@ class BaseQuery {
         } else {
           return column;
         }
-      }).map(c => this.escapeColumnName(c));
-      return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
+      };
+
+      const columns = this.cubeEvaluator.evaluateReferences(cube, index.columns, { originalSorting: true });
+      const include = index.include ?
+        this.cubeEvaluator.evaluateReferences(cube, index.include) :
+        undefined;
+
+      const escapedColumns = columns.map(escapeColumn).map(c => this.escapeColumnName(c));
+      const escapedInclude = include ?
+        include.map(escapeColumn).map(c => this.escapeColumnName(c)) :
+        undefined;
+
+      return this.paramAllocator.buildSqlAndParams(
+        this.createIndexSql(indexName, tableName, escapedColumns, escapedInclude, index.clustered, index.compression)
+      );
+    } else if (index.clustered && index.compression === "columnstore") {
+      return this.paramAllocator.buildSqlAndParams(
+        this.createIndexSql(indexName, tableName, undefined, undefined, index.clustered, index.compression)
+      );
     } else {
       throw new Error(`Index SQL support is not implemented`);
     }
   }
 
   createIndexSql(indexName, tableName, escapedColumns) {
-    return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
+       return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
   }
 
   preAggregationSql(cube, preAggregation) {

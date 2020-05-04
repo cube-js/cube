@@ -81,7 +81,14 @@ const BasePreAggregation = {
       sql: Joi.func().required()
     }),
     Joi.object().keys({
-      columns: Joi.func().required()
+      columns: Joi.func().required(),
+      include: Joi.func(),
+      clustered: Joi.boolean(),
+      compression: Joi.any().valid('columnstore', 'row', 'page')
+    }),
+    Joi.object().keys({
+      clustered: Joi.valid(true).required(),
+      compression: Joi.valid('columnstore').required()
     })
   )),
 };

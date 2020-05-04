@@ -27,7 +27,6 @@ describe('MSSqlPreAggregations', function test() {
           sql: \`\${CUBE}.id = \${visitor_checkins}.visitor_id\`
         }
       },
-
       measures: {
         count: {
           type: 'count'
@@ -83,7 +82,18 @@ describe('MSSqlPreAggregations', function test() {
       
       preAggregations: {
         default: {
-          type: 'originalSql'
+          type: 'originalSql',
+          indexes: {
+            clustered: {
+              clustered: true,
+              compression: 'columnstore' 
+            },
+            rowstore: {
+              columns: ['id'],
+              include: ['created_at', 'status'],
+              compression: 'page'
+            }
+          }
         },
         googleRollup: {
           type: 'rollup',
@@ -157,7 +167,18 @@ describe('MSSqlPreAggregations', function test() {
       
       preAggregations: {
         main: {
-          type: 'originalSql'
+          type: 'originalSql',
+          indexes: {
+            clustered: {
+              columns: ['id'],
+              clustered: true,
+              compression: 'row'
+            },
+            columnstore: {
+              columns: ['created_at'],
+              compression: 'columnstore'
+            }
+          }
         },
         auto: {
           type: 'autoRollup',
@@ -178,7 +199,8 @@ describe('MSSqlPreAggregations', function test() {
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
       preAggregation.reduce(
-        (replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`), toReplace
+        (replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`)
+          .replace(/CREATE( CLUSTERED)?( COLUMNSTORE)? INDEX (?!i_)/, `CREATE$1$2 INDEX i_${suffix}_`), toReplace
       ),
       params
     ];
@@ -186,7 +208,9 @@ describe('MSSqlPreAggregations', function test() {
 
   function tempTablePreAggregations(preAggregationsDescriptions) {
     return R.unnest(preAggregationsDescriptions.map(
-      desc => desc.invalidateKeyQueries.concat([[desc.loadSql[0], desc.loadSql[1]]])
+      desc => desc.invalidateKeyQueries.concat([[desc.loadSql[0], desc.loadSql[1]]]).concat(
+        (desc.indexesSql || []).map(({ sql }) => sql)
+      )
     ));
   }
 
@@ -210,7 +234,6 @@ describe('MSSqlPreAggregations', function test() {
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()

@@ -102,6 +102,28 @@ class MssqlQuery extends BaseQuery {
     return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
   }
 
+  createIndexSql(indexName, tableName, escapedColumns, escapedInclude, clustered, compression) {
+    if (compression === "columnstore") {
+      return this.createColumnstoreIndexSql(indexName, tableName, clustered, escapedColumns);
+    } else if (clustered) {
+      return this.createClusteredRowstoreIndexSql(indexName, tableName, escapedColumns, compression);
+    } else {
+      return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(", ")}) ${
+        escapedInclude ? `INCLUDE (${escapedInclude.join(", ")})` : ""} ${
+        compression ? `WITH (DATA_COMPRESSION = ${compression})` : ""}`;
+    }
+  }
+
+  createColumnstoreIndexSql(indexName, tableName, clustered, escapedColumns) {
+    return `CREATE ${clustered ? "CLUSTERED " : ""}COLUMNSTORE INDEX ${indexName} ON ${tableName}${
+      escapedColumns ? `(${escapedColumns.join(", ")})` : ""}`;
+  }
+
+  createClusteredRowstoreIndexSql(indexName, tableName, escapedColumns, compression) {
+    return `CREATE CLUSTERED INDEX ${indexName} ON ${tableName}(${escapedColumns.join(", ")})${
+      compression ? ` WITH (DATA_COMPRESSION = ${compression})` : ""}`;
+  }
+
   wrapSegmentForDimensionSelect(sql) {
     return `CAST((CASE WHEN ${sql} THEN 1 ELSE 0 END) AS BIT)`;
   }
