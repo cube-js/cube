@@ -235,6 +235,7 @@ describe('MSSqlPreAggregations', function test() {
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
