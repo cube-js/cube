@@ -289,7 +289,7 @@ CubejsServerCore.create({
     const user = authInfo.u;
     if (user.filterByRegion) {
       query.filters.push({
-        dimension: 'Regions.id',
+        member: 'Regions.id',
         operator: 'equals',
         values: [user.regionId]
       })
