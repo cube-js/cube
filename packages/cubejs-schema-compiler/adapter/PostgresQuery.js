@@ -41,6 +41,11 @@ class PostgresQuery extends BaseQuery {
   countDistinctApprox(sql) {
     return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }
+
+  createIndexSql(indexName, tableName, escapedColumns, _, indexOptions) {
+    const { unique } = indexOptions;
+    return `CREATE ${unique ? "UNIQUE " : ""}INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
+  }
 }
 
 module.exports = PostgresQuery;

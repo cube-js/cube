@@ -496,7 +496,7 @@ Currently, supported options are:
 cover more queries, thus reducing the need to retrieve values from missing columns from the underlying table or clustered index.  Not permitted when `clustered` is specified, or when
 `columnstore` compression is used.
  * **clustered** (mssql) - When `true`, indicates that the index should be used as the clustering index for the table.  Only one clustering index may be specified per table.
- * **unique** (mssql) - When `true`, indicates that values in the key columns of the index are unique, which can help the query compiler come up with better estimates when the index is used.
+ * **unique** (mssql, pgsql) - When `true`, indicates that values in the key columns of the index are unique, which can help the query compiler come up with better estimates when the index is used.
  * **compression** (mssql) - Supported values are `page`, `row`, or `columnstore`.  `row` and `page` compression levels can improve performance by reducing the amount of disk io.
 In addition to reducing the size of the table, `columnstore` compression unlocks [additional query performance improvements](https://docs.microsoft.com/en-us/sql/relational-databases/indexes/columnstore-indexes-query-performance?view=sql-server-ver15) such as column and rowgroup elimination, batch mode execution, and aggregate and predicate pushdown.
 

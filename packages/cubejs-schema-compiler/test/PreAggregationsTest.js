@@ -92,7 +92,8 @@ describe('PreAggregations', function test() {
           },
           indexes: {
             source: {
-              columns: ['source', 'created_at']
+              columns: ['source', 'created_at'],
+              unique: true
             }
           },
           partitionGranularity: 'month',
@@ -251,8 +252,8 @@ describe('PreAggregations', function test() {
     return [
       preAggregation.reduce(
         (replacedQuery, desc) => replacedQuery
-          .replace(new RegExp(desc.tableName, 'g'), desc.tableName + '_' + suffix)
-          .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`),
+          .replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`)
+          .replace(/CREATE( UNIQUE)? INDEX (?!i_)/, `CREATE$1 INDEX i_${suffix}_`),
         toReplace
       ),
       params
