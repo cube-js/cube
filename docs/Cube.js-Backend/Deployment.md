@@ -35,7 +35,8 @@ If `REDIS_URL` is provided Cube.js will create Redis pool with 2 min and 1000 ma
 No pool behavior with each connection created on demand can be achieved with `CUBEJS_REDIS_POOL_MAX=0` setting.
 
 If your `CUBEJS_REDIS_POOL_MAX` too low you may see `TimeoutError: ResourceRequest timed out` errors.
-As rule of a thumb you need to have `Queue Size * Number of Cube.js server instances * Number of tenants` concurrent connections to ensure best performance possible.
+As a rule of a thumb you need to have `Queue Size * Number of tenants` concurrent connections to ensure best performance possible.
+If you use clustered deployments please make sure you have enough connections for all Cube.js server instances.
 Lower number of connections still can work however Redis becomes performance bottleneck in this case.
 
 ### Running without Redis
