@@ -34,6 +34,10 @@ If `REDIS_URL` is provided Cube.js will create Redis pool with 2 min and 1000 ma
 `CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be used to tweak pool size.
 No pool behavior with each connection created on demand can be achieved with `CUBEJS_REDIS_POOL_MAX=0` setting.
 
+If your `CUBEJS_REDIS_POOL_MAX` too low you may see `TimeoutError: ResourceRequest timed out` errors.
+As rule of a thumb you need to have `Queue Size * Number of Cube.js server instances * Number of tenants` concurrent connections to ensure best performance possible.
+Lower number of connections still can work however Redis becomes performance bottleneck in this case.
+
 ### Running without Redis
 
 If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
