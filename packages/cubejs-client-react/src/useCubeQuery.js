@@ -4,6 +4,7 @@ import {
 import { equals } from 'ramda';
 import CubeContext from './CubeContext';
 import isQueryPresent from './isQueryPresent';
+import useDeepCompareMemoize from './useDeepCompareMemoize';
 
 export default (query, options = {}) => {
   const [mutexObj] = useState({});
@@ -65,7 +66,7 @@ export default (query, options = {}) => {
         subscribeRequest = null;
       }
     };
-  }, [JSON.stringify(query), options.cubejsApi, context]);
+  }, useDeepCompareMemoize([query, options, context]));
 
   return { isLoading, resultSet, error };
 };
