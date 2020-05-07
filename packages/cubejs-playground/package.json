@@ -16,7 +16,7 @@
     "@babel/types": "^7.4.0",
     "@cubejs-client/core": "^0.19.16",
     "@cubejs-client/react": "^0.19.16",
-    "antd": "^3.14.1",
+    "antd": "^4.2.0",
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
