@@ -15380,9 +15380,19 @@
 	  }
 	})(typeof commonjsGlobal !== 'undefined' ? commonjsGlobal : typeof window !== 'undefined' ? window : commonjsGlobal);
 
+	/**
+	 * Default transport implementation.
+	 */
+
 	var HttpTransport =
 	/*#__PURE__*/
 	function () {
+	  /**
+	   * @param options - mandatory options object
+	   * @param options.authorization - [jwt auth token](security)
+	   * @param options.apiUrl - path to `/cubejs-api/v1`
+	   * @param [options.headers] - object of custom headers
+	   */
 	  function HttpTransport(_ref) {
 	    var authorization = _ref.authorization,
 	        apiUrl = _ref.apiUrl,
@@ -15507,6 +15517,23 @@
 	        baseRequestId: v4_1()
 	      }, params));
 	    }
+	    /**
+	     * Base method used to perform all API calls.
+	     * Shouldn't be used directly.
+	     * @param request - function that invoked to perform actual request using `transport.request()` method.
+	     * @param toResult - function that maps results of invocation to method return result
+	     * @param [options] - options object
+	     * @param options.mutexObj - object to use to store MUTEX
+	     * @param [options.mutexKey='default'] - key to use to store current request MUTEX inside `mutexObj`.
+	     * MUTEX object is used to reject orphaned queries results when new queries are sent.
+	     * For example if two queries are sent with same `mutexKey` only last one will return results.
+	     * @param options.subscribe - pass `true` to use continuous fetch behavior.
+	     * @param {Function} options.progressCallback - function that receives `ProgressResult` on each
+	     * `Continue wait` message.
+	     * @param [callback] - if passed `callback` function will be called instead of `Promise` returned
+	     * @return {{unsubscribe: function()}}
+	     */
+
 	  }, {
 	    key: "loadMethod",
 	    value: function loadMethod(request, toResult, options, callback) {
@@ -15922,8 +15949,8 @@
 	     * new Chart(context, chartjsConfig(resultSet));
 	     * ```
 	     * @param query - [Query object](query-format)
-	     * @param options
-	     * @param callback
+	     * @param [options] - See {@link CubejsApi#loadMethod}
+	     * @param [callback] - See {@link CubejsApi#loadMethod}
 	     * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
 	     */
 
@@ -15945,8 +15972,8 @@
 	    /**
 	     * Get generated SQL string for given `query`.
 	     * @param query - [Query object](query-format)
-	     * @param options
-	     * @param callback
+	     * @param [options] - See {@link CubejsApi#loadMethod}
+	     * @param [callback] - See {@link CubejsApi#loadMethod}
 	     * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
 	     */
 
@@ -15965,8 +15992,8 @@
 	    }
 	    /**
 	     * Get meta description of cubes available for querying.
-	     * @param options
-	     * @param callback
+	     * @param [options] - See {@link CubejsApi#loadMethod}
+	     * @param [callback] - See {@link CubejsApi#loadMethod}
 	     * @return {Promise} for {@link Meta} if `callback` isn't passed
 	     */
 
@@ -16015,12 +16042,13 @@
 	 );
 	 ```
 	 * @name cubejs
-	 * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
+	 * @param [apiToken] - [API token](security) is used to authorize requests and determine SQL database you're accessing.
 	 * In the development mode, Cube.js Backend will print the API token to the console on on startup.
-	 * Can be an async function without arguments that returns API token. Optional.
-	 * @param options - options object.
+	 * Can be an async function without arguments that returns API token.
+	 * @param [options] - options object.
 	 * @param options.apiUrl - URL of your Cube.js Backend.
 	 * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
+	 * @param options.transport - transport implementation to use. {@link HttpTransport} will be used by default.
 	 * @returns {CubejsApi}
 	 * @order -10
 	 */

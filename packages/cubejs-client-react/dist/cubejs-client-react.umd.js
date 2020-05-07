@@ -8252,6 +8252,16 @@
 	  children: PropTypes.any.isRequired
 	};
 
+	function useDeepCompareMemoize(value) {
+	  var ref = React.useRef([]);
+
+	  if (!equals(value, ref.current)) {
+	    ref.current = value;
+	  }
+
+	  return ref.current;
+	}
+
 	var useCubeQuery = (function (query) {
 	  var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
@@ -8387,7 +8397,7 @@
 	        subscribeRequest = null;
 	      }
 	    };
-	  }, [JSON.stringify(query), options.cubejsApi, context]);
+	  }, useDeepCompareMemoize([query, options, context]));
 	  return {
 	    isLoading: isLoading,
 	    resultSet: resultSet,
