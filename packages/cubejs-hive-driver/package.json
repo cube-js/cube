@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/hive-driver",
   "description": "Cube.js Hive database driver",
   "author": "Statsbot, Inc.",
-  "version": "0.19.15",
+  "version": "0.19.16",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
