@@ -151,7 +151,7 @@ class PreAggregationLoadCache {
     this.tables = undefined;
     this.queryStageState = undefined;
     this.versionEntries = undefined;
-    await this.tablesFromCache(preAggregation, true);
+    await this.cacheDriver.remove(this.tablesRedisKey(preAggregation));
   }
 }
 
