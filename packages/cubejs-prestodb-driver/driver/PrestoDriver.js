@@ -49,6 +49,7 @@ class PrestoDriver extends BaseDriver {
       this.client.execute({
         query,
         schema: this.config.schema || 'default',
+        timezone: this.config.timezone,
         data: (error, data, columns) => {
           const normalData = this.normalizeResultOverColumns(data, columns);
           fullData = concat(normalData, fullData);
