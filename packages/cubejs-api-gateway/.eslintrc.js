@@ -6,6 +6,9 @@ module.exports = {
   "rules": {
     "import/no-unresolved": 0,
     "comma-dangle": 0,
+    "no-trailing-spaces": ["error", {
+      "skipBlankLines": true
+    }],
     "no-console": 0,
     "arrow-parens": 0,
     "import/extensions": 0,
