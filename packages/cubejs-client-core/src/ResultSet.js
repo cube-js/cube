@@ -432,35 +432,38 @@ class ResultSet {
    */
   tableColumns(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-    const column = field => (
-      field === 'measures' ?
-        (this.query().measures || []).map(m => ({
-          key: m,
-          title: this.loadResponse.annotation.measures[m].title,
-          shortTitle: this.loadResponse.annotation.measures[m].shortTitle,
-          format: this.loadResponse.annotation.measures[m].format,
-          type: this.loadResponse.annotation.measures[m].type,
-        })) :
-        [{
+
+    const column = (field) => {
+      const exractFields = (annotation = {}) => {
+        const {
+          title,
+          shortTitle,
+          format,
+          type,
+          meta
+        } = annotation;
+
+        return {
+          title,
+          shortTitle,
+          format,
+          type,
+          meta
+        };
+      };
+
+      return field === 'measures' ? (this.query().measures || []).map((key) => ({
+        key,
+        ...exractFields(this.loadResponse.annotation.measures[key])
+      })) : [
+        {
           key: field,
-          title: (
-            this.loadResponse.annotation.dimensions[field] ||
-            this.loadResponse.annotation.timeDimensions[field]
-          ).title,
-          shortTitle: (
-            this.loadResponse.annotation.dimensions[field] ||
-            this.loadResponse.annotation.timeDimensions[field]
-          ).shortTitle,
-          format: (
-            this.loadResponse.annotation.dimensions[field] ||
-            this.loadResponse.annotation.timeDimensions[field]
-          ).format,
-          type: (
-            this.loadResponse.annotation.dimensions[field] ||
-            this.loadResponse.annotation.timeDimensions[field]
-          ).type
-        }]
-    );
+          ...exractFields(this.loadResponse.annotation.dimensions[field] ||
+              this.loadResponse.annotation.timeDimensions[field])
+        },
+      ];
+    };
+
     return normalizedPivotConfig.x.map(column)
       .concat(normalizedPivotConfig.y.map(column))
       .reduce((a, b) => a.concat(b));
