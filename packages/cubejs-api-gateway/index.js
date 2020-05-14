@@ -22,18 +22,21 @@ const prepareAnnotation = (metaConfig, query) => {
   const configMap = toConfigMap(metaConfig);
 
   const annotation = (memberType) => (member) => {
-    const path = member.split('.');
-    const memberWithoutGranularity = [path[0], path[1]].join('.');
-    const config = configMap[path[0]][memberType].find(m => m.name === memberWithoutGranularity);
+    const [cubeName, fieldName] = member.split('.');
+    const memberWithoutGranularity = [cubeName, fieldName].join('.');
+    const config = configMap[cubeName][memberType].find(m => m.name === memberWithoutGranularity);
+
     if (!config) {
       return undefined;
     }
+
     return [member, {
       title: config.title,
       shortTitle: config.shortTitle,
       description: config.description,
       type: config.type,
-      format: config.format
+      format: config.format,
+      meta: config.meta
     }];
   };
 
@@ -58,7 +61,7 @@ const prepareAnnotation = (metaConfig, query) => {
 };
 
 const transformValue = (value, type) => {
-  if (value && type === 'time') {
+  if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
     return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
   return value && value.value ? value.value : value; // TODO move to sql adapter
@@ -396,6 +399,7 @@ class ApiGateway {
         query,
         sqlQuery
       });
+
       const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
       const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
       const toExecute = {
@@ -409,11 +413,13 @@ class ApiGateway {
       const response = await this.getAdapterApi({
         ...context, dataSource: sqlQuery.dataSource
       }).executeQuery(toExecute);
+
       const flattenAnnotation = {
         ...annotation.measures,
         ...annotation.dimensions,
         ...annotation.timeDimensions
       };
+
       const result = {
         query: normalizedQuery,
         data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data, normalizedQuery),
@@ -424,6 +430,7 @@ class ApiGateway {
         }),
         annotation
       };
+
       this.log(context, {
         type: 'Load Request Success',
         query,

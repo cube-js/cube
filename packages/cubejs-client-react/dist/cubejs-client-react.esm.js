@@ -11,7 +11,7 @@ import _possibleConstructorReturn from '@babel/runtime/helpers/possibleConstruct
 import _getPrototypeOf from '@babel/runtime/helpers/getPrototypeOf';
 import _createClass from '@babel/runtime/helpers/createClass';
 import _inherits from '@babel/runtime/helpers/inherits';
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useRef, useState, useContext, useEffect } from 'react';
 import { func, object, any, bool } from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import _extends from '@babel/runtime/helpers/extends';
@@ -754,6 +754,16 @@ CubeProvider.propTypes = {
   children: any.isRequired
 };
 
+function useDeepCompareMemoize(value) {
+  var ref = useRef([]);
+
+  if (!equals(value, ref.current)) {
+    ref.current = value;
+  }
+
+  return ref.current;
+}
+
 var useCubeQuery = (function (query) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
@@ -889,7 +899,7 @@ var useCubeQuery = (function (query) {
         subscribeRequest = null;
       }
     };
-  }, [JSON.stringify(query), options.cubejsApi, context]);
+  }, useDeepCompareMemoize([query, options, context]));
   return {
     isLoading: isLoading,
     resultSet: resultSet,

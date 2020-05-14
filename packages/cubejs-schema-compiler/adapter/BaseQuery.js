@@ -61,6 +61,7 @@ class BaseQuery {
       contextSymbols: this.options.contextSymbols,
       timezone: this.options.timezone,
       limit: this.options.limit,
+      offset: this.options.offset,
       rowLimit: this.options.rowLimit,
       preAggregationsSchema: this.options.preAggregationsSchema,
       className: this.constructor.name,

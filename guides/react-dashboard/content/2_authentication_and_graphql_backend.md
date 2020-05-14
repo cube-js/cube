@@ -167,8 +167,8 @@ const server = new CubejsServer({
   }
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 

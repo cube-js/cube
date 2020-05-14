@@ -2,6 +2,7 @@
 require('dotenv').config();
 const CubejsServerCore = require('@cubejs-backend/server-core');
 const WebSocketServer = require('./WebSocketServer');
+const { version } = require('./package.json');
 
 class CubejsServer {
   constructor(config) {
@@ -69,7 +70,8 @@ class CubejsServer {
             app,
             port: PORT,
             tlsPort: process.env.CUBEJS_ENABLE_TLS === "true" ? TLS_PORT : undefined,
-            server: this.server
+            server: this.server,
+            version
           });
         });
       });
@@ -126,6 +128,10 @@ class CubejsServer {
 
   static apiSecret() {
     return process.env.CUBEJS_API_SECRET;
+  }
+
+  static version() {
+    return version;
   }
 }
 

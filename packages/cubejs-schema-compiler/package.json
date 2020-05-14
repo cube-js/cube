@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube.js schema compiler",
   "author": "Statsbot, Inc.",
-  "version": "0.19.14",
+  "version": "0.19.18",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@apla/clickhouse": "^1.5.5",
+    "@types/hapi__joi" : "^17.1.0",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",

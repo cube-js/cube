@@ -761,6 +761,16 @@ CubeProvider.propTypes = {
   children: PropTypes.any.isRequired
 };
 
+function useDeepCompareMemoize(value) {
+  var ref = React.useRef([]);
+
+  if (!ramda.equals(value, ref.current)) {
+    ref.current = value;
+  }
+
+  return ref.current;
+}
+
 var useCubeQuery = (function (query) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
@@ -896,7 +906,7 @@ var useCubeQuery = (function (query) {
         subscribeRequest = null;
       }
     };
-  }, [JSON.stringify(query), options.cubejsApi, context]);
+  }, useDeepCompareMemoize([query, options, context]));
   return {
     isLoading: isLoading,
     resultSet: resultSet,
