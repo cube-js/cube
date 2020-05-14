@@ -317,6 +317,7 @@ var QueryBuilder = {
   data: function data() {
     var data = {
       meta: undefined,
+      chartType: undefined,
       measures: [],
       dimensions: [],
       segments: [],
