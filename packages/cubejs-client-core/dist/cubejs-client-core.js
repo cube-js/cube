@@ -4,6 +4,9 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
+require('core-js/modules/es.object.to-string');
+require('core-js/modules/es.promise');
+require('core-js/modules/web.timers');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
@@ -11,35 +14,37 @@ var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSprea
 var _typeof = _interopDefault(require('@babel/runtime/helpers/typeof'));
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
-require('core-js/modules/es6.promise');
-require('core-js/modules/es6.object.to-string');
 var uuid = _interopDefault(require('uuid/v4'));
-require('core-js/modules/es6.number.parse-float');
-require('core-js/modules/es6.number.constructor');
-require('core-js/modules/es6.number.is-nan');
-require('core-js/modules/web.dom.iterable');
-require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.keys');
+require('core-js/modules/es.array.concat');
+require('core-js/modules/es.array.filter');
+require('core-js/modules/es.array.find');
+require('core-js/modules/es.array.from');
+require('core-js/modules/es.array.index-of');
+require('core-js/modules/es.array.join');
+require('core-js/modules/es.array.map');
+require('core-js/modules/es.array.reduce');
+require('core-js/modules/es.date.to-string');
+require('core-js/modules/es.number.constructor');
+require('core-js/modules/es.number.is-nan');
+require('core-js/modules/es.number.parse-float');
+require('core-js/modules/es.object.assign');
+require('core-js/modules/es.object.keys');
+require('core-js/modules/es.regexp.exec');
+require('core-js/modules/es.string.iterator');
+require('core-js/modules/es.string.match');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
-require('core-js/modules/es6.object.assign');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
-require('core-js/modules/es6.array.reduce');
-require('core-js/modules/es6.regexp.match');
-require('core-js/modules/es6.array.index-of');
-require('core-js/modules/es6.array.find');
-require('core-js/modules/es6.array.filter');
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
-require('core-js/modules/es6.string.iterator');
-require('core-js/modules/es6.array.from');
-require('core-js/modules/es6.array.map');
 var ramda = require('ramda');
 var Moment = _interopDefault(require('moment'));
 var momentRange = _interopDefault(require('moment-range'));
-require('core-js/modules/es6.array.is-array');
-require('core-js/modules/es6.regexp.split');
-require('core-js/modules/es6.function.name');
-require('core-js/modules/es6.regexp.to-string');
-require('core-js/modules/es6.date.to-string');
+require('core-js/modules/es.array.is-array');
+require('core-js/modules/es.function.name');
+require('core-js/modules/es.string.split');
+require('core-js/modules/es.array.iterator');
+require('core-js/modules/es.regexp.to-string');
+require('core-js/modules/web.dom-collections.iterator');
+require('core-js/modules/web.url');
 var fetch = _interopDefault(require('cross-fetch'));
 require('url-search-params-polyfill');
 
@@ -932,9 +937,19 @@ function () {
   return ProgressResult;
 }();
 
+/**
+ * Default transport implementation.
+ */
+
 var HttpTransport =
 /*#__PURE__*/
 function () {
+  /**
+   * @param options - mandatory options object
+   * @param options.authorization - [jwt auth token](security)
+   * @param options.apiUrl - path to `/cubejs-api/v1`
+   * @param [options.headers] - object of custom headers
+   */
   function HttpTransport(_ref) {
     var authorization = _ref.authorization,
         apiUrl = _ref.apiUrl,
@@ -1059,6 +1074,23 @@ function () {
         baseRequestId: uuid()
       }, params));
     }
+    /**
+     * Base method used to perform all API calls.
+     * Shouldn't be used directly.
+     * @param request - function that invoked to perform actual request using `transport.request()` method.
+     * @param toResult - function that maps results of invocation to method return result
+     * @param [options] - options object
+     * @param options.mutexObj - object to use to store MUTEX
+     * @param [options.mutexKey='default'] - key to use to store current request MUTEX inside `mutexObj`.
+     * MUTEX object is used to reject orphaned queries results when new queries are sent.
+     * For example if two queries are sent with same `mutexKey` only last one will return results.
+     * @param options.subscribe - pass `true` to use continuous fetch behavior.
+     * @param {Function} options.progressCallback - function that receives `ProgressResult` on each
+     * `Continue wait` message.
+     * @param [callback] - if passed `callback` function will be called instead of `Promise` returned
+     * @return {{unsubscribe: function()}}
+     */
+
   }, {
     key: "loadMethod",
     value: function loadMethod(request, toResult, options, callback) {
@@ -1474,8 +1506,8 @@ function () {
      * new Chart(context, chartjsConfig(resultSet));
      * ```
      * @param query - [Query object](query-format)
-     * @param options
-     * @param callback
+     * @param [options] - See {@link CubejsApi#loadMethod}
+     * @param [callback] - See {@link CubejsApi#loadMethod}
      * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
      */
 
@@ -1497,8 +1529,8 @@ function () {
     /**
      * Get generated SQL string for given `query`.
      * @param query - [Query object](query-format)
-     * @param options
-     * @param callback
+     * @param [options] - See {@link CubejsApi#loadMethod}
+     * @param [callback] - See {@link CubejsApi#loadMethod}
      * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
      */
 
@@ -1517,8 +1549,8 @@ function () {
     }
     /**
      * Get meta description of cubes available for querying.
-     * @param options
-     * @param callback
+     * @param [options] - See {@link CubejsApi#loadMethod}
+     * @param [callback] - See {@link CubejsApi#loadMethod}
      * @return {Promise} for {@link Meta} if `callback` isn't passed
      */
 
@@ -1567,12 +1599,13 @@ function () {
  );
  ```
  * @name cubejs
- * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing.
+ * @param [apiToken] - [API token](security) is used to authorize requests and determine SQL database you're accessing.
  * In the development mode, Cube.js Backend will print the API token to the console on on startup.
- * Can be an async function without arguments that returns API token. Optional.
- * @param options - options object.
+ * Can be an async function without arguments that returns API token.
+ * @param [options] - options object.
  * @param options.apiUrl - URL of your Cube.js Backend.
  * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
+ * @param options.transport - transport implementation to use. {@link HttpTransport} will be used by default.
  * @returns {CubejsApi}
  * @order -10
  */
