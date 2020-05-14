@@ -16271,21 +16271,29 @@
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
 	      var column = function column(field) {
-	        return field === 'measures' ? (_this4.query().measures || []).map(function (m) {
+	        var exractFields = function exractFields() {
+	          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+	          var title = annotation.title,
+	              shortTitle = annotation.shortTitle,
+	              format = annotation.format,
+	              type$$1 = annotation.type,
+	              meta = annotation.meta;
 	          return {
-	            key: m,
-	            title: _this4.loadResponse.annotation.measures[m].title,
-	            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle,
-	            format: _this4.loadResponse.annotation.measures[m].format,
-	            type: _this4.loadResponse.annotation.measures[m].type
+	            title: title,
+	            shortTitle: shortTitle,
+	            format: format,
+	            type: type$$1,
+	            meta: meta
 	          };
-	        }) : [{
-	          key: field,
-	          title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title,
-	          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle,
-	          format: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).format,
-	          type: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).type
-	        }];
+	        };
+
+	        return field === 'measures' ? (_this4.query().measures || []).map(function (key) {
+	          return _objectSpread({
+	            key: key
+	          }, exractFields(_this4.loadResponse.annotation.measures[key]));
+	        }) : [_objectSpread({
+	          key: field
+	        }, exractFields(_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]))];
 	      };
 
 	      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
