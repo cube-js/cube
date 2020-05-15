@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.19](https://github.com/cube-js/cube.js/compare/v0.19.18...v0.19.19) (2020-05-15)
+
+
+### Bug Fixes
+
+* corejs version ([8bef3b2](https://github.com/cube-js/cube.js/commit/8bef3b2))
+* **client-vue:** updateChartType fix ([#644](https://github.com/cube-js/cube.js/issues/644)) ([5c0e79c](https://github.com/cube-js/cube.js/commit/5c0e79c)), closes [#635](https://github.com/cube-js/cube.js/issues/635)
+
+
+### Features
+
+* ability to add custom meta data for measures, dimensions and segments ([#641](https://github.com/cube-js/cube.js/issues/641)) ([88d5c9b](https://github.com/cube-js/cube.js/commit/88d5c9b)), closes [#625](https://github.com/cube-js/cube.js/issues/625)
+
+
+
+
+
 ## [0.19.18](https://github.com/cube-js/cube.js/compare/v0.19.17...v0.19.18) (2020-05-11)
 
 
