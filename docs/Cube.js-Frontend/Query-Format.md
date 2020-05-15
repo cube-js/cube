@@ -5,34 +5,34 @@ category: Cube.js Frontend
 menuOrder: 1
 ---
 
-Query is plain JavaScript object, describing an analytics query. The basic elements of query (query members) are `measures`, `dimensions`, and `segments`.
+Cube Queries are plain JavaScript objects, describing an analytics query. The basic elements of a query (query members) are `measures`, `dimensions`, and `segments`.
 
-The query member format name is `CUBE_NAME.MEMBER_NAME`, for example dimension email in the Cube Users would have the following name `Users.email`.
+The query member format name is `CUBE_NAME.MEMBER_NAME`, for example the dimension `email` in the Cube `Users` would have the name `Users.email`.
 
-In a case of dimension of type time granularity could be optionally added to the name, in the following format `CUBE_NAME.TIME_DIMENSION_NAME.GRANULARITY`, ex: `Stories.time.month`.
+In the case of dimension of type `time` granularity could be optionally added to the name, in the following format `CUBE_NAME.TIME_DIMENSION_NAME.GRANULARITY`, ex: `Stories.time.month`.
 
 Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`.
 
 ## Query Properties
 
-Query has the following properties:
+A Query has the following properties:
 
 - `measures`: An array of measures.
 - `dimensions`: An array of dimensions.
 - `filters`: An array of objects, describing filters. Learn about [filters format](#filters-format).
-- `timeDimensions`: A convient way to specify a time dimension with a filter. It is an array of objects in [timeDimension format.](#time-dimensions-format)
-- `segments`: An array of segments. Segment is a named filter, created in the Data Schema.
+- `timeDimensions`: A convenient way to specify a time dimension with a filter. It is an array of objects in [timeDimension format.](#time-dimensions-format)
+- `segments`: An array of segments. A segment is a named filter, created in the Data Schema.
 - `limit`: A row limit for your query. The default value is `10000`. The
     maximum allowed limit is `50000`.
-- `offset`: Number of first rows to be skipped for your query. The default value is `0`.
-- `order`: An object, where keys are measures or dimensions to order by and
+- `offset`: The number of initial rows to be skipped for your query. The default value is `0`.
+- `order`: An object, where the keys are measures or dimensions to order by and
     their corresponding values are either `asc` or `desc`. The order of the
-    fields to order is based on the order of the keys in the object.
+    fields to order on is based on the order of the keys in the object.
 - `timezone`: All time based calculations performed within Cube.js are timezone-aware. Using this property you can set your desired timezone in [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.: `America/Los_Angeles`. The default value is `UTC`.
-- `renewQuery`: If `renewQuery` is set to `true`, Cube.js will renew all `refreshKey` for query and query result itself in foreground. However if `refreshKey` or `refreshKeyRenewalThreshold` don't indicate that there's a need for update this setting has no effect. The default value is `false`.
-- `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be added to the query and raw results after filtering and joining will be returned without grouping. 
-By default `ungrouped` query requires to pass primary key as a dimension of every cube involved in query for security purpose.
-To disable this behavior please see [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#options-reference-allow-ungrouped-without-primary-key) server option. 
+- `renewQuery`: If `renewQuery` is set to `true`, Cube.js will renew all `refreshKey` for queries and query results in the foreground. However if the `refreshKey` or `refreshKeyRenewalThreshold` don't indicate that there's a need for an update this setting has no effect. The default value is `false`.
+- `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be added to the query. Instead, the raw results after filtering and joining will be returned without grouping. 
+By default `ungrouped` queries require a primary key as a dimension of every cube involved in the query for security purposes.
+To disable this behavior please see the [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#options-reference-allow-ungrouped-without-primary-key) server option. 
 
 ```js
 {
@@ -60,7 +60,7 @@ To disable this behavior please see [allowUngroupedWithoutPrimaryKey](@cubejs-ba
 
 ### Default order
 
-If `order` property is not specified in the query, Cube.js sorts results by default using the following rules:
+If the `order` property is not specified in the query, Cube.js sorts results by default using the following rules:
 
 - The first time dimension with granularity, ascending. If no time dimension with granularity exists...
 - The first measure, descending. If no measure exists...
@@ -70,11 +70,11 @@ If `order` property is not specified in the query, Cube.js sorts results by defa
 
 A filter is a Javascript object with the following properties:
 
-- `member`: Dimension or measure to be used in the filter, for example: `Stories.isDraft`. See below on difference on filtering dimensions vs filtering measures.
-- `operator`: An operator to be used in filter. Only some operators are available for measures, for dimensions available operators depend on the type
+- `member`: Dimension or measure to be used in the filter, for example: `Stories.isDraft`. See below on difference between filtering dimensions vs filtering measures.
+- `operator`: An operator to be used in the filter. Only some operators are available for measures. For dimensions the available operators depend on the type
     of the dimension. Please see the reference below for the full list of available
     operators.
-- `values`: An array of values for the filter. Values must be of type String. If you need to pass a date, pass it as a string in `YYYY-MM-DD`.
+- `values`: An array of values for the filter. Values must be of type String. If you need to pass a date, pass it as a string in `YYYY-MM-DD` format.
 
 #### Filtering Dimensions vs Filtering Measures
 Filters are applied differently to dimensions and measures.
@@ -83,7 +83,7 @@ When you filter on a dimension, you are restricting the raw data before any calc
 When you filter on a measure, you are restricting the results after the measure has been calculated.
 
 ## Filters Operators
-Only some operators are available for measures. For dimensions available operators are depend on the [type of the dimension](types-and-formats#dimensions-types).
+Only some operators are available for measures. For dimensions, the available operators depend on the [type of the dimension](types-and-formats#dimensions-types).
 
 ### equals
 
@@ -102,7 +102,7 @@ Use it when you need an exact match. It supports multiple values.
 
 ### notEquals
 
-An opposite operator of `equals`. It supports multiple values.
+The opposite operator of `equals`. It supports multiple values.
 
 * Applied to measures.
 * Dimension types: `string`, `number`, `time`.
@@ -117,7 +117,7 @@ An opposite operator of `equals`. It supports multiple values.
 
 ### contains
 
-`contains` filter acts as a wildcard case insensitive `LIKE` operator. In the majority of SQL backends it uses `ILIKE` operator with values being surrounded by `%`. It supports multiple values.
+The `contains` filter acts as a wildcard case insensitive `LIKE` operator. In the majority of SQL backends it uses `ILIKE` operator with values being surrounded by `%`. It supports multiple values.
 
 * Dimension types: `string`.
 
@@ -131,7 +131,7 @@ An opposite operator of `equals`. It supports multiple values.
 
 ### notContains
 
-An opposite operator of `contains`. It supports multiple values.
+The opposite operator of `contains`. It supports multiple values.
 
 * Dimension types: `string`.
 
@@ -145,7 +145,7 @@ An opposite operator of `contains`. It supports multiple values.
 
 ### gt
 
-The `gt` operator means **greater than** and is used with measures or dimensions of type number.
+The `gt` operator means **greater than** and is used with measures or dimensions of type `number`.
 
 * Applied to measures.
 * Dimension types: `number`.
@@ -160,7 +160,7 @@ The `gt` operator means **greater than** and is used with measures or dimensions
 
 ### gte
 
-The `gte` operator means **greater than or equal to** and is used with measures or dimensions of type number.
+The `gte` operator means **greater than or equal to** and is used with measures or dimensions of type `number`.
 
 * Applied to measures.
 * Dimension types: `number`.
@@ -175,7 +175,7 @@ The `gte` operator means **greater than or equal to** and is used with measures 
 
 ### lt
 
-The `lt` operator means **less than** and is used with measures or dimensions of type number.
+The `lt` operator means **less than** and is used with measures or dimensions of type `number`.
 
 * Applied to measures.
 * Dimension types: `number`.
@@ -190,7 +190,7 @@ The `lt` operator means **less than** and is used with measures or dimensions of
 
 ### lte
 
-The `lte` operator means **less than or equal to** and is used with measures or dimensions of type number.
+The `lte` operator means **less than or equal to** and is used with measures or dimensions of type `number`.
 
 * Applied to measures.
 * Dimension types: `number`.
@@ -220,7 +220,7 @@ need to pass `values` for this operator.
 
 ### notSet
 
-An opposite to `set` operator. It checks whether the value of the member **is** `NULL`. You don't
+An opposite to the `set` operator. It checks whether the value of the member **is** `NULL`. You don't
 need to pass `values` for this operator.
 
 * Applied to measures.
@@ -235,7 +235,7 @@ need to pass `values` for this operator.
 
 ### inDateRange
 
-Operator `inDateRange` used to filter a time dimension into specific date range. The values must be an array of dates with following format '2015-01-01'. If only one date specified the filter would be set exactly to this date.
+The operator `inDateRange` is used to filter a time dimension into a specific date range. The values must be an array of dates with the following format 'YYYY-MM-DD'. If only one date specified the filter would be set exactly to this date.
 
 There is a convient way to use date filters with grouping - [learn more about
 timeDimensions query property here](#time-dimensions-format)
@@ -281,7 +281,7 @@ values should be an array of one element in `YYYY-MM-DD` format.
 
 ### afterDate
 
-The same as `beforeDate`, but used to get all results after specific date.
+The same as `beforeDate`, but is used to get all results after a specific date.
 
 
 * Dimension types: `time`.
@@ -297,15 +297,16 @@ The same as `beforeDate`, but used to get all results after specific date.
 
 ## Time Dimensions Format
 
-Since grouping and filtering by a time dimension is quite a common case, Cube.js provides a convient shortcut to pass a dimension and a filter as a `timeDimension` property.
+Since grouping and filtering by a time dimension is quite a common case, Cube.js provides a convenient shortcut to pass a dimension and a filter as a `timeDimension` property.
 
   - `dimension`: Time dimension name.
   - `dateRange`: An array of dates with the following format `YYYY-MM-DD` or in `YYYY-MM-DDTHH:mm:ss.SSS` format.
 Values should always be local and in query `timezone`.
-Dates in `YYYY-MM-DD` format padded to start and end of day if used in start and end of date range interval accordingly. 
-If only one date specified it's equivalent to passing two same dates as a date range.
+Dates in `YYYY-MM-DD` format are also accepted. 
+Such dates are padded to the start and end of the day if used in start and end of date range interval accordingly. 
+If only one date is specified it's equivalent to passing two of the same dates as a date range.
 You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
-  - `granularity`: A granularity for a time dimension. It supports following values `second`, `minute`, `hour`, `day`, `week`, `month`, `year`. If you pass `null` to the granularity, the Cube.js will only perform a filtering by specified time dimension, without grouping.
+  - `granularity`: A granularity for a time dimension. It supports the following values `second`, `minute`, `hour`, `day`, `week`, `month`, `year`. If you pass `null` to the granularity, Cube.js will only perform filtering by a specified time dimension, without grouping.
 
 ```js
 {

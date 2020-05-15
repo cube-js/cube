@@ -831,6 +831,9 @@ describe('ResultSet', () => {
               "title": "Orders Count",
               "shortTitle": "Count",
               "type": "count",
+              "meta": {
+                "isVisible": false
+              }
             },
             "Orders.totalAmount": {
               "title": "Orders Total Amount",
@@ -843,7 +846,8 @@ describe('ResultSet', () => {
             "Orders.createdAt": {
               "title": "Orders Created at",
               "shortTitle": "Created at",
-              "type": "time"
+              "type": "time",
+              "meta": 123
             }
           },
           "segments": {},
@@ -871,6 +875,7 @@ describe('ResultSet', () => {
           "shortTitle": "Created at",
           "title": "Orders Created at",
           "type": "time",
+          "meta": 123
         },
         {
           "format": undefined,
@@ -878,6 +883,9 @@ describe('ResultSet', () => {
           "shortTitle": "Count",
           "title": "Orders Count",
           "type": "count",
+          "meta": {
+            "isVisible": false
+          }
         },
         {
           "format": "currency",

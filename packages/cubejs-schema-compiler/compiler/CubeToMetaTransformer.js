@@ -43,7 +43,8 @@ class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
-            format: nameToDimension[1].format
+            format: nameToDimension[1].format,
+            meta: nameToDimension[1].meta,
           })),
           R.filter(
             nameToDimension => this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
@@ -55,7 +56,8 @@ class CubeToMetaTransformer {
             name: `${cube.name}.${nameToSegment[0]}`,
             title: this.title(cubeTitle, nameToSegment),
             shortTitle: this.title(cubeTitle, nameToSegment, true),
-            description: nameToSegment[1].description
+            description: nameToSegment[1].description,
+            meta: nameToSegment[1].meta,
           })),
           R.toPairs
         )(cube.segments || {})
@@ -108,7 +110,8 @@ class CubeToMetaTransformer {
       aggType: nameToMetric[1].type,
       drillMembers: drillMembers && this.cubeEvaluator.evaluateReferences(
         cubeName, drillMembers, { originalSorting: true }
-      )
+      ),
+      meta: nameToMetric[1].meta
     };
   }
 

@@ -4,6 +4,9 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
+require('core-js/modules/es.object.to-string');
+require('core-js/modules/es.promise');
+require('core-js/modules/web.timers');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
@@ -11,35 +14,37 @@ var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSprea
 var _typeof = _interopDefault(require('@babel/runtime/helpers/typeof'));
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _createClass = _interopDefault(require('@babel/runtime/helpers/createClass'));
-require('core-js/modules/es6.promise');
-require('core-js/modules/es6.object.to-string');
 var uuid = _interopDefault(require('uuid/v4'));
-require('core-js/modules/es6.number.parse-float');
-require('core-js/modules/es6.number.constructor');
-require('core-js/modules/es6.number.is-nan');
-require('core-js/modules/web.dom.iterable');
-require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.keys');
+require('core-js/modules/es.array.concat');
+require('core-js/modules/es.array.filter');
+require('core-js/modules/es.array.find');
+require('core-js/modules/es.array.from');
+require('core-js/modules/es.array.index-of');
+require('core-js/modules/es.array.join');
+require('core-js/modules/es.array.map');
+require('core-js/modules/es.array.reduce');
+require('core-js/modules/es.date.to-string');
+require('core-js/modules/es.number.constructor');
+require('core-js/modules/es.number.is-nan');
+require('core-js/modules/es.number.parse-float');
+require('core-js/modules/es.object.assign');
+require('core-js/modules/es.object.keys');
+require('core-js/modules/es.regexp.exec');
+require('core-js/modules/es.string.iterator');
+require('core-js/modules/es.string.match');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
-require('core-js/modules/es6.object.assign');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
-require('core-js/modules/es6.array.reduce');
-require('core-js/modules/es6.regexp.match');
-require('core-js/modules/es6.array.index-of');
-require('core-js/modules/es6.array.find');
-require('core-js/modules/es6.array.filter');
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
-require('core-js/modules/es6.string.iterator');
-require('core-js/modules/es6.array.from');
-require('core-js/modules/es6.array.map');
 var ramda = require('ramda');
 var Moment = _interopDefault(require('moment'));
 var momentRange = _interopDefault(require('moment-range'));
-require('core-js/modules/es6.array.is-array');
-require('core-js/modules/es6.regexp.split');
-require('core-js/modules/es6.function.name');
-require('core-js/modules/es6.regexp.to-string');
-require('core-js/modules/es6.date.to-string');
+require('core-js/modules/es.array.is-array');
+require('core-js/modules/es.function.name');
+require('core-js/modules/es.string.split');
+require('core-js/modules/es.array.iterator');
+require('core-js/modules/es.regexp.to-string');
+require('core-js/modules/web.dom-collections.iterator');
+require('core-js/modules/web.url');
 var fetch = _interopDefault(require('cross-fetch'));
 require('url-search-params-polyfill');
 
@@ -596,21 +601,29 @@ function () {
       var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
       var column = function column(field) {
-        return field === 'measures' ? (_this4.query().measures || []).map(function (m) {
+        var exractFields = function exractFields() {
+          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+          var title = annotation.title,
+              shortTitle = annotation.shortTitle,
+              format = annotation.format,
+              type = annotation.type,
+              meta = annotation.meta;
           return {
-            key: m,
-            title: _this4.loadResponse.annotation.measures[m].title,
-            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle,
-            format: _this4.loadResponse.annotation.measures[m].format,
-            type: _this4.loadResponse.annotation.measures[m].type
+            title: title,
+            shortTitle: shortTitle,
+            format: format,
+            type: type,
+            meta: meta
           };
-        }) : [{
-          key: field,
-          title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title,
-          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle,
-          format: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).format,
-          type: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).type
-        }];
+        };
+
+        return field === 'measures' ? (_this4.query().measures || []).map(function (key) {
+          return _objectSpread2({
+            key: key
+          }, exractFields(_this4.loadResponse.annotation.measures[key]));
+        }) : [_objectSpread2({
+          key: field
+        }, exractFields(_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]))];
       };
 
       return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {

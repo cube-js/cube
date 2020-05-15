@@ -4,25 +4,28 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
+require('core-js/modules/es.array.iterator');
+require('core-js/modules/es.array.map');
+require('core-js/modules/es.object.assign');
+require('core-js/modules/es.object.keys');
+require('core-js/modules/es.object.to-string');
+require('core-js/modules/es.promise');
+require('core-js/modules/es.string.iterator');
+require('core-js/modules/web.dom-collections.iterator');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
-require('core-js/modules/es6.array.map');
-require('core-js/modules/es6.promise');
-require('core-js/modules/es6.string.iterator');
-require('core-js/modules/web.dom.iterable');
-require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.to-string');
-require('core-js/modules/es6.object.keys');
-require('core-js/modules/es6.object.assign');
 var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
 var ramda = require('ramda');
-require('core-js/modules/es6.array.find-index');
-require('core-js/modules/es6.array.find');
-require('core-js/modules/es6.array.filter');
-require('core-js/modules/es6.function.name');
-require('core-js/modules/es6.array.for-each');
+require('core-js/modules/es.array.filter');
+require('core-js/modules/es.array.find');
+require('core-js/modules/es.array.find-index');
+require('core-js/modules/es.array.for-each');
+require('core-js/modules/es.array.slice');
+require('core-js/modules/es.array.splice');
+require('core-js/modules/es.function.name');
+require('core-js/modules/web.dom-collections.for-each');
 
 var QueryRenderer = {
   props: {
@@ -320,6 +323,7 @@ var QueryBuilder = {
   data: function data() {
     var data = {
       meta: undefined,
+      chartType: undefined,
       measures: [],
       dimensions: [],
       segments: [],

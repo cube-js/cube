@@ -1,3 +1,6 @@
+import 'core-js/modules/es.object.to-string';
+import 'core-js/modules/es.promise';
+import 'core-js/modules/web.timers';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
@@ -5,35 +8,37 @@ import _objectSpread2 from '@babel/runtime/helpers/objectSpread';
 import _typeof from '@babel/runtime/helpers/typeof';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
 import _createClass from '@babel/runtime/helpers/createClass';
-import 'core-js/modules/es6.promise';
-import 'core-js/modules/es6.object.to-string';
 import uuid from 'uuid/v4';
-import 'core-js/modules/es6.number.parse-float';
-import 'core-js/modules/es6.number.constructor';
-import 'core-js/modules/es6.number.is-nan';
-import 'core-js/modules/web.dom.iterable';
-import 'core-js/modules/es6.array.iterator';
-import 'core-js/modules/es6.object.keys';
+import 'core-js/modules/es.array.concat';
+import 'core-js/modules/es.array.filter';
+import 'core-js/modules/es.array.find';
+import 'core-js/modules/es.array.from';
+import 'core-js/modules/es.array.index-of';
+import 'core-js/modules/es.array.join';
+import 'core-js/modules/es.array.map';
+import 'core-js/modules/es.array.reduce';
+import 'core-js/modules/es.date.to-string';
+import 'core-js/modules/es.number.constructor';
+import 'core-js/modules/es.number.is-nan';
+import 'core-js/modules/es.number.parse-float';
+import 'core-js/modules/es.object.assign';
+import 'core-js/modules/es.object.keys';
+import 'core-js/modules/es.regexp.exec';
+import 'core-js/modules/es.string.iterator';
+import 'core-js/modules/es.string.match';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
-import 'core-js/modules/es6.object.assign';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
-import 'core-js/modules/es6.array.reduce';
-import 'core-js/modules/es6.regexp.match';
-import 'core-js/modules/es6.array.index-of';
-import 'core-js/modules/es6.array.find';
-import 'core-js/modules/es6.array.filter';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
-import 'core-js/modules/es6.string.iterator';
-import 'core-js/modules/es6.array.from';
-import 'core-js/modules/es6.array.map';
 import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, dropLast, fromPairs } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
-import 'core-js/modules/es6.array.is-array';
-import 'core-js/modules/es6.regexp.split';
-import 'core-js/modules/es6.function.name';
-import 'core-js/modules/es6.regexp.to-string';
-import 'core-js/modules/es6.date.to-string';
+import 'core-js/modules/es.array.is-array';
+import 'core-js/modules/es.function.name';
+import 'core-js/modules/es.string.split';
+import 'core-js/modules/es.array.iterator';
+import 'core-js/modules/es.regexp.to-string';
+import 'core-js/modules/web.dom-collections.iterator';
+import 'core-js/modules/web.url';
 import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
@@ -590,21 +595,29 @@ function () {
       var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
       var column = function column(field) {
-        return field === 'measures' ? (_this4.query().measures || []).map(function (m) {
+        var exractFields = function exractFields() {
+          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+          var title = annotation.title,
+              shortTitle = annotation.shortTitle,
+              format = annotation.format,
+              type = annotation.type,
+              meta = annotation.meta;
           return {
-            key: m,
-            title: _this4.loadResponse.annotation.measures[m].title,
-            shortTitle: _this4.loadResponse.annotation.measures[m].shortTitle,
-            format: _this4.loadResponse.annotation.measures[m].format,
-            type: _this4.loadResponse.annotation.measures[m].type
+            title: title,
+            shortTitle: shortTitle,
+            format: format,
+            type: type,
+            meta: meta
           };
-        }) : [{
-          key: field,
-          title: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).title,
-          shortTitle: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).shortTitle,
-          format: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).format,
-          type: (_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]).type
-        }];
+        };
+
+        return field === 'measures' ? (_this4.query().measures || []).map(function (key) {
+          return _objectSpread2({
+            key: key
+          }, exractFields(_this4.loadResponse.annotation.measures[key]));
+        }) : [_objectSpread2({
+          key: field
+        }, exractFields(_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]))];
       };
 
       return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
