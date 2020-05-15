@@ -1,17 +1,16 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import {
-  Menu, Icon
-} from 'antd';
+import { Menu } from 'antd';
+import { LineChartOutlined, AreaChartOutlined, BarChartOutlined, PieChartOutlined, TableOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import ButtonDropdown from './ButtonDropdown';
 
 const ChartTypes = [
-  { name: 'line', title: 'Line', icon: 'line-chart' },
-  { name: 'area', title: 'Area', icon: 'area-chart' },
-  { name: 'bar', title: 'Bar', icon: 'bar-chart' },
-  { name: 'pie', title: 'Pie', icon: 'pie-chart' },
-  { name: 'table', title: 'Table', icon: 'table' },
-  { name: 'number', title: 'Number', icon: 'info-circle' }
+  { name: 'line', title: 'Line', icon: <LineChartOutlined /> },
+  { name: 'area', title: 'Area', icon: <AreaChartOutlined /> },
+  { name: 'bar', title: 'Bar', icon: <BarChartOutlined /> },
+  { name: 'pie', title: 'Pie', icon: <PieChartOutlined /> },
+  { name: 'table', title: 'Table', icon: <TableOutlined /> },
+  { name: 'number', title: 'Number', icon: <InfoCircleOutlined /> }
 ];
 
 const SelectChartType = ({ chartType, updateChartType }) => {
@@ -19,8 +18,7 @@ const SelectChartType = ({ chartType, updateChartType }) => {
     <Menu>
       {ChartTypes.map(m => (
         <Menu.Item key={m.title} onClick={() => updateChartType(m.name)}>
-          <Icon type={m.icon} />
-          {m.title}
+          {m.icon} {m.title}
         </Menu.Item>
       ))}
     </Menu>

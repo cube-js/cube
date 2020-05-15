@@ -1,6 +1,7 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import { Select } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import FilterInput from './FilterInput';
@@ -45,7 +46,7 @@ const FilterGroup = ({
       onClick={(m) => updateMethods.add({ dimension: m })}
       availableMembers={availableMembers}
       type="dashed"
-      icon="plus"
+      icon={<PlusOutlined />}
     >
       {addMemberName}
     </MemberDropdown>

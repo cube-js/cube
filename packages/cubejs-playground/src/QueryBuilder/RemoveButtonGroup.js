@@ -1,6 +1,7 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Button, Icon } from 'antd';
+import { CloseOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
 
 const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group style={{ marginRight: 8 }} {...props}>
@@ -10,7 +11,7 @@ const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
       ghost
       onClick={onRemoveClick}
     >
-      <Icon type="close" />
+      <CloseOutlined />
     </Button>
   </Button.Group>
 );

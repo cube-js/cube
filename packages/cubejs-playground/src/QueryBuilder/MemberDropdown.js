@@ -15,7 +15,10 @@ const memberMenu = (onClick, availableMembers) => (
 );
 
 const MemberDropdown = ({ onClick, availableMembers, ...buttonProps }) => (
-  <ButtonDropdown overlay={memberMenu(onClick, availableMembers)} {...buttonProps} />
+  <ButtonDropdown
+    overlay={memberMenu(onClick, availableMembers)}
+    {...buttonProps}
+  />
 );
 
 MemberDropdown.propTypes = {

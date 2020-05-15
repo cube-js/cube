@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import SourceRender from 'react-source-render';
 import presetEnv from '@babel/preset-env';
@@ -6,8 +6,8 @@ import presetReact from '@babel/preset-react';
 import cubejs from '@cubejs-client/core';
 import * as cubejsReact from '@cubejs-client/react';
 // eslint-disable-next-line import/no-duplicates
-import * as antd from 'antd';
 // eslint-disable-next-line import/no-duplicates
+import * as antd from 'antd';
 import { Alert } from 'antd';
 
 import ChartContainer from './ChartContainer';
@@ -81,6 +81,9 @@ export const chartLibraries = Object.keys(libraryToTemplate)
   .map(k => ({ value: k, title: libraryToTemplate[k].title }));
 
 export const ChartRenderer = (props) => {
+  const [jsCompilingError, setError] = useState(null)
+  const [chartLibrary, setChartLibrary] = useState('bizcharts');
+
   const {
     query,
     resultSet,
@@ -88,14 +91,12 @@ export const ChartRenderer = (props) => {
     sqlQuery,
     dashboardSource,
     cubejsApi,
-    chartType
+    chartType,
+    sourceCodeFn: sourceCodeFnProp
   } = props;
 
-  let { sourceCodeFn } = props;
+  const sourceCodeFn = sourceCodeFnProp || sourceCodeTemplate
 
-  const [chartLibrary, setChartLibrary] = useState('bizcharts');
-
-  sourceCodeFn = sourceCodeFn || sourceCodeTemplate;
   const selectedChartLibrary = selectChartLibrary(chartType, chartLibrary);
   const source = sourceCodeFn({
     ...props,
@@ -108,39 +109,52 @@ export const ChartRenderer = (props) => {
     react: React,
     ...selectedChartLibrary.imports
   };
+
+  useEffect(() => {
+    if (jsCompilingError) {
+      setError(null)
+    }
+  }, [source, chartType])
+
   return (
-    <SourceRender
-      babelConfig={babelConfig}
-      onError={e => console.log(e)}
-      resolver={importName => dependencies[importName]}
-      source={source}
-    >
-      <SourceRender.Consumer>
-        {({ element, error: jsCompilingError }) => (
-          <ChartContainer
-            query={query}
-            resultSet={resultSet}
-            error={error}
-            sqlQuery={sqlQuery}
-            codeExample={source}
-            codeSandboxSource={forCodeSandBox(source)}
-            dependencies={dependencies}
-            dashboardSource={dashboardSource}
-            chartLibrary={chartLibrary}
-            setChartLibrary={setChartLibrary}
-            chartLibraries={chartLibraries}
-            cubejsApi={cubejsApi}
-            render={() => (jsCompilingError ? (
-              <Alert
-                message="Error occurred while compiling JS"
-                description={<pre>{jsCompilingError.toString()}</pre>}
-                type="error"
-              />
-            ) : element)}
+    <ChartContainer
+      query={query}
+      resultSet={resultSet}
+      error={error}
+      sqlQuery={sqlQuery}
+      codeExample={source}
+      codeSandboxSource={forCodeSandBox(source)}
+      dependencies={dependencies}
+      dashboardSource={dashboardSource}
+      chartLibrary={chartLibrary}
+      setChartLibrary={setChartLibrary}
+      chartLibraries={chartLibraries}
+      cubejsApi={cubejsApi}
+      render={() => {
+        if (jsCompilingError) {
+          return (
+            <Alert
+              message="Error occurred while compiling JS"
+              description={<pre>{jsCompilingError.toString()}</pre>}
+              type="error"
+            />
+          )
+        }
+
+        return (
+          <SourceRender
+            onRender={(error) => {
+              if (error) {
+                setError(error)
+              }
+            }}
+            babelConfig={babelConfig}
+            resolver={importName => dependencies[importName]}
+            source={source}
           />
-        )}
-      </SourceRender.Consumer>
-    </SourceRender>
+        )
+      }}
+    />
   );
 };
 
