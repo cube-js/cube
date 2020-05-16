@@ -1,7 +1,8 @@
 import React from 'react';
-import {
-  Switch, Menu, Dropdown, Icon, Form, Modal, Alert
-} from 'antd';
+import { CaretDownOutlined } from '@ant-design/icons';
+import { Form } from '@ant-design/compatible';
+import '@ant-design/compatible/assets/index.css';
+import { Switch, Menu, Dropdown, Modal, Alert } from 'antd';
 import styled from 'styled-components';
 import { playgroundAction } from "../events";
 import Button from "../components/Button";
@@ -46,7 +47,7 @@ const StyledForm = styled(Form)`
 `;
 
 const DropdownIcon = () => (
-  <Icon type="caret-down" style={{ color: '#727290' }} />
+  <CaretDownOutlined style={{ color: '#727290' }} />
 );
 
 const CreateOwnModal = ({

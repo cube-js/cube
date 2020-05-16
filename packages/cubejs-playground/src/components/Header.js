@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from "react-router-dom";
-import { Layout, Menu, Icon, Dropdown } from "antd";
+import { BookOutlined, MenuOutlined, SlackOutlined } from '@ant-design/icons';
+import { Layout, Menu, Dropdown } from "antd";
 import * as PropTypes from 'prop-types';
 import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
-import Button from "../components/Button";
 
 const StyledMenu = styled(Menu)`
   background: #EEEEF5;
@@ -42,14 +42,18 @@ const StyledMenuButton = styled.a`
   align-items: center;
   color: #43436B;
   transition: all 0.25s ease;
-  i {
+  padding: 0 10px;
+  
+  span {
     font-size: 20px;
     margin-right: 10px;
     opacity: 0.3;
   }
-  padding: 0 10px;
+  
   &:hover {
-    i { opacity: 0.6; }
+    span { 
+      opacity: 0.6; 
+    }
     border-color: rgba(67, 67, 107, 1);
     color: #43436B;
   }
@@ -84,7 +88,7 @@ const Header = ({ selectedKeys }) => {
             href="https://slack.cube.dev"
             target="_blank"
           >
-            <Icon type="slack" />
+            <SlackOutlined />
             Slack
           </StyledMenuButton>
           <StyledMenuButton
@@ -92,7 +96,7 @@ const Header = ({ selectedKeys }) => {
             href="https://cube.dev/docs"
             target="_blank"
           >
-            <Icon type="book" />
+            <BookOutlined />
             Docs
           </StyledMenuButton>
         </StyledMenu>
@@ -108,7 +112,7 @@ const Header = ({ selectedKeys }) => {
               </Menu>
             }
           >
-            <Icon type="menu" />
+            <MenuOutlined />
           </Dropdown>
         </div>
       )}

@@ -1,15 +1,14 @@
 import React, { Component } from 'react';
 import styled from 'styled-components';
-import { Switch, Menu, Dropdown, Icon, Form, Row, Col, Card, Modal, Typography } from 'antd';
-import { withRouter, Redirect } from "react-router-dom";
-import DashboardSource from "../DashboardSource";
-import fetch from '../playgroundFetch';
-import { frameworks } from "../ChartContainer";
-import { playgroundAction } from "../events";
-import { chartLibraries } from "../ChartRenderer";
-import Button from "../components/Button";
-import { ReactComponent as PlusSVG } from "./plus.svg";
-import CreateOwnModal from "./CreateOwnModal";
+import '@ant-design/compatible/assets/index.css';
+import { Card, Col, Row, Typography } from 'antd';
+import { Redirect, withRouter } from 'react-router-dom';
+import DashboardSource from '../DashboardSource';
+import { frameworks } from '../ChartContainer';
+import { chartLibraries } from '../ChartRenderer';
+import Button from '../components/Button';
+import { ReactComponent as PlusSVG } from './plus.svg';
+import CreateOwnModal from './CreateOwnModal';
 
 const MarginFrame = ({ children }) => (
   <div style={{ marginTop: 50, margin: 25 }}>

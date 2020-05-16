@@ -7,6 +7,8 @@
     "directory": "packages/cubejs-playground"
   },
   "dependencies": {
+    "@ant-design/compatible": "^1.0.2",
+    "@ant-design/icons": "^4.1.0",
     "@babel/generator": "^7.4.0",
     "@babel/parser": "^7.4.2",
     "@babel/preset-env": "^7.3.4",
@@ -16,7 +18,7 @@
     "@babel/types": "^7.4.0",
     "@cubejs-client/core": "^0.19.19",
     "@cubejs-client/react": "^0.19.19",
-    "antd": "^3.14.1",
+    "antd": "^4.2.0",
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
@@ -38,8 +40,8 @@
     "react-responsive": "^8.0.1",
     "react-router": "^5.1.2",
     "react-router-dom": "^5.1.2",
-    "react-scripts": "2.1.5",
-    "react-source-render": "^3.0.0-5",
+    "react-scripts": "3.4.1",
+    "react-source-render": "4.0.0-1",
     "recharts": "^1.7.1",
     "sql-formatter": "^2.3.2",
     "styled-components": "^4.4.1",
