@@ -82,7 +82,7 @@ class PostgresDriver extends BaseDriver {
     const client = await this.pool.connect();
     try {
       await client.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
-      await client.query("set statement_timeout to 600000");
+      await client.query(`set statement_timeout to ${(this.config.hasOwnProperty('executionTimeout')) ? this.config.executionTimeout * 1000 : 600000}`);
       const res = await client.query({
         text: query,
         values: values || [],
