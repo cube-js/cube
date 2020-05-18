@@ -217,7 +217,6 @@ class SchemaPage extends Component {
           style={{
             background: '#fff',
             borderRight: '1px solid #eee',
-            padding: '0 16px'
           }}
           className="schema-sidebar"
         >

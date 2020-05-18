@@ -1071,8 +1071,6 @@
 	    // Unhandled rejections tracking support, NodeJS Promise without it fails @@species test
 	    if (!IS_NODE$1 && typeof PromiseRejectionEvent != 'function') return true;
 	  }
-	  // We need Promise#finally in the pure version for preventing prototype pollution
-	  if (isPure && !PromiseConstructor.prototype['finally']) return true;
 	  // We can't use @@species feature detection in V8 since it causes
 	  // deoptimization and performance degradation
 	  // https://github.com/zloirock/core-js/issues/679
@@ -1292,7 +1290,7 @@
 	      : newGenericPromiseCapability(C);
 	  };
 
-	  if (!isPure && typeof nativePromiseConstructor == 'function') {
+	  if (typeof nativePromiseConstructor == 'function') {
 	    nativeThen = nativePromiseConstructor.prototype.then;
 
 	    // wrap native Promise#then for native async functions
@@ -1334,11 +1332,11 @@
 	  }
 	});
 
-	_export({ target: PROMISE, stat: true, forced: isPure || FORCED }, {
+	_export({ target: PROMISE, stat: true, forced: FORCED }, {
 	  // `Promise.resolve` method
 	  // https://tc39.github.io/ecma262/#sec-promise.resolve
 	  resolve: function resolve(x) {
-	    return promiseResolve(isPure && this === PromiseWrapper ? PromiseConstructor : this, x);
+	    return promiseResolve(this, x);
 	  }
 	});
 
@@ -1799,7 +1797,7 @@
 	        return getInternalState$1(this).description;
 	      }
 	    });
-	    {
+	    if (!isPure) {
 	      redefine(ObjectPrototype, 'propertyIsEnumerable', $propertyIsEnumerable, { unsafe: true });
 	    }
 	  }
@@ -2162,7 +2160,7 @@
 	  if (anyNativeIterator) {
 	    CurrentIteratorPrototype = objectGetPrototypeOf(anyNativeIterator.call(new Iterable()));
 	    if (IteratorPrototype$2 !== Object.prototype && CurrentIteratorPrototype.next) {
-	      if (objectGetPrototypeOf(CurrentIteratorPrototype) !== IteratorPrototype$2) {
+	      if (!isPure && objectGetPrototypeOf(CurrentIteratorPrototype) !== IteratorPrototype$2) {
 	        if (objectSetPrototypeOf) {
 	          objectSetPrototypeOf(CurrentIteratorPrototype, IteratorPrototype$2);
 	        } else if (typeof CurrentIteratorPrototype[ITERATOR$4] != 'function') {
@@ -2171,6 +2169,7 @@
 	      }
 	      // Set @@toStringTag to native iterators
 	      setToStringTag(CurrentIteratorPrototype, TO_STRING_TAG, true, true);
+	      if (isPure) iterators[TO_STRING_TAG] = returnThis$2;
 	    }
 	  }
 
@@ -2181,7 +2180,7 @@
 	  }
 
 	  // define iterator
-	  if (IterablePrototype[ITERATOR$4] !== defaultIterator) {
+	  if ((!isPure || FORCED) && IterablePrototype[ITERATOR$4] !== defaultIterator) {
 	    createNonEnumerableProperty(IterablePrototype, ITERATOR$4, defaultIterator);
 	  }
 	  iterators[NAME] = defaultIterator;
