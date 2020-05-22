@@ -44,6 +44,18 @@ cube(`Post_Topic`, {
 };
 ```
 
+In case when a table doesn't have a primary key you can define it manually as follows
+
+```javascript
+dimensions: {
+  id: {
+    sql: `CONCAT(${CUBE}.post_id, ${CUBE}.topic_id)`,
+    type: `number`,
+    primaryKey: true
+  },
+}
+```
+
 ## Many-to-Many Relationship Without an Associative Table 
 Sometimes there is no associative table in the database, when in reality, there is a many-to-many relationship. In this case, the solution is to extract some data from existing tables and create a virtual (not backed by a real table in the database) associative cube.
 
