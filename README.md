@@ -271,12 +271,14 @@ The Cube.js javascript Client performs queries, expressed via dimensions, measur
 
 ## Contributing
 
-How you can help:
+There are many ways you can contribute and help Cube.js. Here a few ones:
 
-1. Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
-2. Create issues every time you feel something is missing or goes wrong.
-3. Ask questions on [Stack Overflow with cube.js tag](https://stackoverflow.com/questions/tagged/cube.js) if others can have these questions as well.
-4. Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels. 
+* Star this repo and follow us on [Twitter](https://twitter.com/thecubejs).
+* Add Cube.js to your stack on [Stackshare](https://stackshare.io/cube-js).
+* Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
+* Create issues every time you feel something is missing or goes wrong.
+* Ask questions on [Stack Overflow with cube.js tag](https://stackoverflow.com/questions/tagged/cube.js) if others can have these questions as well.
+* Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels. 
 
 All sort of contributions are **welcome and extremely helpful** 🙌 Please refer to [the contribution guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md) for more information.
 
