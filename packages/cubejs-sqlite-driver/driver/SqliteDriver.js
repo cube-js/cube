@@ -59,7 +59,7 @@ class SqliteDriver extends BaseDriver {
           .map((nameAndType) => {
             const match = nameAndType
               .trim()
-              // replace \t with whitespace 
+              // replace \t with whitespace
               .replace(/\t/g, ' ')
               // obtain "([|`|")?name(]|`|")? type"
               .match(/([|`|"])?([^[\]"`]+)(]|`|")?\s+(\w+)/);
@@ -71,7 +71,7 @@ class SqliteDriver extends BaseDriver {
 
   createSchemaIfNotExists(schemaName) {
     return this.query(
-      `PRAGMA database_list`
+      'PRAGMA database_list'
     ).then((schemas) => {
       if (!schemas.find(s => s.name === schemaName)) {
         return this.query(`ATTACH DATABASE ${schemaName} AS ${schemaName}`);
@@ -82,7 +82,7 @@ class SqliteDriver extends BaseDriver {
 
   async getTablesQuery(schemaName) {
     const attachedDatabases = await this.query(
-      `PRAGMA database_list`
+      'PRAGMA database_list'
     );
     if (!attachedDatabases.find(s => s.name === schemaName)) {
       return [];
