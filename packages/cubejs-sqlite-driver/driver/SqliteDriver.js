@@ -36,6 +36,7 @@ class SqliteDriver extends BaseDriver {
       SELECT name, sql
       FROM sqlite_master
       WHERE type='table'
+      AND name!='sqlite_sequence'
       ORDER BY name
    `;
   }
@@ -58,8 +59,10 @@ class SqliteDriver extends BaseDriver {
           .map((nameAndType) => {
             const match = nameAndType
               .trim()
+              // replace \t with whitespace 
+              .replace(/\t/g, ' ')
               // obtain "([|`|")?name(]|`|")? type"
-              .match(/([|`|")?([^[\]"`]+)(]|`|")?\s+(\w+)/);
+              .match(/([|`|"])?([^[\]"`]+)(]|`|")?\s+(\w+)/);
             return { name: match[2], type: match[4] };
           })
       }), {}),
