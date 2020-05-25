@@ -324,6 +324,9 @@ cube(`Orders`, {
 ```
 
 As in case of cube pre-aggregations `refreshKey` can define `every` parameter which can be used to refresh pre-aggregations based on time interval.
+
+> **NOTE:** `every` parameter doesn't force Cube.js to fetch `refreshKey` based on it's interval. It generates SQL which result set change at least once per defined interval and adjusts `refreshKeyRenewalThreshold` accordingly.
+
 For example:
 
 ```javascript
