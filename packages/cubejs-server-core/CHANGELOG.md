@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.21](https://github.com/cube-js/cube.js/compare/v0.19.20...v0.19.21) (2020-05-25)
+
+
+### Bug Fixes
+
+* **playground:** Dynamic dashboard templated doesn't work: graphql-tools version downgrade ([#665](https://github.com/cube-js/cube.js/issues/665)) ([f5dfe54](https://github.com/cube-js/cube.js/commit/f5dfe54)), closes [#661](https://github.com/cube-js/cube.js/issues/661)
+
+
+
+
+
 ## [0.19.19](https://github.com/cube-js/cube.js/compare/v0.19.18...v0.19.19) (2020-05-15)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

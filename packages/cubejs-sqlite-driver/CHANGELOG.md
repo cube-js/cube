@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.21](https://github.com/cube-js/cube.js/compare/v0.19.20...v0.19.21) (2020-05-25)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/sqlite-driver:** sqlite name and type extraction ([#659](https://github.com/cube-js/cube.js/issues/659)) Thanks to [@avin3sh](https://github.com/avin3sh) ! ([b1c179d](https://github.com/cube-js/cube.js/commit/b1c179d))
+
+
+
+
+
 ## [0.19.17](https://github.com/cube-js/cube.js/compare/v0.19.16...v0.19.17) (2020-05-09)
 
 **Note:** Version bump only for package @cubejs-backend/sqlite-driver
