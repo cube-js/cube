@@ -140,7 +140,10 @@ class AppContainer {
     if (!packageJson || !packageJson.dependencies) {
       return [];
     }
-    const toInstall = Object.keys(dependencies).filter(dependency => !packageJson.dependencies[dependency]);
+    const toInstall = Object.keys(dependencies)
+      .filter(dependency => !packageJson.dependencies[dependency])
+      .map((dependency) => (dependency === 'graphql-tools' ? `${dependency}@5.0.0` : dependency));
+
     if (toInstall.length) {
       await this.executeCommand(
         'npm',
