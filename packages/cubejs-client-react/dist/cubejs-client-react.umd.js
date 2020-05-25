@@ -9600,35 +9600,35 @@
 
   var useCubeQuery = (function (query) {
     var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    var mutexRef = React.useRef({});
 
-    var _useState = React.useState({}),
-        _useState2 = _slicedToArray(_useState, 1),
-        mutexObj = _useState2[0];
+    var _useState = React.useState(null),
+        _useState2 = _slicedToArray(_useState, 2),
+        currentQuery = _useState2[0],
+        setCurrentQuery = _useState2[1];
 
-    var _useState3 = React.useState(null),
+    var _useState3 = React.useState(false),
         _useState4 = _slicedToArray(_useState3, 2),
-        currentQuery = _useState4[0],
-        setCurrentQuery = _useState4[1];
+        isLoading = _useState4[0],
+        setLoading = _useState4[1];
 
-    var _useState5 = React.useState(false),
+    var _useState5 = React.useState(null),
         _useState6 = _slicedToArray(_useState5, 2),
-        isLoading = _useState6[0],
-        setLoading = _useState6[1];
+        resultSet = _useState6[0],
+        setResultSet = _useState6[1];
 
     var _useState7 = React.useState(null),
         _useState8 = _slicedToArray(_useState7, 2),
-        resultSet = _useState8[0],
-        setResultSet = _useState8[1];
-
-    var _useState9 = React.useState(null),
-        _useState10 = _slicedToArray(_useState9, 2),
-        error = _useState10[0],
-        setError = _useState10[1];
+        error = _useState8[0],
+        setError = _useState8[1];
 
     var context = React.useContext(CubeContext);
-    var resetResultSetOnChange = options.resetResultSetOnChange;
     var subscribeRequest = null;
     React.useEffect(function () {
+      var _options$skip = options.skip,
+          skip = _options$skip === void 0 ? false : _options$skip,
+          resetResultSetOnChange = options.resetResultSetOnChange;
+
       function loadQuery() {
         return _loadQuery.apply(this, arguments);
       }
@@ -9642,7 +9642,7 @@
             while (1) {
               switch (_context.prev = _context.next) {
                 case 0:
-                  if (!(query && isQueryPresent(query))) {
+                  if (!(!skip && query && isQueryPresent(query))) {
                     _context.next = 25;
                     break;
                   }
@@ -9679,16 +9679,16 @@
                   }
 
                   subscribeRequest = cubejsApi.subscribe(query, {
-                    mutexObj: mutexObj,
+                    mutexObj: mutexRef.current,
                     mutexKey: 'query'
                   }, function (e, result) {
-                    setLoading(false);
-
                     if (e) {
                       setError(e);
                     } else {
                       setResultSet(result);
                     }
+
+                    setLoading(false);
                   });
                   _context.next = 19;
                   break;
@@ -9697,7 +9697,7 @@
                   _context.t0 = setResultSet;
                   _context.next = 16;
                   return cubejsApi.load(query, {
-                    mutexObj: mutexObj,
+                    mutexObj: mutexRef.current,
                     mutexKey: 'query'
                   });
 

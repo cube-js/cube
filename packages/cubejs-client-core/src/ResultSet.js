@@ -41,6 +41,80 @@ class ResultSet {
   }
 
   /**
+   * Returns a measure drill down query
+   *
+   * @param drillDownLocator
+   * @param pivotConfig - See {@link ResultSet#pivot}.
+   * @returns {Object|null}
+   */
+  drillDown(drillDownLocator, pivotConfig) {
+    const { xValues = [], yValues = [] } = drillDownLocator;
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+    const { dimensions } = this.query();
+    const { measures } = this.loadResponse.annotation;
+
+    let [measureName] = yValues;
+    if (measureName === undefined) {
+      [measureName] = Object.keys(measures);
+    }
+
+    if (measures[measureName].drillMembers == null) {
+      return null;
+    }
+
+    const yDimensionFilters = normalizedPivotConfig.y
+      .map((member, currentIndex) => {
+        if (dimensions.includes(member) && yValues[currentIndex] != null) {
+          return {
+            member,
+            operator: 'equals',
+            values: [yValues[currentIndex]]
+          };
+        }
+
+        return false;
+      }).filter(Boolean);
+
+    const filters = [];
+    const timeDimensions = [];
+
+    xValues.forEach((xValue, xValueIndex) => {
+      const member = normalizedPivotConfig.x[xValueIndex];
+      const [cubeName, dimension, granularity] = member.split('.');
+
+      if (granularity !== undefined) {
+        const range = moment.range(xValue, xValue).snapTo(
+          granularity
+        );
+
+        timeDimensions.push({
+          dimension: [cubeName, dimension].join('.'),
+          dateRange: [
+            range.start,
+            range.end
+          ].map((dt) => dt.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)),
+        });
+      } else {
+        filters.push({
+          member,
+          operator: 'equals',
+          values: [xValue.toString()],
+        });
+      }
+    });
+
+    return {
+      ...measures[measureName].drillMembers,
+      filters: [
+        ...filters,
+        ...yDimensionFilters,
+      ],
+      timeDimensions
+    };
+  }
+
+  /**
    * Returns an array of series with key, title and series data.
    *
    * ```js
@@ -173,19 +247,25 @@ class ResultSet {
         reduce(maxBy(d => d.toDate()), dates[0], dates)
       ] || null;
     }
+
     if (!dateRange) {
       return null;
     }
+
     const padToDay = timeDimension.dateRange ?
       timeDimension.dateRange.find(d => d.match(DateRegex)) :
-      ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
-    const start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
-    const end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+      !['hour', 'minute', 'second'].includes(timeDimension.granularity);
+
+    const [start, end] = dateRange;
     const range = moment.range(start, end);
+
     if (!TIME_SERIES[timeDimension.granularity]) {
       throw new Error(`Unsupported time granularity: ${timeDimension.granularity}`);
     }
-    return TIME_SERIES[timeDimension.granularity](range);
+
+    return TIME_SERIES[timeDimension.granularity](
+      padToDay ? range.snapTo('day') : range
+    );
   }
 
   /**
@@ -349,6 +429,7 @@ class ResultSet {
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ', '), // TODO deprecated
       x: this.axisValuesString(xValues, ', '),
+      xValues,
       ...(
         yValuesArray
           .map(([yValues, m]) => ({
@@ -501,14 +582,21 @@ class ResultSet {
    */
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
+
     return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(
       this.timeDimensionBackwardCompatibleData()
     ).map(axisValues => ({
-      title: this.axisValuesString(pivotConfig.y.find(d => d === 'measures') ?
-        dropLast(1, axisValues)
-          .concat(this.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) :
-        axisValues, ', '),
-      key: this.axisValuesString(axisValues)
+      title: this.axisValuesString(
+        pivotConfig.y.find(d => d === 'measures') ?
+          dropLast(1, axisValues).concat(
+            this.loadResponse.annotation.measures[
+              ResultSet.measureFromAxis(axisValues)
+            ].title
+          ) :
+          axisValues, ', '
+      ),
+      key: this.axisValuesString(axisValues),
+      yValues: axisValues
     }));
   }
 

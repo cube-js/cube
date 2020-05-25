@@ -12,7 +12,9 @@ import uuid from 'uuid/v4';
 import 'core-js/modules/es.array.concat';
 import 'core-js/modules/es.array.filter';
 import 'core-js/modules/es.array.find';
+import 'core-js/modules/es.array.for-each';
 import 'core-js/modules/es.array.from';
+import 'core-js/modules/es.array.includes';
 import 'core-js/modules/es.array.index-of';
 import 'core-js/modules/es.array.join';
 import 'core-js/modules/es.array.map';
@@ -24,19 +26,22 @@ import 'core-js/modules/es.number.parse-float';
 import 'core-js/modules/es.object.assign';
 import 'core-js/modules/es.object.keys';
 import 'core-js/modules/es.regexp.exec';
+import 'core-js/modules/es.regexp.to-string';
+import 'core-js/modules/es.string.includes';
 import 'core-js/modules/es.string.iterator';
 import 'core-js/modules/es.string.match';
-import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
+import 'core-js/modules/es.string.split';
+import 'core-js/modules/web.dom-collections.for-each';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+import _toConsumableArray from '@babel/runtime/helpers/toConsumableArray';
+import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
 import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, dropLast, fromPairs } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
 import 'core-js/modules/es.array.is-array';
 import 'core-js/modules/es.function.name';
-import 'core-js/modules/es.string.split';
 import 'core-js/modules/es.array.iterator';
-import 'core-js/modules/es.regexp.to-string';
 import 'core-js/modules/web.dom-collections.iterator';
 import 'core-js/modules/web.url';
 import fetch from 'cross-fetch';
@@ -97,39 +102,119 @@ function () {
     this.parseDateMeasures = options.parseDateMeasures;
   }
   /**
-   * Returns an array of series with key, title and series data.
+   * Returns a measure drill down query
    *
-   * ```js
-   * // For query
-   * {
-   *   measures: ['Stories.count'],
-   *   timeDimensions: [{
-   *     dimension: 'Stories.time',
-   *     dateRange: ['2015-01-01', '2015-12-31'],
-   *     granularity: 'month'
-   *   }]
-   * }
-   *
-   * // ResultSet.series() will return
-   * [
-   *   {
-   *     "key":"Stories.count",
-   *     "title": "Stories Count",
-   *     "series": [
-   *       { "x":"2015-01-01T00:00:00", "value": 27120 },
-   *       { "x":"2015-02-01T00:00:00", "value": 25861 },
-   *       { "x": "2015-03-01T00:00:00", "value": 29661 },
-   *       //...
-   *     ]
-   *   }
-   * ]
-   * ```
+   * @param drillDownLocator
    * @param pivotConfig - See {@link ResultSet#pivot}.
-   * @returns {Array}
+   * @returns {Object|null}
    */
 
 
   _createClass(ResultSet, [{
+    key: "drillDown",
+    value: function drillDown(drillDownLocator, pivotConfig) {
+      var _drillDownLocator$xVa = drillDownLocator.xValues,
+          xValues = _drillDownLocator$xVa === void 0 ? [] : _drillDownLocator$xVa,
+          _drillDownLocator$yVa = drillDownLocator.yValues,
+          yValues = _drillDownLocator$yVa === void 0 ? [] : _drillDownLocator$yVa;
+      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+      var _this$query = this.query(),
+          dimensions = _this$query.dimensions;
+
+      var measures = this.loadResponse.annotation.measures;
+
+      var _yValues = _slicedToArray(yValues, 1),
+          measureName = _yValues[0];
+
+      if (measureName === undefined) {
+        var _Object$keys = Object.keys(measures);
+
+        var _Object$keys2 = _slicedToArray(_Object$keys, 1);
+
+        measureName = _Object$keys2[0];
+      }
+
+      if (measures[measureName].drillMembers == null) {
+        return null;
+      }
+
+      var yDimensionFilters = normalizedPivotConfig.y.map(function (member, currentIndex) {
+        if (dimensions.includes(member) && yValues[currentIndex] != null) {
+          return {
+            member: member,
+            operator: 'equals',
+            values: [yValues[currentIndex]]
+          };
+        }
+
+        return false;
+      }).filter(Boolean);
+      var filters = [];
+      var timeDimensions = [];
+      xValues.forEach(function (xValue, xValueIndex) {
+        var member = normalizedPivotConfig.x[xValueIndex];
+
+        var _member$split = member.split('.'),
+            _member$split2 = _slicedToArray(_member$split, 3),
+            cubeName = _member$split2[0],
+            dimension = _member$split2[1],
+            granularity = _member$split2[2];
+
+        if (granularity !== undefined) {
+          var range = moment.range(xValue, xValue).snapTo(granularity);
+          timeDimensions.push({
+            dimension: [cubeName, dimension].join('.'),
+            dateRange: [range.start, range.end].map(function (dt) {
+              return dt.format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+            })
+          });
+        } else {
+          filters.push({
+            member: member,
+            operator: 'equals',
+            values: [xValue.toString()]
+          });
+        }
+      });
+      return _objectSpread2({}, measures[measureName].drillMembers, {
+        filters: [].concat(filters, _toConsumableArray(yDimensionFilters)),
+        timeDimensions: timeDimensions
+      });
+    }
+    /**
+     * Returns an array of series with key, title and series data.
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-12-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.series() will return
+     * [
+     *   {
+     *     "key":"Stories.count",
+     *     "title": "Stories Count",
+     *     "series": [
+     *       { "x":"2015-01-01T00:00:00", "value": 27120 },
+     *       { "x":"2015-02-01T00:00:00", "value": 25861 },
+     *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+     *       //...
+     *     ]
+     *   }
+     * ]
+     * ```
+     * @param pivotConfig - See {@link ResultSet#pivot}.
+     * @returns {Array}
+     */
+
+  }, {
     key: "series",
     value: function series(pivotConfig) {
       var _this = this;
@@ -280,16 +365,20 @@ function () {
 
       var padToDay = timeDimension.dateRange ? timeDimension.dateRange.find(function (d) {
         return d.match(DateRegex);
-      }) : ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
-      var start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
-      var end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+      }) : !['hour', 'minute', 'second'].includes(timeDimension.granularity);
+
+      var _dateRange = dateRange,
+          _dateRange2 = _slicedToArray(_dateRange, 2),
+          start = _dateRange2[0],
+          end = _dateRange2[1];
+
       var range = moment.range(start, end);
 
       if (!TIME_SERIES[timeDimension.granularity]) {
         throw new Error("Unsupported time granularity: ".concat(timeDimension.granularity));
       }
 
-      return TIME_SERIES[timeDimension.granularity](range);
+      return TIME_SERIES[timeDimension.granularity](padToDay ? range.snapTo('day') : range);
     }
     /**
      * Base method for pivoting {@link ResultSet} data.
@@ -493,7 +582,8 @@ function () {
         return _objectSpread2({
           category: _this3.axisValuesString(xValues, ', '),
           // TODO deprecated
-          x: _this3.axisValuesString(xValues, ', ')
+          x: _this3.axisValuesString(xValues, ', '),
+          xValues: xValues
         }, yValuesArray.map(function (_ref16) {
           var _ref17 = _slicedToArray(_ref16, 2),
               yValues = _ref17[0],
@@ -669,7 +759,8 @@ function () {
           title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
           }) ? dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-          key: _this5.axisValuesString(axisValues)
+          key: _this5.axisValuesString(axisValues),
+          yValues: axisValues
         };
       });
     }
