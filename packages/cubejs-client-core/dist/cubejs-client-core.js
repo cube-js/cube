@@ -18,20 +18,29 @@ var uuid = _interopDefault(require('uuid/v4'));
 require('core-js/modules/es.array.concat');
 require('core-js/modules/es.array.filter');
 require('core-js/modules/es.array.find');
+require('core-js/modules/es.array.for-each');
 require('core-js/modules/es.array.from');
 require('core-js/modules/es.array.index-of');
+require('core-js/modules/es.array.iterator');
 require('core-js/modules/es.array.join');
 require('core-js/modules/es.array.map');
 require('core-js/modules/es.array.reduce');
+require('core-js/modules/es.array.slice');
 require('core-js/modules/es.date.to-string');
+require('core-js/modules/es.map');
 require('core-js/modules/es.number.constructor');
 require('core-js/modules/es.number.is-nan');
 require('core-js/modules/es.number.parse-float');
 require('core-js/modules/es.object.assign');
 require('core-js/modules/es.object.keys');
 require('core-js/modules/es.regexp.exec');
+require('core-js/modules/es.regexp.to-string');
+require('core-js/modules/es.set');
 require('core-js/modules/es.string.iterator');
 require('core-js/modules/es.string.match');
+require('core-js/modules/web.dom-collections.for-each');
+require('core-js/modules/web.dom-collections.iterator');
+var _toConsumableArray = _interopDefault(require('@babel/runtime/helpers/toConsumableArray'));
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
@@ -41,9 +50,6 @@ var momentRange = _interopDefault(require('moment-range'));
 require('core-js/modules/es.array.is-array');
 require('core-js/modules/es.function.name');
 require('core-js/modules/es.string.split');
-require('core-js/modules/es.array.iterator');
-require('core-js/modules/es.regexp.to-string');
-require('core-js/modules/web.dom-collections.iterator');
 require('core-js/modules/web.url');
 var fetch = _interopDefault(require('cross-fetch'));
 require('url-search-params-polyfill');
@@ -543,28 +549,36 @@ function () {
     key: "tablePivot",
     value: function tablePivot(pivotConfig) {
       var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
+      return this.pivot(normalizedPivotConfig).reduce(function (memo, _ref19) {
+        var xValues = _ref19.xValues,
+            yValuesArray = _ref19.yValuesArray;
+        var index = -1;
+        var set = new Set();
+        yValuesArray.forEach(function (_ref20) {
+          var _ref21 = _slicedToArray(_ref20, 2),
+              yValues = _ref21[0],
+              m = _ref21[1];
 
-      var valueToObject = function valueToObject(valuesArray, measureValue) {
-        return function (field, index) {
-          return _defineProperty({}, field === 'measures' ? valuesArray[index] : field, field === 'measures' ? measureValue : valuesArray[index]);
-        };
-      };
+          var dimensions = normalizedPivotConfig.y.filter(function (d) {
+            return d !== 'measures';
+          });
+          var dimensionValues = yValues.slice(0, yValues.length - 1);
+          var key = dimensionValues.join();
 
-      return this.pivot(normalizedPivotConfig).map(function (_ref20) {
-        var xValues = _ref20.xValues,
-            yValuesArray = _ref20.yValuesArray;
-        return yValuesArray.map(function (_ref21) {
-          var _ref22 = _slicedToArray(_ref21, 2),
-              yValues = _ref22[0],
-              m = _ref22[1];
+          if (!set.has(key)) {
+            set.add(key);
+            index++;
+          }
 
-          return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
-            return Object.assign(a, b);
-          }, {});
-        }).reduce(function (a, b) {
-          return Object.assign(a, b);
-        }, {});
-      });
+          var path = [xValues.join('.'), yValues[yValues.length - 1]].join('.');
+          memo[index] = _objectSpread2({}, memo[index], _defineProperty({}, path, m), dimensions.reduce(function (dimensionsMemo, currentDimension, index) {
+            dimensionsMemo[currentDimension] = dimensionValues[index];
+            return dimensionsMemo;
+          }, {}));
+        });
+        set.clear();
+        return memo;
+      }, []);
     }
     /**
      * Returns array of column definitions for `tablePivot`.
@@ -599,36 +613,87 @@ function () {
       var _this4 = this;
 
       var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+      var map = new Map();
+      var columns = [];
+      normalizedPivotConfig.x.forEach(function (_, index) {
+        _this4.pivot(normalizedPivotConfig).forEach(function (_ref22) {
+          var xValues = _ref22.xValues;
+          map.set(xValues[index], {
+            key: normalizedPivotConfig.x[index],
+            value: xValues[index]
+          }); // tmp[xValues[index]] = {
+          //   key: normalizedPivotConfig.x[index],
+          //   value: xValues[index],
+          // };
+        });
 
-      var column = function column(field) {
-        var exractFields = function exractFields() {
-          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-          var title = annotation.title,
-              shortTitle = annotation.shortTitle,
-              format = annotation.format,
-              type = annotation.type,
-              meta = annotation.meta;
-          return {
-            title: title,
-            shortTitle: shortTitle,
-            format: format,
-            type: type,
-            meta: meta
-          };
-        };
-
-        return field === 'measures' ? (_this4.query().measures || []).map(function (key) {
-          return _objectSpread2({
-            key: key
-          }, exractFields(_this4.loadResponse.annotation.measures[key]));
-        }) : [_objectSpread2({
-          key: field
-        }, exractFields(_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]))];
-      };
-
-      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
-        return a.concat(b);
+        columns.push(_toConsumableArray(map.values()));
+        map.clear();
       });
+      (this.pivot(normalizedPivotConfig)[0].yValuesArray || []).forEach(function (_ref23) {
+        var _ref24 = _slicedToArray(_ref23, 1),
+            yValues = _ref24[0];
+
+        var measureName = yValues[yValues.length - 1];
+        map.set(measureName, {
+          key: measureName
+        });
+      });
+      columns.push(_toConsumableArray(map.values()));
+
+      function groupColumns(level) {
+        var path = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+
+        if (columns[level] === undefined) {
+          return [];
+        }
+
+        return columns[level].map(function (element) {
+          var currentPath = [path, (element.value === undefined ? '' : element.value).toString()].filter(Boolean).join('.');
+          var dataIndex = element.value === undefined ? [currentPath, element.key].join('.') : element.key;
+          return {
+            title: element.value || dataIndex,
+            dataIndex: dataIndex,
+            key: dataIndex,
+            children: groupColumns(level + 1, currentPath)
+          };
+        });
+      }
+
+      return groupColumns(0); // const column = (field) => {
+      //   const exractFields = (annotation = {}) => {
+      //     const {
+      //       title,
+      //       shortTitle,
+      //       format,
+      //       type,
+      //       meta
+      //     } = annotation;
+      //
+      //     return {
+      //       title,
+      //       shortTitle,
+      //       format,
+      //       type,
+      //       meta
+      //     };
+      //   };
+      //
+      //   return field === 'measures' ? (this.query().measures || []).map((key) => ({
+      //     key,
+      //     ...exractFields(this.loadResponse.annotation.measures[key])
+      //   })) : [
+      //     {
+      //       key: field,
+      //       ...exractFields(this.loadResponse.annotation.dimensions[field] ||
+      //           this.loadResponse.annotation.timeDimensions[field])
+      //     },
+      //   ];
+      // };
+      //
+      // return normalizedPivotConfig.x.map(column)
+      //   .concat(normalizedPivotConfig.y.map(column))
+      //   .reduce((a, b) => a.concat(b));
     }
   }, {
     key: "totalRow",

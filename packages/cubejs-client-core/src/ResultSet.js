@@ -388,20 +388,37 @@ class ResultSet {
    */
   tablePivot(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
-    const valueToObject =
-      (valuesArray, measureValue) => (
-        (field, index) => ({
-          [field === 'measures' ? valuesArray[index] : field]: field === 'measures' ? measureValue : valuesArray[index]
-        })
-      );
+    return this.pivot(normalizedPivotConfig).reduce((
+      memo, { xValues, yValuesArray }
+    ) => {
+      let index = -1;
+      const set = new Set();
 
-    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => (
-      yValuesArray.map(([yValues, m]) => (
-        normalizedPivotConfig.x.map(valueToObject(xValues, m))
-          .concat(normalizedPivotConfig.y.map(valueToObject(yValues, m)))
-          .reduce((a, b) => Object.assign(a, b), {})
-      )).reduce((a, b) => Object.assign(a, b), {})
-    ));
+      yValuesArray.forEach(([yValues, m]) => {
+        const dimensions = normalizedPivotConfig.y.filter((d) => d !== 'measures');
+        const dimensionValues = yValues.slice(0, yValues.length - 1);
+        const key = dimensionValues.join();
+
+        if (!set.has(key)) {
+          set.add(key);
+          index++;
+        }
+        const path = [xValues.join('.'), yValues[yValues.length - 1]].join('.');
+
+        memo[index] = {
+          ...memo[index],
+          [path]: m,
+          ...dimensions.reduce((dimensionsMemo, currentDimension, currentIndex) => {
+            dimensionsMemo[currentDimension] = dimensionValues[currentIndex];
+            return dimensionsMemo;
+          }, {}),
+        };
+      });
+
+      set.clear();
+
+      return memo;
+    }, []);
   }
 
   /**
@@ -433,40 +450,49 @@ class ResultSet {
   tableColumns(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
-    const column = (field) => {
-      const exractFields = (annotation = {}) => {
-        const {
-          title,
-          shortTitle,
-          format,
-          type,
-          meta
-        } = annotation;
+    const m = new Map();
+    const columns = [];
+
+    normalizedPivotConfig.x.forEach((_, index) => {
+      this.pivot(normalizedPivotConfig).forEach(({ xValues }) => {
+        m.set(xValues[index], {
+          key: normalizedPivotConfig.x[index],
+          value: xValues[index],
+        });
+      });
+
+      columns.push([...m.values()]);
+      m.clear();
+    });
+
+    (this.pivot(normalizedPivotConfig)[0].yValuesArray || []).forEach(([yValues]) => {
+      const measureName = yValues[yValues.length - 1];
+      m.set(measureName, { key: measureName });
+    });
+
+    columns.push([...m.values()]);
+
+    function groupColumns(level, path = '') {
+      if (columns[level] === undefined) {
+        return [];
+      }
+
+      return columns[level].map((element) => {
+        const currentPath = [path, (element.value === undefined ? '' : element.value).toString()].filter(Boolean).join('.');
+        const dataIndex = element.value === undefined ?
+          [currentPath, element.key].join('.') :
+          element.key;
 
         return {
-          title,
-          shortTitle,
-          format,
-          type,
-          meta
+          title: element.value || dataIndex,
+          dataIndex,
+          key: dataIndex,
+          children: groupColumns(level + 1, currentPath),
         };
-      };
+      });
+    }
 
-      return field === 'measures' ? (this.query().measures || []).map((key) => ({
-        key,
-        ...exractFields(this.loadResponse.annotation.measures[key])
-      })) : [
-        {
-          key: field,
-          ...exractFields(this.loadResponse.annotation.dimensions[field] ||
-              this.loadResponse.annotation.timeDimensions[field])
-        },
-      ];
-    };
-
-    return normalizedPivotConfig.x.map(column)
-      .concat(normalizedPivotConfig.y.map(column))
-      .reduce((a, b) => a.concat(b));
+    return groupColumns(0);
   }
 
   totalRow() {

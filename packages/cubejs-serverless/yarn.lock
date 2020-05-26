@@ -771,10 +771,10 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@cubejs-backend/api-gateway@^0.18.5":
-  version "0.18.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.18.5.tgz#6f7f081d9251011e9a20b940bc9d9605bc99947c"
-  integrity sha512-ItX7ybqfXPnWvz/UYZ9XSfzRrWEtJa5nfw6hEWfkgXbuQScFS3eZ0DXBxymc0WJRRJwNVwHO5R8LfqTTaV49JA==
+"@cubejs-backend/api-gateway@^0.19.19":
+  version "0.19.19"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.19.19.tgz#ac465832309b7430cd7ba63b3487e3f9aa6056db"
+  integrity sha512-l/DNGftod1y0L+N0LQIT28D0Dj8bympdc1q6fIebjQgjGnU2dP+8Ms+rsRQdzWwEwdO58eUiaQ20qpLRTHyv+A==
   dependencies:
     "@hapi/joi" "^15.1.1"
     chrono-node "^1.3.11"
@@ -784,19 +784,19 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.18.5":
-  version "0.18.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.5.tgz#196b59fea6c46da28fbcf56b40e62e6415632f81"
-  integrity sha512-y9hiOTHR27i4ypGk3oLOB0100Aa05MV8q/E6q03gAAEQQH88h7V1TfXUsG64BDZLT9lxedN6PumCnw2q9ALXiQ==
+"@cubejs-backend/query-orchestrator@^0.19.17":
+  version "0.19.17"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.17.tgz#ab68ef89f2d751ec547315e2919b01c70596743f"
+  integrity sha512-yRA3GbTZwsbFw415Mb8STRyK3w95acXv8315yNGUN0YTpbQVhCDge9Owx0inP9GicRs5XQhh2Ewc76FTvT0NSw==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
-    redis "^2.8.0"
+    redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.18.5":
-  version "0.18.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.18.5.tgz#b94b7a0a25d5a03e203f0c0d74451bb42ae16d2f"
-  integrity sha512-lGvq6zIg9q2Mbjp/R80RrVkICxAMeZGgWexaSD9Xs1EwUvKzeT3SBFEi9uNTWiSNrUV/5gs8EMfdmsxoggChOg==
+"@cubejs-backend/schema-compiler@^0.19.19":
+  version "0.19.19"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.19.19.tgz#b7f0419b38cf136ed5d3205ad1b29885676b0fa9"
+  integrity sha512-DLjhmzNtcn8wfokqotnQBW0TscxAGnWo+mXQ+rPT0ByeTUpdDBPS4qcGBH5sGNzBP7fDJNc//xhrUdnX/PdaJw==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -805,18 +805,20 @@
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
     "@hapi/joi" "^15.1.1"
+    antlr4 "^4.8.0"
     humps "^2.0.1"
     inflection "^1.12.0"
+    lru-cache "^5.1.1"
     moment-range "^4.0.1"
-    moment-timezone "^0.5.13"
+    moment-timezone "^0.5.28"
     node-dijkstra "^2.5.0"
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.18.5":
-  version "0.18.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.18.5.tgz#d2ffa848a3b2f17fa0e139e47d333df9ce39f901"
-  integrity sha512-OLYHR6AYNBHoEJXBgih2YYEv2fejb3w+xLdDUCcs7KvjObtlAcM0jakd0IXxsGA5SK/0JLbUKcBd0REdisR0/w==
+"@cubejs-backend/server-core@^0.19.21":
+  version "0.19.21"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.19.21.tgz#b5c1a9064ac316d67de67a7f9e572f262fca76e5"
+  integrity sha512-7r7m8p3j5JVE2XV+wY7lRfMCHGNEi870UjFMHq3DwmILLlCZOaZ87ixrfZyJuMBcPYu1jJes3WSJ/hZHC5up+w==
   dependencies:
     "@babel/core" "^7.7.4"
     "@babel/generator" "^7.4.0"
@@ -826,9 +828,9 @@
     "@babel/standalone" "^7.3.4"
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
-    "@cubejs-backend/api-gateway" "^0.18.5"
-    "@cubejs-backend/query-orchestrator" "^0.18.5"
-    "@cubejs-backend/schema-compiler" "^0.18.5"
+    "@cubejs-backend/api-gateway" "^0.19.19"
+    "@cubejs-backend/query-orchestrator" "^0.19.17"
+    "@cubejs-backend/schema-compiler" "^0.19.19"
     codesandbox-import-utils "^2.1.12"
     cross-spawn "^7.0.1"
     fs-extra "^8.1.0"
@@ -965,6 +967,11 @@ ansi-styles@^4.1.0:
   dependencies:
     "@types/color-name" "^1.1.1"
     color-convert "^2.0.1"
+
+antlr4@^4.8.0:
+  version "4.8.0"
+  resolved "https://registry.yarnpkg.com/antlr4/-/antlr4-4.8.0.tgz#f938ec171be7fc2855cd3a533e87647185b32b6a"
+  integrity sha512-en/MxQ4OkPgGJQ3wD/muzj1uDnFSzdFIhc2+c6bHZokWkuBb6RRvFjpWhPxWLbgQvaEzldJZ0GSQpfSAaE3hqg==
 
 argparse@^1.0.7:
   version "1.0.10"
@@ -1270,6 +1277,11 @@ define-properties@^1.1.2:
   dependencies:
     object-keys "^1.0.12"
 
+denque@^1.4.1:
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/denque/-/denque-1.4.1.tgz#6744ff7641c148c3f8a69c307e51235c1f4a37cf"
+  integrity sha512-OfzPuSZKGcgr96rf1oODnfjqBFmr1DVoc/TrItj3Ohe0Ah1C5WX5Baquw/9U9KovnQ88EqmJbD66rKYUQYN1tQ==
+
 depd@~1.1.2:
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/depd/-/depd-1.1.2.tgz#9bcd52e14c097763e749b274c4346ed2e560b5a9"
@@ -1291,11 +1303,6 @@ doctrine@^3.0.0:
   integrity sha512-yS+Q5i3hBf7GBkd4KG8a7eBNNWNGLTaEwwYWUijIYM7zrlYDM0BFXHjjPWlWZ1Rg7UaddZeIDmi9jF3HmqiQ2w==
   dependencies:
     esutils "^2.0.2"
-
-double-ended-queue@^2.1.0-0:
-  version "2.1.0-0"
-  resolved "https://registry.yarnpkg.com/double-ended-queue/-/double-ended-queue-2.1.0-0.tgz#103d3527fd31528f40188130c841efdd78264e5c"
-  integrity sha1-ED01J/0xUo9AGIEwyEHv3XgmTlw=
 
 ecdsa-sig-formatter@1.0.10:
   version "1.0.10"
@@ -2102,17 +2109,17 @@ moment-range@^4.0.1:
   dependencies:
     es6-symbol "^3.1.0"
 
-moment-timezone@^0.5.13:
-  version "0.5.23"
-  resolved "https://registry.yarnpkg.com/moment-timezone/-/moment-timezone-0.5.23.tgz#7cbb00db2c14c71b19303cb47b0fb0a6d8651463"
-  integrity sha512-WHFH85DkCfiNMDX5D3X7hpNH3/PUhjTGcD0U1SgfBGZxJ3qUmJh5FdvaFjcClxOvB3rzdfj4oRffbI38jEnC1w==
-  dependencies:
-    moment ">= 2.9.0"
-
 moment-timezone@^0.5.27:
   version "0.5.27"
   resolved "https://registry.yarnpkg.com/moment-timezone/-/moment-timezone-0.5.27.tgz#73adec8139b6fe30452e78f210f27b1f346b8877"
   integrity sha512-EIKQs7h5sAsjhPCqN6ggx6cEbs94GK050254TIJySD1bzoM5JTYDwAU1IoVOeTOL6Gm27kYJ51/uuvq1kIlrbw==
+  dependencies:
+    moment ">= 2.9.0"
+
+moment-timezone@^0.5.28:
+  version "0.5.31"
+  resolved "https://registry.yarnpkg.com/moment-timezone/-/moment-timezone-0.5.31.tgz#9c40d8c5026f0c7ab46eda3d63e49c155148de05"
+  integrity sha512-+GgHNg8xRhMXfEbv81iDtrVeTcWt0kWmTEY1XQK14dICTXnWJnT0dxdlPspwqF3keKMVPXwayEsk1DI0AA/jdA==
   dependencies:
     moment ">= 2.9.0"
 
@@ -2341,24 +2348,32 @@ raw-body@2.3.3:
     iconv-lite "0.4.23"
     unpipe "1.0.0"
 
-redis-commands@^1.2.0:
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/redis-commands/-/redis-commands-1.4.0.tgz#52f9cf99153efcce56a8f86af986bd04e988602f"
-  integrity sha512-cu8EF+MtkwI4DLIT0x9P8qNTLFhQD4jLfxLR0cCNkeGzs87FN6879JOJwNQR/1zD7aSYNbU0hgsV9zGY71Itvw==
+redis-commands@^1.5.0:
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/redis-commands/-/redis-commands-1.5.0.tgz#80d2e20698fe688f227127ff9e5164a7dd17e785"
+  integrity sha512-6KxamqpZ468MeQC3bkWmCB1fp56XL64D4Kf0zJSwDZbVLLm7KFkoIcHrgRvQ+sk8dnhySs7+yBg94yIkAK7aJg==
 
-redis-parser@^2.6.0:
-  version "2.6.0"
-  resolved "https://registry.yarnpkg.com/redis-parser/-/redis-parser-2.6.0.tgz#52ed09dacac108f1a631c07e9b69941e7a19504b"
-  integrity sha1-Uu0J2srBCPGmMcB+m2mUHnoZUEs=
+redis-errors@^1.0.0, redis-errors@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/redis-errors/-/redis-errors-1.2.0.tgz#eb62d2adb15e4eaf4610c04afe1529384250abad"
+  integrity sha1-62LSrbFeTq9GEMBK/hUpOEJQq60=
 
-redis@^2.8.0:
-  version "2.8.0"
-  resolved "https://registry.yarnpkg.com/redis/-/redis-2.8.0.tgz#202288e3f58c49f6079d97af7a10e1303ae14b02"
-  integrity sha512-M1OkonEQwtRmZv4tEWF2VgpG0JWJ8Fv1PhlgT5+B+uNq2cA3Rt1Yt/ryoR+vQNOQcIEgdCdfH0jr3bDpihAw1A==
+redis-parser@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/redis-parser/-/redis-parser-3.0.0.tgz#b66d828cdcafe6b4b8a428a7def4c6bcac31c8b4"
+  integrity sha1-tm2CjNyv5rS4pCin3vTGvKwxyLQ=
   dependencies:
-    double-ended-queue "^2.1.0-0"
-    redis-commands "^1.2.0"
-    redis-parser "^2.6.0"
+    redis-errors "^1.0.0"
+
+redis@^3.0.2:
+  version "3.0.2"
+  resolved "https://registry.yarnpkg.com/redis/-/redis-3.0.2.tgz#bd47067b8a4a3e6a2e556e57f71cc82c7360150a"
+  integrity sha512-PNhLCrjU6vKVuMOyFu7oSP296mwBkcE6lrAjruBYG5LgdSqtRBoVQIylrMyVZD/lkF24RSNNatzvYag6HRBHjQ==
+  dependencies:
+    denque "^1.4.1"
+    redis-commands "^1.5.0"
+    redis-errors "^1.2.0"
+    redis-parser "^3.0.0"
 
 regenerate-unicode-properties@^8.1.0:
   version "8.1.0"

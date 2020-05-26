@@ -1389,231 +1389,29 @@
 	  }
 	});
 
-	var _global = createCommonjsModule(function (module) {
-	// https://github.com/zloirock/core-js/issues/86#issuecomment-115759028
-	var global = module.exports = typeof window != 'undefined' && window.Math == Math
-	  ? window : typeof self != 'undefined' && self.Math == Math ? self
-	  // eslint-disable-next-line no-new-func
-	  : Function('return this')();
-	if (typeof __g == 'number') __g = global; // eslint-disable-line no-undef
-	});
+	var slice = [].slice;
+	var MSIE = /MSIE .\./.test(engineUserAgent); // <- dirty ie9- check
 
-	var _core = createCommonjsModule(function (module) {
-	var core = module.exports = { version: '2.5.7' };
-	if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
-	});
-	var _core_1 = _core.version;
-
-	var _isObject = function (it) {
-	  return typeof it === 'object' ? it !== null : typeof it === 'function';
-	};
-
-	var _anObject = function (it) {
-	  if (!_isObject(it)) throw TypeError(it + ' is not an object!');
-	  return it;
-	};
-
-	var _fails = function (exec) {
-	  try {
-	    return !!exec();
-	  } catch (e) {
-	    return true;
-	  }
-	};
-
-	// Thank's IE8 for his funny defineProperty
-	var _descriptors = !_fails(function () {
-	  return Object.defineProperty({}, 'a', { get: function () { return 7; } }).a != 7;
-	});
-
-	var document$3 = _global.document;
-	// typeof document.createElement is 'object' in old IE
-	var is = _isObject(document$3) && _isObject(document$3.createElement);
-	var _domCreate = function (it) {
-	  return is ? document$3.createElement(it) : {};
-	};
-
-	var _ie8DomDefine = !_descriptors && !_fails(function () {
-	  return Object.defineProperty(_domCreate('div'), 'a', { get: function () { return 7; } }).a != 7;
-	});
-
-	// 7.1.1 ToPrimitive(input [, PreferredType])
-
-	// instead of the ES6 spec version, we didn't implement @@toPrimitive case
-	// and the second argument - flag - preferred type is a string
-	var _toPrimitive = function (it, S) {
-	  if (!_isObject(it)) return it;
-	  var fn, val;
-	  if (S && typeof (fn = it.toString) == 'function' && !_isObject(val = fn.call(it))) return val;
-	  if (typeof (fn = it.valueOf) == 'function' && !_isObject(val = fn.call(it))) return val;
-	  if (!S && typeof (fn = it.toString) == 'function' && !_isObject(val = fn.call(it))) return val;
-	  throw TypeError("Can't convert object to primitive value");
-	};
-
-	var dP = Object.defineProperty;
-
-	var f$6 = _descriptors ? Object.defineProperty : function defineProperty(O, P, Attributes) {
-	  _anObject(O);
-	  P = _toPrimitive(P, true);
-	  _anObject(Attributes);
-	  if (_ie8DomDefine) try {
-	    return dP(O, P, Attributes);
-	  } catch (e) { /* empty */ }
-	  if ('get' in Attributes || 'set' in Attributes) throw TypeError('Accessors not supported!');
-	  if ('value' in Attributes) O[P] = Attributes.value;
-	  return O;
-	};
-
-	var _objectDp = {
-		f: f$6
-	};
-
-	var _propertyDesc = function (bitmap, value) {
-	  return {
-	    enumerable: !(bitmap & 1),
-	    configurable: !(bitmap & 2),
-	    writable: !(bitmap & 4),
-	    value: value
+	var wrap = function (scheduler) {
+	  return function (handler, timeout /* , ...arguments */) {
+	    var boundArgs = arguments.length > 2;
+	    var args = boundArgs ? slice.call(arguments, 2) : undefined;
+	    return scheduler(boundArgs ? function () {
+	      // eslint-disable-next-line no-new-func
+	      (typeof handler == 'function' ? handler : Function(handler)).apply(this, args);
+	    } : handler, timeout);
 	  };
 	};
-
-	var _hide = _descriptors ? function (object, key, value) {
-	  return _objectDp.f(object, key, _propertyDesc(1, value));
-	} : function (object, key, value) {
-	  object[key] = value;
-	  return object;
-	};
-
-	var hasOwnProperty$1 = {}.hasOwnProperty;
-	var _has = function (it, key) {
-	  return hasOwnProperty$1.call(it, key);
-	};
-
-	var id$1 = 0;
-	var px = Math.random();
-	var _uid = function (key) {
-	  return 'Symbol('.concat(key === undefined ? '' : key, ')_', (++id$1 + px).toString(36));
-	};
-
-	var _redefine = createCommonjsModule(function (module) {
-	var SRC = _uid('src');
-	var TO_STRING = 'toString';
-	var $toString = Function[TO_STRING];
-	var TPL = ('' + $toString).split(TO_STRING);
-
-	_core.inspectSource = function (it) {
-	  return $toString.call(it);
-	};
-
-	(module.exports = function (O, key, val, safe) {
-	  var isFunction = typeof val == 'function';
-	  if (isFunction) _has(val, 'name') || _hide(val, 'name', key);
-	  if (O[key] === val) return;
-	  if (isFunction) _has(val, SRC) || _hide(val, SRC, O[key] ? '' + O[key] : TPL.join(String(key)));
-	  if (O === _global) {
-	    O[key] = val;
-	  } else if (!safe) {
-	    delete O[key];
-	    _hide(O, key, val);
-	  } else if (O[key]) {
-	    O[key] = val;
-	  } else {
-	    _hide(O, key, val);
-	  }
-	// add fake Function#toString for correct work wrapped methods / constructors with methods like LoDash isNative
-	})(Function.prototype, TO_STRING, function toString() {
-	  return typeof this == 'function' && this[SRC] || $toString.call(this);
-	});
-	});
-
-	var _aFunction = function (it) {
-	  if (typeof it != 'function') throw TypeError(it + ' is not a function!');
-	  return it;
-	};
-
-	// optional / simple context binding
-
-	var _ctx = function (fn, that, length) {
-	  _aFunction(fn);
-	  if (that === undefined) return fn;
-	  switch (length) {
-	    case 1: return function (a) {
-	      return fn.call(that, a);
-	    };
-	    case 2: return function (a, b) {
-	      return fn.call(that, a, b);
-	    };
-	    case 3: return function (a, b, c) {
-	      return fn.call(that, a, b, c);
-	    };
-	  }
-	  return function (/* ...args */) {
-	    return fn.apply(that, arguments);
-	  };
-	};
-
-	var PROTOTYPE = 'prototype';
-
-	var $export = function (type, name, source) {
-	  var IS_FORCED = type & $export.F;
-	  var IS_GLOBAL = type & $export.G;
-	  var IS_STATIC = type & $export.S;
-	  var IS_PROTO = type & $export.P;
-	  var IS_BIND = type & $export.B;
-	  var target = IS_GLOBAL ? _global : IS_STATIC ? _global[name] || (_global[name] = {}) : (_global[name] || {})[PROTOTYPE];
-	  var exports = IS_GLOBAL ? _core : _core[name] || (_core[name] = {});
-	  var expProto = exports[PROTOTYPE] || (exports[PROTOTYPE] = {});
-	  var key, own, out, exp;
-	  if (IS_GLOBAL) source = name;
-	  for (key in source) {
-	    // contains in native
-	    own = !IS_FORCED && target && target[key] !== undefined;
-	    // export native or passed
-	    out = (own ? target : source)[key];
-	    // bind timers to global for call from export context
-	    exp = IS_BIND && own ? _ctx(out, _global) : IS_PROTO && typeof out == 'function' ? _ctx(Function.call, out) : out;
-	    // extend global
-	    if (target) _redefine(target, key, out, type & $export.U);
-	    // export
-	    if (exports[key] != out) _hide(exports, key, exp);
-	    if (IS_PROTO && expProto[key] != out) expProto[key] = out;
-	  }
-	};
-	_global.core = _core;
-	// type bitmap
-	$export.F = 1;   // forced
-	$export.G = 2;   // global
-	$export.S = 4;   // static
-	$export.P = 8;   // proto
-	$export.B = 16;  // bind
-	$export.W = 32;  // wrap
-	$export.U = 64;  // safe
-	$export.R = 128; // real proto method for `library`
-	var _export$1 = $export;
-
-	var navigator = _global.navigator;
-
-	var _userAgent = navigator && navigator.userAgent || '';
 
 	// ie9- setTimeout & setInterval additional parameters fix
-
-
-
-	var slice = [].slice;
-	var MSIE = /MSIE .\./.test(_userAgent); // <- dirty ie9- check
-	var wrap = function (set) {
-	  return function (fn, time /* , ...args */) {
-	    var boundArgs = arguments.length > 2;
-	    var args = boundArgs ? slice.call(arguments, 2) : false;
-	    return set(boundArgs ? function () {
-	      // eslint-disable-next-line no-new-func
-	      (typeof fn == 'function' ? fn : Function(fn)).apply(this, args);
-	    } : fn, time);
-	  };
-	};
-	_export$1(_export$1.G + _export$1.B + _export$1.F * MSIE, {
-	  setTimeout: wrap(_global.setTimeout),
-	  setInterval: wrap(_global.setInterval)
+	// https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timers
+	_export({ global: true, bind: true, forced: MSIE }, {
+	  // `setTimeout` method
+	  // https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#dom-settimeout
+	  setTimeout: wrap(global_1.setTimeout),
+	  // `setInterval` method
+	  // https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#dom-setinterval
+	  setInterval: wrap(global_1.setInterval)
 	});
 
 	// `IsArray` abstract operation
@@ -1648,7 +1446,7 @@
 
 	var GT = '>';
 	var LT = '<';
-	var PROTOTYPE$1 = 'prototype';
+	var PROTOTYPE = 'prototype';
 	var SCRIPT = 'script';
 	var IE_PROTO = sharedKey('IE_PROTO');
 
@@ -1697,7 +1495,7 @@
 	  } catch (error) { /* ignore */ }
 	  NullProtoObject = activeXDocument ? NullProtoObjectViaActiveX(activeXDocument) : NullProtoObjectViaIFrame();
 	  var length = enumBugKeys.length;
-	  while (length--) delete NullProtoObject[PROTOTYPE$1][enumBugKeys[length]];
+	  while (length--) delete NullProtoObject[PROTOTYPE][enumBugKeys[length]];
 	  return NullProtoObject();
 	};
 
@@ -1708,9 +1506,9 @@
 	var objectCreate = Object.create || function create(O, Properties) {
 	  var result;
 	  if (O !== null) {
-	    EmptyConstructor[PROTOTYPE$1] = anObject(O);
+	    EmptyConstructor[PROTOTYPE] = anObject(O);
 	    result = new EmptyConstructor();
-	    EmptyConstructor[PROTOTYPE$1] = null;
+	    EmptyConstructor[PROTOTYPE] = null;
 	    // add "__proto__" for Object.getPrototypeOf polyfill
 	    result[IE_PROTO] = O;
 	  } else result = NullProtoObject();
@@ -1733,20 +1531,20 @@
 	};
 
 	// fallback for IE11 buggy Object.getOwnPropertyNames with iframe and window
-	var f$7 = function getOwnPropertyNames(it) {
+	var f$6 = function getOwnPropertyNames(it) {
 	  return windowNames && toString$1.call(it) == '[object Window]'
 	    ? getWindowNames(it)
 	    : nativeGetOwnPropertyNames(toIndexedObject(it));
 	};
 
 	var objectGetOwnPropertyNamesExternal = {
-		f: f$7
+		f: f$6
 	};
 
-	var f$8 = wellKnownSymbol;
+	var f$7 = wellKnownSymbol;
 
 	var wellKnownSymbolWrapped = {
-		f: f$8
+		f: f$7
 	};
 
 	var defineProperty$1 = objectDefineProperty.f;
@@ -1839,11 +1637,11 @@
 
 	var HIDDEN = sharedKey('hidden');
 	var SYMBOL = 'Symbol';
-	var PROTOTYPE$2 = 'prototype';
+	var PROTOTYPE$1 = 'prototype';
 	var TO_PRIMITIVE = wellKnownSymbol('toPrimitive');
 	var setInternalState$1 = internalState.set;
 	var getInternalState$1 = internalState.getterFor(SYMBOL);
-	var ObjectPrototype = Object[PROTOTYPE$2];
+	var ObjectPrototype = Object[PROTOTYPE$1];
 	var $Symbol = global_1.Symbol;
 	var $stringify = getBuiltIn('JSON', 'stringify');
 	var nativeGetOwnPropertyDescriptor$1 = objectGetOwnPropertyDescriptor.f;
@@ -1857,7 +1655,7 @@
 	var WellKnownSymbolsStore$1 = shared('wks');
 	var QObject = global_1.QObject;
 	// Don't use setters in Qt Script, https://github.com/zloirock/core-js/issues/173
-	var USE_SETTER = !QObject || !QObject[PROTOTYPE$2] || !QObject[PROTOTYPE$2].findChild;
+	var USE_SETTER = !QObject || !QObject[PROTOTYPE$1] || !QObject[PROTOTYPE$1].findChild;
 
 	// fallback for old Android, https://code.google.com/p/v8/issues/detail?id=687
 	var setSymbolDescriptor = descriptors && fails(function () {
@@ -1874,7 +1672,7 @@
 	} : nativeDefineProperty$1;
 
 	var wrap$1 = function (tag, description) {
-	  var symbol = AllSymbols[tag] = objectCreate($Symbol[PROTOTYPE$2]);
+	  var symbol = AllSymbols[tag] = objectCreate($Symbol[PROTOTYPE$1]);
 	  setInternalState$1(symbol, {
 	    type: SYMBOL,
 	    tag: tag,
@@ -1975,7 +1773,7 @@
 	    return wrap$1(tag, description);
 	  };
 
-	  redefine($Symbol[PROTOTYPE$2], 'toString', function toString() {
+	  redefine($Symbol[PROTOTYPE$1], 'toString', function toString() {
 	    return getInternalState$1(this).tag;
 	  });
 
@@ -1995,7 +1793,7 @@
 
 	  if (descriptors) {
 	    // https://github.com/tc39/proposal-Symbol-description
-	    nativeDefineProperty$1($Symbol[PROTOTYPE$2], 'description', {
+	    nativeDefineProperty$1($Symbol[PROTOTYPE$1], 'description', {
 	      configurable: true,
 	      get: function description() {
 	        return getInternalState$1(this).description;
@@ -2102,8 +1900,8 @@
 
 	// `Symbol.prototype[@@toPrimitive]` method
 	// https://tc39.github.io/ecma262/#sec-symbol.prototype-@@toprimitive
-	if (!$Symbol[PROTOTYPE$2][TO_PRIMITIVE]) {
-	  createNonEnumerableProperty($Symbol[PROTOTYPE$2], TO_PRIMITIVE, $Symbol[PROTOTYPE$2].valueOf);
+	if (!$Symbol[PROTOTYPE$1][TO_PRIMITIVE]) {
+	  createNonEnumerableProperty($Symbol[PROTOTYPE$1], TO_PRIMITIVE, $Symbol[PROTOTYPE$1].valueOf);
 	}
 	// `Symbol.prototype[@@toStringTag]` property
 	// https://tc39.github.io/ecma262/#sec-symbol.prototype-@@tostringtag
@@ -2904,8 +2702,24 @@
 	  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
 	}
 
+	function _toConsumableArray(arr) {
+	  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
+	}
+
+	function _arrayWithoutHoles(arr) {
+	  if (Array.isArray(arr)) {
+	    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
+
+	    return arr2;
+	  }
+	}
+
 	function _arrayWithHoles(arr) {
 	  if (Array.isArray(arr)) return arr;
+	}
+
+	function _iterableToArray(iter) {
+	  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
 	}
 
 	function _iterableToArrayLimit(arr, i) {
@@ -2934,18 +2748,22 @@
 	  return _arr;
 	}
 
+	function _nonIterableSpread() {
+	  throw new TypeError("Invalid attempt to spread non-iterable instance");
+	}
+
 	function _nonIterableRest() {
 	  throw new TypeError("Invalid attempt to destructure non-iterable instance");
 	}
 
-	var runtime = createCommonjsModule(function (module) {
+	var runtime_1 = createCommonjsModule(function (module) {
 	  /**
 	   * Copyright (c) 2014-present, Facebook, Inc.
 	   *
 	   * This source code is licensed under the MIT license found in the
 	   * LICENSE file in the root directory of this source tree.
 	   */
-	  !function (global) {
+	  var runtime = function (exports) {
 
 	    var Op = Object.prototype;
 	    var hasOwn = Op.hasOwnProperty;
@@ -2955,23 +2773,6 @@
 	    var iteratorSymbol = $Symbol.iterator || "@@iterator";
 	    var asyncIteratorSymbol = $Symbol.asyncIterator || "@@asyncIterator";
 	    var toStringTagSymbol = $Symbol.toStringTag || "@@toStringTag";
-	    var runtime = global.regeneratorRuntime;
-
-	    if (runtime) {
-	      {
-	        // If regeneratorRuntime is defined globally and we're in a module,
-	        // make the exports object identical to regeneratorRuntime.
-	        module.exports = runtime;
-	      } // Don't bother evaluating the rest of this file if the runtime was
-	      // already defined globally.
-
-
-	      return;
-	    } // Define the runtime globally (as expected by generated code) as either
-	    // module.exports (if we're in a module) or a new, empty object.
-
-
-	    runtime = global.regeneratorRuntime = module.exports;
 
 	    function wrap(innerFn, outerFn, self, tryLocsList) {
 	      // If outerFn provided and outerFn.prototype is a Generator, then outerFn.prototype instanceof Generator.
@@ -2984,7 +2785,7 @@
 	      return generator;
 	    }
 
-	    runtime.wrap = wrap; // Try/catch helper to minimize deoptimizations. Returns a completion
+	    exports.wrap = wrap; // Try/catch helper to minimize deoptimizations. Returns a completion
 	    // record like context.tryEntries[i].completion. This interface could
 	    // have been (and was previously) designed to take a closure to be
 	    // invoked without arguments, but in all the cases we care about we
@@ -3057,14 +2858,14 @@
 	      });
 	    }
 
-	    runtime.isGeneratorFunction = function (genFun) {
+	    exports.isGeneratorFunction = function (genFun) {
 	      var ctor = typeof genFun === "function" && genFun.constructor;
 	      return ctor ? ctor === GeneratorFunction || // For the native GeneratorFunction constructor, the best we can
 	      // do is to check its .name property.
 	      (ctor.displayName || ctor.name) === "GeneratorFunction" : false;
 	    };
 
-	    runtime.mark = function (genFun) {
+	    exports.mark = function (genFun) {
 	      if (Object.setPrototypeOf) {
 	        Object.setPrototypeOf(genFun, GeneratorFunctionPrototype);
 	      } else {
@@ -3083,13 +2884,13 @@
 	    // meant to be awaited.
 
 
-	    runtime.awrap = function (arg) {
+	    exports.awrap = function (arg) {
 	      return {
 	        __await: arg
 	      };
 	    };
 
-	    function AsyncIterator(generator) {
+	    function AsyncIterator(generator, PromiseImpl) {
 	      function invoke(method, arg, resolve, reject) {
 	        var record = tryCatch(generator[method], generator, arg);
 
@@ -3100,14 +2901,14 @@
 	          var value = result.value;
 
 	          if (value && _typeof(value) === "object" && hasOwn.call(value, "__await")) {
-	            return Promise.resolve(value.__await).then(function (value) {
+	            return PromiseImpl.resolve(value.__await).then(function (value) {
 	              invoke("next", value, resolve, reject);
 	            }, function (err) {
 	              invoke("throw", err, resolve, reject);
 	            });
 	          }
 
-	          return Promise.resolve(value).then(function (unwrapped) {
+	          return PromiseImpl.resolve(value).then(function (unwrapped) {
 	            // When a yielded Promise is resolved, its final value becomes
 	            // the .value of the Promise<{value,done}> result for the
 	            // current iteration.
@@ -3125,7 +2926,7 @@
 
 	      function enqueue(method, arg) {
 	        function callInvokeWithMethodAndArg() {
-	          return new Promise(function (resolve, reject) {
+	          return new PromiseImpl(function (resolve, reject) {
 	            invoke(method, arg, resolve, reject);
 	          });
 	        }
@@ -3158,13 +2959,14 @@
 	      return this;
 	    };
 
-	    runtime.AsyncIterator = AsyncIterator; // Note that simple async functions are implemented on top of
+	    exports.AsyncIterator = AsyncIterator; // Note that simple async functions are implemented on top of
 	    // AsyncIterator objects; they just return a Promise for the value of
 	    // the final result produced by the iterator.
 
-	    runtime.async = function (innerFn, outerFn, self, tryLocsList) {
-	      var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList));
-	      return runtime.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
+	    exports.async = function (innerFn, outerFn, self, tryLocsList, PromiseImpl) {
+	      if (PromiseImpl === void 0) PromiseImpl = Promise;
+	      var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList), PromiseImpl);
+	      return exports.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
 	      : iter.next().then(function (result) {
 	        return result.done ? result.value : iter.next();
 	      });
@@ -3257,6 +3059,7 @@
 	        context.delegate = null;
 
 	        if (context.method === "throw") {
+	          // Note: ["return"] must be used for ES3 parsing compatibility.
 	          if (delegate.iterator["return"]) {
 	            // If the delegate iterator has a return method, give it a
 	            // chance to clean up.
@@ -3375,7 +3178,7 @@
 	      this.reset(true);
 	    }
 
-	    runtime.keys = function (object) {
+	    exports.keys = function (object) {
 	      var keys = [];
 
 	      for (var key in object) {
@@ -3442,7 +3245,7 @@
 	      };
 	    }
 
-	    runtime.values = values;
+	    exports.values = values;
 
 	    function doneResult() {
 	      return {
@@ -3633,13 +3436,32 @@
 
 	        return ContinueSentinel;
 	      }
-	    };
-	  }( // In sloppy mode, unbound `this` refers to the global object, fallback to
-	  // Function constructor if we're in global strict mode. That is sadly a form
-	  // of indirect eval which violates Content Security Policy.
-	  function () {
-	    return this || (typeof self === "undefined" ? "undefined" : _typeof(self)) === "object" && self;
-	  }() || Function("return this")());
+	    }; // Regardless of whether this script is executing as a CommonJS module
+	    // or not, return the runtime object so that we can declare the variable
+	    // regeneratorRuntime in the outer scope, which allows this module to be
+	    // injected easily by `bin/regenerator --include-runtime script.js`.
+
+	    return exports;
+	  }( // If this script is executing as a CommonJS module, use module.exports
+	  // as the regeneratorRuntime namespace. Otherwise create a new empty
+	  // object. Either way, the resulting object will be used to initialize
+	  // the regeneratorRuntime variable at the top of this file.
+	  module.exports);
+
+	  try {
+	    regeneratorRuntime = runtime;
+	  } catch (accidentalStrictMode) {
+	    // This module should not be running in strict mode, so the above
+	    // assignment should always work unless something is misconfigured. Just
+	    // in case runtime.js accidentally runs in strict mode, we can escape
+	    // strict mode using a global Function call. This could conceivably fail
+	    // if a Content Security Policy forbids using Function, but in that case
+	    // the proper solution is to fix the accidental strict mode problem. If
+	    // you've misconfigured your bundler to force strict mode and applied a
+	    // CSP to forbid Function, and you're not willing to fix either of those
+	    // problems, please detail your unique predicament in a GitHub issue.
+	    Function("r", "regeneratorRuntime = r")(runtime);
+	  }
 	});
 
 	var arrayBufferNative = typeof ArrayBuffer !== 'undefined' && typeof DataView !== 'undefined';
@@ -3766,13 +3588,13 @@
 	var setInternalState$4 = internalState.set;
 	var ARRAY_BUFFER = 'ArrayBuffer';
 	var DATA_VIEW = 'DataView';
-	var PROTOTYPE$3 = 'prototype';
+	var PROTOTYPE$2 = 'prototype';
 	var WRONG_LENGTH = 'Wrong length';
 	var WRONG_INDEX = 'Wrong index';
 	var NativeArrayBuffer = global_1[ARRAY_BUFFER];
 	var $ArrayBuffer = NativeArrayBuffer;
 	var $DataView = global_1[DATA_VIEW];
-	var $DataViewPrototype = $DataView && $DataView[PROTOTYPE$3];
+	var $DataViewPrototype = $DataView && $DataView[PROTOTYPE$2];
 	var ObjectPrototype$2 = Object.prototype;
 	var RangeError$1 = global_1.RangeError;
 
@@ -3804,7 +3626,7 @@
 	};
 
 	var addGetter = function (Constructor, key) {
-	  defineProperty$5(Constructor[PROTOTYPE$3], key, { get: function () { return getInternalState$4(this)[key]; } });
+	  defineProperty$5(Constructor[PROTOTYPE$2], key, { get: function () { return getInternalState$4(this)[key]; } });
 	};
 
 	var get$1 = function (view, count, index, isLittleEndian) {
@@ -3865,7 +3687,7 @@
 	    addGetter($DataView, 'byteOffset');
 	  }
 
-	  redefineAll($DataView[PROTOTYPE$3], {
+	  redefineAll($DataView[PROTOTYPE$2], {
 	    getInt8: function getInt8(byteOffset) {
 	      return get$1(this, 1, byteOffset)[0] << 24 >> 24;
 	    },
@@ -3932,7 +3754,7 @@
 	      anInstance(this, $ArrayBuffer);
 	      return new NativeArrayBuffer(toIndex(length));
 	    };
-	    var ArrayBufferPrototype = $ArrayBuffer[PROTOTYPE$3] = NativeArrayBuffer[PROTOTYPE$3];
+	    var ArrayBufferPrototype = $ArrayBuffer[PROTOTYPE$2] = NativeArrayBuffer[PROTOTYPE$2];
 	    for (var keys$1 = getOwnPropertyNames(NativeArrayBuffer), j = 0, key; keys$1.length > j;) {
 	      if (!((key = keys$1[j++]) in $ArrayBuffer)) {
 	        createNonEnumerableProperty($ArrayBuffer, key, NativeArrayBuffer[key]);
@@ -5189,6 +5011,353 @@
 	  }
 	});
 
+	var freezing = !fails(function () {
+	  return Object.isExtensible(Object.preventExtensions({}));
+	});
+
+	var internalMetadata = createCommonjsModule(function (module) {
+	var defineProperty = objectDefineProperty.f;
+
+
+
+	var METADATA = uid('meta');
+	var id = 0;
+
+	var isExtensible = Object.isExtensible || function () {
+	  return true;
+	};
+
+	var setMetadata = function (it) {
+	  defineProperty(it, METADATA, { value: {
+	    objectID: 'O' + ++id, // object ID
+	    weakData: {}          // weak collections IDs
+	  } });
+	};
+
+	var fastKey = function (it, create) {
+	  // return a primitive with prefix
+	  if (!isObject(it)) return typeof it == 'symbol' ? it : (typeof it == 'string' ? 'S' : 'P') + it;
+	  if (!has(it, METADATA)) {
+	    // can't set metadata to uncaught frozen object
+	    if (!isExtensible(it)) return 'F';
+	    // not necessary to add metadata
+	    if (!create) return 'E';
+	    // add missing metadata
+	    setMetadata(it);
+	  // return object ID
+	  } return it[METADATA].objectID;
+	};
+
+	var getWeakData = function (it, create) {
+	  if (!has(it, METADATA)) {
+	    // can't set metadata to uncaught frozen object
+	    if (!isExtensible(it)) return true;
+	    // not necessary to add metadata
+	    if (!create) return false;
+	    // add missing metadata
+	    setMetadata(it);
+	  // return the store of weak collections IDs
+	  } return it[METADATA].weakData;
+	};
+
+	// add metadata on freeze-family methods calling
+	var onFreeze = function (it) {
+	  if (freezing && meta.REQUIRED && isExtensible(it) && !has(it, METADATA)) setMetadata(it);
+	  return it;
+	};
+
+	var meta = module.exports = {
+	  REQUIRED: false,
+	  fastKey: fastKey,
+	  getWeakData: getWeakData,
+	  onFreeze: onFreeze
+	};
+
+	hiddenKeys[METADATA] = true;
+	});
+	var internalMetadata_1 = internalMetadata.REQUIRED;
+	var internalMetadata_2 = internalMetadata.fastKey;
+	var internalMetadata_3 = internalMetadata.getWeakData;
+	var internalMetadata_4 = internalMetadata.onFreeze;
+
+	var collection = function (CONSTRUCTOR_NAME, wrapper, common) {
+	  var IS_MAP = CONSTRUCTOR_NAME.indexOf('Map') !== -1;
+	  var IS_WEAK = CONSTRUCTOR_NAME.indexOf('Weak') !== -1;
+	  var ADDER = IS_MAP ? 'set' : 'add';
+	  var NativeConstructor = global_1[CONSTRUCTOR_NAME];
+	  var NativePrototype = NativeConstructor && NativeConstructor.prototype;
+	  var Constructor = NativeConstructor;
+	  var exported = {};
+
+	  var fixMethod = function (KEY) {
+	    var nativeMethod = NativePrototype[KEY];
+	    redefine(NativePrototype, KEY,
+	      KEY == 'add' ? function add(value) {
+	        nativeMethod.call(this, value === 0 ? 0 : value);
+	        return this;
+	      } : KEY == 'delete' ? function (key) {
+	        return IS_WEAK && !isObject(key) ? false : nativeMethod.call(this, key === 0 ? 0 : key);
+	      } : KEY == 'get' ? function get(key) {
+	        return IS_WEAK && !isObject(key) ? undefined : nativeMethod.call(this, key === 0 ? 0 : key);
+	      } : KEY == 'has' ? function has(key) {
+	        return IS_WEAK && !isObject(key) ? false : nativeMethod.call(this, key === 0 ? 0 : key);
+	      } : function set(key, value) {
+	        nativeMethod.call(this, key === 0 ? 0 : key, value);
+	        return this;
+	      }
+	    );
+	  };
+
+	  // eslint-disable-next-line max-len
+	  if (isForced_1(CONSTRUCTOR_NAME, typeof NativeConstructor != 'function' || !(IS_WEAK || NativePrototype.forEach && !fails(function () {
+	    new NativeConstructor().entries().next();
+	  })))) {
+	    // create collection constructor
+	    Constructor = common.getConstructor(wrapper, CONSTRUCTOR_NAME, IS_MAP, ADDER);
+	    internalMetadata.REQUIRED = true;
+	  } else if (isForced_1(CONSTRUCTOR_NAME, true)) {
+	    var instance = new Constructor();
+	    // early implementations not supports chaining
+	    var HASNT_CHAINING = instance[ADDER](IS_WEAK ? {} : -0, 1) != instance;
+	    // V8 ~ Chromium 40- weak-collections throws on primitives, but should return false
+	    var THROWS_ON_PRIMITIVES = fails(function () { instance.has(1); });
+	    // most early implementations doesn't supports iterables, most modern - not close it correctly
+	    // eslint-disable-next-line no-new
+	    var ACCEPT_ITERABLES = checkCorrectnessOfIteration(function (iterable) { new NativeConstructor(iterable); });
+	    // for early implementations -0 and +0 not the same
+	    var BUGGY_ZERO = !IS_WEAK && fails(function () {
+	      // V8 ~ Chromium 42- fails only with 5+ elements
+	      var $instance = new NativeConstructor();
+	      var index = 5;
+	      while (index--) $instance[ADDER](index, index);
+	      return !$instance.has(-0);
+	    });
+
+	    if (!ACCEPT_ITERABLES) {
+	      Constructor = wrapper(function (dummy, iterable) {
+	        anInstance(dummy, Constructor, CONSTRUCTOR_NAME);
+	        var that = inheritIfRequired(new NativeConstructor(), dummy, Constructor);
+	        if (iterable != undefined) iterate_1(iterable, that[ADDER], that, IS_MAP);
+	        return that;
+	      });
+	      Constructor.prototype = NativePrototype;
+	      NativePrototype.constructor = Constructor;
+	    }
+
+	    if (THROWS_ON_PRIMITIVES || BUGGY_ZERO) {
+	      fixMethod('delete');
+	      fixMethod('has');
+	      IS_MAP && fixMethod('get');
+	    }
+
+	    if (BUGGY_ZERO || HASNT_CHAINING) fixMethod(ADDER);
+
+	    // weak collections should not contains .clear method
+	    if (IS_WEAK && NativePrototype.clear) delete NativePrototype.clear;
+	  }
+
+	  exported[CONSTRUCTOR_NAME] = Constructor;
+	  _export({ global: true, forced: Constructor != NativeConstructor }, exported);
+
+	  setToStringTag(Constructor, CONSTRUCTOR_NAME);
+
+	  if (!IS_WEAK) common.setStrong(Constructor, CONSTRUCTOR_NAME, IS_MAP);
+
+	  return Constructor;
+	};
+
+	var defineProperty$7 = objectDefineProperty.f;
+
+
+
+
+
+
+
+
+	var fastKey = internalMetadata.fastKey;
+
+
+	var setInternalState$5 = internalState.set;
+	var internalStateGetterFor = internalState.getterFor;
+
+	var collectionStrong = {
+	  getConstructor: function (wrapper, CONSTRUCTOR_NAME, IS_MAP, ADDER) {
+	    var C = wrapper(function (that, iterable) {
+	      anInstance(that, C, CONSTRUCTOR_NAME);
+	      setInternalState$5(that, {
+	        type: CONSTRUCTOR_NAME,
+	        index: objectCreate(null),
+	        first: undefined,
+	        last: undefined,
+	        size: 0
+	      });
+	      if (!descriptors) that.size = 0;
+	      if (iterable != undefined) iterate_1(iterable, that[ADDER], that, IS_MAP);
+	    });
+
+	    var getInternalState = internalStateGetterFor(CONSTRUCTOR_NAME);
+
+	    var define = function (that, key, value) {
+	      var state = getInternalState(that);
+	      var entry = getEntry(that, key);
+	      var previous, index;
+	      // change existing entry
+	      if (entry) {
+	        entry.value = value;
+	      // create new entry
+	      } else {
+	        state.last = entry = {
+	          index: index = fastKey(key, true),
+	          key: key,
+	          value: value,
+	          previous: previous = state.last,
+	          next: undefined,
+	          removed: false
+	        };
+	        if (!state.first) state.first = entry;
+	        if (previous) previous.next = entry;
+	        if (descriptors) state.size++;
+	        else that.size++;
+	        // add to index
+	        if (index !== 'F') state.index[index] = entry;
+	      } return that;
+	    };
+
+	    var getEntry = function (that, key) {
+	      var state = getInternalState(that);
+	      // fast case
+	      var index = fastKey(key);
+	      var entry;
+	      if (index !== 'F') return state.index[index];
+	      // frozen object case
+	      for (entry = state.first; entry; entry = entry.next) {
+	        if (entry.key == key) return entry;
+	      }
+	    };
+
+	    redefineAll(C.prototype, {
+	      // 23.1.3.1 Map.prototype.clear()
+	      // 23.2.3.2 Set.prototype.clear()
+	      clear: function clear() {
+	        var that = this;
+	        var state = getInternalState(that);
+	        var data = state.index;
+	        var entry = state.first;
+	        while (entry) {
+	          entry.removed = true;
+	          if (entry.previous) entry.previous = entry.previous.next = undefined;
+	          delete data[entry.index];
+	          entry = entry.next;
+	        }
+	        state.first = state.last = undefined;
+	        if (descriptors) state.size = 0;
+	        else that.size = 0;
+	      },
+	      // 23.1.3.3 Map.prototype.delete(key)
+	      // 23.2.3.4 Set.prototype.delete(value)
+	      'delete': function (key) {
+	        var that = this;
+	        var state = getInternalState(that);
+	        var entry = getEntry(that, key);
+	        if (entry) {
+	          var next = entry.next;
+	          var prev = entry.previous;
+	          delete state.index[entry.index];
+	          entry.removed = true;
+	          if (prev) prev.next = next;
+	          if (next) next.previous = prev;
+	          if (state.first == entry) state.first = next;
+	          if (state.last == entry) state.last = prev;
+	          if (descriptors) state.size--;
+	          else that.size--;
+	        } return !!entry;
+	      },
+	      // 23.2.3.6 Set.prototype.forEach(callbackfn, thisArg = undefined)
+	      // 23.1.3.5 Map.prototype.forEach(callbackfn, thisArg = undefined)
+	      forEach: function forEach(callbackfn /* , that = undefined */) {
+	        var state = getInternalState(this);
+	        var boundFunction = functionBindContext(callbackfn, arguments.length > 1 ? arguments[1] : undefined, 3);
+	        var entry;
+	        while (entry = entry ? entry.next : state.first) {
+	          boundFunction(entry.value, entry.key, this);
+	          // revert to the last existing entry
+	          while (entry && entry.removed) entry = entry.previous;
+	        }
+	      },
+	      // 23.1.3.7 Map.prototype.has(key)
+	      // 23.2.3.7 Set.prototype.has(value)
+	      has: function has(key) {
+	        return !!getEntry(this, key);
+	      }
+	    });
+
+	    redefineAll(C.prototype, IS_MAP ? {
+	      // 23.1.3.6 Map.prototype.get(key)
+	      get: function get(key) {
+	        var entry = getEntry(this, key);
+	        return entry && entry.value;
+	      },
+	      // 23.1.3.9 Map.prototype.set(key, value)
+	      set: function set(key, value) {
+	        return define(this, key === 0 ? 0 : key, value);
+	      }
+	    } : {
+	      // 23.2.3.1 Set.prototype.add(value)
+	      add: function add(value) {
+	        return define(this, value = value === 0 ? 0 : value, value);
+	      }
+	    });
+	    if (descriptors) defineProperty$7(C.prototype, 'size', {
+	      get: function () {
+	        return getInternalState(this).size;
+	      }
+	    });
+	    return C;
+	  },
+	  setStrong: function (C, CONSTRUCTOR_NAME, IS_MAP) {
+	    var ITERATOR_NAME = CONSTRUCTOR_NAME + ' Iterator';
+	    var getInternalCollectionState = internalStateGetterFor(CONSTRUCTOR_NAME);
+	    var getInternalIteratorState = internalStateGetterFor(ITERATOR_NAME);
+	    // add .keys, .values, .entries, [@@iterator]
+	    // 23.1.3.4, 23.1.3.8, 23.1.3.11, 23.1.3.12, 23.2.3.5, 23.2.3.8, 23.2.3.10, 23.2.3.11
+	    defineIterator(C, CONSTRUCTOR_NAME, function (iterated, kind) {
+	      setInternalState$5(this, {
+	        type: ITERATOR_NAME,
+	        target: iterated,
+	        state: getInternalCollectionState(iterated),
+	        kind: kind,
+	        last: undefined
+	      });
+	    }, function () {
+	      var state = getInternalIteratorState(this);
+	      var kind = state.kind;
+	      var entry = state.last;
+	      // revert to the last existing entry
+	      while (entry && entry.removed) entry = entry.previous;
+	      // get next entry
+	      if (!state.target || !(state.last = entry = entry ? entry.next : state.state.first)) {
+	        // or finish the iteration
+	        state.target = undefined;
+	        return { value: undefined, done: true };
+	      }
+	      // return step by kind
+	      if (kind == 'keys') return { value: entry.key, done: false };
+	      if (kind == 'values') return { value: entry.value, done: false };
+	      return { value: [entry.key, entry.value], done: false };
+	    }, IS_MAP ? 'entries' : 'values', !IS_MAP, true);
+
+	    // add [@@species], 23.1.2.2, 23.2.2.2
+	    setSpecies(CONSTRUCTOR_NAME);
+	  }
+	};
+
+	// `Map` constructor
+	// https://tc39.github.io/ecma262/#sec-map-objects
+	var es_map = collection('Map', function (init) {
+	  return function Map() { return init(this, arguments.length ? arguments[0] : undefined); };
+	}, collectionStrong);
+
 	// a string of all valid unicode whitespaces
 	// eslint-disable-next-line max-len
 	var whitespaces = '\u0009\u000A\u000B\u000C\u000D\u0020\u00A0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028\u2029\uFEFF';
@@ -5221,7 +5390,7 @@
 
 	var getOwnPropertyNames$1 = objectGetOwnPropertyNames.f;
 	var getOwnPropertyDescriptor$3 = objectGetOwnPropertyDescriptor.f;
-	var defineProperty$7 = objectDefineProperty.f;
+	var defineProperty$8 = objectDefineProperty.f;
 	var trim = stringTrim.trim;
 
 	var NUMBER = 'Number';
@@ -5279,7 +5448,7 @@
 	    'MIN_SAFE_INTEGER,parseFloat,parseInt,isInteger'
 	  ).split(','), j$1 = 0, key$1; keys$2.length > j$1; j$1++) {
 	    if (has(NativeNumber, key$1 = keys$2[j$1]) && !has(NumberWrapper, key$1)) {
-	      defineProperty$7(NumberWrapper, key$1, getOwnPropertyDescriptor$3(NativeNumber, key$1));
+	      defineProperty$8(NumberWrapper, key$1, getOwnPropertyDescriptor$3(NativeNumber, key$1));
 	    }
 	  }
 	  NumberWrapper.prototype = NumberPrototype;
@@ -5317,16 +5486,16 @@
 	});
 
 	var nativeAssign = Object.assign;
-	var defineProperty$8 = Object.defineProperty;
+	var defineProperty$9 = Object.defineProperty;
 
 	// `Object.assign` method
 	// https://tc39.github.io/ecma262/#sec-object.assign
 	var objectAssign = !nativeAssign || fails(function () {
 	  // should have correct order of operations (Edge bug)
-	  if (descriptors && nativeAssign({ b: 1 }, nativeAssign(defineProperty$8({}, 'a', {
+	  if (descriptors && nativeAssign({ b: 1 }, nativeAssign(defineProperty$9({}, 'a', {
 	    enumerable: true,
 	    get: function () {
-	      defineProperty$8(this, 'b', {
+	      defineProperty$9(this, 'b', {
 	        value: 3,
 	        enumerable: false
 	      });
@@ -5488,6 +5657,12 @@
 	_export({ target: 'RegExp', proto: true, forced: /./.exec !== regexpExec }, {
 	  exec: regexpExec
 	});
+
+	// `Set` constructor
+	// https://tc39.github.io/ecma262/#sec-set-objects
+	var es_set = collection('Set', function (init) {
+	  return function Set() { return init(this, arguments.length ? arguments[0] : undefined); };
+	}, collectionStrong);
 
 	// TODO: Remove from `core-js@4` since it's moved to entry points
 
@@ -6383,7 +6558,7 @@
 	  return new XMap(f, xf);
 	});
 
-	function _has$1(prop, obj) {
+	function _has(prop, obj) {
 	  return Object.prototype.hasOwnProperty.call(obj, prop);
 	}
 
@@ -6395,7 +6570,7 @@
 	  return toString$2.call(arguments) === '[object Arguments]' ? function _isArguments(x) {
 	    return toString$2.call(x) === '[object Arguments]';
 	  } : function _isArguments(x) {
-	    return _has$1('callee', x);
+	    return _has('callee', x);
 	  };
 	}();
 
@@ -6463,7 +6638,7 @@
 	  var checkArgsLength = hasArgsEnumBug && _isArguments(obj);
 
 	  for (prop in obj) {
-	    if (_has$1(prop, obj) && (!checkArgsLength || prop !== 'length')) {
+	    if (_has(prop, obj) && (!checkArgsLength || prop !== 'length')) {
 	      ks[ks.length] = prop;
 	    }
 	  }
@@ -6474,7 +6649,7 @@
 	    while (nIdx >= 0) {
 	      prop = nonEnumerableProps[nIdx];
 
-	      if (_has$1(prop, obj) && !contains(ks, prop)) {
+	      if (_has(prop, obj) && !contains(ks, prop)) {
 	        ks[ks.length] = prop;
 	      }
 
@@ -7093,14 +7268,14 @@
 	  return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : classofRaw(it) == 'RegExp');
 	};
 
-	var defineProperty$9 = objectDefineProperty.f;
+	var defineProperty$a = objectDefineProperty.f;
 	var getOwnPropertyNames$2 = objectGetOwnPropertyNames.f;
 
 
 
 
 
-	var setInternalState$5 = internalState.set;
+	var setInternalState$6 = internalState.set;
 
 
 
@@ -7152,12 +7327,12 @@
 	      RegExpWrapper
 	    );
 
-	    if (UNSUPPORTED_Y$2 && sticky) setInternalState$5(result, { sticky: sticky });
+	    if (UNSUPPORTED_Y$2 && sticky) setInternalState$6(result, { sticky: sticky });
 
 	    return result;
 	  };
 	  var proxy = function (key) {
-	    key in RegExpWrapper || defineProperty$9(RegExpWrapper, key, {
+	    key in RegExpWrapper || defineProperty$a(RegExpWrapper, key, {
 	      configurable: true,
 	      get: function () { return NativeRegExp[key]; },
 	      set: function (it) { NativeRegExp[key] = it; }
@@ -7923,7 +8098,7 @@
 	  while (idx >= 0) {
 	    var key = keysA[idx];
 
-	    if (!(_has$1(key, b) && _equals(b[key], a[key], extendedStackA, extendedStackB))) {
+	    if (!(_has(key, b) && _equals(b[key], a[key], extendedStackA, extendedStackB))) {
 	      return false;
 	    }
 
@@ -8412,7 +8587,7 @@
 	  return result;
 	}
 
-	function _isObject$1(x) {
+	function _isObject(x) {
 	  return Object.prototype.toString.call(x) === '[object Object]';
 	}
 
@@ -8473,7 +8648,7 @@
 	_curry2(
 	/*#__PURE__*/
 	_dispatchable(['filter'], _xfilter, function (pred, filterable) {
-	  return _isObject$1(filterable) ? _reduce(function (acc, key) {
+	  return _isObject(filterable) ? _reduce(function (acc, key) {
 	    if (pred(filterable[key])) {
 	      acc[key] = filterable[key];
 	    }
@@ -8668,7 +8843,7 @@
 	    var key;
 
 	    for (key in this.inputs) {
-	      if (_has$1(key, this.inputs)) {
+	      if (_has(key, this.inputs)) {
 	        result = this.xf['@@transducer/step'](result, this.inputs[key]);
 
 	        if (result['@@transducer/reduced']) {
@@ -8747,7 +8922,7 @@
 	_dispatchable([], _xreduceBy, function reduceBy(valueFn, valueAcc, keyFn, list) {
 	  return _reduce(function (acc, elt) {
 	    var key = keyFn(elt);
-	    acc[key] = valueFn(_has$1(key, acc) ? acc[key] : _clone(valueAcc, [], [], false), elt);
+	    acc[key] = valueFn(_has(key, acc) ? acc[key] : _clone(valueAcc, [], [], false), elt);
 	    return acc;
 	  }, {}, list);
 	}));
@@ -8802,353 +8977,6 @@
 	var dec =
 	/*#__PURE__*/
 	add(-1);
-
-	var freezing = !fails(function () {
-	  return Object.isExtensible(Object.preventExtensions({}));
-	});
-
-	var internalMetadata = createCommonjsModule(function (module) {
-	var defineProperty = objectDefineProperty.f;
-
-
-
-	var METADATA = uid('meta');
-	var id = 0;
-
-	var isExtensible = Object.isExtensible || function () {
-	  return true;
-	};
-
-	var setMetadata = function (it) {
-	  defineProperty(it, METADATA, { value: {
-	    objectID: 'O' + ++id, // object ID
-	    weakData: {}          // weak collections IDs
-	  } });
-	};
-
-	var fastKey = function (it, create) {
-	  // return a primitive with prefix
-	  if (!isObject(it)) return typeof it == 'symbol' ? it : (typeof it == 'string' ? 'S' : 'P') + it;
-	  if (!has(it, METADATA)) {
-	    // can't set metadata to uncaught frozen object
-	    if (!isExtensible(it)) return 'F';
-	    // not necessary to add metadata
-	    if (!create) return 'E';
-	    // add missing metadata
-	    setMetadata(it);
-	  // return object ID
-	  } return it[METADATA].objectID;
-	};
-
-	var getWeakData = function (it, create) {
-	  if (!has(it, METADATA)) {
-	    // can't set metadata to uncaught frozen object
-	    if (!isExtensible(it)) return true;
-	    // not necessary to add metadata
-	    if (!create) return false;
-	    // add missing metadata
-	    setMetadata(it);
-	  // return the store of weak collections IDs
-	  } return it[METADATA].weakData;
-	};
-
-	// add metadata on freeze-family methods calling
-	var onFreeze = function (it) {
-	  if (freezing && meta.REQUIRED && isExtensible(it) && !has(it, METADATA)) setMetadata(it);
-	  return it;
-	};
-
-	var meta = module.exports = {
-	  REQUIRED: false,
-	  fastKey: fastKey,
-	  getWeakData: getWeakData,
-	  onFreeze: onFreeze
-	};
-
-	hiddenKeys[METADATA] = true;
-	});
-	var internalMetadata_1 = internalMetadata.REQUIRED;
-	var internalMetadata_2 = internalMetadata.fastKey;
-	var internalMetadata_3 = internalMetadata.getWeakData;
-	var internalMetadata_4 = internalMetadata.onFreeze;
-
-	var collection = function (CONSTRUCTOR_NAME, wrapper, common) {
-	  var IS_MAP = CONSTRUCTOR_NAME.indexOf('Map') !== -1;
-	  var IS_WEAK = CONSTRUCTOR_NAME.indexOf('Weak') !== -1;
-	  var ADDER = IS_MAP ? 'set' : 'add';
-	  var NativeConstructor = global_1[CONSTRUCTOR_NAME];
-	  var NativePrototype = NativeConstructor && NativeConstructor.prototype;
-	  var Constructor = NativeConstructor;
-	  var exported = {};
-
-	  var fixMethod = function (KEY) {
-	    var nativeMethod = NativePrototype[KEY];
-	    redefine(NativePrototype, KEY,
-	      KEY == 'add' ? function add(value) {
-	        nativeMethod.call(this, value === 0 ? 0 : value);
-	        return this;
-	      } : KEY == 'delete' ? function (key) {
-	        return IS_WEAK && !isObject(key) ? false : nativeMethod.call(this, key === 0 ? 0 : key);
-	      } : KEY == 'get' ? function get(key) {
-	        return IS_WEAK && !isObject(key) ? undefined : nativeMethod.call(this, key === 0 ? 0 : key);
-	      } : KEY == 'has' ? function has(key) {
-	        return IS_WEAK && !isObject(key) ? false : nativeMethod.call(this, key === 0 ? 0 : key);
-	      } : function set(key, value) {
-	        nativeMethod.call(this, key === 0 ? 0 : key, value);
-	        return this;
-	      }
-	    );
-	  };
-
-	  // eslint-disable-next-line max-len
-	  if (isForced_1(CONSTRUCTOR_NAME, typeof NativeConstructor != 'function' || !(IS_WEAK || NativePrototype.forEach && !fails(function () {
-	    new NativeConstructor().entries().next();
-	  })))) {
-	    // create collection constructor
-	    Constructor = common.getConstructor(wrapper, CONSTRUCTOR_NAME, IS_MAP, ADDER);
-	    internalMetadata.REQUIRED = true;
-	  } else if (isForced_1(CONSTRUCTOR_NAME, true)) {
-	    var instance = new Constructor();
-	    // early implementations not supports chaining
-	    var HASNT_CHAINING = instance[ADDER](IS_WEAK ? {} : -0, 1) != instance;
-	    // V8 ~ Chromium 40- weak-collections throws on primitives, but should return false
-	    var THROWS_ON_PRIMITIVES = fails(function () { instance.has(1); });
-	    // most early implementations doesn't supports iterables, most modern - not close it correctly
-	    // eslint-disable-next-line no-new
-	    var ACCEPT_ITERABLES = checkCorrectnessOfIteration(function (iterable) { new NativeConstructor(iterable); });
-	    // for early implementations -0 and +0 not the same
-	    var BUGGY_ZERO = !IS_WEAK && fails(function () {
-	      // V8 ~ Chromium 42- fails only with 5+ elements
-	      var $instance = new NativeConstructor();
-	      var index = 5;
-	      while (index--) $instance[ADDER](index, index);
-	      return !$instance.has(-0);
-	    });
-
-	    if (!ACCEPT_ITERABLES) {
-	      Constructor = wrapper(function (dummy, iterable) {
-	        anInstance(dummy, Constructor, CONSTRUCTOR_NAME);
-	        var that = inheritIfRequired(new NativeConstructor(), dummy, Constructor);
-	        if (iterable != undefined) iterate_1(iterable, that[ADDER], that, IS_MAP);
-	        return that;
-	      });
-	      Constructor.prototype = NativePrototype;
-	      NativePrototype.constructor = Constructor;
-	    }
-
-	    if (THROWS_ON_PRIMITIVES || BUGGY_ZERO) {
-	      fixMethod('delete');
-	      fixMethod('has');
-	      IS_MAP && fixMethod('get');
-	    }
-
-	    if (BUGGY_ZERO || HASNT_CHAINING) fixMethod(ADDER);
-
-	    // weak collections should not contains .clear method
-	    if (IS_WEAK && NativePrototype.clear) delete NativePrototype.clear;
-	  }
-
-	  exported[CONSTRUCTOR_NAME] = Constructor;
-	  _export({ global: true, forced: Constructor != NativeConstructor }, exported);
-
-	  setToStringTag(Constructor, CONSTRUCTOR_NAME);
-
-	  if (!IS_WEAK) common.setStrong(Constructor, CONSTRUCTOR_NAME, IS_MAP);
-
-	  return Constructor;
-	};
-
-	var defineProperty$a = objectDefineProperty.f;
-
-
-
-
-
-
-
-
-	var fastKey = internalMetadata.fastKey;
-
-
-	var setInternalState$6 = internalState.set;
-	var internalStateGetterFor = internalState.getterFor;
-
-	var collectionStrong = {
-	  getConstructor: function (wrapper, CONSTRUCTOR_NAME, IS_MAP, ADDER) {
-	    var C = wrapper(function (that, iterable) {
-	      anInstance(that, C, CONSTRUCTOR_NAME);
-	      setInternalState$6(that, {
-	        type: CONSTRUCTOR_NAME,
-	        index: objectCreate(null),
-	        first: undefined,
-	        last: undefined,
-	        size: 0
-	      });
-	      if (!descriptors) that.size = 0;
-	      if (iterable != undefined) iterate_1(iterable, that[ADDER], that, IS_MAP);
-	    });
-
-	    var getInternalState = internalStateGetterFor(CONSTRUCTOR_NAME);
-
-	    var define = function (that, key, value) {
-	      var state = getInternalState(that);
-	      var entry = getEntry(that, key);
-	      var previous, index;
-	      // change existing entry
-	      if (entry) {
-	        entry.value = value;
-	      // create new entry
-	      } else {
-	        state.last = entry = {
-	          index: index = fastKey(key, true),
-	          key: key,
-	          value: value,
-	          previous: previous = state.last,
-	          next: undefined,
-	          removed: false
-	        };
-	        if (!state.first) state.first = entry;
-	        if (previous) previous.next = entry;
-	        if (descriptors) state.size++;
-	        else that.size++;
-	        // add to index
-	        if (index !== 'F') state.index[index] = entry;
-	      } return that;
-	    };
-
-	    var getEntry = function (that, key) {
-	      var state = getInternalState(that);
-	      // fast case
-	      var index = fastKey(key);
-	      var entry;
-	      if (index !== 'F') return state.index[index];
-	      // frozen object case
-	      for (entry = state.first; entry; entry = entry.next) {
-	        if (entry.key == key) return entry;
-	      }
-	    };
-
-	    redefineAll(C.prototype, {
-	      // 23.1.3.1 Map.prototype.clear()
-	      // 23.2.3.2 Set.prototype.clear()
-	      clear: function clear() {
-	        var that = this;
-	        var state = getInternalState(that);
-	        var data = state.index;
-	        var entry = state.first;
-	        while (entry) {
-	          entry.removed = true;
-	          if (entry.previous) entry.previous = entry.previous.next = undefined;
-	          delete data[entry.index];
-	          entry = entry.next;
-	        }
-	        state.first = state.last = undefined;
-	        if (descriptors) state.size = 0;
-	        else that.size = 0;
-	      },
-	      // 23.1.3.3 Map.prototype.delete(key)
-	      // 23.2.3.4 Set.prototype.delete(value)
-	      'delete': function (key) {
-	        var that = this;
-	        var state = getInternalState(that);
-	        var entry = getEntry(that, key);
-	        if (entry) {
-	          var next = entry.next;
-	          var prev = entry.previous;
-	          delete state.index[entry.index];
-	          entry.removed = true;
-	          if (prev) prev.next = next;
-	          if (next) next.previous = prev;
-	          if (state.first == entry) state.first = next;
-	          if (state.last == entry) state.last = prev;
-	          if (descriptors) state.size--;
-	          else that.size--;
-	        } return !!entry;
-	      },
-	      // 23.2.3.6 Set.prototype.forEach(callbackfn, thisArg = undefined)
-	      // 23.1.3.5 Map.prototype.forEach(callbackfn, thisArg = undefined)
-	      forEach: function forEach(callbackfn /* , that = undefined */) {
-	        var state = getInternalState(this);
-	        var boundFunction = functionBindContext(callbackfn, arguments.length > 1 ? arguments[1] : undefined, 3);
-	        var entry;
-	        while (entry = entry ? entry.next : state.first) {
-	          boundFunction(entry.value, entry.key, this);
-	          // revert to the last existing entry
-	          while (entry && entry.removed) entry = entry.previous;
-	        }
-	      },
-	      // 23.1.3.7 Map.prototype.has(key)
-	      // 23.2.3.7 Set.prototype.has(value)
-	      has: function has(key) {
-	        return !!getEntry(this, key);
-	      }
-	    });
-
-	    redefineAll(C.prototype, IS_MAP ? {
-	      // 23.1.3.6 Map.prototype.get(key)
-	      get: function get(key) {
-	        var entry = getEntry(this, key);
-	        return entry && entry.value;
-	      },
-	      // 23.1.3.9 Map.prototype.set(key, value)
-	      set: function set(key, value) {
-	        return define(this, key === 0 ? 0 : key, value);
-	      }
-	    } : {
-	      // 23.2.3.1 Set.prototype.add(value)
-	      add: function add(value) {
-	        return define(this, value = value === 0 ? 0 : value, value);
-	      }
-	    });
-	    if (descriptors) defineProperty$a(C.prototype, 'size', {
-	      get: function () {
-	        return getInternalState(this).size;
-	      }
-	    });
-	    return C;
-	  },
-	  setStrong: function (C, CONSTRUCTOR_NAME, IS_MAP) {
-	    var ITERATOR_NAME = CONSTRUCTOR_NAME + ' Iterator';
-	    var getInternalCollectionState = internalStateGetterFor(CONSTRUCTOR_NAME);
-	    var getInternalIteratorState = internalStateGetterFor(ITERATOR_NAME);
-	    // add .keys, .values, .entries, [@@iterator]
-	    // 23.1.3.4, 23.1.3.8, 23.1.3.11, 23.1.3.12, 23.2.3.5, 23.2.3.8, 23.2.3.10, 23.2.3.11
-	    defineIterator(C, CONSTRUCTOR_NAME, function (iterated, kind) {
-	      setInternalState$6(this, {
-	        type: ITERATOR_NAME,
-	        target: iterated,
-	        state: getInternalCollectionState(iterated),
-	        kind: kind,
-	        last: undefined
-	      });
-	    }, function () {
-	      var state = getInternalIteratorState(this);
-	      var kind = state.kind;
-	      var entry = state.last;
-	      // revert to the last existing entry
-	      while (entry && entry.removed) entry = entry.previous;
-	      // get next entry
-	      if (!state.target || !(state.last = entry = entry ? entry.next : state.state.first)) {
-	        // or finish the iteration
-	        state.target = undefined;
-	        return { value: undefined, done: true };
-	      }
-	      // return step by kind
-	      if (kind == 'keys') return { value: entry.key, done: false };
-	      if (kind == 'values') return { value: entry.value, done: false };
-	      return { value: [entry.key, entry.value], done: false };
-	    }, IS_MAP ? 'entries' : 'values', !IS_MAP, true);
-
-	    // add [@@species], 23.1.2.2, 23.2.2.2
-	    setSpecies(CONSTRUCTOR_NAME);
-	  }
-	};
-
-	// `Set` constructor
-	// https://tc39.github.io/ecma262/#sec-set-objects
-	var es_set = collection('Set', function (init) {
-	  return function Set() { return init(this, arguments.length ? arguments[0] : undefined); };
-	}, collectionStrong);
 
 	var _Set =
 	/*#__PURE__*/
@@ -10438,7 +10266,7 @@
 	  var pairs = [];
 
 	  for (var prop in obj) {
-	    if (_has$1(prop, obj)) {
+	    if (_has(prop, obj)) {
 	      pairs[pairs.length] = [prop, obj[prop]];
 	    }
 	  }
@@ -16411,28 +16239,36 @@
 	    key: "tablePivot",
 	    value: function tablePivot(pivotConfig) {
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
+	      return this.pivot(normalizedPivotConfig).reduce(function (memo, _ref19) {
+	        var xValues = _ref19.xValues,
+	            yValuesArray = _ref19.yValuesArray;
+	        var index = -1;
+	        var set = new Set();
+	        yValuesArray.forEach(function (_ref20) {
+	          var _ref21 = _slicedToArray(_ref20, 2),
+	              yValues = _ref21[0],
+	              m = _ref21[1];
 
-	      var valueToObject = function valueToObject(valuesArray, measureValue) {
-	        return function (field, index) {
-	          return _defineProperty({}, field === 'measures' ? valuesArray[index] : field, field === 'measures' ? measureValue : valuesArray[index]);
-	        };
-	      };
+	          var dimensions = normalizedPivotConfig.y.filter(function (d) {
+	            return d !== 'measures';
+	          });
+	          var dimensionValues = yValues.slice(0, yValues.length - 1);
+	          var key = dimensionValues.join();
 
-	      return this.pivot(normalizedPivotConfig).map(function (_ref20) {
-	        var xValues = _ref20.xValues,
-	            yValuesArray = _ref20.yValuesArray;
-	        return yValuesArray.map(function (_ref21) {
-	          var _ref22 = _slicedToArray(_ref21, 2),
-	              yValues = _ref22[0],
-	              m = _ref22[1];
+	          if (!set.has(key)) {
+	            set.add(key);
+	            index++;
+	          }
 
-	          return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
-	            return Object.assign(a, b);
-	          }, {});
-	        }).reduce(function (a, b) {
-	          return Object.assign(a, b);
-	        }, {});
-	      });
+	          var path = [xValues.join('.'), yValues[yValues.length - 1]].join('.');
+	          memo[index] = _objectSpread({}, memo[index], _defineProperty({}, path, m), dimensions.reduce(function (dimensionsMemo, currentDimension, index) {
+	            dimensionsMemo[currentDimension] = dimensionValues[index];
+	            return dimensionsMemo;
+	          }, {}));
+	        });
+	        set.clear();
+	        return memo;
+	      }, []);
 	    }
 	    /**
 	     * Returns array of column definitions for `tablePivot`.
@@ -16467,36 +16303,87 @@
 	      var _this4 = this;
 
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+	      var map$$1 = new Map();
+	      var columns = [];
+	      normalizedPivotConfig.x.forEach(function (_, index) {
+	        _this4.pivot(normalizedPivotConfig).forEach(function (_ref22) {
+	          var xValues = _ref22.xValues;
+	          map$$1.set(xValues[index], {
+	            key: normalizedPivotConfig.x[index],
+	            value: xValues[index]
+	          }); // tmp[xValues[index]] = {
+	          //   key: normalizedPivotConfig.x[index],
+	          //   value: xValues[index],
+	          // };
+	        });
 
-	      var column = function column(field) {
-	        var exractFields = function exractFields() {
-	          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-	          var title = annotation.title,
-	              shortTitle = annotation.shortTitle,
-	              format = annotation.format,
-	              type$$1 = annotation.type,
-	              meta = annotation.meta;
-	          return {
-	            title: title,
-	            shortTitle: shortTitle,
-	            format: format,
-	            type: type$$1,
-	            meta: meta
-	          };
-	        };
-
-	        return field === 'measures' ? (_this4.query().measures || []).map(function (key) {
-	          return _objectSpread({
-	            key: key
-	          }, exractFields(_this4.loadResponse.annotation.measures[key]));
-	        }) : [_objectSpread({
-	          key: field
-	        }, exractFields(_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]))];
-	      };
-
-	      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
-	        return a.concat(b);
+	        columns.push(_toConsumableArray(map$$1.values()));
+	        map$$1.clear();
 	      });
+	      (this.pivot(normalizedPivotConfig)[0].yValuesArray || []).forEach(function (_ref23) {
+	        var _ref24 = _slicedToArray(_ref23, 1),
+	            yValues = _ref24[0];
+
+	        var measureName = yValues[yValues.length - 1];
+	        map$$1.set(measureName, {
+	          key: measureName
+	        });
+	      });
+	      columns.push(_toConsumableArray(map$$1.values()));
+
+	      function groupColumns(level) {
+	        var path = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+
+	        if (columns[level] === undefined) {
+	          return [];
+	        }
+
+	        return columns[level].map(function (element) {
+	          var currentPath = [path, (element.value === undefined ? '' : element.value).toString()].filter(Boolean).join('.');
+	          var dataIndex = element.value === undefined ? [currentPath, element.key].join('.') : element.key;
+	          return {
+	            title: element.value || dataIndex,
+	            dataIndex: dataIndex,
+	            key: dataIndex,
+	            children: groupColumns(level + 1, currentPath)
+	          };
+	        });
+	      }
+
+	      return groupColumns(0); // const column = (field) => {
+	      //   const exractFields = (annotation = {}) => {
+	      //     const {
+	      //       title,
+	      //       shortTitle,
+	      //       format,
+	      //       type,
+	      //       meta
+	      //     } = annotation;
+	      //
+	      //     return {
+	      //       title,
+	      //       shortTitle,
+	      //       format,
+	      //       type,
+	      //       meta
+	      //     };
+	      //   };
+	      //
+	      //   return field === 'measures' ? (this.query().measures || []).map((key) => ({
+	      //     key,
+	      //     ...exractFields(this.loadResponse.annotation.measures[key])
+	      //   })) : [
+	      //     {
+	      //       key: field,
+	      //       ...exractFields(this.loadResponse.annotation.dimensions[field] ||
+	      //           this.loadResponse.annotation.timeDimensions[field])
+	      //     },
+	      //   ];
+	      // };
+	      //
+	      // return normalizedPivotConfig.x.map(column)
+	      //   .concat(normalizedPivotConfig.y.map(column))
+	      //   .reduce((a, b) => a.concat(b));
 	    }
 	  }, {
 	    key: "totalRow",
