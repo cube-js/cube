@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.22](https://github.com/cube-js/cube.js/compare/v0.19.21...v0.19.22) (2020-05-26)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
 ## [0.19.20](https://github.com/cube-js/cube.js/compare/v0.19.19...v0.19.20) (2020-05-21)
 
 
