@@ -12,6 +12,141 @@ jest.mock('moment-range', () => {
 });
 
 describe('ResultSet', () => {
+  describe('drillDown', () => {
+    test('it returns null when no drillMembers provided', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {}
+          }
+        }
+      });
+
+      expect(resultSet.drillDown({})).toBeNull();
+    });
+
+    test('it returns a correct query', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {
+              drillMembers: {
+                dimensions: ['Users.id']
+              }
+            }
+          }
+        }
+      });
+
+      expect(
+        resultSet.drillDown({ xValues: ['Foo'] })
+      ).toEqual({
+        dimensions: ['Users.id'],
+        filters: [
+          {
+            member: 'Users.country',
+            values: ['Foo'],
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: []
+      });
+    });
+
+    test('it returns a correct timeDimensions when passed as dimension', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country', 'Orders.ts.month']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {
+              drillMembers: {
+                dimensions: ['Users.id']
+              }
+            }
+          }
+        }
+      });
+
+      expect(
+        resultSet.drillDown({ xValues: ['Foo', '2020-05-01'] })
+      ).toEqual({
+        dimensions: ['Users.id'],
+        filters: [
+          {
+            member: 'Users.country',
+            values: ['Foo'],
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'Orders.ts',
+          dateRange: [
+            '2020-05-01T00:00:00.000',
+            '2020-05-31T23:59:59.999'
+          ]
+        }]
+      });
+    });
+
+    test('it handles yValues dimensions correctly', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country', 'Orders.ts.month']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {
+              drillMembers: {
+                dimensions: ['Users.id']
+              }
+            }
+          }
+        }
+      });
+
+      expect(
+        resultSet.drillDown(
+          {
+            xValues: ['2020-05-01'],
+            yValues: ['Foo', 'Orders.count']
+          },
+          {
+            x: ['Orders.ts.month'],
+            y: ['Users.country', 'measures']
+          }
+        )
+      ).toEqual({
+        dimensions: ['Users.id'],
+        filters: [
+          {
+            member: 'Users.country',
+            values: ['Foo'],
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'Orders.ts',
+          dateRange: [
+            '2020-05-01T00:00:00.000',
+            '2020-05-31T23:59:59.999'
+          ]
+        }]
+      });
+    });
+  });
+
   describe('timeSeries', () => {
     test('it generates array of dates - granularity month', () => {
       const resultSet = new ResultSet({});

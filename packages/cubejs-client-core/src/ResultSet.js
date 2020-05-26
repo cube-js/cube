@@ -54,7 +54,7 @@ class ResultSet {
     const { dimensions } = this.query();
     const { measures } = this.loadResponse.annotation;
 
-    let [measureName] = yValues;
+    let measureName = yValues[yValues.length - 1];
     if (measureName === undefined) {
       [measureName] = Object.keys(measures);
     }
