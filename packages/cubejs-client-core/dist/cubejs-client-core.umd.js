@@ -15860,9 +15860,7 @@
 	          dimensions = _this$query.dimensions;
 
 	      var measures = this.loadResponse.annotation.measures;
-
-	      var _yValues = _slicedToArray(yValues, 1),
-	          measureName = _yValues[0];
+	      var measureName = yValues[yValues.length - 1];
 
 	      if (measureName === undefined) {
 	        var _Object$keys = Object.keys(measures);
