@@ -52,6 +52,10 @@ describe('ResultSet', () => {
           dimensions: ['Users.id'],
           filters: [
             {
+              dimension: 'Orders.count',
+              operator: 'measureFilter',
+            },
+            {
               member: 'Users.country',
               values: ['Foo'],
               operator: 'equals'
@@ -84,6 +88,10 @@ describe('ResultSet', () => {
       ).toEqual({
         dimensions: ['Users.id'],
         filters: [
+          {
+            dimension: 'Orders.count',
+            operator: 'measureFilter',
+          },
           {
             member: 'Users.country',
             values: ['Foo'],
@@ -132,6 +140,66 @@ describe('ResultSet', () => {
       ).toEqual({
         dimensions: ['Users.id'],
         filters: [
+          {
+            dimension: 'Orders.count',
+            operator: 'measureFilter',
+          },
+          {
+            member: 'Users.country',
+            values: ['Foo'],
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'Orders.ts',
+          dateRange: [
+            '2020-05-01T00:00:00.000',
+            '2020-05-31T23:59:59.999'
+          ]
+        }]
+      });
+    });
+
+    test('it utilizes measure filters', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.countPaid'],
+          dimensions: ['Users.country', 'Orders.ts.month']
+        },
+        annotation: {
+          measures: {
+            'Orders.countPaid': {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
+                dimensions: ['Users.id']
+              },
+              measureFilter: {
+                dimension: 'Orders.countPaid',
+                operator: 'measure_filter'
+              }
+            }
+          }
+        }
+      });
+
+      expect(
+        resultSet.drillDown(
+          {
+            xValues: ['2020-05-01'],
+            yValues: ['Foo', 'Orders.count']
+          },
+          {
+            x: ['Orders.ts.month'],
+            y: ['Users.country', 'measures']
+          }
+        )
+      ).toEqual({
+        dimensions: ['Users.id'],
+        filters: [
+          {
+            dimension: 'Orders.countPaid',
+            operator: 'measureFilter',
+          },
           {
             member: 'Users.country',
             values: ['Foo'],

@@ -66,7 +66,10 @@ class ResultSet {
       return null;
     }
 
-    const filters = [];
+    const filters = [{
+      dimension: measureName,
+      operator: 'measureFilter',
+    }];
     const timeDimensions = [];
 
     values.filter(([member]) => member !== 'measures')

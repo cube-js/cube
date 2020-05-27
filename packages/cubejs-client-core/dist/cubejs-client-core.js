@@ -152,7 +152,10 @@ function () {
         return null;
       }
 
-      var filters = [];
+      var filters = [{
+        dimension: measureName,
+        operator: 'measureFilter'
+      }];
       var timeDimensions = [];
       values.filter(function (_ref5) {
         var _ref6 = _slicedToArray(_ref5, 1),
