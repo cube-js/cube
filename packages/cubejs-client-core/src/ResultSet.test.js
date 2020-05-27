@@ -38,7 +38,8 @@ describe('ResultSet', () => {
         annotation: {
           measures: {
             'Orders.count': {
-              drillMembers: {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
                 dimensions: ['Users.id']
               }
             }
@@ -46,22 +47,21 @@ describe('ResultSet', () => {
         }
       });
 
-      expect(
-        resultSet.drillDown({ xValues: ['Foo'] })
-      ).toEqual({
-        dimensions: ['Users.id'],
-        filters: [
-          {
-            member: 'Users.country',
-            values: ['Foo'],
-            operator: 'equals'
-          }
-        ],
-        timeDimensions: []
-      });
+      expect(resultSet.drillDown({ xValues: ['Foo'] }))
+        .toEqual({
+          dimensions: ['Users.id'],
+          filters: [
+            {
+              member: 'Users.country',
+              values: ['Foo'],
+              operator: 'equals'
+            }
+          ],
+          timeDimensions: []
+        });
     });
 
-    test('it returns a correct timeDimensions when passed as dimension', () => {
+    test('it returns a correct timeDimensions', () => {
       const resultSet = new ResultSet({
         query: {
           measures: ['Orders.count'],
@@ -70,7 +70,8 @@ describe('ResultSet', () => {
         annotation: {
           measures: {
             'Orders.count': {
-              drillMembers: {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
                 dimensions: ['Users.id']
               }
             }
@@ -108,7 +109,8 @@ describe('ResultSet', () => {
         annotation: {
           measures: {
             'Orders.count': {
-              drillMembers: {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
                 dimensions: ['Users.id']
               }
             }

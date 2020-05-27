@@ -2702,24 +2702,8 @@
 	  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
 	}
 
-	function _toConsumableArray(arr) {
-	  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
-	}
-
-	function _arrayWithoutHoles(arr) {
-	  if (Array.isArray(arr)) {
-	    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
-
-	    return arr2;
-	  }
-	}
-
 	function _arrayWithHoles(arr) {
 	  if (Array.isArray(arr)) return arr;
-	}
-
-	function _iterableToArray(iter) {
-	  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
 	}
 
 	function _iterableToArrayLimit(arr, i) {
@@ -2746,10 +2730,6 @@
 	  }
 
 	  return _arr;
-	}
-
-	function _nonIterableSpread() {
-	  throw new TypeError("Invalid attempt to spread non-iterable instance");
 	}
 
 	function _nonIterableRest() {
@@ -5328,44 +5308,6 @@
 	  exec: regexpExec
 	});
 
-	var MATCH = wellKnownSymbol('match');
-
-	// `IsRegExp` abstract operation
-	// https://tc39.github.io/ecma262/#sec-isregexp
-	var isRegexp = function (it) {
-	  var isRegExp;
-	  return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : classofRaw(it) == 'RegExp');
-	};
-
-	var notARegexp = function (it) {
-	  if (isRegexp(it)) {
-	    throw TypeError("The method doesn't accept regular expressions");
-	  } return it;
-	};
-
-	var MATCH$1 = wellKnownSymbol('match');
-
-	var correctIsRegexpLogic = function (METHOD_NAME) {
-	  var regexp = /./;
-	  try {
-	    '/./'[METHOD_NAME](regexp);
-	  } catch (e) {
-	    try {
-	      regexp[MATCH$1] = false;
-	      return '/./'[METHOD_NAME](regexp);
-	    } catch (f) { /* empty */ }
-	  } return false;
-	};
-
-	// `String.prototype.includes` method
-	// https://tc39.github.io/ecma262/#sec-string.prototype.includes
-	_export({ target: 'String', proto: true, forced: !correctIsRegexpLogic('includes') }, {
-	  includes: function includes(searchString /* , position = 0 */) {
-	    return !!~String(requireObjectCoercible(this))
-	      .indexOf(notARegexp(searchString), arguments.length > 1 ? arguments[1] : undefined);
-	  }
-	});
-
 	// TODO: Remove from `core-js@4` since it's moved to entry points
 
 
@@ -5554,6 +5496,15 @@
 	    }
 	  ];
 	});
+
+	var MATCH = wellKnownSymbol('match');
+
+	// `IsRegExp` abstract operation
+	// https://tc39.github.io/ecma262/#sec-isregexp
+	var isRegexp = function (it) {
+	  var isRegExp;
+	  return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : classofRaw(it) == 'RegExp');
+	};
 
 	var arrayPush = [].push;
 	var min$4 = Math.min;
@@ -7095,7 +7046,7 @@
 
 
 
-	var MATCH$2 = wellKnownSymbol('match');
+	var MATCH$1 = wellKnownSymbol('match');
 	var NativeRegExp = global_1.RegExp;
 	var RegExpPrototype$1 = NativeRegExp.prototype;
 	var re1 = /a/g;
@@ -7107,7 +7058,7 @@
 	var UNSUPPORTED_Y$2 = regexpStickyHelpers.UNSUPPORTED_Y;
 
 	var FORCED$7 = descriptors && isForced_1('RegExp', (!CORRECT_NEW || UNSUPPORTED_Y$2 || fails(function () {
-	  re2[MATCH$2] = false;
+	  re2[MATCH$1] = false;
 	  // RegExp constructor can alter flags and IsRegExp works correct with @@match
 	  return NativeRegExp(re1) != re1 || NativeRegExp(re2) == re2 || NativeRegExp(re1, 'i') != '/a/i';
 	})));
@@ -15855,12 +15806,23 @@
 	          _drillDownLocator$yVa = drillDownLocator.yValues,
 	          yValues = _drillDownLocator$yVa === void 0 ? [] : _drillDownLocator$yVa;
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-
-	      var _this$query = this.query(),
-	          dimensions = _this$query.dimensions;
-
+	      var values$$1 = [];
+	      normalizedPivotConfig.x.forEach(function (member, currentIndex) {
+	        return values$$1.push([member, xValues[currentIndex]]);
+	      });
+	      normalizedPivotConfig.y.forEach(function (member, currentIndex) {
+	        return values$$1.push([member, yValues[currentIndex]]);
+	      });
 	      var measures = this.loadResponse.annotation.measures;
-	      var measureName = yValues[yValues.length - 1];
+
+	      var _ref = values$$1.find(function (_ref3) {
+	        var _ref4 = _slicedToArray(_ref3, 1),
+	            member = _ref4[0];
+
+	        return member === 'measues';
+	      }) || [],
+	          _ref2 = _slicedToArray(_ref, 2),
+	          measureName = _ref2[1];
 
 	      if (measureName === undefined) {
 	        var _Object$keys = Object.keys(measures);
@@ -15870,25 +15832,21 @@
 	        measureName = _Object$keys2[0];
 	      }
 
-	      if (measures[measureName].drillMembers == null) {
+	      if (!(measures[measureName] && measures[measureName].drillMembers || []).length) {
 	        return null;
 	      }
 
-	      var yDimensionFilters = normalizedPivotConfig.y.map(function (member, currentIndex) {
-	        if (dimensions.includes(member) && yValues[currentIndex] != null) {
-	          return {
-	            member: member,
-	            operator: 'equals',
-	            values: [yValues[currentIndex]]
-	          };
-	        }
-
-	        return false;
-	      }).filter(Boolean);
 	      var filters = [];
 	      var timeDimensions = [];
-	      xValues.forEach(function (xValue, xValueIndex) {
-	        var member = normalizedPivotConfig.x[xValueIndex];
+	      values$$1.filter(function (_ref5) {
+	        var _ref6 = _slicedToArray(_ref5, 1),
+	            member = _ref6[0];
+
+	        return member !== 'measures';
+	      }).forEach(function (_ref7) {
+	        var _ref8 = _slicedToArray(_ref7, 2),
+	            member = _ref8[0],
+	            value = _ref8[1];
 
 	        var _member$split = member.split('.'),
 	            _member$split2 = _slicedToArray(_member$split, 3),
@@ -15897,7 +15855,7 @@
 	            granularity = _member$split2[2];
 
 	        if (granularity !== undefined) {
-	          var range$$1 = moment$1.range(xValue, xValue).snapTo(granularity);
+	          var range$$1 = moment$1.range(value, value).snapTo(granularity);
 	          timeDimensions.push({
 	            dimension: [cubeName, dimension].join('.'),
 	            dateRange: [range$$1.start, range$$1.end].map(function (dt) {
@@ -15908,12 +15866,12 @@
 	          filters.push({
 	            member: member,
 	            operator: 'equals',
-	            values: [xValue.toString()]
+	            values: [value.toString()]
 	          });
 	        }
 	      });
-	      return _objectSpread({}, measures[measureName].drillMembers, {
-	        filters: [].concat(filters, _toConsumableArray(yDimensionFilters)),
+	      return _objectSpread({}, measures[measureName].drillMembersGrouped, {
+	        filters: filters,
 	        timeDimensions: timeDimensions
 	      });
 	    }
@@ -15954,16 +15912,16 @@
 	    value: function series(pivotConfig) {
 	      var _this = this;
 
-	      return this.seriesNames(pivotConfig).map(function (_ref) {
-	        var title = _ref.title,
-	            key = _ref.key;
+	      return this.seriesNames(pivotConfig).map(function (_ref9) {
+	        var title = _ref9.title,
+	            key = _ref9.key;
 	        return {
 	          title: title,
 	          key: key,
-	          series: _this.chartPivot(pivotConfig).map(function (_ref2) {
-	            var category = _ref2.category,
-	                x = _ref2.x,
-	                obj = _objectWithoutProperties(_ref2, ["category", "x"]);
+	          series: _this.chartPivot(pivotConfig).map(function (_ref10) {
+	            var category = _ref10.category,
+	                x = _ref10.x,
+	                obj = _objectWithoutProperties(_ref10, ["category", "x"]);
 
 	            return {
 	              value: obj[key],
@@ -16168,8 +16126,8 @@
 	      var _this2 = this;
 
 	      pivotConfig = this.normalizePivotConfig(pivotConfig);
-	      var groupByXAxis = groupBy(function (_ref3) {
-	        var xValues = _ref3.xValues;
+	      var groupByXAxis = groupBy(function (_ref11) {
+	        var xValues = _ref11.xValues;
 	        return _this2.axisValuesString(xValues);
 	      }); // eslint-disable-next-line no-unused-vars
 
@@ -16186,8 +16144,8 @@
 
 	        if (series) {
 	          groupByXAxis = function groupByXAxis(rows) {
-	            var byXValues = groupBy(function (_ref4) {
-	              var xValues = _ref4.xValues;
+	            var byXValues = groupBy(function (_ref12) {
+	              var xValues = _ref12.xValues;
 	              return moment$1(xValues[0]).format(moment$1.HTML5_FMT.DATETIME_LOCAL_MS);
 	            }, rows);
 	            return series.map(function (d) {
@@ -16216,37 +16174,37 @@
 	        });
 	      }), unnest, groupByXAxis, toPairs)(this.timeDimensionBackwardCompatibleData());
 	      var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
-	      function (_ref6) {
-	        var _ref7 = _slicedToArray(_ref6, 2),
-	            xValuesString = _ref7[0],
-	            rows = _ref7[1];
+	      function (_ref14) {
+	        var _ref15 = _slicedToArray(_ref14, 2),
+	            xValuesString = _ref15[0],
+	            rows = _ref15[1];
 
 	        return unnest( // collect Y values only from filled rows
-	        rows.filter(function (_ref8) {
-	          var row = _ref8.row;
+	        rows.filter(function (_ref16) {
+	          var row = _ref16.row;
 	          return Object.keys(row).length > 0;
-	        }).map(function (_ref9) {
-	          var row = _ref9.row;
+	        }).map(function (_ref17) {
+	          var row = _ref17.row;
 	          return _this2.axisValues(pivotConfig.y)(row);
 	        }));
 	      }), unnest, uniq)(xGrouped); // eslint-disable-next-line no-unused-vars
 
-	      return xGrouped.map(function (_ref10) {
-	        var _ref11 = _slicedToArray(_ref10, 2),
-	            xValuesString = _ref11[0],
-	            rows = _ref11[1];
+	      return xGrouped.map(function (_ref18) {
+	        var _ref19 = _slicedToArray(_ref18, 2),
+	            xValuesString = _ref19[0],
+	            rows = _ref19[1];
 
 	        var xValues = rows[0].xValues;
-	        var yGrouped = pipe(map(function (_ref12) {
-	          var row = _ref12.row;
+	        var yGrouped = pipe(map(function (_ref20) {
+	          var row = _ref20.row;
 	          return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
 	            return {
 	              yValues: yValues,
 	              row: row
 	            };
 	          });
-	        }), unnest, groupBy(function (_ref13) {
-	          var yValues = _ref13.yValues;
+	        }), unnest, groupBy(function (_ref21) {
+	          var yValues = _ref21.yValues;
 	          return _this2.axisValuesString(yValues);
 	        }))(rows);
 	        return {
@@ -16257,8 +16215,8 @@
 	            }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
 	            return (yGrouped[_this2.axisValuesString(yValues)] || [{
 	              row: {}
-	            }]).map(function (_ref14) {
-	              var row = _ref14.row;
+	            }]).map(function (_ref22) {
+	              var row = _ref22.row;
 	              return [yValues, measureValue(row, measure, xValues)];
 	            });
 	          }))
@@ -16311,18 +16269,18 @@
 	        return value;
 	      };
 
-	      return this.pivot(pivotConfig).map(function (_ref15) {
-	        var xValues = _ref15.xValues,
-	            yValuesArray = _ref15.yValuesArray;
+	      return this.pivot(pivotConfig).map(function (_ref23) {
+	        var xValues = _ref23.xValues,
+	            yValuesArray = _ref23.yValuesArray;
 	        return _objectSpread({
 	          category: _this3.axisValuesString(xValues, ', '),
 	          // TODO deprecated
 	          x: _this3.axisValuesString(xValues, ', '),
 	          xValues: xValues
-	        }, yValuesArray.map(function (_ref16) {
-	          var _ref17 = _slicedToArray(_ref16, 2),
-	              yValues = _ref17[0],
-	              m = _ref17[1];
+	        }, yValuesArray.map(function (_ref24) {
+	          var _ref25 = _slicedToArray(_ref24, 2),
+	              yValues = _ref25[0],
+	              m = _ref25[1];
 
 	          return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && validate(m));
 	        }).reduce(function (a, b) {
@@ -16369,13 +16327,13 @@
 	        };
 	      };
 
-	      return this.pivot(normalizedPivotConfig).map(function (_ref20) {
-	        var xValues = _ref20.xValues,
-	            yValuesArray = _ref20.yValuesArray;
-	        return yValuesArray.map(function (_ref21) {
-	          var _ref22 = _slicedToArray(_ref21, 2),
-	              yValues = _ref22[0],
-	              m = _ref22[1];
+	      return this.pivot(normalizedPivotConfig).map(function (_ref28) {
+	        var xValues = _ref28.xValues,
+	            yValuesArray = _ref28.yValuesArray;
+	        return yValuesArray.map(function (_ref29) {
+	          var _ref30 = _slicedToArray(_ref29, 2),
+	              yValues = _ref30[0],
+	              m = _ref30[1];
 
 	          return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
 	            return Object.assign(a, b);

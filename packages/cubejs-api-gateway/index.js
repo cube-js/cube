@@ -30,34 +30,6 @@ const prepareAnnotation = (metaConfig, query) => {
       return undefined;
     }
 
-    let drillMembers = null;
-    if (Array.isArray(config.drillMembers)) {
-      drillMembers = config.drillMembers.reduce((memo, currentMember) => {
-        const [currentCubeName, currentFieldName] = currentMember.split('.');
-
-        const measure = configMap[currentCubeName].measures.find(
-          ({ name }) => name === `${currentCubeName}.${currentFieldName}`
-        );
-        const dimension = configMap[currentCubeName].dimensions.find(
-          ({ name }) => name === `${currentCubeName}.${currentFieldName}`
-        );
-
-        return {
-          measures: [
-            ...memo.measures,
-            measure && measure.name
-          ].filter(Boolean),
-          dimensions: [
-            ...memo.dimensions,
-            dimension && dimension.name
-          ].filter(Boolean),
-        };
-      }, {
-        measures: [],
-        dimensions: [],
-      });
-    }
-
     return [member, {
       title: config.title,
       shortTitle: config.shortTitle,
@@ -65,7 +37,10 @@ const prepareAnnotation = (metaConfig, query) => {
       type: config.type,
       format: config.format,
       meta: config.meta,
-      ...(memberType === 'measures' ? { drillMembers } : {})
+      ...(memberType === 'measures' ? {
+        drillMembers: config.drillMembers,
+        drillMembersGrouped: config.drillMembersGrouped
+      } : {})
     }];
   };
 

@@ -51,65 +51,52 @@ class ResultSet {
     const { xValues = [], yValues = [] } = drillDownLocator;
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
-    const { dimensions } = this.query();
-    const { measures } = this.loadResponse.annotation;
+    const values = [];
+    normalizedPivotConfig.x.forEach((member, currentIndex) => values.push([member, xValues[currentIndex]]));
+    normalizedPivotConfig.y.forEach((member, currentIndex) => values.push([member, yValues[currentIndex]]));
 
-    let measureName = yValues[yValues.length - 1];
+    const { measures } = this.loadResponse.annotation;
+    let [, measureName] = values.find(([member]) => member === 'measues') || [];
+
     if (measureName === undefined) {
       [measureName] = Object.keys(measures);
     }
 
-    if (measures[measureName].drillMembers == null) {
+    if (!(measures[measureName] && measures[measureName].drillMembers || []).length) {
       return null;
     }
-
-    const yDimensionFilters = normalizedPivotConfig.y
-      .map((member, currentIndex) => {
-        if (dimensions.includes(member) && yValues[currentIndex] != null) {
-          return {
-            member,
-            operator: 'equals',
-            values: [yValues[currentIndex]]
-          };
-        }
-
-        return false;
-      }).filter(Boolean);
 
     const filters = [];
     const timeDimensions = [];
 
-    xValues.forEach((xValue, xValueIndex) => {
-      const member = normalizedPivotConfig.x[xValueIndex];
-      const [cubeName, dimension, granularity] = member.split('.');
+    values.filter(([member]) => member !== 'measures')
+      .forEach(([member, value]) => {
+        const [cubeName, dimension, granularity] = member.split('.');
 
-      if (granularity !== undefined) {
-        const range = moment.range(xValue, xValue).snapTo(
-          granularity
-        );
+        if (granularity !== undefined) {
+          const range = moment.range(value, value).snapTo(
+            granularity
+          );
 
-        timeDimensions.push({
-          dimension: [cubeName, dimension].join('.'),
-          dateRange: [
-            range.start,
-            range.end
-          ].map((dt) => dt.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)),
-        });
-      } else {
-        filters.push({
-          member,
-          operator: 'equals',
-          values: [xValue.toString()],
-        });
-      }
-    });
+          timeDimensions.push({
+            dimension: [cubeName, dimension].join('.'),
+            dateRange: [
+              range.start,
+              range.end
+            ].map((dt) => dt.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)),
+          });
+        } else {
+          filters.push({
+            member,
+            operator: 'equals',
+            values: [value.toString()],
+          });
+        }
+      });
 
     return {
-      ...measures[measureName].drillMembers,
-      filters: [
-        ...filters,
-        ...yDimensionFilters,
-      ],
+      ...measures[measureName].drillMembersGrouped,
+      filters,
       timeDimensions
     };
   }
