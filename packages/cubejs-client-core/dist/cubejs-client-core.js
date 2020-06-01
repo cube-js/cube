@@ -18,7 +18,9 @@ var uuid = _interopDefault(require('uuid/v4'));
 require('core-js/modules/es.array.concat');
 require('core-js/modules/es.array.filter');
 require('core-js/modules/es.array.find');
+require('core-js/modules/es.array.for-each');
 require('core-js/modules/es.array.from');
+require('core-js/modules/es.array.includes');
 require('core-js/modules/es.array.index-of');
 require('core-js/modules/es.array.join');
 require('core-js/modules/es.array.map');
@@ -30,19 +32,20 @@ require('core-js/modules/es.number.parse-float');
 require('core-js/modules/es.object.assign');
 require('core-js/modules/es.object.keys');
 require('core-js/modules/es.regexp.exec');
+require('core-js/modules/es.regexp.to-string');
 require('core-js/modules/es.string.iterator');
 require('core-js/modules/es.string.match');
-var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
+require('core-js/modules/es.string.split');
+require('core-js/modules/web.dom-collections.for-each');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
+var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 var ramda = require('ramda');
 var Moment = _interopDefault(require('moment'));
 var momentRange = _interopDefault(require('moment-range'));
 require('core-js/modules/es.array.is-array');
 require('core-js/modules/es.function.name');
-require('core-js/modules/es.string.split');
 require('core-js/modules/es.array.iterator');
-require('core-js/modules/es.regexp.to-string');
 require('core-js/modules/web.dom-collections.iterator');
 require('core-js/modules/web.url');
 var fetch = _interopDefault(require('cross-fetch'));
@@ -103,53 +106,141 @@ function () {
     this.parseDateMeasures = options.parseDateMeasures;
   }
   /**
-   * Returns an array of series with key, title and series data.
+   * Returns a measure drill down query
    *
-   * ```js
-   * // For query
-   * {
-   *   measures: ['Stories.count'],
-   *   timeDimensions: [{
-   *     dimension: 'Stories.time',
-   *     dateRange: ['2015-01-01', '2015-12-31'],
-   *     granularity: 'month'
-   *   }]
-   * }
-   *
-   * // ResultSet.series() will return
-   * [
-   *   {
-   *     "key":"Stories.count",
-   *     "title": "Stories Count",
-   *     "series": [
-   *       { "x":"2015-01-01T00:00:00", "value": 27120 },
-   *       { "x":"2015-02-01T00:00:00", "value": 25861 },
-   *       { "x": "2015-03-01T00:00:00", "value": 29661 },
-   *       //...
-   *     ]
-   *   }
-   * ]
-   * ```
+   * @param drillDownLocator
    * @param pivotConfig - See {@link ResultSet#pivot}.
-   * @returns {Array}
+   * @returns {Object|null}
    */
 
 
   _createClass(ResultSet, [{
+    key: "drillDown",
+    value: function drillDown(drillDownLocator, pivotConfig) {
+      var _drillDownLocator$xVa = drillDownLocator.xValues,
+          xValues = _drillDownLocator$xVa === void 0 ? [] : _drillDownLocator$xVa,
+          _drillDownLocator$yVa = drillDownLocator.yValues,
+          yValues = _drillDownLocator$yVa === void 0 ? [] : _drillDownLocator$yVa;
+      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+      var values = [];
+      normalizedPivotConfig.x.forEach(function (member, currentIndex) {
+        return values.push([member, xValues[currentIndex]]);
+      });
+      normalizedPivotConfig.y.forEach(function (member, currentIndex) {
+        return values.push([member, yValues[currentIndex]]);
+      });
+      var measures = this.loadResponse.annotation.measures;
+
+      var _ref = values.find(function (_ref3) {
+        var _ref4 = _slicedToArray(_ref3, 1),
+            member = _ref4[0];
+
+        return member === 'measues';
+      }) || [],
+          _ref2 = _slicedToArray(_ref, 2),
+          measureName = _ref2[1];
+
+      if (measureName === undefined) {
+        var _Object$keys = Object.keys(measures);
+
+        var _Object$keys2 = _slicedToArray(_Object$keys, 1);
+
+        measureName = _Object$keys2[0];
+      }
+
+      if (!(measures[measureName] && measures[measureName].drillMembers || []).length) {
+        return null;
+      }
+
+      var filters = [{
+        dimension: measureName,
+        operator: 'measureFilter'
+      }];
+      var timeDimensions = [];
+      values.filter(function (_ref5) {
+        var _ref6 = _slicedToArray(_ref5, 1),
+            member = _ref6[0];
+
+        return member !== 'measures';
+      }).forEach(function (_ref7) {
+        var _ref8 = _slicedToArray(_ref7, 2),
+            member = _ref8[0],
+            value = _ref8[1];
+
+        var _member$split = member.split('.'),
+            _member$split2 = _slicedToArray(_member$split, 3),
+            cubeName = _member$split2[0],
+            dimension = _member$split2[1],
+            granularity = _member$split2[2];
+
+        if (granularity !== undefined) {
+          var range = moment.range(value, value).snapTo(granularity);
+          timeDimensions.push({
+            dimension: [cubeName, dimension].join('.'),
+            dateRange: [range.start, range.end].map(function (dt) {
+              return dt.format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+            })
+          });
+        } else {
+          filters.push({
+            member: member,
+            operator: 'equals',
+            values: [value.toString()]
+          });
+        }
+      });
+      return _objectSpread2({}, measures[measureName].drillMembersGrouped, {
+        filters: filters,
+        timeDimensions: timeDimensions
+      });
+    }
+    /**
+     * Returns an array of series with key, title and series data.
+     *
+     * ```js
+     * // For query
+     * {
+     *   measures: ['Stories.count'],
+     *   timeDimensions: [{
+     *     dimension: 'Stories.time',
+     *     dateRange: ['2015-01-01', '2015-12-31'],
+     *     granularity: 'month'
+     *   }]
+     * }
+     *
+     * // ResultSet.series() will return
+     * [
+     *   {
+     *     "key":"Stories.count",
+     *     "title": "Stories Count",
+     *     "series": [
+     *       { "x":"2015-01-01T00:00:00", "value": 27120 },
+     *       { "x":"2015-02-01T00:00:00", "value": 25861 },
+     *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+     *       //...
+     *     ]
+     *   }
+     * ]
+     * ```
+     * @param pivotConfig - See {@link ResultSet#pivot}.
+     * @returns {Array}
+     */
+
+  }, {
     key: "series",
     value: function series(pivotConfig) {
       var _this = this;
 
-      return this.seriesNames(pivotConfig).map(function (_ref) {
-        var title = _ref.title,
-            key = _ref.key;
+      return this.seriesNames(pivotConfig).map(function (_ref9) {
+        var title = _ref9.title,
+            key = _ref9.key;
         return {
           title: title,
           key: key,
-          series: _this.chartPivot(pivotConfig).map(function (_ref2) {
-            var category = _ref2.category,
-                x = _ref2.x,
-                obj = _objectWithoutProperties(_ref2, ["category", "x"]);
+          series: _this.chartPivot(pivotConfig).map(function (_ref10) {
+            var category = _ref10.category,
+                x = _ref10.x,
+                obj = _objectWithoutProperties(_ref10, ["category", "x"]);
 
             return {
               value: obj[key],
@@ -286,16 +377,20 @@ function () {
 
       var padToDay = timeDimension.dateRange ? timeDimension.dateRange.find(function (d) {
         return d.match(DateRegex);
-      }) : ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
-      var start = moment(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
-      var end = moment(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+      }) : !['hour', 'minute', 'second'].includes(timeDimension.granularity);
+
+      var _dateRange = dateRange,
+          _dateRange2 = _slicedToArray(_dateRange, 2),
+          start = _dateRange2[0],
+          end = _dateRange2[1];
+
       var range = moment.range(start, end);
 
       if (!TIME_SERIES[timeDimension.granularity]) {
         throw new Error("Unsupported time granularity: ".concat(timeDimension.granularity));
       }
 
-      return TIME_SERIES[timeDimension.granularity](range);
+      return TIME_SERIES[timeDimension.granularity](padToDay ? range.snapTo('day') : range);
     }
     /**
      * Base method for pivoting {@link ResultSet} data.
@@ -350,8 +445,8 @@ function () {
       var _this2 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
-      var groupByXAxis = ramda.groupBy(function (_ref3) {
-        var xValues = _ref3.xValues;
+      var groupByXAxis = ramda.groupBy(function (_ref11) {
+        var xValues = _ref11.xValues;
         return _this2.axisValuesString(xValues);
       }); // eslint-disable-next-line no-unused-vars
 
@@ -368,8 +463,8 @@ function () {
 
         if (series) {
           groupByXAxis = function groupByXAxis(rows) {
-            var byXValues = ramda.groupBy(function (_ref4) {
-              var xValues = _ref4.xValues;
+            var byXValues = ramda.groupBy(function (_ref12) {
+              var xValues = _ref12.xValues;
               return moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
             }, rows);
             return series.map(function (d) {
@@ -398,37 +493,37 @@ function () {
         });
       }), ramda.unnest, groupByXAxis, ramda.toPairs)(this.timeDimensionBackwardCompatibleData());
       var allYValues = ramda.pipe(ramda.map( // eslint-disable-next-line no-unused-vars
-      function (_ref6) {
-        var _ref7 = _slicedToArray(_ref6, 2),
-            xValuesString = _ref7[0],
-            rows = _ref7[1];
+      function (_ref14) {
+        var _ref15 = _slicedToArray(_ref14, 2),
+            xValuesString = _ref15[0],
+            rows = _ref15[1];
 
         return ramda.unnest( // collect Y values only from filled rows
-        rows.filter(function (_ref8) {
-          var row = _ref8.row;
+        rows.filter(function (_ref16) {
+          var row = _ref16.row;
           return Object.keys(row).length > 0;
-        }).map(function (_ref9) {
-          var row = _ref9.row;
+        }).map(function (_ref17) {
+          var row = _ref17.row;
           return _this2.axisValues(pivotConfig.y)(row);
         }));
       }), ramda.unnest, ramda.uniq)(xGrouped); // eslint-disable-next-line no-unused-vars
 
-      return xGrouped.map(function (_ref10) {
-        var _ref11 = _slicedToArray(_ref10, 2),
-            xValuesString = _ref11[0],
-            rows = _ref11[1];
+      return xGrouped.map(function (_ref18) {
+        var _ref19 = _slicedToArray(_ref18, 2),
+            xValuesString = _ref19[0],
+            rows = _ref19[1];
 
         var xValues = rows[0].xValues;
-        var yGrouped = ramda.pipe(ramda.map(function (_ref12) {
-          var row = _ref12.row;
+        var yGrouped = ramda.pipe(ramda.map(function (_ref20) {
+          var row = _ref20.row;
           return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
             return {
               yValues: yValues,
               row: row
             };
           });
-        }), ramda.unnest, ramda.groupBy(function (_ref13) {
-          var yValues = _ref13.yValues;
+        }), ramda.unnest, ramda.groupBy(function (_ref21) {
+          var yValues = _ref21.yValues;
           return _this2.axisValuesString(yValues);
         }))(rows);
         return {
@@ -439,8 +534,8 @@ function () {
             }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
             return (yGrouped[_this2.axisValuesString(yValues)] || [{
               row: {}
-            }]).map(function (_ref14) {
-              var row = _ref14.row;
+            }]).map(function (_ref22) {
+              var row = _ref22.row;
               return [yValues, measureValue(row, measure, xValues)];
             });
           }))
@@ -493,17 +588,18 @@ function () {
         return value;
       };
 
-      return this.pivot(pivotConfig).map(function (_ref15) {
-        var xValues = _ref15.xValues,
-            yValuesArray = _ref15.yValuesArray;
+      return this.pivot(pivotConfig).map(function (_ref23) {
+        var xValues = _ref23.xValues,
+            yValuesArray = _ref23.yValuesArray;
         return _objectSpread2({
           category: _this3.axisValuesString(xValues, ', '),
           // TODO deprecated
-          x: _this3.axisValuesString(xValues, ', ')
-        }, yValuesArray.map(function (_ref16) {
-          var _ref17 = _slicedToArray(_ref16, 2),
-              yValues = _ref17[0],
-              m = _ref17[1];
+          x: _this3.axisValuesString(xValues, ', '),
+          xValues: xValues
+        }, yValuesArray.map(function (_ref24) {
+          var _ref25 = _slicedToArray(_ref24, 2),
+              yValues = _ref25[0],
+              m = _ref25[1];
 
           return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && validate(m));
         }).reduce(function (a, b) {
@@ -550,13 +646,13 @@ function () {
         };
       };
 
-      return this.pivot(normalizedPivotConfig).map(function (_ref20) {
-        var xValues = _ref20.xValues,
-            yValuesArray = _ref20.yValuesArray;
-        return yValuesArray.map(function (_ref21) {
-          var _ref22 = _slicedToArray(_ref21, 2),
-              yValues = _ref22[0],
-              m = _ref22[1];
+      return this.pivot(normalizedPivotConfig).map(function (_ref28) {
+        var xValues = _ref28.xValues,
+            yValuesArray = _ref28.yValuesArray;
+        return yValuesArray.map(function (_ref29) {
+          var _ref30 = _slicedToArray(_ref29, 2),
+              yValues = _ref30[0],
+              m = _ref30[1];
 
           return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
             return Object.assign(a, b);
@@ -675,7 +771,8 @@ function () {
           title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
           }) ? ramda.dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-          key: _this5.axisValuesString(axisValues)
+          key: _this5.axisValuesString(axisValues),
+          yValues: axisValues
         };
       });
     }

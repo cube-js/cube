@@ -12,6 +12,211 @@ jest.mock('moment-range', () => {
 });
 
 describe('ResultSet', () => {
+  describe('drillDown', () => {
+    test('it returns null when no drillMembers provided', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {}
+          }
+        }
+      });
+
+      expect(resultSet.drillDown({})).toBeNull();
+    });
+
+    test('it returns a correct query', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
+                dimensions: ['Users.id']
+              }
+            }
+          }
+        }
+      });
+
+      expect(resultSet.drillDown({ xValues: ['Foo'] }))
+        .toEqual({
+          dimensions: ['Users.id'],
+          filters: [
+            {
+              dimension: 'Orders.count',
+              operator: 'measureFilter',
+            },
+            {
+              member: 'Users.country',
+              values: ['Foo'],
+              operator: 'equals'
+            }
+          ],
+          timeDimensions: []
+        });
+    });
+
+    test('it returns a correct timeDimensions', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country', 'Orders.ts.month']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
+                dimensions: ['Users.id']
+              }
+            }
+          }
+        }
+      });
+
+      expect(
+        resultSet.drillDown({ xValues: ['Foo', '2020-05-01'] })
+      ).toEqual({
+        dimensions: ['Users.id'],
+        filters: [
+          {
+            dimension: 'Orders.count',
+            operator: 'measureFilter',
+          },
+          {
+            member: 'Users.country',
+            values: ['Foo'],
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'Orders.ts',
+          dateRange: [
+            '2020-05-01T00:00:00.000',
+            '2020-05-31T23:59:59.999'
+          ]
+        }]
+      });
+    });
+
+    test('it handles yValues dimensions correctly', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country', 'Orders.ts.month']
+        },
+        annotation: {
+          measures: {
+            'Orders.count': {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
+                dimensions: ['Users.id']
+              }
+            }
+          }
+        }
+      });
+
+      expect(
+        resultSet.drillDown(
+          {
+            xValues: ['2020-05-01'],
+            yValues: ['Foo', 'Orders.count']
+          },
+          {
+            x: ['Orders.ts.month'],
+            y: ['Users.country', 'measures']
+          }
+        )
+      ).toEqual({
+        dimensions: ['Users.id'],
+        filters: [
+          {
+            dimension: 'Orders.count',
+            operator: 'measureFilter',
+          },
+          {
+            member: 'Users.country',
+            values: ['Foo'],
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'Orders.ts',
+          dateRange: [
+            '2020-05-01T00:00:00.000',
+            '2020-05-31T23:59:59.999'
+          ]
+        }]
+      });
+    });
+
+    test('it utilizes measure filters', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.countPaid'],
+          dimensions: ['Users.country', 'Orders.ts.month']
+        },
+        annotation: {
+          measures: {
+            'Orders.countPaid': {
+              drillMembers: ['Users.id'],
+              drillMembersGrouped: {
+                dimensions: ['Users.id']
+              },
+              measureFilter: {
+                dimension: 'Orders.countPaid',
+                operator: 'measure_filter'
+              }
+            }
+          }
+        }
+      });
+
+      expect(
+        resultSet.drillDown(
+          {
+            xValues: ['2020-05-01'],
+            yValues: ['Foo', 'Orders.count']
+          },
+          {
+            x: ['Orders.ts.month'],
+            y: ['Users.country', 'measures']
+          }
+        )
+      ).toEqual({
+        dimensions: ['Users.id'],
+        filters: [
+          {
+            dimension: 'Orders.countPaid',
+            operator: 'measureFilter',
+          },
+          {
+            member: 'Users.country',
+            values: ['Foo'],
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'Orders.ts',
+          dateRange: [
+            '2020-05-01T00:00:00.000',
+            '2020-05-31T23:59:59.999'
+          ]
+        }]
+      });
+    });
+  });
+
   describe('timeSeries', () => {
     test('it generates array of dates - granularity month', () => {
       const resultSet = new ResultSet({});
@@ -130,6 +335,7 @@ describe('ResultSet', () => {
         x: 'Name 1',
         category: 'Name 1',
         'Foo.count': 'Some string',
+        xValues: ['Name 1']
       }]);
     });
 
@@ -172,6 +378,7 @@ describe('ResultSet', () => {
         x: 'Name 1',
         category: 'Name 1',
         'Foo.count': null,
+        xValues: ['Name 1']
       }]);
     });
 
@@ -214,6 +421,7 @@ describe('ResultSet', () => {
         x: 'Name 1',
         category: 'Name 1',
         'Foo.count': undefined,
+        xValues: ['Name 1']
       }]);
     });
 
@@ -256,6 +464,7 @@ describe('ResultSet', () => {
         x: 'Name 1',
         category: 'Name 1',
         'Foo.count': 10,
+        xValues: ['Name 1']
       }]);
     });
 
@@ -298,6 +507,7 @@ describe('ResultSet', () => {
         x: 'Name 1',
         category: 'Name 1',
         'Foo.latestRun': new Date('2020-03-11T18:06:09.403Z'),
+        xValues: ['Name 1']
       }]);
     });
   });
@@ -341,15 +551,15 @@ describe('ResultSet', () => {
 
     test('double time dimensions without granularity', () => {
       const resultSet = new ResultSet({
-        "query": {
-          "measures": [],
-          "timeDimensions": [{
-            "dimension": "Orders.createdAt",
-            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+        'query': {
+          'measures': [],
+          'timeDimensions': [{
+            'dimension': 'Orders.createdAt',
+            'dateRange': ['2020-01-08T00:00:00.000', '2020-01-14T23:59:59.999']
           }],
-          "dimensions": ["Orders.createdAt"],
-          "filters": [],
-          "timezone": "UTC"
+          'dimensions': ['Orders.createdAt'],
+          'filters': [],
+          'timezone': 'UTC'
         },
       });
 
@@ -362,15 +572,15 @@ describe('ResultSet', () => {
 
     test('single time dimensions with granularity', () => {
       const resultSet = new ResultSet({
-        "query": {
-          "measures": [],
-          "timeDimensions": [{
-            "dimension": "Orders.createdAt",
-            "granularity": "day",
-            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-09T23:59:59.999"]
+        'query': {
+          'measures': [],
+          'timeDimensions': [{
+            'dimension': 'Orders.createdAt',
+            'granularity': 'day',
+            'dateRange': ['2020-01-08T00:00:00.000', '2020-01-09T23:59:59.999']
           }],
-          "filters": [],
-          "timezone": "UTC"
+          'filters': [],
+          'timezone': 'UTC'
         }
       });
 
@@ -383,21 +593,21 @@ describe('ResultSet', () => {
 
     test('double time dimensions with granularity', () => {
       const resultSet = new ResultSet({
-        "query": {
-          "measures": [],
-          "timeDimensions": [{
-            "dimension": "Orders.createdAt",
-            "granularity": "day",
-            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+        'query': {
+          'measures': [],
+          'timeDimensions': [{
+            'dimension': 'Orders.createdAt',
+            'granularity': 'day',
+            'dateRange': ['2020-01-08T00:00:00.000', '2020-01-14T23:59:59.999']
           }],
-          "dimensions": ["Orders.createdAt"],
-          "filters": [],
-          "timezone": "UTC"
+          'dimensions': ['Orders.createdAt'],
+          'filters': [],
+          'timezone': 'UTC'
         },
       });
 
       expect(resultSet.normalizePivotConfig(resultSet.normalizePivotConfig({}))).toEqual({
-        x: ['Orders.createdAt.day', "Orders.createdAt"],
+        x: ['Orders.createdAt.day', 'Orders.createdAt'],
         y: [],
         fillMissingDates: true
       });
@@ -407,147 +617,147 @@ describe('ResultSet', () => {
   describe('pivot', () => {
     test('same dimension and time dimension', () => {
       const resultSet = new ResultSet({
-        "query": {
-          "measures": [],
-          "timeDimensions": [{
-            "dimension": "Orders.createdAt",
-            "granularity": "day",
-            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+        'query': {
+          'measures': [],
+          'timeDimensions': [{
+            'dimension': 'Orders.createdAt',
+            'granularity': 'day',
+            'dateRange': ['2020-01-08T00:00:00.000', '2020-01-14T23:59:59.999']
           }],
-          "dimensions": ["Orders.createdAt"],
-          "filters": [],
-          "timezone": "UTC"
+          'dimensions': ['Orders.createdAt'],
+          'filters': [],
+          'timezone': 'UTC'
         },
-        "data": [{
-          "Orders.createdAt": "2020-01-08T17:04:43.000",
-          "Orders.createdAt.day": "2020-01-08T00:00:00.000"
+        'data': [{
+          'Orders.createdAt': '2020-01-08T17:04:43.000',
+          'Orders.createdAt.day': '2020-01-08T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-08T19:28:26.000",
-          "Orders.createdAt.day": "2020-01-08T00:00:00.000"
+          'Orders.createdAt': '2020-01-08T19:28:26.000',
+          'Orders.createdAt.day': '2020-01-08T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T00:13:01.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T00:13:01.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T00:25:32.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T00:25:32.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T00:43:11.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T00:43:11.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T03:04:00.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T03:04:00.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T04:30:10.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T04:30:10.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T10:25:04.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T10:25:04.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T19:47:19.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T19:47:19.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T19:48:04.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T19:48:04.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T21:46:24.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T21:46:24.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T23:49:37.000",
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T23:49:37.000',
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-10T09:07:20.000",
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000"
+          'Orders.createdAt': '2020-01-10T09:07:20.000',
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-10T13:50:05.000",
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000"
+          'Orders.createdAt': '2020-01-10T13:50:05.000',
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-10T15:30:32.000",
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000"
+          'Orders.createdAt': '2020-01-10T15:30:32.000',
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-10T15:32:52.000",
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000"
+          'Orders.createdAt': '2020-01-10T15:32:52.000',
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-10T18:55:23.000",
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000"
+          'Orders.createdAt': '2020-01-10T18:55:23.000',
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-11T01:13:17.000",
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000"
+          'Orders.createdAt': '2020-01-11T01:13:17.000',
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-11T09:17:40.000",
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000"
+          'Orders.createdAt': '2020-01-11T09:17:40.000',
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-11T13:23:03.000",
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000"
+          'Orders.createdAt': '2020-01-11T13:23:03.000',
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-11T17:28:42.000",
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000"
+          'Orders.createdAt': '2020-01-11T17:28:42.000',
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-11T22:34:32.000",
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000"
+          'Orders.createdAt': '2020-01-11T22:34:32.000',
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-11T23:03:58.000",
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000"
+          'Orders.createdAt': '2020-01-11T23:03:58.000',
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-12T03:46:25.000",
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000"
+          'Orders.createdAt': '2020-01-12T03:46:25.000',
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-12T09:57:10.000",
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000"
+          'Orders.createdAt': '2020-01-12T09:57:10.000',
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-12T12:28:22.000",
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000"
+          'Orders.createdAt': '2020-01-12T12:28:22.000',
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-12T14:34:20.000",
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000"
+          'Orders.createdAt': '2020-01-12T14:34:20.000',
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-12T18:45:15.000",
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000"
+          'Orders.createdAt': '2020-01-12T18:45:15.000',
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-12T19:38:05.000",
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000"
+          'Orders.createdAt': '2020-01-12T19:38:05.000',
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-12T21:43:51.000",
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000"
+          'Orders.createdAt': '2020-01-12T21:43:51.000',
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-13T01:42:49.000",
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000"
+          'Orders.createdAt': '2020-01-13T01:42:49.000',
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-13T03:19:22.000",
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000"
+          'Orders.createdAt': '2020-01-13T03:19:22.000',
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-13T05:20:50.000",
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000"
+          'Orders.createdAt': '2020-01-13T05:20:50.000',
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-13T05:46:35.000",
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000"
+          'Orders.createdAt': '2020-01-13T05:46:35.000',
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-13T11:24:01.000",
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000"
+          'Orders.createdAt': '2020-01-13T11:24:01.000',
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-13T12:13:42.000",
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000"
+          'Orders.createdAt': '2020-01-13T12:13:42.000',
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-13T20:21:59.000",
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000"
+          'Orders.createdAt': '2020-01-13T20:21:59.000',
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-14T20:16:23.000",
-          "Orders.createdAt.day": "2020-01-14T00:00:00.000"
+          'Orders.createdAt': '2020-01-14T20:16:23.000',
+          'Orders.createdAt.day': '2020-01-14T00:00:00.000'
         }],
-        "annotation": {
-          "measures": {},
-          "dimensions": {
-            "Orders.createdAt": {
-              "title": "Orders Created at",
-              "shortTitle": "Created at",
-              "type": "time"
+        'annotation': {
+          'measures': {},
+          'dimensions': {
+            'Orders.createdAt': {
+              'title': 'Orders Created at',
+              'shortTitle': 'Created at',
+              'type': 'time'
             }
           },
-          "segments": {},
-          "timeDimensions": {
-            "Orders.createdAt.day": {
-              "title": "Orders Created at",
-              "shortTitle": "Created at",
-              "type": "time"
+          'segments': {},
+          'timeDimensions': {
+            'Orders.createdAt.day': {
+              'title': 'Orders Created at',
+              'shortTitle': 'Created at',
+              'type': 'time'
             }
           }
         }
@@ -555,185 +765,185 @@ describe('ResultSet', () => {
 
       expect(resultSet.tablePivot()).toEqual([
         {
-          "Orders.createdAt.day": "2020-01-08T00:00:00.000",
-          "Orders.createdAt": "2020-01-08T17:04:43.000"
+          'Orders.createdAt.day': '2020-01-08T00:00:00.000',
+          'Orders.createdAt': '2020-01-08T17:04:43.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-08T00:00:00.000",
-          "Orders.createdAt": "2020-01-08T19:28:26.000"
+          'Orders.createdAt.day': '2020-01-08T00:00:00.000',
+          'Orders.createdAt': '2020-01-08T19:28:26.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T00:13:01.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T00:13:01.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T00:25:32.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T00:25:32.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T00:43:11.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T00:43:11.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T03:04:00.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T03:04:00.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T04:30:10.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T04:30:10.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T10:25:04.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T10:25:04.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T19:47:19.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T19:47:19.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T19:48:04.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T19:48:04.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T21:46:24.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T21:46:24.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
-          "Orders.createdAt": "2020-01-09T23:49:37.000"
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.createdAt': '2020-01-09T23:49:37.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000",
-          "Orders.createdAt": "2020-01-10T09:07:20.000"
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+          'Orders.createdAt': '2020-01-10T09:07:20.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000",
-          "Orders.createdAt": "2020-01-10T13:50:05.000"
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+          'Orders.createdAt': '2020-01-10T13:50:05.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000",
-          "Orders.createdAt": "2020-01-10T15:30:32.000"
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+          'Orders.createdAt': '2020-01-10T15:30:32.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000",
-          "Orders.createdAt": "2020-01-10T15:32:52.000"
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+          'Orders.createdAt': '2020-01-10T15:32:52.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-10T00:00:00.000",
-          "Orders.createdAt": "2020-01-10T18:55:23.000"
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+          'Orders.createdAt': '2020-01-10T18:55:23.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000",
-          "Orders.createdAt": "2020-01-11T01:13:17.000"
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.createdAt': '2020-01-11T01:13:17.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000",
-          "Orders.createdAt": "2020-01-11T09:17:40.000"
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.createdAt': '2020-01-11T09:17:40.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000",
-          "Orders.createdAt": "2020-01-11T13:23:03.000"
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.createdAt': '2020-01-11T13:23:03.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000",
-          "Orders.createdAt": "2020-01-11T17:28:42.000"
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.createdAt': '2020-01-11T17:28:42.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000",
-          "Orders.createdAt": "2020-01-11T22:34:32.000"
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.createdAt': '2020-01-11T22:34:32.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-11T00:00:00.000",
-          "Orders.createdAt": "2020-01-11T23:03:58.000"
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.createdAt': '2020-01-11T23:03:58.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000",
-          "Orders.createdAt": "2020-01-12T03:46:25.000"
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000',
+          'Orders.createdAt': '2020-01-12T03:46:25.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000",
-          "Orders.createdAt": "2020-01-12T09:57:10.000"
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000',
+          'Orders.createdAt': '2020-01-12T09:57:10.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000",
-          "Orders.createdAt": "2020-01-12T12:28:22.000"
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000',
+          'Orders.createdAt': '2020-01-12T12:28:22.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000",
-          "Orders.createdAt": "2020-01-12T14:34:20.000"
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000',
+          'Orders.createdAt': '2020-01-12T14:34:20.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000",
-          "Orders.createdAt": "2020-01-12T18:45:15.000"
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000',
+          'Orders.createdAt': '2020-01-12T18:45:15.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000",
-          "Orders.createdAt": "2020-01-12T19:38:05.000"
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000',
+          'Orders.createdAt': '2020-01-12T19:38:05.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-12T00:00:00.000",
-          "Orders.createdAt": "2020-01-12T21:43:51.000"
+          'Orders.createdAt.day': '2020-01-12T00:00:00.000',
+          'Orders.createdAt': '2020-01-12T21:43:51.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000",
-          "Orders.createdAt": "2020-01-13T01:42:49.000"
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000',
+          'Orders.createdAt': '2020-01-13T01:42:49.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000",
-          "Orders.createdAt": "2020-01-13T03:19:22.000"
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000',
+          'Orders.createdAt': '2020-01-13T03:19:22.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000",
-          "Orders.createdAt": "2020-01-13T05:20:50.000"
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000',
+          'Orders.createdAt': '2020-01-13T05:20:50.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000",
-          "Orders.createdAt": "2020-01-13T05:46:35.000"
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000',
+          'Orders.createdAt': '2020-01-13T05:46:35.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000",
-          "Orders.createdAt": "2020-01-13T11:24:01.000"
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000',
+          'Orders.createdAt': '2020-01-13T11:24:01.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000",
-          "Orders.createdAt": "2020-01-13T12:13:42.000"
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000',
+          'Orders.createdAt': '2020-01-13T12:13:42.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-13T00:00:00.000",
-          "Orders.createdAt": "2020-01-13T20:21:59.000"
+          'Orders.createdAt.day': '2020-01-13T00:00:00.000',
+          'Orders.createdAt': '2020-01-13T20:21:59.000'
         },
         {
-          "Orders.createdAt.day": "2020-01-14T00:00:00.000",
-          "Orders.createdAt": "2020-01-14T20:16:23.000"
+          'Orders.createdAt.day': '2020-01-14T00:00:00.000',
+          'Orders.createdAt': '2020-01-14T20:16:23.000'
         }]);
     });
 
     test('time dimension backward compatibility', () => {
       const resultSet = new ResultSet({
-        "query": {
-          "measures": [],
-          "timeDimensions": [{
-            "dimension": "Orders.createdAt",
-            "granularity": "day",
-            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-09T23:59:59.999"]
+        'query': {
+          'measures': [],
+          'timeDimensions': [{
+            'dimension': 'Orders.createdAt',
+            'granularity': 'day',
+            'dateRange': ['2020-01-08T00:00:00.000', '2020-01-09T23:59:59.999']
           }],
-          "filters": [],
-          "timezone": "UTC"
+          'filters': [],
+          'timezone': 'UTC'
         },
-        "data": [{
-          "Orders.createdAt": "2020-01-08T00:00:00.000"
+        'data': [{
+          'Orders.createdAt': '2020-01-08T00:00:00.000'
         }, {
-          "Orders.createdAt": "2020-01-09T00:00:00.000"
+          'Orders.createdAt': '2020-01-09T00:00:00.000'
         }],
-        "annotation": {
-          "measures": {},
-          "dimensions": {},
-          "segments": {},
-          "timeDimensions": {
-            "Orders.createdAt": {
-              "title": "Orders Created at",
-              "shortTitle": "Created at",
-              "type": "time"
+        'annotation': {
+          'measures': {},
+          'dimensions': {},
+          'segments': {},
+          'timeDimensions': {
+            'Orders.createdAt': {
+              'title': 'Orders Created at',
+              'shortTitle': 'Created at',
+              'type': 'time'
             }
           }
         }
@@ -741,71 +951,71 @@ describe('ResultSet', () => {
 
       expect(resultSet.tablePivot()).toEqual([
         {
-          "Orders.createdAt.day": "2020-01-08T00:00:00.000",
+          'Orders.createdAt.day': '2020-01-08T00:00:00.000',
         },
         {
-          "Orders.createdAt.day": "2020-01-09T00:00:00.000",
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
         }
       ]);
     });
 
     test('same dimension and time dimension without granularity', () => {
       const resultSet = new ResultSet({
-        "query": {
-          "measures": [],
-          "timeDimensions": [{
-            "dimension": "Orders.createdAt",
-            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+        'query': {
+          'measures': [],
+          'timeDimensions': [{
+            'dimension': 'Orders.createdAt',
+            'dateRange': ['2020-01-08T00:00:00.000', '2020-01-14T23:59:59.999']
           }],
-          "dimensions": ["Orders.createdAt"],
-          "filters": [],
-          "timezone": "UTC"
+          'dimensions': ['Orders.createdAt'],
+          'filters': [],
+          'timezone': 'UTC'
         },
-        "data": [
-          { "Orders.createdAt": "2020-01-08T17:04:43.000" },
-          { "Orders.createdAt": "2020-01-08T19:28:26.000" },
-          { "Orders.createdAt": "2020-01-09T00:13:01.000" },
-          { "Orders.createdAt": "2020-01-09T00:25:32.000" },
-          { "Orders.createdAt": "2020-01-09T00:43:11.000" },
-          { "Orders.createdAt": "2020-01-09T03:04:00.000" },
-          { "Orders.createdAt": "2020-01-09T04:30:10.000" },
-          { "Orders.createdAt": "2020-01-09T10:25:04.000" },
-          { "Orders.createdAt": "2020-01-09T19:47:19.000" },
-          { "Orders.createdAt": "2020-01-09T19:48:04.000" },
-          { "Orders.createdAt": "2020-01-09T21:46:24.000" },
-          { "Orders.createdAt": "2020-01-09T23:49:37.000" },
-          { "Orders.createdAt": "2020-01-10T09:07:20.000" },
-          { "Orders.createdAt": "2020-01-10T13:50:05.000" }
+        'data': [
+          { 'Orders.createdAt': '2020-01-08T17:04:43.000' },
+          { 'Orders.createdAt': '2020-01-08T19:28:26.000' },
+          { 'Orders.createdAt': '2020-01-09T00:13:01.000' },
+          { 'Orders.createdAt': '2020-01-09T00:25:32.000' },
+          { 'Orders.createdAt': '2020-01-09T00:43:11.000' },
+          { 'Orders.createdAt': '2020-01-09T03:04:00.000' },
+          { 'Orders.createdAt': '2020-01-09T04:30:10.000' },
+          { 'Orders.createdAt': '2020-01-09T10:25:04.000' },
+          { 'Orders.createdAt': '2020-01-09T19:47:19.000' },
+          { 'Orders.createdAt': '2020-01-09T19:48:04.000' },
+          { 'Orders.createdAt': '2020-01-09T21:46:24.000' },
+          { 'Orders.createdAt': '2020-01-09T23:49:37.000' },
+          { 'Orders.createdAt': '2020-01-10T09:07:20.000' },
+          { 'Orders.createdAt': '2020-01-10T13:50:05.000' }
         ],
-        "annotation": {
-          "measures": {},
-          "dimensions": {
-            "Orders.createdAt": {
-              "title": "Orders Created at",
-              "shortTitle": "Created at",
-              "type": "time"
+        'annotation': {
+          'measures': {},
+          'dimensions': {
+            'Orders.createdAt': {
+              'title': 'Orders Created at',
+              'shortTitle': 'Created at',
+              'type': 'time'
             }
           },
-          "segments": {},
-          "timeDimensions": {}
+          'segments': {},
+          'timeDimensions': {}
         }
       });
 
       expect(resultSet.tablePivot()).toEqual([
-        { "Orders.createdAt": "2020-01-08T17:04:43.000" },
-        { "Orders.createdAt": "2020-01-08T19:28:26.000" },
-        { "Orders.createdAt": "2020-01-09T00:13:01.000" },
-        { "Orders.createdAt": "2020-01-09T00:25:32.000" },
-        { "Orders.createdAt": "2020-01-09T00:43:11.000" },
-        { "Orders.createdAt": "2020-01-09T03:04:00.000" },
-        { "Orders.createdAt": "2020-01-09T04:30:10.000" },
-        { "Orders.createdAt": "2020-01-09T10:25:04.000" },
-        { "Orders.createdAt": "2020-01-09T19:47:19.000" },
-        { "Orders.createdAt": "2020-01-09T19:48:04.000" },
-        { "Orders.createdAt": "2020-01-09T21:46:24.000" },
-        { "Orders.createdAt": "2020-01-09T23:49:37.000" },
-        { "Orders.createdAt": "2020-01-10T09:07:20.000" },
-        { "Orders.createdAt": "2020-01-10T13:50:05.000" }
+        { 'Orders.createdAt': '2020-01-08T17:04:43.000' },
+        { 'Orders.createdAt': '2020-01-08T19:28:26.000' },
+        { 'Orders.createdAt': '2020-01-09T00:13:01.000' },
+        { 'Orders.createdAt': '2020-01-09T00:25:32.000' },
+        { 'Orders.createdAt': '2020-01-09T00:43:11.000' },
+        { 'Orders.createdAt': '2020-01-09T03:04:00.000' },
+        { 'Orders.createdAt': '2020-01-09T04:30:10.000' },
+        { 'Orders.createdAt': '2020-01-09T10:25:04.000' },
+        { 'Orders.createdAt': '2020-01-09T19:47:19.000' },
+        { 'Orders.createdAt': '2020-01-09T19:48:04.000' },
+        { 'Orders.createdAt': '2020-01-09T21:46:24.000' },
+        { 'Orders.createdAt': '2020-01-09T23:49:37.000' },
+        { 'Orders.createdAt': '2020-01-10T09:07:20.000' },
+        { 'Orders.createdAt': '2020-01-10T13:50:05.000' }
       ]);
     });
   });
@@ -813,49 +1023,49 @@ describe('ResultSet', () => {
   describe('tableColumns', () => {
     test('returns array of column definitions for tablePivot', () => {
       const resultSet = new ResultSet({
-        "query": {
-          "measures": ["Orders.count", "Orders.totalAmount"],
-          "timeDimensions": [{
-            "dimension": "Orders.createdAt",
-            "granularity": "day",
-            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+        'query': {
+          'measures': ['Orders.count', 'Orders.totalAmount'],
+          'timeDimensions': [{
+            'dimension': 'Orders.createdAt',
+            'granularity': 'day',
+            'dateRange': ['2020-01-08T00:00:00.000', '2020-01-14T23:59:59.999']
           }],
-          "dimensions": ["Orders.createdAt"],
-          "filters": [],
-          "timezone": "UTC"
+          'dimensions': ['Orders.createdAt'],
+          'filters': [],
+          'timezone': 'UTC'
         },
-        "data": [],
-        "annotation": {
-          "measures": {
-            "Orders.count": {
-              "title": "Orders Count",
-              "shortTitle": "Count",
-              "type": "count",
-              "meta": {
-                "isVisible": false
+        'data': [],
+        'annotation': {
+          'measures': {
+            'Orders.count': {
+              'title': 'Orders Count',
+              'shortTitle': 'Count',
+              'type': 'count',
+              'meta': {
+                'isVisible': false
               }
             },
-            "Orders.totalAmount": {
-              "title": "Orders Total Amount",
-              "shortTitle": "Total Amount",
-              "type": "number",
-              "format": "currency"
+            'Orders.totalAmount': {
+              'title': 'Orders Total Amount',
+              'shortTitle': 'Total Amount',
+              'type': 'number',
+              'format': 'currency'
             }
           },
-          "dimensions": {
-            "Orders.createdAt": {
-              "title": "Orders Created at",
-              "shortTitle": "Created at",
-              "type": "time",
-              "meta": 123
+          'dimensions': {
+            'Orders.createdAt': {
+              'title': 'Orders Created at',
+              'shortTitle': 'Created at',
+              'type': 'time',
+              'meta': 123
             }
           },
-          "segments": {},
-          "timeDimensions": {
-            "Orders.createdAt.day": {
-              "title": "Orders Created at",
-              "shortTitle": "Created at",
-              "type": "time"
+          'segments': {},
+          'timeDimensions': {
+            'Orders.createdAt.day': {
+              'title': 'Orders Created at',
+              'shortTitle': 'Created at',
+              'type': 'time'
             }
           }
         }
@@ -863,36 +1073,36 @@ describe('ResultSet', () => {
 
       expect(resultSet.tableColumns()).toEqual([
         {
-          "format": undefined,
-          "key": "Orders.createdAt.day",
-          "shortTitle": "Created at",
-          "title": "Orders Created at",
-          "type": "time",
+          'format': undefined,
+          'key': 'Orders.createdAt.day',
+          'shortTitle': 'Created at',
+          'title': 'Orders Created at',
+          'type': 'time',
         },
         {
-          "format": undefined,
-          "key": "Orders.createdAt",
-          "shortTitle": "Created at",
-          "title": "Orders Created at",
-          "type": "time",
-          "meta": 123
+          'format': undefined,
+          'key': 'Orders.createdAt',
+          'shortTitle': 'Created at',
+          'title': 'Orders Created at',
+          'type': 'time',
+          'meta': 123
         },
         {
-          "format": undefined,
-          "key": "Orders.count",
-          "shortTitle": "Count",
-          "title": "Orders Count",
-          "type": "count",
-          "meta": {
-            "isVisible": false
+          'format': undefined,
+          'key': 'Orders.count',
+          'shortTitle': 'Count',
+          'title': 'Orders Count',
+          'type': 'count',
+          'meta': {
+            'isVisible': false
           }
         },
         {
-          "format": "currency",
-          "key": "Orders.totalAmount",
-          "shortTitle": "Total Amount",
-          "title": "Orders Total Amount",
-          "type": "number",
+          'format': 'currency',
+          'key': 'Orders.totalAmount',
+          'shortTitle': 'Total Amount',
+          'title': 'Orders Total Amount',
+          'type': 'number',
         }
       ]);
     });
