@@ -2702,24 +2702,8 @@
 	  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
 	}
 
-	function _toConsumableArray(arr) {
-	  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
-	}
-
-	function _arrayWithoutHoles(arr) {
-	  if (Array.isArray(arr)) {
-	    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
-
-	    return arr2;
-	  }
-	}
-
 	function _arrayWithHoles(arr) {
 	  if (Array.isArray(arr)) return arr;
-	}
-
-	function _iterableToArray(iter) {
-	  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
 	}
 
 	function _iterableToArrayLimit(arr, i) {
@@ -2746,10 +2730,6 @@
 	  }
 
 	  return _arr;
-	}
-
-	function _nonIterableSpread() {
-	  throw new TypeError("Invalid attempt to spread non-iterable instance");
 	}
 
 	function _nonIterableRest() {
@@ -5328,44 +5308,6 @@
 	  exec: regexpExec
 	});
 
-	var MATCH = wellKnownSymbol('match');
-
-	// `IsRegExp` abstract operation
-	// https://tc39.github.io/ecma262/#sec-isregexp
-	var isRegexp = function (it) {
-	  var isRegExp;
-	  return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : classofRaw(it) == 'RegExp');
-	};
-
-	var notARegexp = function (it) {
-	  if (isRegexp(it)) {
-	    throw TypeError("The method doesn't accept regular expressions");
-	  } return it;
-	};
-
-	var MATCH$1 = wellKnownSymbol('match');
-
-	var correctIsRegexpLogic = function (METHOD_NAME) {
-	  var regexp = /./;
-	  try {
-	    '/./'[METHOD_NAME](regexp);
-	  } catch (e) {
-	    try {
-	      regexp[MATCH$1] = false;
-	      return '/./'[METHOD_NAME](regexp);
-	    } catch (f) { /* empty */ }
-	  } return false;
-	};
-
-	// `String.prototype.includes` method
-	// https://tc39.github.io/ecma262/#sec-string.prototype.includes
-	_export({ target: 'String', proto: true, forced: !correctIsRegexpLogic('includes') }, {
-	  includes: function includes(searchString /* , position = 0 */) {
-	    return !!~String(requireObjectCoercible(this))
-	      .indexOf(notARegexp(searchString), arguments.length > 1 ? arguments[1] : undefined);
-	  }
-	});
-
 	// TODO: Remove from `core-js@4` since it's moved to entry points
 
 
@@ -5554,6 +5496,138 @@
 	    }
 	  ];
 	});
+
+	var MATCH = wellKnownSymbol('match');
+
+	// `IsRegExp` abstract operation
+	// https://tc39.github.io/ecma262/#sec-isregexp
+	var isRegexp = function (it) {
+	  var isRegExp;
+	  return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : classofRaw(it) == 'RegExp');
+	};
+
+	var arrayPush = [].push;
+	var min$4 = Math.min;
+	var MAX_UINT32 = 0xFFFFFFFF;
+
+	// babel-minify transpiles RegExp('x', 'y') -> /x/y and it causes SyntaxError
+	var SUPPORTS_Y = !fails(function () { return !RegExp(MAX_UINT32, 'y'); });
+
+	// @@split logic
+	fixRegexpWellKnownSymbolLogic('split', 2, function (SPLIT, nativeSplit, maybeCallNative) {
+	  var internalSplit;
+	  if (
+	    'abbc'.split(/(b)*/)[1] == 'c' ||
+	    'test'.split(/(?:)/, -1).length != 4 ||
+	    'ab'.split(/(?:ab)*/).length != 2 ||
+	    '.'.split(/(.?)(.?)/).length != 4 ||
+	    '.'.split(/()()/).length > 1 ||
+	    ''.split(/.?/).length
+	  ) {
+	    // based on es5-shim implementation, need to rework it
+	    internalSplit = function (separator, limit) {
+	      var string = String(requireObjectCoercible(this));
+	      var lim = limit === undefined ? MAX_UINT32 : limit >>> 0;
+	      if (lim === 0) return [];
+	      if (separator === undefined) return [string];
+	      // If `separator` is not a regex, use native split
+	      if (!isRegexp(separator)) {
+	        return nativeSplit.call(string, separator, lim);
+	      }
+	      var output = [];
+	      var flags = (separator.ignoreCase ? 'i' : '') +
+	                  (separator.multiline ? 'm' : '') +
+	                  (separator.unicode ? 'u' : '') +
+	                  (separator.sticky ? 'y' : '');
+	      var lastLastIndex = 0;
+	      // Make `global` and avoid `lastIndex` issues by working with a copy
+	      var separatorCopy = new RegExp(separator.source, flags + 'g');
+	      var match, lastIndex, lastLength;
+	      while (match = regexpExec.call(separatorCopy, string)) {
+	        lastIndex = separatorCopy.lastIndex;
+	        if (lastIndex > lastLastIndex) {
+	          output.push(string.slice(lastLastIndex, match.index));
+	          if (match.length > 1 && match.index < string.length) arrayPush.apply(output, match.slice(1));
+	          lastLength = match[0].length;
+	          lastLastIndex = lastIndex;
+	          if (output.length >= lim) break;
+	        }
+	        if (separatorCopy.lastIndex === match.index) separatorCopy.lastIndex++; // Avoid an infinite loop
+	      }
+	      if (lastLastIndex === string.length) {
+	        if (lastLength || !separatorCopy.test('')) output.push('');
+	      } else output.push(string.slice(lastLastIndex));
+	      return output.length > lim ? output.slice(0, lim) : output;
+	    };
+	  // Chakra, V8
+	  } else if ('0'.split(undefined, 0).length) {
+	    internalSplit = function (separator, limit) {
+	      return separator === undefined && limit === 0 ? [] : nativeSplit.call(this, separator, limit);
+	    };
+	  } else internalSplit = nativeSplit;
+
+	  return [
+	    // `String.prototype.split` method
+	    // https://tc39.github.io/ecma262/#sec-string.prototype.split
+	    function split(separator, limit) {
+	      var O = requireObjectCoercible(this);
+	      var splitter = separator == undefined ? undefined : separator[SPLIT];
+	      return splitter !== undefined
+	        ? splitter.call(separator, O, limit)
+	        : internalSplit.call(String(O), separator, limit);
+	    },
+	    // `RegExp.prototype[@@split]` method
+	    // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@split
+	    //
+	    // NOTE: This cannot be properly polyfilled in engines that don't support
+	    // the 'y' flag.
+	    function (regexp, limit) {
+	      var res = maybeCallNative(internalSplit, regexp, this, limit, internalSplit !== nativeSplit);
+	      if (res.done) return res.value;
+
+	      var rx = anObject(regexp);
+	      var S = String(this);
+	      var C = speciesConstructor(rx, RegExp);
+
+	      var unicodeMatching = rx.unicode;
+	      var flags = (rx.ignoreCase ? 'i' : '') +
+	                  (rx.multiline ? 'm' : '') +
+	                  (rx.unicode ? 'u' : '') +
+	                  (SUPPORTS_Y ? 'y' : 'g');
+
+	      // ^(? + rx + ) is needed, in combination with some S slicing, to
+	      // simulate the 'y' flag.
+	      var splitter = new C(SUPPORTS_Y ? rx : '^(?:' + rx.source + ')', flags);
+	      var lim = limit === undefined ? MAX_UINT32 : limit >>> 0;
+	      if (lim === 0) return [];
+	      if (S.length === 0) return regexpExecAbstract(splitter, S) === null ? [S] : [];
+	      var p = 0;
+	      var q = 0;
+	      var A = [];
+	      while (q < S.length) {
+	        splitter.lastIndex = SUPPORTS_Y ? q : 0;
+	        var z = regexpExecAbstract(splitter, SUPPORTS_Y ? S : S.slice(q));
+	        var e;
+	        if (
+	          z === null ||
+	          (e = min$4(toLength(splitter.lastIndex + (SUPPORTS_Y ? 0 : q)), S.length)) === p
+	        ) {
+	          q = advanceStringIndex(S, q, unicodeMatching);
+	        } else {
+	          A.push(S.slice(p, q));
+	          if (A.length === lim) return A;
+	          for (var i = 1; i <= z.length - 1; i++) {
+	            A.push(z[i]);
+	            if (A.length === lim) return A;
+	          }
+	          q = p = e;
+	        }
+	      }
+	      A.push(S.slice(p));
+	      return A;
+	    }
+	  ];
+	}, !SUPPORTS_Y);
 
 	/**
 	 * A function that always returns `false`. Any passed in parameters are ignored.
@@ -6972,7 +7046,7 @@
 
 
 
-	var MATCH$2 = wellKnownSymbol('match');
+	var MATCH$1 = wellKnownSymbol('match');
 	var NativeRegExp = global_1.RegExp;
 	var RegExpPrototype$1 = NativeRegExp.prototype;
 	var re1 = /a/g;
@@ -6984,7 +7058,7 @@
 	var UNSUPPORTED_Y$2 = regexpStickyHelpers.UNSUPPORTED_Y;
 
 	var FORCED$7 = descriptors && isForced_1('RegExp', (!CORRECT_NEW || UNSUPPORTED_Y$2 || fails(function () {
-	  re2[MATCH$2] = false;
+	  re2[MATCH$1] = false;
 	  // RegExp constructor can alter flags and IsRegExp works correct with @@match
 	  return NativeRegExp(re1) != re1 || NativeRegExp(re2) == re2 || NativeRegExp(re1, 'i') != '/a/i';
 	})));
@@ -7313,129 +7387,6 @@
 
 	  return _arity(arguments[0].length, reduce(_pipe, arguments[0], tail(arguments)));
 	}
-
-	var arrayPush = [].push;
-	var min$4 = Math.min;
-	var MAX_UINT32 = 0xFFFFFFFF;
-
-	// babel-minify transpiles RegExp('x', 'y') -> /x/y and it causes SyntaxError
-	var SUPPORTS_Y = !fails(function () { return !RegExp(MAX_UINT32, 'y'); });
-
-	// @@split logic
-	fixRegexpWellKnownSymbolLogic('split', 2, function (SPLIT, nativeSplit, maybeCallNative) {
-	  var internalSplit;
-	  if (
-	    'abbc'.split(/(b)*/)[1] == 'c' ||
-	    'test'.split(/(?:)/, -1).length != 4 ||
-	    'ab'.split(/(?:ab)*/).length != 2 ||
-	    '.'.split(/(.?)(.?)/).length != 4 ||
-	    '.'.split(/()()/).length > 1 ||
-	    ''.split(/.?/).length
-	  ) {
-	    // based on es5-shim implementation, need to rework it
-	    internalSplit = function (separator, limit) {
-	      var string = String(requireObjectCoercible(this));
-	      var lim = limit === undefined ? MAX_UINT32 : limit >>> 0;
-	      if (lim === 0) return [];
-	      if (separator === undefined) return [string];
-	      // If `separator` is not a regex, use native split
-	      if (!isRegexp(separator)) {
-	        return nativeSplit.call(string, separator, lim);
-	      }
-	      var output = [];
-	      var flags = (separator.ignoreCase ? 'i' : '') +
-	                  (separator.multiline ? 'm' : '') +
-	                  (separator.unicode ? 'u' : '') +
-	                  (separator.sticky ? 'y' : '');
-	      var lastLastIndex = 0;
-	      // Make `global` and avoid `lastIndex` issues by working with a copy
-	      var separatorCopy = new RegExp(separator.source, flags + 'g');
-	      var match, lastIndex, lastLength;
-	      while (match = regexpExec.call(separatorCopy, string)) {
-	        lastIndex = separatorCopy.lastIndex;
-	        if (lastIndex > lastLastIndex) {
-	          output.push(string.slice(lastLastIndex, match.index));
-	          if (match.length > 1 && match.index < string.length) arrayPush.apply(output, match.slice(1));
-	          lastLength = match[0].length;
-	          lastLastIndex = lastIndex;
-	          if (output.length >= lim) break;
-	        }
-	        if (separatorCopy.lastIndex === match.index) separatorCopy.lastIndex++; // Avoid an infinite loop
-	      }
-	      if (lastLastIndex === string.length) {
-	        if (lastLength || !separatorCopy.test('')) output.push('');
-	      } else output.push(string.slice(lastLastIndex));
-	      return output.length > lim ? output.slice(0, lim) : output;
-	    };
-	  // Chakra, V8
-	  } else if ('0'.split(undefined, 0).length) {
-	    internalSplit = function (separator, limit) {
-	      return separator === undefined && limit === 0 ? [] : nativeSplit.call(this, separator, limit);
-	    };
-	  } else internalSplit = nativeSplit;
-
-	  return [
-	    // `String.prototype.split` method
-	    // https://tc39.github.io/ecma262/#sec-string.prototype.split
-	    function split(separator, limit) {
-	      var O = requireObjectCoercible(this);
-	      var splitter = separator == undefined ? undefined : separator[SPLIT];
-	      return splitter !== undefined
-	        ? splitter.call(separator, O, limit)
-	        : internalSplit.call(String(O), separator, limit);
-	    },
-	    // `RegExp.prototype[@@split]` method
-	    // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@split
-	    //
-	    // NOTE: This cannot be properly polyfilled in engines that don't support
-	    // the 'y' flag.
-	    function (regexp, limit) {
-	      var res = maybeCallNative(internalSplit, regexp, this, limit, internalSplit !== nativeSplit);
-	      if (res.done) return res.value;
-
-	      var rx = anObject(regexp);
-	      var S = String(this);
-	      var C = speciesConstructor(rx, RegExp);
-
-	      var unicodeMatching = rx.unicode;
-	      var flags = (rx.ignoreCase ? 'i' : '') +
-	                  (rx.multiline ? 'm' : '') +
-	                  (rx.unicode ? 'u' : '') +
-	                  (SUPPORTS_Y ? 'y' : 'g');
-
-	      // ^(? + rx + ) is needed, in combination with some S slicing, to
-	      // simulate the 'y' flag.
-	      var splitter = new C(SUPPORTS_Y ? rx : '^(?:' + rx.source + ')', flags);
-	      var lim = limit === undefined ? MAX_UINT32 : limit >>> 0;
-	      if (lim === 0) return [];
-	      if (S.length === 0) return regexpExecAbstract(splitter, S) === null ? [S] : [];
-	      var p = 0;
-	      var q = 0;
-	      var A = [];
-	      while (q < S.length) {
-	        splitter.lastIndex = SUPPORTS_Y ? q : 0;
-	        var z = regexpExecAbstract(splitter, SUPPORTS_Y ? S : S.slice(q));
-	        var e;
-	        if (
-	          z === null ||
-	          (e = min$4(toLength(splitter.lastIndex + (SUPPORTS_Y ? 0 : q)), S.length)) === p
-	        ) {
-	          q = advanceStringIndex(S, q, unicodeMatching);
-	        } else {
-	          A.push(S.slice(p, q));
-	          if (A.length === lim) return A;
-	          for (var i = 1; i <= z.length - 1; i++) {
-	            A.push(z[i]);
-	            if (A.length === lim) return A;
-	          }
-	          q = p = e;
-	        }
-	      }
-	      A.push(S.slice(p));
-	      return A;
-	    }
-	  ];
-	}, !SUPPORTS_Y);
 
 	/**
 	 * Returns a new list or string with the elements or characters in reverse
@@ -15839,9 +15790,9 @@
 	    this.parseDateMeasures = options.parseDateMeasures;
 	  }
 	  /**
-	   * Returns a drill down query
+	   * Returns a measure drill down query
 	   *
-	   * @param config
+	   * @param drillDownLocator
 	   * @param pivotConfig - See {@link ResultSet#pivot}.
 	   * @returns {Object|null}
 	   */
@@ -15849,82 +15800,81 @@
 
 	  _createClass(ResultSet, [{
 	    key: "drillDown",
-	    value: function drillDown(config, pivotConfig) {
-	      var _this = this;
-
-	      var xValues = config.xValues,
-	          yValues = config.yValues; // x: ["Sales.paid"]
-	      // y: ['Users.country', 'measures']
-
+	    value: function drillDown(drillDownLocator, pivotConfig) {
+	      var _drillDownLocator$xVa = drillDownLocator.xValues,
+	          xValues = _drillDownLocator$xVa === void 0 ? [] : _drillDownLocator$xVa,
+	          _drillDownLocator$yVa = drillDownLocator.yValues,
+	          yValues = _drillDownLocator$yVa === void 0 ? [] : _drillDownLocator$yVa;
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-	      console.log('__', {
-	        xValues: xValues,
-	        yValues: yValues
-	      }); // const pivotRow = this.pivot(normalizedPivotConfig)[x] || null;
-	      //
-	      // if (pivotRow == null) {
-	      //   throw new Error(`Cannot drill to index ${x}.${y}`);
-	      // }
-
-	      var _this$query = this.query(),
-	          dimensions = _this$query.dimensions;
-
+	      var values$$1 = [];
+	      normalizedPivotConfig.x.forEach(function (member, currentIndex) {
+	        return values$$1.push([member, xValues[currentIndex]]);
+	      });
+	      normalizedPivotConfig.y.forEach(function (member, currentIndex) {
+	        return values$$1.push([member, yValues[currentIndex]]);
+	      });
 	      var measures = this.loadResponse.annotation.measures;
 
-	      var _Object$keys = Object.keys(measures),
-	          _Object$keys2 = _slicedToArray(_Object$keys, 1),
-	          measureName = _Object$keys2[0];
+	      var _ref = values$$1.find(function (_ref3) {
+	        var _ref4 = _slicedToArray(_ref3, 1),
+	            member = _ref4[0];
 
-	      if (measures[measureName].drillMembers == null) {
+	        return member === 'measues';
+	      }) || [],
+	          _ref2 = _slicedToArray(_ref, 2),
+	          measureName = _ref2[1];
+
+	      if (measureName === undefined) {
+	        var _Object$keys = Object.keys(measures);
+
+	        var _Object$keys2 = _slicedToArray(_Object$keys, 1);
+
+	        measureName = _Object$keys2[0];
+	      }
+
+	      if (!(measures[measureName] && measures[measureName].drillMembers || []).length) {
 	        return null;
 	      }
 
-	      var yDimensionFilters = normalizedPivotConfig.y.map(function (member, currentIndex) {
-	        if (dimensions.includes(member)) ;
-
-	        return false;
-	      }).filter(Boolean);
-	      var filters = [];
+	      var filters = [{
+	        dimension: measureName,
+	        operator: 'measureFilter'
+	      }];
 	      var timeDimensions = [];
-	      xValues.forEach(function (xValue, xValueIndex) {
-	        var member = normalizedPivotConfig.x[xValueIndex];
-	        var isTimeDimension = Boolean((_this.query().timeDimensions || []).find(function (td) {
-	          return ResultSet.timeDimensionMember(td) === member;
-	        }));
+	      values$$1.filter(function (_ref5) {
+	        var _ref6 = _slicedToArray(_ref5, 1),
+	            member = _ref6[0];
 
-	        if (isTimeDimension) {
-	          var _member$match = member.match(/(.*)\.(.*)/),
-	              _member$match2 = _slicedToArray(_member$match, 3),
-	              dimension = _member$match2[1],
-	              granularity = _member$match2[2];
+	        return member !== 'measures';
+	      }).forEach(function (_ref7) {
+	        var _ref8 = _slicedToArray(_ref7, 2),
+	            member = _ref8[0],
+	            value = _ref8[1];
 
+	        var _member$split = member.split('.'),
+	            _member$split2 = _slicedToArray(_member$split, 3),
+	            cubeName = _member$split2[0],
+	            dimension = _member$split2[1],
+	            granularity = _member$split2[2];
+
+	        if (granularity !== undefined) {
+	          var range$$1 = moment$1.range(value, value).snapTo(granularity);
 	          timeDimensions.push({
-	            dimension: dimension,
-	            dateRange: [xValue, moment$1(xValue).add(1, granularity).format('YYYY-MM-DDT00:00:00.000')]
+	            dimension: [cubeName, dimension].join('.'),
+	            dateRange: [range$$1.start, range$$1.end].map(function (dt) {
+	              return dt.format(moment$1.HTML5_FMT.DATETIME_LOCAL_MS);
+	            })
 	          });
 	        } else {
 	          filters.push({
 	            member: member,
 	            operator: 'equals',
-	            values: [xValue.toString()]
+	            values: [value.toString()]
 	          });
 	        }
-	      }); // const filters = [
-	      //   ...xValues.map((xValue, xValueIndex) => ({
-	      //     member: normalizedPivotConfig.x[xValueIndex],
-	      //     operator: 'equals',
-	      //     values: [xValue.toString()],
-	      //   })),
-	      //   ...yDimensionFilters
-	      // ];
-
-	      return _objectSpread({}, measures[measureName].drillMembers, {
-	        filters: [].concat(filters, _toConsumableArray(yDimensionFilters), _toConsumableArray((this.query().filters || []).map(function (_ref) {
-	          var dimension = _ref.dimension,
-	              otherKeys = _objectWithoutProperties(_ref, ["dimension"]);
-
-	          return otherKeys;
-	        }))),
+	      });
+	      return _objectSpread({}, measures[measureName].drillMembersGrouped, {
+	        filters: filters,
 	        timeDimensions: timeDimensions
 	      });
 	    }
@@ -15963,18 +15913,18 @@
 	  }, {
 	    key: "series",
 	    value: function series(pivotConfig) {
-	      var _this2 = this;
+	      var _this = this;
 
-	      return this.seriesNames(pivotConfig).map(function (_ref2) {
-	        var title = _ref2.title,
-	            key = _ref2.key;
+	      return this.seriesNames(pivotConfig).map(function (_ref9) {
+	        var title = _ref9.title,
+	            key = _ref9.key;
 	        return {
 	          title: title,
 	          key: key,
-	          series: _this2.chartPivot(pivotConfig).map(function (_ref3) {
-	            var category = _ref3.category,
-	                x = _ref3.x,
-	                obj = _objectWithoutProperties(_ref3, ["category", "x"]);
+	          series: _this.chartPivot(pivotConfig).map(function (_ref10) {
+	            var category = _ref10.category,
+	                x = _ref10.x,
+	                obj = _objectWithoutProperties(_ref10, ["category", "x"]);
 
 	            return {
 	              value: obj[key],
@@ -16111,16 +16061,20 @@
 
 	      var padToDay = timeDimension.dateRange ? timeDimension.dateRange.find(function (d) {
 	        return d.match(DateRegex);
-	      }) : ['hour', 'minute', 'second'].indexOf(timeDimension.granularity) === -1;
-	      var start = moment$1(dateRange[0]).format(padToDay ? 'YYYY-MM-DDT00:00:00.000' : moment$1.HTML5_FMT.DATETIME_LOCAL_MS);
-	      var end = moment$1(dateRange[1]).format(padToDay ? 'YYYY-MM-DDT23:59:59.999' : moment$1.HTML5_FMT.DATETIME_LOCAL_MS);
+	      }) : !['hour', 'minute', 'second'].includes(timeDimension.granularity);
+
+	      var _dateRange = dateRange,
+	          _dateRange2 = _slicedToArray(_dateRange, 2),
+	          start = _dateRange2[0],
+	          end = _dateRange2[1];
+
 	      var range$$1 = moment$1.range(start, end);
 
 	      if (!TIME_SERIES[timeDimension.granularity]) {
 	        throw new Error("Unsupported time granularity: ".concat(timeDimension.granularity));
 	      }
 
-	      return TIME_SERIES[timeDimension.granularity](range$$1);
+	      return TIME_SERIES[timeDimension.granularity](padToDay ? range$$1.snapTo('day') : range$$1);
 	    }
 	    /**
 	     * Base method for pivoting {@link ResultSet} data.
@@ -16172,12 +16126,12 @@
 	  }, {
 	    key: "pivot",
 	    value: function pivot(pivotConfig) {
-	      var _this3 = this;
+	      var _this2 = this;
 
 	      pivotConfig = this.normalizePivotConfig(pivotConfig);
-	      var groupByXAxis = groupBy(function (_ref4) {
-	        var xValues = _ref4.xValues;
-	        return _this3.axisValuesString(xValues);
+	      var groupByXAxis = groupBy(function (_ref11) {
+	        var xValues = _ref11.xValues;
+	        return _this2.axisValuesString(xValues);
 	      }); // eslint-disable-next-line no-unused-vars
 
 	      var measureValue = function measureValue(row, measure, xValues) {
@@ -16193,8 +16147,8 @@
 
 	        if (series) {
 	          groupByXAxis = function groupByXAxis(rows) {
-	            var byXValues = groupBy(function (_ref5) {
-	              var xValues = _ref5.xValues;
+	            var byXValues = groupBy(function (_ref12) {
+	              var xValues = _ref12.xValues;
 	              return moment$1(xValues[0]).format(moment$1.HTML5_FMT.DATETIME_LOCAL_MS);
 	            }, rows);
 	            return series.map(function (d) {
@@ -16215,7 +16169,7 @@
 	      }
 
 	      var xGrouped = pipe(map(function (row) {
-	        return _this3.axisValues(pivotConfig.x)(row).map(function (xValues) {
+	        return _this2.axisValues(pivotConfig.x)(row).map(function (xValues) {
 	          return {
 	            xValues: xValues,
 	            row: row
@@ -16223,38 +16177,38 @@
 	        });
 	      }), unnest, groupByXAxis, toPairs)(this.timeDimensionBackwardCompatibleData());
 	      var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
-	      function (_ref7) {
-	        var _ref8 = _slicedToArray(_ref7, 2),
-	            xValuesString = _ref8[0],
-	            rows = _ref8[1];
+	      function (_ref14) {
+	        var _ref15 = _slicedToArray(_ref14, 2),
+	            xValuesString = _ref15[0],
+	            rows = _ref15[1];
 
 	        return unnest( // collect Y values only from filled rows
-	        rows.filter(function (_ref9) {
-	          var row = _ref9.row;
+	        rows.filter(function (_ref16) {
+	          var row = _ref16.row;
 	          return Object.keys(row).length > 0;
-	        }).map(function (_ref10) {
-	          var row = _ref10.row;
-	          return _this3.axisValues(pivotConfig.y)(row);
+	        }).map(function (_ref17) {
+	          var row = _ref17.row;
+	          return _this2.axisValues(pivotConfig.y)(row);
 	        }));
 	      }), unnest, uniq)(xGrouped); // eslint-disable-next-line no-unused-vars
 
-	      return xGrouped.map(function (_ref11) {
-	        var _ref12 = _slicedToArray(_ref11, 2),
-	            xValuesString = _ref12[0],
-	            rows = _ref12[1];
+	      return xGrouped.map(function (_ref18) {
+	        var _ref19 = _slicedToArray(_ref18, 2),
+	            xValuesString = _ref19[0],
+	            rows = _ref19[1];
 
 	        var xValues = rows[0].xValues;
-	        var yGrouped = pipe(map(function (_ref13) {
-	          var row = _ref13.row;
-	          return _this3.axisValues(pivotConfig.y)(row).map(function (yValues) {
+	        var yGrouped = pipe(map(function (_ref20) {
+	          var row = _ref20.row;
+	          return _this2.axisValues(pivotConfig.y)(row).map(function (yValues) {
 	            return {
 	              yValues: yValues,
 	              row: row
 	            };
 	          });
-	        }), unnest, groupBy(function (_ref14) {
-	          var yValues = _ref14.yValues;
-	          return _this3.axisValuesString(yValues);
+	        }), unnest, groupBy(function (_ref21) {
+	          var yValues = _ref21.yValues;
+	          return _this2.axisValuesString(yValues);
 	        }))(rows);
 	        return {
 	          xValues: xValues,
@@ -16262,10 +16216,10 @@
 	            var measure = pivotConfig.x.find(function (d) {
 	              return d === 'measures';
 	            }) ? ResultSet.measureFromAxis(xValues) : ResultSet.measureFromAxis(yValues);
-	            return (yGrouped[_this3.axisValuesString(yValues)] || [{
+	            return (yGrouped[_this2.axisValuesString(yValues)] || [{
 	              row: {}
-	            }]).map(function (_ref15) {
-	              var row = _ref15.row;
+	            }]).map(function (_ref22) {
+	              var row = _ref22.row;
 	              return [yValues, measureValue(row, measure, xValues)];
 	            });
 	          }))
@@ -16306,10 +16260,10 @@
 	  }, {
 	    key: "chartPivot",
 	    value: function chartPivot(pivotConfig) {
-	      var _this4 = this;
+	      var _this3 = this;
 
 	      var validate = function validate(value) {
-	        if (_this4.parseDateMeasures && LocalDateRegex.test(value)) {
+	        if (_this3.parseDateMeasures && LocalDateRegex.test(value)) {
 	          return new Date(value);
 	        } else if (!Number.isNaN(Number.parseFloat(value))) {
 	          return Number.parseFloat(value);
@@ -16318,20 +16272,20 @@
 	        return value;
 	      };
 
-	      return this.pivot(pivotConfig).map(function (_ref16) {
-	        var xValues = _ref16.xValues,
-	            yValuesArray = _ref16.yValuesArray;
+	      return this.pivot(pivotConfig).map(function (_ref23) {
+	        var xValues = _ref23.xValues,
+	            yValuesArray = _ref23.yValuesArray;
 	        return _objectSpread({
-	          category: _this4.axisValuesString(xValues, ', '),
+	          category: _this3.axisValuesString(xValues, ', '),
 	          // TODO deprecated
-	          x: _this4.axisValuesString(xValues, ', '),
+	          x: _this3.axisValuesString(xValues, ', '),
 	          xValues: xValues
-	        }, yValuesArray.map(function (_ref17) {
-	          var _ref18 = _slicedToArray(_ref17, 2),
-	              yValues = _ref18[0],
-	              m = _ref18[1];
+	        }, yValuesArray.map(function (_ref24) {
+	          var _ref25 = _slicedToArray(_ref24, 2),
+	              yValues = _ref25[0],
+	              m = _ref25[1];
 
-	          return _defineProperty({}, _this4.axisValuesString(yValues, ', '), m && validate(m));
+	          return _defineProperty({}, _this3.axisValuesString(yValues, ', '), m && validate(m));
 	        }).reduce(function (a, b) {
 	          return Object.assign(a, b);
 	        }, {}));
@@ -16376,13 +16330,13 @@
 	        };
 	      };
 
-	      return this.pivot(normalizedPivotConfig).map(function (_ref21) {
-	        var xValues = _ref21.xValues,
-	            yValuesArray = _ref21.yValuesArray;
-	        return yValuesArray.map(function (_ref22) {
-	          var _ref23 = _slicedToArray(_ref22, 2),
-	              yValues = _ref23[0],
-	              m = _ref23[1];
+	      return this.pivot(normalizedPivotConfig).map(function (_ref28) {
+	        var xValues = _ref28.xValues,
+	            yValuesArray = _ref28.yValuesArray;
+	        return yValuesArray.map(function (_ref29) {
+	          var _ref30 = _slicedToArray(_ref29, 2),
+	              yValues = _ref30[0],
+	              m = _ref30[1];
 
 	          return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
 	            return Object.assign(a, b);
@@ -16422,7 +16376,7 @@
 	  }, {
 	    key: "tableColumns",
 	    value: function tableColumns(pivotConfig) {
-	      var _this5 = this;
+	      var _this4 = this;
 
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
@@ -16443,13 +16397,13 @@
 	          };
 	        };
 
-	        return field === 'measures' ? (_this5.query().measures || []).map(function (key) {
+	        return field === 'measures' ? (_this4.query().measures || []).map(function (key) {
 	          return _objectSpread({
 	            key: key
-	          }, exractFields(_this5.loadResponse.annotation.measures[key]));
+	          }, exractFields(_this4.loadResponse.annotation.measures[key]));
 	        }) : [_objectSpread({
 	          key: field
-	        }, exractFields(_this5.loadResponse.annotation.dimensions[field] || _this5.loadResponse.annotation.timeDimensions[field]))];
+	        }, exractFields(_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]))];
 	      };
 
 	      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
@@ -16493,15 +16447,15 @@
 	  }, {
 	    key: "seriesNames",
 	    value: function seriesNames(pivotConfig) {
-	      var _this6 = this;
+	      var _this5 = this;
 
 	      pivotConfig = this.normalizePivotConfig(pivotConfig);
 	      return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.timeDimensionBackwardCompatibleData()).map(function (axisValues) {
 	        return {
-	          title: _this6.axisValuesString(pivotConfig.y.find(function (d) {
+	          title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
 	            return d === 'measures';
-	          }) ? dropLast$1(1, axisValues).concat(_this6.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-	          key: _this6.axisValuesString(axisValues),
+	          }) ? dropLast$1(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+	          key: _this5.axisValuesString(axisValues),
 	          yValues: axisValues
 	        };
 	      });
