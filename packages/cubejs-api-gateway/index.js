@@ -127,7 +127,6 @@ const operators = [
   'beforeDate',
   'afterDate',
   'measureFilter',
-  'measure_filter',
 ];
 
 const querySchema = Joi.object().keys({
@@ -196,13 +195,12 @@ const normalizeQuery = (query) => {
       'beforeDate',
       'afterDate',
       'measureFilter',
-      'measure_filter'
     ].indexOf(f.operator) === -1);
   if (filterWithIncorrectOperator) {
     throw new UserError(`Operator ${filterWithIncorrectOperator.operator} not supported for filter: ${JSON.stringify(filterWithIncorrectOperator)}`);
   }
   const filterWithoutValues = (query.filters || [])
-    .find(f => !f.values && ['set', 'notSet', 'measureFilter', 'measure_filter'].indexOf(f.operator) === -1);
+    .find(f => !f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1);
   if (filterWithoutValues) {
     throw new UserError(`Values required for filter: ${JSON.stringify(filterWithoutValues)}`);
   }
