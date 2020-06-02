@@ -1,0 +1,12 @@
+{
+  "name": "react-dashboard",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/postgres-driver": "^0.19.1",
+    "@cubejs-backend/server": "^0.19.1"
+  }
+}

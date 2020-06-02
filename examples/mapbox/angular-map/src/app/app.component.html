@@ -1,0 +1,108 @@
+<nz-layout style="min-height: 100vh;">
+  <nz-header>
+    <h2 style="color: #fff">
+      Mapbox example
+    </h2>
+  </nz-header>
+  <nz-layout>
+    <nz-content style="padding: 24px;">
+      <nz-tabset>
+        <nz-tab nzTitle="choropleth">
+          <app-choropleth></app-choropleth>
+          <nz-slider
+            [nzMin]="dates.min"
+            [nzMax]="dates.max"
+            [(ngModel)]="dates.current"
+            [nzStep]="86400"
+            [nzTipFormatter]="tipFormatter"
+            [nzTooltipVisible]="'always'"
+          ></nz-slider>
+        </nz-tab>
+        <nz-tab nzTitle="heatmap and clusters">
+          Content of Tab Pane 2
+        </nz-tab>
+      </nz-tabset>
+    </nz-content>
+    <nz-sider [nzWidth]="300">
+      <nz-card [nzTitle]="linksTitleTemplate" nzBordered="false">
+        <ul [ngClass]="'useful-links'">
+          <li>
+            <a href="/" target="_blank">
+              <img src="assets/cube.png" />
+              Tutorial at Cube.JS
+            </a>
+          </li>
+          <li>
+            <a href="/" target="_blank">
+              <img src="assets/github.png" />
+              View source
+            </a>
+          </li>
+          <nz-divider></nz-divider>
+          <li>
+            <a href="//cube.dev/docs/" target="_blank">
+              <img src="assets/cube.png" />
+              Cube.JS docs
+            </a>
+          </li>
+          <li>
+            <a href="//docs.mapbox.com/" target="_blank">
+              <img src="assets/mapbox.png" />
+              Mapbox docs
+            </a>
+          </li>
+          <li>
+            <a
+              href="//docs.mapbox.com/mapbox-gl-js/example/updating-choropleth/"
+              target="_blank"
+            >
+              <img src="assets/mapbox.png" />
+              Mapbox Choropleth example
+            </a>
+          </li>
+          <li>
+            <a
+              href="//docs.mapbox.com/mapbox-gl-js/example/heatmap-layer/"
+              target="_blank"
+            >
+              <img src="assets/mapbox.png" />
+              Mapbox Heatmap example
+            </a>
+          </li>
+          <li>
+            <a
+              href="//docs.mapbox.com/mapbox-gl-js/example/cluster/"
+              target="_blank"
+            >
+              <img src="assets/mapbox.png" />
+              Mapbox Cluster example
+            </a>
+          </li>
+          <li>
+            <a href="//visgl.github.io/react-map-gl/" target="_blank">
+              <img src="assets/github.png" />
+              React Mapbox wrapper
+            </a>
+          </li>
+        </ul>
+      </nz-card>
+      <nz-card [nzTitle]="helpTitleTemplate" nzBordered="false">
+        <p>
+          For help please use our&nbsp;
+          <a href="//slack.cube.dev" target="_blank">
+            Slack
+          </a>
+          &nbsp;channel or&nbsp;drop a mail on&nbsp;
+          <a href="mailto:help@cube.dev">help@cube.dev</a>.
+        </p>
+      </nz-card>
+
+      <ng-template #linksTitleTemplate>
+        <i nz-icon nzType="link" nzTheme="outline"></i> Links
+      </ng-template>
+      <ng-template #helpTitleTemplate>
+        <i nz-icon nzType="smile" nzTheme="outline"></i> Need help?
+      </ng-template>
+    </nz-sider>
+  </nz-layout>
+</nz-layout>
