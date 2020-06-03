@@ -17,9 +17,9 @@ import Header from './components/Header';
 import Heatmap from './components/Heatmap';
 import Choropleth from './components/Choropleth';
 
-const API_URL = 'http://localhost:4000';
+const API_URL = process.env.NODE_ENV === 'production' ? '' : "http://localhost:4000";
 const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1ODY2MTg3NDcsImV4cCI6MTU4NjcwNTE0N30.1M3LWja51cQJ8Hgoja8joBU-Z9o6vbhtqnV72WsTAic';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTExNDkxODksImV4cCI6MTU5Mzc0MTE4OX0.TI-aVwcaYpS6jNbEZgWXFz3zUrhRsqQF7PIXnvmu4ow';
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`,
 });
