@@ -65,8 +65,9 @@ Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. `CUBEJS_DB_
 
 ### AWS RDS Postgres 
 
-Use `CUBEJS_DB_SSL=true` to enable SSL if you have force_ssl enabled for your RDS. Download the new certificate [here](https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem) provide the contents of the downloaded file to `CUBEJS_DB_SSL_CA`. `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` can be left blank. More info on AWS RDS SSL can be found [here](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html)
-
+Use `CUBEJS_DB_SSL=true` to enable SSL if you have force_ssl enabled for your RDS. 
+Download the new certificate [here](https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem) provide the contents of the downloaded file to `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` can be left blank. 
+More info on AWS RDS SSL can be found [here](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html)
 
 ### AWS Athena
 
