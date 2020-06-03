@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import equals from 'fast-deep-equal';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { DndProvider, useDrop } from 'react-dnd';
 import DraggableItem from './DraggableItem';
-import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
 
 export const TYPE = 'orderItem';
 
@@ -103,6 +103,16 @@ function Order({ members, onChange }) {
       })}
     </div>
   );
+}
+
+function useDeepCompareMemoize(value) {
+  const ref = useRef([]);
+
+  if (!equals(value, ref.current)) {
+    ref.current = value;
+  }
+
+  return ref.current;
 }
 
 export default function OrderGroup(props) {

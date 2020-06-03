@@ -1,3 +1,23 @@
 body {
   background-color: #f0f2f5 !important;
 }
+
+.sort-item {
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+.sort-item + div {
+  margin-top: 8px;
+}
+
+.member-name {
+  display: inline-block;
+  border: 1px dotted #d9d9d9;
+  border-right: none;
+  border-radius: 3px;
+  padding: 4px 12px;
+  cursor: move;
+  flex-grow: 1;
+  margin-right: -3px;
+}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as PropTypes from 'prop-types';
+import { prop, uniqBy } from 'ramda';
 import { Row, Col, Divider, Card, Button, Popover } from 'antd';
 import { SortAscendingOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
@@ -70,20 +71,24 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
         updateTimeDimensions,
         updateOrder,
       }) => {
-        const orderMembers = [
-          ...measures.map(getOrderMember),
-          ...dimensions.map(getOrderMember),
-          ...timeDimensions.map((td) => getOrderMember(td.dimension)),
-        ].map((member) => {
-          if (!query.order) {
-            return member;
-          }
+        let activeOrderMembersCount = 0;
+        const orderMembers = uniqBy(
+          prop('id'),
+          [
+            ...measures.map(getOrderMember),
+            ...dimensions.map(getOrderMember),
+            ...timeDimensions.map((td) => getOrderMember(td.dimension)),
+          ].map((member) => {
+            if (!validatedQuery.order) {
+              return member;
+            }
 
-          return {
-            ...member,
-            order: query.order[member.id] ?? 'none',
-          };
-        });
+            return {
+              ...member,
+              order: (validatedQuery.order[member.id] && ++activeOrderMembersCount) || 'none',
+            };
+          })
+        );
 
         return (
           <>
@@ -150,16 +155,19 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                         visible={isOrderPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"
-                        onClick={toggleOrderPopover}
-                        onVisibleChange={toggleOrderPopover}
+                        onVisibleChange={(visible) => {
+                          if (!visible) {
+                            toggleOrderPopover(false);
+                          } else {
+                            if (orderMembers.length) {
+                              toggleOrderPopover(!isOrderPopoverVisible);
+                            }
+                          }
+                        }}
                       >
-                        <Button
-                          disabled={!orderMembers.length}
-                          icon={<SortAscendingOutlined />}
-                          onClick={() => toggleOrderPopover(!isOrderPopoverVisible)}
-                        >
+                        <Button disabled={!orderMembers.length} icon={<SortAscendingOutlined />}>
                           Order
-                          {Object.keys(query.order || {}).length ? ` (${Object.keys(query.order).length})` : ''}
+                          {activeOrderMembersCount > 0 ? ` (${activeOrderMembersCount})` : ''}
                         </Button>
                       </Popover>
                     </Col>
