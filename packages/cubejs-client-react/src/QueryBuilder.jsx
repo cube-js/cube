@@ -89,6 +89,7 @@ export default class QueryBuilder extends React.Component {
     ];
 
     const { meta, query, chartType } = this.state;
+    const self = this;
 
     return {
       meta,
@@ -128,6 +129,35 @@ export default class QueryBuilder extends React.Component {
       updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
       updateFilters: updateMethods('filters', toFilter),
       updateChartType: (newChartType) => this.updateVizState({ chartType: newChartType }),
+      updateOrder: {
+        set(member, order = 'asc') {
+          if (order === 'none') {
+            this.remove(member);
+          } else {
+            self.updateQuery({
+              order: {
+                ...query.order,
+                [member]: order
+              }
+            });
+          }
+        },
+        remove: (member) => {
+          this.updateQuery({
+            order: Object.keys(query.order)
+              .filter(currentMember => currentMember !== member)
+              .reduce((memo, currentMember) => {
+                memo[currentMember] = query.order[currentMember];
+                return memo;
+              }, {})
+          });
+        },
+        update: (order) => {
+          this.updateQuery({
+            order
+          });
+        }
+      },
       ...queryRendererProps
     };
   }

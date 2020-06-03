@@ -18,8 +18,10 @@ import _extends from '@babel/runtime/helpers/extends';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import 'core-js/modules/es.array.concat';
 import 'core-js/modules/es.array.filter';
+import 'core-js/modules/es.array.reduce';
 import 'core-js/modules/es.array.splice';
 import 'core-js/modules/es.function.name';
+import 'core-js/modules/es.object.keys';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
@@ -467,6 +469,7 @@ function (_React$Component) {
           meta = _this$state.meta,
           query = _this$state.query,
           chartType = _this$state.chartType;
+      var self = this;
       return _objectSpread2({
         meta: meta,
         query: query,
@@ -518,6 +521,34 @@ function (_React$Component) {
           return _this2.updateVizState({
             chartType: newChartType
           });
+        },
+        updateOrder: {
+          set: function set(member) {
+            var order = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'asc';
+
+            if (order === 'none') {
+              this.remove(member);
+            } else {
+              self.updateQuery({
+                order: _objectSpread2({}, query.order, _defineProperty({}, member, order))
+              });
+            }
+          },
+          remove: function remove(member) {
+            _this2.updateQuery({
+              order: Object.keys(query.order).filter(function (currentMember) {
+                return currentMember !== member;
+              }).reduce(function (memo, currentMember) {
+                memo[currentMember] = query.order[currentMember];
+                return memo;
+              }, {})
+            });
+          },
+          update: function update(order) {
+            _this2.updateQuery({
+              order: order
+            });
+          }
         }
       }, queryRendererProps);
     }
@@ -766,35 +797,35 @@ function useDeepCompareMemoize(value) {
 
 var useCubeQuery = (function (query) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var mutexRef = useRef({});
 
-  var _useState = useState({}),
-      _useState2 = _slicedToArray(_useState, 1),
-      mutexObj = _useState2[0];
+  var _useState = useState(null),
+      _useState2 = _slicedToArray(_useState, 2),
+      currentQuery = _useState2[0],
+      setCurrentQuery = _useState2[1];
 
-  var _useState3 = useState(null),
+  var _useState3 = useState(false),
       _useState4 = _slicedToArray(_useState3, 2),
-      currentQuery = _useState4[0],
-      setCurrentQuery = _useState4[1];
+      isLoading = _useState4[0],
+      setLoading = _useState4[1];
 
-  var _useState5 = useState(false),
+  var _useState5 = useState(null),
       _useState6 = _slicedToArray(_useState5, 2),
-      isLoading = _useState6[0],
-      setLoading = _useState6[1];
+      resultSet = _useState6[0],
+      setResultSet = _useState6[1];
 
   var _useState7 = useState(null),
       _useState8 = _slicedToArray(_useState7, 2),
-      resultSet = _useState8[0],
-      setResultSet = _useState8[1];
-
-  var _useState9 = useState(null),
-      _useState10 = _slicedToArray(_useState9, 2),
-      error = _useState10[0],
-      setError = _useState10[1];
+      error = _useState8[0],
+      setError = _useState8[1];
 
   var context = useContext(CubeContext);
-  var resetResultSetOnChange = options.resetResultSetOnChange;
   var subscribeRequest = null;
   useEffect(function () {
+    var _options$skip = options.skip,
+        skip = _options$skip === void 0 ? false : _options$skip,
+        resetResultSetOnChange = options.resetResultSetOnChange;
+
     function loadQuery() {
       return _loadQuery.apply(this, arguments);
     }
@@ -808,7 +839,7 @@ var useCubeQuery = (function (query) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                if (!(query && isQueryPresent(query))) {
+                if (!(!skip && query && isQueryPresent(query))) {
                   _context.next = 25;
                   break;
                 }
@@ -845,16 +876,16 @@ var useCubeQuery = (function (query) {
                 }
 
                 subscribeRequest = cubejsApi.subscribe(query, {
-                  mutexObj: mutexObj,
+                  mutexObj: mutexRef.current,
                   mutexKey: 'query'
                 }, function (e, result) {
-                  setLoading(false);
-
                   if (e) {
                     setError(e);
                   } else {
                     setResultSet(result);
                   }
+
+                  setLoading(false);
                 });
                 _context.next = 19;
                 break;
@@ -863,7 +894,7 @@ var useCubeQuery = (function (query) {
                 _context.t0 = setResultSet;
                 _context.next = 16;
                 return cubejsApi.load(query, {
-                  mutexObj: mutexObj,
+                  mutexObj: mutexRef.current,
                   mutexKey: 'query'
                 });
 
