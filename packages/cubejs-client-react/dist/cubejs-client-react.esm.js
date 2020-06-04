@@ -13,15 +13,19 @@ import _createClass from '@babel/runtime/helpers/createClass';
 import _inherits from '@babel/runtime/helpers/inherits';
 import React, { createContext, useRef, useState, useContext, useEffect } from 'react';
 import { func, object, any, bool } from 'prop-types';
-import { equals, toPairs, fromPairs } from 'ramda';
+import { equals, toPairs, fromPairs, uniqBy, prop } from 'ramda';
 import _extends from '@babel/runtime/helpers/extends';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import 'core-js/modules/es.array.concat';
 import 'core-js/modules/es.array.filter';
 import 'core-js/modules/es.array.reduce';
+import 'core-js/modules/es.array.sort';
 import 'core-js/modules/es.array.splice';
 import 'core-js/modules/es.function.name';
+import 'core-js/modules/es.number.constructor';
+import 'core-js/modules/es.number.max-safe-integer';
 import 'core-js/modules/es.object.keys';
+import _toConsumableArray from '@babel/runtime/helpers/toConsumableArray';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
@@ -423,6 +427,13 @@ function (_React$Component) {
         };
       };
 
+      var toOrderMember = function toOrderMember(member) {
+        return {
+          id: member.name,
+          title: member.title
+        };
+      };
+
       var updateMethods = function updateMethods(memberType) {
         var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
         return {
@@ -470,35 +481,64 @@ function (_React$Component) {
           query = _this$state.query,
           chartType = _this$state.chartType;
       var self = this;
+      var measures = (meta && query.measures || []).map(function (m, index) {
+        return _objectSpread2({
+          index: index
+        }, meta.resolveMember(m, 'measures'));
+      });
+      var dimensions = (meta && query.dimensions || []).map(function (m, index) {
+        return _objectSpread2({
+          index: index
+        }, meta.resolveMember(m, 'dimensions'));
+      });
+      var timeDimensions = (meta && query.timeDimensions || []).map(function (m, index) {
+        return _objectSpread2({}, m, {
+          dimension: _objectSpread2({}, meta.resolveMember(m.dimension, 'dimensions'), {
+            granularities: granularities
+          }),
+          index: index
+        });
+      });
+      var indexById = Object.keys(query.order || []).map(function (id, index) {
+        return _defineProperty({}, id, index);
+      }).reduce(function (a, b) {
+        return _objectSpread2({}, a, {}, b);
+      });
+      var orderMembers = uniqBy(prop('id'), [].concat(_toConsumableArray(measures.map(toOrderMember)), _toConsumableArray(dimensions.map(toOrderMember)), _toConsumableArray(timeDimensions.map(function (td) {
+        return toOrderMember(td.dimension);
+      }))).map(function (member) {
+        if (!query.order) {
+          return member;
+        }
+
+        return _objectSpread2({}, member, {
+          order: query.order[member.id] || 'none',
+          isActive: Boolean(query.order[member.id])
+        });
+      })).sort(function (a, b) {
+        var a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
+        var b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id]; // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
+
+        return a1 - b1;
+      });
+      console.log('prepare:', {
+        order: query.order,
+        orderMembers: orderMembers
+      });
       return _objectSpread2({
         meta: meta,
         query: query,
         validatedQuery: this.validatedQuery(),
         isQueryPresent: this.isQueryPresent(),
         chartType: chartType,
-        measures: (meta && query.measures || []).map(function (m, i) {
-          return _objectSpread2({
-            index: i
-          }, meta.resolveMember(m, 'measures'));
-        }),
-        dimensions: (meta && query.dimensions || []).map(function (m, i) {
-          return _objectSpread2({
-            index: i
-          }, meta.resolveMember(m, 'dimensions'));
-        }),
+        measures: measures,
+        dimensions: dimensions,
         segments: (meta && query.segments || []).map(function (m, i) {
           return _objectSpread2({
             index: i
           }, meta.resolveMember(m, 'segments'));
         }),
-        timeDimensions: (meta && query.timeDimensions || []).map(function (m, i) {
-          return _objectSpread2({}, m, {
-            dimension: _objectSpread2({}, meta.resolveMember(m.dimension, 'dimensions'), {
-              granularities: granularities
-            }),
-            index: i
-          });
-        }),
+        timeDimensions: timeDimensions,
         filters: (meta && query.filters || []).map(function (m, i) {
           return _objectSpread2({}, m, {
             dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
@@ -506,6 +546,7 @@ function (_React$Component) {
             index: i
           });
         }),
+        orderMembers: orderMembers,
         availableMeasures: meta && meta.membersForQuery(query, 'measures') || [],
         availableDimensions: meta && meta.membersForQuery(query, 'dimensions') || [],
         availableTimeDimensions: (meta && meta.membersForQuery(query, 'dimensions') || []).filter(function (m) {

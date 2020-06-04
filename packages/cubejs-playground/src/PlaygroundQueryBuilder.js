@@ -31,14 +31,9 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
         }
         playgroundAction(actionName, { memberName });
         return updateMethods[method].apply(null, [member, values, ...rest]);
-      },
+      }
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
-
-const getOrderMember = (member) => ({
-  id: member.name,
-  title: member.title,
-});
 
 export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubejsToken, dashboardSource, setQuery }) {
   const [isOrderPopoverVisible, toggleOrderPopover] = useState(false);
@@ -69,26 +64,10 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
         timeDimensions,
         availableTimeDimensions,
         updateTimeDimensions,
-        updateOrder,
+        orderMembers,
+        updateOrder
       }) => {
-        let activeOrderMembersCount = 0;
-        const orderMembers = uniqBy(
-          prop('id'),
-          [
-            ...measures.map(getOrderMember),
-            ...dimensions.map(getOrderMember),
-            ...timeDimensions.map((td) => getOrderMember(td.dimension)),
-          ].map((member) => {
-            if (!validatedQuery.order) {
-              return member;
-            }
-
-            return {
-              ...member,
-              order: (validatedQuery.order[member.id] && ++activeOrderMembersCount) || 'none',
-            };
-          })
-        );
+        const activeOrderMembersCount = orderMembers.filter((member) => member.isActive).length;
 
         return (
           <>
@@ -151,7 +130,16 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                       <Divider type="vertical" />
 
                       <Popover
-                        content={<OrderGroup members={orderMembers} onChange={updateOrder.update} />}
+                        content={
+                          <OrderGroup
+                            orderMembers={orderMembers}
+                            onChange={() => 0}
+                            testOnOrderChange={(id, order, index) => {
+                              console.log('orderChange', { id, order,index });
+                              updateOrder.set(id, order, index);
+                            }}
+                          />
+                        }
                         visible={isOrderPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"
@@ -171,10 +159,6 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                         </Button>
                       </Popover>
                     </Col>
-                  </Row>
-
-                  <Row type="flex" justify="space-around" align="top" gutter={24}>
-                    <Col span={24}>empty</Col>
                   </Row>
                 </Card>
               </Col>
@@ -211,7 +195,7 @@ PlaygroundQueryBuilder.propTypes = {
   cubejsApi: PropTypes.object,
   dashboardSource: PropTypes.object,
   apiUrl: PropTypes.string,
-  cubejsToken: PropTypes.string,
+  cubejsToken: PropTypes.string
 };
 
 PlaygroundQueryBuilder.defaultProps = {
@@ -220,5 +204,5 @@ PlaygroundQueryBuilder.defaultProps = {
   cubejsApi: null,
   dashboardSource: null,
   apiUrl: '/cubejs-api/v1',
-  cubejsToken: null,
+  cubejsToken: null
 };

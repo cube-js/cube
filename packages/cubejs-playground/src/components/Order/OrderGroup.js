@@ -6,95 +6,144 @@ import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
 
 export const TYPE = 'orderItem';
 
-function Order({ members, onChange }) {
-  const [sortItems, setSortItems] = useState([]);
+function indexById(members) {
+  return members.map(({ id }, index) => ({ [id]: index })).reduce((a, b) => ({ ...a, ...b }));
+}
 
-  const [{ didDrop }, drop] = useDrop({
+function Order({ orderMembers, onChange, testOnOrderChange }) {
+  const [members, setMembers] = useState(orderMembers);
+  const [orderMembersOrder, setOrderMembersOrder] = useState(indexById(orderMembers));
+
+  const [{ didDrop, dropItem }, drop] = useDrop({
     accept: TYPE,
-    collect(monitor) {
+    collect(monitor, props) {
+      // console.log('collect', props, monitor.getItem())
       return {
         didDrop: monitor.didDrop(),
+        dropItem: monitor.getItem()
       };
-    },
+    }
   });
 
   useEffect(() => {
-    const memberIds = members.map((member) => member.id);
-    const addedMembers = [];
+    let index = Math.max(...Object.values(orderMembersOrder));
+    const nextOrderMembersOrder = { ...orderMembersOrder };
 
-    const nextSortItems = sortItems
-      .map((currentSortItem, index) => {
-        if (memberIds.includes(currentSortItem.id)) {
-          addedMembers.push(currentSortItem.id);
-
-          return {
-            ...currentSortItem,
-            index,
-          };
-        }
-      })
-      .filter(Boolean);
-
-    members.forEach(({ id, title, order }) => {
-      if (!addedMembers.includes(id)) {
-        nextSortItems.push({
-          id,
-          title,
-          order: order || 'none',
-          index: nextSortItems.length - 1,
-        });
+    orderMembers.forEach(({ id }) => {
+      if (nextOrderMembersOrder[id] === undefined) {
+        nextOrderMembersOrder[id] = ++index;
       }
-    });
+    })
 
-    setSortItems(nextSortItems);
-  }, useDeepCompareMemoize([members]));
+    setOrderMembersOrder(nextOrderMembersOrder);
+  }, useDeepCompareMemoize([orderMembers]));
+
+  // useEffect(() => {
+  //   const memberIds = orderMembers.map((member) => member.id);
+  //   const addedMembers = [];
+  //
+  //   const nextMembers = members
+  //     .map((currentSortItem, index) => {
+  //       if (memberIds.includes(currentSortItem.id)) {
+  //         addedMembers.push(currentSortItem.id);
+  //
+  //         return {
+  //           ...currentSortItem,
+  //           index,
+  //         };
+  //       }
+  //     })
+  //     .filter(Boolean);
+  //
+  //   orderMembers.forEach(({ id, title, order }) => {
+  //     if (!addedMembers.includes(id)) {
+  //       nextMembers.push({
+  //         id,
+  //         title,
+  //         order: order || 'none',
+  //         index: nextMembers.length - 1,
+  //       });
+  //     }
+  //   });
+  //
+  //   setMembers(nextMembers);
+  // }, useDeepCompareMemoize([orderMembers]));
 
   useEffect(() => {
     if (didDrop) {
-      handleOnChange(sortItems);
+      const { id, order, index } = dropItem;
+      if (order !== 'none') {
+        testOnOrderChange(id, order, index);
+      }
+      // handleOnChange(members);
     }
   }, [didDrop]);
 
-  function handleOnChange(sortItems) {
+  function handleOnChange(members) {
     onChange(
-      sortItems
-        .filter((tag) => tag.order !== 'none')
-        .map((tag) => ({ [tag.id]: tag.order }))
+      members
+        .filter((member) => member.order !== 'none')
+        .map((member) => ({ [member.id]: member.order }))
         .reduce((a, b) => ({ ...a, ...b }), {})
     );
   }
 
   const moveTag = useCallback(
     (dragIndex, hoverIndex) => {
-      const dragTag = sortItems[dragIndex];
-      const nextSortItems = [...sortItems.filter((_, index) => index !== dragIndex)];
-      nextSortItems.splice(hoverIndex, 0, dragTag);
+      // onMove(orderMembers[dragIndex].id, hoverIndex);
+      // const dragItem = members[dragIndex];
+      // const nextMembers = [...members.filter((_, index) => index !== dragIndex)];
+      // nextMembers.splice(hoverIndex, 0, dragItem);
 
-      setSortItems(nextSortItems.map((tag, index) => ({ ...tag, index })));
+      console.log({
+        dragIndex,
+        hoverIndex
+      })
+      console.log('before', orderMembersOrder)
+
+      setOrderMembersOrder({
+          ...orderMembersOrder,
+          [dragIndex]: orderMembersOrder[hoverIndex],
+          [hoverIndex]: orderMembersOrder[dragIndex]
+        }
+      )
+
+      // setMembers(nextMembers.map((member, index) => ({ ...member, index })));
+
+      console.log('after', {
+        ...orderMembersOrder,
+        [dragIndex]: orderMembersOrder[hoverIndex],
+        [hoverIndex]: orderMembersOrder[dragIndex]
+      })
     },
-    [sortItems]
+    [orderMembers, orderMembersOrder]
   );
+
+  const sortedMembers = orderMembers.sort((a, b) => orderMembersOrder[a.id] - orderMembersOrder[b.id]);
+
+  console.log('...', orderMembersOrder)
 
   return (
     <div ref={drop}>
-      {sortItems.map(({ id, title, order }, index) => {
+      {sortedMembers.map(({ id, title, order }, index) => {
         return (
           <DraggableItem
             key={id}
             id={id}
-            index={index}
+            index={orderMembersOrder[id]}
             order={order}
             moveTag={moveTag}
             onOrderChange={(order) => {
-              const nextSortItems = sortItems.map((currentSortItem) => {
-                return {
-                  ...currentSortItem,
-                  order: currentSortItem.id === id ? order : currentSortItem.order,
-                };
-              });
-
-              setSortItems(nextSortItems);
-              handleOnChange(nextSortItems);
+              testOnOrderChange(id, order);
+              // const nextMembers = members.map((currentSortItem) => {
+              //   return {
+              //     ...currentSortItem,
+              //     order: currentSortItem.id === id ? order : currentSortItem.order,
+              //   };
+              // });
+              //
+              // setMembers(nextMembers);
+              // handleOnChange(nextMembers);
             }}
           >
             {title}

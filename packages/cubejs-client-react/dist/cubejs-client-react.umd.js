@@ -2182,8 +2182,24 @@
     return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
   }
 
+  function _toConsumableArray(arr) {
+    return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
+  }
+
+  function _arrayWithoutHoles(arr) {
+    if (Array.isArray(arr)) {
+      for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
+
+      return arr2;
+    }
+  }
+
   function _arrayWithHoles(arr) {
     if (Array.isArray(arr)) return arr;
+  }
+
+  function _iterableToArray(iter) {
+    if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
   }
 
   function _iterableToArrayLimit(arr, i) {
@@ -2210,6 +2226,10 @@
     }
 
     return _arr;
+  }
+
+  function _nonIterableSpread() {
+    throw new TypeError("Invalid attempt to spread non-iterable instance");
   }
 
   function _nonIterableRest() {
@@ -8370,6 +8390,12 @@
     }
   });
 
+  // `Number.MAX_SAFE_INTEGER` constant
+  // https://tc39.github.io/ecma262/#sec-number.max_safe_integer
+  _export({ target: 'Number', stat: true }, {
+    MAX_SAFE_INTEGER: 0x1FFFFFFFFFFFFF
+  });
+
   // `Symbol.asyncIterator` well-known symbol
   // https://tc39.github.io/ecma262/#sec-symbol.asynciterator
   defineWellKnownSymbol('asyncIterator');
@@ -9255,6 +9281,13 @@
           };
         };
 
+        var toOrderMember = function toOrderMember(member) {
+          return {
+            id: member.name,
+            title: member.title
+          };
+        };
+
         var updateMethods = function updateMethods(memberType) {
           var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
           return {
@@ -9302,35 +9335,64 @@
             query = _this$state.query,
             chartType = _this$state.chartType;
         var self = this;
+        var measures = (meta && query.measures || []).map(function (m, index) {
+          return _objectSpread({
+            index: index
+          }, meta.resolveMember(m, 'measures'));
+        });
+        var dimensions = (meta && query.dimensions || []).map(function (m, index) {
+          return _objectSpread({
+            index: index
+          }, meta.resolveMember(m, 'dimensions'));
+        });
+        var timeDimensions = (meta && query.timeDimensions || []).map(function (m, index) {
+          return _objectSpread({}, m, {
+            dimension: _objectSpread({}, meta.resolveMember(m.dimension, 'dimensions'), {
+              granularities: granularities
+            }),
+            index: index
+          });
+        });
+        var indexById = Object.keys(query.order || []).map(function (id, index) {
+          return _defineProperty({}, id, index);
+        }).reduce(function (a, b) {
+          return _objectSpread({}, a, {}, b);
+        });
+        var orderMembers = uniqBy(prop('id'), [].concat(_toConsumableArray(measures.map(toOrderMember)), _toConsumableArray(dimensions.map(toOrderMember)), _toConsumableArray(timeDimensions.map(function (td) {
+          return toOrderMember(td.dimension);
+        }))).map(function (member) {
+          if (!query.order) {
+            return member;
+          }
+
+          return _objectSpread({}, member, {
+            order: query.order[member.id] || 'none',
+            isActive: Boolean(query.order[member.id])
+          });
+        })).sort(function (a, b) {
+          var a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
+          var b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id]; // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
+
+          return a1 - b1;
+        });
+        console.log('prepare:', {
+          order: query.order,
+          orderMembers: orderMembers
+        });
         return _objectSpread({
           meta: meta,
           query: query,
           validatedQuery: this.validatedQuery(),
           isQueryPresent: this.isQueryPresent(),
           chartType: chartType,
-          measures: (meta && query.measures || []).map(function (m, i) {
-            return _objectSpread({
-              index: i
-            }, meta.resolveMember(m, 'measures'));
-          }),
-          dimensions: (meta && query.dimensions || []).map(function (m, i) {
-            return _objectSpread({
-              index: i
-            }, meta.resolveMember(m, 'dimensions'));
-          }),
+          measures: measures,
+          dimensions: dimensions,
           segments: (meta && query.segments || []).map(function (m, i) {
             return _objectSpread({
               index: i
             }, meta.resolveMember(m, 'segments'));
           }),
-          timeDimensions: (meta && query.timeDimensions || []).map(function (m, i) {
-            return _objectSpread({}, m, {
-              dimension: _objectSpread({}, meta.resolveMember(m.dimension, 'dimensions'), {
-                granularities: granularities
-              }),
-              index: i
-            });
-          }),
+          timeDimensions: timeDimensions,
           filters: (meta && query.filters || []).map(function (m, i) {
             return _objectSpread({}, m, {
               dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
@@ -9338,6 +9400,7 @@
               index: i
             });
           }),
+          orderMembers: orderMembers,
           availableMeasures: meta && meta.membersForQuery(query, 'measures') || [],
           availableDimensions: meta && meta.membersForQuery(query, 'dimensions') || [],
           availableTimeDimensions: (meta && meta.membersForQuery(query, 'dimensions') || []).filter(function (m) {

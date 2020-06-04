@@ -1,7 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Button } from 'antd';
 import styled from 'styled-components';
-import { SortDescendingOutlined, SortAscendingOutlined } from '@ant-design/icons';
 import { useDrag, useDrop } from 'react-dnd';
 
 import { TYPE } from './OrderGroup';
@@ -14,6 +13,10 @@ const SortItem = styled.div`
 
   & + div {
     margin-top: 8px;
+  }
+  
+  & > button {
+    width: 70px;  
   }
 `;
 
@@ -28,7 +31,7 @@ const MemberName = styled.div`
   margin-right: -3px;
 `;
 
-export default function DraggableItem({ id, children, index, order = 'none', moveTag, onOrderChange }) {
+export default function DraggableItem({ id, index, order = 'none', moveTag, children, onOrderChange }) {
   const ref = useRef(null);
 
   const [, drop] = useDrop({
@@ -43,7 +46,9 @@ export default function DraggableItem({ id, children, index, order = 'none', mov
       if (dragIndex === hoverIndex) {
         return;
       }
-      moveTag(dragIndex, hoverIndex);
+      // moveTag(dragIndex, hoverIndex);
+      // console.log('hover', item.id, id, { dragIndex, hoverIndex, item })
+      moveTag(item.id, id);
 
       item.index = hoverIndex;
     },
@@ -54,6 +59,7 @@ export default function DraggableItem({ id, children, index, order = 'none', mov
       id,
       type: TYPE,
       index,
+      order
     },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
@@ -74,9 +80,10 @@ export default function DraggableItem({ id, children, index, order = 'none', mov
       <MemberName>{children}</MemberName>
       <Button
         type={order !== 'none' ? 'primary' : undefined}
-        icon={order === 'desc' ? <SortDescendingOutlined /> : <SortAscendingOutlined />}
         onClick={() => onOrderChange(getNextOrder())}
-      />
+      >
+        {order.toUpperCase()}
+      </Button>
     </SortItem>
   );
 }

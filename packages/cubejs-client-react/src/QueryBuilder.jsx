@@ -1,6 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { equals } from 'ramda';
+import { equals, prop, uniqBy } from 'ramda';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 
@@ -34,7 +34,7 @@ export default class QueryBuilder extends React.Component {
   cubejsApi() {
     const { cubejsApi } = this.props;
     // eslint-disable-next-line react/destructuring-assignment
-    return cubejsApi || this.context && this.context.cubejsApi;
+    return cubejsApi || (this.context && this.context.cubejsApi);
   }
 
   isQueryPresent() {
@@ -43,17 +43,22 @@ export default class QueryBuilder extends React.Component {
   }
 
   prepareRenderProps(queryRendererProps) {
-    const getName = member => member.name;
-    const toTimeDimension = member => ({
+    const getName = (member) => member.name;
+    const toTimeDimension = (member) => ({
       dimension: member.dimension.name,
       granularity: member.granularity,
       dateRange: member.dateRange
     });
-    const toFilter = member => ({
+    const toFilter = (member) => ({
       dimension: member.dimension.name,
       operator: member.operator,
       values: member.values
     });
+    const toOrderMember = (member) => ({
+      id: member.name,
+      title: member.title
+    });
+
     const updateMethods = (memberType, toQuery = getName) => ({
       add: (member) => {
         const { query } = this.state;
@@ -91,37 +96,77 @@ export default class QueryBuilder extends React.Component {
     const { meta, query, chartType } = this.state;
     const self = this;
 
+    const measures = ((meta && query.measures) || []).map((m, index) => ({
+      index,
+      ...meta.resolveMember(m, 'measures')
+    }));
+    const dimensions = ((meta && query.dimensions) || []).map((m, index) => ({
+      index,
+      ...meta.resolveMember(m, 'dimensions')
+    }));
+    const timeDimensions = ((meta && query.timeDimensions) || []).map((m, index) => ({
+      ...m,
+      dimension: {
+        ...meta.resolveMember(m.dimension, 'dimensions'),
+        granularities
+      },
+      index
+    }));
+
+    const indexById = Object.keys(query.order || [])
+      .map((id, index) => ({ [id]: index }))
+      .reduce((a, b) => ({ ...a, ...b }));
+
+    const orderMembers = uniqBy(
+      prop('id'),
+      [
+        ...measures.map(toOrderMember),
+        ...dimensions.map(toOrderMember),
+        ...timeDimensions.map((td) => toOrderMember(td.dimension))
+      ].map((member) => {
+        if (!query.order) {
+          return member;
+        }
+
+        return {
+          ...member,
+          order: query.order[member.id] || 'none',
+          isActive: Boolean(query.order[member.id])
+        };
+      })
+    ).sort((a, b) => {
+      const a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
+      const b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id];
+
+      // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
+      return a1 - b1;
+    });
+
+    console.log('prepare:', { order: query.order, orderMembers });
+
     return {
       meta,
       query,
       validatedQuery: this.validatedQuery(),
       isQueryPresent: this.isQueryPresent(),
       chartType,
-      measures: (meta && query.measures || [])
-        .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'measures') })),
-      dimensions: (meta && query.dimensions || [])
-        .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'dimensions') })),
-      segments: (meta && query.segments || [])
-        .map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
-      timeDimensions: (meta && query.timeDimensions || [])
-        .map((m, i) => ({
-          ...m,
-          dimension: { ...meta.resolveMember(m.dimension, 'dimensions'), granularities },
-          index: i
-        })),
-      filters: (meta && query.filters || [])
-        .map((m, i) => ({
-          ...m,
-          dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
-          operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
-          index: i
-        })),
-      availableMeasures: meta && meta.membersForQuery(query, 'measures') || [],
-      availableDimensions: meta && meta.membersForQuery(query, 'dimensions') || [],
-      availableTimeDimensions: (
-        meta && meta.membersForQuery(query, 'dimensions') || []
-      ).filter(m => m.type === 'time'),
-      availableSegments: meta && meta.membersForQuery(query, 'segments') || [],
+      measures,
+      dimensions,
+      segments: ((meta && query.segments) || []).map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
+      timeDimensions,
+      filters: ((meta && query.filters) || []).map((m, i) => ({
+        ...m,
+        dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
+        operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
+        index: i
+      })),
+      orderMembers,
+      availableMeasures: (meta && meta.membersForQuery(query, 'measures')) || [],
+      availableDimensions: (meta && meta.membersForQuery(query, 'dimensions')) || [],
+      availableTimeDimensions: ((meta && meta.membersForQuery(query, 'dimensions')) || []).filter(
+        (m) => m.type === 'time'
+      ),
+      availableSegments: (meta && meta.membersForQuery(query, 'segments')) || [],
 
       updateMeasures: updateMethods('measures'),
       updateDimensions: updateMethods('dimensions'),
@@ -130,7 +175,7 @@ export default class QueryBuilder extends React.Component {
       updateFilters: updateMethods('filters', toFilter),
       updateChartType: (newChartType) => this.updateVizState({ chartType: newChartType }),
       updateOrder: {
-        set(member, order = 'asc') {
+        set(member, order = 'asc', atIndex = null) {
           if (order === 'none') {
             this.remove(member);
           } else {
@@ -145,7 +190,7 @@ export default class QueryBuilder extends React.Component {
         remove: (member) => {
           this.updateQuery({
             order: Object.keys(query.order)
-              .filter(currentMember => currentMember !== member)
+              .filter((currentMember) => currentMember !== member)
               .reduce((memo, currentMember) => {
                 memo[currentMember] = query.order[currentMember];
                 return memo;
@@ -190,7 +235,7 @@ export default class QueryBuilder extends React.Component {
     const { query } = this.state;
     return {
       ...query,
-      filters: (query.filters || []).filter(f => f.operator)
+      filters: (query.filters || []).filter((f) => f.operator)
     };
   }
 
@@ -204,10 +249,10 @@ export default class QueryBuilder extends React.Component {
       const { meta } = this.state;
 
       if (
-        (oldQuery.timeDimensions || []).length === 1
-        && (newQuery.timeDimensions || []).length === 1
-        && newQuery.timeDimensions[0].granularity
-        && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
+        (oldQuery.timeDimensions || []).length === 1 &&
+        (newQuery.timeDimensions || []).length === 1 &&
+        newQuery.timeDimensions[0].granularity &&
+        oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
       ) {
         newState = {
           ...newState,
@@ -216,20 +261,22 @@ export default class QueryBuilder extends React.Component {
       }
 
       if (
-        (oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0
-        || (
-          (oldQuery.measures || []).length === 1
-          && (newQuery.measures || []).length === 1
-          && oldQuery.measures[0] !== newQuery.measures[0]
-        )
+        ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0) ||
+        ((oldQuery.measures || []).length === 1 &&
+          (newQuery.measures || []).length === 1 &&
+          oldQuery.measures[0] !== newQuery.measures[0])
       ) {
         const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
         newQuery = {
           ...newQuery,
-          timeDimensions: defaultTimeDimension ? [{
-            dimension: defaultTimeDimension,
-            granularity: defaultGranularity
-          }] : [],
+          timeDimensions: defaultTimeDimension
+            ? [
+                {
+                  dimension: defaultTimeDimension,
+                  granularity: defaultGranularity
+                }
+              ]
+            : []
         };
         return {
           ...newState,
@@ -238,13 +285,10 @@ export default class QueryBuilder extends React.Component {
         };
       }
 
-      if (
-        (oldQuery.dimensions || []).length === 0
-        && (newQuery.dimensions || []).length > 0
-      ) {
+      if ((oldQuery.dimensions || []).length === 0 && (newQuery.dimensions || []).length > 0) {
         newQuery = {
           ...newQuery,
-          timeDimensions: (newQuery.timeDimensions || []).map(td => ({ ...td, granularity: undefined })),
+          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({ ...td, granularity: undefined }))
         };
         return {
           ...newState,
@@ -253,15 +297,13 @@ export default class QueryBuilder extends React.Component {
         };
       }
 
-      if (
-        (oldQuery.dimensions || []).length > 0
-        && (newQuery.dimensions || []).length === 0
-      ) {
+      if ((oldQuery.dimensions || []).length > 0 && (newQuery.dimensions || []).length === 0) {
         newQuery = {
           ...newQuery,
-          timeDimensions: (newQuery.timeDimensions || []).map(td => ({
-            ...td, granularity: td.granularity || defaultGranularity
-          })),
+          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({
+            ...td,
+            granularity: td.granularity || defaultGranularity
+          }))
         };
         return {
           ...newState,
@@ -271,12 +313,9 @@ export default class QueryBuilder extends React.Component {
       }
 
       if (
-        (
-          (oldQuery.dimensions || []).length > 0
-          || (oldQuery.measures || []).length > 0
-        )
-        && (newQuery.dimensions || []).length === 0
-        && (newQuery.measures || []).length === 0
+        ((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0) &&
+        (newQuery.dimensions || []).length === 0 &&
+        (newQuery.measures || []).length === 0
       ) {
         newQuery = {
           ...newQuery,
@@ -295,9 +334,9 @@ export default class QueryBuilder extends React.Component {
     if (newState.chartType) {
       const newChartType = newState.chartType;
       if (
-        (newChartType === 'line' || newChartType === 'area')
-        && (query.timeDimensions || []).length === 1
-        && !query.timeDimensions[0].granularity
+        (newChartType === 'line' || newChartType === 'area') &&
+        (query.timeDimensions || []).length === 1 &&
+        !query.timeDimensions[0].granularity
       ) {
         const [td] = query.timeDimensions;
         return {
@@ -310,9 +349,9 @@ export default class QueryBuilder extends React.Component {
       }
 
       if (
-        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number')
-        && (query.timeDimensions || []).length === 1
-        && query.timeDimensions[0].granularity
+        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number') &&
+        (query.timeDimensions || []).length === 1 &&
+        query.timeDimensions[0].granularity
       ) {
         const [td] = query.timeDimensions;
         return {
@@ -333,8 +372,7 @@ export default class QueryBuilder extends React.Component {
     if (disableHeuristics) {
       return newState;
     }
-    return stateChangeHeuristics && stateChangeHeuristics(this.state, newState)
-      || this.defaultHeuristics(newState);
+    return (stateChangeHeuristics && stateChangeHeuristics(this.state, newState)) || this.defaultHeuristics(newState);
   }
 
   render() {
