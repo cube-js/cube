@@ -18,13 +18,17 @@ import _extends from '@babel/runtime/helpers/extends';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import 'core-js/modules/es.array.concat';
 import 'core-js/modules/es.array.filter';
+import 'core-js/modules/es.array.includes';
 import 'core-js/modules/es.array.reduce';
 import 'core-js/modules/es.array.sort';
 import 'core-js/modules/es.array.splice';
 import 'core-js/modules/es.function.name';
 import 'core-js/modules/es.number.constructor';
 import 'core-js/modules/es.number.max-safe-integer';
+import 'core-js/modules/es.object.entries';
+import 'core-js/modules/es.object.from-entries';
 import 'core-js/modules/es.object.keys';
+import 'core-js/modules/es.string.includes';
 import _toConsumableArray from '@babel/runtime/helpers/toConsumableArray';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
@@ -318,6 +322,27 @@ QueryRendererWithTotals.defaultProps = {
   loadSql: null
 };
 
+function moveKeyAtIndex(object$$1, key, atIndex) {
+  var keys = Object.keys(object$$1);
+  var entries = [];
+  var index = 0;
+  var j = 0;
+
+  while (j < keys.length) {
+    if (entries.length === atIndex) {
+      entries.push([key, object$$1[key]]);
+      j++;
+    } else {
+      if (keys[index] !== key) {
+        entries.push([keys[index], object$$1[keys[index]]]);
+        j++;
+      }
+
+      index++;
+    }
+  }
+}
+
 var QueryBuilder =
 /*#__PURE__*/
 function (_React$Component) {
@@ -372,13 +397,25 @@ function (_React$Component) {
     }()
   }, {
     key: "componentDidUpdate",
-    value: function componentDidUpdate(prevProps) {
+    value: function componentDidUpdate(prevProps, prevState) {
+      var _this2 = this;
+
       var _this$props = this.props,
           query = _this$props.query,
           vizState = _this$props.vizState;
 
       if (!equals(prevProps.query, query)) {
-        // eslint-disable-next-line react/no-did-update-set-state
+        if (query.order == null && this.isQueryPresent(query)) {
+          this.cubejsApi().sql(query).then(function (response) {
+            var order = response.sqlQuery.sql.order;
+
+            _this2.updateQuery({
+              order: order
+            });
+          })["catch"](function () {});
+        } // eslint-disable-next-line react/no-did-update-set-state
+
+
         this.setState({
           query: query
         });
@@ -405,7 +442,7 @@ function (_React$Component) {
   }, {
     key: "prepareRenderProps",
     value: function prepareRenderProps(queryRendererProps) {
-      var _this2 = this;
+      var _this3 = this;
 
       var getName = function getName(member) {
         return member.name;
@@ -438,21 +475,21 @@ function (_React$Component) {
         var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
         return {
           add: function add(member) {
-            var query = _this2.state.query;
+            var query = _this3.state.query;
 
-            _this2.updateQuery(_defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))));
+            _this3.updateQuery(_defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))));
           },
           remove: function remove(member) {
-            var query = _this2.state.query;
+            var query = _this3.state.query;
             var members = (query[memberType] || []).concat([]);
             members.splice(member.index, 1);
-            return _this2.updateQuery(_defineProperty({}, memberType, members));
+            return _this3.updateQuery(_defineProperty({}, memberType, members));
           },
           update: function update(member, updateWith) {
-            var query = _this2.state.query;
+            var query = _this3.state.query;
             var members = (query[memberType] || []).concat([]);
             members.splice(member.index, 1, toQuery(updateWith));
-            return _this2.updateQuery(_defineProperty({}, memberType, members));
+            return _this3.updateQuery(_defineProperty({}, memberType, members));
           }
         };
       };
@@ -499,11 +536,9 @@ function (_React$Component) {
           index: index
         });
       });
-      var indexById = Object.keys(query.order || []).map(function (id, index) {
-        return _defineProperty({}, id, index);
-      }).reduce(function (a, b) {
-        return _objectSpread2({}, a, {}, b);
-      });
+      var indexById = Object.fromEntries(Object.keys(query.order || {}).map(function (id, index) {
+        return [id, index];
+      }));
       var orderMembers = uniqBy(prop('id'), [].concat(_toConsumableArray(measures.map(toOrderMember)), _toConsumableArray(dimensions.map(toOrderMember)), _toConsumableArray(timeDimensions.map(function (td) {
         return toOrderMember(td.dimension);
       }))).map(function (member) {
@@ -512,18 +547,13 @@ function (_React$Component) {
         }
 
         return _objectSpread2({}, member, {
-          order: query.order[member.id] || 'none',
-          isActive: Boolean(query.order[member.id])
+          order: query.order[member.id] || 'none'
         });
       })).sort(function (a, b) {
         var a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
         var b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id]; // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
 
         return a1 - b1;
-      });
-      console.log('prepare:', {
-        order: query.order,
-        orderMembers: orderMembers
       });
       return _objectSpread2({
         meta: meta,
@@ -559,24 +589,34 @@ function (_React$Component) {
         updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
         updateFilters: updateMethods('filters', toFilter),
         updateChartType: function updateChartType(newChartType) {
-          return _this2.updateVizState({
+          return _this3.updateVizState({
             chartType: newChartType
           });
         },
         updateOrder: {
           set: function set(member) {
             var order = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'asc';
+            var atIndex = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
 
             if (order === 'none') {
               this.remove(member);
-            } else {
-              self.updateQuery({
-                order: _objectSpread2({}, query.order, _defineProperty({}, member, order))
-              });
             }
+
+            var nextOrder;
+
+            if (atIndex !== null) {
+              nextOrder = moveKeyAtIndex(query.order, member, atIndex);
+              nextOrder[member] = order;
+            } else {
+              nextOrder = _objectSpread2({}, query.order, _defineProperty({}, member, order));
+            }
+
+            self.updateQuery({
+              order: nextOrder
+            });
           },
           remove: function remove(member) {
-            _this2.updateQuery({
+            _this3.updateQuery({
               order: Object.keys(query.order).filter(function (currentMember) {
                 return currentMember !== member;
               }).reduce(function (memo, currentMember) {
@@ -586,8 +626,17 @@ function (_React$Component) {
             });
           },
           update: function update(order) {
-            _this2.updateQuery({
+            _this3.updateQuery({
               order: order
+            });
+          },
+          updateByOrderMembers: function updateByOrderMembers(orderMembers) {
+            _this3.updateQuery({
+              order: Object.fromEntries(orderMembers.map(function (_ref) {
+                var id = _ref.id,
+                    order = _ref.order;
+                return order !== 'none' && [id, order];
+              }).filter(Boolean)) || {}
             });
           }
         }
@@ -597,8 +646,15 @@ function (_React$Component) {
     key: "updateQuery",
     value: function updateQuery(queryUpdate) {
       var query = this.state.query;
+
+      var _query$queryUpdate = _objectSpread2({}, query, {}, queryUpdate),
+          order = _query$queryUpdate.order,
+          updatedQuery = _objectWithoutProperties(_query$queryUpdate, ["order"]);
+
       this.updateVizState({
-        query: _objectSpread2({}, query, {}, queryUpdate)
+        query: _objectSpread2({}, updatedQuery, {}, order == null ? {} : {
+          order: order
+        })
       });
     }
   }, {
@@ -751,12 +807,37 @@ function (_React$Component) {
         return newState;
       }
 
-      return stateChangeHeuristics && stateChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
+      function adjustedOrder(query) {
+        var orderMembers = [].concat(_toConsumableArray(query.measures || []), _toConsumableArray(query.dimensions || []), _toConsumableArray((query.timeDimensions || []).map(function (td) {
+          return td.dimension;
+        })));
+        var order = Object.fromEntries(Object.entries(query.order || {}).map(function (_ref2) {
+          var _ref3 = _slicedToArray(_ref2, 2),
+              member = _ref3[0],
+              order = _ref3[1];
+
+          return orderMembers.includes(member) ? [member, order] : false;
+        }).filter(Boolean));
+        return query.order == null && !Object.keys(order).length || !orderMembers.length ? null : order;
+      }
+
+      var heuristics = stateChangeHeuristics && stateChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
+      var order = adjustedOrder(heuristics.query);
+
+      var _heuristics$query = heuristics.query,
+          _ = _heuristics$query.order,
+          query = _objectWithoutProperties(_heuristics$query, ["order"]);
+
+      return _objectSpread2({}, heuristics, {
+        query: _objectSpread2({}, query, {}, order ? {
+          order: order
+        } : {})
+      });
     }
   }, {
     key: "render",
     value: function render() {
-      var _this3 = this;
+      var _this4 = this;
 
       var _this$props4 = this.props,
           cubejsApi = _this$props4.cubejsApi,
@@ -769,7 +850,7 @@ function (_React$Component) {
           cubejsApi: cubejsApi,
           render: function render(queryRendererProps) {
             if (_render) {
-              return _render(_this3.prepareRenderProps(queryRendererProps));
+              return _render(_this4.prepareRenderProps(queryRendererProps));
             }
 
             return null;

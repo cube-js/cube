@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import * as PropTypes from 'prop-types';
-import { prop, uniqBy } from 'ramda';
 import { Row, Col, Divider, Card, Button, Popover } from 'antd';
 import { SortAscendingOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
@@ -133,11 +132,7 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                         content={
                           <OrderGroup
                             orderMembers={orderMembers}
-                            onChange={() => 0}
-                            testOnOrderChange={(id, order, index) => {
-                              console.log('orderChange', { id, order,index });
-                              updateOrder.set(id, order, index);
-                            }}
+                            onChange={updateOrder.updateByOrderMembers}
                           />
                         }
                         visible={isOrderPopoverVisible}

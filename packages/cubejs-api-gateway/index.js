@@ -370,7 +370,10 @@ class ApiGateway {
         { includeDebugInfo: process.env.NODE_ENV !== 'production' }
       );
       res({
-        sql: sqlQuery
+        sql: {
+          ...sqlQuery,
+          order: Object.fromEntries(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
+        }
       });
     } catch (e) {
       this.handleError({

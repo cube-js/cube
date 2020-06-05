@@ -3,6 +3,7 @@ import * as PropTypes from 'prop-types';
 import { equals, prop, uniqBy } from 'ramda';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
+import { moveKeyAtIndex } from './utils';
 
 export default class QueryBuilder extends React.Component {
   constructor(props) {
@@ -19,9 +20,22 @@ export default class QueryBuilder extends React.Component {
     this.setState({ meta });
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps, prevState) {
     const { query, vizState } = this.props;
+
     if (!equals(prevProps.query, query)) {
+      if (query.order == null && this.isQueryPresent(query)) {
+        this.cubejsApi()
+          .sql(query)
+          .then((response) => {
+            const {
+              sql: { order }
+            } = response.sqlQuery;
+
+            this.updateQuery({ order });
+          })
+          .catch(() => {});
+      }
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState({ query });
     }
@@ -113,9 +127,7 @@ export default class QueryBuilder extends React.Component {
       index
     }));
 
-    const indexById = Object.keys(query.order || [])
-      .map((id, index) => ({ [id]: index }))
-      .reduce((a, b) => ({ ...a, ...b }));
+    const indexById = Object.fromEntries(Object.keys(query.order || {}).map((id, index) => [id, index]));
 
     const orderMembers = uniqBy(
       prop('id'),
@@ -130,8 +142,7 @@ export default class QueryBuilder extends React.Component {
 
         return {
           ...member,
-          order: query.order[member.id] || 'none',
-          isActive: Boolean(query.order[member.id])
+          order: query.order[member.id] || 'none'
         };
       })
     ).sort((a, b) => {
@@ -141,8 +152,6 @@ export default class QueryBuilder extends React.Component {
       // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
       return a1 - b1;
     });
-
-    console.log('prepare:', { order: query.order, orderMembers });
 
     return {
       meta,
@@ -178,14 +187,20 @@ export default class QueryBuilder extends React.Component {
         set(member, order = 'asc', atIndex = null) {
           if (order === 'none') {
             this.remove(member);
-          } else {
-            self.updateQuery({
-              order: {
-                ...query.order,
-                [member]: order
-              }
-            });
           }
+
+          let nextOrder;
+          if (atIndex !== null) {
+            nextOrder = moveKeyAtIndex(query.order, member, atIndex);
+            nextOrder[member] = order;
+          } else {
+            nextOrder = {
+              ...query.order,
+              [member]: order
+            };
+          }
+
+          self.updateQuery({ order: nextOrder });
         },
         remove: (member) => {
           this.updateQuery({
@@ -201,6 +216,14 @@ export default class QueryBuilder extends React.Component {
           this.updateQuery({
             order
           });
+        },
+        updateByOrderMembers: (orderMembers) => {
+          this.updateQuery({
+            order:
+              Object.fromEntries(
+                orderMembers.map(({ id, order }) => order !== 'none' && [id, order]).filter(Boolean)
+              ) || {}
+          });
         }
       },
       ...queryRendererProps
@@ -209,10 +232,16 @@ export default class QueryBuilder extends React.Component {
 
   updateQuery(queryUpdate) {
     const { query } = this.state;
+
+    let { order, ...updatedQuery } = {
+      ...query,
+      ...queryUpdate
+    };
+
     this.updateVizState({
       query: {
-        ...query,
-        ...queryUpdate
+        ...updatedQuery,
+        ...(order == null ? {} : { order })
       }
     });
   }
@@ -372,7 +401,38 @@ export default class QueryBuilder extends React.Component {
     if (disableHeuristics) {
       return newState;
     }
-    return (stateChangeHeuristics && stateChangeHeuristics(this.state, newState)) || this.defaultHeuristics(newState);
+
+    function adjustedOrder(query) {
+      const orderMembers = [
+        ...(query.measures || []),
+        ...(query.dimensions || []),
+        ...(query.timeDimensions || []).map((td) => td.dimension)
+      ];
+
+      const order = Object.fromEntries(
+        Object.entries(query.order || {})
+          .map(([member, order]) => {
+            return orderMembers.includes(member) ? [member, order] : false;
+          })
+          .filter(Boolean)
+      );
+
+      return (query.order == null && !Object.keys(order).length) || !orderMembers.length ? null : order;
+    }
+
+    const heuristics =
+      (stateChangeHeuristics && stateChangeHeuristics(this.state, newState)) || this.defaultHeuristics(newState);
+
+    const order = adjustedOrder(heuristics.query);
+    const { order: _, ...query } = heuristics.query;
+
+    return {
+      ...heuristics,
+      query: {
+        ...query,
+        ...(order ? { order } : {})
+      }
+    };
   }
 
   render() {

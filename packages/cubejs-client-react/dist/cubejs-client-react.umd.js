@@ -8390,10 +8390,108 @@
     }
   });
 
+  var $includes = arrayIncludes.includes;
+
+
+
+  var USES_TO_LENGTH$7 = arrayMethodUsesToLength('indexOf', { ACCESSORS: true, 1: 0 });
+
+  // `Array.prototype.includes` method
+  // https://tc39.github.io/ecma262/#sec-array.prototype.includes
+  _export({ target: 'Array', proto: true, forced: !USES_TO_LENGTH$7 }, {
+    includes: function includes(el /* , fromIndex = 0 */) {
+      return $includes(this, el, arguments.length > 1 ? arguments[1] : undefined);
+    }
+  });
+
+  // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
+  addToUnscopables('includes');
+
   // `Number.MAX_SAFE_INTEGER` constant
   // https://tc39.github.io/ecma262/#sec-number.max_safe_integer
   _export({ target: 'Number', stat: true }, {
     MAX_SAFE_INTEGER: 0x1FFFFFFFFFFFFF
+  });
+
+  var propertyIsEnumerable = objectPropertyIsEnumerable.f;
+
+  // `Object.{ entries, values }` methods implementation
+  var createMethod$6 = function (TO_ENTRIES) {
+    return function (it) {
+      var O = toIndexedObject(it);
+      var keys = objectKeys(O);
+      var length = keys.length;
+      var i = 0;
+      var result = [];
+      var key;
+      while (length > i) {
+        key = keys[i++];
+        if (!descriptors || propertyIsEnumerable.call(O, key)) {
+          result.push(TO_ENTRIES ? [key, O[key]] : O[key]);
+        }
+      }
+      return result;
+    };
+  };
+
+  var objectToArray = {
+    // `Object.entries` method
+    // https://tc39.github.io/ecma262/#sec-object.entries
+    entries: createMethod$6(true),
+    // `Object.values` method
+    // https://tc39.github.io/ecma262/#sec-object.values
+    values: createMethod$6(false)
+  };
+
+  var $entries = objectToArray.entries;
+
+  // `Object.entries` method
+  // https://tc39.github.io/ecma262/#sec-object.entries
+  _export({ target: 'Object', stat: true }, {
+    entries: function entries(O) {
+      return $entries(O);
+    }
+  });
+
+  // `Object.fromEntries` method
+  // https://github.com/tc39/proposal-object-from-entries
+  _export({ target: 'Object', stat: true }, {
+    fromEntries: function fromEntries(iterable) {
+      var obj = {};
+      iterate_1(iterable, function (k, v) {
+        createProperty(obj, k, v);
+      }, undefined, true);
+      return obj;
+    }
+  });
+
+  var notARegexp = function (it) {
+    if (isRegexp(it)) {
+      throw TypeError("The method doesn't accept regular expressions");
+    } return it;
+  };
+
+  var MATCH$2 = wellKnownSymbol('match');
+
+  var correctIsRegexpLogic = function (METHOD_NAME) {
+    var regexp = /./;
+    try {
+      '/./'[METHOD_NAME](regexp);
+    } catch (e) {
+      try {
+        regexp[MATCH$2] = false;
+        return '/./'[METHOD_NAME](regexp);
+      } catch (f) { /* empty */ }
+    } return false;
+  };
+
+  // `String.prototype.includes` method
+  // https://tc39.github.io/ecma262/#sec-string.prototype.includes
+  _export({ target: 'String', proto: true, forced: !correctIsRegexpLogic('includes') }, {
+    includes: function includes(searchString /* , position = 0 */) {
+      return !!~String(requireObjectCoercible(this))
+        .indexOf(notARegexp(searchString), arguments.length > 1 ? arguments[1] : undefined);
+    }
   });
 
   // `Symbol.asyncIterator` well-known symbol
@@ -8409,11 +8507,11 @@
 
 
   var STRICT_METHOD$5 = arrayMethodIsStrict('forEach');
-  var USES_TO_LENGTH$7 = arrayMethodUsesToLength('forEach');
+  var USES_TO_LENGTH$8 = arrayMethodUsesToLength('forEach');
 
   // `Array.prototype.forEach` method implementation
   // https://tc39.github.io/ecma262/#sec-array.prototype.foreach
-  var arrayForEach = (!STRICT_METHOD$5 || !USES_TO_LENGTH$7) ? function forEach(callbackfn /* , thisArg */) {
+  var arrayForEach = (!STRICT_METHOD$5 || !USES_TO_LENGTH$8) ? function forEach(callbackfn /* , thisArg */) {
     return $forEach$1(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
   } : [].forEach;
 
@@ -9172,6 +9270,27 @@
     }
   });
 
+  function moveKeyAtIndex(object, key, atIndex) {
+    var keys = Object.keys(object);
+    var entries = [];
+    var index = 0;
+    var j = 0;
+
+    while (j < keys.length) {
+      if (entries.length === atIndex) {
+        entries.push([key, object[key]]);
+        j++;
+      } else {
+        if (keys[index] !== key) {
+          entries.push([keys[index], object[keys[index]]]);
+          j++;
+        }
+
+        index++;
+      }
+    }
+  }
+
   var QueryBuilder =
   /*#__PURE__*/
   function (_React$Component) {
@@ -9226,13 +9345,25 @@
       }()
     }, {
       key: "componentDidUpdate",
-      value: function componentDidUpdate(prevProps) {
+      value: function componentDidUpdate(prevProps, prevState) {
+        var _this2 = this;
+
         var _this$props = this.props,
             query = _this$props.query,
             vizState = _this$props.vizState;
 
         if (!equals(prevProps.query, query)) {
-          // eslint-disable-next-line react/no-did-update-set-state
+          if (query.order == null && this.isQueryPresent(query)) {
+            this.cubejsApi().sql(query).then(function (response) {
+              var order = response.sqlQuery.sql.order;
+
+              _this2.updateQuery({
+                order: order
+              });
+            })["catch"](function () {});
+          } // eslint-disable-next-line react/no-did-update-set-state
+
+
           this.setState({
             query: query
           });
@@ -9259,7 +9390,7 @@
     }, {
       key: "prepareRenderProps",
       value: function prepareRenderProps(queryRendererProps) {
-        var _this2 = this;
+        var _this3 = this;
 
         var getName = function getName(member) {
           return member.name;
@@ -9292,21 +9423,21 @@
           var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
           return {
             add: function add$$1(member) {
-              var query = _this2.state.query;
+              var query = _this3.state.query;
 
-              _this2.updateQuery(_defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))));
+              _this3.updateQuery(_defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))));
             },
             remove: function remove$$1(member) {
-              var query = _this2.state.query;
+              var query = _this3.state.query;
               var members = (query[memberType] || []).concat([]);
               members.splice(member.index, 1);
-              return _this2.updateQuery(_defineProperty({}, memberType, members));
+              return _this3.updateQuery(_defineProperty({}, memberType, members));
             },
             update: function update$$1(member, updateWith) {
-              var query = _this2.state.query;
+              var query = _this3.state.query;
               var members = (query[memberType] || []).concat([]);
               members.splice(member.index, 1, toQuery(updateWith));
-              return _this2.updateQuery(_defineProperty({}, memberType, members));
+              return _this3.updateQuery(_defineProperty({}, memberType, members));
             }
           };
         };
@@ -9353,11 +9484,9 @@
             index: index
           });
         });
-        var indexById = Object.keys(query.order || []).map(function (id, index) {
-          return _defineProperty({}, id, index);
-        }).reduce(function (a, b) {
-          return _objectSpread({}, a, {}, b);
-        });
+        var indexById = Object.fromEntries(Object.keys(query.order || {}).map(function (id, index) {
+          return [id, index];
+        }));
         var orderMembers = uniqBy(prop('id'), [].concat(_toConsumableArray(measures.map(toOrderMember)), _toConsumableArray(dimensions.map(toOrderMember)), _toConsumableArray(timeDimensions.map(function (td) {
           return toOrderMember(td.dimension);
         }))).map(function (member) {
@@ -9366,18 +9495,13 @@
           }
 
           return _objectSpread({}, member, {
-            order: query.order[member.id] || 'none',
-            isActive: Boolean(query.order[member.id])
+            order: query.order[member.id] || 'none'
           });
         })).sort(function (a, b) {
           var a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
           var b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id]; // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
 
           return a1 - b1;
-        });
-        console.log('prepare:', {
-          order: query.order,
-          orderMembers: orderMembers
         });
         return _objectSpread({
           meta: meta,
@@ -9413,24 +9537,34 @@
           updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
           updateFilters: updateMethods('filters', toFilter),
           updateChartType: function updateChartType(newChartType) {
-            return _this2.updateVizState({
+            return _this3.updateVizState({
               chartType: newChartType
             });
           },
           updateOrder: {
             set: function set(member) {
               var order = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'asc';
+              var atIndex = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
 
               if (order === 'none') {
                 this.remove(member);
-              } else {
-                self.updateQuery({
-                  order: _objectSpread({}, query.order, _defineProperty({}, member, order))
-                });
               }
+
+              var nextOrder;
+
+              if (atIndex !== null) {
+                nextOrder = moveKeyAtIndex(query.order, member, atIndex);
+                nextOrder[member] = order;
+              } else {
+                nextOrder = _objectSpread({}, query.order, _defineProperty({}, member, order));
+              }
+
+              self.updateQuery({
+                order: nextOrder
+              });
             },
             remove: function remove$$1(member) {
-              _this2.updateQuery({
+              _this3.updateQuery({
                 order: Object.keys(query.order).filter(function (currentMember) {
                   return currentMember !== member;
                 }).reduce(function (memo, currentMember) {
@@ -9440,8 +9574,17 @@
               });
             },
             update: function update$$1(order) {
-              _this2.updateQuery({
+              _this3.updateQuery({
                 order: order
+              });
+            },
+            updateByOrderMembers: function updateByOrderMembers(orderMembers) {
+              _this3.updateQuery({
+                order: Object.fromEntries(orderMembers.map(function (_ref) {
+                  var id = _ref.id,
+                      order = _ref.order;
+                  return order !== 'none' && [id, order];
+                }).filter(Boolean)) || {}
               });
             }
           }
@@ -9451,8 +9594,15 @@
       key: "updateQuery",
       value: function updateQuery(queryUpdate) {
         var query = this.state.query;
+
+        var _query$queryUpdate = _objectSpread({}, query, {}, queryUpdate),
+            order = _query$queryUpdate.order,
+            updatedQuery = _objectWithoutProperties(_query$queryUpdate, ["order"]);
+
         this.updateVizState({
-          query: _objectSpread({}, query, {}, queryUpdate)
+          query: _objectSpread({}, updatedQuery, {}, order == null ? {} : {
+            order: order
+          })
         });
       }
     }, {
@@ -9605,12 +9755,37 @@
           return newState;
         }
 
-        return stateChangeHeuristics && stateChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
+        function adjustedOrder(query) {
+          var orderMembers = [].concat(_toConsumableArray(query.measures || []), _toConsumableArray(query.dimensions || []), _toConsumableArray((query.timeDimensions || []).map(function (td) {
+            return td.dimension;
+          })));
+          var order = Object.fromEntries(Object.entries(query.order || {}).map(function (_ref2) {
+            var _ref3 = _slicedToArray(_ref2, 2),
+                member = _ref3[0],
+                order = _ref3[1];
+
+            return orderMembers.includes(member) ? [member, order] : false;
+          }).filter(Boolean));
+          return query.order == null && !Object.keys(order).length || !orderMembers.length ? null : order;
+        }
+
+        var heuristics = stateChangeHeuristics && stateChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
+        var order = adjustedOrder(heuristics.query);
+
+        var _heuristics$query = heuristics.query,
+            _ = _heuristics$query.order,
+            query = _objectWithoutProperties(_heuristics$query, ["order"]);
+
+        return _objectSpread({}, heuristics, {
+          query: _objectSpread({}, query, {}, order ? {
+            order: order
+          } : {})
+        });
       }
     }, {
       key: "render",
       value: function render() {
-        var _this3 = this;
+        var _this4 = this;
 
         var _this$props4 = this.props,
             cubejsApi = _this$props4.cubejsApi,
@@ -9623,7 +9798,7 @@
             cubejsApi: cubejsApi,
             render: function render(queryRendererProps) {
               if (_render) {
-                return _render(_this3.prepareRenderProps(queryRendererProps));
+                return _render(_this4.prepareRenderProps(queryRendererProps));
               }
 
               return null;
