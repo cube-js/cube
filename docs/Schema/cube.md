@@ -197,8 +197,8 @@ If the `refreshKey` is not set, Cube.js will use the default strategy:
 
 The result of the default `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default. 
 
-Refresh key of a query is a concatenation of all cubes refresh keys involved in query as well.
-For rollup queries pre-aggregation table name is used as a key.
+Refresh key of a query is a concatenation of all cubes refresh keys involved in query.
+For rollup queries pre-aggregation table name is used as a refresh key.
 
 You can use an existing timestamp from your tables. Make sure to select max
 timestamp in that case.
