@@ -406,16 +406,20 @@ cube(`Orders`, {
 ### SQL Utils
 #### convertTz
 
-In case you need to convert your timestamp to user request timezone in cube or member SQL you can use `SQL_UTILS.convertTz()` method:
+In case you need to convert your timestamp to user request timezone in cube or member SQL you can use `SQL_UTILS.convertTz()` method. Note that Cube.js will automatically convert timezones for `timeDimensions` fields in [queries](Query-Format#query-properties). *Dimensions that use `SQL_UTILS.convertTz()` should not be used as `timeDimensions` in queries. Doing so will apply the conversion multiple times and yield wrong results.* In case the same database field needs to be queried in `dimensions` and `timeDimensions`, create dedicated dimensions in the cube definition for the respective use:
 
 ```javascript
 cube(`visitors`, {
   // ...
 
   dimensions: {
-    createdAtConverted: {
+    createdAtConverted: { // do not use in timeDimensions query property
       type: 'time',
       sql: SQL_UTILS.convertTz(`created_at`)
+    },
+    createdAt: { // use in timeDimensions query property
+      type: 'time',
+      sql: `created_at`
     },
   }
 })
