@@ -79,12 +79,27 @@ server.listen().then(({ version, port }) => {
 });
 ```
 
-### USER_CONTEXT vs Multitenant COMPILE_CONTEXT
+### User Context vs Multitenant Compile Context
 
 As a rule of thumb [USER_CONTEXT](cube#context-variables-user-context) should be used in scenarios when you want to define row level security within the same database for different users of such database. 
 For example to separate access of two ecommerce administrators who work on different product categories within same ecommerce store.
+
+```javascript
+cube(`Products`, {
+  sql: `select * from products where ${USER_CONTEXT.categoryId.filter('categoryId')}`
+})
+```
+
 On other hand Multitenant [COMPILE_CONTEXT](cube#context-variables-compile-context) should be used when users in fact access different databases.
 For example if you provide SaaS ecommerce hosting and each of your customers has separate database then each ecommerce store should be modelled as a separate tenant.
+
+```javascript
+const { authInfo: { tenantId } } = COMPILE_CONTEXT;
+
+cube(`Products`, {
+  sql: `select * from ${tenantId}.products`
+})
+```
 
 ## Same DB Instance with per Tenant Row Level Security
 
