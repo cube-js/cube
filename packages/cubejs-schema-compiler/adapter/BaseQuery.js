@@ -1931,7 +1931,7 @@ class BaseQuery {
             if (!paramValue) {
               throw new UserError(`Filter for ${column} is required`);
             }
-            return methods.filter(column);
+            return methods(paramValue).filter(column);
           },
           unsafeValue: () => paramValue
         });
