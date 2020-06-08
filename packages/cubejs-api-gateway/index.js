@@ -36,7 +36,11 @@ const prepareAnnotation = (metaConfig, query) => {
       description: config.description,
       type: config.type,
       format: config.format,
-      meta: config.meta
+      meta: config.meta,
+      ...(memberType === 'measures' ? {
+        drillMembers: config.drillMembers,
+        drillMembersGrouped: config.drillMembersGrouped
+      } : {})
     }];
   };
 
@@ -121,7 +125,8 @@ const operators = [
   'notInDateRange',
   'onTheDate',
   'beforeDate',
-  'afterDate'
+  'afterDate',
+  'measureFilter',
 ];
 
 const querySchema = Joi.object().keys({
@@ -188,13 +193,14 @@ const normalizeQuery = (query) => {
       'notInDateRange',
       'onTheDate',
       'beforeDate',
-      'afterDate'
+      'afterDate',
+      'measureFilter',
     ].indexOf(f.operator) === -1);
   if (filterWithIncorrectOperator) {
     throw new UserError(`Operator ${filterWithIncorrectOperator.operator} not supported for filter: ${JSON.stringify(filterWithIncorrectOperator)}`);
   }
   const filterWithoutValues = (query.filters || [])
-    .find(f => !f.values && ['set', 'notSet'].indexOf(f.operator) === -1);
+    .find(f => !f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1);
   if (filterWithoutValues) {
     throw new UserError(`Values required for filter: ${JSON.stringify(filterWithoutValues)}`);
   }

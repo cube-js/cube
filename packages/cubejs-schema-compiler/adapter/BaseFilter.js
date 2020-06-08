@@ -21,7 +21,7 @@ class BaseFilter extends BaseDimension {
   }
 
   filterToWhere() {
-    if (this.operator === 'measure_filter') {
+    if (this.operator === 'measure_filter' || this.operator === 'measureFilter') {
       return this.measureFilterToWhere();
     }
 
