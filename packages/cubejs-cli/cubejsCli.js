@@ -54,10 +54,10 @@ const createApp = async (projectName, options) => {
   event('Create App', createAppOptions);
   if (!options.dbType) {
     await displayError([
-      "You must pass an application name and a database type (-d).",
-      "",
-      "Example: ",
-      " $ cubejs create hello-world -d postgres"
+      'You must pass an application name and a database type (-d).',
+      '',
+      'Example: ',
+      ' $ cubejs create hello-world -d postgres'
     ], createAppOptions);
   }
   if (await fs.pathExists(projectName)) {
@@ -83,7 +83,7 @@ const createApp = async (projectName, options) => {
     version: '0.0.1',
     private: true,
     scripts: {
-      dev: template === 'express' ? 'node index.js' : "./node_modules/.bin/cubejs-dev-server"
+      dev: template === 'express' ? 'node index.js' : './node_modules/.bin/cubejs-dev-server'
     }
   });
 
@@ -153,10 +153,10 @@ const createApp = async (projectName, options) => {
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
 
   console.log();
-  console.log(`📊 Next step: run dev server`);
+  console.log('📊 Next step: run dev server');
   console.log();
   console.log(`     $ cd ${projectName}`);
-  console.log(`     $ npm run dev`);
+  console.log('     $ npm run dev');
   console.log();
 };
 
@@ -165,15 +165,15 @@ const generateSchema = async (options) => {
   event('Generate Schema', generateSchemaOptions);
   if (!options.tables) {
     await displayError([
-      "You must pass table names to generate schema from (-t).",
-      "",
-      "Example: ",
-      " $ cubejs generate -t orders,customers"
+      'You must pass table names to generate schema from (-t).',
+      '',
+      'Example: ',
+      ' $ cubejs generate -t orders,customers'
     ], generateSchemaOptions);
   }
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server')))) {
     await displayError(
-      "@cubejs-backend/server dependency not found. Please run generate command from project directory.",
+      '@cubejs-backend/server dependency not found. Please run generate command from project directory.',
       generateSchemaOptions
     );
   }

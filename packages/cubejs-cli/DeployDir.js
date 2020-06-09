@@ -8,7 +8,7 @@ class DeployDir {
   }
 
   filter(file) {
-    let baseName = path.basename(file);
+    const baseName = path.basename(file);
     return baseName !== 'node_modules' && baseName !== '.git' && baseName !== '.env';
   }
 
@@ -21,6 +21,7 @@ class DeployDir {
     for (const file of files) {
       const filePath = path.resolve(directory, file);
       if (!this.filter(filePath)) {
+        // eslint-disable-next-line no-continue
         continue;
       }
       const stat = await fs.stat(filePath);
@@ -41,12 +42,12 @@ class DeployDir {
       return fs.createReadStream(file)
         .pipe(hash.setEncoding('hex'))
         .on('finish', () => {
-          resolve(hash.digest('hex'))
+          resolve(hash.digest('hex'));
         })
         .on('error', (err) => {
           reject(err);
         });
-    })
+    });
   }
 }
 

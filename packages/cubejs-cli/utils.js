@@ -33,8 +33,8 @@ const displayError = async (text, options = {}) => {
   console.error(chalk.yellow('Need some help? -------------------------------------'));
   await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString(), ...options });
   console.error('');
-  console.error(`${chalk.yellow(`  Ask this question in Cube.js Slack:`)} https://slack.cube.dev`);
-  console.error(`${chalk.yellow(`  Post an issue:`)} https://github.com/cube-js/cube.js/issues`);
+  console.error(`${chalk.yellow('  Ask this question in Cube.js Slack:')} https://slack.cube.dev`);
+  console.error(`${chalk.yellow('  Post an issue:')} https://github.com/cube-js/cube.js/issues`);
   console.error('');
   process.exit(1);
 };
@@ -58,7 +58,7 @@ exports.requireFromPackage = async (module) => {
 const logStage = async (stage, eventName, props) => {
   console.log(`- ${stage}`);
   if (eventName) {
-    await event(eventName, props)
+    await event(eventName, props);
   }
 };
 

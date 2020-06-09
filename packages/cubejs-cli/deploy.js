@@ -2,8 +2,8 @@ const rp = require('request-promise');
 const jwt = require('jsonwebtoken');
 const fs = require('fs-extra');
 const path = require('path');
-const DeployDir = require('./DeployDir');
 const cliProgress = require('cli-progress');
+const DeployDir = require('./DeployDir');
 const { logStage } = require('./utils');
 
 const cloudReq = (options) => {
@@ -44,7 +44,7 @@ exports.deploy = async ({ directory, auth }) => {
     auth
   });
 
-  await logStage(`Deploying ${deploymentName}...`, `Cube Cloud CLI Deploy`);
+  await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
 
   const files = Object.keys(fileHashes);
   bar.start(files.length, 0, {
@@ -71,7 +71,7 @@ exports.deploy = async ({ directory, auth }) => {
             }
           },
           auth
-        })
+        });
       }
     }
     bar.update(files.length, { file: 'Post processing...' });
@@ -87,5 +87,5 @@ exports.deploy = async ({ directory, auth }) => {
   } finally {
     bar.stop();
   }
-  await logStage(`Done 🎉`, `Cube Cloud CLI Deploy Success`);
+  await logStage('Done 🎉', 'Cube Cloud CLI Deploy Success');
 };
