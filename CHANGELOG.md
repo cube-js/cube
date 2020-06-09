@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.28](https://github.com/cube-js/cube.js/compare/v0.19.27...v0.19.28) (2020-06-09)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** Correct missing auth error ([ceeaff7](https://github.com/cube-js/cube.js/commit/ceeaff7))
+
+
+
+
+
 ## [0.19.27](https://github.com/cube-js/cube.js/compare/v0.19.26...v0.19.27) (2020-06-09)
 
 **Note:** Version bump only for package cubejs
