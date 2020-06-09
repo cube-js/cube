@@ -13,6 +13,7 @@ const spawn = require('cross-spawn');
 const crypto = require('crypto');
 
 const templates = require('./templates');
+const { deploy } = require('./deploy');
 const { token, defaultExpiry, collect } = require('./token');
 const { requireFromPackage, event, displayError } = require('./utils');
 
@@ -255,6 +256,22 @@ program
     console.log('Examples:');
     console.log('');
     console.log('  $ cubejs token -e "1 day" -p foo=bar -p cool=true');
+  });
+
+program
+  .command('deploy')
+  .option('-a, --auth [auth]', 'Cube Cloud Deploy Authentication Token. You can find it in Cube Cloud Deployment Settings')
+  .description('Deploy project to Cube Cloud')
+  .action(
+    (options) => deploy({ directory: process.cwd(), ...options })
+      .catch(e => displayError(e.stack || e))
+  )
+  .on('--help', () => {
+    console.log('');
+    console.log('Examples:');
+    console.log('');
+    console.log('  $ export CUBE_CLOUD_DEPLOY_AUTH=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXBsb3ltZW50SWQiOiIxIiwidXJsIjoiaHR0cHM6Ly9leGFtcGxlcy5jdWJlY2xvdWQuZGV2IiwiaWF0IjoxNTE2MjM5MDIyfQ.La3MiuqfGigfzADl1wpxZ7jlb6dY60caezgqIOoHt-c');
+    console.log('  $ cubejs deploy');
   });
 
 if (!process.argv.slice(2).length) {

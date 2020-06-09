@@ -54,3 +54,12 @@ exports.requireFromPackage = async (module) => {
   // eslint-disable-next-line global-require,import/no-dynamic-require
   return require(path.join(process.cwd(), 'node_modules', module));
 };
+
+const logStage = async (stage, eventName, props) => {
+  console.log(`- ${stage}`);
+  if (eventName) {
+    await event(eventName, props)
+  }
+};
+
+exports.logStage = logStage;
