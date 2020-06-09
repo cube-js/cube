@@ -40,6 +40,7 @@
     "jsonwebtoken": "^8.5.1",
     "node-fetch": "^2.6.0",
     "node-machine-id": "^1.1.10",
+    "request": "^2.88.2",
     "request-promise": "^4.2.5"
   },
   "devDependencies": {
