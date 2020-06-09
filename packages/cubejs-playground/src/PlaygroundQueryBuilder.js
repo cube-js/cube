@@ -70,10 +70,10 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
 
         return (
           <>
-            <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+            <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
               <Col span={24}>
                 <Card>
-                  <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+                  <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
                     <Col span={24}>
                       <MemberGroup
                         members={measures}
@@ -105,7 +105,7 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                     </Col>
                   </Row>
 
-                  <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+                  <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
                     <Col span={24}>
                       <FilterGroup
                         members={filters}
@@ -116,7 +116,7 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                     </Col>
                   </Row>
 
-                  <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+                  <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
                     <Col span={24}>
                       <SelectChartType
                         chartType={chartType}
@@ -159,7 +159,7 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
               </Col>
             </Row>
 
-            <Row type="flex" justify="space-around" align="top" gutter={24}>
+            <Row justify="space-around" align="top" gutter={24}>
               <Col span={24}>
                 {isQueryPresent ? (
                   <ChartRenderer

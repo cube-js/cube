@@ -1,47 +1,113 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { equals, prop, uniqBy } from 'ramda';
+import {
+  equals, prop, uniqBy, indexBy
+} from 'ramda';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 import { moveKeyAtIndex } from './utils';
 
+const granularities = [
+  { name: undefined, title: 'w/o grouping' },
+  { name: 'hour', title: 'Hour' },
+  { name: 'day', title: 'Day' },
+  { name: 'week', title: 'Week' },
+  { name: 'month', title: 'Month' },
+  { name: 'year', title: 'Year' }
+];
+
 export default class QueryBuilder extends React.Component {
   constructor(props) {
     super(props);
+
     this.state = {
       query: props.query,
       chartType: 'line',
+      orderMembers: [],
       ...props.vizState
     };
+
+    this.shouldApplyHeuristicOrder = false;
+    this.requestId = 0;
   }
 
   async componentDidMount() {
+    const { query } = this.state;
     const meta = await this.cubejsApi().meta();
-    this.setState({ meta });
+
+    const getInitialOrderMembers = () => {
+      const indexById = Object.fromEntries(Object.keys(query.order || {}).map((id, index) => [id, index]));
+
+      return this.getOrderMembers().sort((a, b) => {
+        const a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
+        const b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id];
+        return a1 - b1;
+      });
+    };
+
+    this.setState({ meta }, () => {
+      this.setState({ orderMembers: getInitialOrderMembers() });
+    });
   }
 
   componentDidUpdate(prevProps, prevState) {
     const { query, vizState } = this.props;
 
     if (!equals(prevProps.query, query)) {
-      if (query.order == null && this.isQueryPresent(query)) {
-        this.cubejsApi()
-          .sql(query)
-          .then((response) => {
-            const {
-              sql: { order }
-            } = response.sqlQuery;
-
-            this.updateQuery({ order });
-          })
-          .catch(() => {});
-      }
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState({ query });
     }
+
     if (!equals(prevProps.vizState, vizState)) {
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState(vizState);
+    }
+
+    if (!equals(prevState.query, this.state.query)) {
+      const { query, orderMembers } = this.state;
+
+      const indexedOrderMembers = indexBy(prop('id'), this.getOrderMembers());
+      const currentIndexedOrderMembers = orderMembers.map((m) => m.id);
+
+      const nextOrderMembers = orderMembers
+        .map((orderMember) => ({
+          ...orderMember,
+          order: (query.order && query.order[orderMember.id]) || 'none'
+        }))
+        .filter(({ id }) => Boolean(indexedOrderMembers[id]));
+
+      Object.entries(indexedOrderMembers).forEach(([id, orderMember]) => {
+        if (!currentIndexedOrderMembers.includes(id)) {
+          nextOrderMembers.push(orderMember);
+        }
+      });
+
+      const adjustedOrder = (query) => {
+        const orderMembers = [
+          ...(query.measures || []),
+          ...(query.dimensions || []),
+          ...(query.timeDimensions || []).map((td) => td.dimension)
+        ];
+
+        const order = Object.fromEntries(
+          Object.entries(query.order || {})
+            .map(([member, order]) => (orderMembers.includes(member) ? [member, order] : false))
+            .filter(Boolean)
+        );
+
+        return (query.order == null && !Object.keys(order).length) || !orderMembers.length ? null : order;
+      };
+
+      const order = adjustedOrder(query);
+      const { order: _, ...nextQuery } = query;
+
+      this.updateVizState({
+        query: {
+          ...nextQuery,
+          ...(order ? { order } : {})
+        },
+        orderMembers: nextOrderMembers
+      });
     }
   }
 
@@ -56,6 +122,51 @@ export default class QueryBuilder extends React.Component {
     return QueryRenderer.isQueryPresent(query);
   }
 
+  getOrderMembers() {
+    const { query } = this.state;
+
+    const toOrderMember = (member) => ({
+      id: member.name,
+      title: member.title
+    });
+
+    return uniqBy(
+      prop('id'),
+      [
+        ...this.resolveMember('measures').map(toOrderMember),
+        ...this.resolveMember('dimensions').map(toOrderMember),
+        ...this.resolveMember('timeDimensions').map((td) => toOrderMember(td.dimension))
+      ].map((member) => ({
+        ...member,
+        order: (query.order && query.order[member.id]) || 'none'
+      }))
+    );
+  }
+
+  resolveMember(type) {
+    const { meta, query } = this.state;
+
+    if (!meta) {
+      return [];
+    }
+
+    if (type === 'timeDimensions') {
+      return (query.timeDimensions || []).map((m, index) => ({
+        ...m,
+        dimension: {
+          ...meta.resolveMember(m.dimension, 'dimensions'),
+          granularities
+        },
+        index
+      }));
+    }
+
+    return (query[type] || []).map((m, index) => ({
+      index,
+      ...meta.resolveMember(m, type)
+    }));
+  }
+
   prepareRenderProps(queryRendererProps) {
     const getName = (member) => member.name;
     const toTimeDimension = (member) => ({
@@ -67,10 +178,6 @@ export default class QueryBuilder extends React.Component {
       dimension: member.dimension.name,
       operator: member.operator,
       values: member.values
-    });
-    const toOrderMember = (member) => ({
-      id: member.name,
-      title: member.title
     });
 
     const updateMethods = (memberType, toQuery = getName) => ({
@@ -98,60 +205,10 @@ export default class QueryBuilder extends React.Component {
       }
     });
 
-    const granularities = [
-      { name: undefined, title: 'w/o grouping' },
-      { name: 'hour', title: 'Hour' },
-      { name: 'day', title: 'Day' },
-      { name: 'week', title: 'Week' },
-      { name: 'month', title: 'Month' },
-      { name: 'year', title: 'Year' }
-    ];
-
-    const { meta, query, chartType } = this.state;
     const self = this;
-
-    const measures = ((meta && query.measures) || []).map((m, index) => ({
-      index,
-      ...meta.resolveMember(m, 'measures')
-    }));
-    const dimensions = ((meta && query.dimensions) || []).map((m, index) => ({
-      index,
-      ...meta.resolveMember(m, 'dimensions')
-    }));
-    const timeDimensions = ((meta && query.timeDimensions) || []).map((m, index) => ({
-      ...m,
-      dimension: {
-        ...meta.resolveMember(m.dimension, 'dimensions'),
-        granularities
-      },
-      index
-    }));
-
-    const indexById = Object.fromEntries(Object.keys(query.order || {}).map((id, index) => [id, index]));
-
-    const orderMembers = uniqBy(
-      prop('id'),
-      [
-        ...measures.map(toOrderMember),
-        ...dimensions.map(toOrderMember),
-        ...timeDimensions.map((td) => toOrderMember(td.dimension))
-      ].map((member) => {
-        if (!query.order) {
-          return member;
-        }
-
-        return {
-          ...member,
-          order: query.order[member.id] || 'none'
-        };
-      })
-    ).sort((a, b) => {
-      const a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
-      const b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id];
-
-      // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
-      return a1 - b1;
-    });
+    const {
+      meta, query, orderMembers = [], chartType
+    } = this.state;
 
     return {
       meta,
@@ -159,10 +216,10 @@ export default class QueryBuilder extends React.Component {
       validatedQuery: this.validatedQuery(),
       isQueryPresent: this.isQueryPresent(),
       chartType,
-      measures,
-      dimensions,
+      measures: this.resolveMember('measures'),
+      dimensions: this.resolveMember('dimensions'),
+      timeDimensions: this.resolveMember('timeDimensions'),
       segments: ((meta && query.segments) || []).map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
-      timeDimensions,
       filters: ((meta && query.filters) || []).map((m, i) => ({
         ...m,
         dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
@@ -217,7 +274,8 @@ export default class QueryBuilder extends React.Component {
             order
           });
         },
-        updateByOrderMembers: (orderMembers) => {
+        updateByOrderMembers: (orderMembers = []) => {
+          this.setState({ orderMembers });
           this.updateQuery({
             order:
               Object.fromEntries(
@@ -233,22 +291,38 @@ export default class QueryBuilder extends React.Component {
   updateQuery(queryUpdate) {
     const { query } = this.state;
 
-    let { order, ...updatedQuery } = {
-      ...query,
-      ...queryUpdate
-    };
-
     this.updateVizState({
       query: {
-        ...updatedQuery,
-        ...(order == null ? {} : { order })
+        ...query,
+        ...queryUpdate
       }
     });
   }
 
-  updateVizState(state) {
+  async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
     let finalState = this.applyStateChangeHeuristics(state);
+
+    if (this.shouldApplyHeuristicOrder) {
+      try {
+        const currentRequestId = ++this.requestId;
+        const { order: _, ...query } = finalState.query;
+        const { sqlQuery } = await this.cubejsApi().sql(query);
+
+        if (this.requestId === currentRequestId) {
+          finalState = {
+            ...finalState,
+            query: {
+              ...finalState.query,
+              order: sqlQuery.sql.order
+            }
+          };
+        }
+      } catch (e) {}
+
+      this.shouldApplyHeuristicOrder = false;
+    }
+
     this.setState(finalState);
     finalState = { ...this.state, ...finalState };
     if (setQuery) {
@@ -271,6 +345,7 @@ export default class QueryBuilder extends React.Component {
   defaultHeuristics(newState) {
     const { query, sessionGranularity } = this.state;
     const defaultGranularity = sessionGranularity || 'day';
+
     if (newState.query) {
       const oldQuery = query;
       let newQuery = newState.query;
@@ -278,10 +353,10 @@ export default class QueryBuilder extends React.Component {
       const { meta } = this.state;
 
       if (
-        (oldQuery.timeDimensions || []).length === 1 &&
-        (newQuery.timeDimensions || []).length === 1 &&
-        newQuery.timeDimensions[0].granularity &&
-        oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
+        (oldQuery.timeDimensions || []).length === 1
+        && (newQuery.timeDimensions || []).length === 1
+        && newQuery.timeDimensions[0].granularity
+        && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
       ) {
         newState = {
           ...newState,
@@ -290,23 +365,26 @@ export default class QueryBuilder extends React.Component {
       }
 
       if (
-        ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0) ||
-        ((oldQuery.measures || []).length === 1 &&
-          (newQuery.measures || []).length === 1 &&
-          oldQuery.measures[0] !== newQuery.measures[0])
+        ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0)
+        || ((oldQuery.measures || []).length === 1
+          && (newQuery.measures || []).length === 1
+          && oldQuery.measures[0] !== newQuery.measures[0])
       ) {
         const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
         newQuery = {
           ...newQuery,
           timeDimensions: defaultTimeDimension
             ? [
-                {
-                  dimension: defaultTimeDimension,
-                  granularity: defaultGranularity
-                }
-              ]
+              {
+                dimension: defaultTimeDimension,
+                granularity: defaultGranularity
+              }
+            ]
             : []
         };
+
+        this.shouldApplyHeuristicOrder = true;
+
         return {
           ...newState,
           query: newQuery,
@@ -319,6 +397,9 @@ export default class QueryBuilder extends React.Component {
           ...newQuery,
           timeDimensions: (newQuery.timeDimensions || []).map((td) => ({ ...td, granularity: undefined }))
         };
+
+        this.shouldApplyHeuristicOrder = true;
+
         return {
           ...newState,
           query: newQuery,
@@ -334,6 +415,9 @@ export default class QueryBuilder extends React.Component {
             granularity: td.granularity || defaultGranularity
           }))
         };
+
+        this.shouldApplyHeuristicOrder = true;
+
         return {
           ...newState,
           query: newQuery,
@@ -342,15 +426,18 @@ export default class QueryBuilder extends React.Component {
       }
 
       if (
-        ((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0) &&
-        (newQuery.dimensions || []).length === 0 &&
-        (newQuery.measures || []).length === 0
+        ((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0)
+        && (newQuery.dimensions || []).length === 0
+        && (newQuery.measures || []).length === 0
       ) {
         newQuery = {
           ...newQuery,
           timeDimensions: [],
           filters: []
         };
+
+        this.shouldApplyHeuristicOrder = true;
+
         return {
           ...newState,
           query: newQuery,
@@ -363,9 +450,9 @@ export default class QueryBuilder extends React.Component {
     if (newState.chartType) {
       const newChartType = newState.chartType;
       if (
-        (newChartType === 'line' || newChartType === 'area') &&
-        (query.timeDimensions || []).length === 1 &&
-        !query.timeDimensions[0].granularity
+        (newChartType === 'line' || newChartType === 'area')
+        && (query.timeDimensions || []).length === 1
+        && !query.timeDimensions[0].granularity
       ) {
         const [td] = query.timeDimensions;
         return {
@@ -378,9 +465,9 @@ export default class QueryBuilder extends React.Component {
       }
 
       if (
-        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number') &&
-        (query.timeDimensions || []).length === 1 &&
-        query.timeDimensions[0].granularity
+        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number')
+        && (query.timeDimensions || []).length === 1
+        && query.timeDimensions[0].granularity
       ) {
         const [td] = query.timeDimensions;
         return {
@@ -401,38 +488,7 @@ export default class QueryBuilder extends React.Component {
     if (disableHeuristics) {
       return newState;
     }
-
-    function adjustedOrder(query) {
-      const orderMembers = [
-        ...(query.measures || []),
-        ...(query.dimensions || []),
-        ...(query.timeDimensions || []).map((td) => td.dimension)
-      ];
-
-      const order = Object.fromEntries(
-        Object.entries(query.order || {})
-          .map(([member, order]) => {
-            return orderMembers.includes(member) ? [member, order] : false;
-          })
-          .filter(Boolean)
-      );
-
-      return (query.order == null && !Object.keys(order).length) || !orderMembers.length ? null : order;
-    }
-
-    const heuristics =
-      (stateChangeHeuristics && stateChangeHeuristics(this.state, newState)) || this.defaultHeuristics(newState);
-
-    const order = adjustedOrder(heuristics.query);
-    const { order: _, ...query } = heuristics.query;
-
-    return {
-      ...heuristics,
-      query: {
-        ...query,
-        ...(order ? { order } : {})
-      }
-    };
+    return (stateChangeHeuristics && stateChangeHeuristics(this.state, newState)) || this.defaultHeuristics(newState);
   }
 
   render() {

@@ -25,6 +25,7 @@ var _extends = _interopDefault(require('@babel/runtime/helpers/extends'));
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
 require('core-js/modules/es.array.concat');
 require('core-js/modules/es.array.filter');
+require('core-js/modules/es.array.for-each');
 require('core-js/modules/es.array.includes');
 require('core-js/modules/es.array.reduce');
 require('core-js/modules/es.array.sort');
@@ -36,8 +37,9 @@ require('core-js/modules/es.object.entries');
 require('core-js/modules/es.object.from-entries');
 require('core-js/modules/es.object.keys');
 require('core-js/modules/es.string.includes');
-var _toConsumableArray = _interopDefault(require('@babel/runtime/helpers/toConsumableArray'));
+require('core-js/modules/web.dom-collections.for-each');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
+var _toConsumableArray = _interopDefault(require('@babel/runtime/helpers/toConsumableArray'));
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
@@ -350,6 +352,26 @@ function moveKeyAtIndex(object, key, atIndex) {
   }
 }
 
+var granularities = [{
+  name: undefined,
+  title: 'w/o grouping'
+}, {
+  name: 'hour',
+  title: 'Hour'
+}, {
+  name: 'day',
+  title: 'Day'
+}, {
+  name: 'week',
+  title: 'Week'
+}, {
+  name: 'month',
+  title: 'Month'
+}, {
+  name: 'year',
+  title: 'Year'
+}];
+
 var QueryBuilder =
 /*#__PURE__*/
 function (_React$Component) {
@@ -363,8 +385,11 @@ function (_React$Component) {
     _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props));
     _this.state = _objectSpread2({
       query: props.query,
-      chartType: 'line'
+      chartType: 'line',
+      orderMembers: []
     }, props.vizState);
+    _this.shouldApplyHeuristicOrder = false;
+    _this.requestId = 0;
     return _this;
   }
 
@@ -374,21 +399,40 @@ function (_React$Component) {
       var _componentDidMount = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee() {
-        var meta;
+        var _this2 = this;
+
+        var query, meta, getInitialOrderMembers;
         return _regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                _context.next = 2;
+                query = this.state.query;
+                _context.next = 3;
                 return this.cubejsApi().meta();
 
-              case 2:
+              case 3:
                 meta = _context.sent;
+
+                getInitialOrderMembers = function getInitialOrderMembers() {
+                  var indexById = Object.fromEntries(Object.keys(query.order || {}).map(function (id, index) {
+                    return [id, index];
+                  }));
+                  return _this2.getOrderMembers().sort(function (a, b) {
+                    var a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
+                    var b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id];
+                    return a1 - b1;
+                  });
+                };
+
                 this.setState({
                   meta: meta
+                }, function () {
+                  _this2.setState({
+                    orderMembers: getInitialOrderMembers()
+                  });
                 });
 
-              case 4:
+              case 6:
               case "end":
                 return _context.stop();
             }
@@ -405,24 +449,12 @@ function (_React$Component) {
   }, {
     key: "componentDidUpdate",
     value: function componentDidUpdate(prevProps, prevState) {
-      var _this2 = this;
-
       var _this$props = this.props,
           query = _this$props.query,
           vizState = _this$props.vizState;
 
       if (!ramda.equals(prevProps.query, query)) {
-        if (query.order == null && this.isQueryPresent(query)) {
-          this.cubejsApi().sql(query).then(function (response) {
-            var order = response.sqlQuery.sql.order;
-
-            _this2.updateQuery({
-              order: order
-            });
-          })["catch"](function () {});
-        } // eslint-disable-next-line react/no-did-update-set-state
-
-
+        // eslint-disable-next-line react/no-did-update-set-state
         this.setState({
           query: query
         });
@@ -431,6 +463,59 @@ function (_React$Component) {
       if (!ramda.equals(prevProps.vizState, vizState)) {
         // eslint-disable-next-line react/no-did-update-set-state
         this.setState(vizState);
+      }
+
+      if (!ramda.equals(prevState.query, this.state.query)) {
+        var _this$state = this.state,
+            _query = _this$state.query,
+            orderMembers = _this$state.orderMembers;
+        var indexedOrderMembers = ramda.indexBy(ramda.prop('id'), this.getOrderMembers());
+        var currentIndexedOrderMembers = orderMembers.map(function (m) {
+          return m.id;
+        });
+        var nextOrderMembers = orderMembers.map(function (orderMember) {
+          return _objectSpread2({}, orderMember, {
+            order: _query.order && _query.order[orderMember.id] || 'none'
+          });
+        }).filter(function (_ref) {
+          var id = _ref.id;
+          return Boolean(indexedOrderMembers[id]);
+        });
+        Object.entries(indexedOrderMembers).forEach(function (_ref2) {
+          var _ref3 = _slicedToArray(_ref2, 2),
+              id = _ref3[0],
+              orderMember = _ref3[1];
+
+          if (!currentIndexedOrderMembers.includes(id)) {
+            nextOrderMembers.push(orderMember);
+          }
+        });
+
+        var adjustedOrder = function adjustedOrder(query) {
+          var orderMembers = [].concat(_toConsumableArray(query.measures || []), _toConsumableArray(query.dimensions || []), _toConsumableArray((query.timeDimensions || []).map(function (td) {
+            return td.dimension;
+          })));
+          var order = Object.fromEntries(Object.entries(query.order || {}).map(function (_ref4) {
+            var _ref5 = _slicedToArray(_ref4, 2),
+                member = _ref5[0],
+                order = _ref5[1];
+
+            return orderMembers.includes(member) ? [member, order] : false;
+          }).filter(Boolean));
+          return query.order == null && !Object.keys(order).length || !orderMembers.length ? null : order;
+        };
+
+        var order = adjustedOrder(_query);
+
+        var _ = _query.order,
+            nextQuery = _objectWithoutProperties(_query, ["order"]);
+
+        this.updateVizState({
+          query: _objectSpread2({}, nextQuery, {}, order ? {
+            order: order
+          } : {}),
+          orderMembers: nextOrderMembers
+        });
       }
     }
   }, {
@@ -445,6 +530,54 @@ function (_React$Component) {
     value: function isQueryPresent() {
       var query = this.state.query;
       return QueryRenderer.isQueryPresent(query);
+    }
+  }, {
+    key: "getOrderMembers",
+    value: function getOrderMembers() {
+      var query = this.state.query;
+
+      var toOrderMember = function toOrderMember(member) {
+        return {
+          id: member.name,
+          title: member.title
+        };
+      };
+
+      return ramda.uniqBy(ramda.prop('id'), [].concat(_toConsumableArray(this.resolveMember('measures').map(toOrderMember)), _toConsumableArray(this.resolveMember('dimensions').map(toOrderMember)), _toConsumableArray(this.resolveMember('timeDimensions').map(function (td) {
+        return toOrderMember(td.dimension);
+      }))).map(function (member) {
+        return _objectSpread2({}, member, {
+          order: query.order && query.order[member.id] || 'none'
+        });
+      }));
+    }
+  }, {
+    key: "resolveMember",
+    value: function resolveMember(type) {
+      var _this$state2 = this.state,
+          meta = _this$state2.meta,
+          query = _this$state2.query;
+
+      if (!meta) {
+        return [];
+      }
+
+      if (type === 'timeDimensions') {
+        return (query.timeDimensions || []).map(function (m, index) {
+          return _objectSpread2({}, m, {
+            dimension: _objectSpread2({}, meta.resolveMember(m.dimension, 'dimensions'), {
+              granularities: granularities
+            }),
+            index: index
+          });
+        });
+      }
+
+      return (query[type] || []).map(function (m, index) {
+        return _objectSpread2({
+          index: index
+        }, meta.resolveMember(m, type));
+      });
     }
   }, {
     key: "prepareRenderProps",
@@ -471,13 +604,6 @@ function (_React$Component) {
         };
       };
 
-      var toOrderMember = function toOrderMember(member) {
-        return {
-          id: member.name,
-          title: member.title
-        };
-      };
-
       var updateMethods = function updateMethods(memberType) {
         var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
         return {
@@ -501,81 +627,27 @@ function (_React$Component) {
         };
       };
 
-      var granularities = [{
-        name: undefined,
-        title: 'w/o grouping'
-      }, {
-        name: 'hour',
-        title: 'Hour'
-      }, {
-        name: 'day',
-        title: 'Day'
-      }, {
-        name: 'week',
-        title: 'Week'
-      }, {
-        name: 'month',
-        title: 'Month'
-      }, {
-        name: 'year',
-        title: 'Year'
-      }];
-      var _this$state = this.state,
-          meta = _this$state.meta,
-          query = _this$state.query,
-          chartType = _this$state.chartType;
       var self = this;
-      var measures = (meta && query.measures || []).map(function (m, index) {
-        return _objectSpread2({
-          index: index
-        }, meta.resolveMember(m, 'measures'));
-      });
-      var dimensions = (meta && query.dimensions || []).map(function (m, index) {
-        return _objectSpread2({
-          index: index
-        }, meta.resolveMember(m, 'dimensions'));
-      });
-      var timeDimensions = (meta && query.timeDimensions || []).map(function (m, index) {
-        return _objectSpread2({}, m, {
-          dimension: _objectSpread2({}, meta.resolveMember(m.dimension, 'dimensions'), {
-            granularities: granularities
-          }),
-          index: index
-        });
-      });
-      var indexById = Object.fromEntries(Object.keys(query.order || {}).map(function (id, index) {
-        return [id, index];
-      }));
-      var orderMembers = ramda.uniqBy(ramda.prop('id'), [].concat(_toConsumableArray(measures.map(toOrderMember)), _toConsumableArray(dimensions.map(toOrderMember)), _toConsumableArray(timeDimensions.map(function (td) {
-        return toOrderMember(td.dimension);
-      }))).map(function (member) {
-        if (!query.order) {
-          return member;
-        }
-
-        return _objectSpread2({}, member, {
-          order: query.order[member.id] || 'none'
-        });
-      })).sort(function (a, b) {
-        var a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
-        var b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id]; // return indexById[a.id] ?? Number.MAX_SAFE_INTEGER - indexById[b.id] ?? Number.MAX_SAFE_INTEGER;
-
-        return a1 - b1;
-      });
+      var _this$state3 = this.state,
+          meta = _this$state3.meta,
+          query = _this$state3.query,
+          _this$state3$orderMem = _this$state3.orderMembers,
+          orderMembers = _this$state3$orderMem === void 0 ? [] : _this$state3$orderMem,
+          chartType = _this$state3.chartType;
       return _objectSpread2({
         meta: meta,
         query: query,
         validatedQuery: this.validatedQuery(),
         isQueryPresent: this.isQueryPresent(),
         chartType: chartType,
-        measures: measures,
-        dimensions: dimensions,
+        measures: this.resolveMember('measures'),
+        dimensions: this.resolveMember('dimensions'),
+        timeDimensions: this.resolveMember('timeDimensions'),
         segments: (meta && query.segments || []).map(function (m, i) {
           return _objectSpread2({
             index: i
           }, meta.resolveMember(m, 'segments'));
         }),
-        timeDimensions: timeDimensions,
         filters: (meta && query.filters || []).map(function (m, i) {
           return _objectSpread2({}, m, {
             dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
@@ -637,11 +709,17 @@ function (_React$Component) {
               order: order
             });
           },
-          updateByOrderMembers: function updateByOrderMembers(orderMembers) {
+          updateByOrderMembers: function updateByOrderMembers() {
+            var orderMembers = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+
+            _this3.setState({
+              orderMembers: orderMembers
+            });
+
             _this3.updateQuery({
-              order: Object.fromEntries(orderMembers.map(function (_ref) {
-                var id = _ref.id,
-                    order = _ref.order;
+              order: Object.fromEntries(orderMembers.map(function (_ref6) {
+                var id = _ref6.id,
+                    order = _ref6.order;
                 return order !== 'none' && [id, order];
               }).filter(Boolean)) || {}
             });
@@ -653,39 +731,85 @@ function (_React$Component) {
     key: "updateQuery",
     value: function updateQuery(queryUpdate) {
       var query = this.state.query;
-
-      var _query$queryUpdate = _objectSpread2({}, query, {}, queryUpdate),
-          order = _query$queryUpdate.order,
-          updatedQuery = _objectWithoutProperties(_query$queryUpdate, ["order"]);
-
       this.updateVizState({
-        query: _objectSpread2({}, updatedQuery, {}, order == null ? {} : {
-          order: order
-        })
+        query: _objectSpread2({}, query, {}, queryUpdate)
       });
     }
   }, {
     key: "updateVizState",
-    value: function updateVizState(state) {
-      var _this$props2 = this.props,
-          setQuery = _this$props2.setQuery,
-          setVizState = _this$props2.setVizState;
-      var finalState = this.applyStateChangeHeuristics(state);
-      this.setState(finalState);
-      finalState = _objectSpread2({}, this.state, {}, finalState);
+    value: function () {
+      var _updateVizState = _asyncToGenerator(
+      /*#__PURE__*/
+      _regeneratorRuntime.mark(function _callee2(state) {
+        var _this$props2, setQuery, setVizState, finalState, currentRequestId, _finalState$query, _, _query2, _ref7, sqlQuery, _finalState, meta, toSet;
 
-      if (setQuery) {
-        setQuery(finalState.query);
+        return _regeneratorRuntime.wrap(function _callee2$(_context2) {
+          while (1) {
+            switch (_context2.prev = _context2.next) {
+              case 0:
+                _this$props2 = this.props, setQuery = _this$props2.setQuery, setVizState = _this$props2.setVizState;
+                finalState = this.applyStateChangeHeuristics(state);
+
+                if (!this.shouldApplyHeuristicOrder) {
+                  _context2.next = 16;
+                  break;
+                }
+
+                _context2.prev = 3;
+                currentRequestId = ++this.requestId;
+                _finalState$query = finalState.query, _ = _finalState$query.order, _query2 = _objectWithoutProperties(_finalState$query, ["order"]);
+                _context2.next = 8;
+                return this.cubejsApi().sql(_query2);
+
+              case 8:
+                _ref7 = _context2.sent;
+                sqlQuery = _ref7.sqlQuery;
+
+                if (this.requestId === currentRequestId) {
+                  finalState = _objectSpread2({}, finalState, {
+                    query: _objectSpread2({}, finalState.query, {
+                      order: sqlQuery.sql.order
+                    })
+                  });
+                }
+
+                _context2.next = 15;
+                break;
+
+              case 13:
+                _context2.prev = 13;
+                _context2.t0 = _context2["catch"](3);
+
+              case 15:
+                this.shouldApplyHeuristicOrder = false;
+
+              case 16:
+                this.setState(finalState);
+                finalState = _objectSpread2({}, this.state, {}, finalState);
+
+                if (setQuery) {
+                  setQuery(finalState.query);
+                }
+
+                if (setVizState) {
+                  _finalState = finalState, meta = _finalState.meta, toSet = _objectWithoutProperties(_finalState, ["meta"]);
+                  setVizState(toSet);
+                }
+
+              case 20:
+              case "end":
+                return _context2.stop();
+            }
+          }
+        }, _callee2, this, [[3, 13]]);
+      }));
+
+      function updateVizState(_x) {
+        return _updateVizState.apply(this, arguments);
       }
 
-      if (setVizState) {
-        var _finalState = finalState,
-            meta = _finalState.meta,
-            toSet = _objectWithoutProperties(_finalState, ["meta"]);
-
-        setVizState(toSet);
-      }
-    }
+      return updateVizState;
+    }()
   }, {
     key: "validatedQuery",
     value: function validatedQuery() {
@@ -699,9 +823,9 @@ function (_React$Component) {
   }, {
     key: "defaultHeuristics",
     value: function defaultHeuristics(newState) {
-      var _this$state2 = this.state,
-          query = _this$state2.query,
-          sessionGranularity = _this$state2.sessionGranularity;
+      var _this$state4 = this.state,
+          query = _this$state4.query,
+          sessionGranularity = _this$state4.sessionGranularity;
       var defaultGranularity = sessionGranularity || 'day';
 
       if (newState.query) {
@@ -723,6 +847,7 @@ function (_React$Component) {
               granularity: defaultGranularity
             }] : []
           });
+          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             query: newQuery,
             chartType: defaultTimeDimension ? 'line' : 'number'
@@ -737,6 +862,7 @@ function (_React$Component) {
               });
             })
           });
+          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             query: newQuery,
             chartType: 'table'
@@ -751,6 +877,7 @@ function (_React$Component) {
               });
             })
           });
+          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             query: newQuery,
             chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
@@ -762,6 +889,7 @@ function (_React$Component) {
             timeDimensions: [],
             filters: []
           });
+          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             query: newQuery,
             sessionGranularity: null
@@ -814,32 +942,7 @@ function (_React$Component) {
         return newState;
       }
 
-      function adjustedOrder(query) {
-        var orderMembers = [].concat(_toConsumableArray(query.measures || []), _toConsumableArray(query.dimensions || []), _toConsumableArray((query.timeDimensions || []).map(function (td) {
-          return td.dimension;
-        })));
-        var order = Object.fromEntries(Object.entries(query.order || {}).map(function (_ref2) {
-          var _ref3 = _slicedToArray(_ref2, 2),
-              member = _ref3[0],
-              order = _ref3[1];
-
-          return orderMembers.includes(member) ? [member, order] : false;
-        }).filter(Boolean));
-        return query.order == null && !Object.keys(order).length || !orderMembers.length ? null : order;
-      }
-
-      var heuristics = stateChangeHeuristics && stateChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
-      var order = adjustedOrder(heuristics.query);
-
-      var _heuristics$query = heuristics.query,
-          _ = _heuristics$query.order,
-          query = _objectWithoutProperties(_heuristics$query, ["order"]);
-
-      return _objectSpread2({}, heuristics, {
-        query: _objectSpread2({}, query, {}, order ? {
-          order: order
-        } : {})
-      });
+      return stateChangeHeuristics && stateChangeHeuristics(this.state, newState) || this.defaultHeuristics(newState);
     }
   }, {
     key: "render",

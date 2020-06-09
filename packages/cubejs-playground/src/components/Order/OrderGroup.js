@@ -1,83 +1,57 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { DndProvider, useDrop } from 'react-dnd';
+import React from 'react';
+import { DragDropContext, Droppable } from 'react-beautiful-dnd';
 import DraggableItem from './DraggableItem';
-import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
 
-export const TYPE = 'orderItem';
+function reorder(list, startIndex, endIndex) {
+  const result = [...list];
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
 
-function indexById(members) {
-  return Object.fromEntries(members.map(({ id }, index) => [id, index]));
+  return result;
 }
 
-function Order({ orderMembers, onChange }) {
-  const [orderMembersOrder, setOrderMembersOrder] = useState(indexById(orderMembers));
-
-  const sortedMembers = orderMembers.sort((a, b) => orderMembersOrder[a.id] - orderMembersOrder[b.id]);
-
-  const [{ didDrop }, drop] = useDrop({
-    accept: TYPE,
-    collect(monitor) {
-      return {
-        didDrop: monitor.didDrop(),
-        dropItem: monitor.getItem()
-      };
-    }
-  });
-
-  useEffect(() => {
-    setOrderMembersOrder(indexById(orderMembers))
-  }, useDeepCompareMemoize([orderMembers]));
-
-  useEffect(() => {
-    if (didDrop) {
-      onChange(sortedMembers)
-    }
-  }, [didDrop]);
-
-  const moveTag = useCallback(
-    (dragIndex, hoverIndex) => {
-      setOrderMembersOrder({
-          ...orderMembersOrder,
-          [dragIndex]: orderMembersOrder[hoverIndex],
-          [hoverIndex]: orderMembersOrder[dragIndex]
-        }
-      )
-    },
-    [orderMembers, orderMembersOrder]
-  );
-
+export default function OrderGroup({ orderMembers, onChange }) {
   return (
-    <div ref={drop}>
-      {sortedMembers.map(({ id, title, order }, index) => {
-        return (
-          <DraggableItem
-            key={id}
-            id={id}
-            index={index}
-            order={order}
-            moveTag={moveTag}
-            onOrderChange={(order) => {
-              onChange(sortedMembers.map((member) => {
-                return {
-                  ...member,
-                  order: member.id === id ? order : member.order,
-                };
-              }))
+    <DragDropContext
+      onDragEnd={({ source, destination }) => {
+        if (source !== null && destination !== null && source.index !== destination.index) {
+          onChange(reorder(orderMembers, source.index, destination.index));
+        }
+      }}
+    >
+      <Droppable droppableId="droppable">
+        {(provided) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            style={{
+              paddingTop: 8,
+              width: 260
             }}
           >
-            {title}
-          </DraggableItem>
-        );
-      })}
-    </div>
-  );
-}
+            {orderMembers.map(({ id, title, order }, index) => (
+              <DraggableItem
+                key={id}
+                id={id}
+                index={index}
+                order={order}
+                onOrderChange={(order) => {
+                  onChange(
+                    orderMembers.map((member) => ({
+                      ...member,
+                      order: member.id === id ? order : member.order
+                    }))
+                  );
+                }}
+              >
+                {title}
+              </DraggableItem>
+            ))}
 
-export default function OrderGroup(props) {
-  return (
-    <DndProvider backend={HTML5Backend}>
-      <Order {...props} />
-    </DndProvider>
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
   );
 }
