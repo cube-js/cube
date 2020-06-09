@@ -25,6 +25,8 @@
     "utils.js",
     "track.js",
     "templates.js",
+    "deploy.js",
+    "DeployDir.js",
     "yarn.lock",
     "README.md",
     "LICENSE"
