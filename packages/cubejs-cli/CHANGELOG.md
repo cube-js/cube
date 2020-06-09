@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.26](https://github.com/cube-js/cube.js/compare/v0.19.25...v0.19.26) (2020-06-09)
+
+**Note:** Version bump only for package cubejs-cli
+
+
+
+
+
 ## [0.19.25](https://github.com/cube-js/cube.js/compare/v0.19.24...v0.19.25) (2020-06-09)
 
 
