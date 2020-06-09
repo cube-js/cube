@@ -52,6 +52,7 @@ export default class QueryBuilder extends React.Component {
 
   componentDidUpdate(prevProps, prevState) {
     const { query, vizState } = this.props;
+    const { query: stateQuery, orderMembers } = this.state;
 
     if (!equals(prevProps.query, query)) {
       // eslint-disable-next-line react/no-did-update-set-state
@@ -63,9 +64,7 @@ export default class QueryBuilder extends React.Component {
       this.setState(vizState);
     }
 
-    if (!equals(prevState.query, this.state.query)) {
-      const { query, orderMembers } = this.state;
-
+    if (!equals(prevState.query, stateQuery)) {
       const indexedOrderMembers = indexBy(prop('id'), this.getOrderMembers());
       const currentIndexedOrderMembers = orderMembers.map((m) => m.id);
 
@@ -82,24 +81,24 @@ export default class QueryBuilder extends React.Component {
         }
       });
 
-      const adjustedOrder = (query) => {
-        const orderMembers = [
-          ...(query.measures || []),
-          ...(query.dimensions || []),
-          ...(query.timeDimensions || []).map((td) => td.dimension)
+      const adjustedOrder = (currentQuery) => {
+        const currentOrderMembers = [
+          ...(currentQuery.measures || []),
+          ...(currentQuery.dimensions || []),
+          ...(currentQuery.timeDimensions || []).map((td) => td.dimension)
         ];
 
         const order = Object.fromEntries(
-          Object.entries(query.order || {})
-            .map(([member, order]) => (orderMembers.includes(member) ? [member, order] : false))
+          Object.entries(currentQuery.order || {})
+            .map(([member, currentOrder]) => (currentOrderMembers.includes(member) ? [member, currentOrder] : false))
             .filter(Boolean)
         );
 
-        return (query.order == null && !Object.keys(order).length) || !orderMembers.length ? null : order;
+        return (currentQuery.order == null && !Object.keys(order).length) || !currentOrderMembers.length ? null : order;
       };
 
-      const order = adjustedOrder(query);
-      const { order: _, ...nextQuery } = query;
+      const order = adjustedOrder(stateQuery);
+      const { order: _, ...nextQuery } = stateQuery;
 
       this.updateVizState({
         query: {
@@ -274,8 +273,8 @@ export default class QueryBuilder extends React.Component {
             order
           });
         },
-        updateByOrderMembers: (orderMembers = []) => {
-          this.setState({ orderMembers });
+        updateByOrderMembers: (nextOrderMembers) => {
+          this.setState({ orderMembers: nextOrderMembers });
           this.updateQuery({
             order:
               Object.fromEntries(
@@ -318,6 +317,7 @@ export default class QueryBuilder extends React.Component {
             }
           };
         }
+        // eslint-disable-next-line
       } catch (e) {}
 
       this.shouldApplyHeuristicOrder = false;

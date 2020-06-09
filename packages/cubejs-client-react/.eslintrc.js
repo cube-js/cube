@@ -1,10 +1,6 @@
 module.exports = {
   extends: 'airbnb',
-  plugins: [
-    'react',
-    'jsx-a11y',
-    'import'
-  ],
+  plugins: ['react', 'jsx-a11y', 'import'],
   rules: {
     'react/jsx-no-bind': 0,
     'react/jsx-first-prop-new-line': 0,
@@ -31,13 +27,24 @@ module.exports = {
     'no-param-reassign': 0,
     'no-mixed-operators': 0,
     'no-else-return': 0,
-    'max-len': ['error', 120, 2, {
-      ignoreUrls: true,
-      ignoreComments: false,
-      ignoreRegExpLiterals: true,
-      ignoreStrings: true,
-      ignoreTemplateLiterals: true,
-    }],
-    'no-trailing-spaces': ['error', { skipBlankLines: true }]
+    'max-len': [
+      'error',
+      120,
+      2,
+      {
+        ignoreUrls: true,
+        ignoreComments: false,
+        ignoreRegExpLiterals: true,
+        ignoreStrings: true,
+        ignoreTemplateLiterals: true
+      }
+    ],
+    'no-trailing-spaces': ['error', { skipBlankLines: true }],
+    'react/sort-comp': [
+      1,
+      {
+        order: ['static-methods', 'lifecycle', 'everything-else', 'render']
+      }
+    ]
   }
 };
