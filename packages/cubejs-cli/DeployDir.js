@@ -39,14 +39,10 @@ class DeployDir {
   fileHash(file) {
     return new Promise((resolve, reject) => {
       const hash = crypto.createHash('sha1');
-      return fs.createReadStream(file)
-        .pipe(hash.setEncoding('hex'))
-        .on('finish', () => {
-          resolve(hash.digest('hex'));
-        })
-        .on('error', (err) => {
-          reject(err);
-        });
+      const stream = fs.createReadStream(file);
+      stream.on('error', err => reject(err));
+      stream.on('data', chunk => hash.update(chunk));
+      stream.on('end', () => resolve(hash.digest('hex')));
     });
   }
 }
