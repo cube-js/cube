@@ -11,7 +11,7 @@
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
-    "core-js": "^2.5.3",
+    "core-js": "^3.6.5",
     "ramda": "^0.27.0",
     "rollup-plugin-dts": "^1.1.8",
     "whatwg-fetch": "^3.0.0"
@@ -27,6 +27,9 @@
     "@babel/preset-react": "^7.0.0",
     "@babel/runtime": "^7.0.0",
     "@cubejs-client/core": "^0.17.10",
+    "@types/fs-extra": "^8.1.0",
+    "@types/jest" : "^25.2.1",
+    "prettier" : "^2.0.5",
     "babel-runtime": "^6.26.0",
     "babelrc-rollup": "^3.0.0",
     "eslint": "6.8.0",

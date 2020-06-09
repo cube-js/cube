@@ -61,6 +61,7 @@ class BaseQuery {
       contextSymbols: this.options.contextSymbols,
       timezone: this.options.timezone,
       limit: this.options.limit,
+      offset: this.options.offset,
       rowLimit: this.options.rowLimit,
       preAggregationsSchema: this.options.preAggregationsSchema,
       className: this.constructor.name,
@@ -91,8 +92,8 @@ class BaseQuery {
 
     // measure_filter (the one extracted from filters parameter on measure and
     // used in drill downs) should go to WHERE instead of HAVING
-    this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter').map(this.newFilter.bind(this));
-    this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter').map(this.newFilter.bind(this));
+    this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.newFilter.bind(this));
+    this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.newFilter.bind(this));
 
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
@@ -1930,7 +1931,7 @@ class BaseQuery {
             if (!paramValue) {
               throw new UserError(`Filter for ${column} is required`);
             }
-            return methods.filter(column);
+            return methods(paramValue).filter(column);
           },
           unsafeValue: () => paramValue
         });

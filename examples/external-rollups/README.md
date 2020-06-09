@@ -34,7 +34,7 @@ CUBEJS_EXT_DB_PASS=12345
 
 ```
 
-Here we set credentials for both the main DB (BigQuery) and external DB for pre-aggregations (MySQL). You can learn more about obtaining BigQuery credentials at the [Cube.js docs here](https://cube.dev/docs/connecting-to-the-database#notes-google-big-query). Also, in order to build pre-aggregations inside MySQL, Cube.js should have write access to the `stb_pre_aggregations` schema where pre-aggregation tables will be stored. 
+Here we set credentials for both the main DB (BigQuery) and external DB for pre-aggregations (MySQL). You can learn more about obtaining BigQuery credentials at the [Cube.js docs here](https://cube.dev/docs/connecting-to-the-database#notes-google-big-query). Also, in order to build pre-aggregations inside MySQL, Cube.js should have write access to the `stb_pre_aggregations` schema where pre-aggregation tables will be stored.
 
 Now, let’s install the Cube.js MySQL driver.
 
@@ -58,12 +58,12 @@ const server = new CubejsServer({
   })
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
-That is all we need to let Cube.js connect to both BigQuery and MySQL. Now, we can create our first Cube.js data schema file. Cube.js uses the data schema to generate an SQL code, which will be executed in your database. 
+That is all we need to let Cube.js connect to both BigQuery and MySQL. Now, we can create our first Cube.js data schema file. Cube.js uses the data schema to generate an SQL code, which will be executed in your database.
 
 Create the `schema/Stories.js` file with the following content.
 

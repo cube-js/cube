@@ -3,6 +3,7 @@ import * as PropTypes from 'prop-types';
 import {
   Menu
 } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
@@ -85,7 +86,7 @@ const TimeGroup = ({
           onClick={member => updateMethods.add({ dimension: member, granularity: 'day' })}
           availableMembers={availableMembers}
           type="dashed"
-          icon="plus"
+          icon={<PlusOutlined />}
         >
           {addMemberName}
         </MemberDropdown>

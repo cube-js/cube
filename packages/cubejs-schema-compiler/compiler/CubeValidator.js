@@ -26,7 +26,8 @@ const BaseDimensionWithoutSubQuery = {
       type: Joi.string().valid('link'),
       label: Joi.string().required()
     })
-  ])
+  ]),
+  meta: Joi.any()
 };
 
 const BaseDimension = Object.assign({
@@ -59,6 +60,7 @@ const BaseMeasure = {
       sql: Joi.func().required()
     })
   ),
+  meta: Joi.any()
 };
 
 const BasePreAggregation = {
@@ -172,7 +174,8 @@ const cubeSchema = Joi.object().keys({
     aliases: Joi.array().items(Joi.string()),
     sql: Joi.func().required(),
     title: Joi.string(),
-    description: Joi.string()
+    description: Joi.string(),
+    meta: Joi.any()
   })),
   preAggregations: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys(Object.assign({}, BasePreAggregation, {

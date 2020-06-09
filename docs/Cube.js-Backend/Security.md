@@ -175,8 +175,8 @@ var tlsOptions = {
 
 const cubejsServer = new CubejsServer();
 
-cubejsServer.listen(tlsOptions).then(({ tlsPort }) => {
-  console.log(`🚀 Cube.js server is listening securely on ${tlsPort}`);
+cubejsServer.listen(tlsOptions).then(({ version, tlsPort }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening securely on ${tlsPort}`);
 });
 ```
 
@@ -209,10 +209,10 @@ async function main() {
   const certOptions = { days: 2, selfSigned: true };
   const tlsOptions = await createCertificate(certOptions);
 
-  const ({ tlsPort, server }) = await cubejsServer.listen(tlsOptions);
-  
-  console.log(`🚀 Cube.js server is listening securely on ${tlsPort}`);
-  
+  const ({ version, tlsPort, server }) = await cubejsServer.listen(tlsOptions);
+
+  console.log(`🚀 Cube.js server (${version}) is listening securely on ${tlsPort}`);
+
   scheduleCertificateRenewal(server, certOptions, (err, result) => {
     if (err !== null) {
       console.error(

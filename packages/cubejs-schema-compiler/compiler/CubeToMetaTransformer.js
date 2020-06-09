@@ -43,7 +43,8 @@ class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
-            format: nameToDimension[1].format
+            format: nameToDimension[1].format,
+            meta: nameToDimension[1].meta,
           })),
           R.filter(
             nameToDimension => this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
@@ -55,7 +56,8 @@ class CubeToMetaTransformer {
             name: `${cube.name}.${nameToSegment[0]}`,
             title: this.title(cubeTitle, nameToSegment),
             shortTitle: this.title(cubeTitle, nameToSegment, true),
-            description: nameToSegment[1].description
+            description: nameToSegment[1].description,
+            meta: nameToSegment[1].meta,
           })),
           R.toPairs
         )(cube.segments || {})
@@ -96,6 +98,11 @@ class CubeToMetaTransformer {
     const name = `${cubeName}.${nameToMetric[0]}`;
     // Support both old 'drillMemberReferences' and new 'drillMembers' keys
     const drillMembers = nameToMetric[1].drillMembers || nameToMetric[1].drillMemberReferences;
+
+    const drillMembersArray = (drillMembers && this.cubeEvaluator.evaluateReferences(
+      cubeName, drillMembers, { originalSorting: true }
+    )) || [];
+
     return {
       name,
       title: this.title(cubeTitle, nameToMetric),
@@ -106,9 +113,12 @@ class CubeToMetaTransformer {
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       type: 'number', // TODO
       aggType: nameToMetric[1].type,
-      drillMembers: drillMembers && this.cubeEvaluator.evaluateReferences(
-        cubeName, drillMembers, { originalSorting: true }
-      )
+      drillMembers: drillMembersArray,
+      drillMembersGrouped: {
+        measures: drillMembersArray.filter((member) => this.cubeEvaluator.isMeasure(member)),
+        dimensions: drillMembersArray.filter((member) => this.cubeEvaluator.isDimension(member)),
+      },
+      meta: nameToMetric[1].meta
     };
   }
 

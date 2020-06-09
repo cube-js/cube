@@ -4,13 +4,13 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-require('core-js/modules/es6.array.map');
+require('core-js/modules/es.array.iterator');
+require('core-js/modules/es.array.map');
+require('core-js/modules/es.object.to-string');
+require('core-js/modules/es.promise');
+require('core-js/modules/es.string.iterator');
+require('core-js/modules/web.dom-collections.iterator');
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
-require('core-js/modules/es6.promise');
-require('core-js/modules/web.dom.iterable');
-require('core-js/modules/es6.array.iterator');
-require('core-js/modules/es6.object.to-string');
-require('core-js/modules/es6.string.iterator');
 var _objectSpread2 = _interopDefault(require('@babel/runtime/helpers/objectSpread'));
 var _classCallCheck = _interopDefault(require('@babel/runtime/helpers/classCallCheck'));
 var _possibleConstructorReturn = _interopDefault(require('@babel/runtime/helpers/possibleConstructorReturn'));
@@ -23,9 +23,11 @@ var PropTypes = require('prop-types');
 var ramda = require('ramda');
 var _extends = _interopDefault(require('@babel/runtime/helpers/extends'));
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
-require('core-js/modules/es6.array.filter');
+require('core-js/modules/es.array.concat');
+require('core-js/modules/es.array.filter');
+require('core-js/modules/es.array.splice');
+require('core-js/modules/es.function.name');
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
-require('core-js/modules/es6.function.name');
 var _regeneratorRuntime = _interopDefault(require('@babel/runtime/regenerator'));
 require('regenerator-runtime/runtime');
 var _asyncToGenerator = _interopDefault(require('@babel/runtime/helpers/asyncToGenerator'));
@@ -759,6 +761,16 @@ CubeProvider.propTypes = {
   children: PropTypes.any.isRequired
 };
 
+function useDeepCompareMemoize(value) {
+  var ref = React.useRef([]);
+
+  if (!ramda.equals(value, ref.current)) {
+    ref.current = value;
+  }
+
+  return ref.current;
+}
+
 var useCubeQuery = (function (query) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
@@ -894,7 +906,7 @@ var useCubeQuery = (function (query) {
         subscribeRequest = null;
       }
     };
-  }, [JSON.stringify(query), options.cubejsApi, context]);
+  }, useDeepCompareMemoize([query, options, context]));
   return {
     isLoading: isLoading,
     resultSet: resultSet,

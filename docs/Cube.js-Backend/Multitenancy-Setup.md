@@ -9,7 +9,7 @@ Cube.js supports multitenancy out of the box, both on database and data schema l
 Multiple drivers are also supported, meaning that you can have one customer’s data in MongoDB and others in Postgres with one Cube.js instance.
 
 There are 7 [configuration options](@cubejs-backend-server-core#options-reference) you can leverage to make your multitenancy setup.
-You can use all of them or just a couple, depending on your specific case. 
+You can use all of them or just a couple, depending on your specific case.
 The options are:
 
 - `contextToAppId`
@@ -62,11 +62,11 @@ const server = new CubejsServer({
     } else if (dataSource === 'googleAnalytics') {
       return new BigQueryDriver();
     } else if (dataSource === 'financials'){
-      return new PostgresDriver({ 
-        database: 'financials', 
-        host: 'financials-db.acme.com', 
-        user: process.env.FINANCIALS_DB_USER, 
-        password: process.env.FINANCIALS_DB_PASS 
+      return new PostgresDriver({
+        database: 'financials',
+        host: 'financials-db.acme.com',
+        user: process.env.FINANCIALS_DB_USER,
+        password: process.env.FINANCIALS_DB_PASS
       });
     } else {
       return new PostgresDriver();
@@ -74,11 +74,32 @@ const server = new CubejsServer({
   }
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
+### User Context vs Multitenant Compile Context
+
+As a rule of thumb [USER_CONTEXT](cube#context-variables-user-context) should be used in scenarios when you want to define row level security within the same database for different users of such database. 
+For example to separate access of two ecommerce administrators who work on different product categories within same ecommerce store.
+
+```javascript
+cube(`Products`, {
+  sql: `select * from products where ${USER_CONTEXT.categoryId.filter('categoryId')}`
+})
+```
+
+On other hand Multitenant [COMPILE_CONTEXT](cube#context-variables-compile-context) should be used when users in fact access different databases.
+For example if you provide SaaS ecommerce hosting and each of your customers has separate database then each ecommerce store should be modelled as a separate tenant.
+
+```javascript
+const { authInfo: { tenantId } } = COMPILE_CONTEXT;
+
+cube(`Products`, {
+  sql: `select * from ${tenantId}.products`
+})
+```
 
 ## Same DB Instance with per Tenant Row Level Security
 
@@ -103,8 +124,8 @@ const server = new CubejsServer({
   }
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
@@ -142,8 +163,8 @@ const server = new CubejsServer({
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
@@ -163,8 +184,8 @@ const server = new CubejsServer({
     })
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
@@ -182,8 +203,8 @@ const server = new CubejsServer({
   preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
@@ -224,8 +245,8 @@ const server = new CubejsServer({
   }
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 
@@ -265,8 +286,8 @@ const server = new CubejsServer({
   repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
 });
 
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
 

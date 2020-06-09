@@ -6,7 +6,7 @@ const http = require("http");
 const serveStatic = require('serve-static');
 require('dotenv').config();
 
-var app = express();
+const app = express();
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(require('cors')());
 
@@ -26,5 +26,5 @@ const port = process.env.PORT || 4000;
 const server = http.createServer({}, app);
 
 server.listen(port, () => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
+  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
 });

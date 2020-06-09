@@ -151,7 +151,7 @@ class PreAggregationLoadCache {
     this.tables = undefined;
     this.queryStageState = undefined;
     this.versionEntries = undefined;
-    await this.tablesFromCache(preAggregation, true);
+    await this.cacheDriver.remove(this.tablesRedisKey(preAggregation));
   }
 }
 
@@ -281,7 +281,9 @@ class PreAggregationLoader {
       if (versionEntry.structure_version !== newVersionEntry.structure_version) {
         this.logger('Invalidating pre-aggregation structure', {
           preAggregation: this.preAggregation,
-          requestId: this.requestId
+          requestId: this.requestId,
+          queryKey: this.preAggregationQueryKey(invalidationKeys),
+          newVersionEntry
         });
         await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
         return mostRecentTargetTableName();
@@ -289,7 +291,9 @@ class PreAggregationLoader {
         if (this.waitForRenew) {
           this.logger('Waiting for pre-aggregation renew', {
             preAggregation: this.preAggregation,
-            requestId: this.requestId
+            requestId: this.requestId,
+            queryKey: this.preAggregationQueryKey(invalidationKeys),
+            newVersionEntry
           });
           await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
           return mostRecentTargetTableName();
@@ -300,7 +304,9 @@ class PreAggregationLoader {
     } else {
       this.logger('Creating pre-aggregation from scratch', {
         preAggregation: this.preAggregation,
-        requestId: this.requestId
+        requestId: this.requestId,
+        queryKey: this.preAggregationQueryKey(invalidationKeys),
+        newVersionEntry
       });
       await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
       return mostRecentTargetTableName();
@@ -345,7 +351,9 @@ class PreAggregationLoader {
   scheduleRefresh(invalidationKeys, newVersionEntry) {
     this.logger('Refreshing pre-aggregation content', {
       preAggregation: this.preAggregation,
-      requestId: this.requestId
+      requestId: this.requestId,
+      queryKey: this.preAggregationQueryKey(invalidationKeys),
+      newVersionEntry
     });
     this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry)
       .catch(e => {
@@ -360,12 +368,13 @@ class PreAggregationLoader {
   executeInQueue(invalidationKeys, priority, newVersionEntry) {
     return this.preAggregations.getQueue().executeInQueue(
       'query',
-      [this.preAggregation.loadSql, invalidationKeys],
+      this.preAggregationQueryKey(invalidationKeys),
       {
         preAggregation: this.preAggregation,
         preAggregationsTablesToTempTables: this.preAggregationsTablesToTempTables,
         newVersionEntry,
-        requestId: this.requestId
+        requestId: this.requestId,
+        invalidationKeys
       },
       priority,
       // eslint-disable-next-line no-use-before-define
@@ -373,11 +382,15 @@ class PreAggregationLoader {
     );
   }
 
+  preAggregationQueryKey(invalidationKeys) {
+    return [this.preAggregation.loadSql, invalidationKeys];
+  }
+
   targetTableName(versionEntry) {
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 
-  refresh(newVersionEntry) {
+  refresh(newVersionEntry, invalidationKeys) {
     return (client) => {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
@@ -388,12 +401,23 @@ class PreAggregationLoader {
           this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
       }
       return cancelCombinator(
-        saveCancelFn => refreshStrategy.bind(this)(client, newVersionEntry, saveCancelFn)
+        saveCancelFn => refreshStrategy.bind(this)(client, newVersionEntry, saveCancelFn, invalidationKeys)
       );
     };
   }
 
-  async refreshImplStoreInSourceStrategy(client, newVersionEntry, saveCancelFn) {
+  logExecutingSql(invalidationKeys, query, params, targetTableName, newVersionEntry) {
+    this.logger('Executing Load Pre Aggregation SQL', {
+      queryKey: this.preAggregationQueryKey(invalidationKeys),
+      query,
+      values: params,
+      targetTableName,
+      requestId: this.requestId,
+      newVersionEntry,
+    });
+  }
+
+  async refreshImplStoreInSourceStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     const targetTableName = this.targetTableName(newVersionEntry);
@@ -402,13 +426,7 @@ class PreAggregationLoader {
         this.preAggregation.tableName,
         targetTableName
       );
-    this.logger('Executing Load Pre Aggregation SQL', {
-      queryKey: this.preAggregation.loadSql,
-      query,
-      values: params,
-      targetTableName,
-      requestId: this.requestId
-    });
+    this.logExecutingSql(invalidationKeys, query, params, targetTableName, newVersionEntry);
     await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
@@ -420,7 +438,7 @@ class PreAggregationLoader {
     await this.loadCache.reset(this.preAggregation);
   }
 
-  async refreshImplTempTableExternalStrategy(client, newVersionEntry, saveCancelFn) {
+  async refreshImplTempTableExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
@@ -430,13 +448,7 @@ class PreAggregationLoader {
         this.preAggregation.tableName,
         targetTableName
       );
-    this.logger('Executing Load Pre Aggregation SQL', {
-      queryKey: this.preAggregation.loadSql,
-      query,
-      values: params,
-      targetTableName,
-      requestId: this.requestId
-    });
+    this.logExecutingSql(invalidationKeys, query, params, targetTableName, newVersionEntry);
     await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
@@ -448,13 +460,14 @@ class PreAggregationLoader {
     await this.dropOrphanedTables(client, targetTableName, saveCancelFn);
   }
 
-  async refreshImplStreamExternalStrategy(client, newVersionEntry, saveCancelFn) {
+  async refreshImplStreamExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
     if (!client.downloadQueryResults) {
       throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadQueryResults()`);
     }
 
+    this.logExecutingSql(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
     this.logger('Downloading external pre-aggregation via query', {
       preAggregation: this.preAggregation,
       requestId: this.requestId
@@ -614,7 +627,7 @@ class PreAggregations {
     if (!this.queue) {
       this.queue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}`, this.driverFactory, (client, q) => {
         const {
-          preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId
+          preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys
         } = q;
         const loader = new PreAggregationLoader(
           this.redisPrefix,
@@ -627,7 +640,7 @@ class PreAggregations {
           new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this, { requestId }),
           { requestId }
         );
-        return loader.refresh(newVersionEntry)(client);
+        return loader.refresh(newVersionEntry, invalidationKeys)(client);
       }, {
         concurrency: 1,
         logger: this.logger,

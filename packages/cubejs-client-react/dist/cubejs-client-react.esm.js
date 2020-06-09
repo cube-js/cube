@@ -1,24 +1,26 @@
-import 'core-js/modules/es6.array.map';
+import 'core-js/modules/es.array.iterator';
+import 'core-js/modules/es.array.map';
+import 'core-js/modules/es.object.to-string';
+import 'core-js/modules/es.promise';
+import 'core-js/modules/es.string.iterator';
+import 'core-js/modules/web.dom-collections.iterator';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
-import 'core-js/modules/es6.promise';
-import 'core-js/modules/web.dom.iterable';
-import 'core-js/modules/es6.array.iterator';
-import 'core-js/modules/es6.object.to-string';
-import 'core-js/modules/es6.string.iterator';
 import _objectSpread2 from '@babel/runtime/helpers/objectSpread';
 import _classCallCheck from '@babel/runtime/helpers/classCallCheck';
 import _possibleConstructorReturn from '@babel/runtime/helpers/possibleConstructorReturn';
 import _getPrototypeOf from '@babel/runtime/helpers/getPrototypeOf';
 import _createClass from '@babel/runtime/helpers/createClass';
 import _inherits from '@babel/runtime/helpers/inherits';
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useRef, useState, useContext, useEffect } from 'react';
 import { func, object, any, bool } from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import _extends from '@babel/runtime/helpers/extends';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
-import 'core-js/modules/es6.array.filter';
+import 'core-js/modules/es.array.concat';
+import 'core-js/modules/es.array.filter';
+import 'core-js/modules/es.array.splice';
+import 'core-js/modules/es.function.name';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
-import 'core-js/modules/es6.function.name';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
@@ -752,6 +754,16 @@ CubeProvider.propTypes = {
   children: any.isRequired
 };
 
+function useDeepCompareMemoize(value) {
+  var ref = useRef([]);
+
+  if (!equals(value, ref.current)) {
+    ref.current = value;
+  }
+
+  return ref.current;
+}
+
 var useCubeQuery = (function (query) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
@@ -887,7 +899,7 @@ var useCubeQuery = (function (query) {
         subscribeRequest = null;
       }
     };
-  }, [JSON.stringify(query), options.cubejsApi, context]);
+  }, useDeepCompareMemoize([query, options, context]));
   return {
     isLoading: isLoading,
     resultSet: resultSet,

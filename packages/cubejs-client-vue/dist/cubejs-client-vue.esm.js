@@ -1,22 +1,25 @@
+import 'core-js/modules/es.array.iterator';
+import 'core-js/modules/es.array.map';
+import 'core-js/modules/es.object.assign';
+import 'core-js/modules/es.object.keys';
+import 'core-js/modules/es.object.to-string';
+import 'core-js/modules/es.promise';
+import 'core-js/modules/es.string.iterator';
+import 'core-js/modules/web.dom-collections.iterator';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
-import 'core-js/modules/es6.array.map';
-import 'core-js/modules/es6.promise';
-import 'core-js/modules/es6.string.iterator';
-import 'core-js/modules/web.dom.iterable';
-import 'core-js/modules/es6.array.iterator';
-import 'core-js/modules/es6.object.to-string';
-import 'core-js/modules/es6.object.keys';
-import 'core-js/modules/es6.object.assign';
 import _objectSpread2 from '@babel/runtime/helpers/objectSpread';
 import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
 import { toPairs, fromPairs } from 'ramda';
-import 'core-js/modules/es6.array.find-index';
-import 'core-js/modules/es6.array.find';
-import 'core-js/modules/es6.array.filter';
-import 'core-js/modules/es6.function.name';
-import 'core-js/modules/es6.array.for-each';
+import 'core-js/modules/es.array.filter';
+import 'core-js/modules/es.array.find';
+import 'core-js/modules/es.array.find-index';
+import 'core-js/modules/es.array.for-each';
+import 'core-js/modules/es.array.slice';
+import 'core-js/modules/es.array.splice';
+import 'core-js/modules/es.function.name';
+import 'core-js/modules/web.dom-collections.for-each';
 
 var QueryRenderer = {
   props: {
@@ -314,6 +317,7 @@ var QueryBuilder = {
   data: function data() {
     var data = {
       meta: undefined,
+      chartType: undefined,
       measures: [],
       dimensions: [],
       segments: [],

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.19.14",
+  "version": "0.19.23",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -12,7 +12,7 @@
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "core-js": "^2.5.3",
+    "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
     "moment": "^2.22.2",
     "moment-range": "^4.0.1",

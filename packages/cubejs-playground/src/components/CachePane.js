@@ -1,7 +1,6 @@
 import React from 'react';
-import {
-  Table, Icon, Tabs
-} from 'antd';
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { Table, Tabs } from 'antd';
 import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from "sql-formatter";
 import PropTypes from 'prop-types';
@@ -113,8 +112,8 @@ const CachePane = ({ query, cubejsApi }) => (
                   key: 'canUsePreAggregation',
                   dataIndex: 'canUsePreAggregation',
                   render: (text) => (
-                    text ? <Icon type="check" style={{ color: '#52c41a', fontSize: '2em' }}/>
-                      : <Icon type="close" style={{ color: '#c2371b', fontSize: '2em' }}/>
+                    text ? <CheckOutlined style={{ color: '#52c41a', fontSize: '2em' }} />
+                      : <CloseOutlined style={{ color: '#c2371b', fontSize: '2em' }} />
                   ),
                 }
               ]}

@@ -1576,6 +1576,27 @@ describe('SQL Generation', function test() {
     "visitors__created_at_day": "2017-01-06T00:00:00.000Z"
   }]));
 
+  it('offset cache', () => runQueryTest({
+    measures: [],
+    dimensions: [
+      'visitors.id'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles',
+    ungrouped: true,
+    offset: 5
+  }, [{
+    "visitors__id": 5,
+    "visitors__created_at_day": "2017-01-06T00:00:00.000Z"
+  }]));
+
   it('ungrouped without id', () => runQueryTest({
     measures: [],
     dimensions: [],

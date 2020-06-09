@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import * as PropTypes from 'prop-types';
 import cubejs from '@cubejs-client/core';
+import { PlusOutlined } from '@ant-design/icons';
 import {
   Layout, Menu, Button, Tree, Tabs, Dropdown, Spin, Alert, Modal, Empty
 } from 'antd';
@@ -211,17 +212,23 @@ class SchemaPage extends Component {
 
     return (
       <Layout style={{ height: '100%' }}>
-        <Sider width={300} style={{ background: '#fff', borderRight: '1px solid #eee' }} className="schema-sidebar">
+        <Sider
+          width={300}
+          style={{
+            background: '#fff',
+            borderRight: '1px solid #eee',
+          }}
+          className="schema-sidebar"
+        >
           <Tabs
             activeKey={activeTab}
             onChange={(tab) => this.setState({ activeTab: tab })}
             tabBarExtraContent={(
               <Dropdown overlay={menu} placement="bottomRight" disabled={!checkedKeys.length}>
                 <Button
-                shape="circle"
-                icon="plus"
-                type="primary"
-                style={{ marginRight: 8 }}
+                  shape="circle"
+                  icon={<PlusOutlined />}
+                  type="primary"
                 />
               </Dropdown>
 )}

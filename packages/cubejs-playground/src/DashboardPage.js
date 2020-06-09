@@ -1,13 +1,10 @@
 /* globals window */
 import React, { Component } from 'react';
-import {
-  Spin, Button, Alert, Menu, Dropdown, Icon, Form
-} from 'antd';
+import '@ant-design/compatible/assets/index.css';
+import { Spin, Button, Alert, Menu, Dropdown } from 'antd';
 import { Link, withRouter, Redirect } from 'react-router-dom';
 import DashboardSource from "./DashboardSource";
 import fetch from './playgroundFetch';
-import { frameworks } from "./ChartContainer";
-import { playgroundAction } from "./events";
 import { chartLibraries } from "./ChartRenderer";
 
 const Frame = ({ children }) => (

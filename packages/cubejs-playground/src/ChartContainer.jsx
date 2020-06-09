@@ -1,8 +1,16 @@
 /* global navigator */
 import React from 'react';
 import {
-  Card, Button, Menu, Dropdown, Icon, notification, Modal, Table
-} from 'antd';
+  CodeOutlined,
+  CodeSandboxOutlined,
+  CopyOutlined,
+  DownOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
+  SyncOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
+import { Card, Button, Menu, Dropdown, notification, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
@@ -173,7 +181,7 @@ class ChartContainer extends React.Component {
                   });
                 }
               }}
-              icon="plus"
+              icon={<PlusOutlined />}
               size="small"
               loading={addingToDashboard}
               disabled={!!frameworkItem.docsLink}
@@ -184,7 +192,7 @@ class ChartContainer extends React.Component {
           <Dropdown overlay={frameworkMenu}>
             <Button size="small">
               {frameworkItem && frameworkItem.title}
-              <Icon type="down" />
+              <DownOutlined />
             </Button>
           </Dropdown>
           <Dropdown
@@ -195,7 +203,7 @@ class ChartContainer extends React.Component {
               size="small"
             >
               {currentLibraryItem && currentLibraryItem.title}
-              <Icon type="down" />
+              <DownOutlined />
             </Button>
           </Dropdown>
           <Button
@@ -203,7 +211,7 @@ class ChartContainer extends React.Component {
               playgroundAction('Show Query');
               this.setState({ showCode: showCode === 'query' ? null : 'query' });
             }}
-            icon="thunderbolt"
+            icon={<ThunderboltOutlined />}
             size="small"
             type={showCode === 'query' ? 'primary' : 'default'}
             disabled={!!frameworkItem.docsLink}
@@ -215,7 +223,7 @@ class ChartContainer extends React.Component {
               playgroundAction('Show Code');
               this.setState({ showCode: showCode === 'code' ? null : 'code' });
             }}
-            icon="code"
+            icon={<CodeOutlined />}
             size="small"
             type={showCode === 'code' ? 'primary' : 'default'}
             disabled={!!frameworkItem.docsLink}
@@ -227,7 +235,7 @@ class ChartContainer extends React.Component {
               playgroundAction('Show SQL');
               this.setState({ showCode: showCode === 'sql' ? null : 'sql' });
             }}
-            icon="question-circle"
+            icon={<QuestionCircleOutlined />}
             size="small"
             type={showCode === 'sql' ? 'primary' : 'default'}
             disabled={!!frameworkItem.docsLink}
@@ -239,7 +247,7 @@ class ChartContainer extends React.Component {
               playgroundAction('Show Cache');
               this.setState({ showCode: showCode === 'cache' ? null : 'cache' });
             }}
-            icon="sync"
+            icon={<SyncOutlined />}
             size="small"
             type={showCode === 'cache' ? 'primary' : 'default'}
             disabled={!!frameworkItem.docsLink}
@@ -247,7 +255,7 @@ class ChartContainer extends React.Component {
             Cache
           </Button>
           <Button
-            icon="code-sandbox"
+            icon={<CodeSandboxOutlined />}
             size="small"
             onClick={() => playgroundAction('Open Code Sandbox')}
             htmlType="submit"
@@ -330,7 +338,7 @@ class ChartContainer extends React.Component {
     if (showCode === 'code') {
       title = (
         <Button
-          icon="copy"
+          icon={<CopyOutlined />}
           onClick={() => {
             copyCodeToClipboard();
             playgroundAction('Copy Code to Clipboard');
@@ -343,7 +351,7 @@ class ChartContainer extends React.Component {
     } else if (showCode === 'query') {
       title = (
         <Button
-          icon="copy"
+          icon={<CopyOutlined />}
           onClick={() => {
             copyCodeToClipboard();
             playgroundAction('Copy Query to Clipboard');

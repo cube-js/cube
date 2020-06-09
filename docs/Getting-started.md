@@ -216,7 +216,7 @@ In the example below we use Vue-Chartkick to visualize data.
 
 <script>
 import cubejs from '@cubejs-client/core';
-import { QueryBuilder } from '@cubejs-client/vue';
+import { QueryRenderer } from '@cubejs-client/vue';
 import Vue from 'vue';
 import VueChartkick from 'vue-chartkick';
 import Chart from 'chart.js';
@@ -231,7 +231,7 @@ const cubejsApi = cubejs(
 export default {
   name: 'HelloWorld',
   components: {
-    QueryBuilder,
+    QueryRenderer,
   },
   props: {
     msg: String,
