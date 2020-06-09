@@ -10,11 +10,11 @@ const cloudReq = (options) => {
   const { url, auth, ...restOptions } = options;
   const authorization = auth || process.env.CUBE_CLOUD_DEPLOY_AUTH;
   if (!authorization) {
-    throw new (`CUBE_CLOUD_DEPLOY_AUTH isn't set`);
+    throw new Error('CUBE_CLOUD_DEPLOY_AUTH isn\'t set');
   }
   const payload = jwt.decode(authorization);
   if (!payload.url || !payload.deploymentId) {
-    throw new (`Malformed token: ${authorization}`);
+    throw new Error(`Malformed token: ${authorization}`);
   }
   return rp({
     headers: {
