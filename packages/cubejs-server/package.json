@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@cubejs-backend/server-core": "^0.19.24",
-    "body-parser": "^1.15.2",
+    "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
     "dotenv": "^8.1.0",
