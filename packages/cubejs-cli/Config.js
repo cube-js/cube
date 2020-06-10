@@ -9,7 +9,7 @@ class Config {
   async loadConfig() {
     const { configFile } = this.configFile();
     if (await fs.exists(configFile)) {
-      return await fs.readJson(configFile);
+      return fs.readJson(configFile);
     }
     return {};
   }
@@ -22,7 +22,7 @@ class Config {
 
   configFile() {
     const cubeCloudConfigPath = this.cubeCloudConfigPath();
-    const configFile = path.join(cubeCloudConfigPath, `config.json`);
+    const configFile = path.join(cubeCloudConfigPath, 'config.json');
     return { cubeCloudConfigPath, configFile };
   }
 
@@ -34,10 +34,10 @@ class Config {
     if (process.env.CUBE_CLOUD_DEPLOY_AUTH) {
       const payload = jwt.decode(process.env.CUBE_CLOUD_DEPLOY_AUTH);
       if (!payload.url) {
-        throw new Error(`Malformed token in CUBE_CLOUD_DEPLOY_AUTH`);
+        throw new Error('Malformed token in CUBE_CLOUD_DEPLOY_AUTH');
       }
       if (url && payload.url !== url) {
-        throw new Error(`CUBE_CLOUD_DEPLOY_AUTH token doesn't match url in .cubecloud`);
+        throw new Error('CUBE_CLOUD_DEPLOY_AUTH token doesn\'t match url in .cubecloud');
       }
       return {
         [payload.url]: {
@@ -64,7 +64,7 @@ class Config {
     }
     const payload = jwt.decode(authToken);
     if (!payload || !payload.url) {
-      throw `Malformed Cube Cloud token`;
+      throw new Error('Malformed Cube Cloud token');
     }
     config.auth = config.auth || {};
     config.auth[payload.url] = {
@@ -85,7 +85,7 @@ class Config {
         ...deployAuth[dotCubeCloud.url],
         url: dotCubeCloud.url,
         deploymentId: dotCubeCloud.deploymentId
-      }
+      };
     }
     const auth = await this.deployAuth();
     let url = Object.keys(auth)[0];
@@ -99,7 +99,7 @@ class Config {
     }
     const authToken = auth[url];
     const deployments = await this.cloudReq({
-      url: () => `build/deploy/deployments`,
+      url: () => 'build/deploy/deployments',
       method: 'GET',
       auth: { ...authToken, url }
     });
@@ -118,7 +118,7 @@ class Config {
       ...authToken,
       url,
       deploymentId
-    }
+    };
   }
 
   async loadDeployAuth() {
@@ -131,7 +131,7 @@ class Config {
 
   async loadDotCubeCloud() {
     if (await fs.exists(this.dotCubeCloudFile())) {
-      return await fs.readJson(this.dotCubeCloudFile());
+      return fs.readJson(this.dotCubeCloudFile());
     }
     return {};
   }

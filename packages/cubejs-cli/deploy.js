@@ -1,5 +1,3 @@
-const rp = require('request-promise');
-const jwt = require('jsonwebtoken');
 const fs = require('fs-extra');
 const path = require('path');
 const cliProgress = require('cli-progress');

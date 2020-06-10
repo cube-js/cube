@@ -279,7 +279,7 @@ program
   .command('authenticate <token>')
   .description('Authenticate access to Cube Cloud')
   .action(
-    (token) => new Config().addAuthToken(token)
+    (currentToken) => new Config().addAuthToken(currentToken)
       .catch(e => displayError(e.stack || e))
   )
   .on('--help', () => {
