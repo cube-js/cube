@@ -5,28 +5,11 @@ const path = require('path');
 const cliProgress = require('cli-progress');
 const DeployDir = require('./DeployDir');
 const { logStage } = require('./utils');
-
-const cloudReq = (options) => {
-  const { url, auth, ...restOptions } = options;
-  const authorization = auth || process.env.CUBE_CLOUD_DEPLOY_AUTH;
-  if (!authorization) {
-    throw new Error('CUBE_CLOUD_DEPLOY_AUTH isn\'t set');
-  }
-  const payload = jwt.decode(authorization);
-  if (!payload.url || !payload.deploymentId) {
-    throw new Error(`Malformed token: ${authorization}`);
-  }
-  return rp({
-    headers: {
-      authorization
-    },
-    ...restOptions,
-    url: `${payload.url}/${url(payload.deploymentId)}`,
-    json: true
-  });
-};
+const Config = require('./Config');
 
 exports.deploy = async ({ directory, auth }) => {
+  const config = new Config();
+  await config.loadDeployAuth();
   const bar = new cliProgress.SingleBar({
     format: '- Uploading files | {bar} | {percentage}% || {value} / {total} | {file}',
     barCompleteChar: '\u2588',
@@ -36,12 +19,12 @@ exports.deploy = async ({ directory, auth }) => {
 
   const deployDir = new DeployDir({ directory });
   const fileHashes = await deployDir.fileHashes();
-  const upstreamHashes = await cloudReq({
+  const upstreamHashes = await config.cloudReq({
     url: (deploymentId) => `build/deploy/${deploymentId}/files`,
     method: 'GET',
     auth
   });
-  const { transaction, deploymentName } = await cloudReq({
+  const { transaction, deploymentName } = await config.cloudReq({
     url: (deploymentId) => `build/deploy/${deploymentId}/start-upload`,
     method: 'POST',
     auth
@@ -59,7 +42,7 @@ exports.deploy = async ({ directory, auth }) => {
       const file = files[i];
       bar.update(i, { file });
       if (!upstreamHashes[file] || upstreamHashes[file].hash !== fileHashes[file].hash) {
-        await cloudReq({
+        await config.cloudReq({
           url: (deploymentId) => `build/deploy/${deploymentId}/upload-file`,
           method: 'POST',
           formData: {
@@ -78,7 +61,7 @@ exports.deploy = async ({ directory, auth }) => {
       }
     }
     bar.update(files.length, { file: 'Post processing...' });
-    await cloudReq({
+    await config.cloudReq({
       url: (deploymentId) => `build/deploy/${deploymentId}/finish-upload`,
       method: 'POST',
       body: {

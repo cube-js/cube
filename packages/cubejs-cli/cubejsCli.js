@@ -12,6 +12,7 @@ const chalk = require('chalk');
 const spawn = require('cross-spawn');
 const crypto = require('crypto');
 
+const Config = require('./Config');
 const templates = require('./templates');
 const { deploy } = require('./deploy');
 const { token, defaultExpiry, collect } = require('./token');
@@ -271,6 +272,21 @@ program
     console.log('Examples:');
     console.log('');
     console.log('  $ export CUBE_CLOUD_DEPLOY_AUTH=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXBsb3ltZW50SWQiOiIxIiwidXJsIjoiaHR0cHM6Ly9leGFtcGxlcy5jdWJlY2xvdWQuZGV2IiwiaWF0IjoxNTE2MjM5MDIyfQ.La3MiuqfGigfzADl1wpxZ7jlb6dY60caezgqIOoHt-c');
+    console.log('  $ cubejs deploy');
+  });
+
+program
+  .command('authenticate <token>')
+  .description('Authenticate access to Cube Cloud')
+  .action(
+    (token) => new Config().addAuthToken(token)
+      .catch(e => displayError(e.stack || e))
+  )
+  .on('--help', () => {
+    console.log('');
+    console.log('Examples:');
+    console.log('');
+    console.log('  $ cubejs authenticate eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXBsb3ltZW50SWQiOiIxIiwidXJsIjoiaHR0cHM6Ly9leGFtcGxlcy5jdWJlY2xvdWQuZGV2IiwiaWF0IjoxNTE2MjM5MDIyfQ.La3MiuqfGigfzADl1wpxZ7jlb6dY60caezgqIOoHt-c');
     console.log('  $ cubejs deploy');
   });
 
