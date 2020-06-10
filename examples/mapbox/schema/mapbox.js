@@ -1,5 +1,6 @@
 cube(`mapbox`, {
   sql: `SELECT * FROM public.mapbox`,
+  dataSource: `mapbox__example`,
 
   joins: {
     mapbox__coords: {

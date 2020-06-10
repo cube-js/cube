@@ -1,5 +1,6 @@
 cube(`mapbox__coords`, {
   sql: `SELECT * FROM public.mapbox__coords`,
+  dataSource: `mapbox__example`,
 
   joins: {},
 
@@ -15,12 +16,5 @@ cube(`mapbox__coords`, {
       primaryKey: true,
       shown: true,
     },
-
-    /*
-      хотела сгруппировать координаты в мультиполигоны в subquery, не получилось
-      concat: {
-      sql: `string_agg(${coordinates}, 'NEWCOORDS')`,
-      type: 'string',
-    },*/
   },
 });
