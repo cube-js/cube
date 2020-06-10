@@ -8,16 +8,21 @@ import {
   TasksProgress,
   TotalProfit,
   LatestSales,
-  UsersByDevice,
+  OrdersStatus,
   LatestProducts,
   LatestOrders
 } from './components';
+import cubejs from "@cubejs-client/core";
 
 const useStyles = makeStyles(theme => ({
   root: {
     padding: theme.spacing(4)
   }
 }));
+
+const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
+  apiUrl: process.env.REACT_APP_API_URL
+});
 
 const Dashboard = () => {
   const classes = useStyles();
@@ -35,7 +40,7 @@ const Dashboard = () => {
           xl={3}
           xs={12}
         >
-          <Budget />
+          <Budget cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
           item
@@ -44,7 +49,7 @@ const Dashboard = () => {
           xl={3}
           xs={12}
         >
-          <TotalUsers />
+          <TotalUsers cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
           item
@@ -53,7 +58,7 @@ const Dashboard = () => {
           xl={3}
           xs={12}
         >
-          <TasksProgress />
+          <TasksProgress cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
           item
@@ -62,7 +67,7 @@ const Dashboard = () => {
           xl={3}
           xs={12}
         >
-          <TotalProfit />
+          <TotalProfit cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
           item
@@ -71,7 +76,7 @@ const Dashboard = () => {
           xl={9}
           xs={12}
         >
-          <LatestSales />
+          <LatestSales cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
           item
@@ -80,7 +85,7 @@ const Dashboard = () => {
           xl={3}
           xs={12}
         >
-          <UsersByDevice />
+          <OrdersStatus cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
           item
@@ -89,7 +94,7 @@ const Dashboard = () => {
           xl={3}
           xs={12}
         >
-          <LatestProducts />
+          <LatestProducts cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
           item
@@ -98,7 +103,7 @@ const Dashboard = () => {
           xl={9}
           xs={12}
         >
-          <LatestOrders />
+          <LatestOrders cubejsApi={cubejsApi}/>
         </Grid>
       </Grid>
     </div>

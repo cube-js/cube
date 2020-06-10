@@ -12,13 +12,8 @@ import {
 } from '@material-ui/core';
 import InsertChartIcon from '@material-ui/icons/InsertChartOutlined';
 import { QueryRenderer } from "@cubejs-client/react";
-import cubejs from "@cubejs-client/core";
 import CountUp from 'react-countup';
 
-const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: process.env.REACT_APP_API_URL
-});
-const query = { measures: ["Orders.percentOfCompletedOrders"] };
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -46,8 +41,10 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
+const query = { measures: ["Orders.percentOfCompletedOrders"] };
+
 const TasksProgress = props => {
-  const { className, ...rest } = props;
+  const { className, cubejsApi, ...rest } = props;
 
   const classes = useStyles();
 
@@ -82,7 +79,9 @@ const TasksProgress = props => {
                   <Typography variant="h3">
                     <CountUp end={data}
                              duration={2}
-                             separator=","/>
+                             separator=","
+                             decimals={1}
+                    />
                    %
                   </Typography>
                 </Grid>

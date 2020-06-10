@@ -6,7 +6,6 @@ import { Card, CardContent, Grid, Typography, Avatar } from '@material-ui/core';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import PeopleIcon from '@material-ui/icons/PeopleOutlined';
 import { QueryRenderer } from "@cubejs-client/react";
-import cubejs from "@cubejs-client/core";
 import CountUp from 'react-countup';
 
 const useStyles = makeStyles(theme => ({
@@ -43,13 +42,10 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: process.env.REACT_APP_API_URL
-});
 const query = { measures: ["Users.count"] };
 
 const TotalUsers = props => {
-  const { className, ...rest } = props;
+  const { className, cubejsApi, ...rest } = props;
 
   const classes = useStyles();
   return (
@@ -79,9 +75,10 @@ const TotalUsers = props => {
                   if (!resultSet) {
                     return <div className="loader" />;
                   }
+                  let data = parseInt(resultSet.tablePivot()[0]['Users.count']);
                   return (
                     <div>
-                      <CountUp end={resultSet.tablePivot()[0]['Users.count']}
+                      <CountUp end={data}
                                duration={1.75}
                                separator=","/>
                     </div>

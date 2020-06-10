@@ -31,7 +31,7 @@ cube(`Orders`, {
     },
     //
     percentOfCompletedOrders: {
-      sql: `${ordersCompletedCount} * 100 / ${ordersCount}`,
+      sql: `${ordersCompletedCount}*100.0/${ordersCount}`,
       type: `number`,
       format: `percent`
     }

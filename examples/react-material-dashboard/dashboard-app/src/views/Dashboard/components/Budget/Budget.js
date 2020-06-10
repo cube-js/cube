@@ -6,7 +6,6 @@ import { Card, CardContent, Grid, Typography, Avatar } from '@material-ui/core';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
 import MoneyIcon from '@material-ui/icons/Money';
 import { QueryRenderer } from "@cubejs-client/react";
-import cubejs from "@cubejs-client/core";
 import CountUp from 'react-countup';
 
 const useStyles = makeStyles(theme => ({
@@ -43,13 +42,10 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: process.env.REACT_APP_API_URL
-});
 const query = { measures: ["Orders.count"] };
 
 const Budget = props => {
-  const { className, ...rest } = props;
+  const { className, cubejsApi, ...rest } = props;
 
   const classes = useStyles();
 

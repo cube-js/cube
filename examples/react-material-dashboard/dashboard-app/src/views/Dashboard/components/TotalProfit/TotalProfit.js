@@ -4,7 +4,6 @@ import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
 import { Card, CardContent, Grid, Typography, Avatar } from '@material-ui/core';
 import AttachMoneyIcon from '@material-ui/icons/AttachMoney';
-import cubejs from "@cubejs-client/core";
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
 
@@ -33,9 +32,6 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: process.env.REACT_APP_API_URL
-});
 const query = {
   "measures": [
     "LineItems.price"
@@ -45,7 +41,7 @@ const query = {
 };
 
 const TotalProfit = props => {
-  const { className, ...rest } = props;
+  const { className, cubejsApi, ...rest } = props;
 
   const classes = useStyles();
 
@@ -80,8 +76,9 @@ const TotalProfit = props => {
                   if (!resultSet) {
                     return <div className="loader"/>;
                   }
+                  let data = parseInt(resultSet.tablePivot()[0]['LineItems.price'])
                   return (
-                    <CountUp end={resultSet.tablePivot()[0]['LineItems.price']}
+                    <CountUp end={data}
                              duration={2.25}
                              separator=","/>
                   );

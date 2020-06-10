@@ -7,15 +7,12 @@ import {
   Card,
   CardHeader,
   CardContent,
-  IconButton,
   Divider,
   Typography
 } from '@material-ui/core';
-import LaptopMacIcon from '@material-ui/icons/LaptopMac';
-import PhoneIphoneIcon from '@material-ui/icons/PhoneIphone';
-import RefreshIcon from '@material-ui/icons/Refresh';
-import TabletMacIcon from '@material-ui/icons/TabletMac';
-import cubejs from "@cubejs-client/core";
+import ClearAllIcon from '@material-ui/icons/ClearAll';
+import DoneIcon from '@material-ui/icons/Done';
+import AutorenewIcon from '@material-ui/icons/Autorenew';
 import { QueryRenderer } from "@cubejs-client/react";
 
 const useStyles = makeStyles(theme => ({
@@ -40,9 +37,6 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: process.env.REACT_APP_API_URL
-});
 const query = {
   "measures": [
     "Orders.count"
@@ -58,71 +52,11 @@ const query = {
   ]
 };
 
-const UsersByDevice = props => {
-  const { className, ...rest } = props;
+const OrdersStatus = props => {
+  const { className, cubejsApi, ...rest } = props;
 
   const classes = useStyles();
   const theme = useTheme();
-
-  const data = {
-    datasets: [
-      {
-        data: [63, 15, 22],
-        backgroundColor: [
-          theme.palette.primary.main,
-          theme.palette.error.main,
-          theme.palette.warning.main
-        ],
-        borderWidth: 8,
-        borderColor: theme.palette.white,
-        hoverBorderColor: theme.palette.white
-      }
-    ],
-    labels: ['Desktop', 'Tablet', 'Mobile']
-  };
-
-  const options = {
-    legend: {
-      display: false
-    },
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    cutoutPercentage: 80,
-    layout: { padding: 0 },
-    tooltips: {
-      enabled: true,
-      mode: 'index',
-      intersect: false,
-      borderWidth: 1,
-      borderColor: theme.palette.divider,
-      backgroundColor: theme.palette.white,
-      titleFontColor: theme.palette.text.primary,
-      bodyFontColor: theme.palette.text.secondary,
-      footerFontColor: theme.palette.text.secondary
-    }
-  };
-
-  const devices = [
-    {
-      title: 'Desktop',
-      value: '63',
-      icon: <LaptopMacIcon />,
-      color: theme.palette.primary.main
-    },
-    {
-      title: 'Tablet',
-      value: '15',
-      icon: <TabletMacIcon />,
-      color: theme.palette.error.main
-    },
-    {
-      title: 'Mobile',
-      value: '23',
-      icon: <PhoneIphoneIcon />,
-      color: theme.palette.warning.main
-    }
-  ];
 
   return (
     <QueryRenderer
@@ -133,7 +67,61 @@ const UsersByDevice = props => {
           return <div className="loader" />;
         }
         let result = resultSet.tablePivot();
-        console.log(result);
+        let allValues = calculateValueByArrayKey(resultSet.tablePivot(), 'Orders.count');
+
+        const data = {
+          datasets: [
+            {
+              data: result.map((item) => {
+                return ( item['Orders.count'] / allValues * 100).toFixed(1)
+              }),
+              backgroundColor: [
+                theme.palette.primary.main,
+                theme.palette.error.main,
+                theme.palette.warning.main
+              ],
+              borderWidth: 8,
+              borderColor: theme.palette.white,
+              hoverBorderColor: theme.palette.white
+            }
+          ],
+          labels: result.map((item) => {
+            return item['Orders.status']
+          })
+
+        };
+
+        const options = {
+          legend: {
+            display: false
+          },
+          responsive: true,
+          maintainAspectRatio: false,
+          cutoutPercentage: 80,
+          layout: { padding: 0 },
+          tooltips: {
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+            borderWidth: 1,
+            borderColor: theme.palette.divider,
+            backgroundColor: theme.palette.white,
+            titleFontColor: theme.palette.text.primary,
+            bodyFontColor: theme.palette.text.secondary,
+            footerFontColor: theme.palette.text.secondary
+          }
+        };
+        const colors = [theme.palette.primary.main, theme.palette.warning.main, theme.palette.error.main];
+        const icons = [<DoneIcon />, <ClearAllIcon />, <AutorenewIcon />];
+
+        const orders = result.map((item, index) => {
+          return {
+            title: item['Orders.status'],
+            value: ( item['Orders.count'] / allValues * 100).toFixed(0),
+            icon: icons[index],
+            color: colors[index]
+          }
+        });
         return (
           <div>
             <Card
@@ -141,11 +129,6 @@ const UsersByDevice = props => {
               className={clsx(classes.root, className)}
             >
               <CardHeader
-                action={
-                  <IconButton size="small">
-                    <RefreshIcon />
-                  </IconButton>
-                }
                 title="Orders status"
               />
               <Divider />
@@ -157,7 +140,7 @@ const UsersByDevice = props => {
                   />
                 </div>
                 <div className={classes.stats}>
-                  {devices.map(device => (
+                  {orders.map(device => (
                     <div
                       className={classes.device}
                       key={device.title}
@@ -182,8 +165,16 @@ const UsersByDevice = props => {
   );
 };
 
-UsersByDevice.propTypes = {
+const calculateValueByArrayKey = (array, key) => {
+  let count = 0;
+  array.forEach((item) => {
+    count += parseInt(item[key]);
+  });
+  return count
+};
+
+OrdersStatus.propTypes = {
   className: PropTypes.string
 };
 
-export default UsersByDevice;
+export default OrdersStatus;
