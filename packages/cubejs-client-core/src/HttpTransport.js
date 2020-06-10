@@ -30,11 +30,12 @@ class HttpTransport {
 
     let spanCounter = 1;
 
+    // Currently, all methods make GET requests. If a method makes a request with a body payload,
+    // remember to add a 'Content-Type' header.
     const runRequest = () => fetch(
       `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`, {
         headers: {
           Authorization: this.authorization,
-          'Content-Type': 'application/json',
           'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
           ...this.headers
         }
