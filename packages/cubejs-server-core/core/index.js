@@ -189,7 +189,7 @@ class CubejsServerCore {
     this.driverFactory = options.driverFactory;
     this.externalDriverFactory = options.externalDriverFactory;
     this.apiSecret = options.apiSecret;
-    this.schemaPath = options.schemaPath || 'schema';
+    this.schemaPath = options.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema';
     this.dbType = options.dbType;
     this.logger = options.logger ||
       (process.env.NODE_ENV !== 'production' ?
