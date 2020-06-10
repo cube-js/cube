@@ -1,0 +1,78 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.mapbox__nav {
+  margin-bottom: 32px;
+}
+
+.mapbox__container {
+  position: relative;
+}
+
+.mapbox__legend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+}
+
+.mapbox__legend__range {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  background-color: white;
+  padding: 16px;
+  width: 250px;
+}
+.mapbox__legend__row {
+  margin-bottom: 8px;
+}
+.mapbox__legend__row label{
+  display: flex;
+  justify-content: space-between;
+  margin: 0 6px;
+}
+
+.mapbox__legend__row .ant-slider {
+  margin-top: 0;
+}
+
+.mapbox__input__row {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.mapbox__input__row p {
+  width: 40px;
+  text-align: right;
+  font-weight: bold;
+  margin-bottom: 0;
+}
+
+.mapbox__input__row .ant-input {
+  margin-left: 8px;
+}
+
+.mapbox__sample__button {
+  padding: 0 !important;
+  margin-right: 8px;
+}
+
+.mapbox__sample__button span {
+  display: block;
+  width: 45px;
+  height: 30px;
+}

@@ -1,0 +1,15 @@
+{
+  "name": "mapbox",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js",
+    "build": "cd dashboard-app && yarn && yarn build"
+  },
+  "dependencies": {
+    "@cubejs-backend/bigquery-driver": "^0.19.17",
+    "@cubejs-backend/postgres-driver": "^0.19.20",
+    "@cubejs-backend/server": "^0.19.23"
+  }
+}
