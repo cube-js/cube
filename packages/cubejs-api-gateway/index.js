@@ -372,7 +372,7 @@ class ApiGateway {
       res({
         sql: {
           ...sqlQuery,
-          order: Object.fromEntries(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
+          order: R.fromPairs(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
         }
       });
     } catch (e) {
