@@ -1,10 +1,10 @@
-import React from 'react';
-import clsx from 'clsx';
-import moment from 'moment';
-import PerfectScrollbar from 'react-perfect-scrollbar';
-import PropTypes from 'prop-types';
-import { makeStyles } from '@material-ui/styles';
-import { Link } from 'react-router-dom';
+import React from "react";
+import clsx from "clsx";
+import moment from "moment";
+import PerfectScrollbar from "react-perfect-scrollbar";
+import PropTypes from "prop-types";
+import { makeStyles } from "@material-ui/styles";
+import { Link } from "react-router-dom";
 import {
   Card,
   CardActions,
@@ -19,9 +19,9 @@ import {
   TableRow,
   Tooltip,
   TableSortLabel
-} from '@material-ui/core';
-import ArrowRightIcon from '@material-ui/icons/ArrowRight';
-import StatusBullet from '../../../../components/StatusBullet/StatusBullet';
+} from "@material-ui/core";
+import ArrowRightIcon from "@material-ui/icons/ArrowRight";
+import StatusBullet from "../../../../components/StatusBullet/StatusBullet";
 import { QueryRenderer } from "@cubejs-client/react";
 
 const useStyles = makeStyles(theme => ({
@@ -33,21 +33,21 @@ const useStyles = makeStyles(theme => ({
     minWidth: 800
   },
   statusContainer: {
-    display: 'flex',
-    alignItems: 'center'
+    display: "flex",
+    alignItems: "center"
   },
   status: {
     marginRight: theme.spacing(1)
   },
   actions: {
-    justifyContent: 'flex-end'
+    justifyContent: "flex-end"
   }
 }));
 
 const statusColors = {
-  completed: 'success',
-  processing: 'info',
-  shipped: 'danger'
+  completed: "success",
+  processing: "info",
+  shipped: "danger"
 };
 
 const query = {
@@ -73,8 +73,7 @@ const query = {
     "Users.city",
     "Users.company"
   ],
-  "filters": [
-  ]
+  "filters": []
 };
 
 const LatestOrders = props => {
@@ -100,7 +99,7 @@ const LatestOrders = props => {
               <CardHeader
                 title="Latest Orders"
               />
-              <Divider />
+              <Divider/>
               <CardContent className={classes.content}>
                 <PerfectScrollbar>
                   <div className={classes.inner}>
@@ -129,18 +128,23 @@ const LatestOrders = props => {
                         {orders.map(order => (
                           <TableRow
                             hover
-                            key={order['Orders.order_id']}
+                            key={order["Orders.order_id"]}
                           >
-                            <TableCell>{order['Orders.order_id']}</TableCell>
-                            <TableCell>{order['Orders.user_id']}</TableCell>
+                            <TableCell>{order["Orders.order_id"]}</TableCell>
                             <TableCell>
-                              {moment(order['Orders.createdAt']).format('DD/MM/YYYY')}
+                              <Link
+                                to={`/user/${order["Orders.user_id"]}`}>
+                                {order["Orders.user_id"]}
+                              </Link>
+                            </TableCell>
+                            <TableCell>
+                              {moment(order["Orders.createdAt"]).format("DD/MM/YYYY")}
                             </TableCell>
                             <TableCell>
                               <div className={classes.statusContainer}>
                                 <StatusBullet
                                   className={classes.status}
-                                  color={statusColors[order['Orders.status']]}
+                                  color={statusColors[order["Orders.status"]]}
                                   size="sm"
                                 />
                                 {order.status}
@@ -153,16 +157,16 @@ const LatestOrders = props => {
                   </div>
                 </PerfectScrollbar>
               </CardContent>
-              <Divider />
+              <Divider/>
               <CardActions className={classes.actions}>
                 <Button
                   color="primary"
                   size="small"
                   variant="text"
                   component={Link}
-                  to={'/orders'}
+                  to={"/orders"}
                 >
-                  View all <ArrowRightIcon />
+                  View all <ArrowRightIcon/>
                 </Button>
               </CardActions>
             </Card>

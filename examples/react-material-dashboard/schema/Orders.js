@@ -2,7 +2,10 @@ cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
 
   joins: {
-
+    LineItems: {
+      relationship: `belongsTo`,
+      sql: `${Orders}.id = ${LineItems}.order_id`
+    }
   },
 
   measures: {

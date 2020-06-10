@@ -16,6 +16,14 @@ cube(`Users`, {
   },
 
   dimensions: {
+    first_name: {
+      sql: `first_name`,
+      type: `string`
+    },
+    last_name: {
+      sql: `last_name`,
+      type: `string`
+    },
     city: {
       sql: `city`,
       type: `string`

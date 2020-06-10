@@ -7,6 +7,7 @@ import { Main as MainLayout} from './layouts';
 import {
   Dashboard as DashboardView,
   OrderList as OrderListView,
+  UserView
 } from './views';
 
 const Routes = () => {
@@ -28,6 +29,12 @@ const Routes = () => {
         exact
         layout={MainLayout}
         path="/orders"
+      />
+      <RouteWithLayout
+        component={UserView}
+        exact
+        layout={MainLayout}
+        path="/user/:id"
       />
       <Redirect to="/dashboard" />
     </Switch>
