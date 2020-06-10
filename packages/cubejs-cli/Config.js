@@ -64,7 +64,8 @@ class Config {
     }
     const payload = jwt.decode(authToken);
     if (!payload || !payload.url) {
-      throw new Error('Malformed Cube Cloud token');
+      // eslint-disable-next-line no-throw-literal
+      throw 'Malformed Cube Cloud token';
     }
     config.auth = config.auth || {};
     config.auth[payload.url] = {
@@ -103,6 +104,13 @@ class Config {
       method: 'GET',
       auth: { ...authToken, url }
     });
+    if (!Array.isArray(deployments)) {
+      throw new Error(deployments.toString());
+    }
+    if (!deployments.length) {
+      // eslint-disable-next-line no-throw-literal
+      throw `${url} doesn't have any managed deployments. Please create one.`;
+    }
     const { deployment } = await inquirer.prompt([{
       type: 'list',
       name: 'deployment',
