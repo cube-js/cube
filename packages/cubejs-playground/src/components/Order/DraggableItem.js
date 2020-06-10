@@ -31,7 +31,7 @@ export default function DraggableItem({ id, index, order = 'none', children, onO
             type={order !== 'none' ? 'primary' : null}
             size="small"
             style={{ width: 80, float: 'right' }}
-            onClick={() => onOrderChange(getNextOrder())}
+            onClick={() => onOrderChange(id, getNextOrder())}
           >
             {order.toUpperCase()}
           </Button>

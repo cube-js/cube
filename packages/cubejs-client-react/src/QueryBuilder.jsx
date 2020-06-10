@@ -1,11 +1,11 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import {
-  equals, prop, uniqBy, indexBy
+  prop, uniqBy, indexBy
 } from 'ramda';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
-import { moveKeyAtIndex } from './utils';
+import { reorder } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
@@ -17,134 +17,22 @@ const granularities = [
 ];
 
 export default class QueryBuilder extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.state = {
-      query: props.query,
-      chartType: 'line',
-      orderMembers: [],
-      ...props.vizState
+  static getDerivedStateFromProps(props, state) {
+    const nextState = {
+      ...state,
+      ...(props.vizState || {}),
     };
-
-    this.shouldApplyHeuristicOrder = false;
-    this.requestId = 0;
-  }
-
-  async componentDidMount() {
-    const { query } = this.state;
-    const meta = await this.cubejsApi().meta();
-
-    const getInitialOrderMembers = () => {
-      const indexById = Object.fromEntries(Object.keys(query.order || {}).map((id, index) => [id, index]));
-
-      return this.getOrderMembers().sort((a, b) => {
-        const a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
-        const b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id];
-        return a1 - b1;
-      });
+    
+    return {
+      ...nextState,
+      query: {
+        ...nextState.query,
+        ...(props.query || {})
+      }
     };
-
-    this.setState({ meta }, () => {
-      this.setState({ orderMembers: getInitialOrderMembers() });
-    });
   }
-
-  componentDidUpdate(prevProps, prevState) {
-    const { query, vizState } = this.props;
-    const { query: stateQuery, orderMembers } = this.state;
-
-    if (!equals(prevProps.query, query)) {
-      // eslint-disable-next-line react/no-did-update-set-state
-      this.setState({ query });
-    }
-
-    if (!equals(prevProps.vizState, vizState)) {
-      // eslint-disable-next-line react/no-did-update-set-state
-      this.setState(vizState);
-    }
-
-    if (!equals(prevState.query, stateQuery)) {
-      const indexedOrderMembers = indexBy(prop('id'), this.getOrderMembers());
-      const currentIndexedOrderMembers = orderMembers.map((m) => m.id);
-
-      const nextOrderMembers = orderMembers
-        .map((orderMember) => ({
-          ...orderMember,
-          order: (query.order && query.order[orderMember.id]) || 'none'
-        }))
-        .filter(({ id }) => Boolean(indexedOrderMembers[id]));
-
-      Object.entries(indexedOrderMembers).forEach(([id, orderMember]) => {
-        if (!currentIndexedOrderMembers.includes(id)) {
-          nextOrderMembers.push(orderMember);
-        }
-      });
-
-      const adjustedOrder = (currentQuery) => {
-        const currentOrderMembers = [
-          ...(currentQuery.measures || []),
-          ...(currentQuery.dimensions || []),
-          ...(currentQuery.timeDimensions || []).map((td) => td.dimension)
-        ];
-
-        const order = Object.fromEntries(
-          Object.entries(currentQuery.order || {})
-            .map(([member, currentOrder]) => (currentOrderMembers.includes(member) ? [member, currentOrder] : false))
-            .filter(Boolean)
-        );
-
-        return (currentQuery.order == null && !Object.keys(order).length) || !currentOrderMembers.length ? null : order;
-      };
-
-      const order = adjustedOrder(stateQuery);
-      const { order: _, ...nextQuery } = stateQuery;
-
-      this.updateVizState({
-        query: {
-          ...nextQuery,
-          ...(order ? { order } : {})
-        },
-        orderMembers: nextOrderMembers
-      });
-    }
-  }
-
-  cubejsApi() {
-    const { cubejsApi } = this.props;
-    // eslint-disable-next-line react/destructuring-assignment
-    return cubejsApi || (this.context && this.context.cubejsApi);
-  }
-
-  isQueryPresent() {
-    const { query } = this.state;
-    return QueryRenderer.isQueryPresent(query);
-  }
-
-  getOrderMembers() {
-    const { query } = this.state;
-
-    const toOrderMember = (member) => ({
-      id: member.name,
-      title: member.title
-    });
-
-    return uniqBy(
-      prop('id'),
-      [
-        ...this.resolveMember('measures').map(toOrderMember),
-        ...this.resolveMember('dimensions').map(toOrderMember),
-        ...this.resolveMember('timeDimensions').map((td) => toOrderMember(td.dimension))
-      ].map((member) => ({
-        ...member,
-        order: (query.order && query.order[member.id]) || 'none'
-      }))
-    );
-  }
-
-  resolveMember(type) {
-    const { meta, query } = this.state;
-
+  
+  static resolveMember(type, { meta, query }) {
     if (!meta) {
       return [];
     }
@@ -164,6 +52,66 @@ export default class QueryBuilder extends React.Component {
       index,
       ...meta.resolveMember(m, type)
     }));
+  }
+  
+  static getOrderMembers(state) {
+    const { query, meta } = state;
+     
+    if (!meta) {
+      return [];
+    }
+
+    const toOrderMember = (member) => ({
+      id: member.name,
+      title: member.title
+    });
+
+    return uniqBy(
+      prop('id'),
+      [
+        ...QueryBuilder.resolveMember('measures', state).map(toOrderMember),
+        ...QueryBuilder.resolveMember('dimensions', state).map(toOrderMember),
+        ...QueryBuilder.resolveMember('timeDimensions', state).map((td) => toOrderMember(td.dimension))
+      ].map((member) => ({
+        ...member,
+        order: (query.order && query.order[member.id]) || 'none'
+      }))
+    );
+  }
+  
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      query: props.query,
+      chartType: 'line',
+      orderMembers: [],
+      ...props.vizState
+    };
+
+    this.shouldApplyHeuristicOrder = false;
+    this.requestId = 0;
+  }
+
+  async componentDidMount() {
+    const { query } = this.state;
+    const meta = await this.cubejsApi().meta();
+    
+    this.setState({
+      meta,
+      orderMembers: QueryBuilder.getOrderMembers({ meta, query })
+    });
+  }
+
+  cubejsApi() {
+    const { cubejsApi } = this.props;
+    // eslint-disable-next-line react/destructuring-assignment
+    return cubejsApi || (this.context && this.context.cubejsApi);
+  }
+
+  isQueryPresent() {
+    const { query } = this.state;
+    return QueryRenderer.isQueryPresent(query);
   }
 
   prepareRenderProps(queryRendererProps) {
@@ -203,8 +151,7 @@ export default class QueryBuilder extends React.Component {
         });
       }
     });
-
-    const self = this;
+    
     const {
       meta, query, orderMembers = [], chartType
     } = this.state;
@@ -215,9 +162,9 @@ export default class QueryBuilder extends React.Component {
       validatedQuery: this.validatedQuery(),
       isQueryPresent: this.isQueryPresent(),
       chartType,
-      measures: this.resolveMember('measures'),
-      dimensions: this.resolveMember('dimensions'),
-      timeDimensions: this.resolveMember('timeDimensions'),
+      measures: QueryBuilder.resolveMember('measures', this.state),
+      dimensions: QueryBuilder.resolveMember('dimensions', this.state),
+      timeDimensions: QueryBuilder.resolveMember('timeDimensions', this.state),
       segments: ((meta && query.segments) || []).map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
       filters: ((meta && query.filters) || []).map((m, i) => ({
         ...m,
@@ -240,32 +187,12 @@ export default class QueryBuilder extends React.Component {
       updateFilters: updateMethods('filters', toFilter),
       updateChartType: (newChartType) => this.updateVizState({ chartType: newChartType }),
       updateOrder: {
-        set(member, order = 'asc', atIndex = null) {
-          if (order === 'none') {
-            this.remove(member);
-          }
-
-          let nextOrder;
-          if (atIndex !== null) {
-            nextOrder = moveKeyAtIndex(query.order, member, atIndex);
-            nextOrder[member] = order;
-          } else {
-            nextOrder = {
-              ...query.order,
-              [member]: order
-            };
-          }
-
-          self.updateQuery({ order: nextOrder });
-        },
-        remove: (member) => {
-          this.updateQuery({
-            order: Object.keys(query.order)
-              .filter((currentMember) => currentMember !== member)
-              .reduce((memo, currentMember) => {
-                memo[currentMember] = query.order[currentMember];
-                return memo;
-              }, {})
+        set: (memberId, order = 'asc') => {
+          this.updateVizState({
+            orderMembers: orderMembers.map((orderMember) => ({
+              ...orderMember,
+              order: orderMember.id === memberId ? order : orderMember.order
+            }))
           });
         },
         update: (order) => {
@@ -273,13 +200,13 @@ export default class QueryBuilder extends React.Component {
             order
           });
         },
-        updateByOrderMembers: (nextOrderMembers) => {
-          this.setState({ orderMembers: nextOrderMembers });
-          this.updateQuery({
-            order:
-              Object.fromEntries(
-                orderMembers.map(({ id, order }) => order !== 'none' && [id, order]).filter(Boolean)
-              ) || {}
+        reorder: (sourceIndex, destinationIndex) => {
+          if (sourceIndex == null || destinationIndex == null) {
+            return;
+          }
+          
+          this.updateVizState({
+            orderMembers: reorder(orderMembers, sourceIndex, destinationIndex)
           });
         }
       },
@@ -300,28 +227,56 @@ export default class QueryBuilder extends React.Component {
 
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
+    const { query: stateQuery } = this.state;
     let finalState = this.applyStateChangeHeuristics(state);
+    const { order: _, ...query } = finalState.query || {};
 
-    if (this.shouldApplyHeuristicOrder) {
+    if (this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
+      this.shouldApplyHeuristicOrder = false;
+      
       try {
         const currentRequestId = ++this.requestId;
-        const { order: _, ...query } = finalState.query;
         const { sqlQuery } = await this.cubejsApi().sql(query);
-
-        if (this.requestId === currentRequestId) {
-          finalState = {
-            ...finalState,
-            query: {
-              ...finalState.query,
-              order: sqlQuery.sql.order
-            }
-          };
+        
+        if (this.requestId !== currentRequestId) {
+          return;
         }
+        
+        finalState = {
+          ...finalState,
+          query: {
+            ...finalState.query,
+            order: sqlQuery.sql.order
+          }
+        };
         // eslint-disable-next-line
-      } catch (e) {}
-
-      this.shouldApplyHeuristicOrder = false;
+      } catch (e) {}      
     }
+    
+    const updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers({
+      ...this.state, ...finalState
+    }));
+    const currentOrderMemberIds = (finalState.orderMembers || []).map(({ id }) => id);
+    
+    const currentOrderMembers = (finalState.orderMembers || []).filter(({ id }) => Boolean(updatedOrderMembers[id]));
+      
+    Object.entries(updatedOrderMembers).forEach(([id, orderMember]) => {
+      if (!currentOrderMemberIds.includes(id)) {
+        currentOrderMembers.push(orderMember);
+      }
+    });
+      
+    const nextOrder = Object.fromEntries(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean));
+      
+    finalState = {
+      ...finalState,
+      query: {
+        ...stateQuery,
+        ...query,
+        order: nextOrder
+      },
+      orderMembers: currentOrderMembers
+    };
 
     this.setState(finalState);
     finalState = { ...this.state, ...finalState };

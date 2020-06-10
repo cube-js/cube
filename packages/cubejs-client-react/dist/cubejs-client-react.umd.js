@@ -8426,12 +8426,6 @@
   // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
   addToUnscopables('includes');
 
-  // `Number.MAX_SAFE_INTEGER` constant
-  // https://tc39.github.io/ecma262/#sec-number.max_safe_integer
-  _export({ target: 'Number', stat: true }, {
-    MAX_SAFE_INTEGER: 0x1FFFFFFFFFFFFF
-  });
-
   var propertyIsEnumerable = objectPropertyIsEnumerable.f;
 
   // `Object.{ entries, values }` methods implementation
@@ -9270,25 +9264,15 @@
     }
   });
 
-  function moveKeyAtIndex(object, key, atIndex) {
-    var keys = Object.keys(object);
-    var entries = [];
-    var index = 0;
-    var j = 0;
+  function reorder(list, sourceIndex, destinationIndex) {
+    var result = _toConsumableArray(list);
 
-    while (j < keys.length) {
-      if (entries.length === atIndex) {
-        entries.push([key, object[key]]);
-        j++;
-      } else {
-        if (keys[index] !== key) {
-          entries.push([keys[index], object[keys[index]]]);
-          j++;
-        }
+    var _result$splice = result.splice(sourceIndex, 1),
+        _result$splice2 = _slicedToArray(_result$splice, 1),
+        removed = _result$splice2[0];
 
-        index++;
-      }
-    }
+    result.splice(destinationIndex, 0, removed);
+    return result;
   }
 
   var granularities = [{
@@ -9316,186 +9300,20 @@
   function (_React$Component) {
     _inherits(QueryBuilder, _React$Component);
 
-    function QueryBuilder(props$$1) {
-      var _this;
+    _createClass(QueryBuilder, null, [{
+      key: "getDerivedStateFromProps",
+      value: function getDerivedStateFromProps(props$$1, state) {
+        var nextState = _objectSpread({}, state, {}, props$$1.vizState || {});
 
-      _classCallCheck(this, QueryBuilder);
-
-      _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props$$1));
-      _this.state = _objectSpread({
-        query: props$$1.query,
-        chartType: 'line',
-        orderMembers: []
-      }, props$$1.vizState);
-      _this.shouldApplyHeuristicOrder = false;
-      _this.requestId = 0;
-      return _this;
-    }
-
-    _createClass(QueryBuilder, [{
-      key: "componentDidMount",
-      value: function () {
-        var _componentDidMount = _asyncToGenerator(
-        /*#__PURE__*/
-        regeneratorRuntime.mark(function _callee() {
-          var _this2 = this;
-
-          var query, meta, getInitialOrderMembers;
-          return regeneratorRuntime.wrap(function _callee$(_context) {
-            while (1) {
-              switch (_context.prev = _context.next) {
-                case 0:
-                  query = this.state.query;
-                  _context.next = 3;
-                  return this.cubejsApi().meta();
-
-                case 3:
-                  meta = _context.sent;
-
-                  getInitialOrderMembers = function getInitialOrderMembers() {
-                    var indexById = Object.fromEntries(Object.keys(query.order || {}).map(function (id, index) {
-                      return [id, index];
-                    }));
-                    return _this2.getOrderMembers().sort(function (a, b) {
-                      var a1 = indexById[a.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[a.id];
-                      var b1 = indexById[b.id] === undefined ? Number.MAX_SAFE_INTEGER : indexById[b.id];
-                      return a1 - b1;
-                    });
-                  };
-
-                  this.setState({
-                    meta: meta
-                  }, function () {
-                    _this2.setState({
-                      orderMembers: getInitialOrderMembers()
-                    });
-                  });
-
-                case 6:
-                case "end":
-                  return _context.stop();
-              }
-            }
-          }, _callee, this);
-        }));
-
-        function componentDidMount() {
-          return _componentDidMount.apply(this, arguments);
-        }
-
-        return componentDidMount;
-      }()
-    }, {
-      key: "componentDidUpdate",
-      value: function componentDidUpdate(prevProps, prevState) {
-        var _this$props = this.props,
-            query = _this$props.query,
-            vizState = _this$props.vizState;
-
-        if (!equals(prevProps.query, query)) {
-          // eslint-disable-next-line react/no-did-update-set-state
-          this.setState({
-            query: query
-          });
-        }
-
-        if (!equals(prevProps.vizState, vizState)) {
-          // eslint-disable-next-line react/no-did-update-set-state
-          this.setState(vizState);
-        }
-
-        if (!equals(prevState.query, this.state.query)) {
-          var _this$state = this.state,
-              _query = _this$state.query,
-              orderMembers = _this$state.orderMembers;
-          var indexedOrderMembers = indexBy(prop('id'), this.getOrderMembers());
-          var currentIndexedOrderMembers = orderMembers.map(function (m) {
-            return m.id;
-          });
-          var nextOrderMembers = orderMembers.map(function (orderMember) {
-            return _objectSpread({}, orderMember, {
-              order: _query.order && _query.order[orderMember.id] || 'none'
-            });
-          }).filter(function (_ref) {
-            var id = _ref.id;
-            return Boolean(indexedOrderMembers[id]);
-          });
-          Object.entries(indexedOrderMembers).forEach(function (_ref2) {
-            var _ref3 = _slicedToArray(_ref2, 2),
-                id = _ref3[0],
-                orderMember = _ref3[1];
-
-            if (!currentIndexedOrderMembers.includes(id)) {
-              nextOrderMembers.push(orderMember);
-            }
-          });
-
-          var adjustedOrder = function adjustedOrder(query) {
-            var orderMembers = [].concat(_toConsumableArray(query.measures || []), _toConsumableArray(query.dimensions || []), _toConsumableArray((query.timeDimensions || []).map(function (td) {
-              return td.dimension;
-            })));
-            var order = Object.fromEntries(Object.entries(query.order || {}).map(function (_ref4) {
-              var _ref5 = _slicedToArray(_ref4, 2),
-                  member = _ref5[0],
-                  order = _ref5[1];
-
-              return orderMembers.includes(member) ? [member, order] : false;
-            }).filter(Boolean));
-            return query.order == null && !Object.keys(order).length || !orderMembers.length ? null : order;
-          };
-
-          var order = adjustedOrder(_query);
-
-          var _ = _query.order,
-              nextQuery = _objectWithoutProperties(_query, ["order"]);
-
-          this.updateVizState({
-            query: _objectSpread({}, nextQuery, {}, order ? {
-              order: order
-            } : {}),
-            orderMembers: nextOrderMembers
-          });
-        }
-      }
-    }, {
-      key: "cubejsApi",
-      value: function cubejsApi() {
-        var cubejsApi = this.props.cubejsApi; // eslint-disable-next-line react/destructuring-assignment
-
-        return cubejsApi || this.context && this.context.cubejsApi;
-      }
-    }, {
-      key: "isQueryPresent",
-      value: function isQueryPresent() {
-        var query = this.state.query;
-        return QueryRenderer.isQueryPresent(query);
-      }
-    }, {
-      key: "getOrderMembers",
-      value: function getOrderMembers() {
-        var query = this.state.query;
-
-        var toOrderMember = function toOrderMember(member) {
-          return {
-            id: member.name,
-            title: member.title
-          };
-        };
-
-        return uniqBy(prop('id'), [].concat(_toConsumableArray(this.resolveMember('measures').map(toOrderMember)), _toConsumableArray(this.resolveMember('dimensions').map(toOrderMember)), _toConsumableArray(this.resolveMember('timeDimensions').map(function (td) {
-          return toOrderMember(td.dimension);
-        }))).map(function (member) {
-          return _objectSpread({}, member, {
-            order: query.order && query.order[member.id] || 'none'
-          });
-        }));
+        return _objectSpread({}, nextState, {
+          query: _objectSpread({}, nextState.query, {}, props$$1.query || {})
+        });
       }
     }, {
       key: "resolveMember",
-      value: function resolveMember(type$$1) {
-        var _this$state2 = this.state,
-            meta = _this$state2.meta,
-            query = _this$state2.query;
+      value: function resolveMember(type$$1, _ref) {
+        var meta = _ref.meta,
+            query = _ref.query;
 
         if (!meta) {
           return [];
@@ -9519,9 +9337,104 @@
         });
       }
     }, {
+      key: "getOrderMembers",
+      value: function getOrderMembers(state) {
+        var query = state.query,
+            meta = state.meta;
+
+        if (!meta) {
+          return [];
+        }
+
+        var toOrderMember = function toOrderMember(member) {
+          return {
+            id: member.name,
+            title: member.title
+          };
+        };
+
+        return uniqBy(prop('id'), [].concat(_toConsumableArray(QueryBuilder.resolveMember('measures', state).map(toOrderMember)), _toConsumableArray(QueryBuilder.resolveMember('dimensions', state).map(toOrderMember)), _toConsumableArray(QueryBuilder.resolveMember('timeDimensions', state).map(function (td) {
+          return toOrderMember(td.dimension);
+        }))).map(function (member) {
+          return _objectSpread({}, member, {
+            order: query.order && query.order[member.id] || 'none'
+          });
+        }));
+      }
+    }]);
+
+    function QueryBuilder(props$$1) {
+      var _this;
+
+      _classCallCheck(this, QueryBuilder);
+
+      _this = _possibleConstructorReturn(this, _getPrototypeOf(QueryBuilder).call(this, props$$1));
+      _this.state = _objectSpread({
+        query: props$$1.query,
+        chartType: 'line',
+        orderMembers: []
+      }, props$$1.vizState);
+      _this.shouldApplyHeuristicOrder = false;
+      _this.requestId = 0;
+      return _this;
+    }
+
+    _createClass(QueryBuilder, [{
+      key: "componentDidMount",
+      value: function () {
+        var _componentDidMount = _asyncToGenerator(
+        /*#__PURE__*/
+        regeneratorRuntime.mark(function _callee() {
+          var query, meta;
+          return regeneratorRuntime.wrap(function _callee$(_context) {
+            while (1) {
+              switch (_context.prev = _context.next) {
+                case 0:
+                  query = this.state.query;
+                  _context.next = 3;
+                  return this.cubejsApi().meta();
+
+                case 3:
+                  meta = _context.sent;
+                  this.setState({
+                    meta: meta,
+                    orderMembers: QueryBuilder.getOrderMembers({
+                      meta: meta,
+                      query: query
+                    })
+                  });
+
+                case 5:
+                case "end":
+                  return _context.stop();
+              }
+            }
+          }, _callee, this);
+        }));
+
+        function componentDidMount() {
+          return _componentDidMount.apply(this, arguments);
+        }
+
+        return componentDidMount;
+      }()
+    }, {
+      key: "cubejsApi",
+      value: function cubejsApi() {
+        var cubejsApi = this.props.cubejsApi; // eslint-disable-next-line react/destructuring-assignment
+
+        return cubejsApi || this.context && this.context.cubejsApi;
+      }
+    }, {
+      key: "isQueryPresent",
+      value: function isQueryPresent() {
+        var query = this.state.query;
+        return QueryRenderer.isQueryPresent(query);
+      }
+    }, {
       key: "prepareRenderProps",
       value: function prepareRenderProps(queryRendererProps) {
-        var _this3 = this;
+        var _this2 = this;
 
         var getName = function getName(member) {
           return member.name;
@@ -9547,41 +9460,40 @@
           var toQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getName;
           return {
             add: function add$$1(member) {
-              var query = _this3.state.query;
+              var query = _this2.state.query;
 
-              _this3.updateQuery(_defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))));
+              _this2.updateQuery(_defineProperty({}, memberType, (query[memberType] || []).concat(toQuery(member))));
             },
             remove: function remove$$1(member) {
-              var query = _this3.state.query;
+              var query = _this2.state.query;
               var members = (query[memberType] || []).concat([]);
               members.splice(member.index, 1);
-              return _this3.updateQuery(_defineProperty({}, memberType, members));
+              return _this2.updateQuery(_defineProperty({}, memberType, members));
             },
             update: function update$$1(member, updateWith) {
-              var query = _this3.state.query;
+              var query = _this2.state.query;
               var members = (query[memberType] || []).concat([]);
               members.splice(member.index, 1, toQuery(updateWith));
-              return _this3.updateQuery(_defineProperty({}, memberType, members));
+              return _this2.updateQuery(_defineProperty({}, memberType, members));
             }
           };
         };
 
-        var self = this;
-        var _this$state3 = this.state,
-            meta = _this$state3.meta,
-            query = _this$state3.query,
-            _this$state3$orderMem = _this$state3.orderMembers,
-            orderMembers = _this$state3$orderMem === void 0 ? [] : _this$state3$orderMem,
-            chartType = _this$state3.chartType;
+        var _this$state = this.state,
+            meta = _this$state.meta,
+            query = _this$state.query,
+            _this$state$orderMemb = _this$state.orderMembers,
+            orderMembers = _this$state$orderMemb === void 0 ? [] : _this$state$orderMemb,
+            chartType = _this$state.chartType;
         return _objectSpread({
           meta: meta,
           query: query,
           validatedQuery: this.validatedQuery(),
           isQueryPresent: this.isQueryPresent(),
           chartType: chartType,
-          measures: this.resolveMember('measures'),
-          dimensions: this.resolveMember('dimensions'),
-          timeDimensions: this.resolveMember('timeDimensions'),
+          measures: QueryBuilder.resolveMember('measures', this.state),
+          dimensions: QueryBuilder.resolveMember('dimensions', this.state),
+          timeDimensions: QueryBuilder.resolveMember('timeDimensions', this.state),
           segments: (meta && query.segments || []).map(function (m, i) {
             return _objectSpread({
               index: i
@@ -9607,60 +9519,34 @@
           updateTimeDimensions: updateMethods('timeDimensions', toTimeDimension),
           updateFilters: updateMethods('filters', toFilter),
           updateChartType: function updateChartType(newChartType) {
-            return _this3.updateVizState({
+            return _this2.updateVizState({
               chartType: newChartType
             });
           },
           updateOrder: {
-            set: function set(member) {
+            set: function set(memberId) {
               var order = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'asc';
-              var atIndex = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
 
-              if (order === 'none') {
-                this.remove(member);
-              }
-
-              var nextOrder;
-
-              if (atIndex !== null) {
-                nextOrder = moveKeyAtIndex(query.order, member, atIndex);
-                nextOrder[member] = order;
-              } else {
-                nextOrder = _objectSpread({}, query.order, _defineProperty({}, member, order));
-              }
-
-              self.updateQuery({
-                order: nextOrder
-              });
-            },
-            remove: function remove$$1(member) {
-              _this3.updateQuery({
-                order: Object.keys(query.order).filter(function (currentMember) {
-                  return currentMember !== member;
-                }).reduce(function (memo, currentMember) {
-                  memo[currentMember] = query.order[currentMember];
-                  return memo;
-                }, {})
+              _this2.updateVizState({
+                orderMembers: orderMembers.map(function (orderMember) {
+                  return _objectSpread({}, orderMember, {
+                    order: orderMember.id === memberId ? order : orderMember.order
+                  });
+                })
               });
             },
             update: function update$$1(order) {
-              _this3.updateQuery({
+              _this2.updateQuery({
                 order: order
               });
             },
-            updateByOrderMembers: function updateByOrderMembers() {
-              var orderMembers = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+            reorder: function reorder$$1(sourceIndex, destinationIndex) {
+              if (sourceIndex == null || destinationIndex == null) {
+                return;
+              }
 
-              _this3.setState({
-                orderMembers: orderMembers
-              });
-
-              _this3.updateQuery({
-                order: Object.fromEntries(orderMembers.map(function (_ref6) {
-                  var id = _ref6.id,
-                      order = _ref6.order;
-                  return order !== 'none' && [id, order];
-                }).filter(Boolean)) || {}
+              _this2.updateVizState({
+                orderMembers: reorder(orderMembers, sourceIndex, destinationIndex)
               });
             }
           }
@@ -9680,49 +9566,83 @@
         var _updateVizState = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee2(state) {
-          var _this$props2, setQuery, setVizState, finalState, currentRequestId, _finalState$query, _, _query2, _ref7, sqlQuery, _finalState, meta, toSet;
+          var _this$props, setQuery, setVizState, stateQuery, finalState, _ref2, _, query, currentRequestId, _ref3, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, _finalState, _meta, toSet;
 
           return regeneratorRuntime.wrap(function _callee2$(_context2) {
             while (1) {
               switch (_context2.prev = _context2.next) {
                 case 0:
-                  _this$props2 = this.props, setQuery = _this$props2.setQuery, setVizState = _this$props2.setVizState;
+                  _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
+                  stateQuery = this.state.query;
                   finalState = this.applyStateChangeHeuristics(state);
+                  _ref2 = finalState.query || {}, _ = _ref2.order, query = _objectWithoutProperties(_ref2, ["order"]);
 
-                  if (!this.shouldApplyHeuristicOrder) {
-                    _context2.next = 16;
+                  if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
+                    _context2.next = 19;
                     break;
                   }
 
-                  _context2.prev = 3;
+                  this.shouldApplyHeuristicOrder = false;
+                  _context2.prev = 6;
                   currentRequestId = ++this.requestId;
-                  _finalState$query = finalState.query, _ = _finalState$query.order, _query2 = _objectWithoutProperties(_finalState$query, ["order"]);
-                  _context2.next = 8;
-                  return this.cubejsApi().sql(_query2);
+                  _context2.next = 10;
+                  return this.cubejsApi().sql(query);
 
-                case 8:
-                  _ref7 = _context2.sent;
-                  sqlQuery = _ref7.sqlQuery;
+                case 10:
+                  _ref3 = _context2.sent;
+                  sqlQuery = _ref3.sqlQuery;
 
-                  if (this.requestId === currentRequestId) {
-                    finalState = _objectSpread({}, finalState, {
-                      query: _objectSpread({}, finalState.query, {
-                        order: sqlQuery.sql.order
-                      })
-                    });
+                  if (!(this.requestId !== currentRequestId)) {
+                    _context2.next = 14;
+                    break;
                   }
 
-                  _context2.next = 15;
+                  return _context2.abrupt("return");
+
+                case 14:
+                  finalState = _objectSpread({}, finalState, {
+                    query: _objectSpread({}, finalState.query, {
+                      order: sqlQuery.sql.order
+                    })
+                  }); // eslint-disable-next-line
+
+                  _context2.next = 19;
                   break;
 
-                case 13:
-                  _context2.prev = 13;
-                  _context2.t0 = _context2["catch"](3);
+                case 17:
+                  _context2.prev = 17;
+                  _context2.t0 = _context2["catch"](6);
 
-                case 15:
-                  this.shouldApplyHeuristicOrder = false;
+                case 19:
+                  updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread({}, this.state, {}, finalState)));
+                  currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref4) {
+                    var id = _ref4.id;
+                    return id;
+                  });
+                  currentOrderMembers = (finalState.orderMembers || []).filter(function (_ref5) {
+                    var id = _ref5.id;
+                    return Boolean(updatedOrderMembers[id]);
+                  });
+                  Object.entries(updatedOrderMembers).forEach(function (_ref6) {
+                    var _ref7 = _slicedToArray(_ref6, 2),
+                        id = _ref7[0],
+                        orderMember = _ref7[1];
 
-                case 16:
+                    if (!currentOrderMemberIds.includes(id)) {
+                      currentOrderMembers.push(orderMember);
+                    }
+                  });
+                  nextOrder = Object.fromEntries(currentOrderMembers.map(function (_ref8) {
+                    var id = _ref8.id,
+                        order = _ref8.order;
+                    return order !== 'none' ? [id, order] : false;
+                  }).filter(Boolean));
+                  finalState = _objectSpread({}, finalState, {
+                    query: _objectSpread({}, stateQuery, {}, query, {
+                      order: nextOrder
+                    }),
+                    orderMembers: currentOrderMembers
+                  });
                   this.setState(finalState);
                   finalState = _objectSpread({}, this.state, {}, finalState);
 
@@ -9731,16 +9651,16 @@
                   }
 
                   if (setVizState) {
-                    _finalState = finalState, meta = _finalState.meta, toSet = _objectWithoutProperties(_finalState, ["meta"]);
+                    _finalState = finalState, _meta = _finalState.meta, toSet = _objectWithoutProperties(_finalState, ["meta"]);
                     setVizState(toSet);
                   }
 
-                case 20:
+                case 29:
                 case "end":
                   return _context2.stop();
               }
             }
-          }, _callee2, this, [[3, 13]]);
+          }, _callee2, this, [[6, 17]]);
         }));
 
         function updateVizState(_x) {
@@ -9762,15 +9682,15 @@
     }, {
       key: "defaultHeuristics",
       value: function defaultHeuristics(newState) {
-        var _this$state4 = this.state,
-            query = _this$state4.query,
-            sessionGranularity = _this$state4.sessionGranularity;
+        var _this$state2 = this.state,
+            query = _this$state2.query,
+            sessionGranularity = _this$state2.sessionGranularity;
         var defaultGranularity = sessionGranularity || 'day';
 
         if (newState.query) {
           var oldQuery = query;
           var newQuery = newState.query;
-          var meta = this.state.meta;
+          var _meta2 = this.state.meta;
 
           if ((oldQuery.timeDimensions || []).length === 1 && (newQuery.timeDimensions || []).length === 1 && newQuery.timeDimensions[0].granularity && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity) {
             newState = _objectSpread({}, newState, {
@@ -9779,7 +9699,8 @@
           }
 
           if ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0 || (oldQuery.measures || []).length === 1 && (newQuery.measures || []).length === 1 && oldQuery.measures[0] !== newQuery.measures[0]) {
-            var defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
+            var defaultTimeDimension = _meta2.defaultTimeDimensionNameFor(newQuery.measures[0]);
+
             newQuery = _objectSpread({}, newQuery, {
               timeDimensions: defaultTimeDimension ? [{
                 dimension: defaultTimeDimension,
@@ -9873,9 +9794,9 @@
     }, {
       key: "applyStateChangeHeuristics",
       value: function applyStateChangeHeuristics(newState) {
-        var _this$props3 = this.props,
-            stateChangeHeuristics = _this$props3.stateChangeHeuristics,
-            disableHeuristics = _this$props3.disableHeuristics;
+        var _this$props2 = this.props,
+            stateChangeHeuristics = _this$props2.stateChangeHeuristics,
+            disableHeuristics = _this$props2.disableHeuristics;
 
         if (disableHeuristics) {
           return newState;
@@ -9886,12 +9807,12 @@
     }, {
       key: "render",
       value: function render() {
-        var _this4 = this;
+        var _this3 = this;
 
-        var _this$props4 = this.props,
-            cubejsApi = _this$props4.cubejsApi,
-            _render = _this$props4.render,
-            wrapWithQueryRenderer = _this$props4.wrapWithQueryRenderer;
+        var _this$props3 = this.props,
+            cubejsApi = _this$props3.cubejsApi,
+            _render = _this$props3.render,
+            wrapWithQueryRenderer = _this$props3.wrapWithQueryRenderer;
 
         if (wrapWithQueryRenderer) {
           return React__default.createElement(QueryRenderer, {
@@ -9899,7 +9820,7 @@
             cubejsApi: cubejsApi,
             render: function render(queryRendererProps) {
               if (_render) {
-                return _render(_this4.prepareRenderProps(queryRendererProps));
+                return _render(_this3.prepareRenderProps(queryRendererProps));
               }
 
               return null;
@@ -10005,17 +9926,19 @@
         _loadQuery = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee() {
-          var cubejsApi;
+          var hasOrderChanged, cubejsApi;
           return regeneratorRuntime.wrap(function _callee$(_context) {
             while (1) {
               switch (_context.prev = _context.next) {
                 case 0:
                   if (!(!skip && query && isQueryPresent(query))) {
-                    _context.next = 25;
+                    _context.next = 26;
                     break;
                   }
 
-                  if (!equals(currentQuery, query)) {
+                  hasOrderChanged = !equals(Object.keys(currentQuery && currentQuery.order || {}), Object.keys(query.order || {}));
+
+                  if (hasOrderChanged || !equals(currentQuery, query)) {
                     if (resetResultSetOnChange == null || resetResultSetOnChange) {
                       setResultSet(null);
                     }
@@ -10025,24 +9948,24 @@
                   }
 
                   setLoading(true);
-                  _context.prev = 3;
+                  _context.prev = 4;
 
                   if (!subscribeRequest) {
-                    _context.next = 8;
+                    _context.next = 9;
                     break;
                   }
 
-                  _context.next = 7;
+                  _context.next = 8;
                   return subscribeRequest.unsubscribe();
 
-                case 7:
+                case 8:
                   subscribeRequest = null;
 
-                case 8:
+                case 9:
                   cubejsApi = options.cubejsApi || context && context.cubejsApi;
 
                   if (!options.subscribe) {
-                    _context.next = 13;
+                    _context.next = 14;
                     break;
                   }
 
@@ -10058,38 +9981,38 @@
 
                     setLoading(false);
                   });
-                  _context.next = 19;
+                  _context.next = 20;
                   break;
 
-                case 13:
+                case 14:
                   _context.t0 = setResultSet;
-                  _context.next = 16;
+                  _context.next = 17;
                   return cubejsApi.load(query, {
                     mutexObj: mutexRef.current,
                     mutexKey: 'query'
                   });
 
-                case 16:
+                case 17:
                   _context.t1 = _context.sent;
                   (0, _context.t0)(_context.t1);
                   setLoading(false);
 
-                case 19:
-                  _context.next = 25;
+                case 20:
+                  _context.next = 26;
                   break;
 
-                case 21:
-                  _context.prev = 21;
-                  _context.t2 = _context["catch"](3);
+                case 22:
+                  _context.prev = 22;
+                  _context.t2 = _context["catch"](4);
                   setError(_context.t2);
                   setLoading(false);
 
-                case 25:
+                case 26:
                 case "end":
                   return _context.stop();
               }
             }
-          }, _callee, null, [[3, 21]]);
+          }, _callee, null, [[4, 22]]);
         }));
         return _loadQuery.apply(this, arguments);
       }
@@ -10101,7 +10024,7 @@
           subscribeRequest = null;
         }
       };
-    }, useDeepCompareMemoize([query, options, context]));
+    }, useDeepCompareMemoize([query, Object.keys(query && query.order || {}), options, context]));
     return {
       isLoading: isLoading,
       resultSet: resultSet,

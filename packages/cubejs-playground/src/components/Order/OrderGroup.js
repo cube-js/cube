@@ -2,21 +2,11 @@ import React from 'react';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
 import DraggableItem from './DraggableItem';
 
-function reorder(list, startIndex, endIndex) {
-  const result = [...list];
-  const [removed] = result.splice(startIndex, 1);
-  result.splice(endIndex, 0, removed);
-
-  return result;
-}
-
-export default function OrderGroup({ orderMembers, onChange }) {
+export default function OrderGroup({ orderMembers, onOrderChange, onReorder }) {
   return (
     <DragDropContext
       onDragEnd={({ source, destination }) => {
-        if (source !== null && destination !== null && source.index !== destination.index) {
-          onChange(reorder(orderMembers, source.index, destination.index));
-        }
+        onReorder(source && source.index, destination && destination.index)
       }}
     >
       <Droppable droppableId="droppable">
@@ -35,14 +25,7 @@ export default function OrderGroup({ orderMembers, onChange }) {
                 id={id}
                 index={index}
                 order={order}
-                onOrderChange={(order) => {
-                  onChange(
-                    orderMembers.map((member) => ({
-                      ...member,
-                      order: member.id === id ? order : member.order
-                    }))
-                  );
-                }}
+                onOrderChange={onOrderChange}
               >
                 {title}
               </DraggableItem>

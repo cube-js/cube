@@ -10,11 +10,6 @@ import TimeGroup from './TimeGroup';
 import SelectChartType from './SelectChartType';
 import OrderGroup from './Order/OrderGroup';
 
-const getOrderMember = (member) => ({
-  id: member.name,
-  title: member.title,
-});
-
 export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, chartExtra }) {
   const [isOrderPopoverVisible, toggleOrderPopover] = useState(false);
 
@@ -43,24 +38,9 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
         timeDimensions,
         availableTimeDimensions,
         updateTimeDimensions,
+        orderMembers,
         updateOrder
       }) => {
-        let activeOrderMembersCount = 0;
-        const orderMembers = [
-          ...measures.map(getOrderMember),
-          ...dimensions.map(getOrderMember),
-          ...timeDimensions.map((td) => getOrderMember(td.dimension)),
-        ].map((member) => {
-          if (!validatedQuery.order) {
-            return member;
-          }
-
-          return {
-            ...member,
-            order: (validatedQuery.order[member.id] && ++activeOrderMembersCount) || 'none',
-          };
-        });
-
         return (
           <Fragment>
             <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
@@ -116,13 +96,19 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
                       <Divider type="vertical" />
 
                       <Popover
-                        content={<OrderGroup members={orderMembers} onChange={updateOrder.update} />}
+                        content={
+                          <OrderGroup
+                            orderMembers={orderMembers}
+                            onReorder={updateOrder.reorder}
+                            onOrderChange={updateOrder.set}
+                          />
+                        }
                         visible={isOrderPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"
                         onVisibleChange={(visible) => {
                           if (!visible) {
-                            toggleOrderPopover(false)
+                            toggleOrderPopover(false);
                           } else {
                             if (orderMembers.length) {
                               toggleOrderPopover(!isOrderPopoverVisible);
@@ -130,12 +116,8 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
                           }
                         }}
                       >
-                        <Button
-                          disabled={!orderMembers.length}
-                          icon={<SortAscendingOutlined />}
-                        >
+                        <Button disabled={!orderMembers.length} icon={<SortAscendingOutlined />}>
                           Order
-                          {activeOrderMembersCount > 0 ? ` (${activeOrderMembersCount})` : ''}
                         </Button>
                       </Popover>
                     </Col>

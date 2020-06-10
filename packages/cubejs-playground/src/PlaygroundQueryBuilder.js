@@ -66,8 +66,6 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
         orderMembers,
         updateOrder
       }) => {
-        const activeOrderMembersCount = orderMembers.filter((member) => member.isActive).length;
-
         return (
           <>
             <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
@@ -132,7 +130,8 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                         content={
                           <OrderGroup
                             orderMembers={orderMembers}
-                            onChange={updateOrder.updateByOrderMembers}
+                            onReorder={updateOrder.reorder}
+                            onOrderChange={updateOrder.set}
                           />
                         }
                         visible={isOrderPopoverVisible}
@@ -150,7 +149,6 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                       >
                         <Button disabled={!orderMembers.length} icon={<SortAscendingOutlined />}>
                           Order
-                          {activeOrderMembersCount > 0 ? ` (${activeOrderMembersCount})` : ''}
                         </Button>
                       </Popover>
                     </Col>

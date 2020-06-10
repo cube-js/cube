@@ -1,21 +1,7 @@
-export function moveKeyAtIndex(object, key, atIndex) {
-  const keys = Object.keys(object);
+export function reorder(list, sourceIndex, destinationIndex) {
+  const result = [...list];
+  const [removed] = result.splice(sourceIndex, 1);
+  result.splice(destinationIndex, 0, removed);
 
-  const entries = [];
-  let index = 0;
-  let j = 0;
-
-  while (j < keys.length) {
-    if (entries.length === atIndex) {
-      entries.push([key, object[key]]);
-      j++;
-    } else {
-      if (keys[index] !== key) {
-        entries.push([keys[index], object[keys[index]]]);
-        j++;
-      }
-
-      index++;
-    }
-  }
+  return result;
 }
