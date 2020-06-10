@@ -407,7 +407,8 @@ var QueryBuilder = {
         setOffset: setOffset,
         removeOffset: removeOffset,
         renewQuery: renewQuery,
-        order: order
+        order: order,
+        setOrder: this.setOrder
       };
       QUERY_ELEMENTS.forEach(function (e) {
         var name = e.charAt(0).toUpperCase() + e.slice(1);
@@ -766,6 +767,10 @@ var QueryBuilder = {
     },
     updateChart: function updateChart(chartType) {
       this.chartType = chartType;
+    },
+    setOrder: function setOrder() {
+      var order = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      this.order = order;
     }
   },
   watch: {
