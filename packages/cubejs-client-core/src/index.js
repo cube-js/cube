@@ -220,7 +220,7 @@ class CubejsApi {
    */
   load(query, options, callback) {
     return this.loadMethod(
-      () => this.request(`load`, { query }),
+      () => this.request('load', { query }),
       (body) => new ResultSet(body, { parseDateMeasures: this.parseDateMeasures }),
       options,
       callback
@@ -236,7 +236,7 @@ class CubejsApi {
    */
   sql(query, options, callback) {
     return this.loadMethod(
-      () => this.request(`sql`, { query }),
+      () => this.request('sql', { query }),
       (body) => new SqlQuery(body),
       options,
       callback
@@ -251,7 +251,7 @@ class CubejsApi {
    */
   meta(options, callback) {
     return this.loadMethod(
-      () => this.request(`meta`),
+      () => this.request('meta'),
       (body) => new Meta(body),
       options,
       callback
@@ -260,7 +260,7 @@ class CubejsApi {
 
   subscribe(query, options, callback) {
     return this.loadMethod(
-      () => this.request(`subscribe`, { query }),
+      () => this.request('subscribe', { query }),
       (body) => new ResultSet(body, { parseDateMeasures: this.parseDateMeasures }),
       { ...options, subscribe: true },
       callback

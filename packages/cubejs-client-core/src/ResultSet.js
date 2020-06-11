@@ -42,9 +42,9 @@ class ResultSet {
 
   /**
    * Returns a measure drill down query.
-   * 
+   *
    * Provided you have a measure with the defined `drillMemebers` on the `Orders` cube
-   * 
+   *
    * ```js
    * measures: {
    *   count: {
@@ -54,9 +54,9 @@ class ResultSet {
    *   // ...
    * }
    * ```
-   * 
+   *
    * Then you can use the `drillDown` method to see the rows that contribute to that metric
-   * 
+   *
    * ```js
    * resultSet.drillDown(
    *   {
@@ -67,10 +67,10 @@ class ResultSet {
    *   pivotConfig
    * )
    * ```
-   * 
+   *
    * the result will be a query with the required filters applied and the dimensions/measures filled out
    * ```js
-   * 
+   *
    * {
    *   measures: ['Orders.count'],
    *   dimensions: ['Orders.status', 'Users.city'],
