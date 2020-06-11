@@ -41,11 +41,50 @@ class ResultSet {
   }
 
   /**
-   * Returns a measure drill down query
+   * Returns a measure drill down query.
    *
-   * @param drillDownLocator
-   * @param pivotConfig - See {@link ResultSet#pivot}.
-   * @returns {Object|null}
+   * Provided you have a measure with the defined `drillMemebers` on the `Orders` cube
+   *
+   * ```js
+   * measures: {
+   *   count: {
+   *     type: `count`,
+   *     drillMembers: [Orders.status, Users.city, count],
+   *   },
+   *   // ...
+   * }
+   * ```
+   *
+   * Then you can use the `drillDown` method to see the rows that contribute to that metric
+   *
+   * ```js
+   * resultSet.drillDown(
+   *   {
+   *     xValues,
+   *     yValues,
+   *   },
+   *   // you should pass the `pivotConfig` if you have used it for axes manipulation
+   *   pivotConfig
+   * )
+   * ```
+   *
+   * the result will be a query with the required filters applied and the dimensions/measures filled out
+   * ```js
+   *
+   * {
+   *   measures: ['Orders.count'],
+   *   dimensions: ['Orders.status', 'Users.city'],
+   *   filters: [
+   *     // dimension and measure filters
+   *   ],
+   *   timeDimensions: [
+   *     //...
+   *   ]
+   * }
+   * ```
+   * @param {{ xValues: [], yValues: [] }} drillDownLocator
+   * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
+   * @returns {Object|null} Drill down query
    */
   drillDown(drillDownLocator, pivotConfig) {
     const { xValues = [], yValues = [] } = drillDownLocator;

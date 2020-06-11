@@ -43,9 +43,27 @@ selected query builder members.
 API from Cube.js Backend.
 
 - `updateMeasures`, `updateDimensions`, `updateSegments`, `updateTimeDimensions` - objects with three functions: `add`, `remove`, and `update`. They are used to control the state of the query builder. Ex: `updateMeasures.add(newMeasure)`
+- `updateOrder` - similar to the previous update methods but specific for order manipulation. It provides `set(memberId, order)`, `update(orderObject)` and `reorder(sourceIndex, destinationIndex)` methods.
+- `orderMembers` - an array of available order members with the active order direction. 
+
+```js
+// Ex: updateOrder methods
+updateOrder.set('Users.country', 'asc');
+updateOrder.update({ 'Users.country': 'asc' });
+updateOrder.reorder(0, 1);
+
+// Ex: `orderMembers`
+[
+  { 
+    id: 'Users.country', 
+    title: 'Users Country', 
+    order: 'desc' 
+  },
+  //...
+]
+```
 
 - `chartType` - string, containing currently selected chart type.
-
 - `updateChartType` - function-setter for chart type.
 - `isQueryPresent` - Bool indicating whether is query ready to be displayed or
     not.
