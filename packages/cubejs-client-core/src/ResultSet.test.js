@@ -878,8 +878,8 @@ describe('ResultSet', () => {
     
     test('one dimension on `x` and one one `y` axis', () => {
       const pivotConfig = {
-        x: ['Users.gender'],
-        y: ['Users.country', 'measures']
+        x: ['Users.country'],
+        y: ['Users.gender', 'measures']
       };
       
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
@@ -922,14 +922,14 @@ describe('ResultSet', () => {
         {
           'Users.gender': 'male',
           'measures': 'Sales.count',
-          'US.male.Orders.count': 12,
-          'Germany.female.Orders.count': 12,
+          'US': 12,
+          'Germany': 12,
         },
         {
           'Users.gender': 'male',
           'measures': 'Sales.count',
-          'US.male.Orders.count': 5,
-          'Germany.female.Orders.count': 7,
+          'US': 5,
+          'Germany': 7,
         }
       ]);
     })
