@@ -23,6 +23,8 @@ const OrderList = () => {
   const [userIdFilter, setUserIdFilter] = useState(null);
   const [orderFilter, setOrder] = useState("Orders.createdAt");
   const [limit, setLimit] = useState(100);
+  const [startDate, setStartDate] = React.useState(new Date("2019-01-01T00:00:00"));
+  const [finishDate, setFinishDate] = React.useState(new Date("2022-01-01T00:00:00"));
 
   const query = {
     limit: limit,
@@ -35,6 +37,7 @@ const OrderList = () => {
     "timeDimensions": [
       {
         "dimension": "Orders.createdAt",
+        dateRange: [startDate, finishDate],
         "granularity": "day"
       }
     ],
@@ -68,10 +71,16 @@ const OrderList = () => {
         }
         return (
           <div className={classes.root}>
-            <OrdersToolbar setUserIdFilter={setUserIdFilter}
-                           setOrder={setOrder}
+            <OrdersToolbar setOrder={setOrder}
                            setLimit={setLimit}
+                           setUserIdFilter={setUserIdFilter}
+                           orderFilter={orderFilter}
                            limit={limit}
+                           userIdFilter={userIdFilter}
+                           startDate={startDate}
+                           setStartDate={setStartDate}
+                           finishDate={finishDate}
+                           setFinishDate={setFinishDate}
             />
             <div className={classes.content}>
               <OrdersTable orders={resultSet.tablePivot()}/>

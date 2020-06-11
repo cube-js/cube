@@ -9,7 +9,6 @@ import {
   Avatar,
   Typography,
   Divider,
-  LinearProgress
 } from '@material-ui/core';
 
 const useStyles = makeStyles(theme => ({
