@@ -1,5 +1,4 @@
-/* eslint-disable quote-props */
-/* globals jest,describe,test,expect */
+import 'jest'
 import ResultSet from './ResultSet';
 
 jest.mock('moment-range', () => {
@@ -806,6 +805,220 @@ describe('ResultSet', () => {
         { "Orders.createdAt": "2020-01-09T23:49:37.000" },
         { "Orders.createdAt": "2020-01-10T09:07:20.000" },
         { "Orders.createdAt": "2020-01-10T13:50:05.000" }
+      ]);
+    });
+  });
+
+  describe('tablePivot', () => {
+    const resultSet = new ResultSet({
+      query: {
+        measures: ['Orders.count'],
+        dimensions: ['Users.country', 'Users.gender'],        
+      },
+      data: [],
+      annotation: {
+        measures: {
+          'Orders.count': {
+            title: 'Orders Count',
+            shortTitle: 'Count',
+            type: 'count',
+          },
+          'Orders.amount': {
+            title: 'Orders Amount',
+            shortTitle: 'Amount',
+            type: 'sum',
+          },
+        },
+        dimensions: {
+          'Users.country': {
+            title: 'Users Country',
+            shortTitle: 'Country',
+            type: 'string',
+          },
+          'Users.gender': {
+            title: 'Users Gender',
+            shortTitle: 'Gender',
+            type: 'string',
+          },
+        },
+        segments: {},
+        timeDimensions: {},
+      },
+    });
+    
+    test('all dimensions on `x` axis', () => {
+      const pivotConfig = {
+        x: ['Users.country', 'Users.gender'],
+        y: ['measures']
+      };
+      
+      expect(resultSet.tablePivot(pivotConfig)).toEqual([
+        {
+          'Users.country': 'Germany',
+          'Users.gender': 'male',
+          'Orders.count': 10
+        },
+        {
+          'Users.country': 'Germany',
+          'Users.gender': 'female',
+          'Orders.count': 12
+        },
+        {
+          'Users.country': 'US',
+          'Users.gender': 'male',
+          'Orders.count': 5
+        },
+        {
+          'Users.country': 'US',
+          'Users.gender': 'female',
+          'Orders.count': 7
+        }
+      ]);
+    })
+    
+    test('one dimension on `x` and one one `y` axis', () => {
+      const pivotConfig = {
+        x: ['Users.gender'],
+        y: ['Users.country', 'measures']
+      };
+      
+      expect(resultSet.tablePivot(pivotConfig)).toEqual([
+        {
+          'Users.country': 'Germany',
+          'male.Orders.count': 10,
+          'female.Orders.count': 12
+        },
+        {
+          'Users.country': 'Germany',
+          'male.Orders.count': 5,
+          'female.Orders.count': 7
+        }
+      ]);
+    })
+    
+    test('all dimensions and measures on `y` axis', () => {
+      const pivotConfig = {
+        x: [],
+        y: ['Users.country', 'Users.gender', 'measures']
+      };
+      
+      expect(resultSet.tablePivot(pivotConfig)).toEqual([
+        {
+          'Germany.male.Orders.count': 10,
+          'Germany.female.Orders.count': 12,
+          'US.male.Orders.count': 5,
+          'US.female.Orders.count': 7
+        }
+      ]);
+    })
+    
+    test('measures on `x` axis', () => {
+      const pivotConfig = {
+        x: ['Users.gender', 'measures'],
+        y: ['Users.country']
+      };
+      
+      expect(resultSet.tablePivot(pivotConfig)).toEqual([
+        {
+          'Users.gender': 'male',
+          'measures': 'Sales.count',
+          'US.male.Orders.count': 12,
+          'Germany.female.Orders.count': 12,
+        },
+        {
+          'Users.gender': 'male',
+          'measures': 'Sales.count',
+          'US.male.Orders.count': 5,
+          'Germany.female.Orders.count': 7,
+        }
+      ]);
+    })
+  });
+  
+  describe('tableColumns', () => {
+    test('returns array of column definitions for tablePivot', () => {
+      const resultSet = new ResultSet({
+        "query": {
+          "measures": ["Orders.count", "Orders.totalAmount"],
+          "timeDimensions": [{
+            "dimension": "Orders.createdAt",
+            "granularity": "day",
+            "dateRange": ["2020-01-08T00:00:00.000", "2020-01-14T23:59:59.999"]
+          }],
+          "dimensions": ["Orders.createdAt"],
+          "filters": [],
+          "timezone": "UTC"
+        },
+        "data": [],
+        "annotation": {
+          "measures": {
+            "Orders.count": {
+              "title": "Orders Count",
+              "shortTitle": "Count",
+              "type": "count",
+              "meta": {
+                "isVisible": false
+              }
+            },
+            "Orders.totalAmount": {
+              "title": "Orders Total Amount",
+              "shortTitle": "Total Amount",
+              "type": "number",
+              "format": "currency"
+            }
+          },
+          "dimensions": {
+            "Orders.createdAt": {
+              "title": "Orders Created at",
+              "shortTitle": "Created at",
+              "type": "time",
+              "meta": 123
+            }
+          },
+          "segments": {},
+          "timeDimensions": {
+            "Orders.createdAt.day": {
+              "title": "Orders Created at",
+              "shortTitle": "Created at",
+              "type": "time"
+            }
+          }
+        }
+      });
+
+      expect(resultSet.tableColumns()).toEqual([
+        {
+          "format": undefined,
+          "key": "Orders.createdAt.day",
+          "shortTitle": "Created at",
+          "title": "Orders Created at",
+          "type": "time",
+        },
+        {
+          "format": undefined,
+          "key": "Orders.createdAt",
+          "shortTitle": "Created at",
+          "title": "Orders Created at",
+          "type": "time",
+          "meta": 123
+        },
+        {
+          "format": undefined,
+          "key": "Orders.count",
+          "shortTitle": "Count",
+          "title": "Orders Count",
+          "type": "count",
+          "meta": {
+            "isVisible": false
+          }
+        },
+        {
+          "format": "currency",
+          "key": "Orders.totalAmount",
+          "shortTitle": "Total Amount",
+          "title": "Orders Total Amount",
+          "type": "number",
+        }
       ]);
     });
   });
