@@ -82,7 +82,7 @@ class ResultSet {
    *   ]
    * }
    * ```
-   * @param {{ xValues: [], yValues: [] }} drillDownLocator
+   * @param {Object} drillDownLocator - expects `{ xValues: [], yValues: [] }` object.
    * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
    * @returns {Object|null} Drill down query
    */
