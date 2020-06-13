@@ -5535,6 +5535,18 @@
 	  assign: objectAssign
 	});
 
+	// `Object.fromEntries` method
+	// https://github.com/tc39/proposal-object-from-entries
+	_export({ target: 'Object', stat: true }, {
+	  fromEntries: function fromEntries(iterable) {
+	    var obj = {};
+	    iterate_1(iterable, function (k, v) {
+	      createProperty(obj, k, v);
+	    }, undefined, true);
+	    return obj;
+	  }
+	});
+
 	var FAILS_ON_PRIMITIVES$1 = fails(function () { objectKeys(1); });
 
 	// `Object.keys` method
@@ -5657,12 +5669,6 @@
 	_export({ target: 'RegExp', proto: true, forced: /./.exec !== regexpExec }, {
 	  exec: regexpExec
 	});
-
-	// `Set` constructor
-	// https://tc39.github.io/ecma262/#sec-set-objects
-	var es_set = collection('Set', function (init) {
-	  return function Set() { return init(this, arguments.length ? arguments[0] : undefined); };
-	}, collectionStrong);
 
 	// TODO: Remove from `core-js@4` since it's moved to entry points
 
@@ -8977,6 +8983,12 @@
 	var dec =
 	/*#__PURE__*/
 	add(-1);
+
+	// `Set` constructor
+	// https://tc39.github.io/ecma262/#sec-set-objects
+	var es_set = collection('Set', function (init) {
+	  return function Set() { return init(this, arguments.length ? arguments[0] : undefined); };
+	}, collectionStrong);
 
 	var _Set =
 	/*#__PURE__*/
@@ -16238,37 +16250,20 @@
 	  }, {
 	    key: "tablePivot",
 	    value: function tablePivot(pivotConfig) {
-	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
-	      return this.pivot(normalizedPivotConfig).reduce(function (memo, _ref19) {
+	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+	      return this.pivot(normalizedPivotConfig).map(function (_ref19) {
 	        var xValues = _ref19.xValues,
 	            yValuesArray = _ref19.yValuesArray;
-	        var index = -1;
-	        var set = new Set();
-	        yValuesArray.forEach(function (_ref20) {
+	        return Object.fromEntries(pivotConfig.x.map(function (key, index) {
+	          return [key, xValues[index]];
+	        }).concat(yValuesArray.map(function (_ref20) {
 	          var _ref21 = _slicedToArray(_ref20, 2),
 	              yValues = _ref21[0],
-	              m = _ref21[1];
+	              measure = _ref21[1];
 
-	          var dimensions = normalizedPivotConfig.y.filter(function (d) {
-	            return d !== 'measures';
-	          });
-	          var dimensionValues = yValues.slice(0, yValues.length - 1);
-	          var key = dimensionValues.join();
-
-	          if (!set.has(key)) {
-	            set.add(key);
-	            index++;
-	          }
-
-	          var path = [xValues.join('.'), yValues[yValues.length - 1]].join('.');
-	          memo[index] = _objectSpread({}, memo[index], _defineProperty({}, path, m), dimensions.reduce(function (dimensionsMemo, currentDimension, index) {
-	            dimensionsMemo[currentDimension] = dimensionValues[index];
-	            return dimensionsMemo;
-	          }, {}));
-	        });
-	        set.clear();
-	        return memo;
-	      }, []);
+	          return [yValues.join('.'), measure];
+	        })));
+	      });
 	    }
 	    /**
 	     * Returns array of column definitions for `tablePivot`.
@@ -16303,33 +16298,30 @@
 	      var _this4 = this;
 
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-	      var map$$1 = new Map();
+	      var m = new Map();
 	      var columns = [];
 	      normalizedPivotConfig.x.forEach(function (_, index) {
 	        _this4.pivot(normalizedPivotConfig).forEach(function (_ref22) {
 	          var xValues = _ref22.xValues;
-	          map$$1.set(xValues[index], {
+	          m.set(xValues[index], {
 	            key: normalizedPivotConfig.x[index],
 	            value: xValues[index]
-	          }); // tmp[xValues[index]] = {
-	          //   key: normalizedPivotConfig.x[index],
-	          //   value: xValues[index],
-	          // };
+	          });
 	        });
 
-	        columns.push(_toConsumableArray(map$$1.values()));
-	        map$$1.clear();
+	        columns.push(_toConsumableArray(m.values()));
+	        m.clear();
 	      });
 	      (this.pivot(normalizedPivotConfig)[0].yValuesArray || []).forEach(function (_ref23) {
 	        var _ref24 = _slicedToArray(_ref23, 1),
 	            yValues = _ref24[0];
 
 	        var measureName = yValues[yValues.length - 1];
-	        map$$1.set(measureName, {
+	        m.set(measureName, {
 	          key: measureName
 	        });
 	      });
-	      columns.push(_toConsumableArray(map$$1.values()));
+	      columns.push(_toConsumableArray(m.values()));
 
 	      function groupColumns(level) {
 	        var path = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
@@ -16350,40 +16342,7 @@
 	        });
 	      }
 
-	      return groupColumns(0); // const column = (field) => {
-	      //   const exractFields = (annotation = {}) => {
-	      //     const {
-	      //       title,
-	      //       shortTitle,
-	      //       format,
-	      //       type,
-	      //       meta
-	      //     } = annotation;
-	      //
-	      //     return {
-	      //       title,
-	      //       shortTitle,
-	      //       format,
-	      //       type,
-	      //       meta
-	      //     };
-	      //   };
-	      //
-	      //   return field === 'measures' ? (this.query().measures || []).map((key) => ({
-	      //     key,
-	      //     ...exractFields(this.loadResponse.annotation.measures[key])
-	      //   })) : [
-	      //     {
-	      //       key: field,
-	      //       ...exractFields(this.loadResponse.annotation.dimensions[field] ||
-	      //           this.loadResponse.annotation.timeDimensions[field])
-	      //     },
-	      //   ];
-	      // };
-	      //
-	      // return normalizedPivotConfig.x.map(column)
-	      //   .concat(normalizedPivotConfig.y.map(column))
-	      //   .reduce((a, b) => a.concat(b));
+	      return groupColumns(0);
 	    }
 	  }, {
 	    key: "totalRow",
@@ -19791,7 +19750,7 @@
 	      var _this2 = this;
 
 	      return this.loadMethod(function () {
-	        return _this2.request("load", {
+	        return _this2.request('load', {
 	          query: query
 	        });
 	      }, function (body) {
@@ -19814,7 +19773,7 @@
 	      var _this3 = this;
 
 	      return this.loadMethod(function () {
-	        return _this3.request("sql", {
+	        return _this3.request('sql', {
 	          query: query
 	        });
 	      }, function (body) {
@@ -19834,7 +19793,7 @@
 	      var _this4 = this;
 
 	      return this.loadMethod(function () {
-	        return _this4.request("meta");
+	        return _this4.request('meta');
 	      }, function (body) {
 	        return new Meta(body);
 	      }, options, callback);
@@ -19845,7 +19804,7 @@
 	      var _this5 = this;
 
 	      return this.loadMethod(function () {
-	        return _this5.request("subscribe", {
+	        return _this5.request('subscribe', {
 	          query: query
 	        });
 	      }, function (body) {

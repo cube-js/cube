@@ -387,38 +387,11 @@ class ResultSet {
    * @returns {Array} of pivoted rows
    */
   tablePivot(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
-    return this.pivot(normalizedPivotConfig).reduce((
-      memo, { xValues, yValuesArray }
-    ) => {
-      let index = -1;
-      const set = new Set();
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
-      yValuesArray.forEach(([yValues, m]) => {
-        const dimensions = normalizedPivotConfig.y.filter((d) => d !== 'measures');
-        const dimensionValues = yValues.slice(0, yValues.length - 1);
-        const key = dimensionValues.join();
-
-        if (!set.has(key)) {
-          set.add(key);
-          index++;
-        }
-        const path = [xValues.join('.'), yValues[yValues.length - 1]].join('.');
-
-        memo[index] = {
-          ...memo[index],
-          [path]: m,
-          ...dimensions.reduce((dimensionsMemo, currentDimension, currentIndex) => {
-            dimensionsMemo[currentDimension] = dimensionValues[currentIndex];
-            return dimensionsMemo;
-          }, {}),
-        };
-      });
-
-      set.clear();
-
-      return memo;
-    }, []);
+    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => Object.fromEntries(
+      pivotConfig.x.map((key, index) => [key, xValues[index]]).concat(yValuesArray.map(([yValues, measure]) => [yValues.join('.'), measure]))
+    ));
   }
 
   /**
