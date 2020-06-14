@@ -23,20 +23,20 @@ const token = async (options = {}) => {
   if (!secret) throw new Error('No app secret found').message;
 
   const extraOptions = {};
-  if (expiry !== "0") extraOptions.expiresIn = expiry;
+  if (expiry !== '0') extraOptions.expiresIn = expiry;
 
   const payload = parsePayload(options.payload);
 
-  console.log(`Generating Cube.js JWT token`);
-  console.log(``);
+  console.log('Generating Cube.js JWT token');
+  console.log('');
   console.log(`${chalk.yellow('-----------------------------------------------------------------------------------------')}`);
-  console.log(`  ${chalk.yellow(`Use these manually generated tokens in production with caution.`)}`);
+  console.log(`  ${chalk.yellow('Use these manually generated tokens in production with caution.')}`);
   console.log(`  ${chalk.yellow(`Please refer to ${chalk.cyan('https://cube.dev/docs/security')} for production security best practices.`)}`);
   console.log(`${chalk.yellow('-----------------------------------------------------------------------------------------')}`);
-  console.log(``);
+  console.log('');
   console.log(`Expires in: ${chalk.green(expiry)}`);
   console.log(`Payload: ${chalk.green(JSON.stringify(payload))}`);
-  console.log(``);
+  console.log('');
 
   const signedToken = jwt.sign(payload, secret, extraOptions);
   console.log(`Token: ${chalk.green(signedToken)}`);

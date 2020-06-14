@@ -3,6 +3,141 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.34](https://github.com/cube-js/cube.js/compare/v0.19.33...v0.19.34) (2020-06-10)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** Check if correct directory is being deployed ([56b8319](https://github.com/cube-js/cube.js/commit/56b8319))
+
+
+
+
+
+## [0.19.33](https://github.com/cube-js/cube.js/compare/v0.19.32...v0.19.33) (2020-06-10)
+
+
+### Bug Fixes
+
+* **cubejs-api-gateway:** fromEntries replacement ([#715](https://github.com/cube-js/cube.js/issues/715)) ([998c735](https://github.com/cube-js/cube.js/commit/998c735))
+
+
+
+
+
+## [0.19.32](https://github.com/cube-js/cube.js/compare/v0.19.31...v0.19.32) (2020-06-10)
+
+
+### Bug Fixes
+
+* Cannot read property 'reorder' of undefined ([3f1d8d1](https://github.com/cube-js/cube.js/commit/3f1d8d1))
+
+
+
+
+
+## [0.19.31](https://github.com/cube-js/cube.js/compare/v0.19.30...v0.19.31) (2020-06-10)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** linter ([#712](https://github.com/cube-js/cube.js/issues/712)) ([53c053f](https://github.com/cube-js/cube.js/commit/53c053f))
+* **cubejs-client-core:** Remove Content-Type header from requests in HttpTransport ([#709](https://github.com/cube-js/cube.js/issues/709)) ([f6e366c](https://github.com/cube-js/cube.js/commit/f6e366c))
+
+
+### Features
+
+* **cubejs-cli:** Save deploy credentials ([af7e930](https://github.com/cube-js/cube.js/commit/af7e930))
+* add schema path as an environment variable. ([#711](https://github.com/cube-js/cube.js/issues/711)) ([5ee2e16](https://github.com/cube-js/cube.js/commit/5ee2e16)), closes [#695](https://github.com/cube-js/cube.js/issues/695)
+* Query builder order by ([#685](https://github.com/cube-js/cube.js/issues/685)) ([d3c735b](https://github.com/cube-js/cube.js/commit/d3c735b))
+
+
+
+
+
+## [0.19.30](https://github.com/cube-js/cube.js/compare/v0.19.29...v0.19.30) (2020-06-09)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** Fix file hashing for Cube Cloud ([ce8e090](https://github.com/cube-js/cube.js/commit/ce8e090))
+
+
+
+
+
+## [0.19.29](https://github.com/cube-js/cube.js/compare/v0.19.28...v0.19.29) (2020-06-09)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** eslint fixes ([0aa8001](https://github.com/cube-js/cube.js/commit/0aa8001))
+
+
+
+
+
+## [0.19.28](https://github.com/cube-js/cube.js/compare/v0.19.27...v0.19.28) (2020-06-09)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** Correct missing auth error ([ceeaff7](https://github.com/cube-js/cube.js/commit/ceeaff7))
+
+
+
+
+
+## [0.19.27](https://github.com/cube-js/cube.js/compare/v0.19.26...v0.19.27) (2020-06-09)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.19.26](https://github.com/cube-js/cube.js/compare/v0.19.25...v0.19.26) (2020-06-09)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.19.25](https://github.com/cube-js/cube.js/compare/v0.19.24...v0.19.25) (2020-06-09)
+
+
+### Features
+
+* **cubejs-cli:** Cube Cloud deploy implementation ([b34ba53](https://github.com/cube-js/cube.js/commit/b34ba53))
+
+
+
+
+
+## [0.19.24](https://github.com/cube-js/cube.js/compare/v0.19.23...v0.19.24) (2020-06-06)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/elasticsearch-driver:** respect ungrouped parameter ([#684](https://github.com/cube-js/cube.js/issues/684)) Thanks to [@gauravlanjekar](https://github.com/gauravlanjekar)! ([27d0d49](https://github.com/cube-js/cube.js/commit/27d0d49))
+* **@cubejs-backend/schema-compiler:** TypeError: methods.filter is not a function ([25c4ef6](https://github.com/cube-js/cube.js/commit/25c4ef6))
+
+
+
+
+
+## [0.19.23](https://github.com/cube-js/cube.js/compare/v0.19.22...v0.19.23) (2020-06-02)
+
+
+### Features
+
+* drill down queries support ([#664](https://github.com/cube-js/cube.js/issues/664)) ([7e21545](https://github.com/cube-js/cube.js/commit/7e21545)), closes [#190](https://github.com/cube-js/cube.js/issues/190)
+
+
+
+
+
 ## [0.19.22](https://github.com/cube-js/cube.js/compare/v0.19.21...v0.19.22) (2020-05-26)
 
 **Note:** Version bump only for package cubejs

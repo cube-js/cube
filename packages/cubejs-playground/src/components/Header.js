@@ -7,7 +7,7 @@ import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
 
 const StyledMenu = styled(Menu)`
-  background: #EEEEF5;
+  background: #EEEEF5 !important;
   border-bottom: 0;
 `
 

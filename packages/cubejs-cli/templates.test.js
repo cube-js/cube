@@ -1,7 +1,7 @@
 /*
 global test expect
 */
-const { express } = require("./templates");
+const { express } = require('./templates');
 
 const dotEnv = express.files['.env'];
 

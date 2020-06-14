@@ -97,7 +97,8 @@ export default {
         setOffset,
         removeOffset,
         renewQuery,
-        order
+        order,
+        setOrder: this.setOrder
       };
 
       QUERY_ELEMENTS.forEach((e) => {
@@ -384,6 +385,9 @@ export default {
     updateChart(chartType) {
       this.chartType = chartType;
     },
+    setOrder(order = {}) {
+      this.order = order;
+    }
   },
 
   watch: {

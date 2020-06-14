@@ -21,7 +21,12 @@ export default (query, options = {}) => {
 
     async function loadQuery() {
       if (!skip && query && isQueryPresent(query)) {
-        if (!equals(currentQuery, query)) {
+        const hasOrderChanged = !equals(
+          Object.keys(currentQuery && currentQuery.order || {}),
+          Object.keys(query.order || {})
+        );
+        
+        if (hasOrderChanged || !equals(currentQuery, query)) {
           if (resetResultSetOnChange == null || resetResultSetOnChange) {
             setResultSet(null);
           }
@@ -68,7 +73,12 @@ export default (query, options = {}) => {
         subscribeRequest = null;
       }
     };
-  }, useDeepCompareMemoize([query, options, context]));
+  }, useDeepCompareMemoize([
+    query,
+    Object.keys(query && query.order || {}),
+    options,
+    context
+  ]));
 
   return { isLoading, resultSet, error };
 };
