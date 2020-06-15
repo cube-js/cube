@@ -16,7 +16,6 @@ import 'core-js/modules/es.array.for-each';
 import 'core-js/modules/es.array.from';
 import 'core-js/modules/es.array.includes';
 import 'core-js/modules/es.array.index-of';
-import 'core-js/modules/es.array.iterator';
 import 'core-js/modules/es.array.join';
 import 'core-js/modules/es.array.map';
 import 'core-js/modules/es.array.reduce';
@@ -26,7 +25,6 @@ import 'core-js/modules/es.number.constructor';
 import 'core-js/modules/es.number.is-nan';
 import 'core-js/modules/es.number.parse-float';
 import 'core-js/modules/es.object.assign';
-import 'core-js/modules/es.object.from-entries';
 import 'core-js/modules/es.object.keys';
 import 'core-js/modules/es.object.values';
 import 'core-js/modules/es.regexp.exec';
@@ -40,11 +38,12 @@ import _toConsumableArray from '@babel/runtime/helpers/toConsumableArray';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
-import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, dropLast, fromPairs } from 'ramda';
+import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, fromPairs, dropLast } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
 import 'core-js/modules/es.array.is-array';
 import 'core-js/modules/es.function.name';
+import 'core-js/modules/es.array.iterator';
 import 'core-js/modules/web.dom-collections.iterator';
 import 'core-js/modules/web.url';
 import fetch from 'cross-fetch';
@@ -680,7 +679,7 @@ function () {
       return this.pivot(normalizedPivotConfig).map(function (_ref27) {
         var xValues = _ref27.xValues,
             yValuesArray = _ref27.yValuesArray;
-        return Object.fromEntries(normalizedPivotConfig.x.map(function (key, index) {
+        return fromPairs(normalizedPivotConfig.x.map(function (key, index) {
           return [key, xValues[index]];
         }).concat(yValuesArray[0][0].length && yValuesArray.map(function (_ref28) {
           var _ref29 = _slicedToArray(_ref28, 2),

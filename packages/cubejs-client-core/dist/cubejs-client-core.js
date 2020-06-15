@@ -22,7 +22,6 @@ require('core-js/modules/es.array.for-each');
 require('core-js/modules/es.array.from');
 require('core-js/modules/es.array.includes');
 require('core-js/modules/es.array.index-of');
-require('core-js/modules/es.array.iterator');
 require('core-js/modules/es.array.join');
 require('core-js/modules/es.array.map');
 require('core-js/modules/es.array.reduce');
@@ -32,7 +31,6 @@ require('core-js/modules/es.number.constructor');
 require('core-js/modules/es.number.is-nan');
 require('core-js/modules/es.number.parse-float');
 require('core-js/modules/es.object.assign');
-require('core-js/modules/es.object.from-entries');
 require('core-js/modules/es.object.keys');
 require('core-js/modules/es.object.values');
 require('core-js/modules/es.regexp.exec');
@@ -51,6 +49,7 @@ var Moment = _interopDefault(require('moment'));
 var momentRange = _interopDefault(require('moment-range'));
 require('core-js/modules/es.array.is-array');
 require('core-js/modules/es.function.name');
+require('core-js/modules/es.array.iterator');
 require('core-js/modules/web.dom-collections.iterator');
 require('core-js/modules/web.url');
 var fetch = _interopDefault(require('cross-fetch'));
@@ -686,7 +685,7 @@ function () {
       return this.pivot(normalizedPivotConfig).map(function (_ref27) {
         var xValues = _ref27.xValues,
             yValuesArray = _ref27.yValuesArray;
-        return Object.fromEntries(normalizedPivotConfig.x.map(function (key, index) {
+        return ramda.fromPairs(normalizedPivotConfig.x.map(function (key, index) {
           return [key, xValues[index]];
         }).concat(yValuesArray[0][0].length && yValuesArray.map(function (_ref28) {
           var _ref29 = _slicedToArray(_ref28, 2),

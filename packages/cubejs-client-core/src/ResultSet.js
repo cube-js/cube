@@ -3,7 +3,7 @@
  */
 
 import {
-  groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
+  groupBy, pipe, fromPairs, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -499,7 +499,7 @@ class ResultSet {
   tablePivot(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
 
-    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => Object.fromEntries(
+    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
       normalizedPivotConfig.x
         .map((key, index) => [key, xValues[index]])
         .concat(

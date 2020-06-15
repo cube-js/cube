@@ -5205,18 +5205,6 @@
 	  assign: objectAssign
 	});
 
-	// `Object.fromEntries` method
-	// https://github.com/tc39/proposal-object-from-entries
-	_export({ target: 'Object', stat: true }, {
-	  fromEntries: function fromEntries(iterable) {
-	    var obj = {};
-	    iterate_1(iterable, function (k, v) {
-	      createProperty(obj, k, v);
-	    }, undefined, true);
-	    return obj;
-	  }
-	});
-
 	var FAILS_ON_PRIMITIVES$1 = fails(function () { objectKeys(1); });
 
 	// `Object.keys` method
@@ -16437,7 +16425,7 @@
 	      return this.pivot(normalizedPivotConfig).map(function (_ref27) {
 	        var xValues = _ref27.xValues,
 	            yValuesArray = _ref27.yValuesArray;
-	        return Object.fromEntries(normalizedPivotConfig.x.map(function (key, index) {
+	        return fromPairs(normalizedPivotConfig.x.map(function (key, index) {
 	          return [key, xValues[index]];
 	        }).concat(yValuesArray[0][0].length && yValuesArray.map(function (_ref28) {
 	          var _ref29 = _slicedToArray(_ref28, 2),
