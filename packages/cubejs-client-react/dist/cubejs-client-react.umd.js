@@ -8556,7 +8556,7 @@
     setPrototypeOf: objectSetPrototypeOf
   });
 
-  var runtime = createCommonjsModule(function (module) {
+  var runtime_1 = createCommonjsModule(function (module) {
     /**
      * Copyright (c) 2014-present, Facebook, Inc.
      *

@@ -48,12 +48,12 @@ describe('resultSet tablePivot and tableColumns', () => {
           'Orders.count': {
             title: 'Orders Count',
             shortTitle: 'Count',
-            type: 'count',
+            type: 'number',
           },
           'Orders.amount': {
             title: 'Orders Amount',
             shortTitle: 'Amount',
-            type: 'sum',
+            type: 'number',
           },
         },
         dimensions: {
@@ -72,79 +72,270 @@ describe('resultSet tablePivot and tableColumns', () => {
         timeDimensions: {},
       },
     });
-    
-    test('all dimensions on `x` axis', () => {
+
+    describe('all dimensions on `x` axis', () => {
       const pivotConfig = {
         x: ['Users.country', 'Users.gender'],
         y: ['measures'],
       };
-      
-      expect(resultSet.tablePivot(pivotConfig)).toEqual([
-        {
-          'Users.country': 'Germany',
-          'Users.gender': 'male',
-          'Orders.count': 10,
-        },
-        {
-          'Users.country': 'Germany',
-          'Users.gender': 'female',
-          'Orders.count': 12,
-        },
-        {
-          'Users.country': 'US',
-          'Users.gender': 'male',
-          'Orders.count': 5,
-        },
-        {
-          'Users.country': 'US',
-          'Users.gender': 'female',
-          'Orders.count': 7,
-        },
-      ]);
+
+      test('tablePivot', () => {
+        expect(resultSet.tablePivot(pivotConfig)).toEqual([
+          {
+            'Users.country': 'Germany',
+            'Users.gender': 'male',
+            'Orders.count': 10,
+          },
+          {
+            'Users.country': 'Germany',
+            'Users.gender': 'female',
+            'Orders.count': 12,
+          },
+          {
+            'Users.country': 'US',
+            'Users.gender': 'male',
+            'Orders.count': 5,
+          },
+          {
+            'Users.country': 'US',
+            'Users.gender': 'female',
+            'Orders.count': 7,
+          },
+        ]);
+      });
+
+      test('tableColumns', () => {
+        expect(resultSet.tableColumns(pivotConfig)).toEqual([
+          {
+            key: 'Users.country',
+            dataIndex: 'Users.country',
+            title: 'Users Country',
+            shortTitle: 'Country',
+            type: 'string',
+            format: undefined,
+            meta: undefined,
+          },
+          {
+            key: 'Users.gender',
+            dataIndex: 'Users.gender',
+            title: 'Users Gender',
+            shortTitle: 'Gender',
+            type: 'string',
+            format: undefined,
+            meta: undefined,
+          },
+          {
+            key: 'Orders.count',
+            dataIndex: 'Orders.count',
+            title: 'Orders Count',
+            shortTitle: 'Count',
+            type: 'number',
+            format: undefined,
+            meta: undefined,
+          },
+        ]);
+      });
     });
-  
-    test('one dimension on `x` and one one `y` axis', () => {
+
+    describe('one dimension on `x` and one one `y` axis', () => {
       const pivotConfig = {
         x: ['Users.country'],
         y: ['Users.gender', 'measures'],
       };
-      
-      expect(resultSet.tablePivot(pivotConfig)).toEqual([
-        {
-          'Users.country': 'Germany',
-          'male.Orders.count': 10,
-          'female.Orders.count': 12,
-        },
-        {
-          'Users.country': 'US',
-          'male.Orders.count': 5,
-          'female.Orders.count': 7,
-        },
-      ]);
+
+      test('tablePivot', () => {
+        expect(resultSet.tablePivot(pivotConfig)).toEqual([
+          {
+            'Users.country': 'Germany',
+            'male.Orders.count': 10,
+            'female.Orders.count': 12,
+          },
+          {
+            'Users.country': 'US',
+            'male.Orders.count': 5,
+            'female.Orders.count': 7,
+          },
+        ]);
+      });
+
+      test('tableColumns', () => {
+        expect(resultSet.tableColumns(pivotConfig)).toEqual([
+          {
+            key: 'Users.country',
+            title: 'Users Country',
+            shortTitle: 'Country',
+            type: 'string',
+            dataIndex: 'Users.country',
+            format: undefined,
+            meta: undefined,
+          },
+          {
+            key: 'male',
+            type: 'string',
+            title: 'Users Gender Male',
+            shortTitle: 'Male',
+            format: undefined,
+            meta: undefined,
+            children: [
+              {
+                key: 'Orders.count',
+                type: 'number',
+                dataIndex: 'male.Orders.count',
+                title: 'Orders Count',
+                shortTitle: 'Count',
+                format: undefined,
+                meta: undefined,
+              },
+            ],
+          },
+          {
+            key: 'female',
+            type: 'string',
+            title: 'Users Gender Female',
+            shortTitle: 'Female',
+            format: undefined,
+            meta: undefined,
+            children: [
+              {
+                key: 'Orders.count',
+                type: 'number',
+                dataIndex: 'female.Orders.count',
+                title: 'Orders Count',
+                shortTitle: 'Count',
+                format: undefined,
+                meta: undefined,
+              },
+            ],
+          },
+        ]);
+      });
     });
-  
-    test('all dimensions and measures on `y` axis', () => {
+
+    describe('all dimensions and measures on `y` axis', () => {
       const pivotConfig = {
         x: [],
         y: ['Users.country', 'Users.gender', 'measures'],
       };
-  
-      expect(resultSet.tablePivot(pivotConfig)).toEqual([
-        {
-          'Germany.male.Orders.count': 10,
-          'Germany.female.Orders.count': 12,
-          'US.male.Orders.count': 5,
-          'US.female.Orders.count': 7,
-        },
-      ]);
+
+      test('tablePivot', () => {
+        expect(resultSet.tablePivot(pivotConfig)).toEqual([
+          {
+            'Germany.male.Orders.count': 10,
+            'Germany.female.Orders.count': 12,
+            'US.male.Orders.count': 5,
+            'US.female.Orders.count': 7,
+          },
+        ]);
+      });
+
+      test('tableColumns', () => {
+        expect(resultSet.tableColumns(pivotConfig)).toEqual([
+          {
+            key: 'Germany',
+            type: 'string',
+            title: 'Users Country Germany',
+            shortTitle: 'Germany',
+            meta: undefined,
+            format: undefined,
+            children: [
+              {
+                key: 'male',
+                type: 'string',
+                title: 'Users Gender Male',
+                shortTitle: 'Male',
+                meta: undefined,
+                format: undefined,
+                children: [
+                  {
+                    key: 'Orders.count',
+                    type: 'number',
+                    dataIndex: 'Germany.male.Orders.count',
+                    title: 'Orders Count',
+                    shortTitle: 'Count',
+                    meta: undefined,
+                    format: undefined,
+                  },
+                ],
+              },
+              {
+                key: 'female',
+                type: 'string',
+                title: 'Users Gender Female',
+                shortTitle: 'Female',
+                meta: undefined,
+                format: undefined,
+                children: [
+                  {
+                    key: 'Orders.count',
+                    type: 'number',
+                    dataIndex: 'Germany.female.Orders.count',
+                    title: 'Orders Count',
+                    shortTitle: 'Count',
+                    meta: undefined,
+                    format: undefined,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            key: 'US',
+            type: 'string',
+            title: 'Users Country US',
+            shortTitle: 'US',
+            meta: undefined,
+            format: undefined,
+            children: [
+              {
+                key: 'male',
+                type: 'string',
+                title: 'Users Gender Male',
+                shortTitle: 'Male',
+                meta: undefined,
+                format: undefined,
+                children: [
+                  {
+                    key: 'Orders.count',
+                    type: 'number',
+                    dataIndex: 'US.male.Orders.count',
+                    title: 'Orders Count',
+                    shortTitle: 'Count',
+                    meta: undefined,
+                    format: undefined,
+                  },
+                ],
+              },
+              {
+                key: 'female',
+                type: 'string',
+                title: 'Users Gender Female',
+                shortTitle: 'Female',
+                meta: undefined,
+                format: undefined,
+                children: [
+                  {
+                    key: 'Orders.count',
+                    type: 'number',
+                    dataIndex: 'US.female.Orders.count',
+                    title: 'Orders Count',
+                    shortTitle: 'Count',
+                    meta: undefined,
+                    format: undefined,
+                  },
+                ],
+              },
+            ],
+          },
+        ]);
+      });
     });
-  
+
     test('measures on `x` axis', () => {
       const pivotConfig = {
         x: ['Users.gender', 'measures'],
         y: ['Users.country'],
       };
-  
+
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
         {
           'Users.gender': 'male',
@@ -160,8 +351,8 @@ describe('resultSet tablePivot and tableColumns', () => {
         },
       ]);
     });
-  })
-  
+  });
+
   describe('it works with more than one measure', () => {
     const resultSet = new ResultSet({
       query: {
@@ -199,12 +390,12 @@ describe('resultSet tablePivot and tableColumns', () => {
           'Orders.count': {
             title: 'Orders Count',
             shortTitle: 'Count',
-            type: 'count',
+            type: 'number',
           },
           'Orders.amount': {
             title: 'Orders Amount',
             shortTitle: 'Amount',
-            type: 'sum',
+            type: 'number',
           },
         },
         dimensions: {
@@ -223,13 +414,13 @@ describe('resultSet tablePivot and tableColumns', () => {
         timeDimensions: {},
       },
     });
-    
+
     test('all dimensions on `x` axis', () => {
       const pivotConfig = {
         x: ['Users.country', 'Users.gender'],
         y: ['measures'],
       };
-      
+
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
         {
           'Users.country': 'Germany',
@@ -257,13 +448,13 @@ describe('resultSet tablePivot and tableColumns', () => {
         },
       ]);
     });
-  
+
     test('one dimension on `x` and one one `y` axis', () => {
       const pivotConfig = {
         x: ['Users.country'],
         y: ['Users.gender', 'measures'],
       };
-  
+
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
         {
           'Users.country': 'Germany',
@@ -281,13 +472,13 @@ describe('resultSet tablePivot and tableColumns', () => {
         },
       ]);
     });
-  
+
     test('all dimensions and measures on `y` axis', () => {
       const pivotConfig = {
         x: [],
         y: ['Users.country', 'Users.gender', 'measures'],
       };
-  
+
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
         {
           'Germany.male.Orders.count': 10,
@@ -301,13 +492,13 @@ describe('resultSet tablePivot and tableColumns', () => {
         },
       ]);
     });
-  
+
     test('measures on `x` axis', () => {
       const pivotConfig = {
         x: ['Users.gender', 'measures'],
         y: ['Users.country'],
       };
-  
+
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
         {
           'Users.gender': 'male',
@@ -331,9 +522,9 @@ describe('resultSet tablePivot and tableColumns', () => {
           'Users.gender': 'female',
           measures: 'Orders.amount',
           US: 8,
-          Germany: 13                                                  
+          Germany: 13,
         },
       ]);
     });
-  })
+  });
 });

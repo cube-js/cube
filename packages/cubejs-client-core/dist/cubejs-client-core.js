@@ -26,22 +26,23 @@ require('core-js/modules/es.array.iterator');
 require('core-js/modules/es.array.join');
 require('core-js/modules/es.array.map');
 require('core-js/modules/es.array.reduce');
+require('core-js/modules/es.array.slice');
 require('core-js/modules/es.date.to-string');
-require('core-js/modules/es.map');
 require('core-js/modules/es.number.constructor');
 require('core-js/modules/es.number.is-nan');
 require('core-js/modules/es.number.parse-float');
 require('core-js/modules/es.object.assign');
 require('core-js/modules/es.object.from-entries');
 require('core-js/modules/es.object.keys');
+require('core-js/modules/es.object.values');
 require('core-js/modules/es.regexp.exec');
 require('core-js/modules/es.regexp.to-string');
 require('core-js/modules/es.string.iterator');
 require('core-js/modules/es.string.match');
+require('core-js/modules/es.string.split');
+require('core-js/modules/es.string.trim');
 require('core-js/modules/web.dom-collections.for-each');
-require('core-js/modules/web.dom-collections.iterator');
 var _toConsumableArray = _interopDefault(require('@babel/runtime/helpers/toConsumableArray'));
-var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
 var _defineProperty = _interopDefault(require('@babel/runtime/helpers/defineProperty'));
 var _objectWithoutProperties = _interopDefault(require('@babel/runtime/helpers/objectWithoutProperties'));
 var _slicedToArray = _interopDefault(require('@babel/runtime/helpers/slicedToArray'));
@@ -50,7 +51,7 @@ var Moment = _interopDefault(require('moment'));
 var momentRange = _interopDefault(require('moment-range'));
 require('core-js/modules/es.array.is-array');
 require('core-js/modules/es.function.name');
-require('core-js/modules/es.string.split');
+require('core-js/modules/web.dom-collections.iterator');
 require('core-js/modules/web.url');
 var fetch = _interopDefault(require('cross-fetch'));
 require('url-search-params-polyfill');
@@ -110,11 +111,50 @@ function () {
     this.parseDateMeasures = options.parseDateMeasures;
   }
   /**
-   * Returns a measure drill down query
+   * Returns a measure drill down query.
    *
-   * @param drillDownLocator
-   * @param pivotConfig - See {@link ResultSet#pivot}.
-   * @returns {Object|null}
+   * Provided you have a measure with the defined `drillMemebers` on the `Orders` cube
+   *
+   * ```js
+   * measures: {
+   *   count: {
+   *     type: `count`,
+   *     drillMembers: [Orders.status, Users.city, count],
+   *   },
+   *   // ...
+   * }
+   * ```
+   *
+   * Then you can use the `drillDown` method to see the rows that contribute to that metric
+   *
+   * ```js
+   * resultSet.drillDown(
+   *   {
+   *     xValues,
+   *     yValues,
+   *   },
+   *   // you should pass the `pivotConfig` if you have used it for axes manipulation
+   *   pivotConfig
+   * )
+   * ```
+   *
+   * the result will be a query with the required filters applied and the dimensions/measures filled out
+   * ```js
+   *
+   * {
+   *   measures: ['Orders.count'],
+   *   dimensions: ['Orders.status', 'Users.city'],
+   *   filters: [
+   *     // dimension and measure filters
+   *   ],
+   *   timeDimensions: [
+   *     //...
+   *   ]
+   * }
+   * ```
+   * @param {Object} drillDownLocator - expects `{ xValues: [], yValues: [] }` object.
+   * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
+   * @returns {Object|null} Drill down query
    */
 
 
@@ -642,19 +682,19 @@ function () {
   }, {
     key: "tablePivot",
     value: function tablePivot(pivotConfig) {
-      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-      return this.pivot(normalizedPivotConfig).map(function (_ref19) {
-        var xValues = _ref19.xValues,
-            yValuesArray = _ref19.yValuesArray;
-        return Object.fromEntries(pivotConfig.x.map(function (key, index) {
+      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
+      return this.pivot(normalizedPivotConfig).map(function (_ref27) {
+        var xValues = _ref27.xValues,
+            yValuesArray = _ref27.yValuesArray;
+        return Object.fromEntries(normalizedPivotConfig.x.map(function (key, index) {
           return [key, xValues[index]];
-        }).concat(yValuesArray.map(function (_ref20) {
-          var _ref21 = _slicedToArray(_ref20, 2),
-              yValues = _ref21[0],
-              measure = _ref21[1];
+        }).concat(yValuesArray[0][0].length && yValuesArray.map(function (_ref28) {
+          var _ref29 = _slicedToArray(_ref28, 2),
+              yValues = _ref29[0],
+              measure = _ref29[1];
 
           return [yValues.join('.'), measure];
-        })));
+        }) || []));
       });
     }
     /**
@@ -690,51 +730,103 @@ function () {
       var _this4 = this;
 
       var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-      var m = new Map();
-      var columns = [];
-      normalizedPivotConfig.x.forEach(function (_, index) {
-        _this4.pivot(normalizedPivotConfig).forEach(function (_ref22) {
-          var xValues = _ref22.xValues;
-          m.set(xValues[index], {
-            key: normalizedPivotConfig.x[index],
-            value: xValues[index]
+      var schema = {};
+
+      var extractFields = function extractFields(key) {
+        var flatMeta = Object.values(_this4.loadResponse.annotation).reduce(function (a, b) {
+          return _objectSpread2({}, a, {}, b);
+        }, {});
+        var _flatMeta$key = flatMeta[key],
+            title = _flatMeta$key.title,
+            shortTitle = _flatMeta$key.shortTitle,
+            type = _flatMeta$key.type,
+            format = _flatMeta$key.format,
+            meta = _flatMeta$key.meta;
+        return {
+          key: key,
+          title: title,
+          shortTitle: shortTitle,
+          type: type,
+          format: format,
+          meta: meta
+        };
+      };
+
+      this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref30) {
+        var _ref31 = _slicedToArray(_ref30, 1),
+            yValues = _ref31[0];
+
+        if (yValues.length > 0) {
+          var currentItem = schema;
+          yValues.forEach(function (value, index) {
+            currentItem[value] = {
+              key: value,
+              memberId: normalizedPivotConfig.y[index] === 'measures' ? value : normalizedPivotConfig.y[index],
+              children: currentItem[value] && currentItem[value].children || {}
+            };
+            currentItem = currentItem[value].children;
           });
-        });
-
-        columns.push(_toConsumableArray(m.values()));
-        m.clear();
+        }
       });
-      (this.pivot(normalizedPivotConfig)[0].yValuesArray || []).forEach(function (_ref23) {
-        var _ref24 = _slicedToArray(_ref23, 1),
-            yValues = _ref24[0];
 
-        var measureName = yValues[yValues.length - 1];
-        m.set(measureName, {
-          key: measureName
-        });
-      });
-      columns.push(_toConsumableArray(m.values()));
+      var toColumns = function toColumns() {
+        var item = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+        var path = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
 
-      function groupColumns(level) {
-        var path = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
-
-        if (columns[level] === undefined) {
+        if (Object.keys(item).length === 0) {
           return [];
         }
 
-        return columns[level].map(function (element) {
-          var currentPath = [path, (element.value === undefined ? '' : element.value).toString()].filter(Boolean).join('.');
-          var dataIndex = element.value === undefined ? [currentPath, element.key].join('.') : element.key;
-          return {
-            title: element.value || dataIndex,
-            dataIndex: dataIndex,
-            key: dataIndex,
-            children: groupColumns(level + 1, currentPath)
-          };
-        });
-      }
+        return Object.values(item).map(function (_ref32) {
+          var key = _ref32.key,
+              currentItem = _objectWithoutProperties(_ref32, ["key"]);
 
-      return groupColumns(0);
+          var children = toColumns(currentItem.children, [].concat(_toConsumableArray(path), [key]));
+
+          var _extractFields = extractFields(currentItem.memberId),
+              title = _extractFields.title,
+              shortTitle = _extractFields.shortTitle,
+              fields = _objectWithoutProperties(_extractFields, ["title", "shortTitle"]);
+
+          var dimensionValue = '';
+
+          if (key !== currentItem.memberId) {
+            dimensionValue = key.charAt(0).toUpperCase() + key.slice(1);
+          }
+
+          if (!children.length) {
+            return _objectSpread2({}, fields, {
+              key: key,
+              dataIndex: [].concat(_toConsumableArray(path), [key]).join('.'),
+              title: [title, dimensionValue].join(' ').trim(),
+              shortTitle: dimensionValue || shortTitle
+            });
+          }
+
+          return _objectSpread2({}, fields, {
+            key: key,
+            title: [title, dimensionValue].join(' ').trim(),
+            shortTitle: dimensionValue || shortTitle,
+            children: children
+          });
+        });
+      };
+
+      return normalizedPivotConfig.x.map(function (key) {
+        if (key === 'measures') {
+          return {
+            key: 'measures',
+            dataIndex: 'measures',
+            title: 'Measures',
+            shortTitle: 'Measures',
+            type: 'string'
+          };
+        }
+
+        return _objectSpread2({}, extractFields(key), {
+          dataIndex: key
+        });
+      }).concat(toColumns(schema));
     }
   }, {
     key: "totalRow",

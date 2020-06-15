@@ -497,10 +497,19 @@ class ResultSet {
    * @returns {Array} of pivoted rows
    */
   tablePivot(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
 
     return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => Object.fromEntries(
-      pivotConfig.x.map((key, index) => [key, xValues[index]]).concat(yValuesArray.map(([yValues, measure]) => [yValues.join('.'), measure]))
+      normalizedPivotConfig.x
+        .map((key, index) => [key, xValues[index]])
+        .concat(
+          (yValuesArray[0][0].length &&
+              yValuesArray.map(([yValues, measure]) => [
+                yValues.join('.'),
+                measure
+              ])) ||
+              []
+        )
     ));
   }
 
@@ -532,50 +541,91 @@ class ResultSet {
    */
   tableColumns(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-
-    const m = new Map();
-    const columns = [];
-
-    normalizedPivotConfig.x.forEach((_, index) => {
-      this.pivot(normalizedPivotConfig).forEach(({ xValues }) => {
-        m.set(xValues[index], {
-          key: normalizedPivotConfig.x[index],
-          value: xValues[index],
+    const schema = {};
+    
+    const extractFields = (key) => {
+      const flatMeta = Object.values(this.loadResponse.annotation).reduce((a, b) => ({ ...a, ...b }), {});
+      const { title, shortTitle, type, format, meta } = flatMeta[key];
+  
+      return {
+        key,
+        title,
+        shortTitle,
+        type,
+        format,
+        meta
+      };
+    };
+    
+    this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(([yValues]) => {
+      if (yValues.length > 0) {
+        let currentItem = schema;
+    
+        yValues.forEach((value, index) => {
+          currentItem[value] = {
+            key: value,
+            memberId: normalizedPivotConfig.y[index] === 'measures' ? value : normalizedPivotConfig.y[index],
+            children: (currentItem[value] && currentItem[value].children) || {}
+          };
+    
+          currentItem = currentItem[value].children;
         });
-      });
-
-      columns.push([...m.values()]);
-      m.clear();
+      }
     });
-
-    (this.pivot(normalizedPivotConfig)[0].yValuesArray || []).forEach(([yValues]) => {
-      const measureName = yValues[yValues.length - 1];
-      m.set(measureName, { key: measureName });
-    });
-
-    columns.push([...m.values()]);
-
-    function groupColumns(level, path = '') {
-      if (columns[level] === undefined) {
+  
+    const toColumns = (item = {}, path = []) => {
+      if (Object.keys(item).length === 0) {
         return [];
       }
+  
+      return Object.values(item).map(({ key, ...currentItem }) => {
+        const children = toColumns(currentItem.children, [
+          ...path,
+          key
+        ]);
 
-      return columns[level].map((element) => {
-        const currentPath = [path, (element.value === undefined ? '' : element.value).toString()].filter(Boolean).join('.');
-        const dataIndex = element.value === undefined ?
-          [currentPath, element.key].join('.') :
-          element.key;
-
+        const { title, shortTitle, ...fields } = extractFields(currentItem.memberId);
+        
+        let dimensionValue = '';
+        if (key !== currentItem.memberId) {
+          dimensionValue = key.charAt(0).toUpperCase() + key.slice(1);
+        }
+        
+        if (!children.length) {
+          return {
+            ...fields,
+            key,
+            dataIndex: [...path, key].join('.'),
+            title: [title, dimensionValue].join(' ').trim(),
+            shortTitle: dimensionValue || shortTitle,
+          };
+        }
+  
         return {
-          title: element.value || dataIndex,
-          dataIndex,
-          key: dataIndex,
-          children: groupColumns(level + 1, currentPath),
+          ...fields,
+          key,
+          title: [title, dimensionValue].join(' ').trim(),
+          shortTitle: dimensionValue || shortTitle,
+          children,
         };
       });
-    }
+    };
+    
+    return normalizedPivotConfig.x
+      .map((key) => {
+        if (key === 'measures') {
+          return {
+            key: 'measures',
+            dataIndex: 'measures',
+            title: 'Measures',
+            shortTitle: 'Measures',
+            type: 'string',
+          };
+        }
 
-    return groupColumns(0);
+        return ({ ...extractFields(key), dataIndex: key });
+      })
+      .concat(toColumns(schema));
   }
 
   totalRow() {
