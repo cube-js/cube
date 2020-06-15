@@ -8,15 +8,16 @@ export default {
   white,
   primary: {
     contrastText: white,
-    dark: colors.indigo[900],
-    main: colors.indigo[500],
-    light: colors.indigo[100]
+    dark: '#43436B',
+    main: '#9592FF',
+    light: '#F3F3FB'
   },
   secondary: {
     contrastText: white,
-    dark: colors.blue[900],
-    main: colors.blue['A400'],
-    light: colors.blue['A400']
+    dark: '#F3F3FB;',
+    main: '#FF6492',
+    light: '#FFA2BE',
+    lighten: '#FFE0E9'
   },
   success: {
     contrastText: white,
@@ -45,12 +46,12 @@ export default {
   text: {
     primary: colors.blueGrey[900],
     secondary: colors.blueGrey[600],
-    link: colors.blue[600]
+    link: '#D5D5E2'
   },
   background: {
     default: '#F4F6F8',
     paper: white
   },
-  icon: colors.blueGrey[600],
+  icon: '#A1A1B5',
   divider: colors.grey[200]
 };

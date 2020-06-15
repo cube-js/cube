@@ -4,7 +4,7 @@ import moment from "moment";
 import PerfectScrollbar from "react-perfect-scrollbar";
 import PropTypes from "prop-types";
 import { makeStyles } from "@material-ui/styles";
-import { Link } from "react-router-dom";
+import { Link, useHistory } from "react-router-dom";
 import {
   Card,
   CardActions,
@@ -41,6 +41,9 @@ const useStyles = makeStyles(theme => ({
   },
   actions: {
     justifyContent: "flex-end"
+  },
+  tableRow: {
+    cursor: 'pointer'
   }
 }));
 
@@ -77,6 +80,11 @@ const query = {
 };
 
 const LatestOrders = props => {
+  const history = useHistory();
+
+  function handleClick(str) {
+    history.push(str);
+  }
   const { className, cubejsApi, ...rest } = props;
 
   const classes = useStyles();
@@ -128,14 +136,13 @@ const LatestOrders = props => {
                         {orders.map(order => (
                           <TableRow
                             hover
+                            className={classes.tableRow}
                             key={order["Orders.order_id"]}
+                            onClick={() => handleClick(`/user/${order["Orders.user_id"]}`)}
                           >
                             <TableCell>{order["Orders.order_id"]}</TableCell>
                             <TableCell>
-                              <Link
-                                to={`/user/${order["Orders.user_id"]}`}>
-                                {order["Orders.user_id"]}
-                              </Link>
+                              {order["Orders.user_id"]}
                             </TableCell>
                             <TableCell>
                               {moment(order["Orders.createdAt"]).format("DD/MM/YYYY")}

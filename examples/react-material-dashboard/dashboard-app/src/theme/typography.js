@@ -1,9 +1,13 @@
 import palette from './palette';
+import 'typeface-roboto'
 
 export default {
+  fontFamily: [
+    'Roboto',
+  ].join(','),
   h1: {
     color: palette.text.primary,
-    fontWeight: 500,
+    fontWeight: 400,
     fontSize: '35px',
     letterSpacing: '-0.24px',
     lineHeight: '40px'

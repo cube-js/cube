@@ -7,11 +7,9 @@ import {
   Card,
   CardHeader,
   CardContent,
-  CardActions,
   Divider,
   Button
 } from "@material-ui/core";
-import ArrowRightIcon from "@material-ui/icons/ArrowRight";
 import ArrowDropDownIcon from "@material-ui/icons/ArrowDropDown"
 
 import { options } from "./chart";
@@ -34,13 +32,13 @@ const useStyles = makeStyles(() => ({
 
 
 const LatestSales = props => {
-  const { className, cubejsApi, ...rest } = props;
+  const { className, cubejsApi, id, ...rest } = props;
 
   const classes = useStyles();
 
   const [anchorEl, setAnchorEl] = React.useState(null);
 
-  const [dateRange, setDateRange] = React.useState('This week');
+  const [dateRange, setDateRange] = React.useState('This year');
 
   const query = {
     "measures": [
@@ -54,9 +52,17 @@ const LatestSales = props => {
       }
     ],
     "dimensions": [
-      "Orders.status"
+      "LineItems.item_price"
     ],
-    "filters": []
+    "filters": [
+      {
+        "dimension": "Orders.user_id",
+        "operator": "equals",
+        "values": [
+          `${id}`
+        ]
+      }
+    ]
   };
 
   const handleClick = (event) => {
@@ -76,26 +82,20 @@ const LatestSales = props => {
         if (!resultSet) {
           return <div className="loader"/>;
         }
-        let prepareData = resultSet.chartPivot();
+        let prepareData = resultSet.tablePivot();
+        console.log(prepareData);
         let data = {
           labels: prepareData.map((obj) => {
-            return moment(obj.x).format('DD/MM/YYYY')
+            return moment(obj['Orders.createdAt.day']).format('DD/MM/YYYY')
           }),
           datasets: [
             {
-              label: "Shipped orders",
+              label: "Purchase price",
               backgroundColor: palette.secondary.main,
               data: prepareData.map((obj) => {
-                return obj['shipped, Orders.count'];
+                return obj['LineItems.item_price'];
               }),
             },
-            {
-              label: "Processing orders",
-              backgroundColor: palette.neutral,
-              data: prepareData.map((obj) => {
-                return obj['processing, Orders.count'];
-              }),
-            }
           ]
         };
         return (
@@ -122,14 +122,12 @@ const LatestSales = props => {
                     open={Boolean(anchorEl)}
                     onClose={handleClose}
                   >
-                    <MenuItem onClick={() => handleClose('This week')}>This week</MenuItem>
-                    <MenuItem onClick={() => handleClose('This month')}>This month</MenuItem>
-                    <MenuItem onClick={() => handleClose('Last 7 days')}>Last 7 days</MenuItem>
-                    <MenuItem onClick={() => handleClose('Last month')}>Last month</MenuItem>
+                    <MenuItem onClick={() => handleClose('This year')}>This year</MenuItem>
+                    <MenuItem onClick={() => handleClose('Last year')}>Last year</MenuItem>
                   </Menu>
                 </div>
               }
-              title="Latest Sales"
+              title="User's latest buys"
             />
             <Divider/>
             <CardContent>
@@ -140,16 +138,6 @@ const LatestSales = props => {
                 />
               </div>
             </CardContent>
-            <Divider/>
-            <CardActions className={classes.actions}>
-              <Button
-                color="primary"
-                size="small"
-                variant="text"
-              >
-                Overview <ArrowRightIcon/>
-              </Button>
-            </CardActions>
           </Card>
         );
         // {resultSet}

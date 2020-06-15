@@ -1,22 +1,25 @@
-import React from 'react';
-import PropTypes from 'prop-types';
-import clsx from 'clsx';
-import moment from 'moment';
-import { makeStyles } from '@material-ui/styles';
+import React from "react";
+import PropTypes from "prop-types";
+import clsx from "clsx";
+import { makeStyles } from "@material-ui/styles";
 import {
   Card,
   CardContent,
   Avatar,
   Typography,
-  Divider,
-} from '@material-ui/core';
+  Divider
+} from "@material-ui/core";
 
 const useStyles = makeStyles(theme => ({
   root: {
     padding: 10
   },
+  name: {
+    fontSize: 18,
+    fontWeight: "bold"
+  },
   details: {
-    display: 'flex',
+    display: "flex",
     padding: 5
   },
   avatar: {
@@ -31,22 +34,41 @@ const useStyles = makeStyles(theme => ({
   },
   uploadButton: {
     marginRight: theme.spacing(2)
+  },
+  divider: {
+    marginBottom: theme.spacing(3)
+  },
+  textRow: {
+    marginTop: theme.spacing(2)
+  },
+  dateText: {
+    width: 60,
+    marginRight: 30,
+    display: "inline-block",
+    fontSize: 13
+  },
+  smallBoldText: {
+    fontSize: 14,
+    fontWeight: "bold"
   }
 }));
 
 const AccountProfile = props => {
-  const { className, ...rest } = props;
+  const {
+    className,
+    userFirstName,
+    userLastName,
+    gender,
+    age,
+    city,
+    id,
+    ...rest
+  } = props;
 
   const classes = useStyles();
 
   const user = {
-    name: 'Shen Zhi',
-    city: 'Los Angeles',
-    country: 'USA',
-    timezone: 'GTM-7',
-    avatar: '/images/avatars/avatar_11.png',
-    sex: 'male',
-    old: 27
+    avatar: gender === 'male' ?  "/images/avatars/avatar_1.png" : "/images/avatars/avatar_2.png"
   };
 
   return (
@@ -63,26 +85,53 @@ const AccountProfile = props => {
           <div>
             <Typography
               variant="h4"
+              className={classes.name}
             >
-              John Doe
+              {userFirstName} {userLastName}
             </Typography>
             <Typography
-              className={classes.locationText}
               color="textSecondary"
             >
-              {capitalizeFirstLetter(user.sex)}, {user.old} years
+              {capitalizeFirstLetter(gender)}, {age} years
             </Typography>
           </div>
         </div>
         <div className={classes.progress}>
-          <Divider />
-          <Typography
-            className={classes.dateText}
-            color="textSecondary"
-            variant="body1"
-          >
-            {moment().format('hh:mm A')} ({user.timezone})
-          </Typography>
+          <Divider className={classes.divider}/>
+          <div className={classes.textRow}>
+            <Typography
+              className={classes.dateText}
+              color="textSecondary"
+              variant="body1"
+              component="span"
+            >
+              City
+            </Typography>
+            <Typography
+              className={classes.smallBoldText}
+              variant="body1"
+              component="span"
+            >
+              {city}
+            </Typography>
+          </div>
+          <div className={classes.textRow}>
+            <Typography
+              className={classes.dateText}
+              color="textSecondary"
+              variant="body1"
+              component="span"
+            >
+              ID
+            </Typography>
+            <Typography
+              className={classes.smallBoldText}
+              variant="body1"
+              component="span"
+            >
+              {id}
+            </Typography>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -5,6 +5,7 @@ import { makeStyles, useTheme } from '@material-ui/styles';
 import { useMediaQuery } from '@material-ui/core';
 
 import { Sidebar, Topbar, Footer } from './components';
+import palette from "../../theme/palette";
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -18,7 +19,9 @@ const useStyles = makeStyles(theme => ({
     paddingLeft: 240
   },
   content: {
-    height: '100%'
+    height: '100%',
+    minHeight: 'calc(100vh - 64px)',
+    backgroundColor: palette.primary.light
   }
 }));
 

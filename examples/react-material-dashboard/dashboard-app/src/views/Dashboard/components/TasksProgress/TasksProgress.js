@@ -7,10 +7,8 @@ import {
   CardContent,
   Grid,
   Typography,
-  Avatar,
   LinearProgress
 } from '@material-ui/core';
-import InsertChartIcon from '@material-ui/icons/InsertChartOutlined';
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
 
@@ -24,13 +22,7 @@ const useStyles = makeStyles(theme => ({
     display: 'flex'
   },
   title: {
-    fontWeight: 700
-  },
-  avatar: {
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.primary.contrastText,
-    height: 56,
-    width: 56
+    fontWeight: 500
   },
   icon: {
     height: 32,
@@ -84,11 +76,6 @@ const TasksProgress = props => {
                     />
                    %
                   </Typography>
-                </Grid>
-                <Grid item>
-                  <Avatar className={classes.avatar}>
-                    <InsertChartIcon className={classes.icon} />
-                  </Avatar>
                 </Grid>
               </Grid>
               <LinearProgress

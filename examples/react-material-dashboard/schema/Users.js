@@ -48,6 +48,11 @@ cube(`Users`, {
     createdAt: {
       sql: `created_at`,
       type: `time`
+    },
+
+    age: {
+      sql: `age`,
+      type: `number`
     }
   }
 });

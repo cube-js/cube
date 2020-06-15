@@ -5,6 +5,8 @@ import { QueryRenderer } from "@cubejs-client/react";
 import cubejs from "@cubejs-client/core";
 import { Grid } from "@material-ui/core";
 import AccountProfile from "./components/AccountProfile";
+import InfoCard from "./components/InfoCard";
+import LatestSales from "./components/LatestSales"
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
   apiUrl: process.env.REACT_APP_API_URL
@@ -13,6 +15,13 @@ const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
 const useStyles = makeStyles(theme => ({
   root: {
     padding: theme.spacing(3)
+  },
+  info: {
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2)
+  },
+  sales: {
+    marginTop: theme.spacing(4),
   }
 }));
 
@@ -34,6 +43,9 @@ const UserView = () => {
       "Orders.product_id",
       "Users.first_name",
       "Users.last_name",
+      "Users.gender",
+      "Users.age",
+      "Users.city",
       "LineItems.item_price",
       "Orders.createdAt"
     ],
@@ -56,7 +68,9 @@ const UserView = () => {
         if (!resultSet) {
           return <div className="loader"/>;
         }
-        console.log(resultSet.tablePivot());
+        let data = resultSet.tablePivot();
+        let userData = data[0];
+        let totalSales = countSales(data, 'LineItems.item_price');
         return (
           <div className={classes.root}>
             <Grid
@@ -67,29 +81,56 @@ const UserView = () => {
                 item
                 lg={4}
                 sm={6}
-                xl={3}
+                xl={4}
                 xs={12}
               >
-                <AccountProfile />
-                {id}
+                <AccountProfile
+                  userFirstName={userData['Users.first_name']}
+                  userLastName={userData['Users.last_name']}
+                  gender={userData['Users.gender']}
+                  age={userData['Users.age']}
+                  city={userData['Users.city']}
+                  id={id}
+                />
               </Grid>
               <Grid
                 item
-                lg={4}
+                lg={8}
                 sm={6}
-                xl={3}
+                xl={4}
                 xs={12}
               >
-
-              </Grid>
-              <Grid
-                item
-                lg={4}
-                sm={6}
-                xl={3}
-                xs={12}
-              >
-
+                <div className="row">
+                  <Grid
+                    className={classes.info}
+                    item
+                    lg={6}
+                    sm={6}
+                    xl={6}
+                    xs={12}
+                  >
+                    <InfoCard
+                      text={'ORDERS'}
+                      value={data.length}
+                    />
+                  </Grid>
+                  <Grid
+                    className={classes.info}
+                    item
+                    lg={6}
+                    sm={6}
+                    xl={6}
+                    xs={12}
+                  >
+                    <InfoCard
+                      text={'TOTAL SALES'}
+                      value={`$ ${totalSales.toLocaleString('ru')}`}
+                    />
+                  </Grid>
+                </div>
+                <div className={classes.sales}>
+                  <LatestSales cubejsApi={cubejsApi} id={id}/>
+                </div>
               </Grid>
             </Grid>
           </div>
@@ -99,4 +140,9 @@ const UserView = () => {
   );
 };
 
+function countSales(array, key) {
+  return array.reduce(function(sum, current) {
+    return sum + current[key];
+  }, 0);
+}
 export default UserView;

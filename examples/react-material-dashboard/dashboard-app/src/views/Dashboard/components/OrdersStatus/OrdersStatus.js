@@ -1,35 +1,32 @@
-import React from 'react';
-import { Doughnut } from 'react-chartjs-2';
-import clsx from 'clsx';
-import PropTypes from 'prop-types';
-import { makeStyles, useTheme } from '@material-ui/styles';
+import React from "react";
+import { Doughnut } from "react-chartjs-2";
+import clsx from "clsx";
+import PropTypes from "prop-types";
+import { makeStyles, useTheme } from "@material-ui/styles";
 import {
   Card,
   CardHeader,
   CardContent,
   Divider,
   Typography
-} from '@material-ui/core';
-import ClearAllIcon from '@material-ui/icons/ClearAll';
-import DoneIcon from '@material-ui/icons/Done';
-import AutorenewIcon from '@material-ui/icons/Autorenew';
+} from "@material-ui/core";
 import { QueryRenderer } from "@cubejs-client/react";
 
 const useStyles = makeStyles(theme => ({
   root: {
-    height: '100%'
+    height: "100%"
   },
   chartContainer: {
-    position: 'relative',
-    height: '300px'
+    position: "relative",
+    height: "300px"
   },
   stats: {
     marginTop: theme.spacing(2),
-    display: 'flex',
-    justifyContent: 'center'
+    display: "flex",
+    justifyContent: "center"
   },
   device: {
-    textAlign: 'center',
+    textAlign: "center",
     padding: theme.spacing(1)
   },
   deviceIcon: {
@@ -64,29 +61,32 @@ const OrdersStatus = props => {
       cubejsApi={cubejsApi}
       render={({ resultSet }) => {
         if (!resultSet) {
-          return <div className="loader" />;
+          return <div className="loader"/>;
         }
         let result = resultSet.tablePivot();
-        let allValues = calculateValueByArrayKey(resultSet.tablePivot(), 'Orders.count');
+        let allValues = calculateValueByArrayKey(resultSet.tablePivot(), "Orders.count");
+        const colors = {
+          "completed": theme.palette.secondary.main,
+          "processing": theme.palette.secondary.light,
+          "shipped": theme.palette.secondary.lighten
+        };
 
         const data = {
           datasets: [
             {
               data: result.map((item) => {
-                return ( item['Orders.count'] / allValues * 100).toFixed(1)
+                return (item["Orders.count"] / allValues * 100).toFixed(1);
               }),
-              backgroundColor: [
-                theme.palette.primary.main,
-                theme.palette.error.main,
-                theme.palette.warning.main
-              ],
+              backgroundColor: result.map((item) => {
+                return colors[item["Orders.status"]];
+              }),
               borderWidth: 8,
               borderColor: theme.palette.white,
               hoverBorderColor: theme.palette.white
             }
           ],
           labels: result.map((item) => {
-            return item['Orders.status']
+            return item["Orders.status"];
           })
 
         };
@@ -101,7 +101,7 @@ const OrdersStatus = props => {
           layout: { padding: 0 },
           tooltips: {
             enabled: true,
-            mode: 'index',
+            mode: "index",
             intersect: false,
             borderWidth: 1,
             borderColor: theme.palette.divider,
@@ -111,16 +111,13 @@ const OrdersStatus = props => {
             footerFontColor: theme.palette.text.secondary
           }
         };
-        const colors = [theme.palette.primary.main, theme.palette.warning.main, theme.palette.error.main];
-        const icons = [<DoneIcon />, <ClearAllIcon />, <AutorenewIcon />];
-
         const orders = result.map((item, index) => {
+
           return {
-            title: item['Orders.status'],
-            value: ( item['Orders.count'] / allValues * 100).toFixed(0),
-            icon: icons[index],
-            color: colors[index]
-          }
+            title: item["Orders.status"],
+            value: (item["Orders.count"] / allValues * 100).toFixed(0),
+            color: colors[item["Orders.status"]]
+          };
         });
         return (
           <div>
@@ -131,7 +128,7 @@ const OrdersStatus = props => {
               <CardHeader
                 title="Orders status"
               />
-              <Divider />
+              <Divider/>
               <CardContent>
                 <div className={classes.chartContainer}>
                   <Doughnut
@@ -145,10 +142,8 @@ const OrdersStatus = props => {
                       className={classes.device}
                       key={device.title}
                     >
-                      <span className={classes.deviceIcon}>{device.icon}</span>
                       <Typography variant="body1">{device.title}</Typography>
                       <Typography
-                        style={{ color: device.color }}
                         variant="h2"
                       >
                         {device.value}%
@@ -170,7 +165,7 @@ const calculateValueByArrayKey = (array, key) => {
   array.forEach((item) => {
     count += parseInt(item[key]);
   });
-  return count
+  return count;
 };
 
 OrdersStatus.propTypes = {

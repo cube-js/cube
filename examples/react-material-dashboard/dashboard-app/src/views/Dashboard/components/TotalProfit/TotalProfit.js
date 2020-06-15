@@ -2,23 +2,20 @@ import React from 'react';
 import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
-import { Card, CardContent, Grid, Typography, Avatar } from '@material-ui/core';
-import AttachMoneyIcon from '@material-ui/icons/AttachMoney';
+import { Card, CardContent, Grid, Typography } from '@material-ui/core';
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
 
 const useStyles = makeStyles(theme => ({
   root: {
     height: '100%',
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.primary.contrastText
   },
   content: {
     alignItems: 'center',
     display: 'flex'
   },
   title: {
-    fontWeight: 700
+    fontWeight: 500
   },
   avatar: {
     backgroundColor: theme.palette.white,
@@ -58,7 +55,7 @@ const TotalProfit = props => {
           <Grid item>
             <Typography
               className={classes.title}
-              color="inherit"
+              color="textSecondary"
               gutterBottom
               variant="body2"
             >
@@ -68,7 +65,7 @@ const TotalProfit = props => {
               color="inherit"
               variant="h3"
             >
-              $
+              $&nbsp;
               <QueryRenderer
                 query={query}
                 cubejsApi={cubejsApi}
@@ -85,11 +82,6 @@ const TotalProfit = props => {
                 }}
               />
             </Typography>
-          </Grid>
-          <Grid item>
-            <Avatar className={classes.avatar}>
-              <AttachMoneyIcon className={classes.icon} />
-            </Avatar>
           </Grid>
         </Grid>
       </CardContent>

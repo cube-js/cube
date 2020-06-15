@@ -2,9 +2,8 @@ import React from 'react';
 import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
-import { Card, CardContent, Grid, Typography, Avatar } from '@material-ui/core';
+import { Card, CardContent, Grid, Typography } from '@material-ui/core';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
-import PeopleIcon from '@material-ui/icons/PeopleOutlined';
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
 
@@ -17,7 +16,7 @@ const useStyles = makeStyles(theme => ({
     display: 'flex'
   },
   title: {
-    fontWeight: 700
+    fontWeight: 500
   },
   avatar: {
     backgroundColor: theme.palette.success.main,
@@ -83,15 +82,9 @@ const TotalUsers = props => {
                                separator=","/>
                     </div>
                   );
-                  // {resultSet}
                 }}
               />
             </Typography>
-          </Grid>
-          <Grid item>
-            <Avatar className={classes.avatar}>
-              <PeopleIcon className={classes.icon} />
-            </Avatar>
           </Grid>
         </Grid>
         <div className={classes.difference}>

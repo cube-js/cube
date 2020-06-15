@@ -2,9 +2,8 @@ import React from 'react';
 import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
-import { Card, CardContent, Grid, Typography, Avatar } from '@material-ui/core';
+import { Card, CardContent, Grid, Typography } from '@material-ui/core';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
-import MoneyIcon from '@material-ui/icons/Money';
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
 
@@ -17,7 +16,7 @@ const useStyles = makeStyles(theme => ({
     display: 'flex'
   },
   title: {
-    fontWeight: 700
+    fontWeight: 500
   },
   avatar: {
     backgroundColor: theme.palette.error.main,
@@ -87,11 +86,6 @@ const Budget = props => {
                 }}
               />
             </Typography>
-          </Grid>
-          <Grid item>
-            <Avatar className={classes.avatar}>
-              <MoneyIcon className={classes.icon} />
-            </Avatar>
           </Grid>
         </Grid>
         <div className={classes.difference}>

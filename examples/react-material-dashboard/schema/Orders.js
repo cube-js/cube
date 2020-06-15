@@ -19,13 +19,7 @@ cube(`Orders`, {
       type: `sum`
     },
 
-    ordersCount: {
-      sql: `id`,
-      type: `count`,
-      shown: true
-    },
-
-    ordersCompletedCount: {
+    completedCount: {
       sql: `id`,
       type: `count`,
       filters: [
@@ -34,7 +28,7 @@ cube(`Orders`, {
     },
     //
     percentOfCompletedOrders: {
-      sql: `${ordersCompletedCount}*100.0/${ordersCount}`,
+      sql: `${completedCount}*100.0/${count}`,
       type: `number`,
       format: `percent`
     }

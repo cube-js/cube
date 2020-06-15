@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { useHistory } from "react-router-dom";
 import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import moment from 'moment';
@@ -14,7 +15,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  Typography,
   TablePagination
 } from '@material-ui/core';
 
@@ -37,6 +37,9 @@ const useStyles = makeStyles(theme => ({
   },
   actions: {
     justifyContent: 'flex-end'
+  },
+  tableRow: {
+    cursor: 'pointer'
   }
 }));
 
@@ -47,6 +50,11 @@ const statusColors = {
 };
 
 const OrdersTable = props => {
+  const history = useHistory();
+
+  function handleClick(str) {
+    history.push(str);
+  }
   const { className, orders, ...rest } = props;
 
   const classes = useStyles();
@@ -133,6 +141,7 @@ const OrdersTable = props => {
                   <TableRow
                     className={classes.tableRow}
                     hover
+                    onClick={() => handleClick(`/user/${obj["Orders.user_id"]}`)}
                     key={obj['Orders.order_id']}
                     selected={selectedOrders.indexOf(obj['Orders.order_id']) !== -1}
                   >
@@ -145,9 +154,7 @@ const OrdersTable = props => {
                       />
                     </TableCell>
                     <TableCell>
-                      <div className={classes.nameContainer}>
-                        <Typography variant="body1">{obj['Orders.user_id']}</Typography>
-                      </div>
+                      {obj['Orders.user_id']}
                     </TableCell>
                     <TableCell>
                       {obj['Users.city']}
