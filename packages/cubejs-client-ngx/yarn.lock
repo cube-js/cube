@@ -804,13 +804,13 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@cubejs-client/core@^0.18.5":
-  version "0.18.5"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.18.5.tgz#e226487e4a568be3d987084b8c939c552b757d8a"
-  integrity sha512-ttF7XWmfq3VHh7zGEJS2DvyFHVqDfj0spLp1TZmFjfF0YhDhLnp7ko8to/usc30p55c8MetfFeuyK5hQqAK+mQ==
+"@cubejs-client/core@^0.19.31":
+  version "0.19.31"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.31.tgz#33a4c63f9c1c795e37f45d1ad165264c623091c4"
+  integrity sha512-BSJF4dnGHlypO2g0zGiHiHUNxDd8lglDBaiHu9CTbyTvqGrjKiRDvPcoiQO+MO8HkGWukTzVBqwDSAUflxfoaA==
   dependencies:
     "@babel/runtime" "^7.1.2"
-    core-js "^2.5.3"
+    core-js "^3.6.5"
     cross-fetch "^3.0.2"
     moment "^2.22.2"
     moment-range "^4.0.1"
@@ -2185,10 +2185,10 @@ core-js@^2.4.0:
   resolved "https://registry.yarnpkg.com/core-js/-/core-js-2.6.9.tgz#6b4b214620c834152e179323727fc19741b084f2"
   integrity sha512-HOpZf6eXmnl7la+cUdMnLvUxKNqLUzJvgIziQ0DiF3JwSImNphIqdGqzj6hIKyX04MmV0poclQ7+wjWvxQyR2A==
 
-core-js@^2.5.3:
-  version "2.6.11"
-  resolved "https://registry.yarnpkg.com/core-js/-/core-js-2.6.11.tgz#38831469f9922bded8ee21c9dc46985e0399308c"
-  integrity sha512-5wjnpaT/3dV+XB4borEsnAYQchn00XSgTAWKDkEqv+K8KevjbzmofK6hfJ9TZIlpj2N0xQpazy7PiRQiWHqzWg==
+core-js@^3.6.5:
+  version "3.6.5"
+  resolved "https://registry.yarnpkg.com/core-js/-/core-js-3.6.5.tgz#7395dc273af37fb2e50e9bd3d9fe841285231d1a"
+  integrity sha512-vZVEEwZoIsI+vPEuoF9Iqf5H7/M3eeQqWlQnYa8FSKKePuYTf5MWnxb5SDAzCa60b3JBRS5g9b+Dq7b1y/RCrA==
 
 core-util-is@1.0.2, core-util-is@~1.0.0:
   version "1.0.2"
@@ -6620,9 +6620,9 @@ trim-right@^1.0.1:
   integrity sha1-yy4SAwZ+DI3h9hQJS5/kVwTqYAM=
 
 tsickle@^0.38.0:
-  version "0.38.0"
-  resolved "https://registry.yarnpkg.com/tsickle/-/tsickle-0.38.0.tgz#89f5952c9bb3ba0b36dc384975e23cf90e584822"
-  integrity sha512-k7kI6afBuLd2jIrj9JR8lKhEkp99sFVRKQbHeaHQkdvDaH5AvzwqA/qX+aNj28OfuAsWryOKAZoXm24l7JelEw==
+  version "0.38.1"
+  resolved "https://registry.yarnpkg.com/tsickle/-/tsickle-0.38.1.tgz#30762db759d40c435943093b6972c7f2efb384ef"
+  integrity sha512-4xZfvC6+etRu6ivKCNqMOd1FqcY/m6JY3Y+yr5+Xw+i751ciwrWINi6x/3l1ekcODH9GZhlf0ny2LpzWxnjWYA==
 
 tslib@1.10.0:
   version "1.10.0"
