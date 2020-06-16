@@ -35,10 +35,9 @@
     "uuid": "^3.3.2",
     "validate.js": "^0.13.1"
   },
-  "homepage": "https://statsbotco.github.io/cubejs/react-dashboard",
   "scripts": {
     "start": "react-scripts start",
-    "build": "GENERATE_SOURCEMAP=false react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
