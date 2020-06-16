@@ -5,8 +5,8 @@ import { Header, Hero, Footer, Feature, Social, SEO, PartsListing, Layout } from
 import config from "../../data/SiteConfig";
 
 import featureOneImg from "./feature-1.png";
-import featureOneTwo from "./feature-2.png";
-import featureOneThree from "./feature-3.png";
+import featureTwoImg from "./feature-2.png";
+import featureThreeImg from "./feature-3.png";
 
 import styled from 'styled-components';
 import media from "styled-media-query";
@@ -45,18 +45,18 @@ class Index extends React.Component {
           image={featureOneImg}
           metaTitle="Hackable"
           title="Fully Customizable"
-          text="Use this template as a starting point to create your own web analytics platform. It’s designed to be completely customizable on every level. You can switch to a different data collection engine or build your own, use any SQL database as a warehouse, change how metrics are defined, and completely customize the frontend."
+          text="Learn how to create your own, completely custom web analytics platform. You will learn how to setup the data collection engine, SQL database, define metrics and build custom  frontend."
         />
         <Feature
           imageAlign='right'
-          image={featureOneTwo}
+          image={featureTwoImg}
           metaTitle="Embeddable"
           title="Easy to Integrate into Existing App"
           text="Backend components can be easily deployed as microservices into your existing stack. The frontend is a pure React application based on Material UI without any custom styles. You can embed any part of the frontend into your existing application and customize the look and feel to match your styles."
         />
         <Feature
           imageAlign='left'
-          image={featureOneTwo}
+          image={featureThreeImg}
           metaTitle="Performance first"
           title="Fast and Scalable"
           text="The response time is under 50 ms by using Cube.js pre-aggregations. It scales well for tracking up to several million daily active users. To achieve this performance, Cube.js stores and manages aggregated tables in MySQL with a 5-minute refresh rate."

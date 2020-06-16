@@ -184,6 +184,35 @@ cube(`ExtendedOrderFacts`, {
 });
 ```
 
+You can also omit the cube name while defining it.
+This way Cube.js doesn't register this cube globally but instead it returns reference to it which you can use while combining cubes.
+It makes sense to use it for dynamic schema generation and reusing with `extends`.
+Previous example without defining `OrderFacts` cube globally:
+
+```javascript
+const OrderFacts = cube({
+  sql: `SELECT * FROM orders`
+
+  measures: {
+    count: {
+      type: `count`,
+      sql: `id`
+    }
+  }
+});
+
+cube(`ExtendedOrderFacts`, {
+  extends: OrderFacts,
+
+  measures: {
+    doubleCount: {
+      type: `number`,
+      sql: `${count} * 2`
+    }
+  }
+});
+```
+
 ### refreshKey
 
 Cube.js caching layer uses `refreshKey` queries to get the current version of content for a specific cube.

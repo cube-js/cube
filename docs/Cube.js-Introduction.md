@@ -18,7 +18,7 @@ Unlike others, it is not a monolith application, but a set of modules, which doe
 
 ### Cube.js Frontend
 
-- __Cube.js Javascript Client.__ Сore set of methods to access Cube.js API Gateway and to work with query result sets.
+- __Cube.js Javascript Client.__ Core set of methods to access Cube.js API Gateway and to work with query result sets.
 - __Cube.js React, Angular and Vue.__ Framework specific wrappers for Cube.js API.
 
 ## Why Cube.js?

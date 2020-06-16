@@ -15,7 +15,7 @@ Cube.js itself doesn't have any dependencies on dashboard data persistance and i
 ## Install and Configure Amplify CLI
 
 I highly recommend using [Yarn](https://yarnpkg.com) instead of NPM while working with our
-dashboard app. It is better at managing dependieces, and specifically in our
+dashboard app. It is better at managing dependencies, and specifically in our
 case we'll use some of its features such as
 [resolutions](https://yarnpkg.com/lang/en/docs/selective-version-resolutions/) to make sure all the
 dependieces are installed correctly.

@@ -65,7 +65,7 @@ const cubejsServer = new CubejsServer();
 cubejsServer.listen().then(({ version, port, server }) => {
   console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 
-    createTerminus(server, {
+  createTerminus(server, {
     healthChecks: {
       '/ready': () => cubejsServer.testConnections()
     },

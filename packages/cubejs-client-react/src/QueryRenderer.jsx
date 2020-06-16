@@ -2,7 +2,7 @@ import React from 'react';
 import * as PropTypes from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import isQueryPresent from './isQueryPresent';
-import CubeContext from "./CubeContext";
+import CubeContext from './CubeContext';
 
 export default class QueryRenderer extends React.Component {
   static isQueryPresent(query) {

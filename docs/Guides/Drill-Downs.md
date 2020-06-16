@@ -7,6 +7,7 @@ menuOrder: 27
 ---
 
 Drill Down is a powerful feature to facilitate data exploration. It allows to build an interface to let users dive deeper into visualizations and data tables.
+See [ResultSet.drillDown()](@cubejs-client-core#result-set-drill-down) on how to use this feature on the client side.
 
 
 ## Defining a Drill Down in Schema

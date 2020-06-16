@@ -19474,13 +19474,13 @@
 	      }).reduce(function (a, b) {
 	        return _objectSpread({}, a, {}, b);
 	      }, {}));
-	      var spanCounter = 1;
+	      var spanCounter = 1; // Currently, all methods make GET requests. If a method makes a request with a body payload,
+	      // remember to add a 'Content-Type' header.
 
 	      var runRequest = function runRequest() {
 	        return browserPonyfill("".concat(_this.apiUrl, "/").concat(method).concat(searchParams.toString().length ? "?".concat(searchParams) : ''), {
 	          headers: _objectSpread({
 	            Authorization: _this.authorization,
-	            'Content-Type': 'application/json',
 	            'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
 	          }, _this.headers)
 	        });

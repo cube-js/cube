@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.19.23",
+  "version": "0.19.32",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -16,8 +16,8 @@
     "@babel/standalone": "^7.3.4",
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
-    "@cubejs-client/core": "^0.19.23",
-    "@cubejs-client/react": "^0.19.23",
+    "@cubejs-client/core": "^0.19.31",
+    "@cubejs-client/react": "^0.19.31",
     "antd": "^4.2.0",
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
@@ -34,6 +34,7 @@
     "prop-types": "^15.7.2",
     "ramda": "^0.27.0",
     "react": "^16.8.3",
+    "react-beautiful-dnd": "^13.0.0",
     "react-chartjs-2": "^2.7.4",
     "react-dom": "^16.8.3",
     "react-is": "^16.8.4",
@@ -52,7 +53,8 @@
     "start": "PORT=3080 react-app-rewired start",
     "build": "react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
     "test": "react-app-rewired test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "eslint src/*.js src/*.jsx"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -72,10 +74,11 @@
   "proxy": "http://localhost:4000",
   "license": "MIT",
   "devDependencies": {
-    "eslint-config-airbnb": "^17.1.0",
-    "eslint-plugin-import": "^2.16.0",
+    "@types/react": "^16.9.35",
+    "@types/react-beautiful-dnd": "^13.0.0",
+    "eslint-config-airbnb": "^18.1.0",
     "eslint-plugin-jsx-a11y": "^6.2.1",
-    "eslint-plugin-react": "^7.12.4",
+    "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
     "react-app-rewired": "^2.1.0",
     "recursive-readdir": "^2.2.2",
