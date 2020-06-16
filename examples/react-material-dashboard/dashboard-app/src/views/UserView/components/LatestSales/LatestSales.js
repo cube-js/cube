@@ -83,7 +83,6 @@ const LatestSales = props => {
           return <div className="loader"/>;
         }
         let prepareData = resultSet.tablePivot();
-        console.log(prepareData);
         let data = {
           labels: prepareData.map((obj) => {
             return moment(obj['Orders.createdAt.day']).format('DD/MM/YYYY')
@@ -120,7 +119,7 @@ const LatestSales = props => {
                     anchorEl={anchorEl}
                     keepMounted
                     open={Boolean(anchorEl)}
-                    onClose={handleClose}
+                    onClose={() => handleClose(dateRange)}
                   >
                     <MenuItem onClick={() => handleClose('This year')}>This year</MenuItem>
                     <MenuItem onClick={() => handleClose('Last year')}>Last year</MenuItem>

@@ -120,7 +120,7 @@ const LatestSales = props => {
                     anchorEl={anchorEl}
                     keepMounted
                     open={Boolean(anchorEl)}
-                    onClose={handleClose}
+                    onClose={() => handleClose(dateRange)}
                   >
                     <MenuItem onClick={() => handleClose('This week')}>This week</MenuItem>
                     <MenuItem onClick={() => handleClose('This month')}>This month</MenuItem>
