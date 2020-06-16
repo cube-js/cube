@@ -172,8 +172,8 @@ describe('resultSet tablePivot and tableColumns', () => {
           {
             key: 'male',
             type: 'string',
-            title: 'Users Gender Male',
-            shortTitle: 'Male',
+            title: 'Users Gender male',
+            shortTitle: 'male',
             format: undefined,
             meta: undefined,
             children: [
@@ -191,8 +191,8 @@ describe('resultSet tablePivot and tableColumns', () => {
           {
             key: 'female',
             type: 'string',
-            title: 'Users Gender Female',
-            shortTitle: 'Female',
+            title: 'Users Gender female',
+            shortTitle: 'female',
             format: undefined,
             meta: undefined,
             children: [
@@ -241,8 +241,8 @@ describe('resultSet tablePivot and tableColumns', () => {
               {
                 key: 'male',
                 type: 'string',
-                title: 'Users Gender Male',
-                shortTitle: 'Male',
+                title: 'Users Gender male',
+                shortTitle: 'male',
                 meta: undefined,
                 format: undefined,
                 children: [
@@ -260,8 +260,8 @@ describe('resultSet tablePivot and tableColumns', () => {
               {
                 key: 'female',
                 type: 'string',
-                title: 'Users Gender Female',
-                shortTitle: 'Female',
+                title: 'Users Gender female',
+                shortTitle: 'female',
                 meta: undefined,
                 format: undefined,
                 children: [
@@ -289,8 +289,8 @@ describe('resultSet tablePivot and tableColumns', () => {
               {
                 key: 'male',
                 type: 'string',
-                title: 'Users Gender Male',
-                shortTitle: 'Male',
+                title: 'Users Gender male',
+                shortTitle: 'male',
                 meta: undefined,
                 format: undefined,
                 children: [
@@ -308,8 +308,8 @@ describe('resultSet tablePivot and tableColumns', () => {
               {
                 key: 'female',
                 type: 'string',
-                title: 'Users Gender Female',
-                shortTitle: 'Female',
+                title: 'Users Gender female',
+                shortTitle: 'female',
                 meta: undefined,
                 format: undefined,
                 children: [
