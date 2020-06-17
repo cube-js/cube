@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
 import {
-  Card,
   CardHeader,
   CardContent,
   CardActions,
@@ -19,6 +18,7 @@ import MoreVertIcon from '@material-ui/icons/MoreVert';
 import moment from "moment";
 import { QueryRenderer } from "@cubejs-client/react";
 import { Link } from "react-router-dom";
+import CustomCard from "../../../../components/CustomCard";
 
 const useStyles = makeStyles(() => ({
   root: {
@@ -73,7 +73,7 @@ const LatestProducts = props => {
         }
         let products = resultSet.tablePivot();
         return (
-          <Card
+          <CustomCard
             {...rest}
             className={clsx(classes.root, className)}
           >
@@ -115,7 +115,7 @@ const LatestProducts = props => {
                 View all <ArrowRightIcon />
               </Button>
             </CardActions>
-          </Card>
+          </CustomCard>
         );
       }}
     />

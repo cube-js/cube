@@ -3,12 +3,12 @@ import PropTypes from "prop-types";
 import clsx from "clsx";
 import { makeStyles } from "@material-ui/styles";
 import {
-  Card,
   CardContent,
   Avatar,
   Typography,
   Divider
 } from "@material-ui/core";
+import CustomCard from "../../../components/CustomCard";
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -16,7 +16,7 @@ const useStyles = makeStyles(theme => ({
   },
   name: {
     fontSize: 18,
-    fontWeight: "bold"
+    fontWeight: "500"
   },
   details: {
     display: "flex",
@@ -49,7 +49,7 @@ const useStyles = makeStyles(theme => ({
   },
   smallBoldText: {
     fontSize: 14,
-    fontWeight: "bold"
+    fontWeight: "500"
   }
 }));
 
@@ -72,8 +72,9 @@ const AccountProfile = props => {
   };
 
   return (
-    <Card
+    <CustomCard
       {...rest}
+      height={'auto'}
       className={clsx(classes.root, className)}
     >
       <CardContent>
@@ -134,7 +135,7 @@ const AccountProfile = props => {
           </div>
         </div>
       </CardContent>
-    </Card>
+    </CustomCard>
   );
 };
 

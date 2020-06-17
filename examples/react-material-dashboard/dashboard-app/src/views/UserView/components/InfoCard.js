@@ -2,16 +2,15 @@ import React from "react";
 import PropTypes from "prop-types";
 import { makeStyles } from "@material-ui/styles";
 import {
-  Card,
   CardContent,
   Typography,
 } from "@material-ui/core";
+import CustomCard from "../../../components/CustomCard";
 
 const useStyles = makeStyles(theme => ({
   text: {
     fontSize: 11,
-    fontWeight: 'bold',
-    marginTop: theme.spacing(1)
+    fontWeight: '500',
   },
   value: {
     fontWeight: '500',
@@ -29,7 +28,7 @@ const InfoCard = props => {
   const classes = useStyles();
 
   return (
-    <Card
+    <CustomCard
       {...rest}
     >
       <CardContent>
@@ -42,7 +41,7 @@ const InfoCard = props => {
           {value}
         </Typography>
       </CardContent>
-    </Card>
+    </CustomCard>
   );
 };
 

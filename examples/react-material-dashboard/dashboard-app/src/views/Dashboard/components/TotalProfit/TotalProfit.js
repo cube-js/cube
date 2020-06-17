@@ -2,9 +2,10 @@ import React from 'react';
 import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
-import { Card, CardContent, Grid, Typography } from '@material-ui/core';
+import { CardContent, Grid, Typography } from '@material-ui/core';
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
+import CustomCard from "../../../../components/CustomCard";
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -43,7 +44,7 @@ const TotalProfit = props => {
   const classes = useStyles();
 
   return (
-    <Card
+    <CustomCard
       {...rest}
       className={clsx(classes.root, className)}
     >
@@ -85,7 +86,7 @@ const TotalProfit = props => {
           </Grid>
         </Grid>
       </CardContent>
-    </Card>
+    </CustomCard>
   );
 };
 

@@ -6,7 +6,6 @@ import moment from 'moment';
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import { makeStyles } from '@material-ui/styles';
 import {
-  Card,
   CardActions,
   CardContent,
   Checkbox,
@@ -19,9 +18,13 @@ import {
 } from '@material-ui/core';
 
 import StatusBullet from '../../../../components/StatusBullet/StatusBullet';
+import palette from "../../../../theme/palette";
+import CustomCard from "../../../../components/CustomCard";
 
 const useStyles = makeStyles(theme => ({
-  root: {},
+  root: {
+    padding: 0
+  },
   content: {
     padding: 0
   },
@@ -30,7 +33,7 @@ const useStyles = makeStyles(theme => ({
   },
   nameContainer: {
     display: 'flex',
-    alignItems: 'center'
+    alignItems: 'baseline'
   },
   status: {
     marginRight: theme.spacing(2)
@@ -40,6 +43,12 @@ const useStyles = makeStyles(theme => ({
   },
   tableRow: {
     cursor: 'pointer'
+  },
+  hoverable: {
+    '&:hover': {
+      color: `${palette.secondary.main}`,
+      cursor: `pointer`
+    },
   }
 }));
 
@@ -55,7 +64,7 @@ const OrdersTable = props => {
   function handleClick(str) {
     history.push(str);
   }
-  const { className, orders, ...rest } = props;
+  const { className, orders, sorting, setSorting, ...rest } = props;
 
   const classes = useStyles();
 
@@ -104,10 +113,14 @@ const OrdersTable = props => {
   const handleRowsPerPageChange = event => {
     setRowsPerPage(event.target.value);
   };
+  const handleSetSorting = str => {
+    setSorting([str, sorting[1] === 'desc' ? 'asc' : 'desc'])
+  };
 
   return (
-    <Card
+    <CustomCard
       {...rest}
+      padding={'0'}
       className={clsx(classes.root, className)}
     >
       <CardContent className={classes.content}>
@@ -127,13 +140,13 @@ const OrdersTable = props => {
                       onChange={handleSelectAll}
                     />
                   </TableCell>
-                  <TableCell>User id</TableCell>
-                  <TableCell>User city</TableCell>
-                  <TableCell>User company</TableCell>
-                  <TableCell>Product id</TableCell>
-                  <TableCell>Order id</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Created at</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.user_id')}}>User id</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Users.city')}}>User city</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Users.company')}}>User company</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.product_id')}}>Product id</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('LineItems.item_price')}}>Item price</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.status')}}>Status</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.createdAt')}}>Created at</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -142,7 +155,7 @@ const OrdersTable = props => {
                     className={classes.tableRow}
                     hover
                     onClick={() => handleClick(`/user/${obj["Orders.user_id"]}`)}
-                    key={obj['Orders.order_id']}
+                    key={obj['Orders.user_id'] + obj['Orders.product_id'] + Math.random()}
                     selected={selectedOrders.indexOf(obj['Orders.order_id']) !== -1}
                   >
                     <TableCell padding="checkbox">
@@ -166,7 +179,7 @@ const OrdersTable = props => {
                       {obj['Orders.product_id']}
                     </TableCell>
                     <TableCell>
-                      {obj['Orders.order_id']}
+                      {obj['LineItems.item_price']}
                     </TableCell>
                     <TableCell>
                       <StatusBullet
@@ -197,7 +210,7 @@ const OrdersTable = props => {
           rowsPerPageOptions={[5, 10, 25, 50, 100]}
         />
       </CardActions>
-    </Card>
+    </CustomCard>
   );
 };
 

@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React from "react";
 import { makeStyles } from "@material-ui/styles";
 
 import { OrdersToolbar, OrdersTable } from "./components";
 import { QueryRenderer } from "@cubejs-client/react";
 import cubejs from "@cubejs-client/core";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
   apiUrl: process.env.REACT_APP_API_URL
@@ -11,25 +12,34 @@ const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
 
 const useStyles = makeStyles(theme => ({
   root: {
-    padding: theme.spacing(3)
+    padding: theme.spacing(4)
   },
   content: {
-    marginTop: theme.spacing(6)
+    marginTop: 15
+  },
+  loaderWrap: {
+    width: '100%',
+    height: '100%',
+    minHeight: 'calc(100vh - 64px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   }
 }));
 
 const OrderList = () => {
   const classes = useStyles();
-  const [userIdFilter, setUserIdFilter] = useState(null);
-  const [orderFilter, setOrder] = useState("Orders.createdAt");
-  const [limit, setLimit] = useState(100);
+  const tabs = ['All', 'Shipped', 'Processing', 'Completed'];
   const [startDate, setStartDate] = React.useState(new Date("2019-01-01T00:00:00"));
   const [finishDate, setFinishDate] = React.useState(new Date("2022-01-01T00:00:00"));
+  const [priceFilter, setPriceFilter] = React.useState([0, 200]);
+  const [statusFilter, setStatusFilter] = React.useState(0);
+  const [sorting, setSorting] = React.useState(['Orders.createdAt', 'desc']);
 
   const query = {
-    limit: limit,
+    limit: 10000,
     order: {
-      [`${orderFilter}`]: "desc"
+      [`${sorting[0]}`]: sorting[1]
     },
     "measures": [
       "Orders.count"
@@ -46,16 +56,30 @@ const OrderList = () => {
       "Orders.product_id",
       "Orders.createdAt",
       "Orders.status",
-      "Orders.order_id",
+      "LineItems.item_price",
       "Users.city",
       "Users.company"
     ],
     "filters": [
       {
-        "dimension": "Orders.user_id",
-        "operator": userIdFilter ? "equals" : "set",
+        "dimension": "LineItems.item_price",
+        "operator": "gt",
         "values": [
-          `${userIdFilter}`
+          `${priceFilter[0]}`
+        ]
+      },
+      {
+        "dimension": "LineItems.item_price",
+        "operator": "lt",
+        "values": [
+          `${priceFilter[1]}`
+        ]
+      },
+      {
+        "dimension": "Orders.status",
+        "operator": tabs[statusFilter] !== 'All' ? "equals" : "set",
+        "values": [
+          `${tabs[statusFilter].toLowerCase()}`
         ]
       }
     ]
@@ -67,23 +91,23 @@ const OrderList = () => {
       cubejsApi={cubejsApi}
       render={({ resultSet }) => {
         if (!resultSet) {
-          return <div className="loader"/>;
+          return <div className={classes.loaderWrap}><CircularProgress color="secondary" /></div>;
         }
         return (
           <div className={classes.root}>
-            <OrdersToolbar setOrder={setOrder}
-                           setLimit={setLimit}
-                           setUserIdFilter={setUserIdFilter}
-                           orderFilter={orderFilter}
-                           limit={limit}
-                           userIdFilter={userIdFilter}
+            <OrdersToolbar
                            startDate={startDate}
                            setStartDate={setStartDate}
                            finishDate={finishDate}
                            setFinishDate={setFinishDate}
+                           priceFilter={priceFilter}
+                           setPriceFilter={setPriceFilter}
+                           statusFilter={statusFilter}
+                           setStatusFilter={setStatusFilter}
+                           tabs={tabs}
             />
             <div className={classes.content}>
-              <OrdersTable orders={resultSet.tablePivot()}/>
+              <OrdersTable sorting={sorting} setSorting={setSorting} orders={resultSet.tablePivot()}/>
             </div>
           </div>
         );

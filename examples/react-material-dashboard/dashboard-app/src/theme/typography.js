@@ -1,5 +1,4 @@
 import palette from './palette';
-import 'typeface-roboto'
 
 export default {
   fontFamily: [

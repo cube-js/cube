@@ -22,10 +22,10 @@ const useStyles = makeStyles(theme => ({
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    padding: theme.spacing(2)
+    padding: theme.spacing(4)
   },
   divider: {
-    margin: theme.spacing(2, 0)
+    margin: theme.spacing(4, 0, 1)
   },
   nav: {
     marginBottom: theme.spacing(2)

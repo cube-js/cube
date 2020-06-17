@@ -6,7 +6,6 @@ import PropTypes from "prop-types";
 import { makeStyles } from "@material-ui/styles";
 import { Link, useHistory } from "react-router-dom";
 import {
-  Card,
   CardActions,
   CardHeader,
   CardContent,
@@ -23,6 +22,7 @@ import {
 import ArrowRightIcon from "@material-ui/icons/ArrowRight";
 import StatusBullet from "../../../../components/StatusBullet/StatusBullet";
 import { QueryRenderer } from "@cubejs-client/react";
+import CustomCard from "../../../../components/CustomCard";
 
 const useStyles = makeStyles(theme => ({
   root: {},
@@ -100,7 +100,7 @@ const LatestOrders = props => {
         let orders = resultSet.tablePivot();
         return (
           <div className={classes.root}>
-            <Card
+            <CustomCard
               {...rest}
               className={clsx(classes.root, className)}
             >
@@ -176,7 +176,7 @@ const LatestOrders = props => {
                   View all <ArrowRightIcon/>
                 </Button>
               </CardActions>
-            </Card>
+            </CustomCard>
           </div>
         );
       }}

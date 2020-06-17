@@ -7,6 +7,7 @@ import { Grid } from "@material-ui/core";
 import AccountProfile from "./components/AccountProfile";
 import InfoCard from "./components/InfoCard";
 import LatestSales from "./components/LatestSales"
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
   apiUrl: process.env.REACT_APP_API_URL
@@ -14,7 +15,7 @@ const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
 
 const useStyles = makeStyles(theme => ({
   root: {
-    padding: theme.spacing(3)
+    padding: theme.spacing(4)
   },
   info: {
     paddingLeft: theme.spacing(2),
@@ -22,6 +23,14 @@ const useStyles = makeStyles(theme => ({
   },
   sales: {
     marginTop: theme.spacing(4),
+  },
+  loaderWrap: {
+    width: '100%',
+    height: '100%',
+    minHeight: 'calc(100vh - 64px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   }
 }));
 
@@ -66,7 +75,7 @@ const UserView = () => {
       cubejsApi={cubejsApi}
       render={({ resultSet }) => {
         if (!resultSet) {
-          return <div className="loader"/>;
+          return <div className={classes.loaderWrap}><CircularProgress color="secondary" /></div>;
         }
         let data = resultSet.tablePivot();
         let userData = data[0];

@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
 import {
-  Card,
   CardContent,
   Grid,
   Typography,
@@ -11,6 +10,7 @@ import {
 } from '@material-ui/core';
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
+import CustomCard from "../../../../components/CustomCard";
 
 
 const useStyles = makeStyles(theme => ({
@@ -41,7 +41,7 @@ const TasksProgress = props => {
   const classes = useStyles();
 
   return (
-    <Card
+    <CustomCard
       {...rest}
       className={clsx(classes.root, className)}
     >
@@ -87,7 +87,7 @@ const TasksProgress = props => {
           );
         }}
       />
-    </Card>
+    </CustomCard>
   );
 };
 

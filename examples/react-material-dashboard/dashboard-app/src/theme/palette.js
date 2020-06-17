@@ -44,8 +44,8 @@ export default {
     light: colors.red[400]
   },
   text: {
-    primary: colors.blueGrey[900],
-    secondary: colors.blueGrey[600],
+    primary: '#43436B',
+    secondary: '#A1A1B5',
     link: '#D5D5E2'
   },
   background: {
@@ -53,5 +53,6 @@ export default {
     paper: white
   },
   icon: '#A1A1B5',
-  divider: colors.grey[200]
+  divider: colors.grey[200],
+  neutral: '#F3F3FB'
 };

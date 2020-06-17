@@ -4,7 +4,6 @@ import PropTypes from "prop-types";
 import { Bar } from "react-chartjs-2";
 import { makeStyles } from "@material-ui/styles";
 import {
-  Card,
   CardHeader,
   CardContent,
   Divider,
@@ -18,6 +17,7 @@ import palette from "../../../../theme/palette";
 import moment from "moment";
 import Menu from "@material-ui/core/Menu";
 import MenuItem from "@material-ui/core/MenuItem";
+import CustomCard from "../../../../components/CustomCard";
 
 const useStyles = makeStyles(() => ({
   root: {},
@@ -98,7 +98,7 @@ const LatestSales = props => {
           ]
         };
         return (
-          <Card
+          <CustomCard
             {...rest}
             className={clsx(classes.root, className)}
           >
@@ -137,7 +137,7 @@ const LatestSales = props => {
                 />
               </div>
             </CardContent>
-          </Card>
+          </CustomCard>
         );
         // {resultSet}
       }}

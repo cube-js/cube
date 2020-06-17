@@ -4,13 +4,13 @@ import clsx from "clsx";
 import PropTypes from "prop-types";
 import { makeStyles, useTheme } from "@material-ui/styles";
 import {
-  Card,
   CardHeader,
   CardContent,
   Divider,
   Typography
 } from "@material-ui/core";
 import { QueryRenderer } from "@cubejs-client/react";
+import CustomCard from "../../../../components/CustomCard";
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -120,40 +120,38 @@ const OrdersStatus = props => {
           };
         });
         return (
-          <div>
-            <Card
-              {...rest}
-              className={clsx(classes.root, className)}
-            >
-              <CardHeader
-                title="Orders status"
-              />
-              <Divider/>
-              <CardContent>
-                <div className={classes.chartContainer}>
-                  <Doughnut
-                    data={data}
-                    options={options}
-                  />
-                </div>
-                <div className={classes.stats}>
-                  {orders.map(device => (
-                    <div
-                      className={classes.device}
-                      key={device.title}
+          <CustomCard
+            {...rest}
+            className={clsx(classes.root, className)}
+          >
+            <CardHeader
+              title="Orders status"
+            />
+            <Divider/>
+            <CardContent>
+              <div className={classes.chartContainer}>
+                <Doughnut
+                  data={data}
+                  options={options}
+                />
+              </div>
+              <div className={classes.stats}>
+                {orders.map(device => (
+                  <div
+                    className={classes.device}
+                    key={device.title}
+                  >
+                    <Typography variant="body1">{device.title}</Typography>
+                    <Typography
+                      variant="h2"
                     >
-                      <Typography variant="body1">{device.title}</Typography>
-                      <Typography
-                        variant="h2"
-                      >
-                        {device.value}%
-                      </Typography>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                      {device.value}%
+                    </Typography>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </CustomCard>
         );
       }}
     />

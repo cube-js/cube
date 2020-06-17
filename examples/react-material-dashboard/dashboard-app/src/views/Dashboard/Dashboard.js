@@ -17,7 +17,7 @@ import cubejs from "@cubejs-client/core";
 const useStyles = makeStyles(theme => ({
   root: {
     padding: theme.spacing(4)
-  }
+  },
 }));
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
@@ -34,6 +34,7 @@ const Dashboard = () => {
         spacing={4}
       >
         <Grid
+          className={classes.gridItem}
           item
           lg={3}
           sm={6}
@@ -43,6 +44,7 @@ const Dashboard = () => {
           <Budget cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
+          className={classes.gridItem}
           item
           lg={3}
           sm={6}
@@ -52,6 +54,7 @@ const Dashboard = () => {
           <TotalUsers cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
+          className={classes.gridItem}
           item
           lg={3}
           sm={6}
@@ -61,6 +64,7 @@ const Dashboard = () => {
           <TasksProgress cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
+          className={classes.gridItem}
           item
           lg={3}
           sm={6}
@@ -70,6 +74,7 @@ const Dashboard = () => {
           <TotalProfit cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
+          className={classes.gridItem}
           item
           lg={8}
           md={12}
@@ -79,6 +84,7 @@ const Dashboard = () => {
           <LatestSales cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
+          className={classes.gridItem}
           item
           lg={4}
           md={6}
@@ -88,6 +94,7 @@ const Dashboard = () => {
           <OrdersStatus cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
+          className={classes.gridItem}
           item
           lg={4}
           md={6}
@@ -97,6 +104,7 @@ const Dashboard = () => {
           <LatestProducts cubejsApi={cubejsApi}/>
         </Grid>
         <Grid
+          className={classes.gridItem}
           item
           lg={8}
           md={12}
