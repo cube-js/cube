@@ -1,23 +1,74 @@
-cube(`stackoverflow__users`, {
-    sql: `select * from \`bigquery-public-data.stackoverflow.users\``,
+cube(`Users`, {
+  sql: `SELECT * FROM public.Users`,
+  dataSource: `mapbox__example`,
+  joins: {
+    Mapbox: {
+      sql: `${CUBE}.country = ${Mapbox}.geounit`,
+      relationship: `belongsTo`,
+    },
+  },
+  measures: {
+    total: {
+      sql: `reputation`,
+      type: `sum`,
+    },
 
+    avg: {
+      sql: `reputation`,
+      type: `avg`,
+    },
 
-    dimensions: {
-        id: {
-            sql: `id`,
-            type: `number`
-        },
-        location: {
-            sql: `location`,
-            type: `string`
-        },
-        name: {
-            sql: `display_name`,
-            type: `string`
-        },
-        reputation: {
-            sql: `reputation`,
-            type: `number`
-        }
+    max: {
+      sql: `reputation`,
+      type: `max`,
+    },
+
+    min: {
+      sql: `reputation`,
+      type: `min`,
+    },
+
+    count: {
+      type: `count`,
     }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: 'number',
+      primaryKey: true,
+      shown: true
+    },
+
+    value: {
+      sql: `reputation`,
+      type: 'number'
+
+    },
+
+    geometry: {
+      sql: 'geometry',
+      type: 'string'
+    },
+
+    country: {
+      sql: 'country',
+      type: 'string'
+    }
+  },
+
+  preAggregations: {
+    usersMeasures: {
+      type: `rollup`,
+      measureReferences: [Users.avg, Users.total],
+      dimensionReferences: [MapboxCoords.coordinates, Users.country]
+    },
+
+    usersRating: {
+      type: `rollup`,
+      measureReferences: [Users.max, Users.min],
+      dimensionReferences: [Users.geometry]
+    }
+  }
 });

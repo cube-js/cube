@@ -1,41 +1,30 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { withRouter } from "react-router";
-import { Layout, Menu } from "antd";
+import { Layout } from "antd";
+import * as Icon from '@ant-design/icons';
+import logo from './../logo.svg';
 
-const Header = ({ location }) => (
+const Header = () => (
   <Layout.Header
     style={{
-      padding: "0 32px"
+      padding: "0 32px",
+      backgroundColor: '#43436B'
     }}
   >
-    <div
-      style={{
-        float: "left"
-      }}
-    >
-      <h2
-        style={{
-          color: "#fff",
-          margin: 0,
-          marginRight: "1em",
-          display: "inline",
-          width: 100,
-          lineHeight: "54px"
-        }}
-      >
-        My Dashboard
-      </h2>
+    <div className="examples__nav">
+      <Link to='//cube.dev' target="_blank"><img src={logo} alt="Cube.js" /></Link>
+      <div className="examples__nav__buttons">
+        <a href='//github.com/statsbotco/cube.js'>
+          <Icon.GithubOutlined />
+            Github
+        </a>
+        <a href='//slack.cube.dev'>
+          <Icon.SlackOutlined />
+            Slack
+        </a>
+      </div>
     </div>
-    <Menu
-      theme="dark"
-      mode="horizontal"
-      selectedKeys={[location.pathname]}
-      style={{
-        lineHeight: "64px"
-      }}
-    >
-    </Menu>
   </Layout.Header>
 );
 

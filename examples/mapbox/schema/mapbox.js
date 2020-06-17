@@ -1,26 +1,18 @@
-cube(`mapbox`, {
-  sql: `SELECT * FROM public.mapbox`,
+cube(`Mapbox`, {
+  sql: `SELECT * FROM public.Mapbox`,
   dataSource: `mapbox__example`,
 
   joins: {
-    mapbox__coords: {
-      sql: `${CUBE}.iso_a3 = ${mapbox__coords}.iso_a3`,
+    MapboxCoords: {
+      sql: `${CUBE}.iso_a3 = ${MapboxCoords}.iso_a3`,
       relationship: `belongsTo`,
     },
   },
 
-  measures: {},
-
   dimensions: {
     name: {
-      sql: 'name',
+      sql: 'name_long',
       type: 'string',
-    },
-
-    postal: {
-      sql: 'postal',
-      type: 'string',
-      primaryKey: true,
     },
 
     geometry: {
@@ -29,3 +21,4 @@ cube(`mapbox`, {
     },
   },
 });
+
