@@ -3,10 +3,28 @@
  */
 
 import {
-  groupBy, pipe, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
+  groupBy, pipe, fromPairs, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
+
+/**
+ * @memberof ResultSet
+ * @typedef {Object} PivotConfig Configuration object that contains information about pivot axes and other options
+ * @property {Array<string>} x Dimensions to put on `x` or `rows` axis.
+ * Put `measures` at the end of array here
+ * @property {Array<string>} y Dimensions to put on `y` or `columns` axis.
+ * @property {Boolean} [fillMissingDates=true] If `true` missing dates on time dimensions
+ * will be filled with `0` for all measures.
+ * Note: the `fillMissingDates` option set to `true` will override any `order` applied to the query
+ */
+
+/**
+ * @memberof ResultSet
+ * @typedef {Object} DrillDownLocator
+ * @property {Array<string>} xValues
+ * @property {Array<string>} yValues
+ */
 
 const moment = momentRange.extendMoment(Moment);
 
@@ -82,8 +100,8 @@ class ResultSet {
    *   ]
    * }
    * ```
-   * @param {Object} drillDownLocator - expects `{ xValues: [], yValues: [] }` object.
-   * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
+   * @param {DrillDownLocator} drillDownLocator
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Object|null} Drill down query
    */
   drillDown(drillDownLocator, pivotConfig) {
@@ -171,7 +189,7 @@ class ResultSet {
    *   }
    * ]
    * ```
-   * @param pivotConfig - See {@link ResultSet#pivot}.
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array}
    */
   series(pivotConfig) {
@@ -318,29 +336,24 @@ class ResultSet {
    *   {
    *     xValues: ["2015-01-01T00:00:00"],
    *     yValuesArray: [
-   *       ['Stories.count', 27120]
+   *       [['Stories.count'], 27120]
    *     ]
    *   },
    *   {
    *     xValues: ["2015-02-01T00:00:00"],
    *     yValuesArray: [
-   *       ['Stories.count', 25861]
+   *       [['Stories.count'], 25861]
    *     ]
    *   },
    *   {
    *     xValues: ["2015-03-01T00:00:00"],
    *     yValuesArray: [
-   *       ['Stories.count', 29661]
+   *       [['Stories.count'], 29661]
    *     ]
    *   }
    * ]
    * ```
-   * @param [pivotConfig] - Configuration object that contains information about pivot axes and other options
-   * @param {Array} pivotConfig.x - dimensions to put on **x** or **rows** axis. Put `measures` at the end of array here
-   * to show measures in rows instead of columns.
-   * @param {Array} pivotConfig.y - dimensions to put on **y** or **columns** axis.
-   * @param {Boolean} [pivotConfig.fillMissingDates=true] - if `true` missing dates on time dimensions will be filled
-   * with `0` for all measures.
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of pivoted rows.
    */
   pivot(pivotConfig) {
@@ -386,7 +399,7 @@ class ResultSet {
     const allYValues = pipe(
       map(
         // eslint-disable-next-line no-unused-vars
-        ([xValuesString, rows]) => unnest(
+        ([, rows]) => unnest(
           // collect Y values only from filled rows
           rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
         )
@@ -436,13 +449,13 @@ class ResultSet {
    *
    * // ResultSet.chartPivot() will return
    * [
-   *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
-   *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
-   *   { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
+   *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120, "xValues": ["2015-01-01T00:00:00"] },
+   *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861, "xValues": ["2015-02-01T00:00:00"]  },
+   *   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
    *   //...
    * ]
    * ```
-   * @param pivotConfig - See {@link ResultSet#pivot}.
+   * @param {PivotConfig} [pivotConfig]
    */
   chartPivot(pivotConfig) {
     const validate = (value) => {
@@ -493,24 +506,87 @@ class ResultSet {
    *   //...
    * ]
    * ```
-   * @param pivotConfig - See {@link ResultSet#pivot}
+   *
+   * Now let's make use of `pivotConfig` and put the `Users.gender` dimension on    * **y** axis.
+   *
+   * ```js
+   * // For example the query is
+   * {
+   *   measures: ['Orders.count'],
+   *   dimensions: ['Users.country', 'Users.gender']
+   * }
+   *
+   * resultSet.tablePivot({
+   *   x: ['Users.country'],
+   *   y: ['Users.gender', 'measures']
+   * })
+   *
+   * // then `tablePivot` will return the rows in the following format
+   * [
+   *   {
+   *     'Users.country': 'Australia',
+   *     'female.Orders.count': 3
+   *     'male.Orders.count': 27
+   *   },
+   *   // ...
+   * ]
+   * ```
+   *
+   * The resulting table will look like this
+   *
+   * | Users Country | male | female |
+   * | ------------- | ---- | ------ |
+   * | Australia     | 3    | 27     |
+   * | Germany       | 10   | 12     |
+   * | US            | 5    | 7      |
+   *
+   * If we put the `Users.country` dimension on **y** axis instead
+   *
+   * ```js
+   * resultSet.tablePivot({
+   *   x: ['Users.gender'],
+   *   y: ['Users.country', 'measures'],
+   * });
+   * ```
+   *
+   * the table will look like
+   *
+   * | Users Gender | Australia | Germany | US  |
+   * | ------------ | --------- | ------- | --- |
+   * | male         | 3         | 10      | 5   |
+   * | female       | 27        | 12      | 7   |
+   *
+   * It's also possible to put the `measures` on **x** axis
+   *
+   * ```js
+   * resultSet.tablePivot({
+   *   x: ['Users.gender', 'measures'],
+   *   y: ['Users.country'],
+   * });
+   * ```
+   *
+   * | Users Gender | measures     | Australia | Germany | US  |
+   * | ------------ | ------------ | --------- | ------- | --- |
+   * | male         | Orders.count | 3         | 10      | 5   |
+   * | female       | Orders.count | 27        | 12      | 7   |
+   *
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of pivoted rows
    */
   tablePivot(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
-    const valueToObject =
-      (valuesArray, measureValue) => (
-        (field, index) => ({
-          [field === 'measures' ? valuesArray[index] : field]: field === 'measures' ? measureValue : valuesArray[index]
-        })
-      );
 
-    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => (
-      yValuesArray.map(([yValues, m]) => (
-        normalizedPivotConfig.x.map(valueToObject(xValues, m))
-          .concat(normalizedPivotConfig.y.map(valueToObject(yValues, m)))
-          .reduce((a, b) => Object.assign(a, b), {})
-      )).reduce((a, b) => Object.assign(a, b), {})
+    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
+      normalizedPivotConfig.x
+        .map((key, index) => [key, xValues[index]])
+        .concat(
+          (yValuesArray[0][0].length &&
+              yValuesArray.map(([yValues, measure]) => [
+                yValues.join('.'),
+                measure
+              ])) ||
+              []
+        )
     ));
   }
 
@@ -520,7 +596,7 @@ class ResultSet {
    * For example
    *
    * ```js
-   * // For query
+   * // For the query
    * {
    *   measures: ['Stories.count'],
    *   timeDimensions: [{
@@ -532,51 +608,171 @@ class ResultSet {
    *
    * // ResultSet.tableColumns() will return
    * [
-   *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time", type: "time", format: undefined },
-   *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count", type: "count", format: undefined },
+   *   {
+   *     key: 'Stories.time',
+   *     dataIndex: 'Stories.time',
+   *     title: 'Stories Time',
+   *     shortTitle: 'Time',
+   *     type: 'time',
+   *     format: undefined,
+   *   },
+   *   {
+   *     key: 'Stories.count',
+   *     dataIndex: 'Stories.count',
+   *     title: 'Stories Count',
+   *     shortTitle: 'Count',
+   *     type: 'count',
+   *     format: undefined,
+   *   },
    *   //...
    * ]
    * ```
-   * @param pivotConfig - See {@link ResultSet#pivot}.
+   *
+   * In case we want to pivot the table
+   *
+   * ```js
+   * // Let's take this query as an example
+   * {
+   *   measures: ['Orders.count'],
+   *   dimensions: ['Users.country', 'Users.gender']
+   * }
+   *
+   * // and put the dimensions on `y` axis
+   * resultSet.tableColumns({
+   *   x: [],
+   *   y: ['Users.country', 'Users.gender', 'measures']
+   * })
+   * ```
+   *
+   * then `tableColumns` will group the table head and return
+   *
+   * ```js
+   * {
+   *   key: 'Germany',
+   *   type: 'string',
+   *   title: 'Users Country Germany',
+   *   shortTitle: 'Germany',
+   *   meta: undefined,
+   *   format: undefined,
+   *   children: [
+   *     {
+   *       key: 'male',
+   *       type: 'string',
+   *       title: 'Users Gender male',
+   *       shortTitle: 'male',
+   *       meta: undefined,
+   *       format: undefined,
+   *       children: [
+   *         {
+   *           // ...
+   *           dataIndex: 'Germany.male.Orders.count',
+   *           shortTitle: 'Count',
+   *         },
+   *       ],
+   *     },
+   *     {
+   *       // ...
+   *       shortTitle: 'female',
+   *       children: [
+   *         {
+   *           // ...
+   *           dataIndex: 'Germany.female.Orders.count',
+   *           shortTitle: 'Count',
+   *         },
+   *       ],
+   *     },
+   *   ],
+   * },
+   * // ...
+   * ```
+   *
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of columns
    */
   tableColumns(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-
-    const column = (field) => {
-      const exractFields = (annotation = {}) => {
-        const {
-          title,
-          shortTitle,
-          format,
-          type,
-          meta
-        } = annotation;
-
-        return {
-          title,
-          shortTitle,
-          format,
-          type,
-          meta
-        };
-      };
-
-      return field === 'measures' ? (this.query().measures || []).map((key) => ({
+    const schema = {};
+    
+    const extractFields = (key) => {
+      const flatMeta = Object.values(this.loadResponse.annotation).reduce((a, b) => ({ ...a, ...b }), {});
+      const { title, shortTitle, type, format, meta } = flatMeta[key];
+  
+      return {
         key,
-        ...exractFields(this.loadResponse.annotation.measures[key])
-      })) : [
-        {
-          key: field,
-          ...exractFields(this.loadResponse.annotation.dimensions[field] ||
-              this.loadResponse.annotation.timeDimensions[field])
-        },
-      ];
+        title,
+        shortTitle,
+        type,
+        format,
+        meta
+      };
     };
+    
+    this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(([yValues]) => {
+      if (yValues.length > 0) {
+        let currentItem = schema;
+    
+        yValues.forEach((value, index) => {
+          currentItem[value] = {
+            key: value,
+            memberId: normalizedPivotConfig.y[index] === 'measures' ? value : normalizedPivotConfig.y[index],
+            children: (currentItem[value] && currentItem[value].children) || {}
+          };
+    
+          currentItem = currentItem[value].children;
+        });
+      }
+    });
+  
+    const toColumns = (item = {}, path = []) => {
+      if (Object.keys(item).length === 0) {
+        return [];
+      }
+  
+      return Object.values(item).map(({ key, ...currentItem }) => {
+        const children = toColumns(currentItem.children, [
+          ...path,
+          key
+        ]);
 
-    return normalizedPivotConfig.x.map(column)
-      .concat(normalizedPivotConfig.y.map(column))
-      .reduce((a, b) => a.concat(b));
+        const { title, shortTitle, ...fields } = extractFields(currentItem.memberId);
+        
+        const dimensionValue = key !== currentItem.memberId ? key : '';
+        
+        if (!children.length) {
+          return {
+            ...fields,
+            key,
+            dataIndex: [...path, key].join('.'),
+            title: [title, dimensionValue].join(' ').trim(),
+            shortTitle: dimensionValue || shortTitle,
+          };
+        }
+  
+        return {
+          ...fields,
+          key,
+          title: [title, dimensionValue].join(' ').trim(),
+          shortTitle: dimensionValue || shortTitle,
+          children,
+        };
+      });
+    };
+    
+    return normalizedPivotConfig.x
+      .map((key) => {
+        if (key === 'measures') {
+          return {
+            key: 'measures',
+            dataIndex: 'measures',
+            title: 'Measures',
+            shortTitle: 'Measures',
+            type: 'string',
+          };
+        }
+
+        return ({ ...extractFields(key), dataIndex: key });
+      })
+      .concat(toColumns(schema));
   }
 
   totalRow() {
@@ -603,10 +799,10 @@ class ResultSet {
    *
    * // ResultSet.seriesNames() will return
    * [
-   * { "key":"Stories.count", "title": "Stories Count" }
+   * { "key":"Stories.count", "title": "Stories Count", yValues: ["Stories.count"] }
    * ]
    * ```
-   * @param pivotConfig - See {@link ResultSet#pivot}.
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of series names
    */
   seriesNames(pivotConfig) {

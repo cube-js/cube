@@ -2,15 +2,15 @@ const fs = require('fs-extra');
 const inline = require('jsdoc/tag/inline');
 const inflection = require('inflection');
 
+let typeDefs = [];
 let knownClassNames = [];
+
 
 const anchorName = (link) => inflection.dasherize(inflection.underscore(link.replace(/#/g, '-')));
 
-const resolveInlineLinks = str => {
-  return inline.replaceInlineTags(str, {
-    link: (string, { completeTag, text, tag }) => string.replace(completeTag, `[${text}](#${anchorName(text)})`)
-  }).newString;
-};
+const resolveInlineLinks = str => inline.replaceInlineTags(str, {
+  link: (string, { completeTag, text }) => string.replace(completeTag, `[${text}](#${anchorName(text)})`)
+}).newString;
 
 const renderLinks = (p) => {
   if (p.type.names[0] === '*') {
@@ -28,22 +28,62 @@ const renderLinks = (p) => {
 function generateParams(doclet) {
   const params = doclet.params.map(
     p => {
-      const optional = p.optional ? `**Optional**` : null;
+      const optional = p.optional ? '**Optional**' : null;
       const defaultValue = p.defaultvalue ? `**Default:** \`${p.defaultvalue}\`` : null;
       const options = [optional, defaultValue].filter(f => !!f);
+      
+      const type = p.type && p.type.parsedType.name;
+      if (!p.description && typeDefs.find((td) => td.name === type)) {
+        const [, parent] = doclet.memberof.split('~');
+        p.description = `See {@link ${parent}#${type}}`;
+      }
+      
       return `- \`${p.name}\`${options.length ? ` (${options.join(', ')})` : ''}${p.description ? ` - ${resolveInlineLinks(p.description)}` : ''}`;
     }
   );
   return `**Parameters:**\n\n${params.join('\n')}\n`;
 }
 
+function generateTypeDefs(doclets) {
+  let markDown = '';
+  let codeBlock = [];
+  let properties = [];
+  
+  if (!doclets.length) {
+    return '';
+  }
+  
+  doclets.forEach((doclet) => {
+    markDown += [`**${doclet.name}**`, doclet.description].filter((d) => !!d).join('\n');
+    doclet.properties.forEach((p) => {
+      if (p.description) {
+        properties.push(`  // ${p.description.replace(/\n/g, '\n  // ')}`);
+      }
+      
+      properties.push(`  ${p.name}${p.optional ? '?' : ''}: ${p.type.parsedType.typeExpression}${p.defaultvalue ? ' = '.concat(p.defaultvalue) : ''}`);
+    });
+    
+    if (properties.length) {
+      codeBlock.push('```js\n{');
+      codeBlock.push(...properties);
+      codeBlock.push('}\n```\n');
+    }
+    
+    markDown += `\n${codeBlock.join('\n')}`;
+    properties = [];
+    codeBlock = [];
+  });
+  
+  return `### Type definitions\n ${markDown}`;
+}
+
 const generateFunctionDocletSection = (doclet, isConstructor) => {
   const title = doclet.name;
   const header = `##${doclet.longname.indexOf('#') !== -1 || isConstructor ? '#' : ''} ${title}${isConstructor ? ' Constructor' : ''}\n`;
-  const args = doclet.params && doclet.params.filter(p => p.name.indexOf('.') === -1).map(p => p.optional ? `[${p.name}]` : p.name).join(', ') || '';
+  const args = doclet.params && doclet.params.filter(p => p.name.indexOf('.') === -1).map(p => (p.optional ? `[${p.name}]` : p.name)).join(', ') || '';
   const signature = `\`${isConstructor ? 'new ' : ''}${doclet.meta.code.name || doclet.name}(${args})\`\n`;
-  const params = doclet.params ? generateParams(doclet) : ``;
-  const returns = doclet.returns ? `**Returns:** ${doclet.returns.map(p => `${p.type ? renderLinks(p) : ''}${p.description ? ` ${resolveInlineLinks(p.description)}` : ''}`)}` : ``;
+  const params = doclet.params ? generateParams(doclet) : '';
+  const returns = doclet.returns ? `**Returns:** ${doclet.returns.map(p => `${p.type ? renderLinks(p) : ''}${p.description ? ` ${resolveInlineLinks(p.description)}` : ''}`)}` : '';
   return [header, signature, doclet.description && `${resolveInlineLinks(doclet.description)}\n`, params, returns, '\n'].filter(f => !!f).join('\n');
 };
 
@@ -83,7 +123,9 @@ const generateMarkDown = (doclets, parent) => {
   children.sort((a, b) => order(a) - order(b));
   return children.map(child => {
     if (child.kind === 'class') {
-      return generateClassSection(child).concat(generateMarkDown(doclets, child));
+      return generateClassSection(child)
+        .concat(generateMarkDown(doclets, child))
+        .concat(generateTypeDefs(typeDefs.filter((td) => td.memberof === child.name)));
     } else if (child.kind === 'function' || child.kind === 'member') {
       return generateFunctionDocletSection(child);
     }
@@ -91,12 +133,14 @@ const generateMarkDown = (doclets, parent) => {
   }).filter(markdown => !!markdown).join('');
 };
 
-const classNamesFrom = (doclets) => {
-  return doclets.filter(d => d.kind === 'class').map(d => d.name);
-};
+const classNamesFrom = (doclets) => doclets.filter(d => d.kind === 'class').map(d => d.name);
 
 exports.publish = (data, { destination }) => {
   knownClassNames = classNamesFrom(data().get());
-  const markDown = generateMarkDown(data().get().filter(d => !d.undocumented));
+  typeDefs = data().get().filter(d => d.kind === 'typedef');
+  
+  const markDown = generateMarkDown(data().get().filter(d => {
+    return !d.undocumented && d.kind !== 'typedef';
+  }));
   fs.writeFile(destination, markDown);
 };

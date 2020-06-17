@@ -1389,231 +1389,29 @@
 	  }
 	});
 
-	var _global = createCommonjsModule(function (module) {
-	// https://github.com/zloirock/core-js/issues/86#issuecomment-115759028
-	var global = module.exports = typeof window != 'undefined' && window.Math == Math
-	  ? window : typeof self != 'undefined' && self.Math == Math ? self
-	  // eslint-disable-next-line no-new-func
-	  : Function('return this')();
-	if (typeof __g == 'number') __g = global; // eslint-disable-line no-undef
-	});
+	var slice = [].slice;
+	var MSIE = /MSIE .\./.test(engineUserAgent); // <- dirty ie9- check
 
-	var _core = createCommonjsModule(function (module) {
-	var core = module.exports = { version: '2.5.7' };
-	if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
-	});
-	var _core_1 = _core.version;
-
-	var _isObject = function (it) {
-	  return typeof it === 'object' ? it !== null : typeof it === 'function';
-	};
-
-	var _anObject = function (it) {
-	  if (!_isObject(it)) throw TypeError(it + ' is not an object!');
-	  return it;
-	};
-
-	var _fails = function (exec) {
-	  try {
-	    return !!exec();
-	  } catch (e) {
-	    return true;
-	  }
-	};
-
-	// Thank's IE8 for his funny defineProperty
-	var _descriptors = !_fails(function () {
-	  return Object.defineProperty({}, 'a', { get: function () { return 7; } }).a != 7;
-	});
-
-	var document$3 = _global.document;
-	// typeof document.createElement is 'object' in old IE
-	var is = _isObject(document$3) && _isObject(document$3.createElement);
-	var _domCreate = function (it) {
-	  return is ? document$3.createElement(it) : {};
-	};
-
-	var _ie8DomDefine = !_descriptors && !_fails(function () {
-	  return Object.defineProperty(_domCreate('div'), 'a', { get: function () { return 7; } }).a != 7;
-	});
-
-	// 7.1.1 ToPrimitive(input [, PreferredType])
-
-	// instead of the ES6 spec version, we didn't implement @@toPrimitive case
-	// and the second argument - flag - preferred type is a string
-	var _toPrimitive = function (it, S) {
-	  if (!_isObject(it)) return it;
-	  var fn, val;
-	  if (S && typeof (fn = it.toString) == 'function' && !_isObject(val = fn.call(it))) return val;
-	  if (typeof (fn = it.valueOf) == 'function' && !_isObject(val = fn.call(it))) return val;
-	  if (!S && typeof (fn = it.toString) == 'function' && !_isObject(val = fn.call(it))) return val;
-	  throw TypeError("Can't convert object to primitive value");
-	};
-
-	var dP = Object.defineProperty;
-
-	var f$6 = _descriptors ? Object.defineProperty : function defineProperty(O, P, Attributes) {
-	  _anObject(O);
-	  P = _toPrimitive(P, true);
-	  _anObject(Attributes);
-	  if (_ie8DomDefine) try {
-	    return dP(O, P, Attributes);
-	  } catch (e) { /* empty */ }
-	  if ('get' in Attributes || 'set' in Attributes) throw TypeError('Accessors not supported!');
-	  if ('value' in Attributes) O[P] = Attributes.value;
-	  return O;
-	};
-
-	var _objectDp = {
-		f: f$6
-	};
-
-	var _propertyDesc = function (bitmap, value) {
-	  return {
-	    enumerable: !(bitmap & 1),
-	    configurable: !(bitmap & 2),
-	    writable: !(bitmap & 4),
-	    value: value
+	var wrap = function (scheduler) {
+	  return function (handler, timeout /* , ...arguments */) {
+	    var boundArgs = arguments.length > 2;
+	    var args = boundArgs ? slice.call(arguments, 2) : undefined;
+	    return scheduler(boundArgs ? function () {
+	      // eslint-disable-next-line no-new-func
+	      (typeof handler == 'function' ? handler : Function(handler)).apply(this, args);
+	    } : handler, timeout);
 	  };
 	};
-
-	var _hide = _descriptors ? function (object, key, value) {
-	  return _objectDp.f(object, key, _propertyDesc(1, value));
-	} : function (object, key, value) {
-	  object[key] = value;
-	  return object;
-	};
-
-	var hasOwnProperty$1 = {}.hasOwnProperty;
-	var _has = function (it, key) {
-	  return hasOwnProperty$1.call(it, key);
-	};
-
-	var id$1 = 0;
-	var px = Math.random();
-	var _uid = function (key) {
-	  return 'Symbol('.concat(key === undefined ? '' : key, ')_', (++id$1 + px).toString(36));
-	};
-
-	var _redefine = createCommonjsModule(function (module) {
-	var SRC = _uid('src');
-	var TO_STRING = 'toString';
-	var $toString = Function[TO_STRING];
-	var TPL = ('' + $toString).split(TO_STRING);
-
-	_core.inspectSource = function (it) {
-	  return $toString.call(it);
-	};
-
-	(module.exports = function (O, key, val, safe) {
-	  var isFunction = typeof val == 'function';
-	  if (isFunction) _has(val, 'name') || _hide(val, 'name', key);
-	  if (O[key] === val) return;
-	  if (isFunction) _has(val, SRC) || _hide(val, SRC, O[key] ? '' + O[key] : TPL.join(String(key)));
-	  if (O === _global) {
-	    O[key] = val;
-	  } else if (!safe) {
-	    delete O[key];
-	    _hide(O, key, val);
-	  } else if (O[key]) {
-	    O[key] = val;
-	  } else {
-	    _hide(O, key, val);
-	  }
-	// add fake Function#toString for correct work wrapped methods / constructors with methods like LoDash isNative
-	})(Function.prototype, TO_STRING, function toString() {
-	  return typeof this == 'function' && this[SRC] || $toString.call(this);
-	});
-	});
-
-	var _aFunction = function (it) {
-	  if (typeof it != 'function') throw TypeError(it + ' is not a function!');
-	  return it;
-	};
-
-	// optional / simple context binding
-
-	var _ctx = function (fn, that, length) {
-	  _aFunction(fn);
-	  if (that === undefined) return fn;
-	  switch (length) {
-	    case 1: return function (a) {
-	      return fn.call(that, a);
-	    };
-	    case 2: return function (a, b) {
-	      return fn.call(that, a, b);
-	    };
-	    case 3: return function (a, b, c) {
-	      return fn.call(that, a, b, c);
-	    };
-	  }
-	  return function (/* ...args */) {
-	    return fn.apply(that, arguments);
-	  };
-	};
-
-	var PROTOTYPE = 'prototype';
-
-	var $export = function (type, name, source) {
-	  var IS_FORCED = type & $export.F;
-	  var IS_GLOBAL = type & $export.G;
-	  var IS_STATIC = type & $export.S;
-	  var IS_PROTO = type & $export.P;
-	  var IS_BIND = type & $export.B;
-	  var target = IS_GLOBAL ? _global : IS_STATIC ? _global[name] || (_global[name] = {}) : (_global[name] || {})[PROTOTYPE];
-	  var exports = IS_GLOBAL ? _core : _core[name] || (_core[name] = {});
-	  var expProto = exports[PROTOTYPE] || (exports[PROTOTYPE] = {});
-	  var key, own, out, exp;
-	  if (IS_GLOBAL) source = name;
-	  for (key in source) {
-	    // contains in native
-	    own = !IS_FORCED && target && target[key] !== undefined;
-	    // export native or passed
-	    out = (own ? target : source)[key];
-	    // bind timers to global for call from export context
-	    exp = IS_BIND && own ? _ctx(out, _global) : IS_PROTO && typeof out == 'function' ? _ctx(Function.call, out) : out;
-	    // extend global
-	    if (target) _redefine(target, key, out, type & $export.U);
-	    // export
-	    if (exports[key] != out) _hide(exports, key, exp);
-	    if (IS_PROTO && expProto[key] != out) expProto[key] = out;
-	  }
-	};
-	_global.core = _core;
-	// type bitmap
-	$export.F = 1;   // forced
-	$export.G = 2;   // global
-	$export.S = 4;   // static
-	$export.P = 8;   // proto
-	$export.B = 16;  // bind
-	$export.W = 32;  // wrap
-	$export.U = 64;  // safe
-	$export.R = 128; // real proto method for `library`
-	var _export$1 = $export;
-
-	var navigator = _global.navigator;
-
-	var _userAgent = navigator && navigator.userAgent || '';
 
 	// ie9- setTimeout & setInterval additional parameters fix
-
-
-
-	var slice = [].slice;
-	var MSIE = /MSIE .\./.test(_userAgent); // <- dirty ie9- check
-	var wrap = function (set) {
-	  return function (fn, time /* , ...args */) {
-	    var boundArgs = arguments.length > 2;
-	    var args = boundArgs ? slice.call(arguments, 2) : false;
-	    return set(boundArgs ? function () {
-	      // eslint-disable-next-line no-new-func
-	      (typeof fn == 'function' ? fn : Function(fn)).apply(this, args);
-	    } : fn, time);
-	  };
-	};
-	_export$1(_export$1.G + _export$1.B + _export$1.F * MSIE, {
-	  setTimeout: wrap(_global.setTimeout),
-	  setInterval: wrap(_global.setInterval)
+	// https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timers
+	_export({ global: true, bind: true, forced: MSIE }, {
+	  // `setTimeout` method
+	  // https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#dom-settimeout
+	  setTimeout: wrap(global_1.setTimeout),
+	  // `setInterval` method
+	  // https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#dom-setinterval
+	  setInterval: wrap(global_1.setInterval)
 	});
 
 	// `IsArray` abstract operation
@@ -1648,7 +1446,7 @@
 
 	var GT = '>';
 	var LT = '<';
-	var PROTOTYPE$1 = 'prototype';
+	var PROTOTYPE = 'prototype';
 	var SCRIPT = 'script';
 	var IE_PROTO = sharedKey('IE_PROTO');
 
@@ -1697,7 +1495,7 @@
 	  } catch (error) { /* ignore */ }
 	  NullProtoObject = activeXDocument ? NullProtoObjectViaActiveX(activeXDocument) : NullProtoObjectViaIFrame();
 	  var length = enumBugKeys.length;
-	  while (length--) delete NullProtoObject[PROTOTYPE$1][enumBugKeys[length]];
+	  while (length--) delete NullProtoObject[PROTOTYPE][enumBugKeys[length]];
 	  return NullProtoObject();
 	};
 
@@ -1708,9 +1506,9 @@
 	var objectCreate = Object.create || function create(O, Properties) {
 	  var result;
 	  if (O !== null) {
-	    EmptyConstructor[PROTOTYPE$1] = anObject(O);
+	    EmptyConstructor[PROTOTYPE] = anObject(O);
 	    result = new EmptyConstructor();
-	    EmptyConstructor[PROTOTYPE$1] = null;
+	    EmptyConstructor[PROTOTYPE] = null;
 	    // add "__proto__" for Object.getPrototypeOf polyfill
 	    result[IE_PROTO] = O;
 	  } else result = NullProtoObject();
@@ -1733,20 +1531,20 @@
 	};
 
 	// fallback for IE11 buggy Object.getOwnPropertyNames with iframe and window
-	var f$7 = function getOwnPropertyNames(it) {
+	var f$6 = function getOwnPropertyNames(it) {
 	  return windowNames && toString$1.call(it) == '[object Window]'
 	    ? getWindowNames(it)
 	    : nativeGetOwnPropertyNames(toIndexedObject(it));
 	};
 
 	var objectGetOwnPropertyNamesExternal = {
-		f: f$7
+		f: f$6
 	};
 
-	var f$8 = wellKnownSymbol;
+	var f$7 = wellKnownSymbol;
 
 	var wellKnownSymbolWrapped = {
-		f: f$8
+		f: f$7
 	};
 
 	var defineProperty$1 = objectDefineProperty.f;
@@ -1839,11 +1637,11 @@
 
 	var HIDDEN = sharedKey('hidden');
 	var SYMBOL = 'Symbol';
-	var PROTOTYPE$2 = 'prototype';
+	var PROTOTYPE$1 = 'prototype';
 	var TO_PRIMITIVE = wellKnownSymbol('toPrimitive');
 	var setInternalState$1 = internalState.set;
 	var getInternalState$1 = internalState.getterFor(SYMBOL);
-	var ObjectPrototype = Object[PROTOTYPE$2];
+	var ObjectPrototype = Object[PROTOTYPE$1];
 	var $Symbol = global_1.Symbol;
 	var $stringify = getBuiltIn('JSON', 'stringify');
 	var nativeGetOwnPropertyDescriptor$1 = objectGetOwnPropertyDescriptor.f;
@@ -1857,7 +1655,7 @@
 	var WellKnownSymbolsStore$1 = shared('wks');
 	var QObject = global_1.QObject;
 	// Don't use setters in Qt Script, https://github.com/zloirock/core-js/issues/173
-	var USE_SETTER = !QObject || !QObject[PROTOTYPE$2] || !QObject[PROTOTYPE$2].findChild;
+	var USE_SETTER = !QObject || !QObject[PROTOTYPE$1] || !QObject[PROTOTYPE$1].findChild;
 
 	// fallback for old Android, https://code.google.com/p/v8/issues/detail?id=687
 	var setSymbolDescriptor = descriptors && fails(function () {
@@ -1874,7 +1672,7 @@
 	} : nativeDefineProperty$1;
 
 	var wrap$1 = function (tag, description) {
-	  var symbol = AllSymbols[tag] = objectCreate($Symbol[PROTOTYPE$2]);
+	  var symbol = AllSymbols[tag] = objectCreate($Symbol[PROTOTYPE$1]);
 	  setInternalState$1(symbol, {
 	    type: SYMBOL,
 	    tag: tag,
@@ -1975,7 +1773,7 @@
 	    return wrap$1(tag, description);
 	  };
 
-	  redefine($Symbol[PROTOTYPE$2], 'toString', function toString() {
+	  redefine($Symbol[PROTOTYPE$1], 'toString', function toString() {
 	    return getInternalState$1(this).tag;
 	  });
 
@@ -1995,7 +1793,7 @@
 
 	  if (descriptors) {
 	    // https://github.com/tc39/proposal-Symbol-description
-	    nativeDefineProperty$1($Symbol[PROTOTYPE$2], 'description', {
+	    nativeDefineProperty$1($Symbol[PROTOTYPE$1], 'description', {
 	      configurable: true,
 	      get: function description() {
 	        return getInternalState$1(this).description;
@@ -2102,8 +1900,8 @@
 
 	// `Symbol.prototype[@@toPrimitive]` method
 	// https://tc39.github.io/ecma262/#sec-symbol.prototype-@@toprimitive
-	if (!$Symbol[PROTOTYPE$2][TO_PRIMITIVE]) {
-	  createNonEnumerableProperty($Symbol[PROTOTYPE$2], TO_PRIMITIVE, $Symbol[PROTOTYPE$2].valueOf);
+	if (!$Symbol[PROTOTYPE$1][TO_PRIMITIVE]) {
+	  createNonEnumerableProperty($Symbol[PROTOTYPE$1], TO_PRIMITIVE, $Symbol[PROTOTYPE$1].valueOf);
 	}
 	// `Symbol.prototype[@@toStringTag]` property
 	// https://tc39.github.io/ecma262/#sec-symbol.prototype-@@tostringtag
@@ -2904,8 +2702,24 @@
 	  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
 	}
 
+	function _toConsumableArray(arr) {
+	  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
+	}
+
+	function _arrayWithoutHoles(arr) {
+	  if (Array.isArray(arr)) {
+	    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
+
+	    return arr2;
+	  }
+	}
+
 	function _arrayWithHoles(arr) {
 	  if (Array.isArray(arr)) return arr;
+	}
+
+	function _iterableToArray(iter) {
+	  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
 	}
 
 	function _iterableToArrayLimit(arr, i) {
@@ -2934,18 +2748,22 @@
 	  return _arr;
 	}
 
+	function _nonIterableSpread() {
+	  throw new TypeError("Invalid attempt to spread non-iterable instance");
+	}
+
 	function _nonIterableRest() {
 	  throw new TypeError("Invalid attempt to destructure non-iterable instance");
 	}
 
-	var runtime = createCommonjsModule(function (module) {
+	var runtime_1 = createCommonjsModule(function (module) {
 	  /**
 	   * Copyright (c) 2014-present, Facebook, Inc.
 	   *
 	   * This source code is licensed under the MIT license found in the
 	   * LICENSE file in the root directory of this source tree.
 	   */
-	  !function (global) {
+	  var runtime = function (exports) {
 
 	    var Op = Object.prototype;
 	    var hasOwn = Op.hasOwnProperty;
@@ -2955,23 +2773,6 @@
 	    var iteratorSymbol = $Symbol.iterator || "@@iterator";
 	    var asyncIteratorSymbol = $Symbol.asyncIterator || "@@asyncIterator";
 	    var toStringTagSymbol = $Symbol.toStringTag || "@@toStringTag";
-	    var runtime = global.regeneratorRuntime;
-
-	    if (runtime) {
-	      {
-	        // If regeneratorRuntime is defined globally and we're in a module,
-	        // make the exports object identical to regeneratorRuntime.
-	        module.exports = runtime;
-	      } // Don't bother evaluating the rest of this file if the runtime was
-	      // already defined globally.
-
-
-	      return;
-	    } // Define the runtime globally (as expected by generated code) as either
-	    // module.exports (if we're in a module) or a new, empty object.
-
-
-	    runtime = global.regeneratorRuntime = module.exports;
 
 	    function wrap(innerFn, outerFn, self, tryLocsList) {
 	      // If outerFn provided and outerFn.prototype is a Generator, then outerFn.prototype instanceof Generator.
@@ -2984,7 +2785,7 @@
 	      return generator;
 	    }
 
-	    runtime.wrap = wrap; // Try/catch helper to minimize deoptimizations. Returns a completion
+	    exports.wrap = wrap; // Try/catch helper to minimize deoptimizations. Returns a completion
 	    // record like context.tryEntries[i].completion. This interface could
 	    // have been (and was previously) designed to take a closure to be
 	    // invoked without arguments, but in all the cases we care about we
@@ -3057,14 +2858,14 @@
 	      });
 	    }
 
-	    runtime.isGeneratorFunction = function (genFun) {
+	    exports.isGeneratorFunction = function (genFun) {
 	      var ctor = typeof genFun === "function" && genFun.constructor;
 	      return ctor ? ctor === GeneratorFunction || // For the native GeneratorFunction constructor, the best we can
 	      // do is to check its .name property.
 	      (ctor.displayName || ctor.name) === "GeneratorFunction" : false;
 	    };
 
-	    runtime.mark = function (genFun) {
+	    exports.mark = function (genFun) {
 	      if (Object.setPrototypeOf) {
 	        Object.setPrototypeOf(genFun, GeneratorFunctionPrototype);
 	      } else {
@@ -3083,13 +2884,13 @@
 	    // meant to be awaited.
 
 
-	    runtime.awrap = function (arg) {
+	    exports.awrap = function (arg) {
 	      return {
 	        __await: arg
 	      };
 	    };
 
-	    function AsyncIterator(generator) {
+	    function AsyncIterator(generator, PromiseImpl) {
 	      function invoke(method, arg, resolve, reject) {
 	        var record = tryCatch(generator[method], generator, arg);
 
@@ -3100,14 +2901,14 @@
 	          var value = result.value;
 
 	          if (value && _typeof(value) === "object" && hasOwn.call(value, "__await")) {
-	            return Promise.resolve(value.__await).then(function (value) {
+	            return PromiseImpl.resolve(value.__await).then(function (value) {
 	              invoke("next", value, resolve, reject);
 	            }, function (err) {
 	              invoke("throw", err, resolve, reject);
 	            });
 	          }
 
-	          return Promise.resolve(value).then(function (unwrapped) {
+	          return PromiseImpl.resolve(value).then(function (unwrapped) {
 	            // When a yielded Promise is resolved, its final value becomes
 	            // the .value of the Promise<{value,done}> result for the
 	            // current iteration.
@@ -3125,7 +2926,7 @@
 
 	      function enqueue(method, arg) {
 	        function callInvokeWithMethodAndArg() {
-	          return new Promise(function (resolve, reject) {
+	          return new PromiseImpl(function (resolve, reject) {
 	            invoke(method, arg, resolve, reject);
 	          });
 	        }
@@ -3158,13 +2959,14 @@
 	      return this;
 	    };
 
-	    runtime.AsyncIterator = AsyncIterator; // Note that simple async functions are implemented on top of
+	    exports.AsyncIterator = AsyncIterator; // Note that simple async functions are implemented on top of
 	    // AsyncIterator objects; they just return a Promise for the value of
 	    // the final result produced by the iterator.
 
-	    runtime.async = function (innerFn, outerFn, self, tryLocsList) {
-	      var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList));
-	      return runtime.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
+	    exports.async = function (innerFn, outerFn, self, tryLocsList, PromiseImpl) {
+	      if (PromiseImpl === void 0) PromiseImpl = Promise;
+	      var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList), PromiseImpl);
+	      return exports.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
 	      : iter.next().then(function (result) {
 	        return result.done ? result.value : iter.next();
 	      });
@@ -3257,6 +3059,7 @@
 	        context.delegate = null;
 
 	        if (context.method === "throw") {
+	          // Note: ["return"] must be used for ES3 parsing compatibility.
 	          if (delegate.iterator["return"]) {
 	            // If the delegate iterator has a return method, give it a
 	            // chance to clean up.
@@ -3375,7 +3178,7 @@
 	      this.reset(true);
 	    }
 
-	    runtime.keys = function (object) {
+	    exports.keys = function (object) {
 	      var keys = [];
 
 	      for (var key in object) {
@@ -3442,7 +3245,7 @@
 	      };
 	    }
 
-	    runtime.values = values;
+	    exports.values = values;
 
 	    function doneResult() {
 	      return {
@@ -3633,13 +3436,32 @@
 
 	        return ContinueSentinel;
 	      }
-	    };
-	  }( // In sloppy mode, unbound `this` refers to the global object, fallback to
-	  // Function constructor if we're in global strict mode. That is sadly a form
-	  // of indirect eval which violates Content Security Policy.
-	  function () {
-	    return this || (typeof self === "undefined" ? "undefined" : _typeof(self)) === "object" && self;
-	  }() || Function("return this")());
+	    }; // Regardless of whether this script is executing as a CommonJS module
+	    // or not, return the runtime object so that we can declare the variable
+	    // regeneratorRuntime in the outer scope, which allows this module to be
+	    // injected easily by `bin/regenerator --include-runtime script.js`.
+
+	    return exports;
+	  }( // If this script is executing as a CommonJS module, use module.exports
+	  // as the regeneratorRuntime namespace. Otherwise create a new empty
+	  // object. Either way, the resulting object will be used to initialize
+	  // the regeneratorRuntime variable at the top of this file.
+	  module.exports);
+
+	  try {
+	    regeneratorRuntime = runtime;
+	  } catch (accidentalStrictMode) {
+	    // This module should not be running in strict mode, so the above
+	    // assignment should always work unless something is misconfigured. Just
+	    // in case runtime.js accidentally runs in strict mode, we can escape
+	    // strict mode using a global Function call. This could conceivably fail
+	    // if a Content Security Policy forbids using Function, but in that case
+	    // the proper solution is to fix the accidental strict mode problem. If
+	    // you've misconfigured your bundler to force strict mode and applied a
+	    // CSP to forbid Function, and you're not willing to fix either of those
+	    // problems, please detail your unique predicament in a GitHub issue.
+	    Function("r", "regeneratorRuntime = r")(runtime);
+	  }
 	});
 
 	var arrayBufferNative = typeof ArrayBuffer !== 'undefined' && typeof DataView !== 'undefined';
@@ -3766,13 +3588,13 @@
 	var setInternalState$4 = internalState.set;
 	var ARRAY_BUFFER = 'ArrayBuffer';
 	var DATA_VIEW = 'DataView';
-	var PROTOTYPE$3 = 'prototype';
+	var PROTOTYPE$2 = 'prototype';
 	var WRONG_LENGTH = 'Wrong length';
 	var WRONG_INDEX = 'Wrong index';
 	var NativeArrayBuffer = global_1[ARRAY_BUFFER];
 	var $ArrayBuffer = NativeArrayBuffer;
 	var $DataView = global_1[DATA_VIEW];
-	var $DataViewPrototype = $DataView && $DataView[PROTOTYPE$3];
+	var $DataViewPrototype = $DataView && $DataView[PROTOTYPE$2];
 	var ObjectPrototype$2 = Object.prototype;
 	var RangeError$1 = global_1.RangeError;
 
@@ -3804,7 +3626,7 @@
 	};
 
 	var addGetter = function (Constructor, key) {
-	  defineProperty$5(Constructor[PROTOTYPE$3], key, { get: function () { return getInternalState$4(this)[key]; } });
+	  defineProperty$5(Constructor[PROTOTYPE$2], key, { get: function () { return getInternalState$4(this)[key]; } });
 	};
 
 	var get$1 = function (view, count, index, isLittleEndian) {
@@ -3865,7 +3687,7 @@
 	    addGetter($DataView, 'byteOffset');
 	  }
 
-	  redefineAll($DataView[PROTOTYPE$3], {
+	  redefineAll($DataView[PROTOTYPE$2], {
 	    getInt8: function getInt8(byteOffset) {
 	      return get$1(this, 1, byteOffset)[0] << 24 >> 24;
 	    },
@@ -3932,7 +3754,7 @@
 	      anInstance(this, $ArrayBuffer);
 	      return new NativeArrayBuffer(toIndex(length));
 	    };
-	    var ArrayBufferPrototype = $ArrayBuffer[PROTOTYPE$3] = NativeArrayBuffer[PROTOTYPE$3];
+	    var ArrayBufferPrototype = $ArrayBuffer[PROTOTYPE$2] = NativeArrayBuffer[PROTOTYPE$2];
 	    for (var keys$1 = getOwnPropertyNames(NativeArrayBuffer), j = 0, key; keys$1.length > j;) {
 	      if (!((key = keys$1[j++]) in $ArrayBuffer)) {
 	        createNonEnumerableProperty($ArrayBuffer, key, NativeArrayBuffer[key]);
@@ -5393,6 +5215,46 @@
 	  }
 	});
 
+	var propertyIsEnumerable = objectPropertyIsEnumerable.f;
+
+	// `Object.{ entries, values }` methods implementation
+	var createMethod$5 = function (TO_ENTRIES) {
+	  return function (it) {
+	    var O = toIndexedObject(it);
+	    var keys = objectKeys(O);
+	    var length = keys.length;
+	    var i = 0;
+	    var result = [];
+	    var key;
+	    while (length > i) {
+	      key = keys[i++];
+	      if (!descriptors || propertyIsEnumerable.call(O, key)) {
+	        result.push(TO_ENTRIES ? [key, O[key]] : O[key]);
+	      }
+	    }
+	    return result;
+	  };
+	};
+
+	var objectToArray = {
+	  // `Object.entries` method
+	  // https://tc39.github.io/ecma262/#sec-object.entries
+	  entries: createMethod$5(true),
+	  // `Object.values` method
+	  // https://tc39.github.io/ecma262/#sec-object.values
+	  values: createMethod$5(false)
+	};
+
+	var $values = objectToArray.values;
+
+	// `Object.values` method
+	// https://tc39.github.io/ecma262/#sec-object.values
+	_export({ target: 'Object', stat: true }, {
+	  values: function values(O) {
+	    return $values(O);
+	  }
+	});
+
 	// babel-minify transpiles RegExp('a', 'y') -> /a/y and it causes SyntaxError,
 	// so we use an intermediate function.
 	function RE(s, f) {
@@ -5826,6 +5688,27 @@
 	    }
 	  ];
 	}, !SUPPORTS_Y);
+
+	var non = '\u200B\u0085\u180E';
+
+	// check that a method works with the correct list
+	// of whitespaces and has a correct name
+	var stringTrimForced = function (METHOD_NAME) {
+	  return fails(function () {
+	    return !!whitespaces[METHOD_NAME]() || non[METHOD_NAME]() != non || whitespaces[METHOD_NAME].name !== METHOD_NAME;
+	  });
+	};
+
+	var $trim = stringTrim.trim;
+
+
+	// `String.prototype.trim` method
+	// https://tc39.github.io/ecma262/#sec-string.prototype.trim
+	_export({ target: 'String', proto: true, forced: stringTrimForced('trim') }, {
+	  trim: function trim() {
+	    return $trim(this);
+	  }
+	});
 
 	/**
 	 * A function that always returns `false`. Any passed in parameters are ignored.
@@ -6532,7 +6415,7 @@
 	  return new XMap(f, xf);
 	});
 
-	function _has$1(prop, obj) {
+	function _has(prop, obj) {
 	  return Object.prototype.hasOwnProperty.call(obj, prop);
 	}
 
@@ -6544,7 +6427,7 @@
 	  return toString$2.call(arguments) === '[object Arguments]' ? function _isArguments(x) {
 	    return toString$2.call(x) === '[object Arguments]';
 	  } : function _isArguments(x) {
-	    return _has$1('callee', x);
+	    return _has('callee', x);
 	  };
 	}();
 
@@ -6612,7 +6495,7 @@
 	  var checkArgsLength = hasArgsEnumBug && _isArguments(obj);
 
 	  for (prop in obj) {
-	    if (_has$1(prop, obj) && (!checkArgsLength || prop !== 'length')) {
+	    if (_has(prop, obj) && (!checkArgsLength || prop !== 'length')) {
 	      ks[ks.length] = prop;
 	    }
 	  }
@@ -6623,7 +6506,7 @@
 	    while (nIdx >= 0) {
 	      prop = nonEnumerableProps[nIdx];
 
-	      if (_has$1(prop, obj) && !contains(ks, prop)) {
+	      if (_has(prop, obj) && !contains(ks, prop)) {
 	        ks[ks.length] = prop;
 	      }
 
@@ -7940,7 +7823,7 @@
 	  while (idx >= 0) {
 	    var key = keysA[idx];
 
-	    if (!(_has$1(key, b) && _equals(b[key], a[key], extendedStackA, extendedStackB))) {
+	    if (!(_has(key, b) && _equals(b[key], a[key], extendedStackA, extendedStackB))) {
 	      return false;
 	    }
 
@@ -8204,7 +8087,7 @@
 	var ceil$1 = Math.ceil;
 
 	// `String.prototype.{ padStart, padEnd }` methods implementation
-	var createMethod$5 = function (IS_END) {
+	var createMethod$6 = function (IS_END) {
 	  return function ($this, maxLength, fillString) {
 	    var S = String(requireObjectCoercible($this));
 	    var stringLength = S.length;
@@ -8222,10 +8105,10 @@
 	var stringPad = {
 	  // `String.prototype.padStart` method
 	  // https://tc39.github.io/ecma262/#sec-string.prototype.padstart
-	  start: createMethod$5(false),
+	  start: createMethod$6(false),
 	  // `String.prototype.padEnd` method
 	  // https://tc39.github.io/ecma262/#sec-string.prototype.padend
-	  end: createMethod$5(true)
+	  end: createMethod$6(true)
 	};
 
 	var padStart = stringPad.start;
@@ -8429,7 +8312,7 @@
 	  return result;
 	}
 
-	function _isObject$1(x) {
+	function _isObject(x) {
 	  return Object.prototype.toString.call(x) === '[object Object]';
 	}
 
@@ -8490,7 +8373,7 @@
 	_curry2(
 	/*#__PURE__*/
 	_dispatchable(['filter'], _xfilter, function (pred, filterable) {
-	  return _isObject$1(filterable) ? _reduce(function (acc, key) {
+	  return _isObject(filterable) ? _reduce(function (acc, key) {
 	    if (pred(filterable[key])) {
 	      acc[key] = filterable[key];
 	    }
@@ -8685,7 +8568,7 @@
 	    var key;
 
 	    for (key in this.inputs) {
-	      if (_has$1(key, this.inputs)) {
+	      if (_has(key, this.inputs)) {
 	        result = this.xf['@@transducer/step'](result, this.inputs[key]);
 
 	        if (result['@@transducer/reduced']) {
@@ -8764,7 +8647,7 @@
 	_dispatchable([], _xreduceBy, function reduceBy(valueFn, valueAcc, keyFn, list) {
 	  return _reduce(function (acc, elt) {
 	    var key = keyFn(elt);
-	    acc[key] = valueFn(_has$1(key, acc) ? acc[key] : _clone(valueAcc, [], [], false), elt);
+	    acc[key] = valueFn(_has(key, acc) ? acc[key] : _clone(valueAcc, [], [], false), elt);
 	    return acc;
 	  }, {}, list);
 	}));
@@ -10455,7 +10338,7 @@
 	  var pairs = [];
 
 	  for (var prop in obj) {
-	    if (_has$1(prop, obj)) {
+	    if (_has(prop, obj)) {
 	      pairs[pairs.length] = [prop, obj[prop]];
 	    }
 	  }
@@ -10535,27 +10418,6 @@
 	/*#__PURE__*/
 	curryN(4, function transduce(xf, fn, acc, list) {
 	  return _reduce(xf(typeof fn === 'function' ? _xwrap(fn) : fn), acc, list);
-	});
-
-	var non = '\u200B\u0085\u180E';
-
-	// check that a method works with the correct list
-	// of whitespaces and has a correct name
-	var stringTrimForced = function (METHOD_NAME) {
-	  return fails(function () {
-	    return !!whitespaces[METHOD_NAME]() || non[METHOD_NAME]() != non || whitespaces[METHOD_NAME].name !== METHOD_NAME;
-	  });
-	};
-
-	var $trim = stringTrim.trim;
-
-
-	// `String.prototype.trim` method
-	// https://tc39.github.io/ecma262/#sec-string.prototype.trim
-	_export({ target: 'String', proto: true, forced: stringTrimForced('trim') }, {
-	  trim: function trim() {
-	    return $trim(this);
-	  }
 	});
 
 	var ws = "\t\n\x0B\f\r \xA0\u1680\u180E\u2000\u2001\u2002\u2003" + "\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028" + "\u2029\uFEFF";
@@ -15988,11 +15850,50 @@
 	    this.parseDateMeasures = options.parseDateMeasures;
 	  }
 	  /**
-	   * Returns a measure drill down query
+	   * Returns a measure drill down query.
 	   *
-	   * @param drillDownLocator
-	   * @param pivotConfig - See {@link ResultSet#pivot}.
-	   * @returns {Object|null}
+	   * Provided you have a measure with the defined `drillMemebers` on the `Orders` cube
+	   *
+	   * ```js
+	   * measures: {
+	   *   count: {
+	   *     type: `count`,
+	   *     drillMembers: [Orders.status, Users.city, count],
+	   *   },
+	   *   // ...
+	   * }
+	   * ```
+	   *
+	   * Then you can use the `drillDown` method to see the rows that contribute to that metric
+	   *
+	   * ```js
+	   * resultSet.drillDown(
+	   *   {
+	   *     xValues,
+	   *     yValues,
+	   *   },
+	   *   // you should pass the `pivotConfig` if you have used it for axes manipulation
+	   *   pivotConfig
+	   * )
+	   * ```
+	   *
+	   * the result will be a query with the required filters applied and the dimensions/measures filled out
+	   * ```js
+	   *
+	   * {
+	   *   measures: ['Orders.count'],
+	   *   dimensions: ['Orders.status', 'Users.city'],
+	   *   filters: [
+	   *     // dimension and measure filters
+	   *   ],
+	   *   timeDimensions: [
+	   *     //...
+	   *   ]
+	   * }
+	   * ```
+	   * @param {Object} drillDownLocator - expects `{ xValues: [], yValues: [] }` object.
+	   * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
+	   * @returns {Object|null} Drill down query
 	   */
 
 
@@ -16295,29 +16196,31 @@
 	     *   {
 	     *     xValues: ["2015-01-01T00:00:00"],
 	     *     yValuesArray: [
-	     *       ['Stories.count', 27120]
+	     *       [['Stories.count'], 27120]
 	     *     ]
 	     *   },
 	     *   {
 	     *     xValues: ["2015-02-01T00:00:00"],
 	     *     yValuesArray: [
-	     *       ['Stories.count', 25861]
+	     *       [['Stories.count'], 25861]
 	     *     ]
 	     *   },
 	     *   {
 	     *     xValues: ["2015-03-01T00:00:00"],
 	     *     yValuesArray: [
-	     *       ['Stories.count', 29661]
+	     *       [['Stories.count'], 29661]
 	     *     ]
 	     *   }
 	     * ]
 	     * ```
-	     * @param [pivotConfig] - Configuration object that contains information about pivot axes and other options
-	     * @param {Array} pivotConfig.x - dimensions to put on **x** or **rows** axis. Put `measures` at the end of array here
-	     * to show measures in rows instead of columns.
-	     * @param {Array} pivotConfig.y - dimensions to put on **y** or **columns** axis.
-	     * @param {Boolean} [pivotConfig.fillMissingDates=true] - if `true` missing dates on time dimensions will be filled
-	     * with `0` for all measures.
+	     * @typedef {Object} PivotConfig
+	     * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
+	     * Put `measures` at the end of array here
+	     * @property {Array<string>} y Dimensions to put on **y** or **columns** axis.
+	     * @property {Boolean} [fillMissingDates=true] If `true` missing dates on time dimensions
+	     *  will be filled with `0` for all measures.
+	     * @param {PivotConfig} [pivotConfig] Configuration object that contains information
+	     * about pivot axes and other options
 	     * @returns {Array} of pivoted rows.
 	     */
 
@@ -16452,7 +16355,7 @@
 	     *   //...
 	     * ]
 	     * ```
-	     * @param pivotConfig - See {@link ResultSet#pivot}.
+	     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
 	     */
 
 	  }, {
@@ -16513,7 +16416,71 @@
 	     *   //...
 	     * ]
 	     * ```
-	     * @param pivotConfig - See {@link ResultSet#pivot}
+	     *
+	     * Now let's make use of `pivotConfig` and put the `Users.gender` dimension on    * **y** axis.
+	     *
+	     * ```js
+	     * // For example the query is
+	     * {
+	     *   measures: ['Orders.count'],
+	     *   dimensions: ['Users.country', 'Users.gender']
+	     * }
+	     *
+	     * resultSet.tablePivot({
+	     *   x: ['Users.country'],
+	     *   y: ['Users.gender', 'measures']
+	     * })
+	     *
+	     * // then `tablePivot` will return the rows in the following format
+	     * [
+	     *   {
+	     *     'Users.country': 'Australia',
+	     *     'female.Orders.count': 3
+	     *     'male.Orders.count': 27
+	     *   },
+	     *   // ...
+	     * ]
+	     * ```
+	     *
+	     * The resulting table will look like this
+	     *
+	     * | Users Country | male | female |
+	     * | ------------- | ---- | ------ |
+	     * | Australia     | 3    | 27     |
+	     * | Germany       | 10   | 12     |
+	     * | US            | 5    | 7      |
+	     *
+	     * If we put the `Users.country` dimension on **y** axis instead
+	     *
+	     * ```js
+	     * resultSet.tablePivot({
+	     *   x: ['Users.gender'],
+	     *   y: ['Users.country', 'measures'],
+	     * });
+	     * ```
+	     *
+	     * the table will look like
+	     *
+	     * | Users Gender | Australia | Germany | US  |
+	     * | ------------ | --------- | ------- | --- |
+	     * | male         | 3         | 10      | 5   |
+	     * | female       | 27        | 12      | 7   |
+	     *
+	     * It's also possible to put the `measures` on **x** axis
+	     *
+	     * ```js
+	     * resultSet.tablePivot({
+	     *   x: ['Users.gender', 'measures'],
+	     *   y: ['Users.country'],
+	     * });
+	     * ```
+	     *
+	     * | Users Gender | measures     | Australia | Germany | US  |
+	     * | ------------ | ------------ | --------- | ------- | --- |
+	     * | male         | Orders.count | 3         | 10      | 5   |
+	     * | female       | Orders.count | 27        | 12      | 7   |
+	     *
+	     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}
 	     * @returns {Array} of pivoted rows
 	     */
 
@@ -16521,27 +16488,18 @@
 	    key: "tablePivot",
 	    value: function tablePivot(pivotConfig) {
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
+	      return this.pivot(normalizedPivotConfig).map(function (_ref27) {
+	        var xValues = _ref27.xValues,
+	            yValuesArray = _ref27.yValuesArray;
+	        return fromPairs(normalizedPivotConfig.x.map(function (key, index) {
+	          return [key, xValues[index]];
+	        }).concat(yValuesArray[0][0].length && yValuesArray.map(function (_ref28) {
+	          var _ref29 = _slicedToArray(_ref28, 2),
+	              yValues = _ref29[0],
+	              measure = _ref29[1];
 
-	      var valueToObject = function valueToObject(valuesArray, measureValue) {
-	        return function (field, index) {
-	          return _defineProperty({}, field === 'measures' ? valuesArray[index] : field, field === 'measures' ? measureValue : valuesArray[index]);
-	        };
-	      };
-
-	      return this.pivot(normalizedPivotConfig).map(function (_ref28) {
-	        var xValues = _ref28.xValues,
-	            yValuesArray = _ref28.yValuesArray;
-	        return yValuesArray.map(function (_ref29) {
-	          var _ref30 = _slicedToArray(_ref29, 2),
-	              yValues = _ref30[0],
-	              m = _ref30[1];
-
-	          return normalizedPivotConfig.x.map(valueToObject(xValues, m)).concat(normalizedPivotConfig.y.map(valueToObject(yValues, m))).reduce(function (a, b) {
-	            return Object.assign(a, b);
-	          }, {});
-	        }).reduce(function (a, b) {
-	          return Object.assign(a, b);
-	        }, {});
+	          return [yValues.join('.'), measure];
+	        }) || []));
 	      });
 	    }
 	    /**
@@ -16550,7 +16508,7 @@
 	     * For example
 	     *
 	     * ```js
-	     * // For query
+	     * // For the query
 	     * {
 	     *   measures: ['Stories.count'],
 	     *   timeDimensions: [{
@@ -16562,11 +16520,84 @@
 	     *
 	     * // ResultSet.tableColumns() will return
 	     * [
-	     *   { key: "Stories.time", title: "Stories Time", shortTitle: "Time", type: "time", format: undefined },
-	     *   { key: "Stories.count", title: "Stories Count", shortTitle: "Count", type: "count", format: undefined },
+	     *   {
+	     *     key: 'Stories.time',
+	     *     dataIndex: 'Stories.time',
+	     *     title: 'Stories Time',
+	     *     shortTitle: 'Time',
+	     *     type: 'time',
+	     *     format: undefined,
+	     *   },
+	     *   {
+	     *     key: 'Stories.count',
+	     *     dataIndex: 'Stories.count',
+	     *     title: 'Stories Count',
+	     *     shortTitle: 'Count',
+	     *     type: 'count',
+	     *     format: undefined,
+	     *   },
 	     *   //...
 	     * ]
 	     * ```
+	     *
+	     * In case we want to pivot the table
+	     *
+	     * ```js
+	     * // Let's take this query as an example
+	     * {
+	     *   measures: ['Orders.count'],
+	     *   dimensions: ['Users.country', 'Users.gender']
+	     * }
+	     *
+	     * // and put the dimensions on `y` axis
+	     * resultSet.tableColumns({
+	     *   x: [],
+	     *   y: ['Users.country', 'Users.gender', 'measures']
+	     * })
+	     * ```
+	     *
+	     * then `tableColumns` will group the table head and return
+	     *
+	     * ```js
+	     * {
+	     *   key: 'Germany',
+	     *   type: 'string',
+	     *   title: 'Users Country Germany',
+	     *   shortTitle: 'Germany',
+	     *   meta: undefined,
+	     *   format: undefined,
+	     *   children: [
+	     *     {
+	     *       key: 'male',
+	     *       type: 'string',
+	     *       title: 'Users Gender male',
+	     *       shortTitle: 'male',
+	     *       meta: undefined,
+	     *       format: undefined,
+	     *       children: [
+	     *         {
+	     *           // ...
+	     *           dataIndex: 'Germany.male.Orders.count',
+	     *           shortTitle: 'Count',
+	     *         },
+	     *       ],
+	     *     },
+	     *     {
+	     *       // ...
+	     *       shortTitle: 'female',
+	     *       children: [
+	     *         {
+	     *           // ...
+	     *           dataIndex: 'Germany.female.Orders.count',
+	     *           shortTitle: 'Count',
+	     *         },
+	     *       ],
+	     *     },
+	     *   ],
+	     * },
+	     * // ...
+	     * ```
+	     *
 	     * @param pivotConfig - See {@link ResultSet#pivot}.
 	     * @returns {Array} of columns
 	     */
@@ -16577,36 +16608,99 @@
 	      var _this4 = this;
 
 	      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+	      var schema = {};
 
-	      var column = function column(field) {
-	        var exractFields = function exractFields() {
-	          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-	          var title = annotation.title,
-	              shortTitle = annotation.shortTitle,
-	              format = annotation.format,
-	              type$$1 = annotation.type,
-	              meta = annotation.meta;
-	          return {
-	            title: title,
-	            shortTitle: shortTitle,
-	            format: format,
-	            type: type$$1,
-	            meta: meta
-	          };
+	      var extractFields = function extractFields(key) {
+	        var flatMeta = Object.values(_this4.loadResponse.annotation).reduce(function (a, b) {
+	          return _objectSpread({}, a, {}, b);
+	        }, {});
+	        var _flatMeta$key = flatMeta[key],
+	            title = _flatMeta$key.title,
+	            shortTitle = _flatMeta$key.shortTitle,
+	            type$$1 = _flatMeta$key.type,
+	            format = _flatMeta$key.format,
+	            meta = _flatMeta$key.meta;
+	        return {
+	          key: key,
+	          title: title,
+	          shortTitle: shortTitle,
+	          type: type$$1,
+	          format: format,
+	          meta: meta
 	        };
-
-	        return field === 'measures' ? (_this4.query().measures || []).map(function (key) {
-	          return _objectSpread({
-	            key: key
-	          }, exractFields(_this4.loadResponse.annotation.measures[key]));
-	        }) : [_objectSpread({
-	          key: field
-	        }, exractFields(_this4.loadResponse.annotation.dimensions[field] || _this4.loadResponse.annotation.timeDimensions[field]))];
 	      };
 
-	      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
-	        return a.concat(b);
+	      this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref30) {
+	        var _ref31 = _slicedToArray(_ref30, 1),
+	            yValues = _ref31[0];
+
+	        if (yValues.length > 0) {
+	          var currentItem = schema;
+	          yValues.forEach(function (value, index) {
+	            currentItem[value] = {
+	              key: value,
+	              memberId: normalizedPivotConfig.y[index] === 'measures' ? value : normalizedPivotConfig.y[index],
+	              children: currentItem[value] && currentItem[value].children || {}
+	            };
+	            currentItem = currentItem[value].children;
+	          });
+	        }
 	      });
+
+	      var toColumns = function toColumns() {
+	        var item = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+	        var path = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+
+	        if (Object.keys(item).length === 0) {
+	          return [];
+	        }
+
+	        return Object.values(item).map(function (_ref32) {
+	          var key = _ref32.key,
+	              currentItem = _objectWithoutProperties(_ref32, ["key"]);
+
+	          var children = toColumns(currentItem.children, [].concat(_toConsumableArray(path), [key]));
+
+	          var _extractFields = extractFields(currentItem.memberId),
+	              title = _extractFields.title,
+	              shortTitle = _extractFields.shortTitle,
+	              fields = _objectWithoutProperties(_extractFields, ["title", "shortTitle"]);
+
+	          var dimensionValue = key !== currentItem.memberId ? key : '';
+
+	          if (!children.length) {
+	            return _objectSpread({}, fields, {
+	              key: key,
+	              dataIndex: [].concat(_toConsumableArray(path), [key]).join('.'),
+	              title: [title, dimensionValue].join(' ').trim(),
+	              shortTitle: dimensionValue || shortTitle
+	            });
+	          }
+
+	          return _objectSpread({}, fields, {
+	            key: key,
+	            title: [title, dimensionValue].join(' ').trim(),
+	            shortTitle: dimensionValue || shortTitle,
+	            children: children
+	          });
+	        });
+	      };
+
+	      return normalizedPivotConfig.x.map(function (key) {
+	        if (key === 'measures') {
+	          return {
+	            key: 'measures',
+	            dataIndex: 'measures',
+	            title: 'Measures',
+	            shortTitle: 'Measures',
+	            type: 'string'
+	          };
+	        }
+
+	        return _objectSpread({}, extractFields(key), {
+	          dataIndex: key
+	        });
+	      }).concat(toColumns(schema));
 	    }
 	  }, {
 	    key: "totalRow",
@@ -16638,7 +16732,7 @@
 	     * { "key":"Stories.count", "title": "Stories Count" }
 	     * ]
 	     * ```
-	     * @param pivotConfig - See {@link ResultSet#pivot}.
+	     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
 	     * @returns {Array} of series names
 	     */
 
@@ -20015,7 +20109,7 @@
 	      var _this2 = this;
 
 	      return this.loadMethod(function () {
-	        return _this2.request("load", {
+	        return _this2.request('load', {
 	          query: query
 	        });
 	      }, function (body) {
@@ -20038,7 +20132,7 @@
 	      var _this3 = this;
 
 	      return this.loadMethod(function () {
-	        return _this3.request("sql", {
+	        return _this3.request('sql', {
 	          query: query
 	        });
 	      }, function (body) {
@@ -20058,7 +20152,7 @@
 	      var _this4 = this;
 
 	      return this.loadMethod(function () {
-	        return _this4.request("meta");
+	        return _this4.request('meta');
 	      }, function (body) {
 	        return new Meta(body);
 	      }, options, callback);
@@ -20069,7 +20163,7 @@
 	      var _this5 = this;
 
 	      return this.loadMethod(function () {
-	        return _this5.request("subscribe", {
+	        return _this5.request('subscribe', {
 	          query: query
 	        });
 	      }, function (body) {
