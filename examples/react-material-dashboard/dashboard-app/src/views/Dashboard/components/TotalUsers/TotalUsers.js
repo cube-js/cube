@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
 import { CardContent, Grid, Typography } from '@material-ui/core';
-import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import { QueryRenderer } from "@cubejs-client/react";
 import CountUp from 'react-countup';
 import CustomCard from "../../../../components/CustomCard";
@@ -18,11 +17,6 @@ const useStyles = makeStyles(theme => ({
   },
   title: {
     fontWeight: 500
-  },
-  avatar: {
-    backgroundColor: theme.palette.success.main,
-    height: 56,
-    width: 56
   },
   icon: {
     height: 32,
@@ -89,12 +83,11 @@ const TotalUsers = props => {
           </Grid>
         </Grid>
         <div className={classes.difference}>
-          <ArrowUpwardIcon className={classes.differenceIcon} />
           <Typography
             className={classes.differenceValue}
             variant="body2"
           >
-            16%
+            + 16%
           </Typography>
           <Typography
             className={classes.caption}

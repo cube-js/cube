@@ -21,7 +21,7 @@ export default {
   },
   success: {
     contrastText: white,
-    dark: colors.green[900],
+    dark: '#51D084',
     main: colors.green[600],
     light: colors.green[400]
   },
@@ -39,7 +39,7 @@ export default {
   },
   error: {
     contrastText: white,
-    dark: colors.red[900],
+    dark: '#E56860',
     main: colors.red[600],
     light: colors.red[400]
   },
