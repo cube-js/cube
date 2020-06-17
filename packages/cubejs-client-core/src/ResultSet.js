@@ -8,6 +8,24 @@ import {
 import Moment from 'moment';
 import momentRange from 'moment-range';
 
+/**
+ * @memberof ResultSet
+ * @typedef {Object} PivotConfig Configuration object that contains information about pivot axes and other options
+ * @property {Array<string>} x Dimensions to put on `x` or `rows` axis.
+ * Put `measures` at the end of array here
+ * @property {Array<string>} y Dimensions to put on `y` or `columns` axis.
+ * @property {Boolean} [fillMissingDates=true] If `true` missing dates on time dimensions
+ * will be filled with `0` for all measures.
+ * Note: the `fillMissingDates` option set to `true` will override any `order` applied to the query
+ */
+
+/**
+ * @memberof ResultSet
+ * @typedef {Object} DrillDownLocator
+ * @property {Array<string>} xValues
+ * @property {Array<string>} yValues
+ */
+
 const moment = momentRange.extendMoment(Moment);
 
 const TIME_SERIES = {
@@ -82,8 +100,8 @@ class ResultSet {
    *   ]
    * }
    * ```
-   * @param {Object} drillDownLocator - expects `{ xValues: [], yValues: [] }` object.
-   * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
+   * @param {DrillDownLocator} drillDownLocator
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Object|null} Drill down query
    */
   drillDown(drillDownLocator, pivotConfig) {
@@ -171,7 +189,7 @@ class ResultSet {
    *   }
    * ]
    * ```
-   * @param pivotConfig - See {@link ResultSet#pivot}.
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array}
    */
   series(pivotConfig) {
@@ -335,14 +353,7 @@ class ResultSet {
    *   }
    * ]
    * ```
-   * @typedef {Object} PivotConfig
-   * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
-   * Put `measures` at the end of array here
-   * @property {Array<string>} y Dimensions to put on **y** or **columns** axis.
-   * @property {Boolean} [fillMissingDates=true] If `true` missing dates on time dimensions
-   *  will be filled with `0` for all measures.
-   * @param {PivotConfig} [pivotConfig] Configuration object that contains information
-   * about pivot axes and other options
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of pivoted rows.
    */
   pivot(pivotConfig) {
@@ -388,7 +399,7 @@ class ResultSet {
     const allYValues = pipe(
       map(
         // eslint-disable-next-line no-unused-vars
-        ([xValuesString, rows]) => unnest(
+        ([, rows]) => unnest(
           // collect Y values only from filled rows
           rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
         )
@@ -438,13 +449,13 @@ class ResultSet {
    *
    * // ResultSet.chartPivot() will return
    * [
-   *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
-   *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
-   *   { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
+   *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120, "xValues": ["2015-01-01T00:00:00"] },
+   *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861, "xValues": ["2015-02-01T00:00:00"]  },
+   *   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
    *   //...
    * ]
    * ```
-   * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
+   * @param {PivotConfig} [pivotConfig]
    */
   chartPivot(pivotConfig) {
     const validate = (value) => {
@@ -559,7 +570,7 @@ class ResultSet {
    * | male         | Orders.count | 3         | 10      | 5   |
    * | female       | Orders.count | 27        | 12      | 7   |
    *
-   * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of pivoted rows
    */
   tablePivot(pivotConfig) {
@@ -675,7 +686,7 @@ class ResultSet {
    * // ...
    * ```
    *
-   * @param pivotConfig - See {@link ResultSet#pivot}.
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of columns
    */
   tableColumns(pivotConfig) {
@@ -788,10 +799,10 @@ class ResultSet {
    *
    * // ResultSet.seriesNames() will return
    * [
-   * { "key":"Stories.count", "title": "Stories Count" }
+   * { "key":"Stories.count", "title": "Stories Count", yValues: ["Stories.count"] }
    * ]
    * ```
-   * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of series names
    */
   seriesNames(pivotConfig) {
