@@ -16,7 +16,7 @@ import Header from './components/Header';
 import aws_exports from './aws-exports';
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: `${process.env.REACT_APP_CUBEJS_API_URL}/cubejs-api/v1`
+  apiUrl: `/cubejs-api/v1`
 });
 
 Amplify.configure(aws_exports);
