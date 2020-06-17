@@ -419,6 +419,7 @@ cube(`Orders`, {
 
 To keep pre-aggregations always up-to-date you can mark them as `scheduledRefresh: true`.
 This instructs `RefreshScheduler` to refresh this pre-aggregation every time it's run.
+Without this flag pre-aggregations are always built on-demand.
 `refreshKey` is used to determine if there's a need to update specific pre-aggregation on each scheduled refresh run.
 For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReference` are fetched to determine range for refresh.
 
