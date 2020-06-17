@@ -144,7 +144,7 @@ const OrdersTable = props => {
                   <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Users.city')}}>User city</TableCell>
                   <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Users.company')}}>User company</TableCell>
                   <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.product_id')}}>Product id</TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('LineItems.item_price')}}>Item price</TableCell>
+                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('LineItems.item_price')}}>Order price</TableCell>
                   <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.status')}}>Status</TableCell>
                   <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.createdAt')}}>Created at</TableCell>
                 </TableRow>
@@ -179,7 +179,7 @@ const OrdersTable = props => {
                       {obj['Orders.product_id']}
                     </TableCell>
                     <TableCell>
-                      {obj['LineItems.item_price']}
+                      {"$ " + obj['LineItems.item_price']}
                     </TableCell>
                     <TableCell>
                       <StatusBullet

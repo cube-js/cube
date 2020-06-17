@@ -37,7 +37,7 @@ const OrderList = () => {
   const [sorting, setSorting] = React.useState(['Orders.createdAt', 'desc']);
 
   const query = {
-    limit: 10000,
+    limit: 500,
     order: {
       [`${sorting[0]}`]: sorting[1]
     },
@@ -86,33 +86,33 @@ const OrderList = () => {
   };
 
   return (
-    <QueryRenderer
-      query={query}
-      cubejsApi={cubejsApi}
-      render={({ resultSet }) => {
-        if (!resultSet) {
-          return <div className={classes.loaderWrap}><CircularProgress color="secondary" /></div>;
-        }
-        return (
-          <div className={classes.root}>
-            <OrdersToolbar
-                           startDate={startDate}
-                           setStartDate={setStartDate}
-                           finishDate={finishDate}
-                           setFinishDate={setFinishDate}
-                           priceFilter={priceFilter}
-                           setPriceFilter={setPriceFilter}
-                           statusFilter={statusFilter}
-                           setStatusFilter={setStatusFilter}
-                           tabs={tabs}
-            />
-            <div className={classes.content}>
+    <div className={classes.root}>
+      <OrdersToolbar
+        startDate={startDate}
+        setStartDate={setStartDate}
+        finishDate={finishDate}
+        setFinishDate={setFinishDate}
+        priceFilter={priceFilter}
+        setPriceFilter={setPriceFilter}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        tabs={tabs}
+      />
+      <div className={classes.content}>
+        <QueryRenderer
+          query={query}
+          cubejsApi={cubejsApi}
+          render={({ resultSet }) => {
+            if (!resultSet) {
+              return <div className={classes.loaderWrap}><CircularProgress color="secondary" /></div>;
+            }
+            return (
               <OrdersTable sorting={sorting} setSorting={setSorting} orders={resultSet.tablePivot()}/>
-            </div>
-          </div>
-        );
-      }}
-    />
+            );
+          }}
+        />
+      </div>
+    </div>
   );
 };
 

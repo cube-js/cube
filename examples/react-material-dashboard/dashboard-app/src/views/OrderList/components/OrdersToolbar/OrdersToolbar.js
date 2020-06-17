@@ -114,6 +114,10 @@ const OrdersToolbar = props => {
     setPriceFilter(newValue);
   };
 
+  function valuetext(value) {
+    return `$ ${value}`;
+  }
+
   return (
     <div
       {...rest}
@@ -193,14 +197,14 @@ const OrdersToolbar = props => {
           m={2}
         >
           <Typography id="range-slider">
-            Item price range
+            Order price range
           </Typography>
           <Slider
             value={rangeValue}
             onChange={handleChangeRange}
             onChangeCommitted={setRangeFilter}
-            valueLabelDisplay="auto"
             aria-labelledby="range-slider"
+            valueLabelDisplay="auto"
             getAriaValueText={valuetext}
             min={0}
             max={300}
@@ -214,9 +218,5 @@ const OrdersToolbar = props => {
 OrdersToolbar.propTypes = {
   className: PropTypes.string
 };
-
-function valuetext(value) {
-  return `${value}$`;
-}
 
 export default OrdersToolbar;
