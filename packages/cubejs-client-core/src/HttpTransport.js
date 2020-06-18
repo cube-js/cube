@@ -10,7 +10,7 @@ import 'url-search-params-polyfill';
  */
 class HttpTransport {
   /**
-   * @param options - mandatory options object
+   * @param {Object} options - mandatory options object
    * @param options.authorization - [jwt auth token](security)
    * @param options.apiUrl - path to `/cubejs-api/v1`
    * @param [options.headers] - object of custom headers
