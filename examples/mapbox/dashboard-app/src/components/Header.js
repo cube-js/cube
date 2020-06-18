@@ -6,12 +6,7 @@ import * as Icon from '@ant-design/icons';
 import logo from './../logo.svg';
 
 const Header = () => (
-  <Layout.Header
-    style={{
-      padding: "0 32px",
-      backgroundColor: '#43436B'
-    }}
-  >
+  <Layout.Header className='example__header'>
     <div className="examples__nav">
       <Link to='//cube.dev' target="_blank"><img src={logo} alt="Cube.js" /></Link>
       <div className="examples__nav__buttons">

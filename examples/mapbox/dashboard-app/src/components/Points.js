@@ -27,7 +27,6 @@ export default (props) => {
       .then((resultSet) => {
         setInitMin(resultSet.tablePivot()[0]['Users.min']);
         setInitMax(resultSet.tablePivot()[0]['Users.max']);
-
         setMin(resultSet.tablePivot()[0]['Users.max'] * 0.4);
         setMax(resultSet.tablePivot()[0]['Users.max']);
       });
@@ -35,22 +34,24 @@ export default (props) => {
 
   useEffect(() => { loadData() }, [min, max])
 
-
   const loadData = () => {
     props.cubejsApi
       .load({
-        measures: ['Users.max'],
+        measures: [
+          'Users.max'
+        ],
         dimensions: [
           'Users.geometry',
         ],
         filters: [
           {
-            member: "Users.max",
+            member: "Users.value",
             operator: "lte",
             values: [max.toString()]
           },
+
           {
-            member: "Users.min",
+            member: "Users.value",
             operator: "gte",
             values: [min.toString()]
           }
@@ -70,7 +71,6 @@ export default (props) => {
             geometry: JSON.parse(item['Users.geometry']),
           });
         });
-        console.log(resultSet.tablePivot());
         setData(data);
       });
   }
@@ -130,7 +130,7 @@ export default (props) => {
             range
             min={initMin}
             max={initMax}
-            step={10000}
+            step={1}
             defaultValue={[initMax, initMax]}
             value={[min, max]}
             onChange={onChange}

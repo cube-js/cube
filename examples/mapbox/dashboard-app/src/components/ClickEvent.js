@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MapGL, { Source, Layer, Popup, NavigationControl } from 'react-map-gl';
 import { Radio } from "antd";
+import { Scrollbars } from 'react-custom-scrollbars';
 
 
 export default (props) => {
@@ -10,7 +11,7 @@ export default (props) => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
-    zoom: 1.5,
+    zoom: 2,
   });
   const [popupInfo, setPopupInfo] = useState(null);
   const [mode, setMode] = useState('both');
@@ -18,10 +19,10 @@ export default (props) => {
   useEffect(() => {
     props.cubejsApi
       .load({
+        measures: [
+          'Questions.count'
+        ],
         dimensions: [
-          'Questions.title',
-          'Questions.views',
-          'Questions.tags',
           'Users.geometry',
         ],
         filters: [{
@@ -30,8 +31,7 @@ export default (props) => {
         }],
         order: {
           'Questions.views': 'desc',
-        },
-        limit: 50000,
+        }
       })
       .then((resultSet) => {
         let data = {
@@ -42,9 +42,8 @@ export default (props) => {
           data['features'].push({
             type: 'Feature',
             properties: {
-              tags: item['Questions.tags'],
-              views: item['Questions.views'],
-              title: item['Questions.title'],
+              count: item['Questions.count'],
+              geometry: item['Users.geometry'],
             },
             geometry: JSON.parse(item['Users.geometry'])
           });
@@ -75,21 +74,41 @@ export default (props) => {
         });
         setDataAnswers(data)
       });
-
-
   }, [])
 
   const onChangeMode = (e) => {
+    setPopupInfo(null);
     setMode(e.target.value)
   }
 
-  const onHoverMap = (event) => {
+  const onClickMap = (event) => {
     if (typeof event.features != 'undefined') {
       const feature = event.features.find(
         (f) => f.layer.id === 'questions-point'
       );
       if (feature) {
-        setPopupInfo(feature);
+        props.cubejsApi
+          .load({
+            dimensions: [
+              'Questions.title',
+              'Questions.views',
+              'Questions.tags'
+            ],
+            filters: [{
+              member: "Users.geometry",
+              operator: "contains",
+              values: [feature.properties.geometry]
+            }],
+            order: {
+              'Questions.views': 'desc',
+            }
+          })
+          .then((resultSet) => {
+            setPopupInfo({
+              geometry: feature.geometry,
+              data: resultSet.tablePivot()
+            });
+          });
       }
       else {
         setPopupInfo(null);
@@ -108,12 +127,28 @@ export default (props) => {
           anchor='top'
           longitude={popupInfo.geometry.coordinates[0]}
           latitude={popupInfo.geometry.coordinates[1]}
+          captureScroll={true}
         >
-          <h3>{popupInfo.properties.title}</h3>
-          <div>
-            Views count: {popupInfo.properties.views}<br />
-            Tags: {popupInfo.properties.tags.replace(/\|/g, ', ')}
-          </div>
+          <Scrollbars
+            autoHeight
+            autoHeightMin={0}
+            autoHeightMax={300}
+          >
+            {
+              popupInfo.data.map((item, i) => (
+                <div className="mapbox__popup__item" key={i}>
+                  <h3>{item['Questions.title']}</h3>
+
+                  <div>
+                    Views count: {item['Questions.views']}<br />
+                  Tags: {item['Questions.tags'].replace(/\|/g, ', ')}
+                  </div>
+                </div>
+
+
+              ))
+            }
+          </Scrollbars>
         </Popup>
       );
   };
@@ -134,7 +169,8 @@ export default (props) => {
         }}
         width='100%'
         height='100%'
-        onHover={onHoverMap}
+        onClick={onClickMap}
+        interactiveLayerIds={['questions-point']}
         mapStyle='mapbox://styles/kalipsik/ckb2fyfqu123n1ilb5yi7uyns/draft'
         mapboxApiAccessToken='pk.eyJ1Ijoia2FsaXBzaWsiLCJhIjoiY2p3Z3JrdjQ4MDRjdDQzcGFyeXBlN3ZtZiJ9.miVaze_snePdEvitucFWSQ'
       >

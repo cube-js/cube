@@ -1,7 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { useCubeQuery } from "@cubejs-client/react";
 import { Slider, Button } from 'antd';
 import MapGL, { NavigationControl, Source, Layer } from 'react-map-gl';
+
 const sample = [
+  [
+    {
+      step: 0,
+      color: "rgba(255, 102, 148, 0)"
+    },
+    {
+      step: 0.33,
+      color: "rgba(255, 102, 148, 0.2)"
+    },
+    {
+      step: 0.66,
+      color: "#FFF4E0"
+    },
+    {
+      step: 1,
+      color: "#FF6694"
+    }
+  ],
   [
     {
       step: 0,
@@ -37,28 +57,10 @@ const sample = [
       step: 1,
       color: "hsl(173, 81%, 96%)"
     }
-  ],
-  [
-    {
-      step: 0,
-      color: "rgba(255, 102, 148, 0)"
-    },
-    {
-      step: 0.33,
-      color: "rgba(255, 102, 148, 0.2)"
-    },
-    {
-      step: 0.66,
-      color: "#FFF4E0"
-    },
-    {
-      step: 1,
-      color: "#FF6694"
-    }
   ]
 ]
 
-export default (props) => {
+export default ({ cubejsApi }) => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
@@ -68,57 +70,47 @@ export default (props) => {
   const [weight, setWeight] = useState(2);
   const [radius, setRadius] = useState(11);
   const [data, setData] = useState(null);
-  const [color, setColor] = useState([
-    {
-      step: 0,
-      color: "rgba(255, 102, 148, 0)"
-    },
-    {
-      step: 0.33,
-      color: "rgba(255, 102, 148, 0.2)"
-    },
-    {
-      step: 0.66,
-      color: "#FFF4E0"
-    },
-    {
-      step: 1,
-      color: "#FF6694"
-    },
-  ]);
+  const [colorState, setColorState] = useState(0);
+  const { resultSet } = useCubeQuery({
+    measures: ['Users.count'],
+    dimensions: [
+      'Users.geometry',
+    ],
+    filters: [{
+      member: "Users.geometry",
+      operator: "set"
+    }],
+    limit: 50000
+  }, { cubejsApi });
+
 
   useEffect(() => {
-    props.
-      cubejsApi
-      .load({
-        measures: ['Users.count'],
-        dimensions: [
-          'Users.geometry',
-        ],
-        filters: [{
-          member: "Users.geometry",
-          operator: "set"
-        }],
-        limit: 50000
-      })
-      .then((resultSet) => {
-        let data = {
-          type: 'FeatureCollection',
-          features: [],
-        };
-        resultSet.tablePivot().map((item) => {
-          data['features'].push({
-            type: 'Feature',
-            properties: {
-              value: parseInt(item['Users.count']),
-            },
-            geometry: JSON.parse(item['Users.geometry']),
-          });
+    if (resultSet) {
+      let data = {
+        type: 'FeatureCollection',
+        features: [],
+      };
+      resultSet.tablePivot().map((item) => {
+        data['features'].push({
+          type: 'Feature',
+          properties: {
+            value: parseInt(item['Users.count']),
+          },
+          geometry: JSON.parse(item['Users.geometry']),
         });
-        setData(data);
-      })
+      });
+      setData(data);
+    }
+  }, [resultSet])
 
-  }, [])
+
+  const renderButtons = sample.map((item, i) => (
+    <Button key={i} className={colorState == i ? 'mapbox__sample__button mapbox__sample__button--active' : 'mapbox__sample__button'} onClick={() => { setColorState(i) }}>
+      <span style={{ background: `linear-gradient(90deg, ${item[3]['color']} 0%, ${item[2]['color']} 50%,${item[1]['color']} 100%)` }}></span>
+    </Button>
+  ))
+
+
 
   return (
     <div className='mapbox__container'>
@@ -144,10 +136,10 @@ export default (props) => {
               'heatmap-weight': ['interpolate', ['linear'], ['get', 'value'], 0, 0, 6, weight],
               'heatmap-color': [
                 "interpolate", ["linear"], ["heatmap-density"],
-                color[0].step, color[0].color,
-                color[1].step, color[1].color,
-                color[2].step, color[2].color,
-                color[3].step, color[3].color,
+                sample[colorState][0].step, sample[colorState][0].color,
+                sample[colorState][1].step, sample[colorState][1].color,
+                sample[colorState][2].step, sample[colorState][2].color,
+                sample[colorState][3].step, sample[colorState][3].color,
               ],
               'heatmap-opacity': 1,
             },
@@ -172,15 +164,7 @@ export default (props) => {
 
         <div className='mapbox__legend__row'>
           <label><span>sample palletes</span></label>
-          <Button className="mapbox__sample__button" onClick={() => { setColor(sample[0]) }}>
-            <span style={{ background: 'linear-gradient(90deg, hsl(47, 100%, 87%) 0%, hsl(350, 68%, 52%) 50%, hsl(275, 18%, 60%) 100%)' }}></span>
-          </Button>
-          <Button className="mapbox__sample__button" onClick={() => { setColor(sample[1]) }}>
-            <span style={{ background: 'linear-gradient(90deg, hsl(173, 81%, 96%) 0%, hsl(200, 74%, 52%) 50%, #F3F3FB 100%)' }}></span>
-          </Button>
-          <Button className="mapbox__sample__button" onClick={() => { setColor(sample[2]) }}>
-            <span style={{ background: 'linear-gradient(90deg, #ff6694 0%, #fff4e0 50%,rgba(255, 102, 148, 0.2) 100%)' }}></span>
-          </Button>
+          {renderButtons}
         </div>
 
       </div>

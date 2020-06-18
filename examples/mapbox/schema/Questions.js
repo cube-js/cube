@@ -7,6 +7,11 @@ cube(`Questions`, {
       relationship: `belongsTo`,
     },
   },
+  measures: {
+    count: {
+      type: `count`,
+    }
+  },
   dimensions: {
     id: {
       sql: `id`,

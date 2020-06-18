@@ -11,8 +11,9 @@ import { Scrollbars } from 'react-custom-scrollbars';
 import Header from "./components/Header";
 import Choropleth from './components/Choropleth';
 import Heatmap from './components/Heatmap';
-import Hover from './components/Hover';
+import ClickEvent from './components/ClickEvent';
 import Points from './components/Points';
+
 
 const API_URL = process.env.NODE_ENV === 'production' ? '' : "http://localhost:4000";
 const CUBEJS_TOKEN =
@@ -36,8 +37,8 @@ class AppLayout extends React.Component {
               <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='points distribution'> personal rating</Tooltip></React.Fragment>)} key={1}>
                 <Points cubejsApi={cubejsApi} />
               </Tabs.TabPane>
-              <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='hover event'>q&amp;a</Tooltip></React.Fragment>)} key={2}>
-                <Hover cubejsApi={cubejsApi} />
+              <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='click event'>q&amp;a</Tooltip></React.Fragment>)} key={2}>
+                <ClickEvent cubejsApi={cubejsApi} />
               </Tabs.TabPane>
               <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='choropleth'>rating by country</Tooltip></React.Fragment>)} key={3}>
                 <Choropleth cubejsApi={cubejsApi} />

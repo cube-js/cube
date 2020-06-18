@@ -11,6 +11,13 @@ body {
   background-color: #7a77ff !important;
 }
 
+.ant-layout-header.example__header {
+    padding: 16px 24px;
+    background: #43436B;
+    height: auto;
+    line-height: 0;
+}
+
 .examples__nav {
   display: flex;
   justify-content: space-between;
@@ -143,14 +150,14 @@ body {
   line-height: 0;
 }
 
-.mapbox__sample__button span {
+.ant-btn.mapbox__sample__button span {
   display: block;
   width: 45px;
   height: 20px;
   overflow: hidden;
 }
 
-.mapbox__sample__button:active {
+.ant-btn.mapbox__sample__button:active, .ant-btn.mapbox__sample__button:hover, .ant-btn.mapbox__sample__button:focus, .ant-btn.mapbox__sample__button--active {
   border-color: #7a77ff;
 }
 
@@ -283,7 +290,7 @@ body {
 .mapbox__popup {
   border-radius: 4px;
   border: none;
-  width: 270px;
+  width: 350px;
   font-weight: normal;
   font-size: 12px;
   line-height: 21px;
@@ -292,10 +299,21 @@ body {
   font-feature-settings: "ss03", "ss04";
 }
 
+.mapbox__popup__item {
+  border-bottom: 1px solid #eaeaea;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+}
+
+.mapbox__popup__item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
 .mapbox__popup h3 {
   font-weight: 500;
   font-size: 16px;
-  line-height: 26px;
+  line-height: 1.2em;
   margin-bottom: 5px;
 }
 

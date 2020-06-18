@@ -83,6 +83,7 @@ export default (props) => {
   const [mode, setMode] = useState('total');
   const [data, setData] = useState(null);
 
+
   const onChangeMode = (e) => {
     setMode(e.target.value);
   };
