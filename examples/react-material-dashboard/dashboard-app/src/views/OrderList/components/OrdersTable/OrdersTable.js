@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useHistory } from "react-router-dom";
-import clsx from 'clsx';
-import PropTypes from 'prop-types';
-import moment from 'moment';
-import PerfectScrollbar from 'react-perfect-scrollbar';
-import { makeStyles } from '@material-ui/styles';
+import clsx from "clsx";
+import PropTypes from "prop-types";
+import moment from "moment";
+import PerfectScrollbar from "react-perfect-scrollbar";
+import { makeStyles } from "@material-ui/styles";
+import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
 import {
   CardActions,
   CardContent,
@@ -14,10 +16,10 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TablePagination
-} from '@material-ui/core';
+  TablePagination, Typography
+} from "@material-ui/core";
 
-import StatusBullet from '../../../../components/StatusBullet/StatusBullet';
+import StatusBullet from "../../../../components/StatusBullet/StatusBullet";
 import palette from "../../../../theme/palette";
 import CustomCard from "../../../../components/CustomCard";
 
@@ -32,30 +34,35 @@ const useStyles = makeStyles(theme => ({
     minWidth: 1050
   },
   nameContainer: {
-    display: 'flex',
-    alignItems: 'baseline'
+    display: "flex",
+    alignItems: "baseline"
   },
   status: {
     marginRight: theme.spacing(2)
   },
   actions: {
-    justifyContent: 'flex-end'
+    justifyContent: "flex-end"
   },
   tableRow: {
-    cursor: 'pointer'
+    cursor: "pointer"
   },
   hoverable: {
-    '&:hover': {
+    "&:hover": {
       color: `${palette.secondary.main}`,
       cursor: `pointer`
-    },
+    }
+  },
+  arrow: {
+    fontSize: 10,
+    display: 'inline-block',
+    padding: '0 4px'
   }
 }));
 
 const statusColors = {
-  completed: 'success',
-  processing: 'info',
-  shipped: 'danger'
+  completed: "success",
+  processing: "info",
+  shipped: "danger"
 };
 
 const OrdersTable = props => {
@@ -64,6 +71,7 @@ const OrdersTable = props => {
   function handleClick(str) {
     history.push(str);
   }
+
   const { className, orders, sorting, setSorting, ...rest } = props;
 
   const classes = useStyles();
@@ -72,13 +80,44 @@ const OrdersTable = props => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [page, setPage] = useState(0);
 
+  const tableHeaders = [
+    {
+      text: 'User id',
+      value: 'Orders.user_id'
+    },
+    {
+      text: 'User city',
+      value: 'Users.city'
+    },
+    {
+      text: 'User company',
+      value: 'Users.company'
+    },
+    {
+      text: 'Product id',
+      value: 'Orders.product_id'
+    },
+    {
+      text: 'Order price',
+      value: 'LineItems.item_price'
+    },
+    {
+      text: 'Status',
+      value: 'Orders.status'
+    },
+    {
+      text: 'Created at',
+      value: 'Orders.createdAt'
+    },
+  ];
+
   const handleSelectAll = event => {
     const { orders } = props;
 
     let selectedOrders;
 
     if (event.target.checked) {
-      selectedOrders = orders.map(order => order['Orders.order_id']);
+      selectedOrders = orders.map(order => order["Orders.order_id"]);
     } else {
       selectedOrders = [];
     }
@@ -114,13 +153,13 @@ const OrdersTable = props => {
     setRowsPerPage(event.target.value);
   };
   const handleSetSorting = str => {
-    setSorting([str, sorting[1] === 'desc' ? 'asc' : 'desc'])
+    setSorting([str, sorting[1] === "desc" ? "asc" : "desc"]);
   };
 
   return (
     <CustomCard
       {...rest}
-      padding={'0'}
+      padding={"0"}
       className={clsx(classes.root, className)}
     >
       <CardContent className={classes.content}>
@@ -140,57 +179,64 @@ const OrdersTable = props => {
                       onChange={handleSelectAll}
                     />
                   </TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.user_id')}}>User id</TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Users.city')}}>User city</TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Users.company')}}>User company</TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.product_id')}}>Product id</TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('LineItems.item_price')}}>Order price</TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.status')}}>Status</TableCell>
-                  <TableCell className={classes.hoverable} onClick={() => {handleSetSorting('Orders.createdAt')}}>Created at</TableCell>
+                  {tableHeaders.map((item) => (
+                    <TableCell key={item.value} className={classes.hoverable}
+                               onClick={() => {handleSetSorting(`${item.value}`);}}
+                    >
+                      <span>{item.text}</span>
+                      <Typography
+                        className={classes.arrow}
+                        variant="body2"
+                        component="span"
+                      >
+                        {(sorting[0] === item.value && sorting[1] === 'desc') ? <KeyboardArrowUpIcon/> : <KeyboardArrowDownIcon/>}
+                      </Typography>
+                    </TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {orders.slice(page*rowsPerPage, page*rowsPerPage+rowsPerPage).map(obj => (
+                {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(obj => (
                   <TableRow
                     className={classes.tableRow}
                     hover
                     onClick={() => handleClick(`/user/${obj["Orders.user_id"]}`)}
-                    key={obj['Orders.user_id'] + obj['Orders.product_id'] + Math.random()}
-                    selected={selectedOrders.indexOf(obj['Orders.order_id']) !== -1}
+                    key={obj["Orders.user_id"] + obj["Orders.product_id"] + Math.random()}
+                    selected={selectedOrders.indexOf(obj["Orders.order_id"]) !== -1}
                   >
                     <TableCell padding="checkbox">
                       <Checkbox
-                        checked={selectedOrders.indexOf(obj['Orders.order_id']) !== -1}
+                        checked={selectedOrders.indexOf(obj["Orders.order_id"]) !== -1}
                         color="primary"
-                        onChange={event => handleSelectOne(event, obj['Orders.order_id'])}
+                        onChange={event => handleSelectOne(event, obj["Orders.order_id"])}
                         value="true"
                       />
                     </TableCell>
                     <TableCell>
-                      {obj['Orders.user_id']}
+                      {obj["Orders.user_id"]}
                     </TableCell>
                     <TableCell>
-                      {obj['Users.city']}
+                      {obj["Users.city"]}
                     </TableCell>
                     <TableCell>
-                      {obj['Users.company']}
+                      {obj["Users.company"]}
                     </TableCell>
                     <TableCell>
-                      {obj['Orders.product_id']}
+                      {obj["Orders.product_id"]}
                     </TableCell>
                     <TableCell>
-                      {"$ " + obj['LineItems.item_price']}
+                      {"$ " + obj["LineItems.item_price"]}
                     </TableCell>
                     <TableCell>
                       <StatusBullet
                         className={classes.status}
-                        color={statusColors[obj['Orders.status']]}
+                        color={statusColors[obj["Orders.status"]]}
                         size="sm"
                       />
-                      {obj['Orders.status']}
+                      {obj["Orders.status"]}
                     </TableCell>
                     <TableCell>
-                      {moment(obj['Orders.createdAt']).format('DD/MM/YYYY')}
+                      {moment(obj["Orders.createdAt"]).format("DD/MM/YYYY")}
                     </TableCell>
                   </TableRow>
                 ))}
