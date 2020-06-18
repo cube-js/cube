@@ -55,7 +55,7 @@ function generateTypeDefs(doclets) {
     return '';
   }
 
-  const res = doclets.map((doclet) => [`### ${doclet.name}`, doclet.description, generateParams(doclet, 'properties'), '\n']
+  const res = doclets.map((doclet) => [`## ${doclet.name}`, doclet.description, generateParams(doclet, 'properties'), '\n']
     .filter((d) => !!d)
     .join('\n'));
 
