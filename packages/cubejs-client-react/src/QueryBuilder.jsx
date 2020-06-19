@@ -1,8 +1,9 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import {
-  prop, uniqBy, indexBy
+  prop, uniqBy, indexBy, fromPairs
 } from 'ramda';
+import { ResultSet } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 import { reorder } from './utils';
@@ -28,7 +29,7 @@ export default class QueryBuilder extends React.Component {
       query: {
         ...nextState.query,
         ...(props.query || {})
-      }
+      },
     };
   }
   
@@ -86,20 +87,26 @@ export default class QueryBuilder extends React.Component {
       query: props.query,
       chartType: 'line',
       orderMembers: [],
+      pivotConfig: {
+        x: [],
+        y: [],
+        fillMissingDates: true
+      },
       ...props.vizState
     };
-
+    
     this.shouldApplyHeuristicOrder = false;
     this.requestId = 0;
   }
 
   async componentDidMount() {
-    const { query } = this.state;
+    const { query, pivotConfig } = this.state;
     const meta = await this.cubejsApi().meta();
     
     this.setState({
       meta,
-      orderMembers: QueryBuilder.getOrderMembers({ meta, query })
+      orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
+      pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : pivotConfig
     });
   }
 
@@ -153,7 +160,7 @@ export default class QueryBuilder extends React.Component {
     });
     
     const {
-      meta, query, orderMembers = [], chartType
+      meta, query, orderMembers = [], chartType, pivotConfig
     } = this.state;
 
     return {
@@ -210,6 +217,33 @@ export default class QueryBuilder extends React.Component {
           });
         }
       },
+      pivotConfig,
+      updatePivotConfig: ({
+        sourceIndex,
+        destinationIndex,
+        sourceAxis,
+        destinationAxis
+      }) => {
+        const nextPivotConfig = {
+          x: [...pivotConfig.x],
+          y: [...pivotConfig.y],
+        };
+        const id = pivotConfig[sourceAxis][sourceIndex];
+    
+        nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
+        nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
+        
+        // console.log('!', nextPivotConfig, {
+        //   sourceIndex,
+        //   destinationIndex,
+        //   sourceAxis,
+        //   destinationAxis
+        // })
+        
+        this.updateVizState({
+          pivotConfig: nextPivotConfig
+        });
+      },
       ...queryRendererProps
     };
   }
@@ -227,30 +261,32 @@ export default class QueryBuilder extends React.Component {
 
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
-    const { query: stateQuery } = this.state;
+    const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
+    const currentPivotConfig = state.pivotConfig || statePivotConfig;
+    
     let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || {};
-
+    
     if (this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
       this.shouldApplyHeuristicOrder = false;
       
-      try {
-        const currentRequestId = ++this.requestId;
-        const { sqlQuery } = await this.cubejsApi().sql(query);
-        
-        if (this.requestId !== currentRequestId) {
-          return;
-        }
-        
-        finalState = {
-          ...finalState,
-          query: {
-            ...finalState.query,
-            order: sqlQuery.sql.order
-          }
-        };
-        // eslint-disable-next-line
-      } catch (e) {}      
+      const currentRequestId = ++this.requestId;
+      const { sqlQuery } = await this.cubejsApi().sql(query);
+      
+      if (this.requestId !== currentRequestId) {
+        return;
+      }
+      
+      console.log('order...', ResultSet.getNormalizedPivotConfig(finalState.query || {}));
+      
+      finalState = {
+        ...finalState,
+        query: {
+          ...finalState.query,
+          order: sqlQuery.sql.order
+        },
+        pivotConfig: ResultSet.getNormalizedPivotConfig(finalState.query || {})
+      };
     }
     
     const updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers({
@@ -266,18 +302,21 @@ export default class QueryBuilder extends React.Component {
       }
     });
       
-    const nextOrder = Object.fromEntries(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean));
-      
+    const nextOrder = fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean));
+    
+    const nextQuery = {
+      ...stateQuery,
+      ...query,
+      order: nextOrder
+    };
+    
     finalState = {
       ...finalState,
-      query: {
-        ...stateQuery,
-        ...query,
-        order: nextOrder
-      },
-      orderMembers: currentOrderMembers
+      query: nextQuery,
+      orderMembers: currentOrderMembers,
+      pivotConfig: (stateQuery.measures || []).length !== (nextQuery.measures || []).length || (stateQuery.dimensions || []).length !== (nextQuery.dimensions || []).length ? ResultSet.getNormalizedPivotConfig(query) : currentPivotConfig
     };
-
+    
     this.setState(finalState);
     finalState = { ...this.state, ...finalState };
     if (setQuery) {

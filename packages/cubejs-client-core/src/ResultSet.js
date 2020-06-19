@@ -51,7 +51,7 @@ const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 /**
  * Provides a convenient interface for data manipulation.
  */
-class ResultSet {
+export default class ResultSet {
   constructor(loadResponse, options) {
     options = options || {};
     this.loadResponse = loadResponse;
@@ -225,8 +225,7 @@ class ResultSet {
     return `${td.dimension}.${td.granularity}`;
   }
 
-  normalizePivotConfig(pivotConfig) {
-    const { query } = this.loadResponse;
+  static getNormalizedPivotConfig(query, pivotConfig = null) {
     const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
     const dimensions = query.dimensions || [];
     pivotConfig = pivotConfig || (timeDimensions.length ? {
@@ -265,6 +264,12 @@ class ResultSet {
       pivotConfig.fillMissingDates = true;
     }
     return pivotConfig;
+  }
+  
+  normalizePivotConfig(pivotConfig) {
+    const { query } = this.loadResponse;
+    
+    return ResultSet.getNormalizedPivotConfig(query, pivotConfig);
   }
 
   static measureFromAxis(axisValues) {
@@ -845,5 +850,3 @@ class ResultSet {
     return this.backwardCompatibleData;
   }
 }
-
-export default ResultSet;

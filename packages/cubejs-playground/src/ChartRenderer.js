@@ -49,8 +49,8 @@ const cubejsApi = cubejs(
   { apiUrl: API_URL + "/cubejs-api/v1" }
 );
 
-const renderChart = (Component) => ({ resultSet, error }) => (
-  (resultSet && <Component resultSet={resultSet} />) ||
+const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => (
+  (resultSet && <Component resultSet={resultSet} pivotConfig={pivotConfig} />) ||
   (error && error.toString()) || 
   (<Spin />)
 )
@@ -58,7 +58,7 @@ const renderChart = (Component) => ({ resultSet, error }) => (
 const ChartRenderer = () => <QueryRenderer
   query={${(typeof query === 'object' ? JSON.stringify(query, null, 2) : query).split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n')}}
   cubejsApi={cubejsApi}
-  render={renderChart(${renderFnName})}
+  render={renderChart(${renderFnName}, ${JSON.stringify(props.pivotConfig)})}
 />;
 
 export default ChartRenderer;
@@ -92,7 +92,8 @@ export const ChartRenderer = (props) => {
     dashboardSource,
     cubejsApi,
     chartType,
-    sourceCodeFn: sourceCodeFnProp
+    sourceCodeFn: sourceCodeFnProp,
+    pivotConfig
   } = props;
 
   const sourceCodeFn = sourceCodeFnProp || sourceCodeTemplate
@@ -100,7 +101,8 @@ export const ChartRenderer = (props) => {
   const selectedChartLibrary = selectChartLibrary(chartType, chartLibrary);
   const source = sourceCodeFn({
     ...props,
-    chartLibrary: selectedChartLibrary
+    chartLibrary: selectedChartLibrary,
+    pivotConfig
   });
   const dependencies = {
     '@cubejs-client/core': cubejs,
@@ -119,6 +121,7 @@ export const ChartRenderer = (props) => {
   return (
     <ChartContainer
       query={query}
+      pivotConfig={pivotConfig}
       resultSet={resultSet}
       error={error}
       sqlQuery={sqlQuery}

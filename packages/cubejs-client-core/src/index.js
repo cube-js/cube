@@ -293,4 +293,4 @@ class CubejsApi {
  */
 export default (apiToken, options) => new CubejsApi(apiToken, options);
 
-export { HttpTransport };
+export { HttpTransport, ResultSet };

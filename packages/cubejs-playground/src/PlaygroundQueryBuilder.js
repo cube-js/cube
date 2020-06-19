@@ -10,6 +10,7 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import OrderGroup from './components/Order/OrderGroup';
+import PivotConfig from './components/PivotConfig/PivotConfig';
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>
   Object.keys(updateMethods)
@@ -30,12 +31,13 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
         }
         playgroundAction(actionName, { memberName });
         return updateMethods[method].apply(null, [member, values, ...rest]);
-      }
+      },
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
 export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubejsToken, dashboardSource, setQuery }) {
   const [isOrderPopoverVisible, toggleOrderPopover] = useState(false);
+  const [isPivotPopoverVisible, togglePivotPopover] = useState(false);
 
   return (
     <QueryBuilder
@@ -64,7 +66,9 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
         availableTimeDimensions,
         updateTimeDimensions,
         orderMembers,
-        updateOrder
+        updateOrder,
+        pivotConfig,
+        updatePivotConfig,
       }) => {
         return (
           <>
@@ -151,6 +155,26 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                           Order
                         </Button>
                       </Popover>
+
+                      <Divider type="vertical" />
+
+                      <Popover
+                        content={<PivotConfig pivotConfig={pivotConfig} onChange={updatePivotConfig} />}
+                        visible={isPivotPopoverVisible}
+                        placement="bottomLeft"
+                        trigger="click"
+                        onVisibleChange={(visible) => {
+                          if (!visible) {
+                            togglePivotPopover(false);
+                          } else {
+                            if (orderMembers.length) {
+                              togglePivotPopover(!isPivotPopoverVisible);
+                            }
+                          }
+                        }}
+                      >
+                        <Button disabled={!(measures.length || dimensions.length)}>Pivot</Button>
+                      </Popover>
                     </Col>
                   </Row>
                 </Card>
@@ -169,6 +193,7 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                     chartType={chartType}
                     cubejsApi={cubejsApi}
                     dashboardSource={dashboardSource}
+                    pivotConfig={pivotConfig}
                   />
                 ) : (
                   <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>
@@ -188,7 +213,7 @@ PlaygroundQueryBuilder.propTypes = {
   cubejsApi: PropTypes.object,
   dashboardSource: PropTypes.object,
   apiUrl: PropTypes.string,
-  cubejsToken: PropTypes.string
+  cubejsToken: PropTypes.string,
 };
 
 PlaygroundQueryBuilder.defaultProps = {
@@ -197,5 +222,5 @@ PlaygroundQueryBuilder.defaultProps = {
   cubejsApi: null,
   dashboardSource: null,
   apiUrl: '/cubejs-api/v1',
-  cubejsToken: null
+  cubejsToken: null,
 };
