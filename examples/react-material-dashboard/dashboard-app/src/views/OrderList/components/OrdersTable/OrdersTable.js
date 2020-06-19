@@ -189,7 +189,7 @@ const OrdersTable = props => {
                         variant="body2"
                         component="span"
                       >
-                        {(sorting[0] === item.value && sorting[1] === 'desc') ? <KeyboardArrowUpIcon/> : <KeyboardArrowDownIcon/>}
+                        {(sorting[0] === item.value) ? (sorting[1] === 'desc' ? <KeyboardArrowUpIcon/> : <KeyboardArrowDownIcon/>) : null }
                       </Typography>
                     </TableCell>
                   ))}
