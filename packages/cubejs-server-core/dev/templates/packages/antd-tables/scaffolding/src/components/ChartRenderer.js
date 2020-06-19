@@ -12,11 +12,11 @@ const TypeToChartComponent = {
       </Col>
     </Row>
   ),
-  table: ({ resultSet }) => (
+  table: ({ resultSet, pivotConfig }) => (
     <Table
       pagination={false}
-      columns={resultSet.tableColumns().map(c => ({ ...c, dataIndex: c.key }))}
-      dataSource={resultSet.tablePivot()}
+      columns={resultSet.tableColumns(pivotConfig)}
+      dataSource={resultSet.tablePivot(pivotConfig)}
     />
   )
 };

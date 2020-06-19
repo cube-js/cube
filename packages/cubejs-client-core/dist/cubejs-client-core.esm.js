@@ -806,11 +806,6 @@ function () {
       var schema = {};
 
       var extractFields = function extractFields(key) {
-        console.log('!!!', {
-          query: _this4.query(),
-          key: key,
-          loadResponse: _this4.loadResponse.annotation
-        });
         var flatMeta = Object.values(_this4.loadResponse.annotation).reduce(function (a, b) {
           return _objectSpread2({}, a, {}, b);
         }, {});

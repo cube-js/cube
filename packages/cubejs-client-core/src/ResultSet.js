@@ -686,11 +686,6 @@ export default class ResultSet {
     const schema = {};
     
     const extractFields = (key) => {
-      console.log('!!!', {
-        query: this.query(),
-        key,
-        loadResponse: this.loadResponse.annotation
-      });
       const flatMeta = Object.values(this.loadResponse.annotation).reduce((a, b) => ({ ...a, ...b }), {});
       const { title, shortTitle, type, format, meta } = flatMeta[key] || {};
   

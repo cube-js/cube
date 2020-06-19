@@ -10,7 +10,7 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import OrderGroup from './components/Order/OrderGroup';
-import PivotConfig from './components/PivotConfig/PivotConfig';
+import Pivot from './components/Pivot/Pivot';
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>
   Object.keys(updateMethods)
@@ -160,7 +160,7 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
 
                       <Popover
                         content={
-                          <PivotConfig
+                          <Pivot
                             pivotConfig={pivotConfig}
                             onMove={updatePivotConfig.moveItem}
                             onToggle={updatePivotConfig.toggleFillMissingDates}
@@ -173,13 +173,13 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                           if (!visible) {
                             togglePivotPopover(false);
                           } else {
-                            if (orderMembers.length) {
+                            if (isQueryPresent) {
                               togglePivotPopover(!isPivotPopoverVisible);
                             }
                           }
                         }}
                       >
-                        <Button disabled={!(measures.length || dimensions.length)}>Pivot</Button>
+                        <Button disabled={!isQueryPresent}>Pivot</Button>
                       </Popover>
                     </Col>
                   </Row>

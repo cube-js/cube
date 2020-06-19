@@ -9,9 +9,11 @@ import FilterGroup from './FilterGroup';
 import TimeGroup from './TimeGroup';
 import SelectChartType from './SelectChartType';
 import OrderGroup from './Order/OrderGroup';
+import Pivot from './Pivot/Pivot';
 
 export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, chartExtra }) {
   const [isOrderPopoverVisible, toggleOrderPopover] = useState(false);
+  const [isPivotPopoverVisible, togglePivotPopover] = useState(false);
 
   return (
     <QueryBuilder
@@ -39,7 +41,9 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
         availableTimeDimensions,
         updateTimeDimensions,
         orderMembers,
-        updateOrder
+        updateOrder,
+        pivotConfig,
+        updatePivotConfig
       }) => {
         return (
           <Fragment>
@@ -119,6 +123,32 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
                         <Button disabled={!orderMembers.length} icon={<SortAscendingOutlined />}>
                           Order
                         </Button>
+                      </Popover>
+
+                      <Divider type="vertical" />
+
+                      <Popover
+                        content={
+                          <Pivot
+                            pivotConfig={pivotConfig}
+                            onMove={updatePivotConfig.moveItem}
+                            onToggle={updatePivotConfig.toggleFillMissingDates}
+                          />
+                        }
+                        visible={isPivotPopoverVisible}
+                        placement="bottomLeft"
+                        trigger="click"
+                        onVisibleChange={(visible) => {
+                          if (!visible) {
+                            togglePivotPopover(false);
+                          } else {
+                            if (isQueryPresent) {
+                              togglePivotPopover(!isPivotPopoverVisible);
+                            }
+                          }
+                        }}
+                      >
+                        <Button disabled={!isQueryPresent}>Pivot</Button>
                       </Popover>
                     </Col>
                   </Row>

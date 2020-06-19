@@ -31,6 +31,15 @@ export const babelConfig = {
   ]
 };
 
+const prettify = (object) => {
+  let str = object;
+  if (typeof object === 'object') {
+    str = JSON.stringify(object, null, 2)
+  }
+  
+  return str.split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n')
+}
+
 const sourceCodeTemplate = (props) => {
   const {
     chartLibrary, query, apiUrl, cubejsToken, chartType
@@ -56,9 +65,9 @@ const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => (
 )
 
 const ChartRenderer = () => <QueryRenderer
-  query={${(typeof query === 'object' ? JSON.stringify(query, null, 2) : query).split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n')}}
+  query={${prettify(query)}}
   cubejsApi={cubejsApi}
-  render={renderChart(${renderFnName}, ${JSON.stringify(props.pivotConfig)})}
+  render={renderChart(${renderFnName}, ${prettify(props.pivotConfig)})}
 />;
 
 export default ChartRenderer;
@@ -121,7 +130,6 @@ export const ChartRenderer = (props) => {
   return (
     <ChartContainer
       query={query}
-      pivotConfig={pivotConfig}
       resultSet={resultSet}
       error={error}
       sqlQuery={sqlQuery}

@@ -13,11 +13,11 @@ const renderChart = Component => ({ resultSet, error }) => (resultSet && <Compon
   || (error && error.toString()) || <Spin />;
 
 const ChartRenderer = ({ vizState }) => {
-  const { query, chartType } = vizState;
+  const { query, chartType, pivotConfig } = vizState;
   const component = TypeToMemoChartComponent[chartType];
   const renderProps = useCubeQuery(query);
 
-  return component && renderChart(component)(renderProps);
+  return component && renderChart(component)({ ...renderProps, pivotConfig });
 };
 
 ChartRenderer.propTypes = {

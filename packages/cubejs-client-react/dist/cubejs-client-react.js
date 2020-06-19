@@ -465,7 +465,6 @@ function (_React$Component) {
 
               case 3:
                 meta = _context.sent;
-                console.log('didMount', core.ResultSet.getNormalizedPivotConfig(query), query);
                 this.setState({
                   meta: meta,
                   orderMembers: QueryBuilder.getOrderMembers({
@@ -475,7 +474,7 @@ function (_React$Component) {
                   pivotConfig: QueryRenderer.isQueryPresent(query) ? core.ResultSet.getNormalizedPivotConfig(query) : pivotConfig
                 });
 
-              case 6:
+              case 5:
               case "end":
                 return _context.stop();
             }

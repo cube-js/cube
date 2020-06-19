@@ -3,7 +3,7 @@ import { DragDropContext } from 'react-beautiful-dnd';
 import { Divider, Checkbox } from 'antd';
 import DroppableArea from './DroppableArea';
 
-export default function PivotConfig({ pivotConfig, onMove, onToggle }) {
+export default function Pivot({ pivotConfig, onMove, onToggle }) {
   return (
     <DragDropContext
       onDragEnd={({ source, destination }) => {

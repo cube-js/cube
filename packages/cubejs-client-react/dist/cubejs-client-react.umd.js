@@ -35712,12 +35712,14 @@
             var flatMeta = Object.values(_this4.loadResponse.annotation).reduce(function (a, b) {
               return _objectSpread2({}, a, {}, b);
             }, {});
-            var _flatMeta$key = flatMeta[key],
-                title = _flatMeta$key.title,
-                shortTitle = _flatMeta$key.shortTitle,
-                type = _flatMeta$key.type,
-                format = _flatMeta$key.format,
-                meta = _flatMeta$key.meta;
+
+            var _ref30 = flatMeta[key] || {},
+                title = _ref30.title,
+                shortTitle = _ref30.shortTitle,
+                type = _ref30.type,
+                format = _ref30.format,
+                meta = _ref30.meta;
+
             return {
               key: key,
               title: title,
@@ -35728,9 +35730,9 @@
             };
           };
 
-          this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref30) {
-            var _ref31 = _slicedToArray$$1(_ref30, 1),
-                yValues = _ref31[0];
+          this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref31) {
+            var _ref32 = _slicedToArray$$1(_ref31, 1),
+                yValues = _ref32[0];
 
             if (yValues.length > 0) {
               var currentItem = schema;
@@ -35753,9 +35755,9 @@
               return [];
             }
 
-            return Object.values(item).map(function (_ref32) {
-              var key = _ref32.key,
-                  currentItem = _objectWithoutProperties$$1(_ref32, ["key"]);
+            return Object.values(item).map(function (_ref33) {
+              var key = _ref33.key,
+                  currentItem = _objectWithoutProperties$$1(_ref33, ["key"]);
 
               var children = toColumns(currentItem.children, [].concat(_toConsumableArray$$1(path), [key]));
 
@@ -36982,7 +36984,7 @@
         }
       }, props$$1.vizState);
       _this.shouldApplyHeuristicOrder = false;
-      _this.requestId = 0;
+      _this.mutexObj = {};
       return _this;
     }
 
@@ -37161,27 +37163,38 @@
             }
           },
           pivotConfig: pivotConfig,
-          updatePivotConfig: function updatePivotConfig(_ref2) {
-            var sourceIndex = _ref2.sourceIndex,
-                destinationIndex = _ref2.destinationIndex,
-                sourceAxis = _ref2.sourceAxis,
-                destinationAxis = _ref2.destinationAxis;
-            var nextPivotConfig = {
-              x: _toConsumableArray(pivotConfig.x),
-              y: _toConsumableArray(pivotConfig.y)
-            };
-            var id = pivotConfig[sourceAxis][sourceIndex];
-            nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
-            nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id); // console.log('!', nextPivotConfig, {
-            //   sourceIndex,
-            //   destinationIndex,
-            //   sourceAxis,
-            //   destinationAxis
-            // })
+          updatePivotConfig: {
+            moveItem: function moveItem(_ref2) {
+              var sourceIndex = _ref2.sourceIndex,
+                  destinationIndex = _ref2.destinationIndex,
+                  sourceAxis = _ref2.sourceAxis,
+                  destinationAxis = _ref2.destinationAxis;
 
-            _this2.updateVizState({
-              pivotConfig: nextPivotConfig
-            });
+              var nextPivotConfig = _objectSpread({}, pivotConfig, {
+                x: _toConsumableArray(pivotConfig.x),
+                y: _toConsumableArray(pivotConfig.y)
+              });
+
+              var id = pivotConfig[sourceAxis][sourceIndex];
+
+              if (id === 'measures') {
+                destinationIndex = nextPivotConfig[destinationAxis].length;
+              }
+
+              nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
+              nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
+
+              _this2.updateVizState({
+                pivotConfig: nextPivotConfig
+              });
+            },
+            toggleFillMissingDates: function toggleFillMissingDates() {
+              _this2.updateVizState({
+                pivotConfig: _objectSpread({}, pivotConfig, {
+                  fillMissingDates: !pivotConfig.fillMissingDates
+                })
+              });
+            }
           }
         }, queryRendererProps);
       }
@@ -37199,7 +37212,7 @@
         var _updateVizState = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee2(state) {
-          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, currentPivotConfig, finalState, _ref3, _, query, currentRequestId, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, currentPivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, shouldNormalizePivotConfig, _finalState, _meta, toSet;
 
           return regeneratorRuntime.wrap(function _callee2$(_context2) {
             while (1) {
@@ -37212,28 +37225,19 @@
                   _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                   if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                    _context2.next = 16;
+                    _context2.next = 12;
                     break;
                   }
 
                   this.shouldApplyHeuristicOrder = false;
-                  currentRequestId = ++this.requestId;
-                  _context2.next = 10;
-                  return this.cubejsApi().sql(query);
+                  _context2.next = 9;
+                  return this.cubejsApi().sql(query, {
+                    mutexObj: this.mutexObj
+                  });
 
-                case 10:
+                case 9:
                   _ref4 = _context2.sent;
                   sqlQuery = _ref4.sqlQuery;
-
-                  if (!(this.requestId !== currentRequestId)) {
-                    _context2.next = 14;
-                    break;
-                  }
-
-                  return _context2.abrupt("return");
-
-                case 14:
-                  console.log('order...', cubejsClientCore_2.getNormalizedPivotConfig(finalState.query || {}));
                   finalState = _objectSpread({}, finalState, {
                     query: _objectSpread({}, finalState.query, {
                       order: sqlQuery.sql.order
@@ -37241,7 +37245,7 @@
                     pivotConfig: cubejsClientCore_2.getNormalizedPivotConfig(finalState.query || {})
                   });
 
-                case 16:
+                case 12:
                   updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread({}, this.state, {}, finalState)));
                   currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
                     var id = _ref5.id;
@@ -37268,10 +37272,19 @@
                   nextQuery = _objectSpread({}, stateQuery, {}, query, {
                     order: nextOrder
                   });
+                  shouldNormalizePivotConfig = !equals({
+                    measures: stateQuery.measures,
+                    dimensions: stateQuery.dimensions,
+                    timeDimensions: stateQuery.timeDimensions
+                  }, {
+                    measures: nextQuery.measures,
+                    dimensions: nextQuery.dimensions,
+                    timeDimensions: nextQuery.timeDimensions
+                  });
                   finalState = _objectSpread({}, finalState, {
                     query: nextQuery,
                     orderMembers: currentOrderMembers,
-                    pivotConfig: (stateQuery.measures || []).length !== (nextQuery.measures || []).length || (stateQuery.dimensions || []).length !== (nextQuery.dimensions || []).length ? cubejsClientCore_2.getNormalizedPivotConfig(query) : currentPivotConfig
+                    pivotConfig: shouldNormalizePivotConfig ? cubejsClientCore_2.getNormalizedPivotConfig(query) : currentPivotConfig
                   });
                   this.setState(finalState);
                   finalState = _objectSpread({}, this.state, {}, finalState);
@@ -37285,7 +37298,7 @@
                     setVizState(toSet);
                   }
 
-                case 27:
+                case 24:
                 case "end":
                   return _context2.stop();
               }

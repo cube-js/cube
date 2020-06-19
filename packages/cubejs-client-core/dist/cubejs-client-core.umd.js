@@ -16556,12 +16556,14 @@
 	        var flatMeta = Object.values(_this4.loadResponse.annotation).reduce(function (a, b) {
 	          return _objectSpread({}, a, {}, b);
 	        }, {});
-	        var _flatMeta$key = flatMeta[key],
-	            title = _flatMeta$key.title,
-	            shortTitle = _flatMeta$key.shortTitle,
-	            type$$1 = _flatMeta$key.type,
-	            format = _flatMeta$key.format,
-	            meta = _flatMeta$key.meta;
+
+	        var _ref30 = flatMeta[key] || {},
+	            title = _ref30.title,
+	            shortTitle = _ref30.shortTitle,
+	            type$$1 = _ref30.type,
+	            format = _ref30.format,
+	            meta = _ref30.meta;
+
 	        return {
 	          key: key,
 	          title: title,
@@ -16572,9 +16574,9 @@
 	        };
 	      };
 
-	      this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref30) {
-	        var _ref31 = _slicedToArray(_ref30, 1),
-	            yValues = _ref31[0];
+	      this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref31) {
+	        var _ref32 = _slicedToArray(_ref31, 1),
+	            yValues = _ref32[0];
 
 	        if (yValues.length > 0) {
 	          var currentItem = schema;
@@ -16597,9 +16599,9 @@
 	          return [];
 	        }
 
-	        return Object.values(item).map(function (_ref32) {
-	          var key = _ref32.key,
-	              currentItem = _objectWithoutProperties(_ref32, ["key"]);
+	        return Object.values(item).map(function (_ref33) {
+	          var key = _ref33.key,
+	              currentItem = _objectWithoutProperties(_ref33, ["key"]);
 
 	          var children = toColumns(currentItem.children, [].concat(_toConsumableArray(path), [key]));
 
