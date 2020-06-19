@@ -5,8 +5,8 @@ import PropTypes from "prop-types";
 import moment from "moment";
 import PerfectScrollbar from "react-perfect-scrollbar";
 import { makeStyles } from "@material-ui/styles";
-import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
-import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
+import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
+import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
 import {
   CardActions,
   CardContent,
@@ -30,6 +30,9 @@ const useStyles = makeStyles(theme => ({
   content: {
     padding: 0
   },
+  head: {
+    backgroundColor: palette.background.gray
+  },
   inner: {
     minWidth: 1050
   },
@@ -44,18 +47,21 @@ const useStyles = makeStyles(theme => ({
     justifyContent: "flex-end"
   },
   tableRow: {
-    cursor: "pointer"
+    cursor: "pointer",
+    '.MuiTableRow-root.MuiTableRow-hover&:hover': {
+      backgroundColor: palette.primary.action
+    }
   },
   hoverable: {
     "&:hover": {
-      color: `${palette.secondary.main}`,
+      color: `${palette.primary.normal}`,
       cursor: `pointer`
     }
   },
   arrow: {
     fontSize: 10,
-    display: 'inline-block',
-    padding: '0 4px'
+    display: "inline-block",
+    padding: "0 4px"
   }
 }));
 
@@ -82,33 +88,33 @@ const OrdersTable = props => {
 
   const tableHeaders = [
     {
-      text: 'User id',
-      value: 'Orders.user_id'
+      text: "User id",
+      value: "Orders.user_id"
     },
     {
-      text: 'User city',
-      value: 'Users.city'
+      text: "User city",
+      value: "Users.city"
     },
     {
-      text: 'User company',
-      value: 'Users.company'
+      text: "User company",
+      value: "Users.company"
     },
     {
-      text: 'Product id',
-      value: 'Orders.product_id'
+      text: "Product id",
+      value: "Orders.product_id"
     },
     {
-      text: 'Order price',
-      value: 'LineItems.item_price'
+      text: "Order price",
+      value: "LineItems.item_price"
     },
     {
-      text: 'Status',
-      value: 'Orders.status'
+      text: "Status",
+      value: "Orders.status"
     },
     {
-      text: 'Created at',
-      value: 'Orders.createdAt'
-    },
+      text: "Created at",
+      value: "Orders.createdAt"
+    }
   ];
 
   const handleSelectAll = event => {
@@ -166,7 +172,7 @@ const OrdersTable = props => {
         <PerfectScrollbar>
           <div className={classes.inner}>
             <Table>
-              <TableHead>
+              <TableHead className={classes.head}>
                 <TableRow>
                   <TableCell padding="checkbox">
                     <Checkbox
@@ -181,7 +187,9 @@ const OrdersTable = props => {
                   </TableCell>
                   {tableHeaders.map((item) => (
                     <TableCell key={item.value} className={classes.hoverable}
-                               onClick={() => {handleSetSorting(`${item.value}`);}}
+                               onClick={() => {
+                                 handleSetSorting(`${item.value}`);
+                               }}
                     >
                       <span>{item.text}</span>
                       <Typography
@@ -189,7 +197,8 @@ const OrdersTable = props => {
                         variant="body2"
                         component="span"
                       >
-                        {(sorting[0] === item.value) ? (sorting[1] === 'desc' ? <KeyboardArrowUpIcon/> : <KeyboardArrowDownIcon/>) : null }
+                        {(sorting[0] === item.value) ? (sorting[1] === "desc" ? <KeyboardArrowUpIcon/> :
+                          <KeyboardArrowDownIcon/>) : null}
                       </Typography>
                     </TableCell>
                   ))}

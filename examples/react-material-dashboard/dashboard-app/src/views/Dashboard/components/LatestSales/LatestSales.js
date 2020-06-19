@@ -24,11 +24,17 @@ import CustomCard from "../../../../components/CustomCard";
 const useStyles = makeStyles(() => ({
   root: {},
   chartContainer: {
-    height: 400,
-    position: "relative"
+    position: "relative",
+    padding: "19px 0"
   },
   actions: {
     justifyContent: "flex-end"
+  },
+  headerButton: {
+    letterSpacing: '0.4px'
+  },
+  bottomButton: {
+    letterSpacing: '0.4px'
   }
 }));
 
@@ -107,6 +113,7 @@ const LatestSales = props => {
               action={
                 <div>
                   <Button
+                    className={classes.headerButton}
                     size="small"
                     variant="text"
                     aria-controls="simple-menu"
@@ -143,6 +150,7 @@ const LatestSales = props => {
             <Divider/>
             <CardActions className={classes.actions}>
               <Button
+                className={classes.bottomButton}
                 color="primary"
                 size="small"
                 variant="text"

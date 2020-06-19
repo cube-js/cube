@@ -20,7 +20,8 @@ const useStyles = makeStyles(theme => ({
   },
   details: {
     display: "flex",
-    padding: 5
+    alignItems: 'center',
+    padding: '5px 5px 13px 5px'
   },
   avatar: {
     height: 60,

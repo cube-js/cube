@@ -17,6 +17,7 @@ const useStyles = makeStyles(theme => ({
     height: "100%"
   },
   chartContainer: {
+    marginTop: theme.spacing(3),
     position: "relative",
     height: "300px"
   },
@@ -25,11 +26,15 @@ const useStyles = makeStyles(theme => ({
     display: "flex",
     justifyContent: "center"
   },
-  device: {
+  status: {
     textAlign: "center",
-    padding: theme.spacing(1)
+    padding: theme.spacing(1),
   },
-  deviceIcon: {
+  title: {
+    color: theme.palette.text.secondary,
+    paddingBottom: theme.spacing(1)
+  },
+  statusIcon: {
     color: theme.palette.icon
   }
 }));
@@ -136,16 +141,16 @@ const OrdersStatus = props => {
                 />
               </div>
               <div className={classes.stats}>
-                {orders.map(device => (
+                {orders.map(status => (
                   <div
-                    className={classes.device}
-                    key={device.title}
+                    className={classes.status}
+                    key={status.title}
                   >
-                    <Typography variant="body1">{device.title}</Typography>
+                    <Typography variant="body1" className={classes.title}>{status.title}</Typography>
                     <Typography
                       variant="h2"
                     >
-                      {device.value}%
+                      {status.value}%
                     </Typography>
                   </div>
                 ))}

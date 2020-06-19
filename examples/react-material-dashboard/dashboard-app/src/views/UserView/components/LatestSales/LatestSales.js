@@ -22,8 +22,8 @@ import CustomCard from "../../../../components/CustomCard";
 const useStyles = makeStyles(() => ({
   root: {},
   chartContainer: {
-    height: 400,
-    position: "relative"
+    position: "relative",
+    padding: "19px 0 11px"
   },
   actions: {
     justifyContent: "flex-end"

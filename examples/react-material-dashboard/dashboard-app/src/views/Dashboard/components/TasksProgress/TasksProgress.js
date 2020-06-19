@@ -29,7 +29,9 @@ const useStyles = makeStyles(theme => ({
     width: 32
   },
   progress: {
-    marginTop: theme.spacing(3)
+    marginTop: theme.spacing(3),
+    height: "8px",
+    borderRadius: "10px"
   }
 }));
 

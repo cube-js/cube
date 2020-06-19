@@ -10,7 +10,9 @@ export default {
     contrastText: white,
     dark: '#43436B',
     main: '#9592FF',
-    light: '#F3F3FB'
+    normal: '#7A77FF',
+    action: '#EEEDFF',
+    light: '#F3F3FB',
   },
   secondary: {
     contrastText: white,
@@ -50,6 +52,7 @@ export default {
   },
   background: {
     default: '#F4F6F8',
+    gray: '#F8F8FC',
     paper: white
   },
   icon: '#A1A1B5',

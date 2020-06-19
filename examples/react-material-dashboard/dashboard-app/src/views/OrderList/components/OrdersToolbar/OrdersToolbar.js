@@ -31,6 +31,8 @@ const AntTab = withStyles((theme) => ({
     fontSize: 12,
     fontWeight: theme.typography.fontWeightRegular,
     marginRight: theme.spacing(0),
+    color: palette.primary.dark,
+    opacity: 0.6,
     '&:hover': {
       color: `${palette.primary.main}`,
       opacity: 1,
@@ -152,7 +154,7 @@ const OrdersToolbar = props => {
             <Grid container justify="space-around">
               <KeyboardDatePicker
                 id="date-picker-dialog"
-                label="Start Date"
+                label={<span style={{opacity: 0.6}}>Start Date</span>}
                 format="MM/dd/yyyy"
                 value={startDate}
                 onChange={handleDateChange}
@@ -176,7 +178,7 @@ const OrdersToolbar = props => {
             <Grid container justify="space-around">
               <KeyboardDatePicker
                 id="date-picker-dialog-finish"
-                label="Finish Date"
+                label={<span style={{opacity: 0.6}}>Start Date</span>}
                 format="MM/dd/yyyy"
                 value={finishDate}
                 onChange={handleDateChangeFinish}

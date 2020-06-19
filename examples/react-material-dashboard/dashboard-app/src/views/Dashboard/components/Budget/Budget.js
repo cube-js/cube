@@ -16,7 +16,8 @@ const useStyles = makeStyles(theme => ({
     display: 'flex'
   },
   title: {
-    fontWeight: 500
+    fontWeight: 500,
+    letterSpacing: '0.4px'
   },
   avatar: {
     backgroundColor: theme.palette.error.main,
