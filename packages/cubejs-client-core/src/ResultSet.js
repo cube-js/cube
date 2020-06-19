@@ -42,6 +42,7 @@ import momentRange from 'moment-range';
  * ```
  *
  * in this case the `Users.country` values will be laid out on **y** or **columns** axis
+ *
  * | Users Gender | Australia, Orders.count | Germany, Orders.count | US, Orders.count |
  * | ------------ | ----------------------- | --------------------- | ---------------- |
  * | male         | 3                       | 10                    | 5                |
