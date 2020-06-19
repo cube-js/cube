@@ -9,6 +9,58 @@ import Moment from 'moment';
 import momentRange from 'moment-range';
 
 /**
+ * Let's apply `pivotConfig` and see how it affects the axes
+ * ```js
+ * // Example query
+ * {
+ *   measures: ['Orders.count'],
+ *   dimensions: ['Users.country', 'Users.gender']
+ * }
+ * ```
+ * If we put the `Users.gender` dimension on **y** axis
+ * ```js
+ * resultSet.tablePivot({
+ *   x: ['Users.country'],
+ *   y: ['Users.gender', 'measures']
+ * })
+ * ```
+ *
+ * The resulting table will look the following way
+ *
+ * | Users Country | male, Orders.count | female, Orders.count |
+ * | ------------- | ------------------ | -------------------- |
+ * | Australia     | 3                  | 27                   |
+ * | Germany       | 10                 | 12                   |
+ * | US            | 5                  | 7                    |
+ *
+ * Now let's put the `Users.country` dimension on **y** axis instead
+ * ```js
+ * resultSet.tablePivot({
+ *   x: ['Users.gender'],
+ *   y: ['Users.country', 'measures'],
+ * });
+ * ```
+ *
+ * in this case the `Users.country` values will be laid out on **y** or **columns** axis
+ * | Users Gender | Australia, Orders.count | Germany, Orders.count | US, Orders.count |
+ * | ------------ | ----------------------- | --------------------- | ---------------- |
+ * | male         | 3                       | 10                    | 5                |
+ * | female       | 27                      | 12                    | 7                |
+ *
+ * It's also possible to put the `measures` on **x** axis.
+ * But in either case it should always be the last item of the array.
+ * ```js
+ * resultSet.tablePivot({
+ *   x: ['Users.gender', 'measures'],
+ *   y: ['Users.country'],
+ * });
+ * ```
+ *
+ * | Users Gender | measures     | Australia | Germany | US  |
+ * | ------------ | ------------ | --------- | ------- | --- |
+ * | male         | Orders.count | 3         | 10      | 5   |
+ * | female       | Orders.count | 27        | 12      | 7   |
+ *
  * @memberof ResultSet
  * @typedef {Object} PivotConfig Configuration object that contains the information about pivot axes and other options
  * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
@@ -313,8 +365,10 @@ class ResultSet {
 
   /**
    * Base method for pivoting {@link ResultSet} data.
-   * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot} or {@link ResultSet#tablePivot}
-   * should be used instead.
+   * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot}
+   * or {@link ResultSet#tablePivot} should be used instead.
+   *
+   * You can find the examples of using the `pivotConfig` [here](#pivot-config)
    * ```js
    * // For query
    * {
@@ -430,8 +484,10 @@ class ResultSet {
 
   /**
    * Returns normalized query result data in the following format.
+   *
+   * You can find the examples of using the `pivotConfig` [here](#pivot-config)
    * ```js
-   * // For query
+   * // For the query
    * {
    *   measures: ['Stories.count'],
    *   timeDimensions: [{
@@ -479,7 +535,9 @@ class ResultSet {
   /**
    * Returns normalized query result data prepared for visualization in the table format.
    *
-   * For example
+   * You can find the examples of using the `pivotConfig` [here](#pivot-config)
+   *
+   * For example:
    * ```js
    * // For the query
    * {
@@ -499,67 +557,6 @@ class ResultSet {
    *   //...
    * ]
    * ```
-   *
-   * Now let's make use of `pivotConfig` and put the `Users.gender` dimension on **y** axis.
-   * ```js
-   * // For example the query is
-   * {
-   *   measures: ['Orders.count'],
-   *   dimensions: ['Users.country', 'Users.gender']
-   * }
-   *
-   * resultSet.tablePivot({
-   *   x: ['Users.country'],
-   *   y: ['Users.gender', 'measures']
-   * })
-   *
-   * // then `tablePivot` will return the rows in the following format
-   * [
-   *   {
-   *     'Users.country': 'Australia',
-   *     'female.Orders.count': 3
-   *     'male.Orders.count': 27
-   *   },
-   *   // ...
-   * ]
-   * ```
-   *
-   * The resulting table will look like this
-   *
-   * | Users Country | male | female |
-   * | ------------- | ---- | ------ |
-   * | Australia     | 3    | 27     |
-   * | Germany       | 10   | 12     |
-   * | US            | 5    | 7      |
-   *
-   * If we put the `Users.country` dimension on **y** axis instead
-   * ```js
-   * resultSet.tablePivot({
-   *   x: ['Users.gender'],
-   *   y: ['Users.country', 'measures'],
-   * });
-   * ```
-   *
-   * the table will look like
-   *
-   * | Users Gender | Australia | Germany | US  |
-   * | ------------ | --------- | ------- | --- |
-   * | male         | 3         | 10      | 5   |
-   * | female       | 27        | 12      | 7   |
-   *
-   * It's also possible to put the `measures` on **x** axis
-   * ```js
-   * resultSet.tablePivot({
-   *   x: ['Users.gender', 'measures'],
-   *   y: ['Users.country'],
-   * });
-   * ```
-   *
-   * | Users Gender | measures     | Australia | Germany | US  |
-   * | ------------ | ------------ | --------- | ------- | --- |
-   * | male         | Orders.count | 3         | 10      | 5   |
-   * | female       | Orders.count | 27        | 12      | 7   |
-   *
    * @param {PivotConfig} [pivotConfig]
    * @returns {Array} of pivoted rows
    */
@@ -583,7 +580,7 @@ class ResultSet {
   /**
    * Returns array of column definitions for `tablePivot`.
    *
-   * For example
+   * For example:
    * ```js
    * // For the query
    * {
@@ -617,7 +614,7 @@ class ResultSet {
    * ]
    * ```
    *
-   * In case we want to pivot the table
+   * In case we want to pivot the table axes
    * ```js
    * // Let's take this query as an example
    * {

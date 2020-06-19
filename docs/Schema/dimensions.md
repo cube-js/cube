@@ -152,3 +152,17 @@ dimensions: {
   }
 }
 ```
+
+### propagateFiltersToSubQuery
+When this statement is set to `true` the filters applied to the query will be passed to the subquery
+
+```javascript
+dimensions: {
+  usersCount: {
+    sql: `${Users.count}`,
+    type: `number`,
+    subQuery: true,
+    propagateFiltersToSubQuery: true
+  }
+}
+```

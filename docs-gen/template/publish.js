@@ -19,7 +19,7 @@ const renderLinks = (p) => {
     return `[${p.type.names.join('#')}](#${anchorName(p.type.names.join('-'))})`;
   }
   if (p.type) {
-    return `\`${p.type.names.join('#')}\``;
+    return `\`${p.type.names.join('|')}\``;
   }
   return p;
 };
@@ -28,8 +28,9 @@ function generateParams(doclet, field = 'params') {
   const params = doclet[field].map((p) => {
     const optional = p.optional ? '**Optional**' : null;
     const defaultValue = p.defaultvalue ? `**Default:** \`${p.defaultvalue}\`` : null;
-    const type = p.type && p.type.parsedType && (p.type.parsedType.name || p.type.parsedType.parsedExpression || p.type.parsedType.typeExpression);
-    const formattedType = type ? ` **${type}**` : '';
+    const type = p.type && p.type.parsedType &&
+    (p.type.parsedType.name || p.type.parsedType.parsedExpression || p.type.parsedType.typeExpression);
+    const formattedType = type ? `: ${type}` : '';
     const options = [optional, defaultValue].filter((f) => !!f);
 
     if (!p.description && typeDefs.find((td) => td.name === type)) {
@@ -38,13 +39,13 @@ function generateParams(doclet, field = 'params') {
 
     p.description = (p.description || '').replace(/\n/g, ' ').trim();
 
-    return `- \`${p.name}\`${formattedType}${options.length ? ` (${options.join(', ')})` : ''}${
+    return `- \`${p.name}${formattedType}\`${options.length ? ` (${options.join(', ')})` : ''}${
       p.description ? ` - ${resolveInlineLinks(p.description)}` : ''
     }`;
   });
 
   if (field === 'properties') {
-    return params.join('\n');
+    return `**Properties:**\n\n${params.join('\n')}\n`;
   }
 
   return `**Parameters:**\n\n${params.join('\n')}\n`;
