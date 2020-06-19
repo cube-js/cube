@@ -1,7 +1,7 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import {
-  prop, uniqBy, indexBy, fromPairs
+  prop, uniqBy, indexBy, fromPairs, equals
 } from 'ramda';
 import { ResultSet } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
@@ -96,12 +96,14 @@ export default class QueryBuilder extends React.Component {
     };
     
     this.shouldApplyHeuristicOrder = false;
-    this.requestId = 0;
+    this.mutexObj = {};
   }
 
   async componentDidMount() {
     const { query, pivotConfig } = this.state;
     const meta = await this.cubejsApi().meta();
+    
+    console.log('didMount', ResultSet.getNormalizedPivotConfig(query), query)
     
     this.setState({
       meta,
@@ -218,31 +220,39 @@ export default class QueryBuilder extends React.Component {
         }
       },
       pivotConfig,
-      updatePivotConfig: ({
-        sourceIndex,
-        destinationIndex,
-        sourceAxis,
-        destinationAxis
-      }) => {
-        const nextPivotConfig = {
-          x: [...pivotConfig.x],
-          y: [...pivotConfig.y],
-        };
-        const id = pivotConfig[sourceAxis][sourceIndex];
-    
-        nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
-        nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
-        
-        // console.log('!', nextPivotConfig, {
-        //   sourceIndex,
-        //   destinationIndex,
-        //   sourceAxis,
-        //   destinationAxis
-        // })
-        
-        this.updateVizState({
-          pivotConfig: nextPivotConfig
-        });
+      updatePivotConfig: {
+        moveItem: ({
+          sourceIndex,
+          destinationIndex,
+          sourceAxis,
+          destinationAxis
+        }) => {
+          const nextPivotConfig = {
+            ...pivotConfig,
+            x: [...pivotConfig.x],
+            y: [...pivotConfig.y],
+          };
+          const id = pivotConfig[sourceAxis][sourceIndex];
+          
+          if (id === 'measures') {
+            destinationIndex = nextPivotConfig[destinationAxis].length;
+          }
+      
+          nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
+          nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
+          
+          this.updateVizState({
+            pivotConfig: nextPivotConfig
+          });
+        },
+        toggleFillMissingDates: () => {
+          this.updateVizState({
+            pivotConfig: {
+              ...pivotConfig,
+              fillMissingDates: !pivotConfig.fillMissingDates
+            }
+          });
+        }
       },
       ...queryRendererProps
     };
@@ -270,14 +280,9 @@ export default class QueryBuilder extends React.Component {
     if (this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
       this.shouldApplyHeuristicOrder = false;
       
-      const currentRequestId = ++this.requestId;
-      const { sqlQuery } = await this.cubejsApi().sql(query);
-      
-      if (this.requestId !== currentRequestId) {
-        return;
-      }
-      
-      console.log('order...', ResultSet.getNormalizedPivotConfig(finalState.query || {}));
+      const { sqlQuery } = await this.cubejsApi().sql(query, {
+        mutexObj: this.mutexObj
+      });
       
       finalState = {
         ...finalState,
@@ -310,11 +315,24 @@ export default class QueryBuilder extends React.Component {
       order: nextOrder
     };
     
+    const shouldNormalizePivotConfig = !equals(
+      {
+        measures: stateQuery.measures,
+        dimensions: stateQuery.dimensions,
+        timeDimensions: stateQuery.timeDimensions,
+      },
+      {
+        measures: nextQuery.measures,
+        dimensions: nextQuery.dimensions,
+        timeDimensions: nextQuery.timeDimensions,
+      }
+    );
+    
     finalState = {
       ...finalState,
       query: nextQuery,
       orderMembers: currentOrderMembers,
-      pivotConfig: (stateQuery.measures || []).length !== (nextQuery.measures || []).length || (stateQuery.dimensions || []).length !== (nextQuery.dimensions || []).length ? ResultSet.getNormalizedPivotConfig(query) : currentPivotConfig
+      pivotConfig: shouldNormalizePivotConfig ? ResultSet.getNormalizedPivotConfig(query) : currentPivotConfig
     };
     
     this.setState(finalState);

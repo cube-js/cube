@@ -15795,6 +15795,24 @@
 	});
 	var momentRange$1 = unwrapExports(momentRange);
 
+	/**
+	 * @memberof ResultSet
+	 * @typedef {Object} PivotConfig Configuration object that contains the information about pivot axes and other options
+	 * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
+	 * Put `measures` at the end of array here
+	 * @property {Array<string>} y Dimensions to put on **y** or **columns** axis.
+	 * @property {Boolean} [fillMissingDates=true] If `true` missing dates on the time dimensions
+	 * will be filled with `0` for all measures.
+	 * Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
+	 */
+
+	/**
+	 * @memberof ResultSet
+	 * @typedef {Object} DrillDownLocator
+	 * @property {Array<string>} xValues
+	 * @property {Array<string>} yValues
+	 */
+
 	var moment$1 = momentRange$1.extendMoment(moment);
 	var TIME_SERIES = {
 	  day: function day(range$$1) {
@@ -15853,7 +15871,6 @@
 	   * Returns a measure drill down query.
 	   *
 	   * Provided you have a measure with the defined `drillMemebers` on the `Orders` cube
-	   *
 	   * ```js
 	   * measures: {
 	   *   count: {
@@ -15865,7 +15882,6 @@
 	   * ```
 	   *
 	   * Then you can use the `drillDown` method to see the rows that contribute to that metric
-	   *
 	   * ```js
 	   * resultSet.drillDown(
 	   *   {
@@ -15879,7 +15895,6 @@
 	   *
 	   * the result will be a query with the required filters applied and the dimensions/measures filled out
 	   * ```js
-	   *
 	   * {
 	   *   measures: ['Orders.count'],
 	   *   dimensions: ['Orders.status', 'Users.city'],
@@ -15891,8 +15906,8 @@
 	   *   ]
 	   * }
 	   * ```
-	   * @param {Object} drillDownLocator - expects `{ xValues: [], yValues: [] }` object.
-	   * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
+	   * @param {DrillDownLocator} drillDownLocator
+	   * @param {PivotConfig} [pivotConfig]
 	   * @returns {Object|null} Drill down query
 	   */
 
@@ -15979,9 +15994,8 @@
 	    }
 	    /**
 	     * Returns an array of series with key, title and series data.
-	     *
 	     * ```js
-	     * // For query
+	     * // For the query
 	     * {
 	     *   measures: ['Stories.count'],
 	     *   timeDimensions: [{
@@ -15994,18 +16008,18 @@
 	     * // ResultSet.series() will return
 	     * [
 	     *   {
-	     *     "key":"Stories.count",
-	     *     "title": "Stories Count",
-	     *     "series": [
-	     *       { "x":"2015-01-01T00:00:00", "value": 27120 },
-	     *       { "x":"2015-02-01T00:00:00", "value": 25861 },
-	     *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+	     *     key: 'Stories.count',
+	     *     title: 'Stories Count',
+	     *     series: [
+	     *       { x: '2015-01-01T00:00:00', value: 27120 },
+	     *       { x: '2015-02-01T00:00:00', value: 25861 },
+	     *       { x: '2015-03-01T00:00:00', value: 29661 },
 	     *       //...
-	     *     ]
-	     *   }
+	     *     ],
+	     *   },
 	     * ]
 	     * ```
-	     * @param pivotConfig - See {@link ResultSet#pivot}.
+	     * @param {PivotConfig} [pivotConfig]
 	     * @returns {Array}
 	     */
 
@@ -16075,62 +16089,7 @@
 	    key: "normalizePivotConfig",
 	    value: function normalizePivotConfig(pivotConfig) {
 	      var query = this.loadResponse.query;
-	      var timeDimensions = (query.timeDimensions || []).filter(function (td) {
-	        return !!td.granularity;
-	      });
-	      var dimensions = query.dimensions || [];
-	      pivotConfig = pivotConfig || (timeDimensions.length ? {
-	        x: timeDimensions.map(function (td) {
-	          return ResultSet.timeDimensionMember(td);
-	        }),
-	        y: dimensions
-	      } : {
-	        x: dimensions,
-	        y: []
-	      });
-
-	      var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
-	        return axis.map(function (subDim) {
-	          return timeDimensions.find(function (td) {
-	            return td.dimension === subDim;
-	          }) && !dimensions.find(function (d) {
-	            return d === subDim;
-	          }) ? ResultSet.timeDimensionMember(query.timeDimensions.find(function (td) {
-	            return td.dimension === subDim;
-	          })) : subDim;
-	        });
-	      };
-
-	      pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
-	      pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
-	      var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
-	      var allDimensions = timeDimensions.map(function (td) {
-	        return ResultSet.timeDimensionMember(td);
-	      }).concat(dimensions);
-	      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
-	        return allIncludedDimensions.indexOf(d) === -1;
-	      }));
-
-	      if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
-	        return d === 'measures';
-	      })) {
-	        pivotConfig.y = pivotConfig.y.concat(['measures']);
-	      }
-
-	      if (!(query.measures || []).length) {
-	        pivotConfig.x = pivotConfig.x.filter(function (d) {
-	          return d !== 'measures';
-	        });
-	        pivotConfig.y = pivotConfig.y.filter(function (d) {
-	          return d !== 'measures';
-	        });
-	      }
-
-	      if (pivotConfig.fillMissingDates == null) {
-	        pivotConfig.fillMissingDates = true;
-	      }
-
-	      return pivotConfig;
+	      return ResultSet.getNormalizedPivotConfig(query, pivotConfig);
 	    }
 	  }, {
 	    key: "timeSeries",
@@ -16179,7 +16138,6 @@
 	     * Base method for pivoting {@link ResultSet} data.
 	     * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot} or {@link ResultSet#tablePivot}
 	     * should be used instead.
-	     *
 	     * ```js
 	     * // For query
 	     * {
@@ -16213,14 +16171,7 @@
 	     *   }
 	     * ]
 	     * ```
-	     * @typedef {Object} PivotConfig
-	     * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
-	     * Put `measures` at the end of array here
-	     * @property {Array<string>} y Dimensions to put on **y** or **columns** axis.
-	     * @property {Boolean} [fillMissingDates=true] If `true` missing dates on time dimensions
-	     *  will be filled with `0` for all measures.
-	     * @param {PivotConfig} [pivotConfig] Configuration object that contains information
-	     * about pivot axes and other options
+	     * @param {PivotConfig} [pivotConfig]
 	     * @returns {Array} of pivoted rows.
 	     */
 
@@ -16280,7 +16231,6 @@
 	      var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
 	      function (_ref14) {
 	        var _ref15 = _slicedToArray(_ref14, 2),
-	            xValuesString = _ref15[0],
 	            rows = _ref15[1];
 
 	        return unnest( // collect Y values only from filled rows
@@ -16335,7 +16285,6 @@
 	    }
 	    /**
 	     * Returns normalized query result data in the following format.
-	     *
 	     * ```js
 	     * // For query
 	     * {
@@ -16349,13 +16298,13 @@
 	     *
 	     * // ResultSet.chartPivot() will return
 	     * [
-	     *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
-	     *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
-	     *   { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
+	     *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120, "xValues": ["2015-01-01T00:00:00"] },
+	     *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861, "xValues": ["2015-02-01T00:00:00"]  },
+	     *   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
 	     *   //...
 	     * ]
 	     * ```
-	     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
+	     * @param {PivotConfig} [pivotConfig]
 	     */
 
 	  }, {
@@ -16396,9 +16345,8 @@
 	     * Returns normalized query result data prepared for visualization in the table format.
 	     *
 	     * For example
-	     *
 	     * ```js
-	     * // For query
+	     * // For the query
 	     * {
 	     *   measures: ['Stories.count'],
 	     *   timeDimensions: [{
@@ -16417,8 +16365,7 @@
 	     * ]
 	     * ```
 	     *
-	     * Now let's make use of `pivotConfig` and put the `Users.gender` dimension on    * **y** axis.
-	     *
+	     * Now let's make use of `pivotConfig` and put the `Users.gender` dimension on **y** axis.
 	     * ```js
 	     * // For example the query is
 	     * {
@@ -16451,7 +16398,6 @@
 	     * | US            | 5    | 7      |
 	     *
 	     * If we put the `Users.country` dimension on **y** axis instead
-	     *
 	     * ```js
 	     * resultSet.tablePivot({
 	     *   x: ['Users.gender'],
@@ -16467,7 +16413,6 @@
 	     * | female       | 27        | 12      | 7   |
 	     *
 	     * It's also possible to put the `measures` on **x** axis
-	     *
 	     * ```js
 	     * resultSet.tablePivot({
 	     *   x: ['Users.gender', 'measures'],
@@ -16480,7 +16425,7 @@
 	     * | male         | Orders.count | 3         | 10      | 5   |
 	     * | female       | Orders.count | 27        | 12      | 7   |
 	     *
-	     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}
+	     * @param {PivotConfig} [pivotConfig]
 	     * @returns {Array} of pivoted rows
 	     */
 
@@ -16506,7 +16451,6 @@
 	     * Returns array of column definitions for `tablePivot`.
 	     *
 	     * For example
-	     *
 	     * ```js
 	     * // For the query
 	     * {
@@ -16541,7 +16485,6 @@
 	     * ```
 	     *
 	     * In case we want to pivot the table
-	     *
 	     * ```js
 	     * // Let's take this query as an example
 	     * {
@@ -16557,7 +16500,6 @@
 	     * ```
 	     *
 	     * then `tableColumns` will group the table head and return
-	     *
 	     * ```js
 	     * {
 	     *   key: 'Germany',
@@ -16598,7 +16540,7 @@
 	     * // ...
 	     * ```
 	     *
-	     * @param pivotConfig - See {@link ResultSet#pivot}.
+	     * @param {PivotConfig} [pivotConfig]
 	     * @returns {Array} of columns
 	     */
 
@@ -16715,7 +16657,6 @@
 	    }
 	    /**
 	     * Returns the array of series objects, containing `key` and `title` parameters.
-	     *
 	     * ```js
 	     * // For query
 	     * {
@@ -16729,10 +16670,14 @@
 	     *
 	     * // ResultSet.seriesNames() will return
 	     * [
-	     * { "key":"Stories.count", "title": "Stories Count" }
+	     *   {
+	     *     key: 'Stories.count',
+	     *     title: 'Stories Count',
+	     *     yValues: ['Stories.count'],
+	     *   },
 	     * ]
 	     * ```
-	     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
+	     * @param {PivotConfig} [pivotConfig]
 	     * @returns {Array} of series names
 	     */
 
@@ -16793,6 +16738,67 @@
 	    key: "timeDimensionMember",
 	    value: function timeDimensionMember(td) {
 	      return "".concat(td.dimension, ".").concat(td.granularity);
+	    }
+	  }, {
+	    key: "getNormalizedPivotConfig",
+	    value: function getNormalizedPivotConfig(query) {
+	      var pivotConfig = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+	      var timeDimensions = (query.timeDimensions || []).filter(function (td) {
+	        return !!td.granularity;
+	      });
+	      var dimensions = query.dimensions || [];
+	      pivotConfig = pivotConfig || (timeDimensions.length ? {
+	        x: timeDimensions.map(function (td) {
+	          return ResultSet.timeDimensionMember(td);
+	        }),
+	        y: dimensions
+	      } : {
+	        x: dimensions,
+	        y: []
+	      });
+
+	      var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
+	        return axis.map(function (subDim) {
+	          return timeDimensions.find(function (td) {
+	            return td.dimension === subDim;
+	          }) && !dimensions.find(function (d) {
+	            return d === subDim;
+	          }) ? ResultSet.timeDimensionMember(query.timeDimensions.find(function (td) {
+	            return td.dimension === subDim;
+	          })) : subDim;
+	        });
+	      };
+
+	      pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
+	      pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
+	      var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+	      var allDimensions = timeDimensions.map(function (td) {
+	        return ResultSet.timeDimensionMember(td);
+	      }).concat(dimensions);
+	      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
+	        return allIncludedDimensions.indexOf(d) === -1;
+	      }));
+
+	      if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
+	        return d === 'measures';
+	      })) {
+	        pivotConfig.y = pivotConfig.y.concat(['measures']);
+	      }
+
+	      if (!(query.measures || []).length) {
+	        pivotConfig.x = pivotConfig.x.filter(function (d) {
+	          return d !== 'measures';
+	        });
+	        pivotConfig.y = pivotConfig.y.filter(function (d) {
+	          return d !== 'measures';
+	        });
+	      }
+
+	      if (pivotConfig.fillMissingDates == null) {
+	        pivotConfig.fillMissingDates = true;
+	      }
+
+	      return pivotConfig;
 	    }
 	  }, {
 	    key: "measureFromAxis",
@@ -19537,7 +19543,7 @@
 	/*#__PURE__*/
 	function () {
 	  /**
-	   * @param options - mandatory options object
+	   * @param {Object} options - mandatory options object
 	   * @param options.authorization - [jwt auth token](security)
 	   * @param options.apiUrl - path to `/cubejs-api/v1`
 	   * @param [options.headers] - object of custom headers
@@ -20209,7 +20215,8 @@
 
 	var src = /*#__PURE__*/Object.freeze({
 		default: index$1,
-		HttpTransport: HttpTransport
+		HttpTransport: HttpTransport,
+		ResultSet: ResultSet
 	});
 
 	var index$2 = ( src && index$1 ) || src;

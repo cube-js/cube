@@ -159,7 +159,13 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                       <Divider type="vertical" />
 
                       <Popover
-                        content={<PivotConfig pivotConfig={pivotConfig} onChange={updatePivotConfig} />}
+                        content={
+                          <PivotConfig
+                            pivotConfig={pivotConfig}
+                            onMove={updatePivotConfig.moveItem}
+                            onToggle={updatePivotConfig.toggleFillMissingDates}
+                          />
+                        }
                         visible={isPivotPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"

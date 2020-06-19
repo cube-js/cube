@@ -436,7 +436,7 @@ function (_React$Component) {
       }
     }, props.vizState);
     _this.shouldApplyHeuristicOrder = false;
-    _this.requestId = 0;
+    _this.mutexObj = {};
     return _this;
   }
 
@@ -458,6 +458,7 @@ function (_React$Component) {
 
               case 3:
                 meta = _context.sent;
+                console.log('didMount', ResultSet.getNormalizedPivotConfig(query), query);
                 this.setState({
                   meta: meta,
                   orderMembers: QueryBuilder.getOrderMembers({
@@ -467,7 +468,7 @@ function (_React$Component) {
                   pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : pivotConfig
                 });
 
-              case 5:
+              case 6:
               case "end":
                 return _context.stop();
             }
@@ -615,27 +616,38 @@ function (_React$Component) {
           }
         },
         pivotConfig: pivotConfig,
-        updatePivotConfig: function updatePivotConfig(_ref2) {
-          var sourceIndex = _ref2.sourceIndex,
-              destinationIndex = _ref2.destinationIndex,
-              sourceAxis = _ref2.sourceAxis,
-              destinationAxis = _ref2.destinationAxis;
-          var nextPivotConfig = {
-            x: _toConsumableArray(pivotConfig.x),
-            y: _toConsumableArray(pivotConfig.y)
-          };
-          var id = pivotConfig[sourceAxis][sourceIndex];
-          nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
-          nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id); // console.log('!', nextPivotConfig, {
-          //   sourceIndex,
-          //   destinationIndex,
-          //   sourceAxis,
-          //   destinationAxis
-          // })
+        updatePivotConfig: {
+          moveItem: function moveItem(_ref2) {
+            var sourceIndex = _ref2.sourceIndex,
+                destinationIndex = _ref2.destinationIndex,
+                sourceAxis = _ref2.sourceAxis,
+                destinationAxis = _ref2.destinationAxis;
 
-          _this2.updateVizState({
-            pivotConfig: nextPivotConfig
-          });
+            var nextPivotConfig = _objectSpread2({}, pivotConfig, {
+              x: _toConsumableArray(pivotConfig.x),
+              y: _toConsumableArray(pivotConfig.y)
+            });
+
+            var id = pivotConfig[sourceAxis][sourceIndex];
+
+            if (id === 'measures') {
+              destinationIndex = nextPivotConfig[destinationAxis].length;
+            }
+
+            nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
+            nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
+
+            _this2.updateVizState({
+              pivotConfig: nextPivotConfig
+            });
+          },
+          toggleFillMissingDates: function toggleFillMissingDates() {
+            _this2.updateVizState({
+              pivotConfig: _objectSpread2({}, pivotConfig, {
+                fillMissingDates: !pivotConfig.fillMissingDates
+              })
+            });
+          }
         }
       }, queryRendererProps);
     }
@@ -653,7 +665,7 @@ function (_React$Component) {
       var _updateVizState = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2(state) {
-        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, currentPivotConfig, finalState, _ref3, _, query, currentRequestId, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, currentPivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, shouldNormalizePivotConfig, _finalState, _meta, toSet;
 
         return _regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
@@ -666,28 +678,19 @@ function (_React$Component) {
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                 if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                  _context2.next = 16;
+                  _context2.next = 12;
                   break;
                 }
 
                 this.shouldApplyHeuristicOrder = false;
-                currentRequestId = ++this.requestId;
-                _context2.next = 10;
-                return this.cubejsApi().sql(query);
+                _context2.next = 9;
+                return this.cubejsApi().sql(query, {
+                  mutexObj: this.mutexObj
+                });
 
-              case 10:
+              case 9:
                 _ref4 = _context2.sent;
                 sqlQuery = _ref4.sqlQuery;
-
-                if (!(this.requestId !== currentRequestId)) {
-                  _context2.next = 14;
-                  break;
-                }
-
-                return _context2.abrupt("return");
-
-              case 14:
-                console.log('order...', ResultSet.getNormalizedPivotConfig(finalState.query || {}));
                 finalState = _objectSpread2({}, finalState, {
                   query: _objectSpread2({}, finalState.query, {
                     order: sqlQuery.sql.order
@@ -695,7 +698,7 @@ function (_React$Component) {
                   pivotConfig: ResultSet.getNormalizedPivotConfig(finalState.query || {})
                 });
 
-              case 16:
+              case 12:
                 updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread2({}, this.state, {}, finalState)));
                 currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
                   var id = _ref5.id;
@@ -722,10 +725,19 @@ function (_React$Component) {
                 nextQuery = _objectSpread2({}, stateQuery, {}, query, {
                   order: nextOrder
                 });
+                shouldNormalizePivotConfig = !equals({
+                  measures: stateQuery.measures,
+                  dimensions: stateQuery.dimensions,
+                  timeDimensions: stateQuery.timeDimensions
+                }, {
+                  measures: nextQuery.measures,
+                  dimensions: nextQuery.dimensions,
+                  timeDimensions: nextQuery.timeDimensions
+                });
                 finalState = _objectSpread2({}, finalState, {
                   query: nextQuery,
                   orderMembers: currentOrderMembers,
-                  pivotConfig: (stateQuery.measures || []).length !== (nextQuery.measures || []).length || (stateQuery.dimensions || []).length !== (nextQuery.dimensions || []).length ? ResultSet.getNormalizedPivotConfig(query) : currentPivotConfig
+                  pivotConfig: shouldNormalizePivotConfig ? ResultSet.getNormalizedPivotConfig(query) : currentPivotConfig
                 });
                 this.setState(finalState);
                 finalState = _objectSpread2({}, this.state, {}, finalState);
@@ -739,7 +751,7 @@ function (_React$Component) {
                   setVizState(toSet);
                 }
 
-              case 27:
+              case 24:
               case "end":
                 return _context2.stop();
             }
