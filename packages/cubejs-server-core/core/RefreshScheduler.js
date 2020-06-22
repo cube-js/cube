@@ -80,7 +80,7 @@ class RefreshScheduler {
   async runScheduledRefresh(context, queryingOptions) {
     queryingOptions = { timezone: 'UTC', ...queryingOptions };
     const { throwErrors, ...restOptions } = queryingOptions;
-    context = { requestId: `scheduler-${uuid()}`, ...context };
+    context = { requestId: `scheduler-${context && context.requestId || uuid()}`, ...context };
     this.serverCore.logger('Refresh Scheduler Run', {
       authInfo: context.authInfo,
       requestId: context.requestId
