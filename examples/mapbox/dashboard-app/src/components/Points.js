@@ -1,23 +1,16 @@
 import React, { useState, useEffect } from 'react';
-
 import { useCubeQuery } from "@cubejs-client/react";
 import MapGL, { Source, Layer, NavigationControl } from 'react-map-gl';
 import { Col, Row, Slider, Tooltip } from "antd";
-import { range } from 'ramda';
 
 export default ({ cubejsApi }) => {
+
+
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
     zoom: 1.5,
   })
-
-  let obj = {
-    initMin: 0,
-    initMax: 0,
-    min: 0,
-    max: 0
-  };
 
   const [initMin, setInitMin] = useState(0);
   const [initMax, setInitMax] = useState(0);
@@ -25,73 +18,69 @@ export default ({ cubejsApi }) => {
   const [min, setMin] = useState(0);
   const [max, setMax] = useState(0);
   const [data, setData] = useState(null);
-  const { resultSet } = useCubeQuery({
+
+
+  const { resultSet: range } = useCubeQuery({
     measures: ['Users.max', 'Users.min'],
     filters: [{
       member: "Users.geometry",
       operator: "set"
     }],
-  });
+  }, { cubejsApi });
 
-  if (resultSet) {
-    obj = {
-      initMin: resultSet.tablePivot()[0]['Users.min'],
-      initMax: resultSet.tablePivot()[0]['Users.max'],
-      min: resultSet.tablePivot()[0]['Users.max'] * 0.4,
-      max: resultSet.tablePivot()[0]['Users.max']
+  const { resultSet: points } = useCubeQuery({
+    measures: [
+      'Users.max'
+    ],
+    dimensions: [
+      'Users.geometry',
+    ],
+    filters: [
+      {
+        member: "Users.value",
+        operator: "lte",
+        values: [max.toString()]
+      },
+      {
+        member: "Users.value",
+        operator: "gte",
+        values: [min.toString()]
+      }
+    ]
+  }, { cubejsApi })
+
+  useEffect(() => {
+    if (range) {
+      setInitMax(range.tablePivot()[0]['Users.max']);
+      setInitMin(range.tablePivot()[0]['Users.min']);
+      setMax(range.tablePivot()[0]['Users.max']);
+      setMin(range.tablePivot()[0]['Users.max'] * 0.4);
     }
-  }
+  }, [range]);
 
-  useEffect(() => { loadData() }, [min, max])
-
-  const loadData = () => {
-    cubejsApi
-      .load({
-        measures: [
-          'Users.max'
-        ],
-        dimensions: [
-          'Users.geometry',
-        ],
-        filters: [
-          {
-            member: "Users.value",
-            operator: "lte",
-            values: [max.toString()]
+  useEffect(() => {
+    if (points) {
+      let data = {
+        type: 'FeatureCollection',
+        features: [],
+      };
+      points.tablePivot().map((item) => {
+        data['features'].push({
+          type: 'Feature',
+          properties: {
+            value: parseInt(item['Users.max']),
           },
-
-          {
-            member: "Users.value",
-            operator: "gte",
-            values: [min.toString()]
-          }
-        ]
-      })
-      .then((resultSet) => {
-        let data = {
-          type: 'FeatureCollection',
-          features: [],
-        };
-        resultSet.tablePivot().map((item) => {
-          data['features'].push({
-            type: 'Feature',
-            properties: {
-              value: parseInt(item['Users.max']),
-            },
-            geometry: JSON.parse(item['Users.geometry']),
-          });
+          geometry: JSON.parse(item['Users.geometry']),
         });
-        setData(data);
       });
-  }
+      setData(data);
+    }
+  }, [points]);
 
   const onChange = (value) => {
-    obj.min = value[0];
-    obj.max = value[1];
     setMin(value[0]);
     setMax(value[1]);
   }
-
 
   return (
     <React.Fragment>
@@ -106,18 +95,12 @@ export default ({ cubejsApi }) => {
           mapStyle='mapbox://styles/kalipsik/ckb2fyfqu123n1ilb5yi7uyns/draft'
           mapboxApiAccessToken='pk.eyJ1Ijoia2FsaXBzaWsiLCJhIjoiY2p3Z3JrdjQ4MDRjdDQzcGFyeXBlN3ZtZiJ9.miVaze_snePdEvitucFWSQ'
         >
-
           <div className='mapbox__navi'>
             <NavigationControl />
           </div>
           <Source type='geojson' data={data}>
             <Layer {...{
               type: 'circle',
-              /*filter: [ //https://docs.mapbox.com/mapbox-gl-js/style-spec/other/#other-filter
-                "all",
-                [">", max, ["get", "value"]],
-                ["<", min, ["get", "value"]]
-              ],*/
               paint: {
                 'circle-radius': {
                   property: 'value',
@@ -140,11 +123,11 @@ export default ({ cubejsApi }) => {
         <Col span={20} >
           <Slider
             range
-            min={obj.initMin}
-            max={obj.initMax}
+            min={initMin}
+            max={initMax}
             step={1}
-            defaultValue={[obj.initMax, obj.initMax]}
-            value={[obj.min, obj.max]}
+            defaultValue={[initMax, initMax]}
+            value={[min, max]}
             onChange={onChange}
             tooltipVisible={false}
           />

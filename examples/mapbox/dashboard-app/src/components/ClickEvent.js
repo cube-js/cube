@@ -1,80 +1,88 @@
 import React, { useState, useEffect } from 'react';
+import { useCubeQuery } from "@cubejs-client/react";
 import MapGL, { Source, Layer, Popup, NavigationControl } from 'react-map-gl';
 import { Radio } from "antd";
 import { Scrollbars } from 'react-custom-scrollbars';
 
 
-export default (props) => {
-  const [dataAnswers, setDataAnswers] = useState(null);
-  const [dataQuestions, setDataQuestions] = useState(null);
-
+export default ({ cubejsApi }) => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
     zoom: 2,
   });
+
+
   const [popupInfo, setPopupInfo] = useState(null);
   const [mode, setMode] = useState('both');
 
+
+  const [dataQuestions, setDataQuestions] = useState(null);
+  const [dataAnswers, setDataAnswers] = useState(null);
+
+
+  const { resultSet: questionsSet } = useCubeQuery({
+    measures: [
+      'Questions.count'
+    ],
+    dimensions: [
+      'Users.geometry',
+    ],
+    filters: [{
+      member: "Users.geometry",
+      operator: "set"
+    }],
+    order: {
+      'Questions.views': 'desc',
+    }
+  }, { cubejsApi });
+
+  const { resultSet: answersSet } = useCubeQuery({
+    measures: ['Answers.count'],
+    dimensions: [
+      'Users.geometry',
+    ],
+    filters: [{
+      member: "Users.geometry",
+      operator: "set"
+    }],
+  }, { cubejsApi });
+
   useEffect(() => {
-    props.cubejsApi
-      .load({
-        measures: [
-          'Questions.count'
-        ],
-        dimensions: [
-          'Users.geometry',
-        ],
-        filters: [{
-          member: "Users.geometry",
-          operator: "set"
-        }],
-        order: {
-          'Questions.views': 'desc',
-        }
-      })
-      .then((resultSet) => {
-        let data = {
-          type: 'FeatureCollection',
-          features: [],
-        };
-        resultSet.tablePivot().map((item) => {
-          data['features'].push({
-            type: 'Feature',
-            properties: {
-              count: item['Questions.count'],
-              geometry: item['Users.geometry'],
-            },
-            geometry: JSON.parse(item['Users.geometry'])
-          });
+    if (questionsSet) {
+      let data = {
+        type: 'FeatureCollection',
+        features: [],
+      };
+      questionsSet.tablePivot().map((item) => {
+        data['features'].push({
+          type: 'Feature',
+          properties: {
+            count: item['Questions.count'],
+            geometry: item['Users.geometry'],
+          },
+          geometry: JSON.parse(item['Users.geometry'])
         });
-        setDataQuestions(data);
       });
-    props.cubejsApi
-      .load({
-        measures: ['Answers.count'],
-        dimensions: [
-          'Users.geometry',
-        ],
-        filters: [{
-          member: "Users.geometry",
-          operator: "set"
-        }],
-      })
-      .then((resultSet) => {
-        let data = {
-          type: 'FeatureCollection',
-          features: [],
-        };
-        resultSet.tablePivot().map((item) => {
-          data['features'].push({
-            type: 'Feature',
-            geometry: JSON.parse(item['Users.geometry']),
-          });
+      setDataQuestions(data);
+    }
+  }, [questionsSet]);
+
+  useEffect(() => {
+    if (answersSet) {
+      let data = {
+        type: 'FeatureCollection',
+        features: [],
+      };
+      answersSet.tablePivot().map((item) => {
+        data['features'].push({
+          type: 'Feature',
+          geometry: JSON.parse(item['Users.geometry']),
         });
-        setDataAnswers(data)
       });
-  }, [])
+      setDataAnswers(data)
+    }
+  }, [answersSet]);
 
   const onChangeMode = (e) => {
     setPopupInfo(null);
@@ -87,7 +95,7 @@ export default (props) => {
         (f) => f.layer.id === 'questions-point'
       );
       if (feature) {
-        props.cubejsApi
+        cubejsApi
           .load({
             dimensions: [
               'Questions.title',

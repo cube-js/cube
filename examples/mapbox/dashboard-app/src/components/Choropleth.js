@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MapGL, { NavigationControl, Source, Layer } from 'react-map-gl';
+import { useCubeQuery } from "@cubejs-client/react";
 import { Radio } from 'antd';
 
 const options = {
@@ -73,7 +74,7 @@ const options = {
   ]
 };
 
-export default (props) => {
+export default ({ cubejsApi }) => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
@@ -82,46 +83,41 @@ export default (props) => {
 
   const [mode, setMode] = useState('total');
   const [data, setData] = useState(null);
+  const { resultSet } = useCubeQuery({
+    measures: [`Users.${mode}`],
+    dimensions: ['Users.country', 'MapboxCoords.coordinates']
+  }, { cubejsApi });
+
+  useEffect(() => {
+    if (resultSet) {
+      let data = {
+        type: 'FeatureCollection',
+        features: []
+      };
+      resultSet
+        .tablePivot()
+        .filter((item) => item['MapboxCoords.coordinates'] != null)
+        .map((item) => {
+          data['features'].push({
+            type: 'Feature',
+            properties: {
+              name: item['Users.country'],
+              value: parseInt(item[`Users.${mode}`])
+            },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [item['MapboxCoords.coordinates'].split(';').map((item) => item.split(','))]
+            }
+          });
+        });
+      setData(data);
+    }
+  }, [resultSet]);
 
 
   const onChangeMode = (e) => {
     setMode(e.target.value);
   };
-
-  const getData = () => {
-    props.cubejsApi
-      .load({
-        measures: [`Users.${mode}`],
-        dimensions: ['Users.country', 'MapboxCoords.coordinates']
-      })
-      .then((resultSet) => {
-        let data = {
-          type: 'FeatureCollection',
-          features: []
-        };
-        resultSet
-          .tablePivot()
-          .filter((item) => item['MapboxCoords.coordinates'] != null)
-          .map((item) => {
-            data['features'].push({
-              type: 'Feature',
-              properties: {
-                name: item['Users.country'],
-                value: parseInt(item[`Users.${mode}`])
-              },
-              geometry: {
-                type: 'Polygon',
-                coordinates: [item['MapboxCoords.coordinates'].split(';').map((item) => item.split(','))]
-              }
-            });
-          });
-        setData(data);
-      });
-  };
-
-  useEffect(() => {
-    getData();
-  }, [mode]);
 
   return (
     <div className="mapbox__container">

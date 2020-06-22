@@ -170,3 +170,5 @@ export default ({ cubejsApi }) => {
       </div>
     </div >)
 }
+
+

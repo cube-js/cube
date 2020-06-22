@@ -22,125 +22,114 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`
 });
 
-
-class AppLayout extends React.Component {
-  render() {
-    return (
-      <React.Fragment>
-        <Header />
-        <Layout className="mapbox">
-          <div className="mapbox__content">
-            <Tabs defaultActiveKey="0">
-              <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='heatmap'>location</Tooltip></React.Fragment>)} key={0}>
-                <Heatmap cubejsApi={cubejsApi} />
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='points distribution'> personal rating</Tooltip></React.Fragment>)} key={1}>
-                <Points cubejsApi={cubejsApi} />
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='click event'>q&amp;a</Tooltip></React.Fragment>)} key={2}>
-                <ClickEvent cubejsApi={cubejsApi} />
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='choropleth'>rating by country</Tooltip></React.Fragment>)} key={3}>
-                <Choropleth cubejsApi={cubejsApi} />
-              </Tabs.TabPane>
-            </Tabs>
-          </div>
-          <div className="mapbox__sider" width={300}>
-            <Scrollbars style={{ minHeight: 300 }}>
-              <Card
-                title='Mapbox Example'
-                bordered={false}
-                className="mapbox__card"
-              >
-                <p>Learn how to visualize different types of data with <a href="//mapbox.com" target="_blank">Mapbox</a>, <a href="//cube.dev" target="_blank">Cube.js</a> and explore <a href="//console.cloud.google.com/marketplace/details/stack-exchange/stack-overflow" target="_blank">Stackoverflow</a> audience.</p>
-              </Card>
-              <Card
-                title='Links'
-                bordered={false}
-              >
-                <ul className='useful-links'>
-                  <li>
-                    <a href='/' target='_blank'>
-                      Tutorial at Cube.JS
+const App = () => (
+  <CubeProvider cubejsApi={cubejsApi}>
+    <Header />
+    <Layout className="mapbox">
+      <div className="mapbox__content">
+        <Tabs defaultActiveKey="0">
+          <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='heatmap'>location</Tooltip></React.Fragment>)} key={0}>
+            <Heatmap cubejsApi={cubejsApi} />
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='points distribution'> personal rating</Tooltip></React.Fragment>)} key={1}>
+            <Points cubejsApi={cubejsApi} />
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='click event'>q&amp;a</Tooltip></React.Fragment>)} key={2}>
+            <ClickEvent cubejsApi={cubejsApi} />
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='choropleth'>rating by country</Tooltip></React.Fragment>)} key={3}>
+            <Choropleth cubejsApi={cubejsApi} />
+          </Tabs.TabPane>
+        </Tabs>
+      </div>
+      <div className="mapbox__sider" width={300}>
+        <Scrollbars style={{ minHeight: 300 }}>
+          <Card
+            title='Mapbox Example'
+            bordered={false}
+            className="mapbox__card"
+          >
+            <p>Learn how to visualize different types of data with <a href="//mapbox.com" target="_blank">Mapbox</a>, <a href="//cube.dev" target="_blank">Cube.js</a> and explore <a href="//console.cloud.google.com/marketplace/details/stack-exchange/stack-overflow" target="_blank">Stackoverflow</a> audience.</p>
+          </Card>
+          <Card
+            title='Links'
+            bordered={false}
+          >
+            <ul className='useful-links'>
+              <li>
+                <a href='/' target='_blank'>
+                  Tutorial at Cube.JS
                   </a>
-                  </li>
-                  <li>
-                    <a href='/' target='_blank'>
-                      View source
+              </li>
+              <li>
+                <a href='/' target='_blank'>
+                  View source
                   </a>
-                  </li>
-                  <li>
-                    <a href='//cube.dev/docs/' target='_blank'>
-                      Cube.JS docs
+              </li>
+              <li>
+                <a href='//cube.dev/docs/' target='_blank'>
+                  Cube.JS docs
                   </a>
-                  </li>
-                  <li>
-                    <a href='//docs.mapbox.com/' target='_blank'>
-                      Mapbox docs
+              </li>
+              <li>
+                <a href='//docs.mapbox.com/' target='_blank'>
+                  Mapbox docs
                   </a>
-                  </li>
-                  <li>
-                    <a
-                      href='//docs.mapbox.com/mapbox-gl-js/example/updating-choropleth/'
-                      target='_blank'
-                    >
-                      Mapbox Choropleth example
+              </li>
+              <li>
+                <a
+                  href='//docs.mapbox.com/mapbox-gl-js/example/updating-choropleth/'
+                  target='_blank'
+                >
+                  Mapbox Choropleth example
                   </a>
-                  </li>
-                  <li>
-                    <a
-                      href='//docs.mapbox.com/mapbox-gl-js/example/heatmap-layer/'
-                      target='_blank'
-                    >
-                      Mapbox Heatmap example
+              </li>
+              <li>
+                <a
+                  href='//docs.mapbox.com/mapbox-gl-js/example/heatmap-layer/'
+                  target='_blank'
+                >
+                  Mapbox Heatmap example
                   </a>
-                  </li>
-                  <li>
-                    <a
-                      href='//docs.mapbox.com/mapbox-gl-js/example/cluster/'
-                      target='_blank'
-                    >
-                      Mapbox Cluster example
+              </li>
+              <li>
+                <a
+                  href='//docs.mapbox.com/mapbox-gl-js/example/cluster/'
+                  target='_blank'
+                >
+                  Mapbox Cluster example
                   </a>
-                  </li>
-                  <li>
-                    <a href='//visgl.github.io/react-map-gl/' target='_blank'>
-                      React Mapbox wrapper
+              </li>
+              <li>
+                <a href='//visgl.github.io/react-map-gl/' target='_blank'>
+                  React Mapbox wrapper
                   </a>
-                  </li>
-                </ul>
-              </Card>
-              <Card
-                title={
-                  <React.Fragment>
-                    <Icon.SmileOutlined /> Need help?
+              </li>
+            </ul>
+          </Card>
+          <Card
+            title={
+              <React.Fragment>
+                <Icon.SmileOutlined /> Need help?
                   </React.Fragment>
-                }
-                bordered={false}
-              >
-                <p>
-                  For help please use our&nbsp;
+            }
+            bordered={false}
+          >
+            <p>
+              For help please use our&nbsp;
                 <a href='//slack.cube.dev' target='_blank'>
-                    Slack
+                Slack
                 </a>
                 &nbsp;channel.
               </p>
-              </Card>
+          </Card>
 
-              <div className="mapbox__copyright">
-                Created by Cube.js️
+          <div className="mapbox__copyright">
+            Created by Cube.js️
               </div>
-            </Scrollbars>
-          </div>
-        </Layout>
-      </React.Fragment>)
-  }
-}
-
-
-const App = () => (
-  <CubeProvider cubejsApi={cubejsApi}>
-    <AppLayout></AppLayout>
+        </Scrollbars>
+      </div>
+    </Layout>
   </CubeProvider>
 );
 
