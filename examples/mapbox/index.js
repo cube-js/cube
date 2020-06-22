@@ -13,28 +13,7 @@ const app = express();
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(require('cors')());
 
-const cubejsServer = CubejsServerCore.create({
-  dbType: ({ dataSource } = {}) => {
-    if (dataSource === 'mapbox__example') {
-      return 'postgres';
-    } else {
-      return 'bigquery';
-    }
-  },
-  driverFactory: ({ dataSource } = {}) => {
-    if (dataSource === 'mapbox__example') {
-      return new PostgresDriver({
-        database: process.env.CUBEJS_EXT_DB_NAME,
-        host: process.env.CUBEJS_EXT_DB_HOST,
-        user: process.env.CUBEJS_EXT_DB_USER,
-        password: process.env.CUBEJS_EXT_DB_PASS.toString()
-      });
-
-    } else {
-      return new BigQueryDriver();
-    }
-  }
-});
+const cubejsServer = CubejsServerCore.create();
 
 if (process.env.NODE_ENV === 'production') {
   app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));

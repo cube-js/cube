@@ -1,6 +1,5 @@
 cube(`Users`, {
   sql: `SELECT * FROM public.Users`,
-  dataSource: `mapbox__example`,
   joins: {
     Mapbox: {
       sql: `${CUBE}.country = ${Mapbox}.geounit`,

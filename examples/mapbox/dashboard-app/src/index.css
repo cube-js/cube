@@ -117,7 +117,7 @@ body {
   z-index: 1;
   background-color: white;
   padding: 16px;
-  width: 250px;
+  width: 220px;
   border-radius: 4px;
 }
 
@@ -229,6 +229,17 @@ body {
     right: auto;
     height: auto;
     padding-top: 24px;
+  }
+
+  .mapbox__slider {
+    flex-wrap: wrap;
+  }
+
+  .mapbox__slider .ant-col:first-child {
+    max-width: 100%;
+    width: 100%;
+    flex: 100%;
+    text-align: left;
   }
 }
 

@@ -119,8 +119,9 @@ export default ({ cubejsApi }) => {
         </MapGL>
       </div>
       <Row className="mapbox__slider">
+        <Col span={2}>Rating range: </Col>
         <Col span={2}><Tooltip placement="top" title='minimal rating'>{Math.round(min / 1000)}k</Tooltip></Col>
-        <Col span={20} >
+        <Col span={18} >
           <Slider
             range
             min={initMin}

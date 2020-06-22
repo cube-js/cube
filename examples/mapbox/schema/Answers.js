@@ -1,6 +1,5 @@
 cube(`Answers`, {
   sql: `SELECT * FROM public.Answers`,
-  dataSource: `mapbox__example`,
   joins: {
     Users: {
       sql: `${CUBE}.owner_user_id = ${Users}.id`,

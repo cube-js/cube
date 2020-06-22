@@ -1,6 +1,5 @@
 cube(`Mapbox`, {
   sql: `SELECT * FROM public.Mapbox`,
-  dataSource: `mapbox__example`,
 
   joins: {
     MapboxCoords: {
