@@ -60,7 +60,7 @@ const UserSearch = props => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return null
   }
 
   if (error) {
