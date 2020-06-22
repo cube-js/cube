@@ -92,6 +92,8 @@ If you want to make changes to the `@cubejs-client/react` package you'll need a 
 
 Now your project will be using the local packages.
 
+**NOTE:** You might need to restart your project after linking the packages.
+
 ## Style guides
 
 We're passionate about what code can do rather how it's formatted.
