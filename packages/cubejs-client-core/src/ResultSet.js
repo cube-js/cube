@@ -9,6 +9,8 @@ import Moment from 'moment';
 import momentRange from 'moment-range';
 
 /**
+ * Configuration object that contains information about pivot axes and other options.
+ *
  * Let's apply `pivotConfig` and see how it affects the axes
  * ```js
  * // Example query
