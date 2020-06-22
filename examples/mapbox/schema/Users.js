@@ -67,8 +67,8 @@ cube(`Users`, {
 
     usersRating: {
       type: `rollup`,
-      measureReferences: [Users.max, Users.min],
-      dimensionReferences: [Users.geometry]
+      measureReferences: [Users.max],
+      dimensionReferences: [Users.geometry, Users.value]
     }
   }
 });
