@@ -74,45 +74,42 @@ const options = {
   ]
 };
 
-export default ({ cubejsApi }) => {
+export default () => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
     zoom: 1.5
   });
-
   const [mode, setMode] = useState('total');
-  const [data, setData] = useState(null);
+
+  let data = {
+    type: 'FeatureCollection',
+    features: []
+  };
+
   const { resultSet } = useCubeQuery({
     measures: [`Users.${mode}`],
     dimensions: ['Users.country', 'MapboxCoords.coordinates']
-  }, { cubejsApi });
+  });
 
-  useEffect(() => {
-    if (resultSet) {
-      let data = {
-        type: 'FeatureCollection',
-        features: []
-      };
-      resultSet
-        .tablePivot()
-        .filter((item) => item['MapboxCoords.coordinates'] != null)
-        .map((item) => {
-          data['features'].push({
-            type: 'Feature',
-            properties: {
-              name: item['Users.country'],
-              value: parseInt(item[`Users.${mode}`])
-            },
-            geometry: {
-              type: 'Polygon',
-              coordinates: [item['MapboxCoords.coordinates'].split(';').map((item) => item.split(','))]
-            }
-          });
+  if (resultSet) {
+    resultSet
+      .tablePivot()
+      .filter((item) => item['MapboxCoords.coordinates'] != null)
+      .map((item) => {
+        data['features'].push({
+          type: 'Feature',
+          properties: {
+            name: item['Users.country'],
+            value: parseInt(item[`Users.${mode}`])
+          },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [item['MapboxCoords.coordinates'].split(';').map((item) => item.split(','))]
+          }
         });
-      setData(data);
-    }
-  }, [resultSet]);
+      });
+  }
 
 
   const onChangeMode = (e) => {

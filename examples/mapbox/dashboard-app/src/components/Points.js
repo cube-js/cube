@@ -3,9 +3,7 @@ import { useCubeQuery } from "@cubejs-client/react";
 import MapGL, { Source, Layer, NavigationControl } from 'react-map-gl';
 import { Col, Row, Slider, Tooltip } from "antd";
 
-export default ({ cubejsApi }) => {
-
-
+export default () => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
@@ -14,10 +12,8 @@ export default ({ cubejsApi }) => {
 
   const [initMin, setInitMin] = useState(0);
   const [initMax, setInitMax] = useState(0);
-
   const [min, setMin] = useState(0);
   const [max, setMax] = useState(0);
-  const [data, setData] = useState(null);
 
 
   const { resultSet: range } = useCubeQuery({
@@ -26,7 +22,7 @@ export default ({ cubejsApi }) => {
       member: "Users.geometry",
       operator: "set"
     }],
-  }, { cubejsApi });
+  });
 
   const { resultSet: points } = useCubeQuery({
     measures: [
@@ -47,7 +43,13 @@ export default ({ cubejsApi }) => {
         values: [min.toString()]
       }
     ]
-  }, { cubejsApi })
+  })
+
+
+  let data = {
+    type: 'FeatureCollection',
+    features: [],
+  };
 
   useEffect(() => {
     if (range) {
@@ -58,24 +60,17 @@ export default ({ cubejsApi }) => {
     }
   }, [range]);
 
-  useEffect(() => {
-    if (points) {
-      let data = {
-        type: 'FeatureCollection',
-        features: [],
-      };
-      points.tablePivot().map((item) => {
-        data['features'].push({
-          type: 'Feature',
-          properties: {
-            value: parseInt(item['Users.max']),
-          },
-          geometry: JSON.parse(item['Users.geometry']),
-        });
+  if (points) {
+    points.tablePivot().map((item) => {
+      data['features'].push({
+        type: 'Feature',
+        properties: {
+          value: parseInt(item['Users.max']),
+        },
+        geometry: JSON.parse(item['Users.geometry']),
       });
-      setData(data);
-    }
-  }, [points]);
+    });
+  }
 
   const onChange = (value) => {
     setMin(value[0]);
@@ -119,9 +114,9 @@ export default ({ cubejsApi }) => {
         </MapGL>
       </div>
       <Row className="mapbox__slider">
-        <Col span={2}>Rating range: </Col>
+        <Col span={3}>Rating range: </Col>
         <Col span={2}><Tooltip placement="top" title='minimal rating'>{Math.round(min / 1000)}k</Tooltip></Col>
-        <Col span={18} >
+        <Col span={17} >
           <Slider
             range
             min={initMin}

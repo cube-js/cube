@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useCubeQuery } from "@cubejs-client/react";
 import { Slider, Button } from 'antd';
 import MapGL, { NavigationControl, Source, Layer } from 'react-map-gl';
@@ -60,7 +60,7 @@ const sample = [
   ]
 ]
 
-export default ({ cubejsApi }) => {
+export default () => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
@@ -69,7 +69,6 @@ export default ({ cubejsApi }) => {
   const [intensity, setIntensity] = useState(0.1);
   const [weight, setWeight] = useState(2);
   const [radius, setRadius] = useState(11);
-  const [data, setData] = useState(null);
   const [colorState, setColorState] = useState(0);
   const { resultSet } = useCubeQuery({
     measures: ['Users.count'],
@@ -81,34 +80,30 @@ export default ({ cubejsApi }) => {
       operator: "set"
     }],
     limit: 50000
-  }, { cubejsApi });
+  });
 
+  let data = {
+    type: 'FeatureCollection',
+    features: [],
+  };
 
-  useEffect(() => {
-    if (resultSet) {
-      let data = {
-        type: 'FeatureCollection',
-        features: [],
-      };
-      resultSet.tablePivot().map((item) => {
-        data['features'].push({
-          type: 'Feature',
-          properties: {
-            value: parseInt(item['Users.count']),
-          },
-          geometry: JSON.parse(item['Users.geometry']),
-        });
+  if (resultSet) {
+    resultSet.tablePivot().map((item) => {
+      data['features'].push({
+        type: 'Feature',
+        properties: {
+          value: parseInt(item['Users.count']),
+        },
+        geometry: JSON.parse(item['Users.geometry']),
       });
-      setData(data);
-    }
-  }, [resultSet])
-
+    });
+  }
 
   const renderButtons = sample.map((item, i) => (
     <Button key={i} className={colorState == i ? 'mapbox__sample__button mapbox__sample__button--active' : 'mapbox__sample__button'} onClick={() => { setColorState(i) }}>
       <span style={{ background: `linear-gradient(90deg, ${item[3]['color']} 0%, ${item[2]['color']} 50%,${item[1]['color']} 100%)` }}></span>
     </Button>
-  ))
+  ));
 
 
 

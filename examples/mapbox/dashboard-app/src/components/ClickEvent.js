@@ -16,16 +16,21 @@ export default ({ cubejsApi }) => {
   const [popupInfo, setPopupInfo] = useState(null);
   const [mode, setMode] = useState('both');
 
-
-  const [dataQuestions, setDataQuestions] = useState(null);
-  const [dataAnswers, setDataAnswers] = useState(null);
-
+  let dataQuestions = {
+    type: 'FeatureCollection',
+    features: [],
+  };
+  let dataAnswers = {
+    type: 'FeatureCollection',
+    features: [],
+  };
 
   const { resultSet: questionsSet } = useCubeQuery({
     measures: [
       'Questions.count'
     ],
     dimensions: [
+      'Users.id',
       'Users.geometry',
     ],
     filters: [{
@@ -35,7 +40,7 @@ export default ({ cubejsApi }) => {
     order: {
       'Questions.views': 'desc',
     }
-  }, { cubejsApi });
+  });
 
   const { resultSet: answersSet } = useCubeQuery({
     measures: ['Answers.count'],
@@ -46,43 +51,41 @@ export default ({ cubejsApi }) => {
       member: "Users.geometry",
       operator: "set"
     }],
-  }, { cubejsApi });
+  });
 
-  useEffect(() => {
-    if (questionsSet) {
-      let data = {
-        type: 'FeatureCollection',
-        features: [],
-      };
-      questionsSet.tablePivot().map((item) => {
-        data['features'].push({
-          type: 'Feature',
-          properties: {
-            count: item['Questions.count'],
-            geometry: item['Users.geometry'],
-          },
-          geometry: JSON.parse(item['Users.geometry'])
-        });
-      });
-      setDataQuestions(data);
-    }
-  }, [questionsSet]);
+  /*const { resultSet: popupSet } = useCubeQuery({
+    measures: ['Answers.count'],
+    dimensions: [
+      'Users.geometry',
+    ],
+    filters: [{
+      member: "Users.geometry",
+      operator: "set"
+    }],
+  });*/
 
-  useEffect(() => {
-    if (answersSet) {
-      let data = {
-        type: 'FeatureCollection',
-        features: [],
-      };
-      answersSet.tablePivot().map((item) => {
-        data['features'].push({
-          type: 'Feature',
-          geometry: JSON.parse(item['Users.geometry']),
-        });
+  if (questionsSet) {
+    questionsSet.tablePivot().map((item) => {
+      dataQuestions['features'].push({
+        type: 'Feature',
+        properties: {
+          count: item['Questions.count'],
+          geometry: item['Users.geometry'],
+          id: item['Users.id'],
+        },
+        geometry: JSON.parse(item['Users.geometry'])
       });
-      setDataAnswers(data)
-    }
-  }, [answersSet]);
+    });
+  }
+
+  if (answersSet) {
+    answersSet.tablePivot().map((item) => {
+      dataAnswers['features'].push({
+        type: 'Feature',
+        geometry: JSON.parse(item['Users.geometry']),
+      });
+    });
+  }
 
   const onChangeMode = (e) => {
     setPopupInfo(null);
@@ -105,7 +108,7 @@ export default ({ cubejsApi }) => {
             filters: [{
               member: "Users.geometry",
               operator: "contains",
-              values: [feature.properties.geometry]
+              values: [feature.geometry.coordinates.toString()]
             }],
             order: {
               'Questions.views': 'desc',

@@ -29,16 +29,16 @@ const App = () => (
       <div className="mapbox__content">
         <Tabs defaultActiveKey="0">
           <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='heatmap'>location</Tooltip></React.Fragment>)} key={0}>
-            <Heatmap cubejsApi={cubejsApi} />
+            <Heatmap />
           </Tabs.TabPane>
           <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='points distribution'> personal rating</Tooltip></React.Fragment>)} key={1}>
-            <Points cubejsApi={cubejsApi} />
+            <Points />
           </Tabs.TabPane>
           <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='click event'>q&amp;a</Tooltip></React.Fragment>)} key={2}>
-            <ClickEvent cubejsApi={cubejsApi} />
+            <ClickEvent />
           </Tabs.TabPane>
           <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='choropleth'>rating by country</Tooltip></React.Fragment>)} key={3}>
-            <Choropleth cubejsApi={cubejsApi} />
+            <Choropleth />
           </Tabs.TabPane>
         </Tabs>
       </div>
