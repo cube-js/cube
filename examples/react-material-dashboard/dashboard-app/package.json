@@ -8,6 +8,7 @@
     "@date-io/date-fns": "^1.3.13",
     "@material-ui/core": "^4.2.1",
     "@material-ui/icons": "^4.2.1",
+    "@material-ui/lab": "^4.0.0-alpha.56",
     "@material-ui/pickers": "^3.2.10",
     "@material-ui/styles": "^4.2.1",
     "bootstrap": "^4.3.1",

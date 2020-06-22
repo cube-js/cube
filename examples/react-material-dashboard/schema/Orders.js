@@ -26,7 +26,7 @@ cube(`Orders`, {
         { sql: `${CUBE}.status = 'completed'` }
       ]
     },
-    //
+
     percentOfCompletedOrders: {
       sql: `${completedCount}*100.0/${count}`,
       type: `number`,
@@ -56,22 +56,22 @@ cube(`Orders`, {
       type: `time`
     },
 
-    user_id: {
+    userId: {
       sql: `user_id`,
       type: `number`
     },
 
-    number_of_order: {
+    numberOfOrder: {
       sql: `number`,
       type: `number`
     },
 
-    product_id: {
+    productId: {
       sql: `product_id`,
       type: `number`
     },
 
-    order_id: {
+    orderId: {
       sql: `id`,
       type: `number`
     }

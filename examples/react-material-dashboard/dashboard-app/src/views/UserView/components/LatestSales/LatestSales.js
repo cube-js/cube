@@ -52,11 +52,11 @@ const LatestSales = props => {
       }
     ],
     "dimensions": [
-      "LineItems.item_price"
+      "LineItems.itemPrice"
     ],
     "filters": [
       {
-        "dimension": "Orders.user_id",
+        "dimension": "Orders.userId",
         "operator": "equals",
         "values": [
           `${id}`
@@ -92,7 +92,7 @@ const LatestSales = props => {
               label: "Purchase price",
               backgroundColor: palette.secondary.main,
               data: prepareData.map((obj) => {
-                return obj['LineItems.item_price'];
+                return obj['LineItems.itemPrice'];
               }),
             },
           ]

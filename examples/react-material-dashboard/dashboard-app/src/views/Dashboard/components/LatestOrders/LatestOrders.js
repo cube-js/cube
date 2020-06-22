@@ -68,11 +68,11 @@ const query = {
     }
   ],
   "dimensions": [
-    "Orders.user_id",
-    "Orders.product_id",
+    "Orders.userId",
+    "Orders.productId",
     "Orders.createdAt",
     "Orders.status",
-    "Orders.order_id",
+    "Orders.orderId",
     "Users.city",
     "Users.company"
   ],
@@ -137,12 +137,12 @@ const LatestOrders = props => {
                           <TableRow
                             hover
                             className={classes.tableRow}
-                            key={order["Orders.order_id"]}
-                            onClick={() => handleClick(`/user/${order["Orders.user_id"]}`)}
+                            key={order["Orders.orderId"]}
+                            onClick={() => handleClick(`/user/${order["Orders.userId"]}`)}
                           >
-                            <TableCell>{order["Orders.order_id"]}</TableCell>
+                            <TableCell>{order["Orders.orderId"]}</TableCell>
                             <TableCell>
-                              {order["Orders.user_id"]}
+                              {order["Orders.userId"]}
                             </TableCell>
                             <TableCell>
                               {moment(order["Orders.createdAt"]).format("DD/MM/YYYY")}

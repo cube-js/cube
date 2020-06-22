@@ -16,11 +16,11 @@ cube(`Users`, {
   },
 
   dimensions: {
-    first_name: {
+    firstName: {
       sql: `first_name`,
       type: `string`
     },
-    last_name: {
+    lastName: {
       sql: `last_name`,
       type: `string`
     },

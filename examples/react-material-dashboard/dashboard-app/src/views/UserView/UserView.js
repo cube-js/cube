@@ -8,6 +8,7 @@ import AccountProfile from "./components/AccountProfile";
 import InfoCard from "./components/InfoCard";
 import LatestSales from "./components/LatestSales"
 import CircularProgress from "@material-ui/core/CircularProgress";
+import UserSearch from "./components/UserSearch";
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
   apiUrl: process.env.REACT_APP_API_URL
@@ -48,19 +49,19 @@ const UserView = () => {
       }
     ],
     "dimensions": [
-      "Orders.user_id",
-      "Orders.product_id",
-      "Users.first_name",
-      "Users.last_name",
+      "Orders.userId",
+      "Orders.productId",
+      "Users.firstName",
+      "Users.lastName",
       "Users.gender",
       "Users.age",
       "Users.city",
-      "LineItems.item_price",
+      "LineItems.itemPrice",
       "Orders.createdAt"
     ],
     "filters": [
       {
-        "dimension": "Orders.user_id",
+        "dimension": "Orders.userId",
         "operator": "equals",
         "values": [
           `${id}`
@@ -79,7 +80,7 @@ const UserView = () => {
         }
         let data = resultSet.tablePivot();
         let userData = data[0];
-        let totalSales = countSales(data, 'LineItems.item_price');
+        let totalSales = countSales(data, 'LineItems.itemPrice');
         return (
           <div className={classes.root}>
             <Grid
@@ -93,9 +94,10 @@ const UserView = () => {
                 xl={4}
                 xs={12}
               >
+                <UserSearch cubejsApi={cubejsApi}/>
                 <AccountProfile
-                  userFirstName={userData['Users.first_name']}
-                  userLastName={userData['Users.last_name']}
+                  userFirstName={userData['Users.firstName']}
+                  userLastName={userData['Users.lastName']}
                   gender={userData['Users.gender']}
                   age={userData['Users.age']}
                   city={userData['Users.city']}

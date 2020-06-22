@@ -89,7 +89,7 @@ const OrdersTable = props => {
   const tableHeaders = [
     {
       text: "User id",
-      value: "Orders.user_id"
+      value: "Orders.userId"
     },
     {
       text: "User city",
@@ -101,11 +101,11 @@ const OrdersTable = props => {
     },
     {
       text: "Product id",
-      value: "Orders.product_id"
+      value: "Orders.productId"
     },
     {
       text: "Order price",
-      value: "LineItems.item_price"
+      value: "LineItems.itemPrice"
     },
     {
       text: "Status",
@@ -123,7 +123,7 @@ const OrdersTable = props => {
     let selectedOrders;
 
     if (event.target.checked) {
-      selectedOrders = orders.map(order => order["Orders.order_id"]);
+      selectedOrders = orders.map(order => order["Orders.orderId"]);
     } else {
       selectedOrders = [];
     }
@@ -209,20 +209,20 @@ const OrdersTable = props => {
                   <TableRow
                     className={classes.tableRow}
                     hover
-                    onClick={() => handleClick(`/user/${obj["Orders.user_id"]}`)}
-                    key={obj["Orders.user_id"] + obj["Orders.product_id"] + Math.random()}
-                    selected={selectedOrders.indexOf(obj["Orders.order_id"]) !== -1}
+                    onClick={() => handleClick(`/user/${obj["Orders.userId"]}`)}
+                    key={obj["Orders.userId"] + obj["Orders.productId"] + Math.random()}
+                    selected={selectedOrders.indexOf(obj["Orders.orderId"]) !== -1}
                   >
                     <TableCell padding="checkbox">
                       <Checkbox
-                        checked={selectedOrders.indexOf(obj["Orders.order_id"]) !== -1}
+                        checked={selectedOrders.indexOf(obj["Orders.orderId"]) !== -1}
                         color="primary"
-                        onChange={event => handleSelectOne(event, obj["Orders.order_id"])}
+                        onChange={event => handleSelectOne(event, obj["Orders.orderId"])}
                         value="true"
                       />
                     </TableCell>
                     <TableCell>
-                      {obj["Orders.user_id"]}
+                      {obj["Orders.userId"]}
                     </TableCell>
                     <TableCell>
                       {obj["Users.city"]}
@@ -231,10 +231,10 @@ const OrdersTable = props => {
                       {obj["Users.company"]}
                     </TableCell>
                     <TableCell>
-                      {obj["Orders.product_id"]}
+                      {obj["Orders.productId"]}
                     </TableCell>
                     <TableCell>
-                      {"$ " + obj["LineItems.item_price"]}
+                      {"$ " + obj["LineItems.itemPrice"]}
                     </TableCell>
                     <TableCell>
                       <StatusBullet

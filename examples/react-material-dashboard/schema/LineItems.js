@@ -37,7 +37,7 @@ cube(`LineItems`, {
       type: `time`
     },
 
-    item_price: {
+    itemPrice: {
       sql: `price`,
       type: `number`
     }

@@ -52,24 +52,24 @@ const OrderList = () => {
       }
     ],
     "dimensions": [
-      "Orders.user_id",
-      "Orders.product_id",
+      "Orders.userId",
+      "Orders.productId",
       "Orders.createdAt",
       "Orders.status",
-      "LineItems.item_price",
+      "LineItems.itemPrice",
       "Users.city",
       "Users.company"
     ],
     "filters": [
       {
-        "dimension": "LineItems.item_price",
+        "dimension": "LineItems.itemPrice",
         "operator": "gt",
         "values": [
           `${priceFilter[0]}`
         ]
       },
       {
-        "dimension": "LineItems.item_price",
+        "dimension": "LineItems.itemPrice",
         "operator": "lt",
         "values": [
           `${priceFilter[1]}`
