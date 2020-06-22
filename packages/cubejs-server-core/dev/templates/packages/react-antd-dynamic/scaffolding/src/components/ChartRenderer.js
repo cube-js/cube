@@ -9,7 +9,7 @@ const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)
   .map(key => ({ [key]: React.memo(TypeToChartComponent[key]) }))
   .reduce((a, b) => ({ ...a, ...b }));
 
-const renderChart = Component => ({ resultSet, error }) => (resultSet && <Component resultSet={resultSet} />)
+const renderChart = Component => ({ resultSet, error, pivotConfig }) => (resultSet && <Component resultSet={resultSet} pivotConfig={pivotConfig} />)
   || (error && error.toString()) || <Spin />;
 
 const ChartRenderer = ({ vizState }) => {

@@ -231,9 +231,14 @@ export default class QueryBuilder extends React.Component {
             y: [...pivotConfig.y],
           };
           const id = pivotConfig[sourceAxis][sourceIndex];
+          const lastIndex = nextPivotConfig[destinationAxis].length - 1;
           
           if (id === 'measures') {
-            destinationIndex = nextPivotConfig[destinationAxis].length;
+            destinationIndex = lastIndex + 1;
+          }
+          
+          if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+            destinationIndex = lastIndex - 1;
           }
       
           nextPivotConfig[sourceAxis].splice(sourceIndex, 1);

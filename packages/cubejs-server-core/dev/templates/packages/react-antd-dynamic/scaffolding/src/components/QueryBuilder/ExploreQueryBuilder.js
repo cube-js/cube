@@ -164,6 +164,7 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
                       vizState={{
                         query: validatedQuery,
                         chartType,
+                        pivotConfig
                       }}
                       cubejsApi={cubejsApi}
                     />

@@ -628,9 +628,14 @@ function (_React$Component) {
             });
 
             var id = pivotConfig[sourceAxis][sourceIndex];
+            var lastIndex = nextPivotConfig[destinationAxis].length - 1;
 
             if (id === 'measures') {
-              destinationIndex = nextPivotConfig[destinationAxis].length;
+              destinationIndex = lastIndex + 1;
+            }
+
+            if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+              destinationIndex = lastIndex - 1;
             }
 
             nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
