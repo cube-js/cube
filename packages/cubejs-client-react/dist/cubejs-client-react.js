@@ -639,7 +639,7 @@ function (_React$Component) {
 
             if (id === 'measures') {
               destinationIndex = lastIndex + 1;
-            } else if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+            } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
               destinationIndex = lastIndex - 1;
             }
 
