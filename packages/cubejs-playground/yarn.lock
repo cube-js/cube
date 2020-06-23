@@ -1564,10 +1564,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.19.31":
-  version "0.19.31"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.31.tgz#33a4c63f9c1c795e37f45d1ad165264c623091c4"
-  integrity sha512-BSJF4dnGHlypO2g0zGiHiHUNxDd8lglDBaiHu9CTbyTvqGrjKiRDvPcoiQO+MO8HkGWukTzVBqwDSAUflxfoaA==
+"@cubejs-client/core@^0.19.35":
+  version "0.19.35"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.35.tgz#4f9e44dbc938c2780a1cd8a56129ce7039d724a7"
+  integrity sha512-Bs/bwDjwxN/2yteAEJGLC7v9/X1h+zpQO68miQbn8C56VvDGq1uCGpK7seqkLO62i0AQi05MfZwRx21RhG0z+Q==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1578,10 +1578,10 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.19.31":
-  version "0.19.31"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.19.31.tgz#e469c4f31cee2358b581035805c006d1e86eb26d"
-  integrity sha512-DYxV1fS0w14gnA/V/aNcf4G3l/jPXIOZEMWLyPRNBPyV+MtfyvDtaFCP0OTNwLk88e9UoCqhVHCKDeMBVMH4Qg==
+"@cubejs-client/react@^0.19.35":
+  version "0.19.35"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.19.35.tgz#2b87cec59e0de9c7a42d4538bbae0f821e9e997e"
+  integrity sha512-wI8c/hcCr4TyEa6vA3fICldrtXb7Kgtnc70oGNNEcDAYiwnxm1ZmMq1L5FEe/p8iF129btBSAL1q91BobrlMAQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -10776,15 +10776,10 @@ react-fast-compare@^2.0.4:
   resolved "https://registry.yarnpkg.com/react-fast-compare/-/react-fast-compare-2.0.4.tgz#e84b4d455b0fec113e0402c329352715196f81f9"
   integrity sha512-suNP+J1VU1MWFKcyt7RtjiSWUjvidmQSlqu+eHslq+342xCbGTYmC0mEhPCOHxlW0CywylOC1u2DFAT+bv4dBw==
 
-react-is@^16.12.0, react-is@^16.9.0:
+react-is@^16.12.0, react-is@^16.6.0, react-is@^16.6.3, react-is@^16.7.0, react-is@^16.8.1, react-is@^16.8.4, react-is@^16.9.0:
   version "16.13.1"
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.13.1.tgz#789729a4dc36de2999dc156dd6c1d9c18cea56a4"
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
-
-react-is@^16.6.0, react-is@^16.6.3, react-is@^16.7.0, react-is@^16.8.1, react-is@^16.8.4:
-  version "16.12.0"
-  resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.12.0.tgz#2cc0fe0fba742d97fd527c42a13bec4eeb06241c"
-  integrity sha512-rPCkf/mWBtKc97aLL9/txD8DZdemK0vkA3JMLShjlJB3Pj3s+lpf1KaBzMfQrAmhMQB0n1cU/SUGgKKBCe837Q==
 
 react-lifecycles-compat@^3.0.4:
   version "3.0.4"
