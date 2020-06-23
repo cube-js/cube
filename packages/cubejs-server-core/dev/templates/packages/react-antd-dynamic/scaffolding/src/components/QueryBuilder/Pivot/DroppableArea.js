@@ -17,7 +17,7 @@ export default function DroppableArea({ pivotConfig, axis }) {
       </Typography.Text>
       <Droppable droppableId={axis}>
         {(provided) => (
-          <div ref={provided.innerRef} {...provided.droppableProps}>
+          <div ref={provided.innerRef} {...provided.droppableProps} style={{ height: '100%' }}>
             {pivotConfig[axis].map((id, index) => (
               <Item key={id} id={id} index={index} />
             ))}

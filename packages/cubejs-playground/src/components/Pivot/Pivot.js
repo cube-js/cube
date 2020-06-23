@@ -1,33 +1,20 @@
 import React from 'react';
-import { DragDropContext } from 'react-beautiful-dnd';
-import { Divider, Checkbox } from 'antd';
-import DroppableArea from './DroppableArea';
+import { Tabs } from 'antd';
+import Axes from './Axes';
+import Options from './Options';
 
-export default function Pivot({ pivotConfig, onMove, onToggle }) {
+const { TabPane } = Tabs;
+
+export default function Pivot({ pivotConfig, onMove, onUpdate }) {
   return (
-    <DragDropContext
-      onDragEnd={({ source, destination }) => {
-        if (!destination) {
-          return;
-        }
+    <Tabs style={{ width: 340 }}>
+      <TabPane tab="Pivot" key="1">
+        <Axes pivotConfig={pivotConfig} onMove={onMove} />
+      </TabPane>
 
-        onMove({
-          sourceIndex: source.index,
-          destinationIndex: destination.index,
-          sourceAxis: source.droppableId,
-          destinationAxis: destination.droppableId,
-        });
-      }}
-    >
-      <DroppableArea pivotConfig={pivotConfig} axis="x" />
-
-      <Divider style={{ margin: '12px 0' }} />
-
-      <DroppableArea pivotConfig={pivotConfig} axis="y" />
-
-      <Checkbox checked={pivotConfig.fillMissingDates} style={{ marginTop: 12 }} onChange={onToggle}>
-        Fill missing dates
-      </Checkbox>
-    </DragDropContext>
+      <TabPane tab="Options" key="2">
+        <Options pivotConfig={pivotConfig} onUpdate={onUpdate} />
+      </TabPane>
+    </Tabs>
   );
 }

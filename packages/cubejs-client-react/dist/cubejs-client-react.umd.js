@@ -37180,9 +37180,7 @@
 
               if (id === 'measures') {
                 destinationIndex = lastIndex + 1;
-              }
-
-              if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+              } else if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
                 destinationIndex = lastIndex - 1;
               }
 
@@ -37193,11 +37191,9 @@
                 pivotConfig: nextPivotConfig
               });
             },
-            toggleFillMissingDates: function toggleFillMissingDates() {
+            update: function update$$1(config) {
               _this2.updateVizState({
-                pivotConfig: _objectSpread({}, pivotConfig, {
-                  fillMissingDates: !pivotConfig.fillMissingDates
-                })
+                pivotConfig: _objectSpread({}, pivotConfig, {}, config)
               });
             }
           }

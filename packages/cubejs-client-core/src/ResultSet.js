@@ -51,7 +51,7 @@ const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 /**
  * Provides a convenient interface for data manipulation.
  */
-export default class ResultSet {
+class ResultSet {
   constructor(loadResponse, options) {
     options = options || {};
     this.loadResponse = loadResponse;
@@ -850,3 +850,5 @@ export default class ResultSet {
     return this.backwardCompatibleData;
   }
 }
+
+export default ResultSet;

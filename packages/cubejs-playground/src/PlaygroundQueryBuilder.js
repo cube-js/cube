@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import * as PropTypes from 'prop-types';
 import { Row, Col, Divider, Card, Button, Popover } from 'antd';
-import { SortAscendingOutlined } from '@ant-design/icons';
+import { SortAscendingOutlined, BorderInnerOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
 import { playgroundAction } from './events';
@@ -36,9 +36,6 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     .reduce((a, b) => ({ ...a, ...b }), {});
 
 export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubejsToken, dashboardSource, setQuery }) {
-  const [isOrderPopoverVisible, toggleOrderPopover] = useState(false);
-  const [isPivotPopoverVisible, togglePivotPopover] = useState(false);
-
   return (
     <QueryBuilder
       query={query}
@@ -138,20 +135,10 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                             onOrderChange={updateOrder.set}
                           />
                         }
-                        visible={isOrderPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"
-                        onVisibleChange={(visible) => {
-                          if (!visible) {
-                            toggleOrderPopover(false);
-                          } else {
-                            if (orderMembers.length) {
-                              toggleOrderPopover(!isOrderPopoverVisible);
-                            }
-                          }
-                        }}
                       >
-                        <Button disabled={!orderMembers.length} icon={<SortAscendingOutlined />}>
+                        <Button disabled={!isQueryPresent} icon={<SortAscendingOutlined />}>
                           Order
                         </Button>
                       </Popover>
@@ -163,23 +150,15 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                           <Pivot
                             pivotConfig={pivotConfig}
                             onMove={updatePivotConfig.moveItem}
-                            onToggle={updatePivotConfig.toggleFillMissingDates}
+                            onUpdate={updatePivotConfig.update}
                           />
                         }
-                        visible={isPivotPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"
-                        onVisibleChange={(visible) => {
-                          if (!visible) {
-                            togglePivotPopover(false);
-                          } else {
-                            if (isQueryPresent) {
-                              togglePivotPopover(!isPivotPopoverVisible);
-                            }
-                          }
-                        }}
                       >
-                        <Button disabled={!isQueryPresent}>Pivot</Button>
+                        <Button disabled={!isQueryPresent} icon={<BorderInnerOutlined />}>
+                          Pivot
+                        </Button>
                       </Popover>
                     </Col>
                   </Row>

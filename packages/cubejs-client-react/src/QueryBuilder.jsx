@@ -235,9 +235,7 @@ export default class QueryBuilder extends React.Component {
           
           if (id === 'measures') {
             destinationIndex = lastIndex + 1;
-          }
-          
-          if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+          } else if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
             destinationIndex = lastIndex - 1;
           }
       
@@ -248,11 +246,11 @@ export default class QueryBuilder extends React.Component {
             pivotConfig: nextPivotConfig
           });
         },
-        toggleFillMissingDates: () => {
+        update: (config) => {
           this.updateVizState({
             pivotConfig: {
               ...pivotConfig,
-              fillMissingDates: !pivotConfig.fillMissingDates
+              ...config
             }
           });
         }

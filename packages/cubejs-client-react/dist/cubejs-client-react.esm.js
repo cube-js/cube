@@ -632,9 +632,7 @@ function (_React$Component) {
 
             if (id === 'measures') {
               destinationIndex = lastIndex + 1;
-            }
-
-            if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+            } else if (destinationIndex > lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
               destinationIndex = lastIndex - 1;
             }
 
@@ -645,11 +643,9 @@ function (_React$Component) {
               pivotConfig: nextPivotConfig
             });
           },
-          toggleFillMissingDates: function toggleFillMissingDates() {
+          update: function update(config) {
             _this2.updateVizState({
-              pivotConfig: _objectSpread2({}, pivotConfig, {
-                fillMissingDates: !pivotConfig.fillMissingDates
-              })
+              pivotConfig: _objectSpread2({}, pivotConfig, {}, config)
             });
           }
         }
