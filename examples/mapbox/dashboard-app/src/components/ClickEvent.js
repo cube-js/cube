@@ -128,12 +128,17 @@ export default () => {
       )
   }
 
+  else {
+    renderPopup = null;
+  }
+
   const onChangeMode = (e) => {
     setMode(e.target.value);
     setSelectedPoint(null);
   }
 
   const onClickMap = (event) => {
+    setSelectedPoint(null);
     if (typeof event.features != 'undefined') {
       const feature = event.features.find(
         (f) => f.layer.id == 'questions-point'
@@ -141,12 +146,6 @@ export default () => {
       if (feature) {
         setSelectedPoint(feature.properties.geometry);
       }
-      else {
-        setSelectedPoint(null);
-      }
-    }
-    else {
-      setSelectedPoint(null);
     }
   }
 
