@@ -66,10 +66,14 @@ export default () => {
     longitude: 5,
     zoom: 1.5,
   })
+
   const [intensity, setIntensity] = useState(0.1);
   const [weight, setWeight] = useState(2);
   const [radius, setRadius] = useState(11);
+
   const [colorState, setColorState] = useState(0);
+
+
   const { resultSet } = useCubeQuery({
     measures: ['Users.count'],
     dimensions: [
@@ -81,6 +85,7 @@ export default () => {
     }],
     limit: 50000
   });
+
 
   let data = {
     type: 'FeatureCollection',
@@ -104,7 +109,6 @@ export default () => {
       <span style={{ background: `linear-gradient(90deg, ${item[3]['color']} 0%, ${item[2]['color']} 50%,${item[1]['color']} 100%)` }}></span>
     </Button>
   ));
-
 
 
   return (
@@ -163,7 +167,7 @@ export default () => {
         </div>
 
       </div>
-    </div >)
+    </div>);
 }
 
 

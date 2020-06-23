@@ -1,36 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useCubeQuery } from "@cubejs-client/react";
 import MapGL, { Source, Layer, Popup, NavigationControl } from 'react-map-gl';
 import { Radio } from "antd";
 import { Scrollbars } from 'react-custom-scrollbars';
 
-
-export default ({ cubejsApi }) => {
+export default () => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
     zoom: 2,
   });
-
-
-  const [popupInfo, setPopupInfo] = useState(null);
   const [mode, setMode] = useState('both');
-
-  let dataQuestions = {
-    type: 'FeatureCollection',
-    features: [],
-  };
-  let dataAnswers = {
-    type: 'FeatureCollection',
-    features: [],
-  };
+  const [selectedPoint, setSelectedPoint] = useState(null);
 
   const { resultSet: questionsSet } = useCubeQuery({
     measures: [
       'Questions.count'
     ],
     dimensions: [
-      'Users.id',
       'Users.geometry',
     ],
     filters: [{
@@ -53,16 +40,34 @@ export default ({ cubejsApi }) => {
     }],
   });
 
-  /*const { resultSet: popupSet } = useCubeQuery({
-    measures: ['Answers.count'],
+  const { resultSet: popupSet } = useCubeQuery({
     dimensions: [
-      'Users.geometry',
+      'Questions.title',
+      'Questions.views',
+      'Questions.tags'
     ],
     filters: [{
       member: "Users.geometry",
-      operator: "set"
+      operator: "contains",
+      values: [selectedPoint]
     }],
-  });*/
+    order: {
+      'Questions.views': 'desc',
+    }
+  });
+
+
+  let dataQuestions = {
+    type: 'FeatureCollection',
+    features: [],
+  };
+
+
+  let dataAnswers = {
+    type: 'FeatureCollection',
+    features: [],
+  };
+
 
   if (questionsSet) {
     questionsSet.tablePivot().map((item) => {
@@ -87,57 +92,19 @@ export default ({ cubejsApi }) => {
     });
   }
 
-  const onChangeMode = (e) => {
-    setPopupInfo(null);
-    setMode(e.target.value)
-  }
 
-  const onClickMap = (event) => {
-    if (typeof event.features != 'undefined') {
-      const feature = event.features.find(
-        (f) => f.layer.id === 'questions-point'
-      );
-      if (feature) {
-        cubejsApi
-          .load({
-            dimensions: [
-              'Questions.title',
-              'Questions.views',
-              'Questions.tags'
-            ],
-            filters: [{
-              member: "Users.geometry",
-              operator: "contains",
-              values: [feature.geometry.coordinates.toString()]
-            }],
-            order: {
-              'Questions.views': 'desc',
-            }
-          })
-          .then((resultSet) => {
-            setPopupInfo({
-              geometry: feature.geometry,
-              data: resultSet.tablePivot()
-            });
-          });
-      }
-      else {
-        setPopupInfo(null);
-      }
-    }
-  };
 
-  const renderPopup = () => {
-    return popupInfo == null ? (
-      <React.Fragment />
-    ) : (
+  let renderPopup = null;
+  if (popupSet && selectedPoint) {
+    renderPopup =
+      (
         <Popup
           className='mapbox__popup'
           closeButton={false}
           tipSize={5}
           anchor='top'
-          longitude={popupInfo.geometry.coordinates[0]}
-          latitude={popupInfo.geometry.coordinates[1]}
+          longitude={JSON.parse(selectedPoint).coordinates[0]}
+          latitude={JSON.parse(selectedPoint).coordinates[1]}
           captureScroll={true}
         >
           <Scrollbars
@@ -146,23 +113,42 @@ export default ({ cubejsApi }) => {
             autoHeightMax={300}
           >
             {
-              popupInfo.data.map((item, i) => (
+              popupSet.tablePivot().map((item, i) => (
                 <div className="mapbox__popup__item" key={i}>
                   <h3>{item['Questions.title']}</h3>
-
                   <div>
                     Views count: {item['Questions.views']}<br />
-                  Tags: {item['Questions.tags'].replace(/\|/g, ', ')}
+                    Tags: {item['Questions.tags'].replace(/\|/g, ', ')}
                   </div>
                 </div>
-
-
               ))
             }
           </Scrollbars>
         </Popup>
+      )
+  }
+
+  const onChangeMode = (e) => {
+    setMode(e.target.value);
+    setSelectedPoint(null);
+  }
+
+  const onClickMap = (event) => {
+    if (typeof event.features != 'undefined') {
+      const feature = event.features.find(
+        (f) => f.layer.id == 'questions-point'
       );
-  };
+      if (feature) {
+        setSelectedPoint(feature.properties.geometry);
+      }
+      else {
+        setSelectedPoint(null);
+      }
+    }
+    else {
+      setSelectedPoint(null);
+    }
+  }
 
   return (
     <div className='mapbox__container'>
@@ -214,7 +200,7 @@ export default ({ cubejsApi }) => {
             }
           }} />
         </Source>
-        {renderPopup()}
+        {renderPopup}
       </MapGL>
     </div>
   )

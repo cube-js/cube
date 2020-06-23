@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCubeQuery } from "@cubejs-client/react";
-import MapGL, { Source, Layer, NavigationControl } from 'react-map-gl';
 import { Col, Row, Slider, Tooltip } from "antd";
+import MapGL, { Source, Layer, NavigationControl } from 'react-map-gl';
 
 export default () => {
   const [viewport, setViewport] = useState({
@@ -45,12 +45,6 @@ export default () => {
     ]
   })
 
-
-  let data = {
-    type: 'FeatureCollection',
-    features: [],
-  };
-
   useEffect(() => {
     if (range) {
       setInitMax(range.tablePivot()[0]['Users.max']);
@@ -59,6 +53,11 @@ export default () => {
       setMin(range.tablePivot()[0]['Users.max'] * 0.4);
     }
   }, [range]);
+
+  let data = {
+    type: 'FeatureCollection',
+    features: [],
+  };
 
   if (points) {
     points.tablePivot().map((item) => {
