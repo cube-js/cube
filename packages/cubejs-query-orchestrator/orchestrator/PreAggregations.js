@@ -257,8 +257,12 @@ class PreAggregationLoader {
         await this.driverFactory();
       await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     }
-    // TODO can be array instead of last
-    const versionEntry = versionEntries.find(e => e.table_name === this.preAggregation.tableName);
+    // ensure we find appropriate structure version before invalidating anything
+    const versionEntry = versionEntries.find(
+      v => v.table_name === this.preAggregation.tableName && v.structure_version === structureVersion
+    ) || versionEntries.find(
+      e => e.table_name === this.preAggregation.tableName
+    );
     const newVersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
