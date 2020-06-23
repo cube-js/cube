@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { makeStyles } from '@material-ui/core/styles';
 import { useCubeQuery } from "@cubejs-client/react";
+import moment from "moment";
 import {
   BarChart,
   Bar,
@@ -12,6 +13,7 @@ import {
   Legend
 } from "recharts";
 import Modal from '@material-ui/core/Modal';
+
 import Fade from '@material-ui/core/Fade';
 import Paper from '@material-ui/core/Paper';
 import Table from '@material-ui/core/Table';
@@ -19,6 +21,8 @@ import TableCell from '@material-ui/core/TableCell';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import TableContainer from '@material-ui/core/TableContainer';
+
+const dateFormatter = item => moment(item).format("MMM DD");
 
 const useStyles = makeStyles((theme) => ({
   modal: {
@@ -51,6 +55,7 @@ const DrillDownExample = () => {
   const classes = useStyles();
   const [drillDownQuery, setDrillDownQuery] = useState();
   const [open, setOpen] = React.useState(false);
+  const [activeId, setActiveId] = useState(null);
 
   const handleClose = () => {
     setOpen(false);
@@ -58,10 +63,7 @@ const DrillDownExample = () => {
 
   const { resultSet } = useCubeQuery(query);
   const drillDownResponse = useCubeQuery(
-    {
-      ...drillDownQuery,
-      limit: 30
-    },
+    drillDownQuery,
     {
       skip: !drillDownQuery
     }
@@ -89,14 +91,26 @@ const DrillDownExample = () => {
     }
   };
 
+  function Tooltip({ active, payload, label }) {
+    if (active && activeId !== null) {
+      return (
+        <div className="tooltip" style={{ color: colors[activeId] }}>
+          Drill down into {dateFormatter(label)}, {payload[activeId].name}
+        </div>
+      );
+    }
+
+    return null;
+  }
+
   return (
     <>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={resultSet.chartPivot()}>
+        <BarChart data={resultSet.chartPivot()} cursor="pointer">
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="x" />
+          <XAxis dataKey="x" tickFormatter={dateFormatter} />
           <YAxis />
-          <RechartsTooltip />
+          <RechartsTooltip content={<Tooltip />} />
           <Legend />
 
           {resultSet.seriesNames().map(({ key, yValues }, index) => {
@@ -107,6 +121,8 @@ const DrillDownExample = () => {
                 stackId="a"
                 fill={colors[index]}
                 onClick={event => handleBarClick(event, yValues)}
+                onMouseOver={() => setActiveId(index)}
+                onMouseOut={() => setActiveId(null)}
               />
             );
           })}
