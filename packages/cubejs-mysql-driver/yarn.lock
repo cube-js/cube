@@ -379,6 +379,13 @@
   resolved "https://registry.yarnpkg.com/@types/color-name/-/color-name-1.1.1.tgz#1c1261bbeaa10a8055bbc5d8ab84b7b2afc846a0"
   integrity sha512-rr+OQyAjxze7GgWrSaJwydHStIhHq2lvY3BOC2Mj7KnzI7XK0Uw1TOOdI9lDoajEbSWLiYgoo4f1R51erQfhPQ==
 
+"@types/dockerode@^2.5.24":
+  version "2.5.32"
+  resolved "https://registry.yarnpkg.com/@types/dockerode/-/dockerode-2.5.32.tgz#52d3628f605f8ea65202541c59a8a6dd166384fd"
+  integrity sha512-TfaGOoOHxsjkWRj2sPoQ3FLmTC5mVMhZ4kzZy13U7mjtIDoloE4e7AMj5jPLbffWB6Csy5DF5e0lC9M+tnKz/A==
+  dependencies:
+    "@types/node" "*"
+
 "@types/istanbul-lib-coverage@*", "@types/istanbul-lib-coverage@^2.0.0", "@types/istanbul-lib-coverage@^2.0.1":
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/@types/istanbul-lib-coverage/-/istanbul-lib-coverage-2.0.1.tgz#42995b446db9a48a11a07ec083499a860e9138ff"
@@ -398,6 +405,11 @@
   dependencies:
     "@types/istanbul-lib-coverage" "*"
     "@types/istanbul-lib-report" "*"
+
+"@types/node@*":
+  version "14.0.13"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.0.13.tgz#ee1128e881b874c371374c1f72201893616417c9"
+  integrity sha512-rouEWBImiRaSJsVA+ITTFM6ZxibuAlTuNOCyxVbwreu6k6+ujs7DfnU9o+PShFhET78pMBl3eH+AGSI5eOTkPA==
 
 "@types/stack-utils@^1.0.1":
   version "1.0.1"
@@ -4002,10 +4014,11 @@ test-exclude@^6.0.0:
     minimatch "^3.0.4"
 
 testcontainers@^2.4.0:
-  version "2.6.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-2.6.0.tgz#0f444d97e0d037880fcffe10ee7cb9f0d5e149f0"
-  integrity sha512-kRO9+pXz8w5JQfbsyTFIlqU6Ooic3XflhsCDE+LavoFUmhAvOkF/ycafPHU2RR5GZ42TwRUXask0PJZEvpcCTg==
+  version "2.12.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-2.12.0.tgz#a441049a0fbadc18be5ca5c5e2877432713a5235"
+  integrity sha512-fNQjRDW5re29SWYCNwZo+P0IoA5SUw9MBxh9KC4WygthvAm72gUBGKWdtJCdtLEBCraV1hPTYOJX1DGoxpFsoQ==
   dependencies:
+    "@types/dockerode" "^2.5.24"
     byline "^5.0.0"
     debug "^4.1.1"
     default-gateway "^5.0.2"
