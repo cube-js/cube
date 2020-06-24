@@ -576,6 +576,9 @@ function (_React$Component) {
           return m.type === 'time';
         }),
         availableSegments: meta && meta.membersForQuery(query, 'segments') || [],
+        updateQuery: function updateQuery(query) {
+          return _this2.updateQuery(query);
+        },
         updateMeasures: updateMethods('measures'),
         updateDimensions: updateMethods('dimensions'),
         updateSegments: updateMethods('segments'),
