@@ -270,8 +270,6 @@ export default class QueryBuilder extends React.Component {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
     
-    const activePivotConfig = state.pivotConfig || statePivotConfig;
-    
     let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || {};
     
@@ -281,16 +279,11 @@ export default class QueryBuilder extends React.Component {
       const { sqlQuery } = await this.cubejsApi().sql(query, {
         mutexObj: this.mutexObj
       });
-      
-      finalState = {
-        ...finalState,
-        query: {
-          ...finalState.query,
-          order: sqlQuery.sql.order
-        },
-        pivotConfig: ResultSet.getNormalizedPivotConfig(finalState.query || {})
-      };
+
+      finalState.query.order = sqlQuery.sql.order;
     }
+    
+    const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
     
     const updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers({
       ...this.state, ...finalState

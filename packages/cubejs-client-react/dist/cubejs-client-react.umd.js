@@ -37248,7 +37248,7 @@
         var _updateVizState = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee2(state) {
-          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, activePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
           return regeneratorRuntime.wrap(function _callee2$(_context2) {
             while (1) {
@@ -37256,32 +37256,27 @@
                 case 0:
                   _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
                   _this$state3 = this.state, stateQuery = _this$state3.query, statePivotConfig = _this$state3.pivotConfig;
-                  activePivotConfig = state.pivotConfig || statePivotConfig;
                   finalState = this.applyStateChangeHeuristics(state);
                   _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                   if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                    _context2.next = 12;
+                    _context2.next = 11;
                     break;
                   }
 
                   this.shouldApplyHeuristicOrder = false;
-                  _context2.next = 9;
+                  _context2.next = 8;
                   return this.cubejsApi().sql(query, {
                     mutexObj: this.mutexObj
                   });
 
-                case 9:
+                case 8:
                   _ref4 = _context2.sent;
                   sqlQuery = _ref4.sqlQuery;
-                  finalState = _objectSpread({}, finalState, {
-                    query: _objectSpread({}, finalState.query, {
-                      order: sqlQuery.sql.order
-                    }),
-                    pivotConfig: cubejsClientCore_2.getNormalizedPivotConfig(finalState.query || {})
-                  });
+                  finalState.query.order = sqlQuery.sql.order;
 
-                case 12:
+                case 11:
+                  activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                   updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread({}, this.state, {}, finalState)));
                   currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
                     var id = _ref5.id;
