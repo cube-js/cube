@@ -16604,9 +16604,9 @@
 	      };
 
 	      var pivot = this.pivot(normalizedPivotConfig);
-	      (pivot[0] && pivot[0].yValuesArray || []).forEach(function (_ref30) {
-	        var _ref31 = _slicedToArray(_ref30, 1),
-	            yValues = _ref31[0];
+	      (pivot[0] && pivot[0].yValuesArray || []).forEach(function (_ref31) {
+	        var _ref32 = _slicedToArray(_ref31, 1),
+	            yValues = _ref32[0];
 
 	        if (yValues.length > 0) {
 	          var currentItem = schema;
