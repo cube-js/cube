@@ -79,6 +79,21 @@ In order to link `@cubejs-backend/server-core`:
 4. Run `yarn build` in `packages/cubejs-playground`.
 5. Install dependencies in all linked packages using `yarn`.
 
+### Client Packages
+
+If you want to make changes to the Cube.js client packages and test them locally in your project you can do it the following way:
+1. Make the desired changes and run `yarn build` in the root directory (you can also use `yarn watch`)
+2. Go to the `~/some-path/cube.js/packages/cubejs-client-core` directory and run `yarn link`. (You'll see the messages _Registered **"@cubejs-client/core"**_)
+3. Now you can link it in your project (e.g. _/my-project/dashboard-app_). You can do so running `yarn link "@cubejs-client/core"`
+
+If you want to make changes to the `@cubejs-client/react` package you'll need a few extra steps
+1. Go to your project's **node_modules** directory and find the react package (e.g. _/my-project/dashboard-app/node_modules/react_ and run `yarn link`
+2. Go to the `~/some-path/cube.js/packages/cubejs-client-react` directory and run `yarn link react`
+
+Now your project will be using the local packages.
+
+**NOTE:** You might need to restart your project after linking the packages.
+
 ## Style guides
 
 We're passionate about what code can do rather how it's formatted.
