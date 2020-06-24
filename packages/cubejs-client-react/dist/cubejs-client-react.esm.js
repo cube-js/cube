@@ -429,11 +429,7 @@ function (_React$Component) {
       query: props.query,
       chartType: 'line',
       orderMembers: [],
-      pivotConfig: {
-        x: [],
-        y: [],
-        fillMissingDates: true
-      }
+      pivotConfig: null
     }, props.vizState);
     _this.shouldApplyHeuristicOrder = false;
     _this.mutexObj = {};
@@ -665,7 +661,7 @@ function (_React$Component) {
       var _updateVizState = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2(state) {
-        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, currentPivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, shouldNormalizePivotConfig, _finalState, _meta, toSet;
+        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, activePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
         return _regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
@@ -673,7 +669,7 @@ function (_React$Component) {
               case 0:
                 _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
                 _this$state3 = this.state, stateQuery = _this$state3.query, statePivotConfig = _this$state3.pivotConfig;
-                currentPivotConfig = state.pivotConfig || statePivotConfig;
+                activePivotConfig = state.pivotConfig || statePivotConfig;
                 finalState = this.applyStateChangeHeuristics(state);
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
@@ -725,19 +721,10 @@ function (_React$Component) {
                 nextQuery = _objectSpread2({}, stateQuery, {}, query, {
                   order: nextOrder
                 });
-                shouldNormalizePivotConfig = !equals({
-                  measures: stateQuery.measures,
-                  dimensions: stateQuery.dimensions,
-                  timeDimensions: stateQuery.timeDimensions
-                }, {
-                  measures: nextQuery.measures,
-                  dimensions: nextQuery.dimensions,
-                  timeDimensions: nextQuery.timeDimensions
-                });
                 finalState = _objectSpread2({}, finalState, {
                   query: nextQuery,
                   orderMembers: currentOrderMembers,
-                  pivotConfig: shouldNormalizePivotConfig ? ResultSet.getNormalizedPivotConfig(query) : currentPivotConfig
+                  pivotConfig: ResultSet.getNormalizedPivotConfig(nextQuery, activePivotConfig)
                 });
                 this.setState(finalState);
                 finalState = _objectSpread2({}, this.state, {}, finalState);
@@ -751,7 +738,7 @@ function (_React$Component) {
                   setVizState(toSet);
                 }
 
-              case 24:
+              case 23:
               case "end":
                 return _context2.stop();
             }
@@ -805,6 +792,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             chartType: defaultTimeDimension ? 'line' : 'number'
           });
@@ -820,6 +808,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             chartType: 'table'
           });
@@ -835,6 +824,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
           });
@@ -847,6 +837,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             sessionGranularity: null
           });
@@ -863,6 +854,7 @@ function (_React$Component) {
               td = _query$timeDimensions[0];
 
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: _objectSpread2({}, query, {
               timeDimensions: [_objectSpread2({}, td, {
                 granularity: defaultGranularity
@@ -876,6 +868,7 @@ function (_React$Component) {
               _td = _query$timeDimensions2[0];
 
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: _objectSpread2({}, query, {
               timeDimensions: [_objectSpread2({}, _td, {
                 granularity: undefined

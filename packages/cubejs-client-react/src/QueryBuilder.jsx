@@ -1,7 +1,7 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import {
-  prop, uniqBy, indexBy, fromPairs, equals
+  prop, uniqBy, indexBy, fromPairs
 } from 'ramda';
 import { ResultSet } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
@@ -87,11 +87,7 @@ export default class QueryBuilder extends React.Component {
       query: props.query,
       chartType: 'line',
       orderMembers: [],
-      pivotConfig: {
-        x: [],
-        y: [],
-        fillMissingDates: true
-      },
+      pivotConfig: null,
       ...props.vizState
     };
     
@@ -241,7 +237,7 @@ export default class QueryBuilder extends React.Component {
       
           nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
           nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
-          
+
           this.updateVizState({
             pivotConfig: nextPivotConfig
           });
@@ -273,7 +269,8 @@ export default class QueryBuilder extends React.Component {
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
-    const currentPivotConfig = state.pivotConfig || statePivotConfig;
+    
+    const activePivotConfig = state.pivotConfig || statePivotConfig;
     
     let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || {};
@@ -315,25 +312,12 @@ export default class QueryBuilder extends React.Component {
       ...query,
       order: nextOrder
     };
-    
-    const shouldNormalizePivotConfig = !equals(
-      {
-        measures: stateQuery.measures,
-        dimensions: stateQuery.dimensions,
-        timeDimensions: stateQuery.timeDimensions,
-      },
-      {
-        measures: nextQuery.measures,
-        dimensions: nextQuery.dimensions,
-        timeDimensions: nextQuery.timeDimensions,
-      }
-    );
-    
+
     finalState = {
       ...finalState,
       query: nextQuery,
       orderMembers: currentOrderMembers,
-      pivotConfig: shouldNormalizePivotConfig ? ResultSet.getNormalizedPivotConfig(query) : currentPivotConfig
+      pivotConfig: ResultSet.getNormalizedPivotConfig(nextQuery, activePivotConfig)
     };
     
     this.setState(finalState);
@@ -400,6 +384,7 @@ export default class QueryBuilder extends React.Component {
 
         return {
           ...newState,
+          pivotConfig: null,
           query: newQuery,
           chartType: defaultTimeDimension ? 'line' : 'number'
         };
@@ -415,6 +400,7 @@ export default class QueryBuilder extends React.Component {
 
         return {
           ...newState,
+          pivotConfig: null,
           query: newQuery,
           chartType: 'table'
         };
@@ -433,6 +419,7 @@ export default class QueryBuilder extends React.Component {
 
         return {
           ...newState,
+          pivotConfig: null,
           query: newQuery,
           chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
         };
@@ -453,6 +440,7 @@ export default class QueryBuilder extends React.Component {
 
         return {
           ...newState,
+          pivotConfig: null,
           query: newQuery,
           sessionGranularity: null
         };
@@ -470,6 +458,7 @@ export default class QueryBuilder extends React.Component {
         const [td] = query.timeDimensions;
         return {
           ...newState,
+          pivotConfig: null,
           query: {
             ...query,
             timeDimensions: [{ ...td, granularity: defaultGranularity }]
@@ -485,6 +474,7 @@ export default class QueryBuilder extends React.Component {
         const [td] = query.timeDimensions;
         return {
           ...newState,
+          pivotConfig: null,
           query: {
             ...query,
             timeDimensions: [{ ...td, granularity: undefined }]

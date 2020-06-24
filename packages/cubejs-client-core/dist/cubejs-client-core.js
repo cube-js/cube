@@ -21,7 +21,6 @@ require('core-js/modules/es.array.find');
 require('core-js/modules/es.array.for-each');
 require('core-js/modules/es.array.from');
 require('core-js/modules/es.array.includes');
-require('core-js/modules/es.array.index-of');
 require('core-js/modules/es.array.join');
 require('core-js/modules/es.array.map');
 require('core-js/modules/es.array.reduce');
@@ -34,6 +33,7 @@ require('core-js/modules/es.object.keys');
 require('core-js/modules/es.object.values');
 require('core-js/modules/es.regexp.exec');
 require('core-js/modules/es.regexp.to-string');
+require('core-js/modules/es.string.includes');
 require('core-js/modules/es.string.iterator');
 require('core-js/modules/es.string.match');
 require('core-js/modules/es.string.split');
@@ -1017,6 +1017,10 @@ function () {
         x: dimensions,
         y: []
       });
+      pivotConfig = _objectSpread2({}, pivotConfig, {
+        x: _toConsumableArray(pivotConfig.x || []),
+        y: _toConsumableArray(pivotConfig.y || [])
+      });
 
       var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
         return axis.map(function (subDim) {
@@ -1036,14 +1040,20 @@ function () {
       var allDimensions = timeDimensions.map(function (td) {
         return ResultSet.timeDimensionMember(td);
       }).concat(dimensions);
+
+      var dimensionFilter = function dimensionFilter(key) {
+        return key === 'measures' || key !== 'measures' && allDimensions.includes(key);
+      };
+
       pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
-        return allIncludedDimensions.indexOf(d) === -1;
-      }));
+        return !allIncludedDimensions.includes(d);
+      })).filter(dimensionFilter);
+      pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
 
       if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
         return d === 'measures';
       })) {
-        pivotConfig.y = pivotConfig.y.concat(['measures']);
+        pivotConfig.y.push('measures');
       }
 
       if (!(query.measures || []).length) {

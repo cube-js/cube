@@ -10360,27 +10360,6 @@
   // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
   addToUnscopables$1('includes');
 
-  var $indexOf$1 = arrayIncludes$1.indexOf;
-
-
-
-  var nativeIndexOf$1 = [].indexOf;
-
-  var NEGATIVE_ZERO$2 = !!nativeIndexOf$1 && 1 / [1].indexOf(1, -0) < 0;
-  var STRICT_METHOD$7 = arrayMethodIsStrict$1('indexOf');
-  var USES_TO_LENGTH$d = arrayMethodUsesToLength$1('indexOf', { ACCESSORS: true, 1: 0 });
-
-  // `Array.prototype.indexOf` method
-  // https://tc39.github.io/ecma262/#sec-array.prototype.indexof
-  _export$1({ target: 'Array', proto: true, forced: NEGATIVE_ZERO$2 || !STRICT_METHOD$7 || !USES_TO_LENGTH$d }, {
-    indexOf: function indexOf(searchElement /* , fromIndex = 0 */) {
-      return NEGATIVE_ZERO$2
-        // convert -0 to +0
-        ? nativeIndexOf$1.apply(this, arguments) || 0
-        : $indexOf$1(this, searchElement, arguments.length > 1 ? arguments[1] : undefined);
-    }
-  });
-
   // `Array.isArray` method
   // https://tc39.github.io/ecma262/#sec-array.isarray
   _export$1({ target: 'Array', stat: true }, {
@@ -10620,11 +10599,11 @@
   var nativeJoin$1 = [].join;
 
   var ES3_STRINGS$1 = indexedObject$1 != Object;
-  var STRICT_METHOD$8 = arrayMethodIsStrict$1('join', ',');
+  var STRICT_METHOD$7 = arrayMethodIsStrict$1('join', ',');
 
   // `Array.prototype.join` method
   // https://tc39.github.io/ecma262/#sec-array.prototype.join
-  _export$1({ target: 'Array', proto: true, forced: ES3_STRINGS$1 || !STRICT_METHOD$8 }, {
+  _export$1({ target: 'Array', proto: true, forced: ES3_STRINGS$1 || !STRICT_METHOD$7 }, {
     join: function join(separator) {
       return nativeJoin$1.call(toIndexedObject$1(this), separator === undefined ? ',' : separator);
     }
@@ -10636,12 +10615,12 @@
 
   var HAS_SPECIES_SUPPORT$5 = arrayMethodHasSpeciesSupport$1('map');
   // FF49- issue
-  var USES_TO_LENGTH$e = arrayMethodUsesToLength$1('map');
+  var USES_TO_LENGTH$d = arrayMethodUsesToLength$1('map');
 
   // `Array.prototype.map` method
   // https://tc39.github.io/ecma262/#sec-array.prototype.map
   // with adding support of @@species
-  _export$1({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT$5 || !USES_TO_LENGTH$e }, {
+  _export$1({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT$5 || !USES_TO_LENGTH$d }, {
     map: function map(callbackfn /* , thisArg */) {
       return $map$1(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
     }
@@ -10687,12 +10666,12 @@
 
 
 
-  var STRICT_METHOD$9 = arrayMethodIsStrict$1('reduce');
-  var USES_TO_LENGTH$f = arrayMethodUsesToLength$1('reduce', { 1: 0 });
+  var STRICT_METHOD$8 = arrayMethodIsStrict$1('reduce');
+  var USES_TO_LENGTH$e = arrayMethodUsesToLength$1('reduce', { 1: 0 });
 
   // `Array.prototype.reduce` method
   // https://tc39.github.io/ecma262/#sec-array.prototype.reduce
-  _export$1({ target: 'Array', proto: true, forced: !STRICT_METHOD$9 || !USES_TO_LENGTH$f }, {
+  _export$1({ target: 'Array', proto: true, forced: !STRICT_METHOD$8 || !USES_TO_LENGTH$e }, {
     reduce: function reduce(callbackfn /* , initialValue */) {
       return $reduce$1(this, callbackfn, arguments.length, arguments.length > 1 ? arguments[1] : undefined);
     }
@@ -11805,6 +11784,44 @@
     }, { unsafe: true });
   }
 
+  var MATCH$3 = wellKnownSymbol$1('match');
+
+  // `IsRegExp` abstract operation
+  // https://tc39.github.io/ecma262/#sec-isregexp
+  var isRegexp$1 = function (it) {
+    var isRegExp;
+    return isObject$1(it) && ((isRegExp = it[MATCH$3]) !== undefined ? !!isRegExp : classofRaw$1(it) == 'RegExp');
+  };
+
+  var notARegexp$1 = function (it) {
+    if (isRegexp$1(it)) {
+      throw TypeError("The method doesn't accept regular expressions");
+    } return it;
+  };
+
+  var MATCH$4 = wellKnownSymbol$1('match');
+
+  var correctIsRegexpLogic$1 = function (METHOD_NAME) {
+    var regexp = /./;
+    try {
+      '/./'[METHOD_NAME](regexp);
+    } catch (e) {
+      try {
+        regexp[MATCH$4] = false;
+        return '/./'[METHOD_NAME](regexp);
+      } catch (f) { /* empty */ }
+    } return false;
+  };
+
+  // `String.prototype.includes` method
+  // https://tc39.github.io/ecma262/#sec-string.prototype.includes
+  _export$1({ target: 'String', proto: true, forced: !correctIsRegexpLogic$1('includes') }, {
+    includes: function includes(searchString /* , position = 0 */) {
+      return !!~String(requireObjectCoercible$1(this))
+        .indexOf(notARegexp$1(searchString), arguments.length > 1 ? arguments[1] : undefined);
+    }
+  });
+
   // `String.prototype.{ codePointAt, at }` methods implementation
   var createMethod$c = function (CONVERT_TO_STRING) {
     return function ($this, pos) {
@@ -12047,15 +12064,6 @@
       }
     ];
   });
-
-  var MATCH$3 = wellKnownSymbol$1('match');
-
-  // `IsRegExp` abstract operation
-  // https://tc39.github.io/ecma262/#sec-isregexp
-  var isRegexp$1 = function (it) {
-    var isRegExp;
-    return isObject$1(it) && ((isRegExp = it[MATCH$3]) !== undefined ? !!isRegExp : classofRaw$1(it) == 'RegExp');
-  };
 
   var arrayPush$1 = [].push;
   var min$9 = Math.min;
@@ -14247,7 +14255,7 @@
   });
 
   var HAS_SPECIES_SUPPORT$6 = arrayMethodHasSpeciesSupport$1('slice');
-  var USES_TO_LENGTH$g = arrayMethodUsesToLength$1('slice', { ACCESSORS: true, 0: 0, 1: 2 });
+  var USES_TO_LENGTH$f = arrayMethodUsesToLength$1('slice', { ACCESSORS: true, 0: 0, 1: 2 });
 
   var SPECIES$d = wellKnownSymbol$1('species');
   var nativeSlice$1 = [].slice;
@@ -14256,7 +14264,7 @@
   // `Array.prototype.slice` method
   // https://tc39.github.io/ecma262/#sec-array.prototype.slice
   // fallback for not array-like ES3 strings and DOM objects
-  _export$1({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT$6 || !USES_TO_LENGTH$g }, {
+  _export$1({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT$6 || !USES_TO_LENGTH$f }, {
     slice: function slice(start, end) {
       var O = toIndexedObject$1(this);
       var length = toLength$1(O.length);
@@ -16114,7 +16122,7 @@
     return $includes$2(aTypedArray$8(this), searchElement, arguments.length > 1 ? arguments[1] : undefined);
   });
 
-  var $indexOf$2 = arrayIncludes$1.indexOf;
+  var $indexOf$1 = arrayIncludes$1.indexOf;
 
   var aTypedArray$9 = arrayBufferViewCore.aTypedArray;
   var exportTypedArrayMethod$9 = arrayBufferViewCore.exportTypedArrayMethod;
@@ -16122,7 +16130,7 @@
   // `%TypedArray%.prototype.indexOf` method
   // https://tc39.github.io/ecma262/#sec-%typedarray%.prototype.indexof
   exportTypedArrayMethod$9('indexOf', function indexOf(searchElement /* , fromIndex */) {
-    return $indexOf$2(aTypedArray$9(this), searchElement, arguments.length > 1 ? arguments[1] : undefined);
+    return $indexOf$1(aTypedArray$9(this), searchElement, arguments.length > 1 ? arguments[1] : undefined);
   });
 
   var ITERATOR$e = wellKnownSymbol$1('iterator');
@@ -16171,17 +16179,17 @@
 
   var min$b = Math.min;
   var nativeLastIndexOf$1 = [].lastIndexOf;
-  var NEGATIVE_ZERO$3 = !!nativeLastIndexOf$1 && 1 / [1].lastIndexOf(1, -0) < 0;
-  var STRICT_METHOD$a = arrayMethodIsStrict$1('lastIndexOf');
+  var NEGATIVE_ZERO$2 = !!nativeLastIndexOf$1 && 1 / [1].lastIndexOf(1, -0) < 0;
+  var STRICT_METHOD$9 = arrayMethodIsStrict$1('lastIndexOf');
   // For preventing possible almost infinite loop in non-standard implementations, test the forward version of the method
-  var USES_TO_LENGTH$h = arrayMethodUsesToLength$1('indexOf', { ACCESSORS: true, 1: 0 });
-  var FORCED$a = NEGATIVE_ZERO$3 || !STRICT_METHOD$a || !USES_TO_LENGTH$h;
+  var USES_TO_LENGTH$g = arrayMethodUsesToLength$1('indexOf', { ACCESSORS: true, 1: 0 });
+  var FORCED$a = NEGATIVE_ZERO$2 || !STRICT_METHOD$9 || !USES_TO_LENGTH$g;
 
   // `Array.prototype.lastIndexOf` method implementation
   // https://tc39.github.io/ecma262/#sec-array.prototype.lastindexof
   var arrayLastIndexOf$1 = FORCED$a ? function lastIndexOf(searchElement /* , fromIndex = @[*-1] */) {
     // convert -0 to +0
-    if (NEGATIVE_ZERO$3) return nativeLastIndexOf$1.apply(this, arguments) || 0;
+    if (NEGATIVE_ZERO$2) return nativeLastIndexOf$1.apply(this, arguments) || 0;
     var O = toIndexedObject$1(this);
     var length = toLength$1(O.length);
     var index = length - 1;
@@ -16506,6 +16514,27 @@
   }
 
   var toConsumableArray = _toConsumableArray$1;
+
+  var $indexOf$2 = arrayIncludes$1.indexOf;
+
+
+
+  var nativeIndexOf$1 = [].indexOf;
+
+  var NEGATIVE_ZERO$3 = !!nativeIndexOf$1 && 1 / [1].indexOf(1, -0) < 0;
+  var STRICT_METHOD$a = arrayMethodIsStrict$1('indexOf');
+  var USES_TO_LENGTH$h = arrayMethodUsesToLength$1('indexOf', { ACCESSORS: true, 1: 0 });
+
+  // `Array.prototype.indexOf` method
+  // https://tc39.github.io/ecma262/#sec-array.prototype.indexof
+  _export$1({ target: 'Array', proto: true, forced: NEGATIVE_ZERO$3 || !STRICT_METHOD$a || !USES_TO_LENGTH$h }, {
+    indexOf: function indexOf(searchElement /* , fromIndex = 0 */) {
+      return NEGATIVE_ZERO$3
+        // convert -0 to +0
+        ? nativeIndexOf$1.apply(this, arguments) || 0
+        : $indexOf$2(this, searchElement, arguments.length > 1 ? arguments[1] : undefined);
+    }
+  });
 
   function _objectWithoutPropertiesLoose$1(source, excluded) {
     if (source == null) return {};
@@ -18995,7 +19024,7 @@
 
 
 
-  var MATCH$4 = wellKnownSymbol$1('match');
+  var MATCH$5 = wellKnownSymbol$1('match');
   var NativeRegExp$1 = global_1$1.RegExp;
   var RegExpPrototype$3 = NativeRegExp$1.prototype;
   var re1$1 = /a/g;
@@ -19007,7 +19036,7 @@
   var UNSUPPORTED_Y$5 = regexpStickyHelpers$1.UNSUPPORTED_Y;
 
   var FORCED$e = descriptors$1 && isForced_1$1('RegExp', (!CORRECT_NEW$1 || UNSUPPORTED_Y$5 || fails$1(function () {
-    re2$1[MATCH$4] = false;
+    re2$1[MATCH$5] = false;
     // RegExp constructor can alter flags and IsRegExp works correct with @@match
     return NativeRegExp$1(re1$1) != re1$1 || NativeRegExp$1(re2$1) == re2$1 || NativeRegExp$1(re1$1, 'i') != '/a/i';
   })));
@@ -35914,6 +35943,10 @@
             x: dimensions,
             y: []
           });
+          pivotConfig = _objectSpread2({}, pivotConfig, {
+            x: _toConsumableArray$$1(pivotConfig.x || []),
+            y: _toConsumableArray$$1(pivotConfig.y || [])
+          });
 
           var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
             return axis.map(function (subDim) {
@@ -35933,14 +35966,20 @@
           var allDimensions = timeDimensions.map(function (td) {
             return ResultSet.timeDimensionMember(td);
           }).concat(dimensions);
+
+          var dimensionFilter = function dimensionFilter(key) {
+            return key === 'measures' || key !== 'measures' && allDimensions.includes(key);
+          };
+
           pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
-            return allIncludedDimensions.indexOf(d) === -1;
-          }));
+            return !allIncludedDimensions.includes(d);
+          })).filter(dimensionFilter);
+          pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
 
           if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
             return d === 'measures';
           })) {
-            pivotConfig.y = pivotConfig.y.concat(['measures']);
+            pivotConfig.y.push('measures');
           }
 
           if (!(query.measures || []).length) {
@@ -36977,11 +37016,7 @@
         query: props$$1.query,
         chartType: 'line',
         orderMembers: [],
-        pivotConfig: {
-          x: [],
-          y: [],
-          fillMissingDates: true
-        }
+        pivotConfig: null
       }, props$$1.vizState);
       _this.shouldApplyHeuristicOrder = false;
       _this.mutexObj = {};
@@ -37213,7 +37248,7 @@
         var _updateVizState = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee2(state) {
-          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, currentPivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, shouldNormalizePivotConfig, _finalState, _meta, toSet;
+          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, activePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
           return regeneratorRuntime.wrap(function _callee2$(_context2) {
             while (1) {
@@ -37221,7 +37256,7 @@
                 case 0:
                   _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
                   _this$state3 = this.state, stateQuery = _this$state3.query, statePivotConfig = _this$state3.pivotConfig;
-                  currentPivotConfig = state.pivotConfig || statePivotConfig;
+                  activePivotConfig = state.pivotConfig || statePivotConfig;
                   finalState = this.applyStateChangeHeuristics(state);
                   _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
@@ -37273,19 +37308,10 @@
                   nextQuery = _objectSpread({}, stateQuery, {}, query, {
                     order: nextOrder
                   });
-                  shouldNormalizePivotConfig = !equals({
-                    measures: stateQuery.measures,
-                    dimensions: stateQuery.dimensions,
-                    timeDimensions: stateQuery.timeDimensions
-                  }, {
-                    measures: nextQuery.measures,
-                    dimensions: nextQuery.dimensions,
-                    timeDimensions: nextQuery.timeDimensions
-                  });
                   finalState = _objectSpread({}, finalState, {
                     query: nextQuery,
                     orderMembers: currentOrderMembers,
-                    pivotConfig: shouldNormalizePivotConfig ? cubejsClientCore_2.getNormalizedPivotConfig(query) : currentPivotConfig
+                    pivotConfig: cubejsClientCore_2.getNormalizedPivotConfig(nextQuery, activePivotConfig)
                   });
                   this.setState(finalState);
                   finalState = _objectSpread({}, this.state, {}, finalState);
@@ -37299,7 +37325,7 @@
                     setVizState(toSet);
                   }
 
-                case 24:
+                case 23:
                 case "end":
                   return _context2.stop();
               }
@@ -37353,6 +37379,7 @@
             });
             this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
+              pivotConfig: null,
               query: newQuery,
               chartType: defaultTimeDimension ? 'line' : 'number'
             });
@@ -37368,6 +37395,7 @@
             });
             this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
+              pivotConfig: null,
               query: newQuery,
               chartType: 'table'
             });
@@ -37383,6 +37411,7 @@
             });
             this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
+              pivotConfig: null,
               query: newQuery,
               chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
             });
@@ -37395,6 +37424,7 @@
             });
             this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
+              pivotConfig: null,
               query: newQuery,
               sessionGranularity: null
             });
@@ -37411,6 +37441,7 @@
                 td = _query$timeDimensions[0];
 
             return _objectSpread({}, newState, {
+              pivotConfig: null,
               query: _objectSpread({}, query, {
                 timeDimensions: [_objectSpread({}, td, {
                   granularity: defaultGranularity
@@ -37424,6 +37455,7 @@
                 _td = _query$timeDimensions2[0];
 
             return _objectSpread({}, newState, {
+              pivotConfig: null,
               query: _objectSpread({}, query, {
                 timeDimensions: [_objectSpread({}, _td, {
                   granularity: undefined

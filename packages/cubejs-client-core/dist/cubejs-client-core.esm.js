@@ -15,7 +15,6 @@ import 'core-js/modules/es.array.find';
 import 'core-js/modules/es.array.for-each';
 import 'core-js/modules/es.array.from';
 import 'core-js/modules/es.array.includes';
-import 'core-js/modules/es.array.index-of';
 import 'core-js/modules/es.array.join';
 import 'core-js/modules/es.array.map';
 import 'core-js/modules/es.array.reduce';
@@ -28,6 +27,7 @@ import 'core-js/modules/es.object.keys';
 import 'core-js/modules/es.object.values';
 import 'core-js/modules/es.regexp.exec';
 import 'core-js/modules/es.regexp.to-string';
+import 'core-js/modules/es.string.includes';
 import 'core-js/modules/es.string.iterator';
 import 'core-js/modules/es.string.match';
 import 'core-js/modules/es.string.split';
@@ -1011,6 +1011,10 @@ function () {
         x: dimensions,
         y: []
       });
+      pivotConfig = _objectSpread2({}, pivotConfig, {
+        x: _toConsumableArray(pivotConfig.x || []),
+        y: _toConsumableArray(pivotConfig.y || [])
+      });
 
       var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
         return axis.map(function (subDim) {
@@ -1030,14 +1034,20 @@ function () {
       var allDimensions = timeDimensions.map(function (td) {
         return ResultSet.timeDimensionMember(td);
       }).concat(dimensions);
+
+      var dimensionFilter = function dimensionFilter(key) {
+        return key === 'measures' || key !== 'measures' && allDimensions.includes(key);
+      };
+
       pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
-        return allIncludedDimensions.indexOf(d) === -1;
-      }));
+        return !allIncludedDimensions.includes(d);
+      })).filter(dimensionFilter);
+      pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
 
       if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
         return d === 'measures';
       })) {
-        pivotConfig.y = pivotConfig.y.concat(['measures']);
+        pivotConfig.y.push('measures');
       }
 
       if (!(query.measures || []).length) {

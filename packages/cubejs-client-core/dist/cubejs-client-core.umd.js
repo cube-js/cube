@@ -4975,39 +4975,18 @@
 	// https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
 	addToUnscopables('includes');
 
-	var $indexOf$1 = arrayIncludes.indexOf;
-
-
-
-	var nativeIndexOf = [].indexOf;
-
-	var NEGATIVE_ZERO$1 = !!nativeIndexOf && 1 / [1].indexOf(1, -0) < 0;
-	var STRICT_METHOD$3 = arrayMethodIsStrict('indexOf');
-	var USES_TO_LENGTH$6 = arrayMethodUsesToLength('indexOf', { ACCESSORS: true, 1: 0 });
-
-	// `Array.prototype.indexOf` method
-	// https://tc39.github.io/ecma262/#sec-array.prototype.indexof
-	_export({ target: 'Array', proto: true, forced: NEGATIVE_ZERO$1 || !STRICT_METHOD$3 || !USES_TO_LENGTH$6 }, {
-	  indexOf: function indexOf(searchElement /* , fromIndex = 0 */) {
-	    return NEGATIVE_ZERO$1
-	      // convert -0 to +0
-	      ? nativeIndexOf.apply(this, arguments) || 0
-	      : $indexOf$1(this, searchElement, arguments.length > 1 ? arguments[1] : undefined);
-	  }
-	});
-
 	var $map$1 = arrayIteration.map;
 
 
 
 	var HAS_SPECIES_SUPPORT$2 = arrayMethodHasSpeciesSupport('map');
 	// FF49- issue
-	var USES_TO_LENGTH$7 = arrayMethodUsesToLength('map');
+	var USES_TO_LENGTH$6 = arrayMethodUsesToLength('map');
 
 	// `Array.prototype.map` method
 	// https://tc39.github.io/ecma262/#sec-array.prototype.map
 	// with adding support of @@species
-	_export({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT$2 || !USES_TO_LENGTH$7 }, {
+	_export({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT$2 || !USES_TO_LENGTH$6 }, {
 	  map: function map(callbackfn /* , thisArg */) {
 	    return $map$1(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
 	  }
@@ -5017,12 +4996,12 @@
 
 
 
-	var STRICT_METHOD$4 = arrayMethodIsStrict('reduce');
-	var USES_TO_LENGTH$8 = arrayMethodUsesToLength('reduce', { 1: 0 });
+	var STRICT_METHOD$3 = arrayMethodIsStrict('reduce');
+	var USES_TO_LENGTH$7 = arrayMethodUsesToLength('reduce', { 1: 0 });
 
 	// `Array.prototype.reduce` method
 	// https://tc39.github.io/ecma262/#sec-array.prototype.reduce
-	_export({ target: 'Array', proto: true, forced: !STRICT_METHOD$4 || !USES_TO_LENGTH$8 }, {
+	_export({ target: 'Array', proto: true, forced: !STRICT_METHOD$3 || !USES_TO_LENGTH$7 }, {
 	  reduce: function reduce(callbackfn /* , initialValue */) {
 	    return $reduce$1(this, callbackfn, arguments.length, arguments.length > 1 ? arguments[1] : undefined);
 	  }
@@ -5368,6 +5347,44 @@
 	  exec: regexpExec
 	});
 
+	var MATCH = wellKnownSymbol('match');
+
+	// `IsRegExp` abstract operation
+	// https://tc39.github.io/ecma262/#sec-isregexp
+	var isRegexp = function (it) {
+	  var isRegExp;
+	  return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : classofRaw(it) == 'RegExp');
+	};
+
+	var notARegexp = function (it) {
+	  if (isRegexp(it)) {
+	    throw TypeError("The method doesn't accept regular expressions");
+	  } return it;
+	};
+
+	var MATCH$1 = wellKnownSymbol('match');
+
+	var correctIsRegexpLogic = function (METHOD_NAME) {
+	  var regexp = /./;
+	  try {
+	    '/./'[METHOD_NAME](regexp);
+	  } catch (e) {
+	    try {
+	      regexp[MATCH$1] = false;
+	      return '/./'[METHOD_NAME](regexp);
+	    } catch (f) { /* empty */ }
+	  } return false;
+	};
+
+	// `String.prototype.includes` method
+	// https://tc39.github.io/ecma262/#sec-string.prototype.includes
+	_export({ target: 'String', proto: true, forced: !correctIsRegexpLogic('includes') }, {
+	  includes: function includes(searchString /* , position = 0 */) {
+	    return !!~String(requireObjectCoercible(this))
+	      .indexOf(notARegexp(searchString), arguments.length > 1 ? arguments[1] : undefined);
+	  }
+	});
+
 	// TODO: Remove from `core-js@4` since it's moved to entry points
 
 
@@ -5556,15 +5573,6 @@
 	    }
 	  ];
 	});
-
-	var MATCH = wellKnownSymbol('match');
-
-	// `IsRegExp` abstract operation
-	// https://tc39.github.io/ecma262/#sec-isregexp
-	var isRegexp = function (it) {
-	  var isRegExp;
-	  return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : classofRaw(it) == 'RegExp');
-	};
 
 	var arrayPush = [].push;
 	var min$4 = Math.min;
@@ -7127,7 +7135,7 @@
 
 
 
-	var MATCH$1 = wellKnownSymbol('match');
+	var MATCH$2 = wellKnownSymbol('match');
 	var NativeRegExp = global_1.RegExp;
 	var RegExpPrototype$1 = NativeRegExp.prototype;
 	var re1 = /a/g;
@@ -7139,7 +7147,7 @@
 	var UNSUPPORTED_Y$2 = regexpStickyHelpers.UNSUPPORTED_Y;
 
 	var FORCED$7 = descriptors && isForced_1('RegExp', (!CORRECT_NEW || UNSUPPORTED_Y$2 || fails(function () {
-	  re2[MATCH$1] = false;
+	  re2[MATCH$2] = false;
 	  // RegExp constructor can alter flags and IsRegExp works correct with @@match
 	  return NativeRegExp(re1) != re1 || NativeRegExp(re2) == re2 || NativeRegExp(re1, 'i') != '/a/i';
 	})));
@@ -7599,9 +7607,9 @@
 	  test$2.sort(null);
 	});
 	// Old WebKit
-	var STRICT_METHOD$5 = arrayMethodIsStrict('sort');
+	var STRICT_METHOD$4 = arrayMethodIsStrict('sort');
 
-	var FORCED$8 = FAILS_ON_UNDEFINED || !FAILS_ON_NULL || !STRICT_METHOD$5;
+	var FORCED$8 = FAILS_ON_UNDEFINED || !FAILS_ON_NULL || !STRICT_METHOD$4;
 
 	// `Array.prototype.sort` method
 	// https://tc39.github.io/ecma262/#sec-array.prototype.sort
@@ -7610,6 +7618,27 @@
 	    return comparefn === undefined
 	      ? nativeSort.call(toObject(this))
 	      : nativeSort.call(toObject(this), aFunction$1(comparefn));
+	  }
+	});
+
+	var $indexOf$1 = arrayIncludes.indexOf;
+
+
+
+	var nativeIndexOf = [].indexOf;
+
+	var NEGATIVE_ZERO$1 = !!nativeIndexOf && 1 / [1].indexOf(1, -0) < 0;
+	var STRICT_METHOD$5 = arrayMethodIsStrict('indexOf');
+	var USES_TO_LENGTH$8 = arrayMethodUsesToLength('indexOf', { ACCESSORS: true, 1: 0 });
+
+	// `Array.prototype.indexOf` method
+	// https://tc39.github.io/ecma262/#sec-array.prototype.indexof
+	_export({ target: 'Array', proto: true, forced: NEGATIVE_ZERO$1 || !STRICT_METHOD$5 || !USES_TO_LENGTH$8 }, {
+	  indexOf: function indexOf(searchElement /* , fromIndex = 0 */) {
+	    return NEGATIVE_ZERO$1
+	      // convert -0 to +0
+	      ? nativeIndexOf.apply(this, arguments) || 0
+	      : $indexOf$1(this, searchElement, arguments.length > 1 ? arguments[1] : undefined);
 	  }
 	});
 
@@ -16758,6 +16787,10 @@
 	        x: dimensions,
 	        y: []
 	      });
+	      pivotConfig = _objectSpread({}, pivotConfig, {
+	        x: _toConsumableArray(pivotConfig.x || []),
+	        y: _toConsumableArray(pivotConfig.y || [])
+	      });
 
 	      var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
 	        return axis.map(function (subDim) {
@@ -16777,14 +16810,20 @@
 	      var allDimensions = timeDimensions.map(function (td) {
 	        return ResultSet.timeDimensionMember(td);
 	      }).concat(dimensions);
+
+	      var dimensionFilter = function dimensionFilter(key) {
+	        return key === 'measures' || key !== 'measures' && allDimensions.includes(key);
+	      };
+
 	      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
-	        return allIncludedDimensions.indexOf(d) === -1;
-	      }));
+	        return !allIncludedDimensions.includes(d);
+	      })).filter(dimensionFilter);
+	      pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
 
 	      if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
 	        return d === 'measures';
 	      })) {
-	        pivotConfig.y = pivotConfig.y.concat(['measures']);
+	        pivotConfig.y.push('measures');
 	      }
 
 	      if (!(query.measures || []).length) {
