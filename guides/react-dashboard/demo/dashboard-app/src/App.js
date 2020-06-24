@@ -15,8 +15,14 @@ import client from "./graphql/client";
 import Header from './components/Header';
 import aws_exports from './aws-exports';
 
+let API_URL;
+if (process.env.NODE_ENV === 'production') {
+  API_URL = window.location.origin;
+} else {
+  API_URL = "http://localhost:4000";
+}
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: `/cubejs-api/v1`
+  apiUrl: `${API_URL}/cubejs-api/v1`
 });
 
 Amplify.configure(aws_exports);
