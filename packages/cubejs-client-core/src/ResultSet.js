@@ -694,7 +694,13 @@ class ResultSet {
       };
     };
     
-    this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(([yValues]) => {
+    const pivot = this.pivot(normalizedPivotConfig);
+    
+    if (!pivot.length) {
+      return [];
+    }
+    
+    pivot[0].yValuesArray.forEach(([yValues]) => {
       if (yValues.length > 0) {
         let currentItem = schema;
     

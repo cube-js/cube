@@ -527,4 +527,45 @@ describe('resultSet tablePivot and tableColumns', () => {
       ]);
     });
   });
+  
+  describe('it works with no data', () => {
+    const resultSet = new ResultSet({
+      query: {
+        measures: ['Orders.count'],
+        dimensions: ['Users.country', 'Users.gender'],
+      },
+      data: [],
+      annotation: {
+        measures: {
+          'Orders.count': {
+            title: 'Orders Count',
+            shortTitle: 'Count',
+            type: 'number',
+          }
+        },
+        dimensions: {
+          'Users.country': {
+            title: 'Users Country',
+            shortTitle: 'Country',
+            type: 'string',
+          },
+          'Users.gender': {
+            title: 'Users Gender',
+            shortTitle: 'Gender',
+            type: 'string',
+          },
+        },
+        segments: {},
+        timeDimensions: {},
+      },
+    });
+    
+    test('tablePivot', () => {
+      expect(resultSet.tablePivot()).toEqual([]);
+    });
+    
+    test('tableColumns', () => {
+      expect(resultSet.tablePivot()).toEqual([]);
+    });
+  });
 });
