@@ -804,10 +804,10 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@cubejs-client/core@^0.19.31":
-  version "0.19.31"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.31.tgz#33a4c63f9c1c795e37f45d1ad165264c623091c4"
-  integrity sha512-BSJF4dnGHlypO2g0zGiHiHUNxDd8lglDBaiHu9CTbyTvqGrjKiRDvPcoiQO+MO8HkGWukTzVBqwDSAUflxfoaA==
+"@cubejs-client/core@^0.19.35":
+  version "0.19.35"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.35.tgz#4f9e44dbc938c2780a1cd8a56129ce7039d724a7"
+  integrity sha512-Bs/bwDjwxN/2yteAEJGLC7v9/X1h+zpQO68miQbn8C56VvDGq1uCGpK7seqkLO62i0AQi05MfZwRx21RhG0z+Q==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -6705,9 +6705,9 @@ tslib@1.10.0:
   integrity sha512-qOebF53frne81cf0S9B41ByenJ3/IuH8yJKngAX35CmiZySA0khhkovshKK+jGCaMnVomla7gVlIcc3EvKPbTQ==
 
 tslib@^1.9.0:
-  version "1.11.1"
-  resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.11.1.tgz#eb15d128827fbee2841549e171f45ed338ac7e35"
-  integrity sha512-aZW88SY8kQbU7gpV19lN24LtXh/yD4ZZg6qieAJDDg+YBsJcSmLGK9QpnUjAKVG/xefmvJGd1WUmfpT/g6AJGA==
+  version "1.13.0"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.13.0.tgz#c881e13cc7015894ed914862d276436fa9a47043"
+  integrity sha512-i/6DQjL8Xf3be4K/E6Wgpekn5Qasl1usyw++dAA35Ue5orEn65VIxOA+YvNNl9HV3qv70T7CNwjODHZrLwvd1Q==
 
 tty-browserify@0.0.0:
   version "0.0.0"
