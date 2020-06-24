@@ -881,12 +881,7 @@ function () {
       };
 
       var pivot = this.pivot(normalizedPivotConfig);
-
-      if (!pivot.length) {
-        return [];
-      }
-
-      pivot[0].yValuesArray.forEach(function (_ref30) {
+      (pivot[0] && pivot[0].yValuesArray || []).forEach(function (_ref30) {
         var _ref31 = _slicedToArray(_ref30, 1),
             yValues = _ref31[0];
 
@@ -942,6 +937,18 @@ function () {
         });
       };
 
+      var measureColumns = [];
+
+      if (!pivot.length && normalizedPivotConfig.y.find(function (key) {
+        return key === 'measures';
+      })) {
+        measureColumns = (this.query().measures || []).map(function (key) {
+          return _objectSpread2({}, extractFields(key), {
+            dataIndex: key
+          });
+        });
+      }
+
       return normalizedPivotConfig.x.map(function (key) {
         if (key === 'measures') {
           return {
@@ -956,7 +963,44 @@ function () {
         return _objectSpread2({}, extractFields(key), {
           dataIndex: key
         });
-      }).concat(toColumns(schema));
+      }).concat(toColumns(schema)).concat(measureColumns);
+    }
+  }, {
+    key: "tableColumns2",
+    value: function tableColumns2(pivotConfig) {
+      var _this5 = this;
+
+      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+      var column = function column(field) {
+        var exractFields = function exractFields() {
+          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+          var title = annotation.title,
+              shortTitle = annotation.shortTitle,
+              format = annotation.format,
+              type = annotation.type,
+              meta = annotation.meta;
+          return {
+            title: title,
+            shortTitle: shortTitle,
+            format: format,
+            type: type,
+            meta: meta
+          };
+        };
+
+        return field === 'measures' ? (_this5.query().measures || []).map(function (key) {
+          return _objectSpread2({
+            key: key
+          }, exractFields(_this5.loadResponse.annotation.measures[key]));
+        }) : [_objectSpread2({
+          key: field
+        }, exractFields(_this5.loadResponse.annotation.dimensions[field] || _this5.loadResponse.annotation.timeDimensions[field]))];
+      };
+
+      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
+        return a.concat(b);
+      });
     }
   }, {
     key: "totalRow",
@@ -998,15 +1042,15 @@ function () {
   }, {
     key: "seriesNames",
     value: function seriesNames(pivotConfig) {
-      var _this5 = this;
+      var _this6 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
       return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.timeDimensionBackwardCompatibleData()).map(function (axisValues) {
         return {
-          title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
+          title: _this6.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
-          }) ? dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-          key: _this5.axisValuesString(axisValues),
+          }) ? dropLast(1, axisValues).concat(_this6.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+          key: _this6.axisValuesString(axisValues),
           yValues: axisValues
         };
       });

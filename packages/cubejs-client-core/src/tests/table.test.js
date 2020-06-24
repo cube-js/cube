@@ -527,7 +527,7 @@ describe('resultSet tablePivot and tableColumns', () => {
       ]);
     });
   });
-  
+
   describe('it works with no data', () => {
     const resultSet = new ResultSet({
       query: {
@@ -541,7 +541,7 @@ describe('resultSet tablePivot and tableColumns', () => {
             title: 'Orders Count',
             shortTitle: 'Count',
             type: 'number',
-          }
+          },
         },
         dimensions: {
           'Users.country': {
@@ -559,13 +559,74 @@ describe('resultSet tablePivot and tableColumns', () => {
         timeDimensions: {},
       },
     });
-    
-    test('tablePivot', () => {
-      expect(resultSet.tablePivot()).toEqual([]);
+
+    test('all dimensions on `x` axis', () => {
+      const pivotConfig = {
+        x: ['Users.country', 'Users.gender'],
+        y: ['measures'],
+      };
+
+      expect(resultSet.tablePivot(pivotConfig)).toEqual([]);
+
+      expect(resultSet.tableColumns(pivotConfig)).toEqual([
+        {
+          dataIndex: 'Users.country',
+          format: undefined,
+          key: 'Users.country',
+          meta: undefined,
+          shortTitle: 'Country',
+          title: 'Users Country',
+          type: 'string',
+        },
+        {
+          dataIndex: 'Users.gender',
+          format: undefined,
+          key: 'Users.gender',
+          meta: undefined,
+          shortTitle: 'Gender',
+          title: 'Users Gender',
+          type: 'string',
+        },
+        {
+          dataIndex: 'Orders.count',
+          format: undefined,
+          key: 'Orders.count',
+          meta: undefined,
+          shortTitle: 'Count',
+          title: 'Orders Count',
+          type: 'number',
+        },
+      ]);
     });
-    
-    test('tableColumns', () => {
-      expect(resultSet.tablePivot()).toEqual([]);
+
+    test('one dimension on `y` axis', () => {
+      const pivotConfig = {
+        x: ['Users.gender'],
+        y: ['Users.country', 'measures'],
+      };
+
+      expect(resultSet.tablePivot(pivotConfig)).toEqual([]);
+
+      expect(resultSet.tableColumns(pivotConfig)).toEqual([
+        {
+          dataIndex: 'Users.gender',
+          format: undefined,
+          key: 'Users.gender',
+          meta: undefined,
+          shortTitle: 'Gender',
+          title: 'Users Gender',
+          type: 'string',
+        },
+        {
+          dataIndex: 'Orders.count',
+          format: undefined,
+          key: 'Orders.count',
+          meta: undefined,
+          shortTitle: 'Count',
+          title: 'Orders Count',
+          type: 'number',
+        },
+      ]);
     });
   });
 });
