@@ -179,7 +179,7 @@ export default class QueryBuilder extends React.Component {
         (m) => m.type === 'time'
       ),
       availableSegments: (meta && meta.membersForQuery(query, 'segments')) || [],
-
+      updateQuery: (queryUpdate) => this.updateQuery(queryUpdate),
       updateMeasures: updateMethods('measures'),
       updateDimensions: updateMethods('dimensions'),
       updateSegments: updateMethods('segments'),
