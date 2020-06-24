@@ -23,7 +23,6 @@ import 'core-js/modules/es.array.includes';
 import 'core-js/modules/es.array.splice';
 import 'core-js/modules/es.function.name';
 import 'core-js/modules/es.object.entries';
-import 'core-js/modules/es.object.from-entries';
 import 'core-js/modules/es.string.includes';
 import 'core-js/modules/web.dom-collections.for-each';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
@@ -31,6 +30,7 @@ import _regeneratorRuntime from '@babel/runtime/regenerator';
 import 'regenerator-runtime/runtime';
 import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
 import _toConsumableArray from '@babel/runtime/helpers/toConsumableArray';
+import { ResultSet } from '@cubejs-client/core';
 import 'core-js/modules/es.object.keys';
 
 var isQueryPresent = (function (query) {
@@ -428,10 +428,11 @@ function (_React$Component) {
     _this.state = _objectSpread2({
       query: props.query,
       chartType: 'line',
-      orderMembers: []
+      orderMembers: [],
+      pivotConfig: null
     }, props.vizState);
     _this.shouldApplyHeuristicOrder = false;
-    _this.requestId = 0;
+    _this.mutexObj = {};
     return _this;
   }
 
@@ -441,12 +442,13 @@ function (_React$Component) {
       var _componentDidMount = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee() {
-        var query, meta;
+        var _this$state, query, pivotConfig, meta;
+
         return _regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                query = this.state.query;
+                _this$state = this.state, query = _this$state.query, pivotConfig = _this$state.pivotConfig;
                 _context.next = 3;
                 return this.cubejsApi().meta();
 
@@ -457,7 +459,8 @@ function (_React$Component) {
                   orderMembers: QueryBuilder.getOrderMembers({
                     meta: meta,
                     query: query
-                  })
+                  }),
+                  pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : pivotConfig
                 });
 
               case 5:
@@ -535,12 +538,13 @@ function (_React$Component) {
         };
       };
 
-      var _this$state = this.state,
-          meta = _this$state.meta,
-          query = _this$state.query,
-          _this$state$orderMemb = _this$state.orderMembers,
-          orderMembers = _this$state$orderMemb === void 0 ? [] : _this$state$orderMemb,
-          chartType = _this$state.chartType;
+      var _this$state2 = this.state,
+          meta = _this$state2.meta,
+          query = _this$state2.query,
+          _this$state2$orderMem = _this$state2.orderMembers,
+          orderMembers = _this$state2$orderMem === void 0 ? [] : _this$state2$orderMem,
+          chartType = _this$state2.chartType,
+          pivotConfig = _this$state2.pivotConfig;
       return _objectSpread2({
         meta: meta,
         query: query,
@@ -608,6 +612,41 @@ function (_React$Component) {
               orderMembers: reorder(orderMembers, sourceIndex, destinationIndex)
             });
           }
+        },
+        pivotConfig: pivotConfig,
+        updatePivotConfig: {
+          moveItem: function moveItem(_ref2) {
+            var sourceIndex = _ref2.sourceIndex,
+                destinationIndex = _ref2.destinationIndex,
+                sourceAxis = _ref2.sourceAxis,
+                destinationAxis = _ref2.destinationAxis;
+
+            var nextPivotConfig = _objectSpread2({}, pivotConfig, {
+              x: _toConsumableArray(pivotConfig.x),
+              y: _toConsumableArray(pivotConfig.y)
+            });
+
+            var id = pivotConfig[sourceAxis][sourceIndex];
+            var lastIndex = nextPivotConfig[destinationAxis].length - 1;
+
+            if (id === 'measures') {
+              destinationIndex = lastIndex + 1;
+            } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+              destinationIndex = lastIndex - 1;
+            }
+
+            nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
+            nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
+
+            _this2.updateVizState({
+              pivotConfig: nextPivotConfig
+            });
+          },
+          update: function update(config) {
+            _this2.updateVizState({
+              pivotConfig: _objectSpread2({}, pivotConfig, {}, config)
+            });
+          }
         }
       }, queryRendererProps);
     }
@@ -625,82 +664,65 @@ function (_React$Component) {
       var _updateVizState = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2(state) {
-        var _this$props, setQuery, setVizState, stateQuery, finalState, _ref2, _, query, currentRequestId, _ref3, sqlQuery, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, _finalState, _meta, toSet;
+        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
         return _regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
                 _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
-                stateQuery = this.state.query;
+                _this$state3 = this.state, stateQuery = _this$state3.query, statePivotConfig = _this$state3.pivotConfig;
                 finalState = this.applyStateChangeHeuristics(state);
-                _ref2 = finalState.query || {}, _ = _ref2.order, query = _objectWithoutProperties(_ref2, ["order"]);
+                _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                 if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                  _context2.next = 19;
+                  _context2.next = 11;
                   break;
                 }
 
                 this.shouldApplyHeuristicOrder = false;
-                _context2.prev = 6;
-                currentRequestId = ++this.requestId;
-                _context2.next = 10;
-                return this.cubejsApi().sql(query);
+                _context2.next = 8;
+                return this.cubejsApi().sql(query, {
+                  mutexObj: this.mutexObj
+                });
 
-              case 10:
-                _ref3 = _context2.sent;
-                sqlQuery = _ref3.sqlQuery;
+              case 8:
+                _ref4 = _context2.sent;
+                sqlQuery = _ref4.sqlQuery;
+                finalState.query.order = sqlQuery.sql.order;
 
-                if (!(this.requestId !== currentRequestId)) {
-                  _context2.next = 14;
-                  break;
-                }
-
-                return _context2.abrupt("return");
-
-              case 14:
-                finalState = _objectSpread2({}, finalState, {
-                  query: _objectSpread2({}, finalState.query, {
-                    order: sqlQuery.sql.order
-                  })
-                }); // eslint-disable-next-line
-
-                _context2.next = 19;
-                break;
-
-              case 17:
-                _context2.prev = 17;
-                _context2.t0 = _context2["catch"](6);
-
-              case 19:
+              case 11:
+                activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                 updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread2({}, this.state, {}, finalState)));
-                currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref4) {
-                  var id = _ref4.id;
+                currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
+                  var id = _ref5.id;
                   return id;
                 });
-                currentOrderMembers = (finalState.orderMembers || []).filter(function (_ref5) {
-                  var id = _ref5.id;
+                currentOrderMembers = (finalState.orderMembers || []).filter(function (_ref6) {
+                  var id = _ref6.id;
                   return Boolean(updatedOrderMembers[id]);
                 });
-                Object.entries(updatedOrderMembers).forEach(function (_ref6) {
-                  var _ref7 = _slicedToArray(_ref6, 2),
-                      id = _ref7[0],
-                      orderMember = _ref7[1];
+                Object.entries(updatedOrderMembers).forEach(function (_ref7) {
+                  var _ref8 = _slicedToArray(_ref7, 2),
+                      id = _ref8[0],
+                      orderMember = _ref8[1];
 
                   if (!currentOrderMemberIds.includes(id)) {
                     currentOrderMembers.push(orderMember);
                   }
                 });
-                nextOrder = Object.fromEntries(currentOrderMembers.map(function (_ref8) {
-                  var id = _ref8.id,
-                      order = _ref8.order;
+                nextOrder = fromPairs(currentOrderMembers.map(function (_ref9) {
+                  var id = _ref9.id,
+                      order = _ref9.order;
                   return order !== 'none' ? [id, order] : false;
                 }).filter(Boolean));
+                nextQuery = _objectSpread2({}, stateQuery, {}, query, {
+                  order: nextOrder
+                });
                 finalState = _objectSpread2({}, finalState, {
-                  query: _objectSpread2({}, stateQuery, {}, query, {
-                    order: nextOrder
-                  }),
-                  orderMembers: currentOrderMembers
+                  query: nextQuery,
+                  orderMembers: currentOrderMembers,
+                  pivotConfig: ResultSet.getNormalizedPivotConfig(nextQuery, activePivotConfig)
                 });
                 this.setState(finalState);
                 finalState = _objectSpread2({}, this.state, {}, finalState);
@@ -714,12 +736,12 @@ function (_React$Component) {
                   setVizState(toSet);
                 }
 
-              case 29:
+              case 23:
               case "end":
                 return _context2.stop();
             }
           }
-        }, _callee2, this, [[6, 17]]);
+        }, _callee2, this);
       }));
 
       function updateVizState(_x) {
@@ -741,9 +763,9 @@ function (_React$Component) {
   }, {
     key: "defaultHeuristics",
     value: function defaultHeuristics(newState) {
-      var _this$state2 = this.state,
-          query = _this$state2.query,
-          sessionGranularity = _this$state2.sessionGranularity;
+      var _this$state4 = this.state,
+          query = _this$state4.query,
+          sessionGranularity = _this$state4.sessionGranularity;
       var defaultGranularity = sessionGranularity || 'day';
 
       if (newState.query) {
@@ -768,6 +790,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             chartType: defaultTimeDimension ? 'line' : 'number'
           });
@@ -783,6 +806,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             chartType: 'table'
           });
@@ -798,6 +822,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
           });
@@ -810,6 +835,7 @@ function (_React$Component) {
           });
           this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: newQuery,
             sessionGranularity: null
           });
@@ -826,6 +852,7 @@ function (_React$Component) {
               td = _query$timeDimensions[0];
 
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: _objectSpread2({}, query, {
               timeDimensions: [_objectSpread2({}, td, {
                 granularity: defaultGranularity
@@ -839,6 +866,7 @@ function (_React$Component) {
               _td = _query$timeDimensions2[0];
 
           return _objectSpread2({}, newState, {
+            pivotConfig: null,
             query: _objectSpread2({}, query, {
               timeDimensions: [_objectSpread2({}, _td, {
                 granularity: undefined

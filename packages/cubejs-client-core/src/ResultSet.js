@@ -280,8 +280,7 @@ class ResultSet {
     return `${td.dimension}.${td.granularity}`;
   }
 
-  normalizePivotConfig(pivotConfig) {
-    const { query } = this.loadResponse;
+  static getNormalizedPivotConfig(query, pivotConfig = null) {
     const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
     const dimensions = query.dimensions || [];
     pivotConfig = pivotConfig || (timeDimensions.length ? {
@@ -291,6 +290,12 @@ class ResultSet {
       x: dimensions,
       y: []
     });
+    
+    pivotConfig = {
+      ...pivotConfig,
+      x: [...(pivotConfig.x || [])],
+      y: [...(pivotConfig.y || [])],
+    };
 
     const substituteTimeDimensionMembers = axis => axis.map(
       subDim => (
@@ -308,9 +313,16 @@ class ResultSet {
 
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
     const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
-    pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(d => allIncludedDimensions.indexOf(d) === -1));
+    
+    const dimensionFilter = (key) => key === 'measures' || (key !== 'measures' && allDimensions.includes(key));
+    
+    pivotConfig.x = pivotConfig.x.concat(
+      allDimensions.filter(d => !allIncludedDimensions.includes(d))
+    ).filter(dimensionFilter);
+    pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
+    
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
-      pivotConfig.y = pivotConfig.y.concat(['measures']);
+      pivotConfig.y.push('measures');
     }
     if (!(query.measures || []).length) {
       pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
@@ -320,6 +332,12 @@ class ResultSet {
       pivotConfig.fillMissingDates = true;
     }
     return pivotConfig;
+  }
+  
+  normalizePivotConfig(pivotConfig) {
+    const { query } = this.loadResponse;
+    
+    return ResultSet.getNormalizedPivotConfig(query, pivotConfig);
   }
 
   static measureFromAxis(axisValues) {
@@ -682,7 +700,7 @@ class ResultSet {
     
     const extractFields = (key) => {
       const flatMeta = Object.values(this.loadResponse.annotation).reduce((a, b) => ({ ...a, ...b }), {});
-      const { title, shortTitle, type, format, meta } = flatMeta[key];
+      const { title, shortTitle, type, format, meta } = flatMeta[key] || {};
   
       return {
         key,

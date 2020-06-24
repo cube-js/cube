@@ -21,7 +21,6 @@ require('core-js/modules/es.array.find');
 require('core-js/modules/es.array.for-each');
 require('core-js/modules/es.array.from');
 require('core-js/modules/es.array.includes');
-require('core-js/modules/es.array.index-of');
 require('core-js/modules/es.array.join');
 require('core-js/modules/es.array.map');
 require('core-js/modules/es.array.reduce');
@@ -34,6 +33,7 @@ require('core-js/modules/es.object.keys');
 require('core-js/modules/es.object.values');
 require('core-js/modules/es.regexp.exec');
 require('core-js/modules/es.regexp.to-string');
+require('core-js/modules/es.string.includes');
 require('core-js/modules/es.string.iterator');
 require('core-js/modules/es.string.match');
 require('core-js/modules/es.string.split');
@@ -403,62 +403,7 @@ function () {
     key: "normalizePivotConfig",
     value: function normalizePivotConfig(pivotConfig) {
       var query = this.loadResponse.query;
-      var timeDimensions = (query.timeDimensions || []).filter(function (td) {
-        return !!td.granularity;
-      });
-      var dimensions = query.dimensions || [];
-      pivotConfig = pivotConfig || (timeDimensions.length ? {
-        x: timeDimensions.map(function (td) {
-          return ResultSet.timeDimensionMember(td);
-        }),
-        y: dimensions
-      } : {
-        x: dimensions,
-        y: []
-      });
-
-      var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
-        return axis.map(function (subDim) {
-          return timeDimensions.find(function (td) {
-            return td.dimension === subDim;
-          }) && !dimensions.find(function (d) {
-            return d === subDim;
-          }) ? ResultSet.timeDimensionMember(query.timeDimensions.find(function (td) {
-            return td.dimension === subDim;
-          })) : subDim;
-        });
-      };
-
-      pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
-      pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
-      var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
-      var allDimensions = timeDimensions.map(function (td) {
-        return ResultSet.timeDimensionMember(td);
-      }).concat(dimensions);
-      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
-        return allIncludedDimensions.indexOf(d) === -1;
-      }));
-
-      if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
-        return d === 'measures';
-      })) {
-        pivotConfig.y = pivotConfig.y.concat(['measures']);
-      }
-
-      if (!(query.measures || []).length) {
-        pivotConfig.x = pivotConfig.x.filter(function (d) {
-          return d !== 'measures';
-        });
-        pivotConfig.y = pivotConfig.y.filter(function (d) {
-          return d !== 'measures';
-        });
-      }
-
-      if (pivotConfig.fillMissingDates == null) {
-        pivotConfig.fillMissingDates = true;
-      }
-
-      return pivotConfig;
+      return ResultSet.getNormalizedPivotConfig(query, pivotConfig);
     }
   }, {
     key: "timeSeries",
@@ -870,12 +815,14 @@ function () {
         var flatMeta = Object.values(_this4.loadResponse.annotation).reduce(function (a, b) {
           return _objectSpread2({}, a, {}, b);
         }, {});
-        var _flatMeta$key = flatMeta[key],
-            title = _flatMeta$key.title,
-            shortTitle = _flatMeta$key.shortTitle,
-            type = _flatMeta$key.type,
-            format = _flatMeta$key.format,
-            meta = _flatMeta$key.meta;
+
+        var _ref30 = flatMeta[key] || {},
+            title = _ref30.title,
+            shortTitle = _ref30.shortTitle,
+            type = _ref30.type,
+            format = _ref30.format,
+            meta = _ref30.meta;
+
         return {
           key: key,
           title: title,
@@ -887,9 +834,9 @@ function () {
       };
 
       var pivot = this.pivot(normalizedPivotConfig);
-      (pivot[0] && pivot[0].yValuesArray || []).forEach(function (_ref30) {
-        var _ref31 = _slicedToArray(_ref30, 1),
-            yValues = _ref31[0];
+      (pivot[0] && pivot[0].yValuesArray || []).forEach(function (_ref31) {
+        var _ref32 = _slicedToArray(_ref31, 1),
+            yValues = _ref32[0];
 
         if (yValues.length > 0) {
           var currentItem = schema;
@@ -912,9 +859,9 @@ function () {
           return [];
         }
 
-        return Object.values(item).map(function (_ref32) {
-          var key = _ref32.key,
-              currentItem = _objectWithoutProperties(_ref32, ["key"]);
+        return Object.values(item).map(function (_ref33) {
+          var key = _ref33.key,
+              currentItem = _objectWithoutProperties(_ref33, ["key"]);
 
           var children = toColumns(currentItem.children, [].concat(_toConsumableArray(path), [key]));
 
@@ -1102,6 +1049,77 @@ function () {
     key: "timeDimensionMember",
     value: function timeDimensionMember(td) {
       return "".concat(td.dimension, ".").concat(td.granularity);
+    }
+  }, {
+    key: "getNormalizedPivotConfig",
+    value: function getNormalizedPivotConfig(query) {
+      var pivotConfig = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+      var timeDimensions = (query.timeDimensions || []).filter(function (td) {
+        return !!td.granularity;
+      });
+      var dimensions = query.dimensions || [];
+      pivotConfig = pivotConfig || (timeDimensions.length ? {
+        x: timeDimensions.map(function (td) {
+          return ResultSet.timeDimensionMember(td);
+        }),
+        y: dimensions
+      } : {
+        x: dimensions,
+        y: []
+      });
+      pivotConfig = _objectSpread2({}, pivotConfig, {
+        x: _toConsumableArray(pivotConfig.x || []),
+        y: _toConsumableArray(pivotConfig.y || [])
+      });
+
+      var substituteTimeDimensionMembers = function substituteTimeDimensionMembers(axis) {
+        return axis.map(function (subDim) {
+          return timeDimensions.find(function (td) {
+            return td.dimension === subDim;
+          }) && !dimensions.find(function (d) {
+            return d === subDim;
+          }) ? ResultSet.timeDimensionMember(query.timeDimensions.find(function (td) {
+            return td.dimension === subDim;
+          })) : subDim;
+        });
+      };
+
+      pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
+      pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
+      var allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+      var allDimensions = timeDimensions.map(function (td) {
+        return ResultSet.timeDimensionMember(td);
+      }).concat(dimensions);
+
+      var dimensionFilter = function dimensionFilter(key) {
+        return key === 'measures' || key !== 'measures' && allDimensions.includes(key);
+      };
+
+      pivotConfig.x = pivotConfig.x.concat(allDimensions.filter(function (d) {
+        return !allIncludedDimensions.includes(d);
+      })).filter(dimensionFilter);
+      pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
+
+      if (!pivotConfig.x.concat(pivotConfig.y).find(function (d) {
+        return d === 'measures';
+      })) {
+        pivotConfig.y.push('measures');
+      }
+
+      if (!(query.measures || []).length) {
+        pivotConfig.x = pivotConfig.x.filter(function (d) {
+          return d !== 'measures';
+        });
+        pivotConfig.y = pivotConfig.y.filter(function (d) {
+          return d !== 'measures';
+        });
+      }
+
+      if (pivotConfig.fillMissingDates == null) {
+        pivotConfig.fillMissingDates = true;
+      }
+
+      return pivotConfig;
     }
   }, {
     key: "measureFromAxis",
@@ -2007,3 +2025,4 @@ var index = (function (apiToken, options) {
 
 exports.default = index;
 exports.HttpTransport = HttpTransport;
+exports.ResultSet = ResultSet;
