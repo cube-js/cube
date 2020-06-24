@@ -694,7 +694,9 @@ class ResultSet {
       };
     };
     
-    this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(([yValues]) => {
+    const pivot = this.pivot(normalizedPivotConfig);
+
+    (pivot[0] && pivot[0].yValuesArray || []).forEach(([yValues]) => {
       if (yValues.length > 0) {
         let currentItem = schema;
     
@@ -745,6 +747,11 @@ class ResultSet {
       });
     };
     
+    let measureColumns = [];
+    if (!pivot.length && normalizedPivotConfig.y.find((key) => key === 'measures')) {
+      measureColumns = (this.query().measures || []).map((key) => ({ ...extractFields(key), dataIndex: key }));
+    }
+    
     return normalizedPivotConfig.x
       .map((key) => {
         if (key === 'measures') {
@@ -759,9 +766,49 @@ class ResultSet {
 
         return ({ ...extractFields(key), dataIndex: key });
       })
-      .concat(toColumns(schema));
+      .concat(toColumns(schema))
+      .concat(measureColumns);
   }
 
+  tableColumns2(pivotConfig) {
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+    const column = (field) => {
+      const exractFields = (annotation = {}) => {
+        const {
+          title,
+          shortTitle,
+          format,
+          type,
+          meta
+        } = annotation;
+
+        return {
+          title,
+          shortTitle,
+          format,
+          type,
+          meta
+        };
+      };
+
+      return field === 'measures' ? (this.query().measures || []).map((key) => ({
+        key,
+        ...exractFields(this.loadResponse.annotation.measures[key])
+      })) : [
+        {
+          key: field,
+          ...exractFields(this.loadResponse.annotation.dimensions[field] ||
+              this.loadResponse.annotation.timeDimensions[field])
+        },
+      ];
+    };
+
+    return normalizedPivotConfig.x.map(column)
+      .concat(normalizedPivotConfig.y.map(column))
+      .reduce((a, b) => a.concat(b));
+  }
+  
   totalRow() {
     return this.chartPivot()[0];
   }

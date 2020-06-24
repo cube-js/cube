@@ -48,6 +48,79 @@ import 'core-js/modules/web.url';
 import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
+/**
+ * Configuration object that contains information about pivot axes and other options.
+ *
+ * Let's apply `pivotConfig` and see how it affects the axes
+ * ```js
+ * // Example query
+ * {
+ *   measures: ['Orders.count'],
+ *   dimensions: ['Users.country', 'Users.gender']
+ * }
+ * ```
+ * If we put the `Users.gender` dimension on **y** axis
+ * ```js
+ * resultSet.tablePivot({
+ *   x: ['Users.country'],
+ *   y: ['Users.gender', 'measures']
+ * })
+ * ```
+ *
+ * The resulting table will look the following way
+ *
+ * | Users Country | male, Orders.count | female, Orders.count |
+ * | ------------- | ------------------ | -------------------- |
+ * | Australia     | 3                  | 27                   |
+ * | Germany       | 10                 | 12                   |
+ * | US            | 5                  | 7                    |
+ *
+ * Now let's put the `Users.country` dimension on **y** axis instead
+ * ```js
+ * resultSet.tablePivot({
+ *   x: ['Users.gender'],
+ *   y: ['Users.country', 'measures'],
+ * });
+ * ```
+ *
+ * in this case the `Users.country` values will be laid out on **y** or **columns** axis
+ *
+ * | Users Gender | Australia, Orders.count | Germany, Orders.count | US, Orders.count |
+ * | ------------ | ----------------------- | --------------------- | ---------------- |
+ * | male         | 3                       | 10                    | 5                |
+ * | female       | 27                      | 12                    | 7                |
+ *
+ * It's also possible to put the `measures` on **x** axis.
+ * But in either case it should always be the last item of the array.
+ * ```js
+ * resultSet.tablePivot({
+ *   x: ['Users.gender', 'measures'],
+ *   y: ['Users.country'],
+ * });
+ * ```
+ *
+ * | Users Gender | measures     | Australia | Germany | US  |
+ * | ------------ | ------------ | --------- | ------- | --- |
+ * | male         | Orders.count | 3         | 10      | 5   |
+ * | female       | Orders.count | 27        | 12      | 7   |
+ *
+ * @memberof ResultSet
+ * @typedef {Object} PivotConfig Configuration object that contains the information about pivot axes and other options
+ * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
+ * Put `measures` at the end of array here
+ * @property {Array<string>} y Dimensions to put on **y** or **columns** axis.
+ * @property {Boolean} [fillMissingDates=true] If `true` missing dates on the time dimensions
+ * will be filled with `0` for all measures.
+ * Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
+ */
+
+/**
+ * @memberof ResultSet
+ * @typedef {Object} DrillDownLocator
+ * @property {Array<string>} xValues
+ * @property {Array<string>} yValues
+ */
+
 var moment = momentRange.extendMoment(Moment);
 var TIME_SERIES = {
   day: function day(range) {
@@ -106,7 +179,6 @@ function () {
    * Returns a measure drill down query.
    *
    * Provided you have a measure with the defined `drillMemebers` on the `Orders` cube
-   *
    * ```js
    * measures: {
    *   count: {
@@ -118,7 +190,6 @@ function () {
    * ```
    *
    * Then you can use the `drillDown` method to see the rows that contribute to that metric
-   *
    * ```js
    * resultSet.drillDown(
    *   {
@@ -132,7 +203,6 @@ function () {
    *
    * the result will be a query with the required filters applied and the dimensions/measures filled out
    * ```js
-   *
    * {
    *   measures: ['Orders.count'],
    *   dimensions: ['Orders.status', 'Users.city'],
@@ -144,8 +214,8 @@ function () {
    *   ]
    * }
    * ```
-   * @param {Object} drillDownLocator - expects `{ xValues: [], yValues: [] }` object.
-   * @param {Object} pivotConfig - See {@link ResultSet#pivot}.
+   * @param {DrillDownLocator} drillDownLocator
+   * @param {PivotConfig} [pivotConfig]
    * @returns {Object|null} Drill down query
    */
 
@@ -232,9 +302,8 @@ function () {
     }
     /**
      * Returns an array of series with key, title and series data.
-     *
      * ```js
-     * // For query
+     * // For the query
      * {
      *   measures: ['Stories.count'],
      *   timeDimensions: [{
@@ -247,18 +316,18 @@ function () {
      * // ResultSet.series() will return
      * [
      *   {
-     *     "key":"Stories.count",
-     *     "title": "Stories Count",
-     *     "series": [
-     *       { "x":"2015-01-01T00:00:00", "value": 27120 },
-     *       { "x":"2015-02-01T00:00:00", "value": 25861 },
-     *       { "x": "2015-03-01T00:00:00", "value": 29661 },
+     *     key: 'Stories.count',
+     *     title: 'Stories Count',
+     *     series: [
+     *       { x: '2015-01-01T00:00:00', value: 27120 },
+     *       { x: '2015-02-01T00:00:00', value: 25861 },
+     *       { x: '2015-03-01T00:00:00', value: 29661 },
      *       //...
-     *     ]
-     *   }
+     *     ],
+     *   },
      * ]
      * ```
-     * @param pivotConfig - See {@link ResultSet#pivot}.
+     * @param {PivotConfig} [pivotConfig]
      * @returns {Array}
      */
 
@@ -430,9 +499,10 @@ function () {
     }
     /**
      * Base method for pivoting {@link ResultSet} data.
-     * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot} or {@link ResultSet#tablePivot}
-     * should be used instead.
+     * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot}
+     * or {@link ResultSet#tablePivot} should be used instead.
      *
+     * You can find the examples of using the `pivotConfig` [here](#pivot-config)
      * ```js
      * // For query
      * {
@@ -466,14 +536,7 @@ function () {
      *   }
      * ]
      * ```
-     * @typedef {Object} PivotConfig
-     * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
-     * Put `measures` at the end of array here
-     * @property {Array<string>} y Dimensions to put on **y** or **columns** axis.
-     * @property {Boolean} [fillMissingDates=true] If `true` missing dates on time dimensions
-     *  will be filled with `0` for all measures.
-     * @param {PivotConfig} [pivotConfig] Configuration object that contains information
-     * about pivot axes and other options
+     * @param {PivotConfig} [pivotConfig]
      * @returns {Array} of pivoted rows.
      */
 
@@ -533,7 +596,6 @@ function () {
       var allYValues = pipe(map( // eslint-disable-next-line no-unused-vars
       function (_ref14) {
         var _ref15 = _slicedToArray(_ref14, 2),
-            xValuesString = _ref15[0],
             rows = _ref15[1];
 
         return unnest( // collect Y values only from filled rows
@@ -589,8 +651,9 @@ function () {
     /**
      * Returns normalized query result data in the following format.
      *
+     * You can find the examples of using the `pivotConfig` [here](#pivot-config)
      * ```js
-     * // For query
+     * // For the query
      * {
      *   measures: ['Stories.count'],
      *   timeDimensions: [{
@@ -602,13 +665,13 @@ function () {
      *
      * // ResultSet.chartPivot() will return
      * [
-     *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120 },
-     *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861 },
-     *   { "x": "2015-03-01T00:00:00", "Stories.count": 29661 },
+     *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120, "xValues": ["2015-01-01T00:00:00"] },
+     *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861, "xValues": ["2015-02-01T00:00:00"]  },
+     *   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
      *   //...
      * ]
      * ```
-     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
+     * @param {PivotConfig} [pivotConfig]
      */
 
   }, {
@@ -648,10 +711,11 @@ function () {
     /**
      * Returns normalized query result data prepared for visualization in the table format.
      *
-     * For example
+     * You can find the examples of using the `pivotConfig` [here](#pivot-config)
      *
+     * For example:
      * ```js
-     * // For query
+     * // For the query
      * {
      *   measures: ['Stories.count'],
      *   timeDimensions: [{
@@ -669,71 +733,7 @@ function () {
      *   //...
      * ]
      * ```
-     *
-     * Now let's make use of `pivotConfig` and put the `Users.gender` dimension on    * **y** axis.
-     *
-     * ```js
-     * // For example the query is
-     * {
-     *   measures: ['Orders.count'],
-     *   dimensions: ['Users.country', 'Users.gender']
-     * }
-     *
-     * resultSet.tablePivot({
-     *   x: ['Users.country'],
-     *   y: ['Users.gender', 'measures']
-     * })
-     *
-     * // then `tablePivot` will return the rows in the following format
-     * [
-     *   {
-     *     'Users.country': 'Australia',
-     *     'female.Orders.count': 3
-     *     'male.Orders.count': 27
-     *   },
-     *   // ...
-     * ]
-     * ```
-     *
-     * The resulting table will look like this
-     *
-     * | Users Country | male | female |
-     * | ------------- | ---- | ------ |
-     * | Australia     | 3    | 27     |
-     * | Germany       | 10   | 12     |
-     * | US            | 5    | 7      |
-     *
-     * If we put the `Users.country` dimension on **y** axis instead
-     *
-     * ```js
-     * resultSet.tablePivot({
-     *   x: ['Users.gender'],
-     *   y: ['Users.country', 'measures'],
-     * });
-     * ```
-     *
-     * the table will look like
-     *
-     * | Users Gender | Australia | Germany | US  |
-     * | ------------ | --------- | ------- | --- |
-     * | male         | 3         | 10      | 5   |
-     * | female       | 27        | 12      | 7   |
-     *
-     * It's also possible to put the `measures` on **x** axis
-     *
-     * ```js
-     * resultSet.tablePivot({
-     *   x: ['Users.gender', 'measures'],
-     *   y: ['Users.country'],
-     * });
-     * ```
-     *
-     * | Users Gender | measures     | Australia | Germany | US  |
-     * | ------------ | ------------ | --------- | ------- | --- |
-     * | male         | Orders.count | 3         | 10      | 5   |
-     * | female       | Orders.count | 27        | 12      | 7   |
-     *
-     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}
+     * @param {PivotConfig} [pivotConfig]
      * @returns {Array} of pivoted rows
      */
 
@@ -758,8 +758,7 @@ function () {
     /**
      * Returns array of column definitions for `tablePivot`.
      *
-     * For example
-     *
+     * For example:
      * ```js
      * // For the query
      * {
@@ -793,8 +792,7 @@ function () {
      * ]
      * ```
      *
-     * In case we want to pivot the table
-     *
+     * In case we want to pivot the table axes
      * ```js
      * // Let's take this query as an example
      * {
@@ -810,7 +808,6 @@ function () {
      * ```
      *
      * then `tableColumns` will group the table head and return
-     *
      * ```js
      * {
      *   key: 'Germany',
@@ -851,7 +848,7 @@ function () {
      * // ...
      * ```
      *
-     * @param pivotConfig - See {@link ResultSet#pivot}.
+     * @param {PivotConfig} [pivotConfig]
      * @returns {Array} of columns
      */
 
@@ -883,7 +880,8 @@ function () {
         };
       };
 
-      this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref30) {
+      var pivot = this.pivot(normalizedPivotConfig);
+      (pivot[0] && pivot[0].yValuesArray || []).forEach(function (_ref30) {
         var _ref31 = _slicedToArray(_ref30, 1),
             yValues = _ref31[0];
 
@@ -939,6 +937,18 @@ function () {
         });
       };
 
+      var measureColumns = [];
+
+      if (!pivot.length && normalizedPivotConfig.y.find(function (key) {
+        return key === 'measures';
+      })) {
+        measureColumns = (this.query().measures || []).map(function (key) {
+          return _objectSpread2({}, extractFields(key), {
+            dataIndex: key
+          });
+        });
+      }
+
       return normalizedPivotConfig.x.map(function (key) {
         if (key === 'measures') {
           return {
@@ -953,7 +963,44 @@ function () {
         return _objectSpread2({}, extractFields(key), {
           dataIndex: key
         });
-      }).concat(toColumns(schema));
+      }).concat(toColumns(schema)).concat(measureColumns);
+    }
+  }, {
+    key: "tableColumns2",
+    value: function tableColumns2(pivotConfig) {
+      var _this5 = this;
+
+      var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+      var column = function column(field) {
+        var exractFields = function exractFields() {
+          var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+          var title = annotation.title,
+              shortTitle = annotation.shortTitle,
+              format = annotation.format,
+              type = annotation.type,
+              meta = annotation.meta;
+          return {
+            title: title,
+            shortTitle: shortTitle,
+            format: format,
+            type: type,
+            meta: meta
+          };
+        };
+
+        return field === 'measures' ? (_this5.query().measures || []).map(function (key) {
+          return _objectSpread2({
+            key: key
+          }, exractFields(_this5.loadResponse.annotation.measures[key]));
+        }) : [_objectSpread2({
+          key: field
+        }, exractFields(_this5.loadResponse.annotation.dimensions[field] || _this5.loadResponse.annotation.timeDimensions[field]))];
+      };
+
+      return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
+        return a.concat(b);
+      });
     }
   }, {
     key: "totalRow",
@@ -968,7 +1015,6 @@ function () {
     }
     /**
      * Returns the array of series objects, containing `key` and `title` parameters.
-     *
      * ```js
      * // For query
      * {
@@ -982,25 +1028,29 @@ function () {
      *
      * // ResultSet.seriesNames() will return
      * [
-     * { "key":"Stories.count", "title": "Stories Count" }
+     *   {
+     *     key: 'Stories.count',
+     *     title: 'Stories Count',
+     *     yValues: ['Stories.count'],
+     *   },
      * ]
      * ```
-     * @param {PivotConfig} [pivotConfig] - See {@link ResultSet#pivot}.
+     * @param {PivotConfig} [pivotConfig]
      * @returns {Array} of series names
      */
 
   }, {
     key: "seriesNames",
     value: function seriesNames(pivotConfig) {
-      var _this5 = this;
+      var _this6 = this;
 
       pivotConfig = this.normalizePivotConfig(pivotConfig);
       return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(this.timeDimensionBackwardCompatibleData()).map(function (axisValues) {
         return {
-          title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
+          title: _this6.axisValuesString(pivotConfig.y.find(function (d) {
             return d === 'measures';
-          }) ? dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-          key: _this5.axisValuesString(axisValues),
+          }) ? dropLast(1, axisValues).concat(_this6.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+          key: _this6.axisValuesString(axisValues),
           yValues: axisValues
         };
       });
@@ -1279,7 +1329,7 @@ var HttpTransport =
 /*#__PURE__*/
 function () {
   /**
-   * @param options - mandatory options object
+   * @param {Object} options - mandatory options object
    * @param options.authorization - [jwt auth token](security)
    * @param options.apiUrl - path to `/cubejs-api/v1`
    * @param [options.headers] - object of custom headers
