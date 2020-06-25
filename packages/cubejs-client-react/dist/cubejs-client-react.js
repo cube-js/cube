@@ -438,7 +438,6 @@ function (_React$Component) {
       orderMembers: [],
       pivotConfig: null
     }, props.vizState);
-    _this.shouldApplyHeuristicOrder = false;
     _this.mutexObj = {};
     return _this;
   }
@@ -467,7 +466,7 @@ function (_React$Component) {
                     meta: meta,
                     query: query
                   }),
-                  pivotConfig: QueryRenderer.isQueryPresent(query) ? core.ResultSet.getNormalizedPivotConfig(query) : pivotConfig
+                  pivotConfig: core.ResultSet.getNormalizedPivotConfig(query || {}, pivotConfig)
                 });
 
               case 5:
@@ -580,8 +579,8 @@ function (_React$Component) {
           return m.type === 'time';
         }),
         availableSegments: meta && meta.membersForQuery(query, 'segments') || [],
-        updateQuery: function updateQuery(query) {
-          return _this2.updateQuery(query);
+        updateQuery: function updateQuery(queryUpdate) {
+          return _this2.updateQuery(queryUpdate);
         },
         updateMeasures: updateMethods('measures'),
         updateDimensions: updateMethods('dimensions'),
@@ -682,23 +681,22 @@ function (_React$Component) {
                 finalState = this.applyStateChangeHeuristics(state);
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
-                if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                  _context2.next = 11;
+                if (!(finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
+                  _context2.next = 10;
                   break;
                 }
 
-                this.shouldApplyHeuristicOrder = false;
-                _context2.next = 8;
+                _context2.next = 7;
                 return this.cubejsApi().sql(query, {
                   mutexObj: this.mutexObj
                 });
 
-              case 8:
+              case 7:
                 _ref4 = _context2.sent;
                 sqlQuery = _ref4.sqlQuery;
                 finalState.query.order = sqlQuery.sql.order;
 
-              case 11:
+              case 10:
                 activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                 updatedOrderMembers = ramda.indexBy(ramda.prop('id'), QueryBuilder.getOrderMembers(_objectSpread2({}, this.state, {}, finalState)));
                 currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -743,7 +741,7 @@ function (_React$Component) {
                   setVizState(toSet);
                 }
 
-              case 23:
+              case 22:
               case "end":
                 return _context2.stop();
             }
@@ -795,9 +793,9 @@ function (_React$Component) {
               granularity: defaultGranularity
             }] : []
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             chartType: defaultTimeDimension ? 'line' : 'number'
           });
@@ -811,9 +809,9 @@ function (_React$Component) {
               });
             })
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             chartType: 'table'
           });
@@ -827,9 +825,9 @@ function (_React$Component) {
               });
             })
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
           });
@@ -840,9 +838,9 @@ function (_React$Component) {
             timeDimensions: [],
             filters: []
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             sessionGranularity: null
           });
@@ -874,6 +872,7 @@ function (_React$Component) {
 
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: _objectSpread2({}, query, {
               timeDimensions: [_objectSpread2({}, _td, {
                 granularity: undefined
