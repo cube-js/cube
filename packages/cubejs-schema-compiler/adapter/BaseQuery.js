@@ -957,7 +957,7 @@ class BaseQuery {
       return this.preAggregations.originalSqlPreAggregationTable(foundPreAggregation);
     }
     const evaluatedSql = this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql);
-    const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".]+)\s*$/i);
+    const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*$/i);
     if (selectAsterisk) {
       return selectAsterisk[1];
     }
