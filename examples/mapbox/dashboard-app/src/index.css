@@ -368,3 +368,7 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
 }
+
+.mapbox__spinner__icon .ant-spin-dot-item {
+  background-color: #7a77ff;
+}
