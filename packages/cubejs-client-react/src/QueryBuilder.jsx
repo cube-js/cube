@@ -95,13 +95,13 @@ export default class QueryBuilder extends React.Component {
   }
 
   async componentDidMount() {
-    const { query } = this.state;
+    const { query, pivotConfig } = this.state;
     const meta = await this.cubejsApi().meta();
     
     this.setState({
       meta,
       orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
-      pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : null
+      pivotConfig: ResultSet.getNormalizedPivotConfig(query || {}, pivotConfig)
     });
   }
 

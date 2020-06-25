@@ -441,12 +441,13 @@ function (_React$Component) {
       var _componentDidMount = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee() {
-        var query, meta;
+        var _this$state, query, pivotConfig, meta;
+
         return _regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                query = this.state.query;
+                _this$state = this.state, query = _this$state.query, pivotConfig = _this$state.pivotConfig;
                 _context.next = 3;
                 return this.cubejsApi().meta();
 
@@ -458,7 +459,7 @@ function (_React$Component) {
                     meta: meta,
                     query: query
                   }),
-                  pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : null
+                  pivotConfig: ResultSet.getNormalizedPivotConfig(query || {}, pivotConfig)
                 });
 
               case 5:
@@ -536,13 +537,13 @@ function (_React$Component) {
         };
       };
 
-      var _this$state = this.state,
-          meta = _this$state.meta,
-          query = _this$state.query,
-          _this$state$orderMemb = _this$state.orderMembers,
-          orderMembers = _this$state$orderMemb === void 0 ? [] : _this$state$orderMemb,
-          chartType = _this$state.chartType,
-          pivotConfig = _this$state.pivotConfig;
+      var _this$state2 = this.state,
+          meta = _this$state2.meta,
+          query = _this$state2.query,
+          _this$state2$orderMem = _this$state2.orderMembers,
+          orderMembers = _this$state2$orderMem === void 0 ? [] : _this$state2$orderMem,
+          chartType = _this$state2.chartType,
+          pivotConfig = _this$state2.pivotConfig;
       return _objectSpread2({
         meta: meta,
         query: query,
@@ -662,14 +663,14 @@ function (_React$Component) {
       var _updateVizState = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2(state) {
-        var _this$props, setQuery, setVizState, _this$state2, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
         return _regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
                 _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
-                _this$state2 = this.state, stateQuery = _this$state2.query, statePivotConfig = _this$state2.pivotConfig;
+                _this$state3 = this.state, stateQuery = _this$state3.query, statePivotConfig = _this$state3.pivotConfig;
                 finalState = this.applyStateChangeHeuristics(state);
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
@@ -760,9 +761,9 @@ function (_React$Component) {
   }, {
     key: "defaultHeuristics",
     value: function defaultHeuristics(newState) {
-      var _this$state3 = this.state,
-          query = _this$state3.query,
-          sessionGranularity = _this$state3.sessionGranularity;
+      var _this$state4 = this.state,
+          query = _this$state4.query,
+          sessionGranularity = _this$state4.sessionGranularity;
       var defaultGranularity = sessionGranularity || 'day';
 
       if (newState.query) {
