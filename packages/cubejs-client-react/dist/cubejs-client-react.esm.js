@@ -431,7 +431,6 @@ function (_React$Component) {
       orderMembers: [],
       pivotConfig: null
     }, props.vizState);
-    _this.shouldApplyHeuristicOrder = false;
     _this.mutexObj = {};
     return _this;
   }
@@ -442,13 +441,12 @@ function (_React$Component) {
       var _componentDidMount = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee() {
-        var _this$state, query, pivotConfig, meta;
-
+        var query, meta;
         return _regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                _this$state = this.state, query = _this$state.query, pivotConfig = _this$state.pivotConfig;
+                query = this.state.query;
                 _context.next = 3;
                 return this.cubejsApi().meta();
 
@@ -460,7 +458,7 @@ function (_React$Component) {
                     meta: meta,
                     query: query
                   }),
-                  pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : pivotConfig
+                  pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : null
                 });
 
               case 5:
@@ -538,13 +536,13 @@ function (_React$Component) {
         };
       };
 
-      var _this$state2 = this.state,
-          meta = _this$state2.meta,
-          query = _this$state2.query,
-          _this$state2$orderMem = _this$state2.orderMembers,
-          orderMembers = _this$state2$orderMem === void 0 ? [] : _this$state2$orderMem,
-          chartType = _this$state2.chartType,
-          pivotConfig = _this$state2.pivotConfig;
+      var _this$state = this.state,
+          meta = _this$state.meta,
+          query = _this$state.query,
+          _this$state$orderMemb = _this$state.orderMembers,
+          orderMembers = _this$state$orderMemb === void 0 ? [] : _this$state$orderMemb,
+          chartType = _this$state.chartType,
+          pivotConfig = _this$state.pivotConfig;
       return _objectSpread2({
         meta: meta,
         query: query,
@@ -573,8 +571,8 @@ function (_React$Component) {
           return m.type === 'time';
         }),
         availableSegments: meta && meta.membersForQuery(query, 'segments') || [],
-        updateQuery: function updateQuery(query) {
-          return _this2.updateQuery(query);
+        updateQuery: function updateQuery(queryUpdate) {
+          return _this2.updateQuery(queryUpdate);
         },
         updateMeasures: updateMethods('measures'),
         updateDimensions: updateMethods('dimensions'),
@@ -664,34 +662,33 @@ function (_React$Component) {
       var _updateVizState = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2(state) {
-        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+        var _this$props, setQuery, setVizState, _this$state2, stateQuery, statePivotConfig, _this$applyStateChang, _this$applyStateChang2, shouldApplyHeuristicOrder, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
         return _regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
                 _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
-                _this$state3 = this.state, stateQuery = _this$state3.query, statePivotConfig = _this$state3.pivotConfig;
-                finalState = this.applyStateChangeHeuristics(state);
+                _this$state2 = this.state, stateQuery = _this$state2.query, statePivotConfig = _this$state2.pivotConfig;
+                _this$applyStateChang = this.applyStateChangeHeuristics(state), _this$applyStateChang2 = _this$applyStateChang.shouldApplyHeuristicOrder, shouldApplyHeuristicOrder = _this$applyStateChang2 === void 0 ? false : _this$applyStateChang2, finalState = _objectWithoutProperties(_this$applyStateChang, ["shouldApplyHeuristicOrder"]);
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
-                if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                  _context2.next = 11;
+                if (!(shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
+                  _context2.next = 10;
                   break;
                 }
 
-                this.shouldApplyHeuristicOrder = false;
-                _context2.next = 8;
+                _context2.next = 7;
                 return this.cubejsApi().sql(query, {
                   mutexObj: this.mutexObj
                 });
 
-              case 8:
+              case 7:
                 _ref4 = _context2.sent;
                 sqlQuery = _ref4.sqlQuery;
                 finalState.query.order = sqlQuery.sql.order;
 
-              case 11:
+              case 10:
                 activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                 updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread2({}, this.state, {}, finalState)));
                 currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -736,7 +733,7 @@ function (_React$Component) {
                   setVizState(toSet);
                 }
 
-              case 23:
+              case 22:
               case "end":
                 return _context2.stop();
             }
@@ -763,9 +760,9 @@ function (_React$Component) {
   }, {
     key: "defaultHeuristics",
     value: function defaultHeuristics(newState) {
-      var _this$state4 = this.state,
-          query = _this$state4.query,
-          sessionGranularity = _this$state4.sessionGranularity;
+      var _this$state3 = this.state,
+          query = _this$state3.query,
+          sessionGranularity = _this$state3.sessionGranularity;
       var defaultGranularity = sessionGranularity || 'day';
 
       if (newState.query) {
@@ -788,9 +785,9 @@ function (_React$Component) {
               granularity: defaultGranularity
             }] : []
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             chartType: defaultTimeDimension ? 'line' : 'number'
           });
@@ -804,9 +801,9 @@ function (_React$Component) {
               });
             })
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             chartType: 'table'
           });
@@ -820,9 +817,9 @@ function (_React$Component) {
               });
             })
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
           });
@@ -833,9 +830,9 @@ function (_React$Component) {
             timeDimensions: [],
             filters: []
           });
-          this.shouldApplyHeuristicOrder = true;
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: newQuery,
             sessionGranularity: null
           });
@@ -867,6 +864,7 @@ function (_React$Component) {
 
           return _objectSpread2({}, newState, {
             pivotConfig: null,
+            shouldApplyHeuristicOrder: true,
             query: _objectSpread2({}, query, {
               timeDimensions: [_objectSpread2({}, _td, {
                 granularity: undefined

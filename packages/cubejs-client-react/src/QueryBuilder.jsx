@@ -91,18 +91,17 @@ export default class QueryBuilder extends React.Component {
       ...props.vizState
     };
     
-    this.shouldApplyHeuristicOrder = false;
     this.mutexObj = {};
   }
 
   async componentDidMount() {
-    const { query, pivotConfig } = this.state;
+    const { query } = this.state;
     const meta = await this.cubejsApi().meta();
     
     this.setState({
       meta,
       orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
-      pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : pivotConfig
+      pivotConfig: QueryRenderer.isQueryPresent(query) ? ResultSet.getNormalizedPivotConfig(query) : null
     });
   }
 
@@ -270,12 +269,13 @@ export default class QueryBuilder extends React.Component {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
     
-    let finalState = this.applyStateChangeHeuristics(state);
+    let {
+      shouldApplyHeuristicOrder = false, 
+      ...finalState 
+    } = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || {};
     
-    if (this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
-      this.shouldApplyHeuristicOrder = false;
-      
+    if (shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
       const { sqlQuery } = await this.cubejsApi().sql(query, {
         mutexObj: this.mutexObj
       });
@@ -373,11 +373,10 @@ export default class QueryBuilder extends React.Component {
             : []
         };
 
-        this.shouldApplyHeuristicOrder = true;
-
         return {
           ...newState,
           pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
           query: newQuery,
           chartType: defaultTimeDimension ? 'line' : 'number'
         };
@@ -389,11 +388,10 @@ export default class QueryBuilder extends React.Component {
           timeDimensions: (newQuery.timeDimensions || []).map((td) => ({ ...td, granularity: undefined }))
         };
 
-        this.shouldApplyHeuristicOrder = true;
-
         return {
           ...newState,
           pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
           query: newQuery,
           chartType: 'table'
         };
@@ -408,11 +406,10 @@ export default class QueryBuilder extends React.Component {
           }))
         };
 
-        this.shouldApplyHeuristicOrder = true;
-
         return {
           ...newState,
           pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
           query: newQuery,
           chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
         };
@@ -429,11 +426,10 @@ export default class QueryBuilder extends React.Component {
           filters: []
         };
 
-        this.shouldApplyHeuristicOrder = true;
-
         return {
           ...newState,
           pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
           query: newQuery,
           sessionGranularity: null
         };
@@ -468,6 +464,7 @@ export default class QueryBuilder extends React.Component {
         return {
           ...newState,
           pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
           query: {
             ...query,
             timeDimensions: [{ ...td, granularity: undefined }]

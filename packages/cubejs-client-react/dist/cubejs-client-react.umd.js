@@ -34980,6 +34980,61 @@
 
     var fetch = _interopDefault(browserPonyfill);
     /**
+     * Configuration object that contains information about pivot axes and other options.
+     *
+     * Let's apply `pivotConfig` and see how it affects the axes
+     * ```js
+     * // Example query
+     * {
+     *   measures: ['Orders.count'],
+     *   dimensions: ['Users.country', 'Users.gender']
+     * }
+     * ```
+     * If we put the `Users.gender` dimension on **y** axis
+     * ```js
+     * resultSet.tablePivot({
+     *   x: ['Users.country'],
+     *   y: ['Users.gender', 'measures']
+     * })
+     * ```
+     *
+     * The resulting table will look the following way
+     *
+     * | Users Country | male, Orders.count | female, Orders.count |
+     * | ------------- | ------------------ | -------------------- |
+     * | Australia     | 3                  | 27                   |
+     * | Germany       | 10                 | 12                   |
+     * | US            | 5                  | 7                    |
+     *
+     * Now let's put the `Users.country` dimension on **y** axis instead
+     * ```js
+     * resultSet.tablePivot({
+     *   x: ['Users.gender'],
+     *   y: ['Users.country', 'measures'],
+     * });
+     * ```
+     *
+     * in this case the `Users.country` values will be laid out on **y** or **columns** axis
+     *
+     * | Users Gender | Australia, Orders.count | Germany, Orders.count | US, Orders.count |
+     * | ------------ | ----------------------- | --------------------- | ---------------- |
+     * | male         | 3                       | 10                    | 5                |
+     * | female       | 27                      | 12                    | 7                |
+     *
+     * It's also possible to put the `measures` on **x** axis.
+     * But in either case it should always be the last item of the array.
+     * ```js
+     * resultSet.tablePivot({
+     *   x: ['Users.gender', 'measures'],
+     *   y: ['Users.country'],
+     * });
+     * ```
+     *
+     * | Users Gender | measures     | Australia | Germany | US  |
+     * | ------------ | ------------ | --------- | ------- | --- |
+     * | male         | Orders.count | 3         | 10      | 5   |
+     * | female       | Orders.count | 27        | 12      | 7   |
+     *
      * @memberof ResultSet
      * @typedef {Object} PivotConfig Configuration object that contains the information about pivot axes and other options
      * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
@@ -35321,8 +35376,10 @@
         }
         /**
          * Base method for pivoting {@link ResultSet} data.
-         * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot} or {@link ResultSet#tablePivot}
-         * should be used instead.
+         * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot}
+         * or {@link ResultSet#tablePivot} should be used instead.
+         *
+         * You can find the examples of using the `pivotConfig` [here](#pivot-config)
          * ```js
          * // For query
          * {
@@ -35470,8 +35527,10 @@
         }
         /**
          * Returns normalized query result data in the following format.
+         *
+         * You can find the examples of using the `pivotConfig` [here](#pivot-config)
          * ```js
-         * // For query
+         * // For the query
          * {
          *   measures: ['Stories.count'],
          *   timeDimensions: [{
@@ -35529,7 +35588,9 @@
         /**
          * Returns normalized query result data prepared for visualization in the table format.
          *
-         * For example
+         * You can find the examples of using the `pivotConfig` [here](#pivot-config)
+         *
+         * For example:
          * ```js
          * // For the query
          * {
@@ -35549,67 +35610,6 @@
          *   //...
          * ]
          * ```
-         *
-         * Now let's make use of `pivotConfig` and put the `Users.gender` dimension on **y** axis.
-         * ```js
-         * // For example the query is
-         * {
-         *   measures: ['Orders.count'],
-         *   dimensions: ['Users.country', 'Users.gender']
-         * }
-         *
-         * resultSet.tablePivot({
-         *   x: ['Users.country'],
-         *   y: ['Users.gender', 'measures']
-         * })
-         *
-         * // then `tablePivot` will return the rows in the following format
-         * [
-         *   {
-         *     'Users.country': 'Australia',
-         *     'female.Orders.count': 3
-         *     'male.Orders.count': 27
-         *   },
-         *   // ...
-         * ]
-         * ```
-         *
-         * The resulting table will look like this
-         *
-         * | Users Country | male | female |
-         * | ------------- | ---- | ------ |
-         * | Australia     | 3    | 27     |
-         * | Germany       | 10   | 12     |
-         * | US            | 5    | 7      |
-         *
-         * If we put the `Users.country` dimension on **y** axis instead
-         * ```js
-         * resultSet.tablePivot({
-         *   x: ['Users.gender'],
-         *   y: ['Users.country', 'measures'],
-         * });
-         * ```
-         *
-         * the table will look like
-         *
-         * | Users Gender | Australia | Germany | US  |
-         * | ------------ | --------- | ------- | --- |
-         * | male         | 3         | 10      | 5   |
-         * | female       | 27        | 12      | 7   |
-         *
-         * It's also possible to put the `measures` on **x** axis
-         * ```js
-         * resultSet.tablePivot({
-         *   x: ['Users.gender', 'measures'],
-         *   y: ['Users.country'],
-         * });
-         * ```
-         *
-         * | Users Gender | measures     | Australia | Germany | US  |
-         * | ------------ | ------------ | --------- | ------- | --- |
-         * | male         | Orders.count | 3         | 10      | 5   |
-         * | female       | Orders.count | 27        | 12      | 7   |
-         *
          * @param {PivotConfig} [pivotConfig]
          * @returns {Array} of pivoted rows
          */
@@ -35635,7 +35635,7 @@
         /**
          * Returns array of column definitions for `tablePivot`.
          *
-         * For example
+         * For example:
          * ```js
          * // For the query
          * {
@@ -35669,7 +35669,7 @@
          * ]
          * ```
          *
-         * In case we want to pivot the table
+         * In case we want to pivot the table axes
          * ```js
          * // Let's take this query as an example
          * {
@@ -35759,7 +35759,8 @@
             };
           };
 
-          this.pivot(normalizedPivotConfig)[0].yValuesArray.forEach(function (_ref31) {
+          var pivot = this.pivot(normalizedPivotConfig);
+          (pivot[0] && pivot[0].yValuesArray || []).forEach(function (_ref31) {
             var _ref32 = _slicedToArray$$1(_ref31, 1),
                 yValues = _ref32[0];
 
@@ -35815,6 +35816,18 @@
             });
           };
 
+          var measureColumns = [];
+
+          if (!pivot.length && normalizedPivotConfig.y.find(function (key) {
+            return key === 'measures';
+          })) {
+            measureColumns = (this.query().measures || []).map(function (key) {
+              return _objectSpread2({}, extractFields(key), {
+                dataIndex: key
+              });
+            });
+          }
+
           return normalizedPivotConfig.x.map(function (key) {
             if (key === 'measures') {
               return {
@@ -35829,7 +35842,44 @@
             return _objectSpread2({}, extractFields(key), {
               dataIndex: key
             });
-          }).concat(toColumns(schema));
+          }).concat(toColumns(schema)).concat(measureColumns);
+        }
+      }, {
+        key: "tableColumns2",
+        value: function tableColumns2(pivotConfig) {
+          var _this5 = this;
+
+          var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+
+          var column = function column(field) {
+            var exractFields = function exractFields() {
+              var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+              var title = annotation.title,
+                  shortTitle = annotation.shortTitle,
+                  format = annotation.format,
+                  type = annotation.type,
+                  meta = annotation.meta;
+              return {
+                title: title,
+                shortTitle: shortTitle,
+                format: format,
+                type: type,
+                meta: meta
+              };
+            };
+
+            return field === 'measures' ? (_this5.query().measures || []).map(function (key) {
+              return _objectSpread2({
+                key: key
+              }, exractFields(_this5.loadResponse.annotation.measures[key]));
+            }) : [_objectSpread2({
+              key: field
+            }, exractFields(_this5.loadResponse.annotation.dimensions[field] || _this5.loadResponse.annotation.timeDimensions[field]))];
+          };
+
+          return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
+            return a.concat(b);
+          });
         }
       }, {
         key: "totalRow",
@@ -35871,15 +35921,15 @@
       }, {
         key: "seriesNames",
         value: function seriesNames(pivotConfig) {
-          var _this5 = this;
+          var _this6 = this;
 
           pivotConfig = this.normalizePivotConfig(pivotConfig);
           return ramda.pipe(ramda.map(this.axisValues(pivotConfig.y)), ramda.unnest, ramda.uniq)(this.timeDimensionBackwardCompatibleData()).map(function (axisValues) {
             return {
-              title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
+              title: _this6.axisValuesString(pivotConfig.y.find(function (d) {
                 return d === 'measures';
-              }) ? ramda.dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-              key: _this5.axisValuesString(axisValues),
+              }) ? ramda.dropLast(1, axisValues).concat(_this6.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+              key: _this6.axisValuesString(axisValues),
               yValues: axisValues
             };
           });
@@ -37018,7 +37068,6 @@
         orderMembers: [],
         pivotConfig: null
       }, props$$1.vizState);
-      _this.shouldApplyHeuristicOrder = false;
       _this.mutexObj = {};
       return _this;
     }
@@ -37029,13 +37078,12 @@
         var _componentDidMount = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee() {
-          var _this$state, query, pivotConfig, meta;
-
+          var query, meta;
           return regeneratorRuntime.wrap(function _callee$(_context) {
             while (1) {
               switch (_context.prev = _context.next) {
                 case 0:
-                  _this$state = this.state, query = _this$state.query, pivotConfig = _this$state.pivotConfig;
+                  query = this.state.query;
                   _context.next = 3;
                   return this.cubejsApi().meta();
 
@@ -37047,7 +37095,7 @@
                       meta: meta,
                       query: query
                     }),
-                    pivotConfig: QueryRenderer.isQueryPresent(query) ? cubejsClientCore_2.getNormalizedPivotConfig(query) : pivotConfig
+                    pivotConfig: QueryRenderer.isQueryPresent(query) ? cubejsClientCore_2.getNormalizedPivotConfig(query) : null
                   });
 
                 case 5:
@@ -37125,13 +37173,13 @@
           };
         };
 
-        var _this$state2 = this.state,
-            meta = _this$state2.meta,
-            query = _this$state2.query,
-            _this$state2$orderMem = _this$state2.orderMembers,
-            orderMembers = _this$state2$orderMem === void 0 ? [] : _this$state2$orderMem,
-            chartType = _this$state2.chartType,
-            pivotConfig = _this$state2.pivotConfig;
+        var _this$state = this.state,
+            meta = _this$state.meta,
+            query = _this$state.query,
+            _this$state$orderMemb = _this$state.orderMembers,
+            orderMembers = _this$state$orderMemb === void 0 ? [] : _this$state$orderMemb,
+            chartType = _this$state.chartType,
+            pivotConfig = _this$state.pivotConfig;
         return _objectSpread({
           meta: meta,
           query: query,
@@ -37160,8 +37208,8 @@
             return m.type === 'time';
           }),
           availableSegments: meta && meta.membersForQuery(query, 'segments') || [],
-          updateQuery: function updateQuery(query) {
-            return _this2.updateQuery(query);
+          updateQuery: function updateQuery(queryUpdate) {
+            return _this2.updateQuery(queryUpdate);
           },
           updateMeasures: updateMethods('measures'),
           updateDimensions: updateMethods('dimensions'),
@@ -37251,34 +37299,33 @@
         var _updateVizState = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee2(state) {
-          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+          var _this$props, setQuery, setVizState, _this$state2, stateQuery, statePivotConfig, _this$applyStateChang, _this$applyStateChang2, shouldApplyHeuristicOrder, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
           return regeneratorRuntime.wrap(function _callee2$(_context2) {
             while (1) {
               switch (_context2.prev = _context2.next) {
                 case 0:
                   _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
-                  _this$state3 = this.state, stateQuery = _this$state3.query, statePivotConfig = _this$state3.pivotConfig;
-                  finalState = this.applyStateChangeHeuristics(state);
+                  _this$state2 = this.state, stateQuery = _this$state2.query, statePivotConfig = _this$state2.pivotConfig;
+                  _this$applyStateChang = this.applyStateChangeHeuristics(state), _this$applyStateChang2 = _this$applyStateChang.shouldApplyHeuristicOrder, shouldApplyHeuristicOrder = _this$applyStateChang2 === void 0 ? false : _this$applyStateChang2, finalState = _objectWithoutProperties(_this$applyStateChang, ["shouldApplyHeuristicOrder"]);
                   _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
-                  if (!(this.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                    _context2.next = 11;
+                  if (!(shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
+                    _context2.next = 10;
                     break;
                   }
 
-                  this.shouldApplyHeuristicOrder = false;
-                  _context2.next = 8;
+                  _context2.next = 7;
                   return this.cubejsApi().sql(query, {
                     mutexObj: this.mutexObj
                   });
 
-                case 8:
+                case 7:
                   _ref4 = _context2.sent;
                   sqlQuery = _ref4.sqlQuery;
                   finalState.query.order = sqlQuery.sql.order;
 
-                case 11:
+                case 10:
                   activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                   updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread({}, this.state, {}, finalState)));
                   currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -37323,7 +37370,7 @@
                     setVizState(toSet);
                   }
 
-                case 23:
+                case 22:
                 case "end":
                   return _context2.stop();
               }
@@ -37350,9 +37397,9 @@
     }, {
       key: "defaultHeuristics",
       value: function defaultHeuristics(newState) {
-        var _this$state4 = this.state,
-            query = _this$state4.query,
-            sessionGranularity = _this$state4.sessionGranularity;
+        var _this$state3 = this.state,
+            query = _this$state3.query,
+            sessionGranularity = _this$state3.sessionGranularity;
         var defaultGranularity = sessionGranularity || 'day';
 
         if (newState.query) {
@@ -37375,9 +37422,9 @@
                 granularity: defaultGranularity
               }] : []
             });
-            this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
               pivotConfig: null,
+              shouldApplyHeuristicOrder: true,
               query: newQuery,
               chartType: defaultTimeDimension ? 'line' : 'number'
             });
@@ -37391,9 +37438,9 @@
                 });
               })
             });
-            this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
               pivotConfig: null,
+              shouldApplyHeuristicOrder: true,
               query: newQuery,
               chartType: 'table'
             });
@@ -37407,9 +37454,9 @@
                 });
               })
             });
-            this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
               pivotConfig: null,
+              shouldApplyHeuristicOrder: true,
               query: newQuery,
               chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
             });
@@ -37420,9 +37467,9 @@
               timeDimensions: [],
               filters: []
             });
-            this.shouldApplyHeuristicOrder = true;
             return _objectSpread({}, newState, {
               pivotConfig: null,
+              shouldApplyHeuristicOrder: true,
               query: newQuery,
               sessionGranularity: null
             });
@@ -37454,6 +37501,7 @@
 
             return _objectSpread({}, newState, {
               pivotConfig: null,
+              shouldApplyHeuristicOrder: true,
               query: _objectSpread({}, query, {
                 timeDimensions: [_objectSpread({}, _td, {
                   granularity: undefined
