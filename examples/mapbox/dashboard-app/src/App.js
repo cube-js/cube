@@ -35,7 +35,7 @@ const App = () => (
             <Points />
           </Tabs.TabPane>
           <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='click event'>q&amp;a</Tooltip></React.Fragment>)} key={2}>
-            <ClickEvent />
+            <ClickEvent cubejsApi={cubejsApi} />
           </Tabs.TabPane>
           <Tabs.TabPane tab={(<React.Fragment><Tooltip placement="bottom" title='choropleth'>rating by country</Tooltip></React.Fragment>)} key={3}>
             <Choropleth />

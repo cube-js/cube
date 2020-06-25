@@ -79,10 +79,6 @@ export default () => {
     dimensions: [
       'Users.geometry',
     ],
-    filters: [{
-      member: "Users.geometry",
-      operator: "set"
-    }],
     limit: 50000
   });
 

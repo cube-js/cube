@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCubeQuery } from "@cubejs-client/react";
 import MapGL, { Source, Layer, Popup, NavigationControl } from 'react-map-gl';
-import { Radio } from "antd";
+import { Radio, Spin } from "antd";
 import { Scrollbars } from 'react-custom-scrollbars';
 
-export default () => {
+export default ({ cubejsApi }) => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
-    zoom: 2,
+    zoom: 2
   });
+
   const [mode, setMode] = useState('both');
+
   const [selectedPoint, setSelectedPoint] = useState(null);
+  const [overlay, setOverlay] = useState(null);
+  const [renderPopup, setRenderPopup] = useState(null);
 
   const { resultSet: questionsSet } = useCubeQuery({
     measures: [
@@ -20,10 +24,6 @@ export default () => {
     dimensions: [
       'Users.geometry',
     ],
-    filters: [{
-      member: "Users.geometry",
-      operator: "set"
-    }],
     order: {
       'Questions.views': 'desc',
     }
@@ -34,28 +34,7 @@ export default () => {
     dimensions: [
       'Users.geometry',
     ],
-    filters: [{
-      member: "Users.geometry",
-      operator: "set"
-    }],
   });
-
-  const { resultSet: popupSet } = useCubeQuery({
-    dimensions: [
-      'Questions.title',
-      'Questions.views',
-      'Questions.tags'
-    ],
-    filters: [{
-      member: "Users.geometry",
-      operator: "contains",
-      values: [selectedPoint]
-    }],
-    order: {
-      'Questions.views': 'desc',
-    }
-  });
-
 
   let dataQuestions = {
     type: 'FeatureCollection',
@@ -93,44 +72,60 @@ export default () => {
   }
 
 
-
-  let renderPopup = null;
-  if (popupSet && selectedPoint) {
-    renderPopup =
-      (
-        <Popup
-          className='mapbox__popup'
-          closeButton={false}
-          tipSize={5}
-          anchor='top'
-          longitude={JSON.parse(selectedPoint).coordinates[0]}
-          latitude={JSON.parse(selectedPoint).coordinates[1]}
-          captureScroll={true}
-        >
-          <Scrollbars
-            autoHeight
-            autoHeightMin={0}
-            autoHeightMax={300}
-          >
-            {
-              popupSet.tablePivot().map((item, i) => (
-                <div className="mapbox__popup__item" key={i}>
-                  <h3>{item['Questions.title']}</h3>
-                  <div>
-                    Views count: {item['Questions.views']}<br />
-                    Tags: {item['Questions.tags'].replace(/\|/g, ', ')}
+  useEffect(() => {
+    if (selectedPoint) {
+      cubejsApi.load({
+        dimensions: [
+          'Questions.title',
+          'Questions.views',
+          'Questions.tags'
+        ],
+        filters: [{
+          member: "Users.geometry",
+          operator: "contains",
+          values: [selectedPoint]
+        }],
+        order: {
+          'Questions.views': 'desc',
+        }
+      })
+        .then((resultSet) => {
+          setRenderPopup((
+            <Popup
+              className='mapbox__popup'
+              closeButton={false}
+              tipSize={5}
+              anchor='top'
+              longitude={JSON.parse(selectedPoint).coordinates[0]}
+              latitude={JSON.parse(selectedPoint).coordinates[1]}
+              captureScroll={true}
+            >
+              <Scrollbars
+                autoHeight
+                autoHeightMin={0}
+                autoHeightMax={300}
+              >
+                {resultSet.tablePivot().map((item, i) => (
+                  <div className="mapbox__popup__item" key={i}>
+                    <h3>{item['Questions.title']}</h3>
+                    <div>
+                      Views count: {item['Questions.views']}<br />
+                Tags: {item['Questions.tags'].replace(/\|/g, ', ')}
+                    </div>
                   </div>
-                </div>
-              ))
-            }
-          </Scrollbars>
-        </Popup>
-      )
-  }
+                ))}
+              </Scrollbars>
+            </Popup>
+          ));
+          setOverlay(null);
+        })
+    }
 
-  else {
-    renderPopup = null;
-  }
+    else {
+      setRenderPopup(null)
+    }
+
+  }, [selectedPoint])
 
   const onChangeMode = (e) => {
     setMode(e.target.value);
@@ -144,10 +139,16 @@ export default () => {
         (f) => f.layer.id == 'questions-point'
       );
       if (feature) {
+        setOverlay((
+          <div className="mapbox__spinner">
+            <Spin className="mapbox__spinner__icon" />
+          </div>
+        ));
         setSelectedPoint(feature.properties.geometry);
       }
     }
   }
+
 
   return (
     <div className='mapbox__container'>
@@ -201,6 +202,7 @@ export default () => {
         </Source>
         {renderPopup}
       </MapGL>
+      {overlay}
     </div>
   )
 }

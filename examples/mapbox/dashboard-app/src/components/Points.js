@@ -10,18 +10,15 @@ export default () => {
     zoom: 1.5,
   })
 
-  const [initMin, setInitMin] = useState(0);
-  const [initMax, setInitMax] = useState(0);
-  const [min, setMin] = useState(0);
-  const [max, setMax] = useState(0);
+  const [sliderInitMin, setsliderInitMin] = useState(0);
+  const [sliderInitMax, setSliderInitMin] = useState(0);
+  const [sliderCurMin, setSliderCurMin] = useState(0);
+  const [sliderCurMax, setSliderCurMax] = useState(0);
+  const [queryMin, setQueryMin] = useState(0);
+  const [queryMax, setQueryMax] = useState(0);
 
-
-  const { resultSet: range } = useCubeQuery({
-    measures: ['Users.max', 'Users.min'],
-    filters: [{
-      member: "Users.geometry",
-      operator: "set"
-    }],
+  const { resultSet: sliderInitQuery } = useCubeQuery({
+    measures: ['Users.max', 'Users.min']
   });
 
   const { resultSet: points } = useCubeQuery({
@@ -35,29 +32,31 @@ export default () => {
       {
         member: "Users.value",
         operator: "lte",
-        values: [max.toString()]
+        values: [queryMax.toString()]
       },
       {
         member: "Users.value",
         operator: "gte",
-        values: [min.toString()]
+        values: [queryMin.toString()]
       }
     ]
-  })
-
-  useEffect(() => {
-    if (range) {
-      setInitMax(range.tablePivot()[0]['Users.max']);
-      setInitMin(range.tablePivot()[0]['Users.min']);
-      setMax(range.tablePivot()[0]['Users.max']);
-      setMin(range.tablePivot()[0]['Users.max'] * 0.4);
-    }
-  }, [range]);
+  });
 
   let data = {
     type: 'FeatureCollection',
-    features: [],
+    features: []
   };
+
+  useEffect(() => {
+    if (sliderInitQuery) {
+      setSliderInitMin(sliderInitQuery.tablePivot()[0]['Users.max']);
+      setsliderInitMin(sliderInitQuery.tablePivot()[0]['Users.min']);
+      setSliderCurMax(sliderInitQuery.tablePivot()[0]['Users.max']);
+      setSliderCurMin(sliderInitQuery.tablePivot()[0]['Users.max'] * 0.4);
+      setQueryMax(sliderInitQuery.tablePivot()[0]['Users.max']);
+      setQueryMin(sliderInitQuery.tablePivot()[0]['Users.max'] * 0.4);
+    }
+  }, [sliderInitQuery]);
 
   if (points) {
     points.tablePivot().map((item) => {
@@ -71,9 +70,15 @@ export default () => {
     });
   }
 
+
   const onChange = (value) => {
-    setMin(value[0]);
-    setMax(value[1]);
+    setSliderCurMin(value[0]);
+    setSliderCurMax(value[1]);
+  }
+
+  const onAfterChange = (value) => {
+    setQueryMin(value[0]);
+    setQueryMax(value[1]);
   }
 
   return (
@@ -114,20 +119,20 @@ export default () => {
       </div>
       <Row className="mapbox__slider">
         <Col span={3}>Rating range: </Col>
-        <Col span={2}><Tooltip placement="top" title='minimal rating'>{Math.round(min / 1000)}k</Tooltip></Col>
+        <Col span={2}><Tooltip placement="top" title='minimal rating'>{Math.round(sliderCurMin / 1000)}k</Tooltip></Col>
         <Col span={17} >
           <Slider
             range
-            min={initMin}
-            max={initMax}
-            step={1}
-            defaultValue={[initMax, initMax]}
-            value={[min, max]}
+            min={sliderInitMin}
+            max={sliderInitMax}
+            step={1000}
+            value={[sliderCurMin, sliderCurMax]}
             onChange={onChange}
+            onAfterChange={onAfterChange}
             tooltipVisible={false}
           />
         </Col>
-        <Col span={2}><Tooltip placement="top" title='maximal rating'>{Math.round(max / 1000)}k</Tooltip></Col>
+        <Col span={2}><Tooltip placement="top" title='maximal rating'>{Math.round(sliderCurMax / 1000)}k</Tooltip></Col>
       </Row>
     </React.Fragment>)
 }

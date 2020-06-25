@@ -1,5 +1,5 @@
 cube(`Users`, {
-  sql: `SELECT * FROM public.Users`,
+  sql: `SELECT * FROM public.Users WHERE geometry is not null`,
   joins: {
     Mapbox: {
       sql: `${CUBE}.country = ${Mapbox}.geounit`,
