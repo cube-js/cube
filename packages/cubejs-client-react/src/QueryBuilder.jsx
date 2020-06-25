@@ -269,13 +269,10 @@ export default class QueryBuilder extends React.Component {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
     
-    let {
-      shouldApplyHeuristicOrder = false, 
-      ...finalState 
-    } = this.applyStateChangeHeuristics(state);
+    let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || {};
     
-    if (shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
+    if (finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
       const { sqlQuery } = await this.cubejsApi().sql(query, {
         mutexObj: this.mutexObj
       });

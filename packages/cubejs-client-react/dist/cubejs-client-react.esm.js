@@ -662,7 +662,7 @@ function (_React$Component) {
       var _updateVizState = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2(state) {
-        var _this$props, setQuery, setVizState, _this$state2, stateQuery, statePivotConfig, _this$applyStateChang, _this$applyStateChang2, shouldApplyHeuristicOrder, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+        var _this$props, setQuery, setVizState, _this$state2, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
         return _regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
@@ -670,10 +670,10 @@ function (_React$Component) {
               case 0:
                 _this$props = this.props, setQuery = _this$props.setQuery, setVizState = _this$props.setVizState;
                 _this$state2 = this.state, stateQuery = _this$state2.query, statePivotConfig = _this$state2.pivotConfig;
-                _this$applyStateChang = this.applyStateChangeHeuristics(state), _this$applyStateChang2 = _this$applyStateChang.shouldApplyHeuristicOrder, shouldApplyHeuristicOrder = _this$applyStateChang2 === void 0 ? false : _this$applyStateChang2, finalState = _objectWithoutProperties(_this$applyStateChang, ["shouldApplyHeuristicOrder"]);
+                finalState = this.applyStateChangeHeuristics(state);
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
-                if (!(shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
+                if (!(finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
                   _context2.next = 10;
                   break;
                 }
