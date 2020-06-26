@@ -350,6 +350,9 @@ CubejsServerCore.create({
 });
 ```
 
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance. 
+For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
+
 ### extendContext
 
 Option to extend the `RequestContext` with custom values. This method is called on each request.  Can be async.
