@@ -13,7 +13,7 @@ class ReactAntdDynamicTemplate extends TemplatePackage {
       },
       requires: 'create-react-app',
       receives: ['credentials', 'charts', 'transport', 'antd-tables'],
-      version: '0.0.1'
+      version: '0.0.2'
     });
   }
 }
