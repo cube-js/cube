@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from 'antd';
+import { Button, Typography } from 'antd';
 import { Draggable } from 'react-beautiful-dnd';
 import { DragOutlined } from '@ant-design/icons';
 
@@ -19,18 +19,27 @@ export default function DraggableItem({ id, index, order = 'none', children, onO
           {...draggableProps}
           {...dragHandleProps}
           style={{
+            display: 'flex',
+            flexWrap: 'nowrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             marginBottom: 8,
-            ...draggableProps.style
+            ...draggableProps.style,
           }}
-        >
-          <DragOutlined style={{ marginRight: 8 }} />
-
-          <span>{children}</span>
+          >
+          <DragOutlined />
+          
+          <Typography.Text ellipsis style={{ margin: '0 auto 0 8px' }}>
+            {children}
+          </Typography.Text>
 
           <Button
             type={order !== 'none' ? 'primary' : null}
             size="small"
-            style={{ width: 80, float: 'right' }}
+            style={{
+              minWidth: 70,
+              marginLeft: 8,
+            }}
             onClick={() => onOrderChange(id, getNextOrder())}
           >
             {order.toUpperCase()}
