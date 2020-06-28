@@ -150,7 +150,8 @@ class RefreshScheduler {
       const queries = await this.refreshQueriesForPreAggregation(
         context, compilerApi, preAggregation, queryingOptions
       );
-      await Promise.all(queries.map(async (query, i) => {
+      for (let i = queries.length - 1; i >= 0; i--) {
+        const query = queries[i];
         const sqlQuery = await compilerApi.getSql(query);
         const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
         await orchestratorApi.executeQuery({
@@ -162,7 +163,7 @@ class RefreshScheduler {
           renewQuery: true,
           requestId: context.requestId
         });
-      }));
+      }
     }));
   }
 }
