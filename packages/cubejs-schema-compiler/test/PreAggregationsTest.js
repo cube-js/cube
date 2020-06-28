@@ -196,6 +196,9 @@ describe('PreAggregations', function test() {
           granularity: 'day',
           partitionGranularity: 'month',
           scheduledRefresh: true,
+          refreshRangeStart: {
+            sql: "SELECT NOW() - interval '30 day'"
+          },
           refreshKey: {
             every: '1 hour',
             incremental: true,
@@ -522,6 +525,8 @@ describe('PreAggregations', function test() {
       const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg.preAggregation);
 
       console.log(minMaxQueries);
+
+      minMaxQueries[0][0].should.match(/NOW/);
 
       const res = await dbRunner.testQueries(minMaxQueries);
 
@@ -1127,6 +1132,7 @@ describe('PreAggregations in time hierarchy', function test() {
       });
     });
   });
+
   it('query on week match to pre-agg on day', () => {
     return compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
