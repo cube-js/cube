@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.38](https://github.com/cube-js/cube.js/compare/v0.19.37...v0.19.38) (2020-06-28)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.19.35](https://github.com/cube-js/cube.js/compare/v0.19.34...v0.19.35) (2020-06-22)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

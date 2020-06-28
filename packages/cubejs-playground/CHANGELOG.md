@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.38](https://github.com/cube-js/cube.js/compare/v0.19.37...v0.19.38) (2020-06-28)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** Long line ellipsis ([#761](https://github.com/cube-js/cube.js/issues/761)) ([4aee9dc](https://github.com/cube-js/cube.js/commit/4aee9dc))
+
+
+
+
+
 ## [0.19.37](https://github.com/cube-js/cube.js/compare/v0.19.36...v0.19.37) (2020-06-26)
 
 
