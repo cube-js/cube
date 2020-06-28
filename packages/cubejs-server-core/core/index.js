@@ -222,10 +222,14 @@ class CubejsServerCore {
       setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
     }
 
-    if (options.scheduledRefreshTimer) {
+    this.scheduledRefreshTimer = options.scheduledRefreshTimer || process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+
+    if (this.scheduledRefreshTimer) {
       setInterval(
         () => this.runScheduledRefresh(),
-        typeof options.scheduledRefreshTimer === 'number' ? (options.scheduledRefreshTimer * 1000) : 5000
+        typeof this.scheduledRefreshTimer === 'number' || this.scheduledRefreshTimer.match(/^\d+$/) ?
+          (this.scheduledRefreshTimer * 1000) :
+          5000
       );
     }
 
