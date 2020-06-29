@@ -31,12 +31,18 @@ class RefreshScheduler {
         return data[0] && data[0][Object.keys(data[0])[0]];
       };
 
+      const dateRange = [extractDate(startDate), extractDate(endDate)];
+      if (!dateRange[0] || !dateRange[1]) {
+        // Empty table. Nothing to refresh.
+        return [];
+      }
+
       const baseQuery = {
         ...queryingOptions,
         ...preAggregation.references,
         timeDimensions: [{
           ...preAggregation.references.timeDimensions[0],
-          dateRange: [extractDate(startDate), extractDate(endDate)]
+          dateRange
         }]
       };
       const partitionQuery = compilerApi.createQuery(compilers, dbType, baseQuery);

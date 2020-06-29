@@ -204,6 +204,19 @@ describe('PreAggregations', function test() {
             incremental: true,
             updateWindow: '1 day'
           }
+        },
+        emptyPartitioned: {
+          type: 'rollup',
+          measureReferences: [count],
+          timeDimensionReference: EmptyHourVisitors.createdAt,
+          granularity: 'hour',
+          partitionGranularity: 'month',
+          scheduledRefresh: true,
+          refreshKey: {
+            every: '1 hour',
+            incremental: true,
+            updateWindow: '1 day'
+          }
         }
       }
     })
@@ -244,6 +257,11 @@ describe('PreAggregations', function test() {
           }
         }
       }
+    })
+    
+    cube('EmptyHourVisitors', {
+      extends: EveryHourVisitors,
+      sql: \`select v.* from \${visitors.sql()} v where created_at < '2000-01-01'\`
     })
     `);
 
@@ -532,6 +550,40 @@ describe('PreAggregations', function test() {
 
       res.should.be.deepEqual(
         [{ max: '2017-01-06T00:00:00.000Z' }]
+      );
+    });
+  });
+
+  it('empty scheduled refresh', () => {
+    return compiler.compile().then(async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitor_checkins.count'
+        ],
+        timeDimensions: [{
+          dimension: 'EmptyHourVisitors.createdAt',
+          granularity: 'hour',
+          dateRange: ['2017-01-01', '2017-01-25']
+        }],
+        timezone: 'UTC',
+        order: [{
+          id: 'EmptyHourVisitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const preAggregations = cubeEvaluator.scheduledPreAggregations();
+      const partitionedPreAgg =
+        preAggregations.find(p => p.preAggregationName === 'emptyPartitioned' && p.cube === 'visitor_checkins');
+
+      const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg.preAggregation);
+
+      console.log(minMaxQueries);
+
+      const res = await dbRunner.testQueries(minMaxQueries);
+
+      res.should.be.deepEqual(
+        [{ max: null }]
       );
     });
   });
