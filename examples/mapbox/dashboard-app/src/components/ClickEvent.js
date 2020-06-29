@@ -85,8 +85,6 @@ export default () => {
   }
 
   let renderPopup = null;
-  let overlay = null;
-
   if (popupSet && selectedPoint) {
     renderPopup = (
       <Popup
@@ -115,43 +113,7 @@ export default () => {
         </Scrollbars>
       </Popup>
     );
-    overlay = null
   }
-
-  useEffect(() => {
-    /*console.log(popupSet)
-    console.log(selectedPoint)
-
-    setRenderPopup((
-      <Popup
-        className='mapbox__popup'
-        closeButton={false}
-        tipSize={5}
-        anchor='top'
-        longitude={JSON.parse(selectedPoint).coordinates[0]}
-        latitude={JSON.parse(selectedPoint).coordinates[1]}
-        captureScroll={true}
-      >
-        <Scrollbars
-          autoHeight
-          autoHeightMin={0}
-          autoHeightMax={300}
-        >
-          {popupSet.tablePivot().map((item, i) => (
-            <div className="mapbox__popup__item" key={i}>
-              <h3>{item['Questions.title']}</h3>
-              <div>
-                Views count: {item['Questions.views']}<br />
-          Tags: {item['Questions.tags'].replace(/\|/g, ', ')}
-              </div>
-            </div>
-          ))}
-        </Scrollbars>
-      </Popup>
-    ));
-    setOverlay(null);*/
-
-  }, [popupSet]);
 
   const onChangeMode = (e) => {
     setMode(e.target.value);
@@ -165,11 +127,6 @@ export default () => {
         (f) => f.layer.id == 'questions-point'
       );
       if (feature) {
-        overlay = (
-          <div className="mapbox__spinner">
-            <Spin className="mapbox__spinner__icon" />
-          </div>
-        );
         setSelectedPoint(feature.properties.geometry);
       }
     }
@@ -228,7 +185,9 @@ export default () => {
         </Source>
         {renderPopup}
       </MapGL>
-      {overlay}
+      <div>{selectedPoint && !popupSet ? (<div className="mapbox__spinner">
+        <Spin className="mapbox__spinner__icon" />
+      </div>) : null}</div>
     </div>
   )
 }
