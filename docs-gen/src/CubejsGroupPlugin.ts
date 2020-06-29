@@ -1,8 +1,7 @@
 import { ReflectionKind, Reflection, ContainerReflection, DeclarationReflection } from 'typedoc';
-// import { CubejsGroupPlugin } from 'typedoc/dist/lib/converter/plugins';
 import { Component } from 'typedoc/dist/lib/utils';
 import { Converter, Context } from 'typedoc/dist/lib/converter';
-import { SourceDirectory, ReflectionGroup, SignatureReflection, CommentTag, Comment } from 'typedoc/dist/lib/models';
+import { SourceDirectory, ReflectionGroup, Comment } from 'typedoc/dist/lib/models';
 import { ConverterComponent } from 'typedoc/dist/lib/converter/components';
 
 @Component({ name: 'cubejs-group' })

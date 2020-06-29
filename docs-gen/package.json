@@ -45,7 +45,6 @@
   "dependencies": {
     "fs-extra": "^9.0.0",
     "handlebars": "^4.7.6",
-    "inflection": "^1.12.0",
-    "ramda": "^0.27.0"
+    "inflection": "^1.12.0"
   }
 }
