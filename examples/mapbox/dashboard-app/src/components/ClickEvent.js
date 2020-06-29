@@ -185,9 +185,9 @@ export default () => {
         </Source>
         {renderPopup}
       </MapGL>
-      <div>{selectedPoint && !popupSet ? (<div className="mapbox__spinner">
+      {selectedPoint && !popupSet ? (<div className="mapbox__spinner">
         <Spin className="mapbox__spinner__icon" />
-      </div>) : null}</div>
+      </div>) : null}
     </div>
   )
 }

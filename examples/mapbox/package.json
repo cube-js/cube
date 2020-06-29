@@ -10,7 +10,7 @@
     "@cubejs-backend/bigquery-driver": "^0.19.17",
     "@cubejs-backend/postgres-driver": "^0.19.20",
     "@cubejs-backend/server": "^0.19.23",
-    "cubejs-cli": "^0.19.37",
+    "cubejs-cli": "^0.19.34",
     "global": "^4.4.0"
   }
 }
