@@ -1,6 +1,14 @@
 {{#if name}}
 
-{{heading 3}} {{#ifNamedAnchors}}<a id="{{anchor}}" name="{{this.anchor}}"></a> {{/ifNamedAnchors}}{{{ memberTitle }}}
+{{#ifParentIsModule true}}
+
+{{heading 2}}{{{ memberTitle }}}
+
+{{else}}
+
+{{heading 3}}{{{ memberTitle }}}
+
+{{/ifParentIsModule}}
 
 {{/if}}
 
@@ -34,11 +42,10 @@
 
 {{#ifIsLiteralType true}}
 
-uuuuuu
 {{> member.declaration}}
-uuuuend
+
 {{{literal}}}
-uuuuu--
+
 {{/ifIsLiteralType}}
 
 {{#ifIsLiteralType false}}
