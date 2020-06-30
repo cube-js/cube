@@ -18,7 +18,9 @@ export function meta(this: ProjectReflection) {
 
     (comment?.tags || []).forEach((tag: CommentTag) => {
       if (tag.tagName !== 'description') {
-        md.push(`${tag.tagName}: ${tag.text}`.replace('\n', ''));
+        const escape = tag.tagName !== 'menuorder';
+        const text = escape ? `'${tag.text}'` : tag.text;
+        md.push(`${tag.tagName === 'menuorder' ? 'menuOrder' : tag.tagName}: ${text}`.replace('\n', ''));
       }
     });
     md.push('---');
