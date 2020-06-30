@@ -283,6 +283,7 @@ $ heroku config:set REDIS_URL:<YOUR-REDIS-URL>
 ```
 
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis server.
+Please [setup connection pool](deployment#production-mode-redis-pool) according to your redis max connections.
 
 ### Create Heroku Procfile
 
