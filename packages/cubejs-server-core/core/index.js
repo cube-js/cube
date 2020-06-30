@@ -227,7 +227,8 @@ class CubejsServerCore {
     if (this.scheduledRefreshTimer) {
       setInterval(
         () => this.runScheduledRefresh(),
-        typeof this.scheduledRefreshTimer === 'number' || this.scheduledRefreshTimer.match(/^\d+$/) ?
+        typeof this.scheduledRefreshTimer === 'number' ||
+        typeof this.scheduledRefreshTimer === 'string' && this.scheduledRefreshTimer.match(/^\d+$/) ?
           (this.scheduledRefreshTimer * 1000) :
           5000
       );
