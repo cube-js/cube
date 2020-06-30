@@ -1,4 +1,4 @@
-import { SignatureReflection } from 'typedoc';
+import { SignatureReflection, ReflectionKind } from 'typedoc';
 
 import { memberSymbol } from './member-symbol';
 import { type } from './type';

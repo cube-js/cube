@@ -242,6 +242,13 @@ export default class MarkdownTheme extends Theme {
    */
   getEntryPoint(project: ProjectReflection): ContainerReflection {
     const entryPoint = this.owner.entryPoint;
+    
+    // if (project.children?.[0].comment.tags?.[0] !== undefined) {
+    //   project.children[0].comment.tags[0].text = 'hello , World';
+      
+    //   return project.children[0].children[0];
+    // }
+    
     if (entryPoint) {
       const reflection = project.getChildByName(entryPoint);
       if (reflection) {
@@ -270,9 +277,9 @@ export default class MarkdownTheme extends Theme {
       if (reflection.kind === ReflectionKind.Namespace) {
         return namespacesNavigation;
       }
-      if (reflection.kind === ReflectionKind.Module) {
-        return modulesNavigation;
-      }
+      // if (reflection.kind === ReflectionKind.Module) {
+      //   return modulesNavigation;
+      // }
       if (reflection.kind === ReflectionKind.Class) {
         return classesNavigation;
       }
@@ -322,8 +329,7 @@ export default class MarkdownTheme extends Theme {
     const isModules = this.application.options.getValue('mode') === 1;
     const isLongTitle = this.application.options.getValue('longTitle') as boolean;
     const navigation = createNavigationGroup(project.name, this.indexName + this.fileExt);
-    const externalModulesNavigation = createNavigationGroup('External Modules'); 
-    const modulesNavigation = createNavigationGroup('Modules');
+    // const modulesNavigation = createNavigationGroup('Modules');
     const namespacesNavigation = createNavigationGroup('Namespaces');
     const classesNavigation = createNavigationGroup('Classes');
     const enumsNavigation = createNavigationGroup('Enums');

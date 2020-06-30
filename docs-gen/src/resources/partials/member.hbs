@@ -1,8 +1,9 @@
+{{#ifCond kindString '!=' 'Module'}}
 {{#if name}}
 
 {{#ifParentIsModule true}}
 
-{{heading 2}}{{{ memberTitle }}}
+{{heading 2}} {{{ memberTitle }}}
 
 {{else}}
 
@@ -11,6 +12,7 @@
 {{/ifParentIsModule}}
 
 {{/if}}
+{{/ifCond}}
 
 {{#if signatures}}
 
@@ -28,7 +30,13 @@
 
 {{else}}
 
+{{#ifCond kindString '!=' 'Module'}}
+{{!-- {{#ifParentIsModule false}} --}}
+
 {{> member.declaration}}
+
+{{!-- {{/ifParentIsModule}} --}}
+{{/ifCond}}
 
 {{/if}}
 

@@ -3,12 +3,15 @@ import { heading } from './heading';
 import { memberSymbol } from './member-symbol';
 import { type } from './type';
 
-export function declarationTitle(this: DeclarationReflection, showSymbol: boolean) {
-  const isOptional = this.flags.map(flag => flag).includes('Optional');
+export function declarationTitle(this: DeclarationReflection, showSymbol: boolean) {  
+  if (this.type?.type !== 'union') {
+    return '';
+  }
 
   const md = [];
-
-  if (this.parent && this.parent.kind !== ReflectionKind.ObjectLiteral && this.kind === ReflectionKind.ObjectLiteral) {
+  const isOptional = this.flags.map(flag => flag).includes('Optional');
+  
+  if (this.parent && this.parent.kind !== ReflectionKind.ObjectLiteral) {
     md.push(heading(3));
   }
 
@@ -24,5 +27,6 @@ export function declarationTitle(this: DeclarationReflection, showSymbol: boolea
   if (this.defaultValue) {
     md.push(`= ${this.defaultValue}`);
   }
+  
   return md.join(' ');
 }

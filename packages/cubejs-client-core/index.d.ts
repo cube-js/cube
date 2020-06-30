@@ -1,23 +1,71 @@
 /**
- * Vanilla JavaScript Cube.js client.
+ * @title @cubejs-client/core
+ * @permalink /@cubejs-client-core
+ * @category Cube.js Frontend
+ * @subcategory Reference
+ * @menuOrder 2
+ * @description Vanilla JavaScript Cube.js client.
  */
+
 declare module '@cubejs-client/core' {
-  export interface TransportInterface {
+  export type TransportOptions = {
+    /**
+     * [jwt auth token](security)
+     */
+    authorization: string;
+    /**
+     * path to `/cubejs-api/v1`
+     */
+    apiUrl: string;
+    /**
+     * custom headers
+     */
+    headers?: Record<string, string>;
+  };
+
+  export interface ITransport {
     request(method: string, params: any): () => Promise<void>;
   }
 
+  /**
+   * Default transport implementation.
+   * @order 3
+   */
+  export class HttpTransport implements ITransport {
+    constructor(options: TransportOptions);
+    request(method: string, params: any): () => Promise<any>;
+  }
+
   export type CubeJSApiOptions = {
+    /**
+     * URL of your Cube.js Backend. By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`
+     */
     apiUrl: string;
+    /**
+     * Transport implementation to use. [HttpTransport](#http-transport) will be used by default.
+     */
+    transport?: ITransport;
     headers?: Record<string, string>;
     pollInterval?: number;
-    transport?: TransportInterface;
   };
 
   export type LoadMethodOptions = {
+    /**
+     * Key to store the current request's MUTEX inside the `mutexObj`. MUTEX object is used to reject orphaned queries results when new queries are sent. For example: if two queries are sent with the same `mutexKey` only the last one will return results.
+     */
     mutexKey?: string;
-    mutexObj?: {};
-    progressCallback?(result: ProgressResult): void;
+    /**
+     * Object to store MUTEX
+     */
+    mutexObj?: Object;
+    /**
+     * Pass `true` to use continuous fetch behavior.
+     */
     subscribe?: boolean;
+    /**
+     * Function that receives `ProgressResult` on each `Continue wait` message.
+     */
+    progressCallback?(result: ProgressResult): void;
   };
 
   export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
@@ -150,7 +198,7 @@ declare module '@cubejs-client/core' {
     type: string | number;
     title: string;
     shortTitle: string;
-    format: undefined;
+    format?: any;
     children?: TableColumn[];
   };
 
@@ -163,13 +211,17 @@ declare module '@cubejs-client/core' {
    * Provides a convenient interface for data manipulation.
    */
   export class ResultSet<T = any> {
+    /**
+     * @hidden
+     */
     static measureFromAxis(axisValues: string[]): string;
     static getNormalizedPivotConfig(query: Query, pivotConfig?: Partial<PivotConfig>): PivotConfig;
 
     constructor(loadResponse: LoadResponse<T>, options?: Object);
 
-    loadResponse: LoadResponse<T>;
-
+    /**
+     * @hidden
+     */
     normalizePivotConfig(pivotConfig?: PivotConfig): PivotConfig;
 
     /**
@@ -370,7 +422,7 @@ declare module '@cubejs-client/core' {
     tablePivot(pivotConfig?: PivotConfig): Array<{ [key: string]: string | number | boolean }>;
 
     /**
-     * Returns array of column definitions for `tablePivot`.
+     * Returns an array of column definitions for `tablePivot`.
      *
      * For example:
      * ```js
@@ -545,6 +597,7 @@ declare module '@cubejs-client/core' {
 
   /**
    * Contains information about available cubes and it's members.
+   * @order 4
    */
   export class Meta {
     constructor(metaResponse: Object);
@@ -553,7 +606,6 @@ declare module '@cubejs-client/core' {
      * Get all members of a specific type for a given query.
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
      * @param query - context query to provide filtering of members available to add to this query
-     * @param memberType - `measures`, `dimensions` or `segments`
      */
     membersForQuery(query: Query, memberType: MemberType);
 
@@ -578,20 +630,82 @@ declare module '@cubejs-client/core' {
     filterOperatorsForMember(memberName: string, memberType: MemberType): any;
   }
 
+  /**
+   * Main class for accessing Cube.js API
+   * 
+   * @order 2
+   */
   export class CubejsApi {
     constructor(apiToken: string, options: CubeJSApiOptions);
 
+    /**
+     * Base method for performing all API calls. Shouldn't be used directly.
+     *
+     * @param request - function that is invoked to perform the actual request using `transport.request()` method.
+     * @param toResult - function that maps results of invocation to method return result
+     * @param options - options object
+     */
+    loadMethod<TResult>(request: () => any, toResult: (body: JSON) => TResult, options?: LoadMethodOptions): Promise<TResult>;
+    loadMethod<TResult>(
+      request: () => any,
+      toResult: (body: JSON) => TResult,
+      options: LoadMethodOptions,
+      callback: LoadMethodCallback<ResultSet>
+    ): Promise<{ unsubscribe: () => any }>;
+
+    /**
+     * Fetch data for the passed `query`.
+     *
+     * ```js
+     * import cubejs from '@cubejs-client/core';
+     * import Chart from 'chart.js';
+     * import chartjsConfig from './toChartjsData';
+     *
+     * const cubejsApi = cubejs('CUBEJS_TOKEN');
+     *
+     * const resultSet = await cubejsApi.load({
+     *  measures: ['Stories.count'],
+     *  timeDimensions: [{
+     *    dimension: 'Stories.time',
+     *    dateRange: ['2015-01-01', '2015-12-31'],
+     *    granularity: 'month'
+     *   }]
+     * });
+     *
+     * const context = document.getElementById('myChart');
+     * new Chart(context, chartjsConfig(resultSet));
+     * ```
+     * @param query - [Query object](query-format)
+     */
     load(query: Query, options?: LoadMethodOptions): Promise<ResultSet>;
     load(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
 
+    /**
+     * Get generated SQL string for the given `query`.
+     * @param query - [Query object](query-format)
+     */
     sql(query: Query, options?: LoadMethodOptions): Promise<SqlQuery>;
     sql(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
+    /**
+     * Get meta description of cubes available for querying.
+     */
     meta(options?: LoadMethodOptions): Promise<Meta>;
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
   }
 
-  function cubejs(apiToken: string, options: CubeJSApiOptions): CubejsApi;
-
-  export default cubejs;
+  /**
+   * Creates an instance of the `CubejsApi`. The API entry point.
+   *
+   * ```js
+   * import cubejs from '@cubejs-client/core';
+   * const cubejsApi = cubejs(
+   *   'CUBEJS-API-TOKEN',
+   *   { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+   * );
+   * ```
+   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token.
+   * @order 1
+   */
+  export default function cubejs(apiToken: string, options: CubeJSApiOptions): CubejsApi;
 }
