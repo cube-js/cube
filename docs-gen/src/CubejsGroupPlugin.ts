@@ -1,9 +1,8 @@
 import { ReflectionKind, Reflection, ContainerReflection, DeclarationReflection } from 'typedoc';
-// import { CubejsGroupPlugin } from 'typedoc/dist/lib/converter/plugins';
 import { Component } from 'typedoc/dist/lib/utils';
 import { Converter, Context } from 'typedoc/dist/lib/converter';
-import { SourceDirectory, ReflectionGroup } from 'typedoc/dist/lib/models';
-import {ConverterComponent} from 'typedoc/dist/lib/converter/components';
+import { SourceDirectory, ReflectionGroup, Comment } from 'typedoc/dist/lib/models';
+import { ConverterComponent } from 'typedoc/dist/lib/converter/components';
 
 @Component({ name: 'cubejs-group' })
 export default class CubejsGroupPlugin extends ConverterComponent {
@@ -12,6 +11,7 @@ export default class CubejsGroupPlugin extends ConverterComponent {
    */
   static WEIGHTS = [
     ReflectionKind.Class,
+    ReflectionKind.Function,
     ReflectionKind.Global,
     ReflectionKind.Module,
     ReflectionKind.Namespace,
@@ -24,7 +24,6 @@ export default class CubejsGroupPlugin extends ConverterComponent {
     ReflectionKind.Event,
     ReflectionKind.Property,
     ReflectionKind.Variable,
-    ReflectionKind.Function,
     ReflectionKind.Accessor,
     ReflectionKind.Method,
     ReflectionKind.ObjectLiteral,
@@ -62,26 +61,60 @@ export default class CubejsGroupPlugin extends ConverterComponent {
     return plurals;
   })();
 
+  static orderByName = new Map<string, number>();
+
   /**
    * Create a new CubejsGroupPlugin instance.
    */
   initialize() {
-    this.listenTo(this.owner, {
-      [Converter.EVENT_RESOLVE]: this.onResolve,
-      [Converter.EVENT_RESOLVE_END]: this.onEndResolve,
-    }, null, 1);
+    this.listenTo(
+      this.owner,
+      {
+        [Converter.EVENT_RESOLVE]: this.onResolve,
+        [Converter.EVENT_RESOLVE_END]: this.onEndResolve,
+      },
+      null,
+      1
+    );
+  }
+
+  private populateOrder(children: Reflection[] = []) {
+    const MAGIC = 100_000;
+
+    function findOrderAndRemove(comment?: Comment) {
+      const orderTag = (comment?.tags || []).find((tag) => tag.tagName === 'order');
+
+      if (orderTag) {
+        comment.tags = (comment.tags || []).filter((tag) => tag.tagName !== 'order');
+        return parseInt(orderTag.text, 10) - MAGIC;
+      }
+    }
+
+    function getOrder(reflection: Reflection) {
+      if (reflection.hasComment()) {
+        return findOrderAndRemove(reflection.comment);
+      } else if (reflection instanceof DeclarationReflection) { 
+        return findOrderAndRemove(reflection.signatures?.[0]?.comment);    
+      }
+
+      return 0;
+    }
+
+    children.forEach((reflection) => {
+      if (!CubejsGroupPlugin.orderByName.has(reflection.name)) {
+        CubejsGroupPlugin.orderByName.set(reflection.name, getOrder(reflection) || 0);
+      }
+    }); 
   }
 
   private onResolve(context: Context, reflection: ContainerReflection) {
     reflection.kindString = CubejsGroupPlugin.getKindSingular(reflection.kind);
-    
-    // if (reflection instanceof ContainerReflection) {
-      
-      if (reflection.children && reflection.children.length > 0) {
-        reflection.children.sort(CubejsGroupPlugin.sortCallback);
-        reflection.groups = CubejsGroupPlugin.getReflectionGroups(reflection.children);
-      }
-    // }
+
+    if (reflection.children && reflection.children.length > 0) {
+      this.populateOrder(reflection.children);
+      reflection.children.sort(CubejsGroupPlugin.sortCallback);
+      reflection.groups = CubejsGroupPlugin.getReflectionGroups(reflection.children);
+    }
   }
 
   /**
@@ -103,6 +136,7 @@ export default class CubejsGroupPlugin extends ConverterComponent {
 
     const project = context.project;
     if (project.children && project.children.length > 0) {
+      this.populateOrder(project.children);
       project.children.sort(CubejsGroupPlugin.sortCallback);
       project.groups = CubejsGroupPlugin.getReflectionGroups(project.children);
     }
@@ -216,8 +250,9 @@ export default class CubejsGroupPlugin extends ConverterComponent {
    * @returns The sorting weight.
    */
   static sortCallback(a: Reflection, b: Reflection): number {
-    const aWeight = CubejsGroupPlugin.WEIGHTS.indexOf(a.kind);
-    const bWeight = CubejsGroupPlugin.WEIGHTS.indexOf(b.kind);
+    const aWeight = CubejsGroupPlugin.orderByName.get(a.name) || CubejsGroupPlugin.WEIGHTS.indexOf(a.kind);
+    const bWeight = CubejsGroupPlugin.orderByName.get(b.name) || CubejsGroupPlugin.WEIGHTS.indexOf(b.kind);
+
     if (aWeight === bWeight) {
       if (a.flags.isStatic && !b.flags.isStatic) {
         return 1;

@@ -1,17 +1,20 @@
+{{!-- {{#if type.declaration}}
+
 {{{declarationTitle true}}}
 
-{{> member.sources}}
+{{/if}} --}}
+{{{declarationTitle true}}}
 
 {{> comment}}
 
 {{#if type.declaration}}
 
-{{heading 4}} Type declaration:
+{{#with type.declaration.children}}
 
-{{#with type.declaration}}
-
-{{> parameter}}
+{{{parameterTable}}}
 
 {{/with}}
+{{!-- {{> parameter}} --}}
+
 
 {{/if}}

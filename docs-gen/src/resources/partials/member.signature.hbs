@@ -20,7 +20,7 @@
 
 **Parameters:**
 
-{{#ifHasTypeDeclarations true}}
+{{!-- {{#ifHasTypeDeclarations true}}
 
 {{#each parameters}}
 
@@ -54,19 +54,17 @@
 
 {{/each}}
 
-{{/ifHasTypeDeclarations}}
+{{/ifHasTypeDeclarations}} --}}
 
-{{#ifHasTypeDeclarations false}}
+{{!-- {{#ifHasTypeDeclarations false}} --}}
 
-{{#each parameters}}
+{{#with parameters}}
 
-{{{parameterNameAndType}}}
+{{{parameterTable}}}
 
-{{> comment}}
+{{/with}}
 
-{{/each}}
-
-{{/ifHasTypeDeclarations}}
+{{!-- {{/ifHasTypeDeclarations}} --}}
 
 {{/if}}
 

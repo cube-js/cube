@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "lint": "tslint --project ./tsconfig.json",
-    "generate": "yarn build && typedoc --excludeExternals --includeDeclarations --plugin ../docs-gen/dist/index.js --hideSources --hideIndexes --out ../docs/Cube.js-Frontend --name @cubejs-client-core ../packages/cubejs-client-core/index.d.ts",
+    "generate": "yarn build && typedoc --excludeExternals --includeDeclarations --plugin ./dist/index.js --hideSources --hideIndexes --out ../docs/Cube.js-Frontend --name @cubejs-client-core ../packages/cubejs-client-core/index.d.ts",
     "dev-generate": "copyfiles --up 1 ./src/**/*.hbs ./dist/ && yarn generate",
     "build": "rm -rf dist && tsc --sourceMap false --declaration false && copyfiles --up 1 ./src/**/*.hbs ./dist/",
     "watch": "tsc-watch",

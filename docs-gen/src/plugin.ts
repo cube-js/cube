@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'fs-extra';
 import { Renderer } from 'typedoc';
 import { Converter } from 'typedoc/dist/lib/converter';
 import { Component, ConverterComponent } from 'typedoc/dist/lib/converter/components';
@@ -58,7 +58,7 @@ export class MarkdownPlugin extends ConverterComponent {
           fs.copyFileSync(path.join(tmpOut, fileName), currentPath);
         });
         
-        fs.rmdirSync(tmpOut, { recursive:  true });
+        fs.removeSync(tmpOut);
       }
     })
   }

@@ -1,11 +1,3 @@
-/**
- * Vanilla JavaScript Cube.js client.
- * @module @cubejs-client/core
- * @permalink /@cubejs-client-core
- * @category Cube.js Frontend
- * @menuOrder 2
- */
-
 import uuid from 'uuid/v4';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
@@ -23,10 +15,6 @@ const mutexPromise = (promise) => new Promise((resolve, reject) => {
   promise.then(r => resolve(r), e => e !== MUTEX_ERROR && reject(e));
 });
 
-/**
- * Main class for accessing Cube.js API
- * @order -5
- */
 class CubejsApi {
   constructor(apiToken, options) {
     if (typeof apiToken === 'object') {
@@ -191,33 +179,6 @@ class CubejsApi {
     }
   }
 
-  /**
-   * Fetch data for passed `query`.
-   *
-   * ```js
-   * import cubejs from '@cubejs-client/core';
-   * import Chart from 'chart.js';
-   * import chartjsConfig from './toChartjsData';
-   *
-   * const cubejsApi = cubejs('CUBEJS_TOKEN');
-   *
-   * const resultSet = await cubejsApi.load({
-   *  measures: ['Stories.count'],
-   *  timeDimensions: [{
-   *    dimension: 'Stories.time',
-   *    dateRange: ['2015-01-01', '2015-12-31'],
-   *    granularity: 'month'
-   *   }]
-   * });
-   *
-   * const context = document.getElementById('myChart');
-   * new Chart(context, chartjsConfig(resultSet));
-   * ```
-   * @param query - [Query object](query-format)
-   * @param [options] - See {@link CubejsApi#loadMethod}
-   * @param [callback] - See {@link CubejsApi#loadMethod}
-   * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
-   */
   load(query, options, callback) {
     return this.loadMethod(
       () => this.request('load', { query }),
@@ -227,13 +188,6 @@ class CubejsApi {
     );
   }
 
-  /**
-   * Get generated SQL string for given `query`.
-   * @param query - [Query object](query-format)
-   * @param [options] - See {@link CubejsApi#loadMethod}
-   * @param [callback] - See {@link CubejsApi#loadMethod}
-   * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
-   */
   sql(query, options, callback) {
     return this.loadMethod(
       () => this.request('sql', { query }),
@@ -243,12 +197,6 @@ class CubejsApi {
     );
   }
 
-  /**
-   * Get meta description of cubes available for querying.
-   * @param [options] - See {@link CubejsApi#loadMethod}
-   * @param [callback] - See {@link CubejsApi#loadMethod}
-   * @return {Promise} for {@link Meta} if `callback` isn't passed
-   */
   meta(options, callback) {
     return this.loadMethod(
       () => this.request('meta'),
@@ -268,29 +216,6 @@ class CubejsApi {
   }
 }
 
-/**
- * Create instance of `CubejsApi`.
- * API entry point.
- *
- * ```javascript
- import cubejs from '@cubejs-client/core';
-
- const cubejsApi = cubejs(
- 'CUBEJS-API-TOKEN',
- { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
- );
- ```
- * @name cubejs
- * @param [apiToken] - [API token](security) is used to authorize requests and determine SQL database you're accessing.
- * In the development mode, Cube.js Backend will print the API token to the console on on startup.
- * Can be an async function without arguments that returns API token.
- * @param [options] - options object.
- * @param options.apiUrl - URL of your Cube.js Backend.
- * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
- * @param options.transport - transport implementation to use. {@link HttpTransport} will be used by default.
- * @returns {CubejsApi}
- * @order -10
- */
 export default (apiToken, options) => new CubejsApi(apiToken, options);
 
 export { HttpTransport, ResultSet };
