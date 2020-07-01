@@ -1,6 +1,7 @@
-## Example of map data visualization with React and Mapbox
+## Example of map data visualization with Cube.js, React and Mapbox
 
-An [example](https://mapbox-example.cubecloudapp.dev/) of map data visualization implemented with [Mapbox](https://www.mapbox.com/) and React.
+An example of map data visualization implemented with [Mapbox](https://www.mapbox.com/) and React.
+You can find [the live demo here.](https://mapbox-example.cubecloudapp.dev/)
 
 Here you can find:
 - heatmap
