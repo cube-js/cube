@@ -217,6 +217,26 @@ declare module '@cubejs-client/core' {
     static measureFromAxis(axisValues: string[]): string;
     static getNormalizedPivotConfig(query: Query, pivotConfig?: Partial<PivotConfig>): PivotConfig;
 
+    /**
+     * Creates new instance of ResultSet based on {LoadResponse} data.
+     *
+     * ```js
+     * import cubejs, { ResultSet } from '@cubejs-client/core';
+     *
+     * const cubejsApi = cubejs('CUBEJS_TOKEN');
+     *
+     * const resultSet = await cubejsApi.load({
+     *  measures: ['Stories.count'],
+     *  timeDimensions: [{
+     *    dimension: 'Stories.time',
+     *    dateRange: ['2015-01-01', '2015-12-31'],
+     *    granularity: 'month'
+     *   }]
+     * });
+     *
+     * const copy = new ResultSet(resultSet.loadResponse);
+     * ```
+     */
     constructor(loadResponse: LoadResponse<T>, options?: Object);
 
     /**
