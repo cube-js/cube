@@ -1,0 +1,16 @@
+{
+  "name": "mapbox",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/bigquery-driver": "^0.19.17",
+    "@cubejs-backend/postgres-driver": "^0.19.20",
+    "@cubejs-backend/server": "^0.19.23",
+    "cubejs-cli": "^0.19.34",
+    "global": "^4.4.0"
+  }
+}
