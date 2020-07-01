@@ -1,10 +1,6 @@
-import { DeclarationReflection, ReflectionKind } from 'typedoc';
+import { DeclarationReflection } from 'typedoc';
 
 export function memberTitle(this: DeclarationReflection) {
-  if (this.parent?.kind === ReflectionKind.Enum) {
-    return '';
-  }
-
   const md = [];
 
   if (this.flags) {

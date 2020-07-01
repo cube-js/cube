@@ -9,6 +9,15 @@ export function meta(this: ProjectReflection) {
 
     return findModuleRelection(reflection.children?.[0]);
   }
+  
+  function tagConverter(tag: string)  {
+    const tags = {
+      menucategory: 'category',
+      menuorder: 'menuOrder'
+    };
+    
+    return tags[tag] ?? tag;
+  }
 
   const moduleReflection = findModuleRelection(this);
 
@@ -20,7 +29,7 @@ export function meta(this: ProjectReflection) {
       if (tag.tagName !== 'description') {
         const escape = tag.tagName !== 'menuorder';
         const text = escape ? `'${tag.text}'` : tag.text;
-        md.push(`${tag.tagName === 'menuorder' ? 'menuOrder' : tag.tagName}: ${text}`.replace('\n', ''));
+        md.push(`${tagConverter(tag.tagName)}: ${text}`.replace('\n', ''));
       }
     });
     md.push('---');
