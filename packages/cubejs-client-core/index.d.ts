@@ -218,7 +218,7 @@ declare module '@cubejs-client/core' {
     static getNormalizedPivotConfig(query: Query, pivotConfig?: Partial<PivotConfig>): PivotConfig;
 
     /**
-     * Creates new instance of ResultSet based on {LoadResponse} data.
+     * Creates new instance of ResultSet based on [LoadResponse](#load-response) data.
      *
      * ```js
      * import cubejs, { ResultSet } from '@cubejs-client/core';
