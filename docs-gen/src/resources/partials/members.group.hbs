@@ -1,0 +1,31 @@
+{{#if categories}}
+
+{{#each categories}}
+
+{{#unless @first}}
+___
+{{/unless}}
+
+{{heading 2}} {{title}} {{../title}}
+
+{{#each children}}
+
+{{> member}}
+
+{{/each}}
+
+{{/each}}
+
+{{else}}
+
+{{#each children}}
+
+{{#unless hasOwnDocument}}
+
+{{> member}}
+
+{{/unless}}
+
+{{/each}}
+
+{{/if}}

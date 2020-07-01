@@ -29,6 +29,7 @@ module.exports = {
       ignoreTemplateLiterals: true,
     }],
     'no-trailing-spaces': ['error', { skipBlankLines: true }],
-    'no-unused-vars': ['warn']
+    'no-unused-vars': ['warn'],
+    'object-curly-newline': 0
   }
 };

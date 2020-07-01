@@ -957,7 +957,7 @@ class BaseQuery {
       return this.preAggregations.originalSqlPreAggregationTable(foundPreAggregation);
     }
     const evaluatedSql = this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql);
-    const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".]+)\s*$/i);
+    const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*$/i);
     if (selectAsterisk) {
       return selectAsterisk[1];
     }
@@ -1888,8 +1888,14 @@ class BaseQuery {
     const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
 
     return this.evaluateSymbolSqlWithContext(() => [
-      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(timeDimension.path()[0], timeDimension, 'min')),
-      this.paramAllocator.buildSqlAndParams(this.aggSelectForDimension(timeDimension.path()[0], timeDimension, 'max'))
+      this.paramAllocator.buildSqlAndParams(
+        preAggregation.refreshRangeStart && this.evaluateSql(cube, preAggregation.refreshRangeStart.sql) ||
+        this.aggSelectForDimension(timeDimension.path()[0], timeDimension, 'min')
+      ),
+      this.paramAllocator.buildSqlAndParams(
+        preAggregation.refreshRangeEnd && this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql) ||
+        this.aggSelectForDimension(timeDimension.path()[0], timeDimension, 'max')
+      )
     ], { preAggregationQuery: true });
   }
 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import * as PropTypes from 'prop-types';
 import { Row, Col, Divider, Card, Button, Popover } from 'antd';
-import { SortAscendingOutlined } from '@ant-design/icons';
+import { SortAscendingOutlined, BorderInnerOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
 import { playgroundAction } from './events';
@@ -10,6 +10,7 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import OrderGroup from './components/Order/OrderGroup';
+import Pivot from './components/Pivot/Pivot';
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>
   Object.keys(updateMethods)
@@ -30,13 +31,11 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
         }
         playgroundAction(actionName, { memberName });
         return updateMethods[method].apply(null, [member, values, ...rest]);
-      }
+      },
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
 export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubejsToken, dashboardSource, setQuery }) {
-  const [isOrderPopoverVisible, toggleOrderPopover] = useState(false);
-
   return (
     <QueryBuilder
       query={query}
@@ -64,7 +63,9 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
         availableTimeDimensions,
         updateTimeDimensions,
         orderMembers,
-        updateOrder
+        updateOrder,
+        pivotConfig,
+        updatePivotConfig,
       }) => {
         return (
           <>
@@ -134,21 +135,29 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                             onOrderChange={updateOrder.set}
                           />
                         }
-                        visible={isOrderPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"
-                        onVisibleChange={(visible) => {
-                          if (!visible) {
-                            toggleOrderPopover(false);
-                          } else {
-                            if (orderMembers.length) {
-                              toggleOrderPopover(!isOrderPopoverVisible);
-                            }
-                          }
-                        }}
                       >
-                        <Button disabled={!orderMembers.length} icon={<SortAscendingOutlined />}>
+                        <Button disabled={!isQueryPresent} icon={<SortAscendingOutlined />}>
                           Order
+                        </Button>
+                      </Popover>
+
+                      <Divider type="vertical" />
+
+                      <Popover
+                        content={
+                          <Pivot
+                            pivotConfig={pivotConfig}
+                            onMove={updatePivotConfig.moveItem}
+                            onUpdate={updatePivotConfig.update}
+                          />
+                        }
+                        placement="bottomLeft"
+                        trigger="click"
+                      >
+                        <Button disabled={!isQueryPresent} icon={<BorderInnerOutlined />}>
+                          Pivot
                         </Button>
                       </Popover>
                     </Col>
@@ -169,6 +178,7 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                     chartType={chartType}
                     cubejsApi={cubejsApi}
                     dashboardSource={dashboardSource}
+                    pivotConfig={pivotConfig}
                   />
                 ) : (
                   <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>
@@ -188,7 +198,7 @@ PlaygroundQueryBuilder.propTypes = {
   cubejsApi: PropTypes.object,
   dashboardSource: PropTypes.object,
   apiUrl: PropTypes.string,
-  cubejsToken: PropTypes.string
+  cubejsToken: PropTypes.string,
 };
 
 PlaygroundQueryBuilder.defaultProps = {
@@ -197,5 +207,5 @@ PlaygroundQueryBuilder.defaultProps = {
   cubejsApi: null,
   dashboardSource: null,
   apiUrl: '/cubejs-api/v1',
-  cubejsToken: null
+  cubejsToken: null,
 };

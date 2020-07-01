@@ -16,7 +16,7 @@ If you’re familiar with Google Analytics (GA), you probably already know that 
 
 Even though this is a high level overview of Google Analytics essentials, it’s enough to reproduce most of the functionality.
 
-You can check the online demo of the application we are going to build here and the complete source code is available on Github.
+You can check the demo web analytics application with Cube.js here and its source code is available on Github.
 
 ## Architecture overview
 

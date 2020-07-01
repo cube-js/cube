@@ -301,6 +301,7 @@ cube(`OrderFacts`, {
 ```
 
 It'll generate aliases for members such as `ofacts__count`.
+`sqlAlias` affects all member names including pre-aggregation table names.
 
 
 ## Context Variables

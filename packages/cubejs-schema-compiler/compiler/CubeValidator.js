@@ -78,6 +78,12 @@ const BasePreAggregation = {
   external: Joi.boolean(),
   partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year'),
   scheduledRefresh: Joi.boolean(),
+  refreshRangeStart: {
+    sql: Joi.func().required()
+  },
+  refreshRangeEnd: {
+    sql: Joi.func().required()
+  },
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({
       sql: Joi.func().required()

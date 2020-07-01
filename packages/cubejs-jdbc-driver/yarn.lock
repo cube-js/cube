@@ -374,9 +374,9 @@ nan@2.9.2:
   integrity sha512-ltW65co7f3PQWBDbqVvaU1WtFJUsNW7sWWm4HINhbMQIyVyzIeyZ8toX5TC5eeooE6piZoaEh4cZkueSKG3KYw==
 
 node-java-maven@^0.1.1:
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/node-java-maven/-/node-java-maven-0.1.1.tgz#cef029cd108eff363497cecd90caa8b23635cd62"
-  integrity sha1-zvApzRCO/zY0l87NkMqosjY1zWI=
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/node-java-maven/-/node-java-maven-0.1.2.tgz#5aa4cf3891f282f0890310a960c0d6787872c815"
+  integrity sha512-xCXEGOc/LQQMw7pXhSuB5Dfew9LYFMX0RS90yt/n4Np1qLWTHbvUWcjjVqREITUqYbyErKKAtd+8J7c2UyUHMA==
   dependencies:
     async "^0.9.0"
     mkdirp "^0.5.0"

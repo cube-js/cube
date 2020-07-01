@@ -10,20 +10,19 @@ const chartTypeToTemplate = {
     </Col>
   </Row>
   `,
-  table: `
+  table: `  
   <Table 
     pagination={false}
-    columns={resultSet.tableColumns().map(c => ({ ...c, dataIndex: c.key }))} 
-    dataSource={resultSet.tablePivot()} 
+    columns={resultSet.tableColumns(pivotConfig)} 
+    dataSource={resultSet.tablePivot(pivotConfig)} 
   />
   `
 };
 
-
 export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
   `import { Row, Col, Statistic, Table } from 'antd';
 
-const ${renderFnName} = ({ resultSet }) => (${chartTypeToTemplate[chartType]}
+const ${renderFnName} = ({ resultSet, pivotConfig }) => (${chartTypeToTemplate[chartType]}
 );`
 );
 

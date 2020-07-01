@@ -222,10 +222,27 @@ class CubejsServerCore {
       setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
     }
 
-    if (options.scheduledRefreshTimer) {
+    this.scheduledRefreshTimer = options.scheduledRefreshTimer || process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    this.scheduledRefreshTimeZones = options.scheduledRefreshTimeZones ||
+      process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
+      process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim());
+
+    if (this.scheduledRefreshTimer) {
       setInterval(
-        () => this.runScheduledRefresh(),
-        typeof options.scheduledRefreshTimer === 'number' ? (options.scheduledRefreshTimer * 1000) : 5000
+        async () => {
+          if (this.scheduledRefreshTimeZones) {
+            // eslint-disable-next-line no-restricted-syntax
+            for (const timezone of this.scheduledRefreshTimeZones) {
+              await this.runScheduledRefresh(null, { timezone });
+            }
+          } else {
+            await this.runScheduledRefresh();
+          }
+        },
+        typeof this.scheduledRefreshTimer === 'number' ||
+        typeof this.scheduledRefreshTimer === 'string' && this.scheduledRefreshTimer.match(/^\d+$/) ?
+          (this.scheduledRefreshTimer * 1000) :
+          5000
       );
     }
 

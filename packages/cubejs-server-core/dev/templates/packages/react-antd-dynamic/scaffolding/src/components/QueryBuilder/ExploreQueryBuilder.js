@@ -1,7 +1,7 @@
-import React, { Fragment, useState } from 'react';
+import React, { Fragment } from 'react';
 import * as PropTypes from 'prop-types';
 import { Row, Col, Divider, Card, Popover, Button } from 'antd';
-import { SortAscendingOutlined } from '@ant-design/icons';
+import { SortAscendingOutlined, BorderInnerOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import ChartRenderer from '../ChartRenderer';
 import MemberGroup from './MemberGroup';
@@ -9,10 +9,9 @@ import FilterGroup from './FilterGroup';
 import TimeGroup from './TimeGroup';
 import SelectChartType from './SelectChartType';
 import OrderGroup from './Order/OrderGroup';
+import Pivot from './Pivot/Pivot';
 
 export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, chartExtra }) {
-  const [isOrderPopoverVisible, toggleOrderPopover] = useState(false);
-
   return (
     <QueryBuilder
       vizState={vizState}
@@ -39,7 +38,9 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
         availableTimeDimensions,
         updateTimeDimensions,
         orderMembers,
-        updateOrder
+        updateOrder,
+        pivotConfig,
+        updatePivotConfig
       }) => {
         return (
           <Fragment>
@@ -103,21 +104,29 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
                             onOrderChange={updateOrder.set}
                           />
                         }
-                        visible={isOrderPopoverVisible}
                         placement="bottomLeft"
                         trigger="click"
-                        onVisibleChange={(visible) => {
-                          if (!visible) {
-                            toggleOrderPopover(false);
-                          } else {
-                            if (orderMembers.length) {
-                              toggleOrderPopover(!isOrderPopoverVisible);
-                            }
-                          }
-                        }}
                       >
-                        <Button disabled={!orderMembers.length} icon={<SortAscendingOutlined />}>
+                        <Button disabled={!isQueryPresent} icon={<SortAscendingOutlined />}>
                           Order
+                        </Button>
+                      </Popover>
+
+                      <Divider type="vertical" />
+
+                      <Popover
+                        content={
+                          <Pivot
+                            pivotConfig={pivotConfig}
+                            onMove={updatePivotConfig.moveItem}
+                            onUpdate={updatePivotConfig.update}
+                          />
+                        }
+                        placement="bottomLeft"
+                        trigger="click"
+                      >
+                        <Button disabled={!isQueryPresent} icon={<BorderInnerOutlined />}>
+                          Pivot
                         </Button>
                       </Popover>
                     </Col>
@@ -134,6 +143,7 @@ export default function ExploreQueryBuilder({ vizState, cubejsApi, setVizState, 
                       vizState={{
                         query: validatedQuery,
                         chartType,
+                        pivotConfig
                       }}
                       cubejsApi={cubejsApi}
                     />

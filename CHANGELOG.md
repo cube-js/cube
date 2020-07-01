@@ -3,6 +3,124 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.42](https://github.com/cube-js/cube.js/compare/v0.19.41...v0.19.42) (2020-07-01)
+
+
+### Bug Fixes
+
+* **docs-gen:** generation fixes ([1598a9b](https://github.com/cube-js/cube.js/commit/1598a9b))
+* **docs-gen:** titles ([12a1a5f](https://github.com/cube-js/cube.js/commit/12a1a5f))
+
+
+### Features
+
+* `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable ([d22e3f0](https://github.com/cube-js/cube.js/commit/d22e3f0))
+
+
+
+
+
+## [0.19.41](https://github.com/cube-js/cube.js/compare/v0.19.40...v0.19.41) (2020-06-30)
+
+
+### Bug Fixes
+
+* **docs-gen:** generator fixes, docs updates ([c5b26d0](https://github.com/cube-js/cube.js/commit/c5b26d0))
+* **docs-gen:** minor fixes ([#771](https://github.com/cube-js/cube.js/issues/771)) ([ae32519](https://github.com/cube-js/cube.js/commit/ae32519))
+* scheduledRefreshTimer.match is not a function ([caecc51](https://github.com/cube-js/cube.js/commit/caecc51)), closes [#772](https://github.com/cube-js/cube.js/issues/772)
+
+
+
+
+
+## [0.19.40](https://github.com/cube-js/cube.js/compare/v0.19.39...v0.19.40) (2020-06-30)
+
+
+### Bug Fixes
+
+* Querying empty Postgres table with 'time' dimension in a cube results in null value ([07d00f8](https://github.com/cube-js/cube.js/commit/07d00f8)), closes [#639](https://github.com/cube-js/cube.js/issues/639)
+
+
+### Features
+
+* CUBEJS_SCHEDULED_REFRESH_TIMER env variable ([6d0096e](https://github.com/cube-js/cube.js/commit/6d0096e))
+* **docs-gen:** Typedoc generator ([#769](https://github.com/cube-js/cube.js/issues/769)) ([15373eb](https://github.com/cube-js/cube.js/commit/15373eb))
+
+
+
+
+
+## [0.19.39](https://github.com/cube-js/cube.js/compare/v0.19.38...v0.19.39) (2020-06-28)
+
+
+### Bug Fixes
+
+* treat wildcard Elasticsearch select as simple asterisk select: include * as part of RE to support elasticsearch indexes ([#760](https://github.com/cube-js/cube.js/issues/760)) Thanks to [@gauravlanjekar](https://github.com/gauravlanjekar) ! ([099a888](https://github.com/cube-js/cube.js/commit/099a888))
+
+
+### Features
+
+* `refreshRangeStart` and `refreshRangeEnd` pre-aggregation params ([e4d2874](https://github.com/cube-js/cube.js/commit/e4d2874))
+
+
+
+
+
+## [0.19.38](https://github.com/cube-js/cube.js/compare/v0.19.37...v0.19.38) (2020-06-28)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** Long line ellipsis ([#761](https://github.com/cube-js/cube.js/issues/761)) ([4aee9dc](https://github.com/cube-js/cube.js/commit/4aee9dc))
+* Refresh partitioned pre-aggregations sequentially to avoid excessive memory and Redis connection consumption ([38aab17](https://github.com/cube-js/cube.js/commit/38aab17))
+
+
+
+
+
+## [0.19.37](https://github.com/cube-js/cube.js/compare/v0.19.36...v0.19.37) (2020-06-26)
+
+
+### Bug Fixes
+
+* **cubejs-client-core:** tableColumns empty data fix ([#750](https://github.com/cube-js/cube.js/issues/750)) ([0ac9b7a](https://github.com/cube-js/cube.js/commit/0ac9b7a))
+* **cubejs-client-react:** order heuristic ([#758](https://github.com/cube-js/cube.js/issues/758)) ([498c10a](https://github.com/cube-js/cube.js/commit/498c10a))
+
+
+### Features
+
+* **cubejs-client-react:** Exposing updateQuery method ([#751](https://github.com/cube-js/cube.js/issues/751)) ([e2083c8](https://github.com/cube-js/cube.js/commit/e2083c8))
+* query builder pivot config support ([#742](https://github.com/cube-js/cube.js/issues/742)) ([4e29057](https://github.com/cube-js/cube.js/commit/4e29057))
+
+
+
+
+
+## [0.19.36](https://github.com/cube-js/cube.js/compare/v0.19.35...v0.19.36) (2020-06-24)
+
+
+### Bug Fixes
+
+* Avoid excessive pre-aggregation invalidation in presence of multiple structure versions ([fd5e602](https://github.com/cube-js/cube.js/commit/fd5e602))
+
+
+
+
+
+## [0.19.35](https://github.com/cube-js/cube.js/compare/v0.19.34...v0.19.35) (2020-06-22)
+
+
+### Bug Fixes
+
+* **cubejs-client-core:** table pivot ([#672](https://github.com/cube-js/cube.js/issues/672)) ([70015f5](https://github.com/cube-js/cube.js/commit/70015f5))
+* header ([#734](https://github.com/cube-js/cube.js/issues/734)) ([056275a](https://github.com/cube-js/cube.js/commit/056275a))
+* Scheduler request annotation for `/v1/run-scheduled-refresh` ([8273544](https://github.com/cube-js/cube.js/commit/8273544))
+* table ([#740](https://github.com/cube-js/cube.js/issues/740)) ([6f1a8e7](https://github.com/cube-js/cube.js/commit/6f1a8e7))
+
+
+
+
+
 ## [0.19.34](https://github.com/cube-js/cube.js/compare/v0.19.33...v0.19.34) (2020-06-10)
 
 

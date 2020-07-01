@@ -4,7 +4,7 @@ cube(`ProductCategories`, {
   joins: {
     Products: {
       relationship: `hasMany`,
-      sql: `${Products}.category_id = ${ProductCategories}.id`
+      sql: `${Products}.product_category_id = ${ProductCategories}.id`
     }
   },
 

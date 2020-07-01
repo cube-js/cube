@@ -196,6 +196,22 @@ describe('PreAggregations', function test() {
           granularity: 'day',
           partitionGranularity: 'month',
           scheduledRefresh: true,
+          refreshRangeStart: {
+            sql: "SELECT NOW() - interval '30 day'"
+          },
+          refreshKey: {
+            every: '1 hour',
+            incremental: true,
+            updateWindow: '1 day'
+          }
+        },
+        emptyPartitioned: {
+          type: 'rollup',
+          measureReferences: [count],
+          timeDimensionReference: EmptyHourVisitors.createdAt,
+          granularity: 'hour',
+          partitionGranularity: 'month',
+          scheduledRefresh: true,
           refreshKey: {
             every: '1 hour',
             incremental: true,
@@ -241,6 +257,11 @@ describe('PreAggregations', function test() {
           }
         }
       }
+    })
+    
+    cube('EmptyHourVisitors', {
+      extends: EveryHourVisitors,
+      sql: \`select v.* from \${visitors.sql()} v where created_at < '2000-01-01'\`
     })
     `);
 
@@ -523,10 +544,46 @@ describe('PreAggregations', function test() {
 
       console.log(minMaxQueries);
 
+      minMaxQueries[0][0].should.match(/NOW/);
+
       const res = await dbRunner.testQueries(minMaxQueries);
 
       res.should.be.deepEqual(
         [{ max: '2017-01-06T00:00:00.000Z' }]
+      );
+    });
+  });
+
+  it('empty scheduled refresh', () => {
+    return compiler.compile().then(async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitor_checkins.count'
+        ],
+        timeDimensions: [{
+          dimension: 'EmptyHourVisitors.createdAt',
+          granularity: 'hour',
+          dateRange: ['2017-01-01', '2017-01-25']
+        }],
+        timezone: 'UTC',
+        order: [{
+          id: 'EmptyHourVisitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const preAggregations = cubeEvaluator.scheduledPreAggregations();
+      const partitionedPreAgg =
+        preAggregations.find(p => p.preAggregationName === 'emptyPartitioned' && p.cube === 'visitor_checkins');
+
+      const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg.preAggregation);
+
+      console.log(minMaxQueries);
+
+      const res = await dbRunner.testQueries(minMaxQueries);
+
+      res.should.be.deepEqual(
+        [{ max: null }]
       );
     });
   });
@@ -1127,6 +1184,7 @@ describe('PreAggregations in time hierarchy', function test() {
       });
     });
   });
+
   it('query on week match to pre-agg on day', () => {
     return compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

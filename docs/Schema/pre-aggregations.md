@@ -445,6 +445,33 @@ cube(`Orders`, {
 });
 ```
 
+Refresh range for partitioned pre-aggregations can be controlled using `refreshRangeStart` and `refreshRangeEnd` params:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  // ...
+
+  preAggregations: {
+    categoryAndDate: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+      scheduledRefresh: true,
+      refreshRangeStart: {
+        sql: `SELECT NOW() - interval '300 day'`
+      },
+      refreshRangeEnd: {
+        sql: `SELECT NOW()`
+      }
+    }
+  }
+});
+```
+
 ## Indexes
 
 In case of pre-aggregation table has quite significant cardinality you might want to create indexes for such pre-aggregation in databases which support it.

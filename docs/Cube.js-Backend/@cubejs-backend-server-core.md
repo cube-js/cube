@@ -334,6 +334,7 @@ CubejsServerCore.create({
 ### scheduledRefreshTimer
 
 Pass `true` to enable default every 5 second scheduled refresh timer with default querying options.
+Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 Each timer invocation will call `runScheduledRefresh()` method as in:
 
 ```javascript
@@ -349,6 +350,9 @@ CubejsServerCore.create({
   scheduledRefreshTimer: 10
 });
 ```
+
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance. 
+For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
 ### extendContext
 

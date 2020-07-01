@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@cubejs-backend/postgres-driver": "^0.10.58",
-    "@cubejs-backend/server": "^0.10.62"
+    "@cubejs-backend/postgres-driver": "^0.19.20",
+    "@cubejs-backend/server": "^0.19.33"
   }
 }

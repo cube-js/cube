@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.19.31",
+  "version": "0.19.42",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -14,6 +14,7 @@
     "ramda": "^0.27.0"
   },
   "peerDependencies": {
+    "@cubejs-client/core": "^0.19.35",
     "prop-types": "^15.6.2",
     "react": "^16.10.2"
   },

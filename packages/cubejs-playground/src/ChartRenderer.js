@@ -31,6 +31,15 @@ export const babelConfig = {
   ]
 };
 
+const prettify = (object) => {
+  let str = object;
+  if (typeof object === 'object') {
+    str = JSON.stringify(object, null, 2)
+  }
+  
+  return str.split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n')
+}
+
 const sourceCodeTemplate = (props) => {
   const {
     chartLibrary, query, apiUrl, cubejsToken, chartType
@@ -49,16 +58,16 @@ const cubejsApi = cubejs(
   { apiUrl: API_URL + "/cubejs-api/v1" }
 );
 
-const renderChart = (Component) => ({ resultSet, error }) => (
-  (resultSet && <Component resultSet={resultSet} />) ||
+const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => (
+  (resultSet && <Component resultSet={resultSet} pivotConfig={pivotConfig} />) ||
   (error && error.toString()) || 
   (<Spin />)
 )
 
 const ChartRenderer = () => <QueryRenderer
-  query={${(typeof query === 'object' ? JSON.stringify(query, null, 2) : query).split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n')}}
+  query={${prettify(query)}}
   cubejsApi={cubejsApi}
-  render={renderChart(${renderFnName})}
+  render={renderChart(${renderFnName}, ${prettify(props.pivotConfig)})}
 />;
 
 export default ChartRenderer;
@@ -92,7 +101,8 @@ export const ChartRenderer = (props) => {
     dashboardSource,
     cubejsApi,
     chartType,
-    sourceCodeFn: sourceCodeFnProp
+    sourceCodeFn: sourceCodeFnProp,
+    pivotConfig
   } = props;
 
   const sourceCodeFn = sourceCodeFnProp || sourceCodeTemplate
@@ -100,7 +110,8 @@ export const ChartRenderer = (props) => {
   const selectedChartLibrary = selectChartLibrary(chartType, chartLibrary);
   const source = sourceCodeFn({
     ...props,
-    chartLibrary: selectedChartLibrary
+    chartLibrary: selectedChartLibrary,
+    pivotConfig
   });
   const dependencies = {
     '@cubejs-client/core': cubejs,

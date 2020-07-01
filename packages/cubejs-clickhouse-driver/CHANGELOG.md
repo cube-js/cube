@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.38](https://github.com/cube-js/cube.js/compare/v0.19.37...v0.19.38) (2020-06-28)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+
+
+
+
+## [0.19.36](https://github.com/cube-js/cube.js/compare/v0.19.35...v0.19.36) (2020-06-24)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+
+
+
+
+## [0.19.35](https://github.com/cube-js/cube.js/compare/v0.19.34...v0.19.35) (2020-06-22)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+
+
+
+
 ## [0.19.17](https://github.com/cube-js/cube.js/compare/v0.19.16...v0.19.17) (2020-05-09)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver

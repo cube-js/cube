@@ -24,3 +24,7 @@ code {
   height: 85%;
   overflow: auto;
 }
+
+.ant-popover-disabled-compatible-wrapper {
+  pointer-events: none;
+}

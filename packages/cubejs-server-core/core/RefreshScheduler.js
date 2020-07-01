@@ -31,12 +31,18 @@ class RefreshScheduler {
         return data[0] && data[0][Object.keys(data[0])[0]];
       };
 
+      const dateRange = [extractDate(startDate), extractDate(endDate)];
+      if (!dateRange[0] || !dateRange[1]) {
+        // Empty table. Nothing to refresh.
+        return [];
+      }
+
       const baseQuery = {
         ...queryingOptions,
         ...preAggregation.references,
         timeDimensions: [{
           ...preAggregation.references.timeDimensions[0],
-          dateRange: [extractDate(startDate), extractDate(endDate)]
+          dateRange
         }]
       };
       const partitionQuery = compilerApi.createQuery(compilers, dbType, baseQuery);
@@ -80,7 +86,7 @@ class RefreshScheduler {
   async runScheduledRefresh(context, queryingOptions) {
     queryingOptions = { timezone: 'UTC', ...queryingOptions };
     const { throwErrors, ...restOptions } = queryingOptions;
-    context = { requestId: `scheduler-${uuid()}`, ...context };
+    context = { requestId: `scheduler-${context && context.requestId || uuid()}`, ...context };
     this.serverCore.logger('Refresh Scheduler Run', {
       authInfo: context.authInfo,
       requestId: context.requestId
@@ -150,7 +156,8 @@ class RefreshScheduler {
       const queries = await this.refreshQueriesForPreAggregation(
         context, compilerApi, preAggregation, queryingOptions
       );
-      await Promise.all(queries.map(async (query, i) => {
+      for (let i = queries.length - 1; i >= 0; i--) {
+        const query = queries[i];
         const sqlQuery = await compilerApi.getSql(query);
         const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
         await orchestratorApi.executeQuery({
@@ -162,7 +169,7 @@ class RefreshScheduler {
           renewQuery: true,
           requestId: context.requestId
         });
-      }));
+      }
     }));
   }
 }

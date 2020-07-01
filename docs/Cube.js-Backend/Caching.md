@@ -169,7 +169,8 @@ Please note `renewQuery` also triggers pre-aggregations refresh as well.
 To keep pre-aggregations fresh Refresh Scheduler can be used.
 All pre-aggregations intended to be refreshed during scheduled refresh run should be marked with [scheduledRefresh](pre-aggregations#scheduled-refresh) parameter.
 There're `CubejsServerCore.runScheduledRefresh(context, queryingOptions)` and `CubejsServer.runScheduledRefresh(context, queryingOptions)` methods that should be invoked at least once a minute to populate queue for pre-aggregations refresh.
-You can do it by using simple timer for example:
+
+You can use [scheduledRefreshTimer](@cubejs-backend-server-core#options-reference-scheduled-refresh-timer) to trigger Refresh Scheduler or you can do it manually by using simple timer for example:
 
 ```javascript
 setInterval(() => server.runScheduledRefresh(), 5000);
@@ -191,6 +192,6 @@ server.listen().then(({ version, port }) => {
 });
 ```
 
-There's also [REST API](REST-API#api-reference-v-1-run-scheduled-refresh) available to trigger run.
+There's also [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) available to trigger run.
 
 > **NOTE:** `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.
