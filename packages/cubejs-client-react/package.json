@@ -20,6 +20,7 @@
   },
   "main": "dist/cubejs-client-react.js",
   "module": "dist/cubejs-client-react.esm.js",
+  "types": "index.d.ts",
   "scripts": {
     "lint": "eslint src/*.js src/*.jsx"
   },

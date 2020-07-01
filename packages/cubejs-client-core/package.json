@@ -8,7 +8,7 @@
   },
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
-  "types": "dist/index.d.ts",
+  "types": "index.d.ts",
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",

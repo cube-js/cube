@@ -8,5 +8,7 @@
  */
 
 declare module '@cubejs-client/react' {
-
+  export default class App extends React.Component<AppState, AppProps> {
+    render(): JSX.Element;
+  }
 }
