@@ -9,7 +9,7 @@ import {
   TypeOperatorType,
   UnionType,
 } from 'typedoc/dist/lib/models/types';
-import { dasherize, underscore } from 'inflection';
+import { dasherize, underscore, camelize } from 'inflection';
 
 import MarkdownTheme from '../../theme';
 
@@ -59,9 +59,10 @@ export function type(
   return this;
 }
 
-
 function anchorName(link) {
-  return '#' + dasherize(underscore(link.replace(/#/g, '-')));
+  return (
+    '#' + dasherize(underscore(link.replace(/[A-Z]{2,}(?=[A-Z])/, (v) => camelize(v.toLowerCase())).replace(/#/g, '-')))
+  );
 }
 
 function getReferenceType(model: ReferenceType) {
