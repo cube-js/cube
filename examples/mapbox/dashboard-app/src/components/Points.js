@@ -92,8 +92,8 @@ export default () => {
           }}
           width='100%'
           height='100%'
-          mapStyle='mapbox://styles/kalipsik/ckb2fyfqu123n1ilb5yi7uyns/draft'
-          mapboxApiAccessToken='pk.eyJ1Ijoia2FsaXBzaWsiLCJhIjoiY2p3Z3JrdjQ4MDRjdDQzcGFyeXBlN3ZtZiJ9.miVaze_snePdEvitucFWSQ'
+          mapStyle='mapbox://styles/kalipsik/ckb2fyfqu123n1ilb5yi7uyns/'
+          mapboxApiAccessToken={process.env.REACT_APP_MAPBOX_KEY}
         >
           <div className='mapbox__navi'>
             <NavigationControl />
