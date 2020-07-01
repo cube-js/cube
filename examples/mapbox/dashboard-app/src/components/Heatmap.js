@@ -83,7 +83,7 @@ export default () => {
   });
 
 
-  let data = {
+  const data = {
     type: 'FeatureCollection',
     features: [],
   };

@@ -28,8 +28,7 @@ cube(`Users`, {
     },
 
     count: {
-      type: `count`,
-      drillMembers: [Users.geometry, Users.id, count],
+      type: `count`
     }
   },
 

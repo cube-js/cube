@@ -47,15 +47,15 @@ export default () => {
       operator: "contains",
       values: [selectedPoint]
     }],
-  }, { skip: selectedPoint == null });
+  }, { skip: selectedPoint === null });
 
-  let dataQuestions = {
+  const dataQuestions = {
     type: 'FeatureCollection',
     features: [],
   };
 
 
-  let dataAnswers = {
+  const dataAnswers = {
     type: 'FeatureCollection',
     features: [],
   };
@@ -161,7 +161,7 @@ export default () => {
           <Layer {...{
             id: 'answers-point',
             type: 'circle',
-            filter: (mode != 'qu') ? ['!', ['has', 'non_exist']] : ['has', ['get', 'id']],
+            filter: (mode != 'qu') ? ['!', ['has', ' ']] : ['has', ['get', 'id']],
             paint: {
               'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 8],
               'circle-stroke-width': 0,
@@ -174,7 +174,7 @@ export default () => {
           <Layer {...{
             id: 'questions-point',
             type: 'circle',
-            filter: (mode != 'ans') ? ['!', ['has', 'non_exist']] : ['has', ['get', 'id']],
+            filter: (mode != 'ans') ? ['!', ['has', ' ']] : ['has', ['get', 'id']],
             paint: {
               'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 15],
               'circle-stroke-width': 0,

@@ -42,19 +42,20 @@ export default () => {
     ]
   });
 
-  let data = {
+  const data = {
     type: 'FeatureCollection',
     features: []
   };
 
   useEffect(() => {
     if (sliderInitQuery) {
-      setSliderInitMin(sliderInitQuery.tablePivot()[0]['Users.max']);
-      setsliderInitMin(sliderInitQuery.tablePivot()[0]['Users.min']);
-      setSliderCurMax(sliderInitQuery.tablePivot()[0]['Users.max']);
-      setSliderCurMin(sliderInitQuery.tablePivot()[0]['Users.max'] * 0.4);
-      setQueryMax(sliderInitQuery.tablePivot()[0]['Users.max']);
-      setQueryMin(sliderInitQuery.tablePivot()[0]['Users.max'] * 0.4);
+      const range = sliderInitQuery.tablePivot()[0];
+      setSliderInitMin(range['Users.max']);
+      setsliderInitMin(range['Users.min']);
+      setSliderCurMax(range['Users.max']);
+      setSliderCurMin(range['Users.max'] * 0.4);
+      setQueryMax(range['Users.max']);
+      setQueryMin(range['Users.max'] * 0.4);
     }
   }, [sliderInitQuery]);
 

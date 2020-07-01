@@ -62,7 +62,7 @@ const App = () => (
                   </a>
               </li>
               <li>
-                <a href='/' target='_blank'>
+                <a href='//github.com/cube-js/cube.js/tree/master/examples/mapbox' target='_blank'>
                   View source
                   </a>
               </li>

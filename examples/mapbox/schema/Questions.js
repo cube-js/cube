@@ -18,10 +18,6 @@ cube(`Questions`, {
       primaryKey: true,
       shown: true
     },
-    owner_user_id: {
-      sql: `owner_user_id`,
-      type: `number`,
-    },
     title: {
       sql: `title`,
       type: `string`

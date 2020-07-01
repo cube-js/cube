@@ -46,7 +46,7 @@ export default () => {
   });
   const [mode, setMode] = useState('total');
 
-  let data = {
+  const data = {
     type: 'FeatureCollection',
     features: []
   };

@@ -17,11 +17,7 @@ cube(`Answers`, {
       type: `number`,
       primaryKey: true,
       shown: true
-    },
-    owner_user_id: {
-      sql: `owner_user_id`,
-      type: `number`,
-    },
+    }
   },
   preAggregations: {
     answersCount: {

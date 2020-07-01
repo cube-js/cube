@@ -1,6 +1,5 @@
 cube(`MapboxCoords`, {
   sql: `SELECT * FROM public.MapboxCoords`,
-  joins: {},
   dimensions: {
     coordinates: {
       sql: `coordinates`,
