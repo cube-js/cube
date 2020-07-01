@@ -7,9 +7,11 @@
 
 {{else}}
 
-{{#if memberTitle}}
+{{#ifParentKindIs 'Enumeration' false}}
+
 {{heading 3}} {{{ memberTitle }}}
-{{/if}}
+
+{{/ifParentKindIs}}
 
 {{/ifParentIsModule}}
 
