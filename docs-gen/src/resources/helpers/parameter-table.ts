@@ -28,7 +28,7 @@ export function parameterTable(this: ParameterReflection[]) {
     const typeOut = type.call(parameter.type);
 
     const row = [
-      `\`${parameter.flags.isRest ? '...' : ''}${parameter.name}${isOptional ? '?' : ''}\``,
+      `${parameter.flags.isRest ? '...' : ''}${parameter.name}${isOptional ? '?' : ''}`,
       typeOut ? typeOut.toString().replace(/\|/g, '&#124;') : '',
     ];
     if (hasDefaultValues) {
