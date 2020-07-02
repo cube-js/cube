@@ -10,6 +10,12 @@ export function signatureTitle(this: SignatureReflection, showSymbol: boolean) {
     md.push(`${memberSymbol.call(this)} `);
   }
 
+  // eg: `static`
+  if (this.parent?.flags) {
+    md.push(this.parent.flags.map((flag) => `\`${flag}\``).join(' ').toLowerCase());
+    md.push(' ');
+  }
+
   if (this.name === '__get') {
     md.push(`**get ${this.parent.name}**`);
   } else if (this.name === '__set') {

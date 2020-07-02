@@ -24,7 +24,13 @@ export function declarationTitle(this: DeclarationReflection, showSymbol: boolea
     md.push(memberSymbol.call(this));
   }
 
-  md.push(`**${this.name}**${isOptional ? '? ' : ''}:`);
+  md.push(`**${this.name}**${isOptional ? '? ' : ''}`);
+  
+  // We want to display enum members like:
+  // • DAY = "day"
+  if (this.kind !== ReflectionKind.EnumMember) {
+    md.push(':');
+  }
 
   if (this.type) {
     md.push(`*${type.call(this.type)}*`);
