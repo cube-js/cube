@@ -4,9 +4,9 @@ import { memberSymbol } from './member-symbol';
 import { type } from './type';
 
 export function declarationTitle(this: DeclarationReflection, showSymbol: boolean) {
-  if (this.type?.type !== 'union' && this.type?.type !== 'tuple' && this.kind !== ReflectionKind.EnumMember) {
-    return '';
-  }
+  // if (this.type?.type !== 'union' && this.type?.type !== 'tuple' && this.kind !== ReflectionKind.EnumMember) {
+  //   return '';
+  // }
 
   const md = [];
   const isOptional = this.flags.map((flag) => flag).includes('Optional');
