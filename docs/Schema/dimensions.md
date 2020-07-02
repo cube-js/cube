@@ -166,3 +166,18 @@ dimensions: {
   }
 }
 ```
+
+### meta
+Custom metadata. Can be used to pass any information to the frontend.
+```javascript
+dimensions: {
+  usersCount: {
+    sql: `${Users.count}`,
+    type: `number`,
+    //...
+    meta: {
+      any: 'value
+    }
+  }
+}
+```

@@ -27,8 +27,7 @@ export function meta(this: ProjectReflection) {
 
     (comment?.tags || []).forEach((tag: CommentTag) => {
       if (tag.tagName !== 'description') {
-        const escape = tag.tagName !== 'menuorder';
-        const text = escape ? `'${tag.text}'` : tag.text;
+        const text = tag.text.startsWith('@') ? `'${tag.text}'` : tag.text;
         md.push(`${tagConverter(tag.tagName)}: ${text}`.replace('\n', ''));
       }
     });
