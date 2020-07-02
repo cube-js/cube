@@ -19,7 +19,7 @@ const ExploreQueryBuilder = ({
     cubejsApi={cubejsApi}
     wrapWithQueryRenderer={false}
     render={({
-      validatedQuery, isQueryPresent, chartType, updateChartType,
+      validatedQuery, chartType, updateChartType,
       measures, availableMeasures, updateMeasures,
       dimensions, availableDimensions, updateDimensions,
       segments, availableSegments, updateSegments,
