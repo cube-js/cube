@@ -659,21 +659,6 @@ declare module '@cubejs-client/core' {
     constructor(apiToken: string, options: CubeJSApiOptions);
 
     /**
-     * Base method for performing all API calls. Shouldn't be used directly.
-     *
-     * @param request - function that is invoked to perform the actual request using `transport.request()` method.
-     * @param toResult - function that maps results of invocation to method return result
-     * @param options - options object
-     */
-    loadMethod<TResult>(request: () => any, toResult: (body: JSON) => TResult, options?: LoadMethodOptions): Promise<TResult>;
-    loadMethod<TResult>(
-      request: () => any,
-      toResult: (body: JSON) => TResult,
-      options: LoadMethodOptions,
-      callback: LoadMethodCallback<ResultSet>
-    ): Promise<{ unsubscribe: () => any }>;
-
-    /**
      * Fetch data for the passed `query`.
      *
      * ```js
