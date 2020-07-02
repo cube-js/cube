@@ -176,7 +176,7 @@ dimensions: {
     type: `number`,
     //...
     meta: {
-      any: 'value
+      any: 'value'
     }
   }
 }

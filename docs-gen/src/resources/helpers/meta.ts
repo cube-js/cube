@@ -13,6 +13,7 @@ export function meta(this: ProjectReflection) {
   function tagConverter(tag: string)  {
     const tags = {
       menucategory: 'category',
+      subcategory: 'subCategory',
       menuorder: 'menuOrder'
     };
     
