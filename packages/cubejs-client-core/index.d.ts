@@ -584,8 +584,6 @@ declare module '@cubejs-client/core' {
   };
 
   export class ProgressResult {
-    constructor(progressResponse: ProgressResponse);
-
     stage(): string;
     timeElapsed(): string;
   }
@@ -607,8 +605,6 @@ declare module '@cubejs-client/core' {
   };
 
   export class SqlQuery {
-    constructor(sqlQuery: SqlApiResponse);
-
     rawQuery(): SqlData;
     sql(): string;
   }
@@ -620,8 +616,6 @@ declare module '@cubejs-client/core' {
    * @order 4
    */
   export class Meta {
-    constructor(metaResponse: Object);
-
     /**
      * Get all members of a specific type for a given query.
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -656,8 +650,6 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
-    constructor(apiToken: string, options: CubeJSApiOptions);
-
     /**
      * Fetch data for the passed `query`.
      *
