@@ -13,6 +13,16 @@ export function meta(this: ProjectReflection) {
 
     return findModuleRelection(reflection?.children?.[0]);
   }
+  
+  function tagConverter(tag: string)  {
+    const tags = {
+      menucategory: 'category',
+      subcategory: 'subCategory',
+      menuorder: 'menuOrder'
+    };
+    
+    return tags[tag] ?? tag;
+  }
 
   const moduleReflection = findModuleRelection(this);
 
@@ -22,9 +32,8 @@ export function meta(this: ProjectReflection) {
 
     (comment?.tags || []).forEach((tag: CommentTag) => {
       if (tag.tagName !== 'description') {
-        const escape = tag.tagName !== 'menuorder';
-        const text = escape ? `'${tag.text}'` : tag.text;
-        md.push(`${tag.tagName === 'menuorder' ? 'menuOrder' : tag.tagName}: ${text}`.replace('\n', ''));
+        const text = tag.text.startsWith('@') ? `'${tag.text}'` : tag.text;
+        md.push(`${tagConverter(tag.tagName)}: ${text}`.replace('\n', ''));
       }
     });
     md.push('---');

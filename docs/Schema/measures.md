@@ -155,6 +155,19 @@ revenue: {
 }
 ```
 
+### meta
+Custom metadata. Can be used to pass any information to the frontend.
+```javascript
+revenue: {
+  type: `sum`,
+  sql: `price`,
+  //...
+  meta: {
+    any: 'value'
+  }
+}
+```
+
 ## Calculated Measures
 In the case where you need to specify a formula for measure calculating with other measures, you can compose a formula in `sql`. For example, you want to calculate the conversion of buyers of all users.
 

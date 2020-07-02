@@ -34,7 +34,11 @@ cube(`Events`, {
       event_id,
       event,
       platform,
-      derived_tstamp
+      derived_tstamp,
+      domain_sessionidx,
+      domain_sessionid,
+      domain_userid,
+      ROW_NUMBER() OVER (PARTITION BY domain_sessionid ORDER BY derived_tstamp) AS event_in_session_index
     FROM
        analytics.snowplow_events
   `,
@@ -46,6 +50,16 @@ cube(`Events`, {
   },
 
   dimensions: {
+    timestamp: {
+      type: `time`,
+      sql: `derived_tstamp`
+    },
+
+    id: {
+      sql: `event_id`,
+      type: `string`,
+      primaryKey: true
+    }
   }
 })
 ```
