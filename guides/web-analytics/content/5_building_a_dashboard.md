@@ -62,7 +62,7 @@ export default DashboardPage;
 
 ## New Users
 
-As you can see we already have the Users chart in place. Let's add few more. First, let's add the KPI chart to display the number of new users. To do that, we need to
+We already have created the Users chart in the previous part. Let's add few more. First, let's add the chart to display the number of new users. To do that, we need to
 a create a new measure in our data schema to count only new users. To
 distinguish **New** users from **Returning** we're going to use session's index
 set by Snowplow tracker - `domain_sessionidx`.
@@ -105,20 +105,12 @@ Finally, on the frontend in the `dashboard-app/src/pages/DashboardPage.js` file 
 ```js
 {
   id: 1,
-  size: 3,
   name: "New Users",
   vizState: {
     query: {
-      measures: ["Sessions.newUsersCount"],
-      timeDimensions: [
-        {
-          dimension: "Sessions.timestamp",
-          granularity: null,
-          dateRange: "Last 30 days"
-        }
-      ]
+      measures: ["Sessions.newUsersCount"]
     },
-    chartType: "number"
+    chartType: "bar"
   }
 }
 ```
@@ -165,56 +157,38 @@ KPI chart. Add the following query to the `DashboardItems` array.
 ```js
 {
   id: 2,
-  size: 3,
   name: "Avg. Events per Session",
   vizState: {
     query: {
-      measures: ["Sessions.avgEvents"],
-      timeDimensions: [
-        {
-          dimension: "Sessions.timestamp",
-          granularity: null,
-          dateRange: "Last 30 days"
-        }
-      ]
+      measures: ["Sessions.avgEvents"]
     },
-    chartType: "number"
+    chartType: "line"
   }
 }
 ```
 
 ## Users by Type
 
-Now, let's add the pie chart! We can use it to show the ratio of
-New vs Returning users to our website. We already have the `type` dimension
-which shows exactly this, so all we need here is to add the following query to
+Now, let's plot New vs Returning users over time with a bar chart! We already have the `type` dimension which shows exactly this, so all we need here is to add the following query to
 our `DashboardItems` array in the frontend app.
 
 ```js
 {
   id: 3,
-  size: 6,
   name: "Users by Type",
   vizState: {
     query: {
       measures: ["Sessions.usersCount"],
       dimensions: ["Sessions.type"],
-      timeDimensions: [
-        {
-          dimension: "Sessions.timestamp",
-          granularity: null,
-          dateRange: "Last 30 days"
-        }
-      ]
     },
-    chartType: "pie"
+    chartType: "bar"
   }
 }
 ```
 
 ## Sessions by Referrer Medium
 
-That's a quite metric if we want to figure which channel or medium bring the
+This metric would help us to figure which channel or medium bring the
 most traffic to our website. Snowplow sets the `refr_medium`, so we just
 need to clean up the values a little bit in the data schema.
 
@@ -232,8 +206,25 @@ referrerMedium: {
 }
 ```
 
+Add let's add it to the `DashboardItems` on the frontend as an area chart.
+
+```js
+{
+  id: 3,
+  size: 6,
+  name: "Sessions by Medium",
+  vizState: {
+    query: {
+      measures: ["Sessions.count"],
+      dimensions: ["Sessions.referrerMedium"]
+    },
+    chartType: "area"
+  }
+}
+```
+
 ## Bounce Rate
-The next metric we're going to create is the **Bounce Rate**.
+The last metric we're going to add to our dashboard is the **Bounce Rate**.
 
 A bounced session is usually defined as a session with only one event. Since we’ve already defined the number of events per session, we can easily add a dimension `isBounced` to identify bounced sessions to the `Sessions` cube. Using this dimension, we can add two measures to the `Sessions` cube as well - a count of bounced sessions and a bounce rate.
 
@@ -262,5 +253,25 @@ bounceRate: {
 }
 ```
 
+Now, let's add to the `DashboardItems` array as a line chart.
+
+```js
+{
+  id: 4,
+  name: "Bounce Rate",
+  vizState: {
+    query: {
+      measures: ["Sessions.bounceRate"]
+    },
+    chartType: "line"
+  }
+}
+```
+
+That's it for this chapter. We have added 5 more new charts to our dashboard.
+If you navigate to the [http://localhost:3000](http://localhost:3000) you should see the dashboard with all these charts like on the screenshot below.
 
 ![](/images/5-screenshot-1.png)
+
+In the next part, we'll add some filters to our dashboard to make it more
+interactive and let users slice and filter the data.
