@@ -62,6 +62,9 @@ Less rows means less time to query Rollup pre-aggregation tables.
 2. If your query is in fact a subset of dimensions and measures of Additive Rollup then it can be used to calculate such query without accessing raw data.
 More dimensions and measures you select to roll-up more queries you can cover with this particular Rollup.
 
+Rollup definitions can contain members from a single cube as well as from multiple cubes.
+In case of multiple cubes are involved, join query will be built according to standard rules of cubes joining.
+
 ### Rollup selection rules
 
 Rollup pre-aggregation defines a set of measures and dimensions used to construct the query for pre-aggregation table.
