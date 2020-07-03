@@ -22,13 +22,13 @@ class HttpTransport {
     // remember to add a 'Content-Type' header.
     const runRequest = () => fetch(
       `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`, {
-      headers: {
-        Authorization: this.authorization,
-        'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
-        ...this.headers
-      },
-      credentials: this.credentials
-    }
+        headers: {
+          Authorization: this.authorization,
+          'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
+          ...this.headers
+        },
+        credentials: this.credentials
+      }
     );
 
     return {
