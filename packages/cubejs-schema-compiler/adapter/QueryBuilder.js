@@ -34,12 +34,13 @@ const ADAPTERS = {
   elasticsearch
 };
 exports.query = (compilers, dbType, queryOptions) => {
-  if (!ADAPTERS[dbType]) {
+  if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
     return null;
   }
 
-  return new (ADAPTERS[dbType])(compilers, {
+  return new (queryOptions.dialectClass || ADAPTERS[dbType])(compilers, {
     ...queryOptions,
-    externalQueryClass: queryOptions.externalDbType && ADAPTERS[queryOptions.externalDbType]
+    externalQueryClass: queryOptions.externalDialectClass ||
+      queryOptions.externalDbType && ADAPTERS[queryOptions.externalDbType]
   });
 };

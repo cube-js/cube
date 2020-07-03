@@ -172,6 +172,8 @@ class CubejsServerCore {
     options = options || {};
     options = {
       driverFactory: () => CubejsServerCore.createDriver(options.dbType),
+      dialectFactory: () => CubejsServerCore.lookupDriverClass(options.dbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(options.dbType).dialectClass(),
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
       devServer: process.env.NODE_ENV !== 'production',
@@ -188,6 +190,8 @@ class CubejsServerCore {
     this.options = options;
     this.driverFactory = options.driverFactory;
     this.externalDriverFactory = options.externalDriverFactory;
+    this.dialectFactory = options.dialectFactory;
+    this.externalDialectFactory = options.externalDialectFactory;
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema';
     this.dbType = options.dbType;
@@ -419,6 +423,9 @@ class CubejsServerCore {
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
+          dialectClass: (dataSourceContext) => this.dialectFactory &&
+            this.dialectFactory({ ...context, ...dataSourceContext }),
+          externalDialectClass: this.externalDialectFactory && this.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
           context
@@ -477,7 +484,9 @@ class CubejsServerCore {
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
       allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey,
-      compileContext: options.context
+      compileContext: options.context,
+      dialectClass: options.dialectClass,
+      externalDialectClass: options.externalDialectClass,
     });
   }
 
@@ -506,15 +515,21 @@ class CubejsServerCore {
 
   static createDriver(dbType) {
     checkEnvForPlaceholders();
+    return new (CubejsServerCore.lookupDriverClass(dbType))();
+  }
+
+  static lookupDriverClass(dbType) {
     // eslint-disable-next-line global-require,import/no-dynamic-require
-    return new (require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE)))();
+    return require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
   }
 
   static driverDependencies(dbType) {
-    if (!DriverDependencies[dbType]) {
-      throw new Error(`Unsupported db type: ${dbType}`);
+    if (DriverDependencies[dbType]) {
+      return DriverDependencies[dbType];
+    } else if (fs.existsSync(path.join('node_modules', `${dbType}-cubejs-driver`))) {
+      return `${dbType}-cubejs-driver`;
     }
-    return DriverDependencies[dbType];
+    throw new Error(`Unsupported db type: ${dbType}`);
   }
 
   testConnections() {
