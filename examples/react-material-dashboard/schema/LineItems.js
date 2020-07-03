@@ -2,6 +2,11 @@ cube(`LineItems`, {
   sql: `SELECT * FROM public.line_items`,
 
   joins: {
+    Products: {
+      sql: `${CUBE}.product_id = ${Products}.id`,
+      relationship: `belongsTo`
+    },
+
     Orders: {
       sql: `${CUBE}.order_id = ${Orders}.id`,
       relationship: `belongsTo`
@@ -14,13 +19,13 @@ cube(`LineItems`, {
       drillMembers: [id, createdAt]
     },
 
-    quantity: {
-      sql: `quantity`,
+    price: {
+      sql: `price`,
       type: `sum`
     },
 
-    price: {
-      sql: `price`,
+    quantity: {
+      sql: `quantity`,
       type: `sum`
     }
   },
@@ -40,6 +45,6 @@ cube(`LineItems`, {
     itemPrice: {
       sql: `price`,
       type: `number`
-    }
+    },
   }
 });

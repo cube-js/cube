@@ -5,7 +5,6 @@ import { makeStyles } from '@material-ui/styles';
 import { Divider, Drawer } from '@material-ui/core';
 import DashboardIcon from '@material-ui/icons/Dashboard';
 import AssignmentIcon from '@material-ui/icons/Assignment';
-import AccountBoxIcon from '@material-ui/icons/AccountBox';
 
 import { Profile, SidebarNav } from './components';
 
@@ -47,12 +46,7 @@ const Sidebar = props => {
       title: 'Orders',
       href: '/orders',
       icon: <AssignmentIcon />
-    },
-    {
-      title: 'Account',
-      href: '/user/1',
-      icon: <AccountBoxIcon />
-    },
+    }
   ];
 
   return (

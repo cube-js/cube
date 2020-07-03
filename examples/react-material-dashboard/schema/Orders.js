@@ -2,9 +2,14 @@ cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
 
   joins: {
-    LineItems: {
-      relationship: `belongsTo`,
-      sql: `${Orders}.id = ${LineItems}.order_id`
+    Users: {
+      sql: `${CUBE}.user_id = ${Users}.id`,
+      relationship: `belongsTo`
+    },
+
+    Products: {
+      sql: `${CUBE}.product_id = ${Products}.id`,
+      relationship: `belongsTo`
     }
   },
 
@@ -18,7 +23,6 @@ cube(`Orders`, {
       sql: `number`,
       type: `sum`
     },
-
     completedCount: {
       sql: `id`,
       type: `count`,
@@ -26,7 +30,6 @@ cube(`Orders`, {
         { sql: `${CUBE}.status = 'completed'` }
       ]
     },
-
     percentOfCompletedOrders: {
       sql: `${completedCount}*100.0/${count}`,
       type: `number`,
@@ -38,7 +41,8 @@ cube(`Orders`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
+      shown: true
     },
 
     status: {
@@ -56,24 +60,16 @@ cube(`Orders`, {
       type: `time`
     },
 
-    userId: {
-      sql: `user_id`,
-      type: `number`
+    size: {
+      sql: `${LineItems.count}`,
+      subQuery: true,
+      type: 'number'
     },
 
-    numberOfOrder: {
-      sql: `number`,
-      type: `number`
-    },
-
-    productId: {
-      sql: `product_id`,
-      type: `number`
-    },
-
-    orderId: {
-      sql: `id`,
-      type: `number`
+    price: {
+      sql: `${LineItems.price}`,
+      subQuery: true,
+      type: 'number'
     }
   }
 });

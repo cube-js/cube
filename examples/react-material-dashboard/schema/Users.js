@@ -2,35 +2,29 @@ cube(`Users`, {
   sql: `SELECT * FROM public.users`,
 
   joins: {
-    Orders: {
-      relationship: `hasOne`,
-      sql: `${Users}.id = ${Orders}.user_id`
-    }
+
   },
 
   measures: {
     count: {
       type: `count`,
-      drillMembers: [city, id, createdAt]
+      drillMembers: [city, id, firstName, lastName, createdAt]
     }
   },
 
   dimensions: {
-    firstName: {
-      sql: `first_name`,
+    gender: {
+      sql: `gender`,
       type: `string`
     },
-    lastName: {
-      sql: `last_name`,
-      type: `string`
-    },
+
     city: {
       sql: `city`,
       type: `string`
     },
 
-    gender: {
-      sql: `gender`,
+    company: {
+      sql: `company`,
       type: `string`
     },
 
@@ -40,19 +34,29 @@ cube(`Users`, {
       primaryKey: true
     },
 
-    company: {
-      sql: `company`,
+    firstName: {
+      sql: `first_name`,
       type: `string`
     },
 
-    createdAt: {
-      sql: `created_at`,
-      type: `time`
+    lastName: {
+      sql: `last_name`,
+      type: `string`
+    },
+
+    fullName: {
+      sql: `CONCAT(${firstName}, ' ', ${lastName})`,
+      type: `string`
     },
 
     age: {
       sql: `age`,
       type: `number`
+    },
+
+    createdAt: {
+      sql: `created_at`,
+      type: `time`
     }
   }
 });

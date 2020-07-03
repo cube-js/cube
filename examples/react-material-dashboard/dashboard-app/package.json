@@ -1,40 +1,33 @@
 {
-  "name": "frontend",
+  "name": "dashboard-app",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cubejs-client/core": "^0.19.22",
-    "@cubejs-client/react": "^0.19.22",
+    "@cubejs-client/core": "^0.19.37",
+    "@cubejs-client/react": "^0.19.37",
     "@date-io/date-fns": "^1.3.13",
-    "@material-ui/core": "^4.2.1",
-    "@material-ui/icons": "^4.2.1",
+    "@date-io/moment": "^1.3.13",
+    "@material-ui/core": "^4.10.2",
+    "@material-ui/icons": "^4.9.1",
     "@material-ui/lab": "^4.0.0-alpha.56",
-    "@material-ui/pickers": "^3.2.10",
-    "@material-ui/styles": "^4.2.1",
-    "bootstrap": "^4.3.1",
-    "chart.js": "^2.8.0",
-    "clsx": "^1.0.4",
-    "date-fns": "^2.14.0",
-    "history": "^4.10.1",
-    "moment": "^2.24.0",
-    "node-sass": "^4.14.1",
-    "numeral": "^2.0.6",
-    "prop-types": "^15.7.2",
-    "react": "^16.8.5",
-    "react-chartjs-2": "^2.9.0",
+    "@testing-library/jest-dom": "^4.2.4",
+    "@testing-library/react": "^9.3.2",
+    "@testing-library/user-event": "^7.1.2",
     "react-countup": "^4.3.3",
-    "react-dom": "^16.8.5",
-    "react-github-corner": "^2.3.0",
-    "react-perfect-scrollbar": "^1.5.3",
-    "react-router-dom": "^5.0.1",
-    "react-scripts": "2.1.8",
-    "reactstrap": "^7.1.0",
-    "recharts": "^1.5.0",
-    "recompose": "^0.30.0",
-    "typeface-roboto": "0.0.75",
-    "underscore": "^1.9.1",
-    "uuid": "^3.3.2",
-    "validate.js": "^0.13.1"
+    "react-perfect-scrollbar": "^1.5.8",
+    "typeface-roboto": "^0.0.75",
+    "@material-ui/pickers": "^3.2.10",
+    "antd": "^4.3.5",
+    "chart.js": "^2.9.3",
+    "date-fns": "^2.14.0",
+    "moment": "^2.27.0",
+    "prop-types": "^15.7.2",
+    "react": "^16.13.1",
+    "react-chartjs-2": "^2.9.0",
+    "react-dom": "^16.13.1",
+    "react-router": "^5.2.0",
+    "react-router-dom": "^5.2.0",
+    "react-scripts": "3.4.1"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -45,10 +38,23 @@
   "eslintConfig": {
     "extends": "react-app"
   },
-  "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not ie <= 11",
-    "not op_mini all"
-  ]
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "cubejsTemplates": {
+    "create-react-app": "0.0.1",
+    "react-material-static": "0.0.1",
+    "credentials": "0.0.1",
+    "chartjs-charts": "0.0.1",
+    "material-tables": "0.0.1"
+  }
 }
