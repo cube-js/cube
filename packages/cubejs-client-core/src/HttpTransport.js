@@ -2,10 +2,11 @@ import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
 class HttpTransport {
-  constructor({ authorization, apiUrl, headers = {} }) {
+  constructor({ authorization, apiUrl, headers = {}, credentials = 'same-origin' }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.headers = headers;
+    this.credentials = credentials;
   }
 
   request(method, { baseRequestId, ...params }) {
@@ -21,12 +22,13 @@ class HttpTransport {
     // remember to add a 'Content-Type' header.
     const runRequest = () => fetch(
       `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`, {
-        headers: {
-          Authorization: this.authorization,
-          'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
-          ...this.headers
-        }
-      }
+      headers: {
+        Authorization: this.authorization,
+        'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
+        ...this.headers
+      },
+      credentials: this.credentials
+    }
     );
 
     return {
