@@ -2,7 +2,7 @@ import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
 class HttpTransport {
-  constructor({ authorization, apiUrl, headers = {}, credentials = 'same-origin' }) {
+  constructor({ authorization, apiUrl, headers = {}, credentials }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.headers = headers;

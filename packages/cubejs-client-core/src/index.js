@@ -25,7 +25,7 @@ class CubejsApi {
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
     this.headers = options.headers || {};
-    this.credentials = options.credentials || 'same-origin';
+    this.credentials = options.credentials;
     this.transport = options.transport || new HttpTransport({
       authorization: typeof apiToken === 'function' ? undefined : apiToken,
       apiUrl: this.apiUrl,
