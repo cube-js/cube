@@ -81,11 +81,11 @@ const statusColors = {
 };
 
 const TableComponent = props => {
-  // const history = useHistory();
-  //
-  // function handleClick(str) {
-  //   history.push(str);
-  // }
+  const history = useHistory();
+
+  function handleClick(str) {
+    history.push(str);
+  }
 
   const { className, sorting, setSorting, query, cubejsApi, ...rest } = props;
 
@@ -180,7 +180,7 @@ const TableComponent = props => {
                     <TableRow
                       className={classes.tableRow}
                       hover
-                      // onClick={() => handleClick(`/user/${obj["Users.id"]}`)}
+                      onClick={() => handleClick(`/user/${obj["Users.id"]}`)}
                       key={obj["Orders.id"]}
                     >
                       <TableCell>

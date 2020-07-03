@@ -31,7 +31,8 @@ cube(`Users`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
+      shown: true
     },
 
     firstName: {

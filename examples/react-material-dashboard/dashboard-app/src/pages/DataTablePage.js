@@ -36,6 +36,7 @@ const DataTablePage = () => {
       }
     ],
     "dimensions": [
+      "Users.id",
       "Orders.id",
       "Orders.size",
       "Users.fullName",
