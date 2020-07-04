@@ -171,8 +171,9 @@ class CubejsServerCore {
   constructor(options) {
     options = options || {};
     options = {
-      driverFactory: () => CubejsServerCore.createDriver(options.dbType),
-      dialectFactory: () => CubejsServerCore.lookupDriverClass(options.dbType).dialectClass &&
+      driverFactory: () => typeof options.dbType === 'string' && CubejsServerCore.createDriver(options.dbType),
+      dialectFactory: () => typeof options.dbType === 'string' &&
+        CubejsServerCore.lookupDriverClass(options.dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(options.dbType).dialectClass(),
       externalDriverFactory: process.env.CUBEJS_EXT_DB_TYPE && (
         () => CubejsServerCore.lookupDriverClass(process.env.CUBEJS_DB_EXT_TYPE)({
