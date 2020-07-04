@@ -330,6 +330,79 @@ describe('resultSet tablePivot and tableColumns', () => {
       });
     });
 
+    describe('all dimensions and measures on `x` axis', () => {
+      const pivotConfig = {
+        x: ['Users.country', 'Users.gender', 'measures'],
+        y: [],
+      };
+
+      test('tablePivot', () => {
+        expect(resultSet.tablePivot(pivotConfig)).toEqual([
+          {
+            'Users.country': 'Germany',
+            'Users.gender': 'male',
+            measures: 'Orders.count',
+            value: 10,
+          },
+          {
+            'Users.country': 'Germany',
+            'Users.gender': 'female',
+            measures: 'Orders.count',
+            value: 12,
+          },
+          {
+            'Users.country': 'US',
+            'Users.gender': 'male',
+            measures: 'Orders.count',
+            value: 5,
+          },
+          {
+            'Users.country': 'US',
+            'Users.gender': 'female',
+            measures: 'Orders.count',
+            value: 7,
+          },
+        ]);
+      });
+
+      test('tableColumns', () => {
+        expect(resultSet.tableColumns(pivotConfig)).toEqual([
+          {
+            key: 'Users.country',
+            title: 'Users Country',
+            shortTitle: 'Country',
+            type: 'string',
+            dataIndex: 'Users.country',
+            format: undefined,
+            meta: undefined,
+          },
+          {
+            key: 'Users.gender',
+            title: 'Users Gender',
+            shortTitle: 'Gender',
+            type: 'string',
+            dataIndex: 'Users.gender',
+            format: undefined,
+            meta: undefined,
+          },
+          {
+            key: 'measures',
+            dataIndex: 'measures',
+            title: 'Measures',
+            shortTitle: 'Measures',
+            type: 'string',
+          },
+          {
+            key: 'value',
+            dataIndex: 'value',
+            title: 'Value',
+            shortTitle: 'Value',
+            type: 'string',
+          },
+        ]);
+      });
+    });
+
     test('measures on `x` axis', () => {
       const pivotConfig = {
         x: ['Users.gender', 'measures'],
