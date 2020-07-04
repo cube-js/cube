@@ -174,6 +174,16 @@ class CubejsServerCore {
       driverFactory: () => CubejsServerCore.createDriver(options.dbType),
       dialectFactory: () => CubejsServerCore.lookupDriverClass(options.dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(options.dbType).dialectClass(),
+      externalDriverFactory: process.env.CUBEJS_EXT_DB_TYPE && (
+        () => CubejsServerCore.lookupDriverClass(process.env.CUBEJS_DB_EXT_TYPE)({
+          host: process.env.CUBEJS_EXT_DB_HOST,
+          database: process.env.CUBEJS_EXT_DB_NAME,
+          port: process.env.CUBEJS_EXT_DB_PORT,
+          user: process.env.CUBEJS_EXT_DB_USER,
+          password: process.env.CUBEJS_EXT_DB_PASS,
+        })
+      ),
+      externalDbType: process.env.CUBEJS_EXT_DB_TYPE,
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
       devServer: process.env.NODE_ENV !== 'production',
