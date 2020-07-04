@@ -176,7 +176,7 @@ class CubejsServerCore {
         CubejsServerCore.lookupDriverClass(options.dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(options.dbType).dialectClass(),
       externalDriverFactory: process.env.CUBEJS_EXT_DB_TYPE && (
-        () => CubejsServerCore.lookupDriverClass(process.env.CUBEJS_DB_EXT_TYPE)({
+        () => new (CubejsServerCore.lookupDriverClass(process.env.CUBEJS_EXT_DB_TYPE))({
           host: process.env.CUBEJS_EXT_DB_HOST,
           database: process.env.CUBEJS_EXT_DB_NAME,
           port: process.env.CUBEJS_EXT_DB_PORT,
