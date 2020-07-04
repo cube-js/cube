@@ -21,6 +21,7 @@ declare module '@cubejs-client/core' {
      * custom headers
      */
     headers?: Record<string, string>;
+    credentials?: 'omit' | 'same-origin' | 'include';
   };
 
   export interface ITransport {
@@ -47,6 +48,7 @@ declare module '@cubejs-client/core' {
     transport?: ITransport;
     headers?: Record<string, string>;
     pollInterval?: number;
+    credentials?: 'omit' | 'same-origin' | 'include';
   };
 
   export type LoadMethodOptions = {
@@ -646,7 +648,7 @@ declare module '@cubejs-client/core' {
 
   /**
    * Main class for accessing Cube.js API
-   * 
+   *
    * @order 2
    */
   export class CubejsApi {
