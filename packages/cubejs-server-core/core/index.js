@@ -85,7 +85,7 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
     `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${withColor(warning, colors.yellow)}`
   );
   const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${error}`);
-  const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
+  const logDetails = (showRestParams) => console.log(`${withColor(type)}: ${format({ ...message, showRestParams })}`);
 
   if (error) {
     logError();
@@ -96,7 +96,7 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
   switch ((level || 'info').toLowerCase()) {
     case "trace": {
       if (!error && !warning) {
-        logDetails();
+        logDetails(true);
         break;
       }
     }
@@ -462,6 +462,9 @@ class CubejsServerCore {
         getDriver: async () => {
           if (!driverPromise) {
             const driver = await this.driverFactory(context);
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
             driverPromise = driver.testConnection().then(() => driver).catch(e => {
               driverPromise = null;
               throw e;
@@ -472,6 +475,9 @@ class CubejsServerCore {
         getExternalDriverFactory: this.externalDriverFactory && (async () => {
           if (!externalPreAggregationsDriverPromise) {
             const driver = await this.externalDriverFactory(context);
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
             externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
               externalPreAggregationsDriverPromise = null;
               throw e;

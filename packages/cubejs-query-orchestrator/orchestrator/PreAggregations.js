@@ -411,14 +411,21 @@ class PreAggregationLoader {
   }
 
   logExecutingSql(invalidationKeys, query, params, targetTableName, newVersionEntry) {
-    this.logger('Executing Load Pre Aggregation SQL', {
+    this.logger(
+      'Executing Load Pre Aggregation SQL',
+      this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry)
+    );
+  }
+
+  queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry) {
+    return {
       queryKey: this.preAggregationQueryKey(invalidationKeys),
       query,
       values: params,
       targetTableName,
       requestId: this.requestId,
       newVersionEntry,
-    });
+    };
   }
 
   async refreshImplStoreInSourceStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
@@ -434,7 +441,8 @@ class PreAggregationLoader {
     await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
-      params
+      params,
+      this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry)
     ));
     await this.createIndexes(client, newVersionEntry, saveCancelFn);
     await this.loadCache.reset(this.preAggregation);
@@ -456,7 +464,8 @@ class PreAggregationLoader {
     await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
-      params
+      params,
+      this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry)
     ));
     const tableData = await this.downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn);
     await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
@@ -476,7 +485,11 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    const tableData = await saveCancelFn(client.downloadQueryResults(sql, params));
+    const tableData = await saveCancelFn(client.downloadQueryResults(
+      sql,
+      params,
+      this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry)
+    ));
     await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
     await this.loadCache.reset(this.preAggregation);
   }
