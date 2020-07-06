@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.46](https://github.com/cube-js/cube.js/compare/v0.19.45...v0.19.46) (2020-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/elasticsearch-driver
+
+
+
+
+
 ## [0.19.38](https://github.com/cube-js/cube.js/compare/v0.19.37...v0.19.38) (2020-06-28)
 
 **Note:** Version bump only for package @cubejs-backend/elasticsearch-driver
