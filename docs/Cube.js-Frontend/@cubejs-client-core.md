@@ -714,8 +714,6 @@ params | any |
 
 ## TimeDimensionGranularities
 
-### • **TimeDimensionGranularities**:
-
 • **DAY** = "day"
 
 • **HOUR** = "hour"
