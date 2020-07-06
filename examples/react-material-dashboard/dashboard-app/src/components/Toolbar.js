@@ -4,17 +4,17 @@ import PropTypes from "prop-types";
 import clsx from "clsx";
 import { makeStyles } from "@material-ui/styles";
 import Grid from "@material-ui/core/Grid";
-import Slider from "@material-ui/core/Slider";
 import Typography from "@material-ui/core/Typography";
+import Tab from "@material-ui/core/Tab";
+import Tabs from "@material-ui/core/Tabs";
+import withStyles from "@material-ui/core/styles/withStyles";
+import palette from "../theme/palette";
+import Slider from "@material-ui/core/Slider";
 import DateFnsUtils from "@date-io/date-fns";
 import {
   MuiPickersUtilsProvider,
   KeyboardDatePicker
 } from "@material-ui/pickers";
-import Tab from "@material-ui/core/Tab";
-import Tabs from "@material-ui/core/Tabs";
-import withStyles from "@material-ui/core/styles/withStyles";
-import palette from "../theme/palette";
 
 const AntTabs = withStyles({
   root: {
@@ -98,27 +98,22 @@ const Toolbar = props => {
 
   const classes = useStyles();
 
+  const handleChangeTab = (e, value) => {
+    setTabValue(value);
+    setStatusFilter(value);
+  };
   const handleDateChange = (date) => {
     setStartDate(date);
   };
   const handleDateChangeFinish = (date) => {
     setFinishDate(date);
   };
-  const handleChangeTab = (e, value) => {
-    setTabValue(value);
-    setStatusFilter(value);
-  };
-
   const handleChangeRange = (event, newValue) => {
     rangeSetValue(newValue);
   };
   const setRangeFilter = (event, newValue) => {
     setPriceFilter(newValue);
   };
-
-  function valuetext(value) {
-    return `$ ${value}`;
-  }
 
   return (
     <div
@@ -178,7 +173,7 @@ const Toolbar = props => {
             <Grid container justify="space-around">
               <KeyboardDatePicker
                 id="date-picker-dialog-finish"
-                label={<span style={{opacity: 0.6}}>Start Date</span>}
+                label={<span style={{opacity: 0.6}}>Finish Date</span>}
                 format="MM/dd/yyyy"
                 value={finishDate}
                 onChange={handleDateChangeFinish}
@@ -207,7 +202,6 @@ const Toolbar = props => {
             onChangeCommitted={setRangeFilter}
             aria-labelledby="range-slider"
             valueLabelDisplay="auto"
-            getAriaValueText={valuetext}
             min={0}
             max={300}
           />

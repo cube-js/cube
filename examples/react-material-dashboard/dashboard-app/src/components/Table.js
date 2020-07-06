@@ -60,14 +60,6 @@ const useStyles = makeStyles(theme => ({
       cursor: `pointer`
     }
   },
-  loaderWrap: {
-    width: '100%',
-    height: '100%',
-    minHeight: 'calc(100vh - 64px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
   arrow: {
     fontSize: 10,
     position: "absolute"

@@ -11,27 +11,30 @@ const useStyles = makeStyles(theme => ({
   },
   content: {
     marginTop: 15
-  },
+  }
 }));
 
 const DataTablePage = () => {
   const classes = useStyles();
-  const tabs = ['All', 'Shipped', 'Processing', 'Completed'];
+  const tabs = ["All", "Shipped", "Processing", "Completed"];
+  const [statusFilter, setStatusFilter] = React.useState(0);
   const [startDate, setStartDate] = React.useState(new Date("2019-01-01T00:00:00"));
   const [finishDate, setFinishDate] = React.useState(new Date("2022-01-01T00:00:00"));
   const [priceFilter, setPriceFilter] = React.useState([0, 200]);
-  const [statusFilter, setStatusFilter] = React.useState(0);
-  const [sorting, setSorting] = React.useState(['Orders.createdAt', 'desc']);
+  const [sorting, setSorting] = React.useState(["Orders.createdAt", "desc"]);
 
   const query = {
-    limit: 500,
-    order: {
+    "limit": 500,
+    "order": {
       [`${sorting[0]}`]: sorting[1]
     },
+    "measures": [
+      "Orders.count"
+    ],
     "timeDimensions": [
       {
         "dimension": "Orders.createdAt",
-        dateRange: [startDate, finishDate],
+        "dateRange": [startDate, finishDate],
         "granularity": "day"
       }
     ],
@@ -47,6 +50,13 @@ const DataTablePage = () => {
     ],
     "filters": [
       {
+        "dimension": "Orders.status",
+        "operator": tabs[statusFilter] !== "All" ? "equals" : "set",
+        "values": [
+          `${tabs[statusFilter].toLowerCase()}`
+        ]
+      },
+      {
         "dimension": "Orders.price",
         "operator": "gt",
         "values": [
@@ -58,13 +68,6 @@ const DataTablePage = () => {
         "operator": "lt",
         "values": [
           `${priceFilter[1]}`
-        ]
-      },
-      {
-        "dimension": "Orders.status",
-        "operator": tabs[statusFilter] !== 'All' ? "equals" : "set",
-        "values": [
-          `${tabs[statusFilter].toLowerCase()}`
         ]
       }
     ]
@@ -84,7 +87,10 @@ const DataTablePage = () => {
         tabs={tabs}
       />
       <div className={classes.content}>
-        <Table sorting={sorting} setSorting={setSorting} query={query}/>
+        <Table
+          sorting={sorting}
+          setSorting={setSorting}
+          query={query}/>
       </div>
     </div>
   );
