@@ -82,6 +82,6 @@
     "fs-extra": "^8.1.0",
     "react-app-rewired": "^2.1.0",
     "recursive-readdir": "^2.2.2",
-    "terser-webpack-plugin": "^2.3.5"
+    "terser-webpack-plugin": "^3.0.6"
   }
 }
