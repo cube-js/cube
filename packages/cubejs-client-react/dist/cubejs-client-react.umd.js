@@ -34940,6 +34940,196 @@
     }
   })(typeof commonjsGlobal !== 'undefined' ? commonjsGlobal : typeof window !== 'undefined' ? window : commonjsGlobal);
 
+  function _assertThisInitialized$1(self) {
+    if (self === void 0) {
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    }
+
+    return self;
+  }
+
+  var assertThisInitialized = _assertThisInitialized$1;
+
+  function _possibleConstructorReturn$1(self, call) {
+    if (call && (_typeof_1(call) === "object" || typeof call === "function")) {
+      return call;
+    }
+
+    return assertThisInitialized(self);
+  }
+
+  var possibleConstructorReturn = _possibleConstructorReturn$1;
+
+  var getPrototypeOf = createCommonjsModule(function (module) {
+    function _getPrototypeOf(o) {
+      module.exports = _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
+        return o.__proto__ || Object.getPrototypeOf(o);
+      };
+      return _getPrototypeOf(o);
+    }
+
+    module.exports = _getPrototypeOf;
+  });
+
+  var setPrototypeOf = createCommonjsModule(function (module) {
+    function _setPrototypeOf(o, p) {
+      module.exports = _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
+        o.__proto__ = p;
+        return o;
+      };
+
+      return _setPrototypeOf(o, p);
+    }
+
+    module.exports = _setPrototypeOf;
+  });
+
+  function _inherits$1(subClass, superClass) {
+    if (typeof superClass !== "function" && superClass !== null) {
+      throw new TypeError("Super expression must either be null or a function");
+    }
+
+    subClass.prototype = Object.create(superClass && superClass.prototype, {
+      constructor: {
+        value: subClass,
+        writable: true,
+        configurable: true
+      }
+    });
+    if (superClass) setPrototypeOf(subClass, superClass);
+  }
+
+  var inherits = _inherits$1;
+
+  // `Map` constructor
+  // https://tc39.github.io/ecma262/#sec-map-objects
+  var es_map = collection$1('Map', function (init) {
+    return function Map() { return init(this, arguments.length ? arguments[0] : undefined); };
+  }, collectionStrong$1);
+
+  function _isNativeFunction$1(fn) {
+    return Function.toString.call(fn).indexOf("[native code]") !== -1;
+  }
+
+  var isNativeFunction = _isNativeFunction$1;
+
+  var nativeConstruct = getBuiltIn$1('Reflect', 'construct');
+
+  // `Reflect.construct` method
+  // https://tc39.github.io/ecma262/#sec-reflect.construct
+  // MS Edge supports only 2 arguments and argumentsList argument is optional
+  // FF Nightly sets third argument as `new.target`, but does not create `this` from it
+  var NEW_TARGET_BUG = fails$1(function () {
+    function F() { /* empty */ }
+    return !(nativeConstruct(function () { /* empty */ }, [], F) instanceof F);
+  });
+  var ARGS_BUG = !fails$1(function () {
+    nativeConstruct(function () { /* empty */ });
+  });
+  var FORCED$j = NEW_TARGET_BUG || ARGS_BUG;
+
+  _export$1({ target: 'Reflect', stat: true, forced: FORCED$j, sham: FORCED$j }, {
+    construct: function construct(Target, args /* , newTarget */) {
+      aFunction$3(Target);
+      anObject$1(args);
+      var newTarget = arguments.length < 3 ? Target : aFunction$3(arguments[2]);
+      if (ARGS_BUG && !NEW_TARGET_BUG) return nativeConstruct(Target, args, newTarget);
+      if (Target == newTarget) {
+        // w/o altered newTarget, optimization for 0-4 arguments
+        switch (args.length) {
+          case 0: return new Target();
+          case 1: return new Target(args[0]);
+          case 2: return new Target(args[0], args[1]);
+          case 3: return new Target(args[0], args[1], args[2]);
+          case 4: return new Target(args[0], args[1], args[2], args[3]);
+        }
+        // w/o altered newTarget, lot of arguments case
+        var $args = [null];
+        $args.push.apply($args, args);
+        return new (functionBind.apply(Target, $args))();
+      }
+      // with altered newTarget, not support built-in constructors
+      var proto = newTarget.prototype;
+      var instance = objectCreate$1(isObject$1(proto) ? proto : Object.prototype);
+      var result = Function.apply.call(Target, instance, args);
+      return isObject$1(result) ? result : instance;
+    }
+  });
+
+  function _isNativeReflectConstruct() {
+    if (typeof Reflect === "undefined" || !Reflect.construct) return false;
+    if (Reflect.construct.sham) return false;
+    if (typeof Proxy === "function") return true;
+
+    try {
+      Date.prototype.toString.call(Reflect.construct(Date, [], function () {}));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  var isNativeReflectConstruct$1 = _isNativeReflectConstruct;
+
+  var construct$3 = createCommonjsModule(function (module) {
+    function _construct(Parent, args, Class) {
+      if (isNativeReflectConstruct$1()) {
+        module.exports = _construct = Reflect.construct;
+      } else {
+        module.exports = _construct = function _construct(Parent, args, Class) {
+          var a = [null];
+          a.push.apply(a, args);
+          var Constructor = Function.bind.apply(Parent, a);
+          var instance = new Constructor();
+          if (Class) setPrototypeOf(instance, Class.prototype);
+          return instance;
+        };
+      }
+
+      return _construct.apply(null, arguments);
+    }
+
+    module.exports = _construct;
+  });
+
+  var wrapNativeSuper = createCommonjsModule(function (module) {
+    function _wrapNativeSuper(Class) {
+      var _cache = typeof Map === "function" ? new Map() : undefined;
+
+      module.exports = _wrapNativeSuper = function _wrapNativeSuper(Class) {
+        if (Class === null || !isNativeFunction(Class)) return Class;
+
+        if (typeof Class !== "function") {
+          throw new TypeError("Super expression must either be null or a function");
+        }
+
+        if (typeof _cache !== "undefined") {
+          if (_cache.has(Class)) return _cache.get(Class);
+
+          _cache.set(Class, Wrapper);
+        }
+
+        function Wrapper() {
+          return construct$3(Class, arguments, getPrototypeOf(this).constructor);
+        }
+
+        Wrapper.prototype = Object.create(Class.prototype, {
+          constructor: {
+            value: Wrapper,
+            enumerable: false,
+            writable: true,
+            configurable: true
+          }
+        });
+        return setPrototypeOf(Wrapper, Class);
+      };
+
+      return _wrapNativeSuper(Class);
+    }
+
+    module.exports = _wrapNativeSuper;
+  });
+
   var ramda = ( es && undefined ) || es;
 
   var cubejsClientCore = createCommonjsModule(function (module, exports) {
@@ -34979,6 +35169,14 @@
     var momentRange$$1 = _interopDefault(momentRange);
 
     var fetch = _interopDefault(browserPonyfill);
+
+    var _possibleConstructorReturn$$1 = _interopDefault(possibleConstructorReturn);
+
+    var _getPrototypeOf$$1 = _interopDefault(getPrototypeOf);
+
+    var _inherits$$1 = _interopDefault(inherits);
+
+    var _wrapNativeSuper$$1 = _interopDefault(wrapNativeSuper);
 
     var moment$$1 = momentRange$$1.extendMoment(Moment);
     var TIME_SERIES = {
@@ -35879,13 +36077,15 @@
         var authorization = _ref.authorization,
             apiUrl = _ref.apiUrl,
             _ref$headers = _ref.headers,
-            headers = _ref$headers === void 0 ? {} : _ref$headers;
+            headers = _ref$headers === void 0 ? {} : _ref$headers,
+            credentials = _ref.credentials;
 
         _classCallCheck$$1(this, HttpTransport);
 
         this.authorization = authorization;
         this.apiUrl = apiUrl;
         this.headers = headers;
+        this.credentials = credentials;
       }
 
       _createClass$$1(HttpTransport, [{
@@ -35909,7 +36109,8 @@
               headers: _objectSpread2({
                 Authorization: _this.authorization,
                 'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
-              }, _this.headers)
+              }, _this.headers),
+              credentials: _this.credentials
             });
           };
 
@@ -35949,6 +36150,24 @@
       return HttpTransport;
     }();
 
+    var RequestError =
+    /*#__PURE__*/
+    function (_Error) {
+      _inherits$$1(RequestError, _Error);
+
+      function RequestError(message, response) {
+        var _this;
+
+        _classCallCheck$$1(this, RequestError);
+
+        _this = _possibleConstructorReturn$$1(this, _getPrototypeOf$$1(RequestError).call(this, message));
+        _this.response = response;
+        return _this;
+      }
+
+      return RequestError;
+    }(_wrapNativeSuper$$1(Error));
+
     var API_URL = "https://statsbot.co/cubejs-api/v1";
     var mutexCounter = 0;
     var MUTEX_ERROR = 'Mutex has been changed';
@@ -35978,10 +36197,12 @@
         this.apiToken = apiToken;
         this.apiUrl = options.apiUrl || API_URL;
         this.headers = options.headers || {};
+        this.credentials = options.credentials;
         this.transport = options.transport || new HttpTransport({
           authorization: typeof apiToken === 'function' ? undefined : apiToken,
           apiUrl: this.apiUrl,
-          headers: this.headers
+          headers: this.headers,
+          credentials: this.credentials
         });
         this.pollInterval = options.pollInterval || 5;
         this.parseDateMeasures = options.parseDateMeasures;
@@ -36251,7 +36472,7 @@
                       return requestInstance.unsubscribe();
 
                     case 25:
-                      error = new Error(body.error); // TODO error class
+                      error = new RequestError(body.error, body); // TODO error class
 
                       if (!callback) {
                         _context4.next = 30;
@@ -36831,21 +37052,35 @@
                   _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                   if (!(finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                    _context2.next = 10;
+                    _context2.next = 17;
                     break;
                   }
 
-                  _context2.next = 7;
+                  _context2.prev = 5;
+                  _context2.next = 8;
                   return this.cubejsApi().sql(query, {
                     mutexObj: this.mutexObj
                   });
 
-                case 7:
+                case 8:
                   _ref4 = _context2.sent;
                   sqlQuery = _ref4.sqlQuery;
                   finalState.query.order = sqlQuery.sql.order;
+                  _context2.next = 17;
+                  break;
 
-                case 10:
+                case 13:
+                  _context2.prev = 13;
+                  _context2.t0 = _context2["catch"](5);
+
+                  if (!(_context2.t0.response.code !== 'MISSING_DATE_RANGE')) {
+                    _context2.next = 17;
+                    break;
+                  }
+
+                  throw _context2.t0;
+
+                case 17:
                   activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                   updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread({}, this.state, {}, finalState)));
                   currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -36890,12 +37125,12 @@
                     setVizState(toSet);
                   }
 
-                case 22:
+                case 29:
                 case "end":
                   return _context2.stop();
               }
             }
-          }, _callee2, this);
+          }, _callee2, this, [[5, 13]]);
         }));
 
         function updateVizState(_x) {

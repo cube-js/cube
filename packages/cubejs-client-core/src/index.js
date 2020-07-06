@@ -4,6 +4,7 @@ import SqlQuery from './SqlQuery';
 import Meta from './Meta';
 import ProgressResult from './ProgressResult';
 import HttpTransport from './HttpTransport';
+import RequestError from './RequestError';
 
 const API_URL = process.env.CUBEJS_API_URL;
 
@@ -130,7 +131,8 @@ class CubejsApi {
         if (!options.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
         }
-        const error = new Error(body.error); // TODO error class
+        
+        const error = new RequestError(body.error, body); // TODO error class
         if (callback) {
           callback(error);
         } else {

@@ -682,21 +682,35 @@ function (_React$Component) {
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                 if (!(finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                  _context2.next = 10;
+                  _context2.next = 17;
                   break;
                 }
 
-                _context2.next = 7;
+                _context2.prev = 5;
+                _context2.next = 8;
                 return this.cubejsApi().sql(query, {
                   mutexObj: this.mutexObj
                 });
 
-              case 7:
+              case 8:
                 _ref4 = _context2.sent;
                 sqlQuery = _ref4.sqlQuery;
                 finalState.query.order = sqlQuery.sql.order;
+                _context2.next = 17;
+                break;
 
-              case 10:
+              case 13:
+                _context2.prev = 13;
+                _context2.t0 = _context2["catch"](5);
+
+                if (!(_context2.t0.response.code !== 'MISSING_DATE_RANGE')) {
+                  _context2.next = 17;
+                  break;
+                }
+
+                throw _context2.t0;
+
+              case 17:
                 activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                 updatedOrderMembers = ramda.indexBy(ramda.prop('id'), QueryBuilder.getOrderMembers(_objectSpread2({}, this.state, {}, finalState)));
                 currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -741,12 +755,12 @@ function (_React$Component) {
                   setVizState(toSet);
                 }
 
-              case 22:
+              case 29:
               case "end":
                 return _context2.stop();
             }
           }
-        }, _callee2, this);
+        }, _callee2, this, [[5, 13]]);
       }));
 
       function updateVizState(_x) {

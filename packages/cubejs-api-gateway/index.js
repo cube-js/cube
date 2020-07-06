@@ -565,6 +565,21 @@ class ApiGateway {
         duration: this.duration(requestStarted)
       });
       res(e, { status: 400 });
+    } else if (e.type === 'UserError') {
+      this.log(context, {
+        type: e.type,
+        query,
+        error: e.message,
+        duration: this.duration(requestStarted)
+      });
+      res(
+        {
+          code: e.code,
+          type: e.type,
+          error: e.message
+        },
+        { status: 400 }
+      );
     } else {
       this.log(context, {
         type: 'Internal Server Error',
