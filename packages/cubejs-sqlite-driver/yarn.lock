@@ -18,10 +18,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.19.36":
-  version "0.19.36"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.36.tgz#84b1ec5029c1fbc9b2c62cdbd34c83233c1df7f0"
-  integrity sha512-DDRNZkebanCC2HgShaw97f1GeNK+bKo2zNOcrhvN4NSfHqFmO1XCsSiOBISDRJNxjvaX9JVybop9BTk62K8V5A==
+"@cubejs-backend/query-orchestrator@^0.19.46":
+  version "0.19.46"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.46.tgz#f31a85be56f6bff8a6a22c280b6f1566db9e0160"
+  integrity sha512-3mCuAIcFKla511MvRcZJwvf5UFxIfTaKdlzZ0Ywhwdm2AkzJA7t1g/Dw+RPgFTJSUQi3m6JutzADs57zFNMmTA==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
@@ -833,7 +833,7 @@ glob@7.1.2:
     once "^1.3.0"
     path-is-absolute "^1.0.0"
 
-glob@^7.1.3:
+glob@^7.1.3, glob@^7.1.6:
   version "7.1.6"
   resolved "https://registry.yarnpkg.com/glob/-/glob-7.1.6.tgz#141f33b81a7c2492e125594307480c46679278a6"
   integrity sha512-LwaxwyZ72Lk7vZINtNNrywX0ZuLyStrdDtabefZKAY5ZGJhVtgdznluResxNmPitE0SAO+O26sWTHeKSI2wMBA==
@@ -2060,9 +2060,9 @@ tar@^4:
     yallist "^3.0.3"
 
 testcontainers@^2.4.0:
-  version "2.12.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-2.12.0.tgz#a441049a0fbadc18be5ca5c5e2877432713a5235"
-  integrity sha512-fNQjRDW5re29SWYCNwZo+P0IoA5SUw9MBxh9KC4WygthvAm72gUBGKWdtJCdtLEBCraV1hPTYOJX1DGoxpFsoQ==
+  version "2.16.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-2.16.0.tgz#ce1e13c0aaf1c822484c9668fa910daa6531d494"
+  integrity sha512-tIgk6wtajwCM05AuJcDfQ6VJxiq5yz8Fyfub2LEUM64KxUWfaDvUxgAqcJuMZ2330V94skNR65oaGO/BxLPy8Q==
   dependencies:
     "@types/dockerode" "^2.5.24"
     byline "^5.0.0"
@@ -2070,6 +2070,7 @@ testcontainers@^2.4.0:
     default-gateway "^5.0.2"
     dockerode "^2.5.8"
     get-port "^4.2.0"
+    glob "^7.1.6"
     node-duration "^1.0.4"
     stream-to-array "^2.3.0"
     tar-fs "^2.0.0"
