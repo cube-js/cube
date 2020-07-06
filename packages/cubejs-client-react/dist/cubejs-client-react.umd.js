@@ -34940,6 +34940,196 @@
     }
   })(typeof commonjsGlobal !== 'undefined' ? commonjsGlobal : typeof window !== 'undefined' ? window : commonjsGlobal);
 
+  function _assertThisInitialized$1(self) {
+    if (self === void 0) {
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    }
+
+    return self;
+  }
+
+  var assertThisInitialized = _assertThisInitialized$1;
+
+  function _possibleConstructorReturn$1(self, call) {
+    if (call && (_typeof_1(call) === "object" || typeof call === "function")) {
+      return call;
+    }
+
+    return assertThisInitialized(self);
+  }
+
+  var possibleConstructorReturn = _possibleConstructorReturn$1;
+
+  var getPrototypeOf = createCommonjsModule(function (module) {
+    function _getPrototypeOf(o) {
+      module.exports = _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
+        return o.__proto__ || Object.getPrototypeOf(o);
+      };
+      return _getPrototypeOf(o);
+    }
+
+    module.exports = _getPrototypeOf;
+  });
+
+  var setPrototypeOf = createCommonjsModule(function (module) {
+    function _setPrototypeOf(o, p) {
+      module.exports = _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
+        o.__proto__ = p;
+        return o;
+      };
+
+      return _setPrototypeOf(o, p);
+    }
+
+    module.exports = _setPrototypeOf;
+  });
+
+  function _inherits$1(subClass, superClass) {
+    if (typeof superClass !== "function" && superClass !== null) {
+      throw new TypeError("Super expression must either be null or a function");
+    }
+
+    subClass.prototype = Object.create(superClass && superClass.prototype, {
+      constructor: {
+        value: subClass,
+        writable: true,
+        configurable: true
+      }
+    });
+    if (superClass) setPrototypeOf(subClass, superClass);
+  }
+
+  var inherits = _inherits$1;
+
+  // `Map` constructor
+  // https://tc39.github.io/ecma262/#sec-map-objects
+  var es_map = collection$1('Map', function (init) {
+    return function Map() { return init(this, arguments.length ? arguments[0] : undefined); };
+  }, collectionStrong$1);
+
+  function _isNativeFunction$1(fn) {
+    return Function.toString.call(fn).indexOf("[native code]") !== -1;
+  }
+
+  var isNativeFunction = _isNativeFunction$1;
+
+  var nativeConstruct = getBuiltIn$1('Reflect', 'construct');
+
+  // `Reflect.construct` method
+  // https://tc39.github.io/ecma262/#sec-reflect.construct
+  // MS Edge supports only 2 arguments and argumentsList argument is optional
+  // FF Nightly sets third argument as `new.target`, but does not create `this` from it
+  var NEW_TARGET_BUG = fails$1(function () {
+    function F() { /* empty */ }
+    return !(nativeConstruct(function () { /* empty */ }, [], F) instanceof F);
+  });
+  var ARGS_BUG = !fails$1(function () {
+    nativeConstruct(function () { /* empty */ });
+  });
+  var FORCED$j = NEW_TARGET_BUG || ARGS_BUG;
+
+  _export$1({ target: 'Reflect', stat: true, forced: FORCED$j, sham: FORCED$j }, {
+    construct: function construct(Target, args /* , newTarget */) {
+      aFunction$3(Target);
+      anObject$1(args);
+      var newTarget = arguments.length < 3 ? Target : aFunction$3(arguments[2]);
+      if (ARGS_BUG && !NEW_TARGET_BUG) return nativeConstruct(Target, args, newTarget);
+      if (Target == newTarget) {
+        // w/o altered newTarget, optimization for 0-4 arguments
+        switch (args.length) {
+          case 0: return new Target();
+          case 1: return new Target(args[0]);
+          case 2: return new Target(args[0], args[1]);
+          case 3: return new Target(args[0], args[1], args[2]);
+          case 4: return new Target(args[0], args[1], args[2], args[3]);
+        }
+        // w/o altered newTarget, lot of arguments case
+        var $args = [null];
+        $args.push.apply($args, args);
+        return new (functionBind.apply(Target, $args))();
+      }
+      // with altered newTarget, not support built-in constructors
+      var proto = newTarget.prototype;
+      var instance = objectCreate$1(isObject$1(proto) ? proto : Object.prototype);
+      var result = Function.apply.call(Target, instance, args);
+      return isObject$1(result) ? result : instance;
+    }
+  });
+
+  function _isNativeReflectConstruct() {
+    if (typeof Reflect === "undefined" || !Reflect.construct) return false;
+    if (Reflect.construct.sham) return false;
+    if (typeof Proxy === "function") return true;
+
+    try {
+      Date.prototype.toString.call(Reflect.construct(Date, [], function () {}));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  var isNativeReflectConstruct$1 = _isNativeReflectConstruct;
+
+  var construct$3 = createCommonjsModule(function (module) {
+    function _construct(Parent, args, Class) {
+      if (isNativeReflectConstruct$1()) {
+        module.exports = _construct = Reflect.construct;
+      } else {
+        module.exports = _construct = function _construct(Parent, args, Class) {
+          var a = [null];
+          a.push.apply(a, args);
+          var Constructor = Function.bind.apply(Parent, a);
+          var instance = new Constructor();
+          if (Class) setPrototypeOf(instance, Class.prototype);
+          return instance;
+        };
+      }
+
+      return _construct.apply(null, arguments);
+    }
+
+    module.exports = _construct;
+  });
+
+  var wrapNativeSuper = createCommonjsModule(function (module) {
+    function _wrapNativeSuper(Class) {
+      var _cache = typeof Map === "function" ? new Map() : undefined;
+
+      module.exports = _wrapNativeSuper = function _wrapNativeSuper(Class) {
+        if (Class === null || !isNativeFunction(Class)) return Class;
+
+        if (typeof Class !== "function") {
+          throw new TypeError("Super expression must either be null or a function");
+        }
+
+        if (typeof _cache !== "undefined") {
+          if (_cache.has(Class)) return _cache.get(Class);
+
+          _cache.set(Class, Wrapper);
+        }
+
+        function Wrapper() {
+          return construct$3(Class, arguments, getPrototypeOf(this).constructor);
+        }
+
+        Wrapper.prototype = Object.create(Class.prototype, {
+          constructor: {
+            value: Wrapper,
+            enumerable: false,
+            writable: true,
+            configurable: true
+          }
+        });
+        return setPrototypeOf(Wrapper, Class);
+      };
+
+      return _wrapNativeSuper(Class);
+    }
+
+    module.exports = _wrapNativeSuper;
+  });
+
   var ramda = ( es && undefined ) || es;
 
   var cubejsClientCore = createCommonjsModule(function (module, exports) {
@@ -34979,79 +35169,14 @@
     var momentRange$$1 = _interopDefault(momentRange);
 
     var fetch = _interopDefault(browserPonyfill);
-    /**
-     * Configuration object that contains information about pivot axes and other options.
-     *
-     * Let's apply `pivotConfig` and see how it affects the axes
-     * ```js
-     * // Example query
-     * {
-     *   measures: ['Orders.count'],
-     *   dimensions: ['Users.country', 'Users.gender']
-     * }
-     * ```
-     * If we put the `Users.gender` dimension on **y** axis
-     * ```js
-     * resultSet.tablePivot({
-     *   x: ['Users.country'],
-     *   y: ['Users.gender', 'measures']
-     * })
-     * ```
-     *
-     * The resulting table will look the following way
-     *
-     * | Users Country | male, Orders.count | female, Orders.count |
-     * | ------------- | ------------------ | -------------------- |
-     * | Australia     | 3                  | 27                   |
-     * | Germany       | 10                 | 12                   |
-     * | US            | 5                  | 7                    |
-     *
-     * Now let's put the `Users.country` dimension on **y** axis instead
-     * ```js
-     * resultSet.tablePivot({
-     *   x: ['Users.gender'],
-     *   y: ['Users.country', 'measures'],
-     * });
-     * ```
-     *
-     * in this case the `Users.country` values will be laid out on **y** or **columns** axis
-     *
-     * | Users Gender | Australia, Orders.count | Germany, Orders.count | US, Orders.count |
-     * | ------------ | ----------------------- | --------------------- | ---------------- |
-     * | male         | 3                       | 10                    | 5                |
-     * | female       | 27                      | 12                    | 7                |
-     *
-     * It's also possible to put the `measures` on **x** axis.
-     * But in either case it should always be the last item of the array.
-     * ```js
-     * resultSet.tablePivot({
-     *   x: ['Users.gender', 'measures'],
-     *   y: ['Users.country'],
-     * });
-     * ```
-     *
-     * | Users Gender | measures     | Australia | Germany | US  |
-     * | ------------ | ------------ | --------- | ------- | --- |
-     * | male         | Orders.count | 3         | 10      | 5   |
-     * | female       | Orders.count | 27        | 12      | 7   |
-     *
-     * @memberof ResultSet
-     * @typedef {Object} PivotConfig Configuration object that contains the information about pivot axes and other options
-     * @property {Array<string>} x Dimensions to put on **x** or **rows** axis.
-     * Put `measures` at the end of array here
-     * @property {Array<string>} y Dimensions to put on **y** or **columns** axis.
-     * @property {Boolean} [fillMissingDates=true] If `true` missing dates on the time dimensions
-     * will be filled with `0` for all measures.
-     * Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
-     */
 
-    /**
-     * @memberof ResultSet
-     * @typedef {Object} DrillDownLocator
-     * @property {Array<string>} xValues
-     * @property {Array<string>} yValues
-     */
+    var _possibleConstructorReturn$$1 = _interopDefault(possibleConstructorReturn);
 
+    var _getPrototypeOf$$1 = _interopDefault(getPrototypeOf);
+
+    var _inherits$$1 = _interopDefault(inherits);
+
+    var _wrapNativeSuper$$1 = _interopDefault(wrapNativeSuper);
 
     var moment$$1 = momentRange$$1.extendMoment(Moment);
     var TIME_SERIES = {
@@ -35093,9 +35218,6 @@
     };
     var DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
     var LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
-    /**
-     * Provides a convenient interface for data manipulation.
-     */
 
     var ResultSet =
     /*#__PURE__*/
@@ -35107,50 +35229,6 @@
         this.loadResponse = loadResponse;
         this.parseDateMeasures = options.parseDateMeasures;
       }
-      /**
-       * Returns a measure drill down query.
-       *
-       * Provided you have a measure with the defined `drillMemebers` on the `Orders` cube
-       * ```js
-       * measures: {
-       *   count: {
-       *     type: `count`,
-       *     drillMembers: [Orders.status, Users.city, count],
-       *   },
-       *   // ...
-       * }
-       * ```
-       *
-       * Then you can use the `drillDown` method to see the rows that contribute to that metric
-       * ```js
-       * resultSet.drillDown(
-       *   {
-       *     xValues,
-       *     yValues,
-       *   },
-       *   // you should pass the `pivotConfig` if you have used it for axes manipulation
-       *   pivotConfig
-       * )
-       * ```
-       *
-       * the result will be a query with the required filters applied and the dimensions/measures filled out
-       * ```js
-       * {
-       *   measures: ['Orders.count'],
-       *   dimensions: ['Orders.status', 'Users.city'],
-       *   filters: [
-       *     // dimension and measure filters
-       *   ],
-       *   timeDimensions: [
-       *     //...
-       *   ]
-       * }
-       * ```
-       * @param {DrillDownLocator} drillDownLocator
-       * @param {PivotConfig} [pivotConfig]
-       * @returns {Object|null} Drill down query
-       */
-
 
       _createClass$$1(ResultSet, [{
         key: "drillDown",
@@ -35232,37 +35310,6 @@
             timeDimensions: timeDimensions
           });
         }
-        /**
-         * Returns an array of series with key, title and series data.
-         * ```js
-         * // For the query
-         * {
-         *   measures: ['Stories.count'],
-         *   timeDimensions: [{
-         *     dimension: 'Stories.time',
-         *     dateRange: ['2015-01-01', '2015-12-31'],
-         *     granularity: 'month'
-         *   }]
-         * }
-         *
-         * // ResultSet.series() will return
-         * [
-         *   {
-         *     key: 'Stories.count',
-         *     title: 'Stories Count',
-         *     series: [
-         *       { x: '2015-01-01T00:00:00', value: 27120 },
-         *       { x: '2015-02-01T00:00:00', value: 25861 },
-         *       { x: '2015-03-01T00:00:00', value: 29661 },
-         *       //...
-         *     ],
-         *   },
-         * ]
-         * ```
-         * @param {PivotConfig} [pivotConfig]
-         * @returns {Array}
-         */
-
       }, {
         key: "series",
         value: function series(pivotConfig) {
@@ -35374,49 +35421,6 @@
 
           return TIME_SERIES[timeDimension.granularity](padToDay ? range.snapTo('day') : range);
         }
-        /**
-         * Base method for pivoting {@link ResultSet} data.
-         * Most of the times shouldn't be used directly and {@link ResultSet#chartPivot}
-         * or {@link ResultSet#tablePivot} should be used instead.
-         *
-         * You can find the examples of using the `pivotConfig` [here](#pivot-config)
-         * ```js
-         * // For query
-         * {
-         *   measures: ['Stories.count'],
-         *   timeDimensions: [{
-         *     dimension: 'Stories.time',
-         *     dateRange: ['2015-01-01', '2015-03-31'],
-         *     granularity: 'month'
-         *   }]
-         * }
-         *
-         * // ResultSet.pivot({ x: ['Stories.time'], y: ['measures'] }) will return
-         * [
-         *   {
-         *     xValues: ["2015-01-01T00:00:00"],
-         *     yValuesArray: [
-         *       [['Stories.count'], 27120]
-         *     ]
-         *   },
-         *   {
-         *     xValues: ["2015-02-01T00:00:00"],
-         *     yValuesArray: [
-         *       [['Stories.count'], 25861]
-         *     ]
-         *   },
-         *   {
-         *     xValues: ["2015-03-01T00:00:00"],
-         *     yValuesArray: [
-         *       [['Stories.count'], 29661]
-         *     ]
-         *   }
-         * ]
-         * ```
-         * @param {PivotConfig} [pivotConfig]
-         * @returns {Array} of pivoted rows.
-         */
-
       }, {
         key: "pivot",
         value: function pivot(pivotConfig) {
@@ -35525,32 +35529,6 @@
           // TODO
           return this.chartPivot(pivotConfig);
         }
-        /**
-         * Returns normalized query result data in the following format.
-         *
-         * You can find the examples of using the `pivotConfig` [here](#pivot-config)
-         * ```js
-         * // For the query
-         * {
-         *   measures: ['Stories.count'],
-         *   timeDimensions: [{
-         *     dimension: 'Stories.time',
-         *     dateRange: ['2015-01-01', '2015-12-31'],
-         *     granularity: 'month'
-         *   }]
-         * }
-         *
-         * // ResultSet.chartPivot() will return
-         * [
-         *   { "x":"2015-01-01T00:00:00", "Stories.count": 27120, "xValues": ["2015-01-01T00:00:00"] },
-         *   { "x":"2015-02-01T00:00:00", "Stories.count": 25861, "xValues": ["2015-02-01T00:00:00"]  },
-         *   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
-         *   //...
-         * ]
-         * ```
-         * @param {PivotConfig} [pivotConfig]
-         */
-
       }, {
         key: "chartPivot",
         value: function chartPivot(pivotConfig) {
@@ -35585,150 +35563,25 @@
             }, {}));
           });
         }
-        /**
-         * Returns normalized query result data prepared for visualization in the table format.
-         *
-         * You can find the examples of using the `pivotConfig` [here](#pivot-config)
-         *
-         * For example:
-         * ```js
-         * // For the query
-         * {
-         *   measures: ['Stories.count'],
-         *   timeDimensions: [{
-         *     dimension: 'Stories.time',
-         *     dateRange: ['2015-01-01', '2015-12-31'],
-         *     granularity: 'month'
-         *   }]
-         * }
-         *
-         * // ResultSet.tablePivot() will return
-         * [
-         *   { "Stories.time": "2015-01-01T00:00:00", "Stories.count": 27120 },
-         *   { "Stories.time": "2015-02-01T00:00:00", "Stories.count": 25861 },
-         *   { "Stories.time": "2015-03-01T00:00:00", "Stories.count": 29661 },
-         *   //...
-         * ]
-         * ```
-         * @param {PivotConfig} [pivotConfig]
-         * @returns {Array} of pivoted rows
-         */
-
       }, {
         key: "tablePivot",
         value: function tablePivot(pivotConfig) {
           var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
+          var isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
           return this.pivot(normalizedPivotConfig).map(function (_ref27) {
             var xValues = _ref27.xValues,
                 yValuesArray = _ref27.yValuesArray;
             return ramda.fromPairs(normalizedPivotConfig.x.map(function (key, index) {
               return [key, xValues[index]];
-            }).concat(yValuesArray[0][0].length && yValuesArray.map(function (_ref28) {
+            }).concat(isMeasuresPresent ? yValuesArray.map(function (_ref28) {
               var _ref29 = _slicedToArray$$1(_ref28, 2),
                   yValues = _ref29[0],
                   measure = _ref29[1];
 
-              return [yValues.join('.'), measure];
-            }) || []));
+              return [yValues.length ? yValues.join('.') : 'value', measure];
+            }) : []));
           });
         }
-        /**
-         * Returns array of column definitions for `tablePivot`.
-         *
-         * For example:
-         * ```js
-         * // For the query
-         * {
-         *   measures: ['Stories.count'],
-         *   timeDimensions: [{
-         *     dimension: 'Stories.time',
-         *     dateRange: ['2015-01-01', '2015-12-31'],
-         *     granularity: 'month'
-         *   }]
-         * }
-         *
-         * // ResultSet.tableColumns() will return
-         * [
-         *   {
-         *     key: 'Stories.time',
-         *     dataIndex: 'Stories.time',
-         *     title: 'Stories Time',
-         *     shortTitle: 'Time',
-         *     type: 'time',
-         *     format: undefined,
-         *   },
-         *   {
-         *     key: 'Stories.count',
-         *     dataIndex: 'Stories.count',
-         *     title: 'Stories Count',
-         *     shortTitle: 'Count',
-         *     type: 'count',
-         *     format: undefined,
-         *   },
-         *   //...
-         * ]
-         * ```
-         *
-         * In case we want to pivot the table axes
-         * ```js
-         * // Let's take this query as an example
-         * {
-         *   measures: ['Orders.count'],
-         *   dimensions: ['Users.country', 'Users.gender']
-         * }
-         *
-         * // and put the dimensions on `y` axis
-         * resultSet.tableColumns({
-         *   x: [],
-         *   y: ['Users.country', 'Users.gender', 'measures']
-         * })
-         * ```
-         *
-         * then `tableColumns` will group the table head and return
-         * ```js
-         * {
-         *   key: 'Germany',
-         *   type: 'string',
-         *   title: 'Users Country Germany',
-         *   shortTitle: 'Germany',
-         *   meta: undefined,
-         *   format: undefined,
-         *   children: [
-         *     {
-         *       key: 'male',
-         *       type: 'string',
-         *       title: 'Users Gender male',
-         *       shortTitle: 'male',
-         *       meta: undefined,
-         *       format: undefined,
-         *       children: [
-         *         {
-         *           // ...
-         *           dataIndex: 'Germany.male.Orders.count',
-         *           shortTitle: 'Count',
-         *         },
-         *       ],
-         *     },
-         *     {
-         *       // ...
-         *       shortTitle: 'female',
-         *       children: [
-         *         {
-         *           // ...
-         *           dataIndex: 'Germany.female.Orders.count',
-         *           shortTitle: 'Count',
-         *         },
-         *       ],
-         *     },
-         *   ],
-         * },
-         * // ...
-         * ```
-         *
-         * @param {PivotConfig} [pivotConfig]
-         * @returns {Array} of columns
-         */
-
       }, {
         key: "tableColumns",
         value: function tableColumns(pivotConfig) {
@@ -35816,15 +35669,24 @@
             });
           };
 
-          var measureColumns = [];
+          var otherColumns = [];
 
-          if (!pivot.length && normalizedPivotConfig.y.find(function (key) {
-            return key === 'measures';
-          })) {
-            measureColumns = (this.query().measures || []).map(function (key) {
+          if (!pivot.length && normalizedPivotConfig.y.includes('measures')) {
+            otherColumns = (this.query().measures || []).map(function (key) {
               return _objectSpread2({}, extractFields(key), {
                 dataIndex: key
               });
+            });
+          } // Syntatic column to display the measure value
+
+
+          if (!normalizedPivotConfig.y.length && normalizedPivotConfig.x.includes('measures')) {
+            otherColumns.push({
+              key: 'value',
+              dataIndex: 'value',
+              title: 'Value',
+              shortTitle: 'Value',
+              type: 'string'
             });
           }
 
@@ -35842,44 +35704,7 @@
             return _objectSpread2({}, extractFields(key), {
               dataIndex: key
             });
-          }).concat(toColumns(schema)).concat(measureColumns);
-        }
-      }, {
-        key: "tableColumns2",
-        value: function tableColumns2(pivotConfig) {
-          var _this5 = this;
-
-          var normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
-
-          var column = function column(field) {
-            var exractFields = function exractFields() {
-              var annotation = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-              var title = annotation.title,
-                  shortTitle = annotation.shortTitle,
-                  format = annotation.format,
-                  type = annotation.type,
-                  meta = annotation.meta;
-              return {
-                title: title,
-                shortTitle: shortTitle,
-                format: format,
-                type: type,
-                meta: meta
-              };
-            };
-
-            return field === 'measures' ? (_this5.query().measures || []).map(function (key) {
-              return _objectSpread2({
-                key: key
-              }, exractFields(_this5.loadResponse.annotation.measures[key]));
-            }) : [_objectSpread2({
-              key: field
-            }, exractFields(_this5.loadResponse.annotation.dimensions[field] || _this5.loadResponse.annotation.timeDimensions[field]))];
-          };
-
-          return normalizedPivotConfig.x.map(column).concat(normalizedPivotConfig.y.map(column)).reduce(function (a, b) {
-            return a.concat(b);
-          });
+          }).concat(toColumns(schema)).concat(otherColumns);
         }
       }, {
         key: "totalRow",
@@ -35892,44 +35717,18 @@
           // TODO
           return this.chartPivot(pivotConfig);
         }
-        /**
-         * Returns the array of series objects, containing `key` and `title` parameters.
-         * ```js
-         * // For query
-         * {
-         *   measures: ['Stories.count'],
-         *   timeDimensions: [{
-         *     dimension: 'Stories.time',
-         *     dateRange: ['2015-01-01', '2015-12-31'],
-         *     granularity: 'month'
-         *   }]
-         * }
-         *
-         * // ResultSet.seriesNames() will return
-         * [
-         *   {
-         *     key: 'Stories.count',
-         *     title: 'Stories Count',
-         *     yValues: ['Stories.count'],
-         *   },
-         * ]
-         * ```
-         * @param {PivotConfig} [pivotConfig]
-         * @returns {Array} of series names
-         */
-
       }, {
         key: "seriesNames",
         value: function seriesNames(pivotConfig) {
-          var _this6 = this;
+          var _this5 = this;
 
           pivotConfig = this.normalizePivotConfig(pivotConfig);
           return ramda.pipe(ramda.map(this.axisValues(pivotConfig.y)), ramda.unnest, ramda.uniq)(this.timeDimensionBackwardCompatibleData()).map(function (axisValues) {
             return {
-              title: _this6.axisValuesString(pivotConfig.y.find(function (d) {
+              title: _this5.axisValuesString(pivotConfig.y.find(function (d) {
                 return d === 'measures';
-              }) ? ramda.dropLast(1, axisValues).concat(_this6.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
-              key: _this6.axisValuesString(axisValues),
+              }) ? ramda.dropLast(1, axisValues).concat(_this5.loadResponse.annotation.measures[ResultSet.measureFromAxis(axisValues)].title) : axisValues, ', '),
+              key: _this5.axisValuesString(axisValues),
               yValues: axisValues
             };
           });
@@ -36270,31 +36069,23 @@
 
       return ProgressResult;
     }();
-    /**
-     * Default transport implementation.
-     */
-
 
     var HttpTransport =
     /*#__PURE__*/
     function () {
-      /**
-       * @param {Object} options - mandatory options object
-       * @param options.authorization - [jwt auth token](security)
-       * @param options.apiUrl - path to `/cubejs-api/v1`
-       * @param [options.headers] - object of custom headers
-       */
       function HttpTransport(_ref) {
         var authorization = _ref.authorization,
             apiUrl = _ref.apiUrl,
             _ref$headers = _ref.headers,
-            headers = _ref$headers === void 0 ? {} : _ref$headers;
+            headers = _ref$headers === void 0 ? {} : _ref$headers,
+            credentials = _ref.credentials;
 
         _classCallCheck$$1(this, HttpTransport);
 
         this.authorization = authorization;
         this.apiUrl = apiUrl;
         this.headers = headers;
+        this.credentials = credentials;
       }
 
       _createClass$$1(HttpTransport, [{
@@ -36318,7 +36109,8 @@
               headers: _objectSpread2({
                 Authorization: _this.authorization,
                 'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
-              }, _this.headers)
+              }, _this.headers),
+              credentials: _this.credentials
             });
           };
 
@@ -36358,6 +36150,24 @@
       return HttpTransport;
     }();
 
+    var RequestError =
+    /*#__PURE__*/
+    function (_Error) {
+      _inherits$$1(RequestError, _Error);
+
+      function RequestError(message, response) {
+        var _this;
+
+        _classCallCheck$$1(this, RequestError);
+
+        _this = _possibleConstructorReturn$$1(this, _getPrototypeOf$$1(RequestError).call(this, message));
+        _this.response = response;
+        return _this;
+      }
+
+      return RequestError;
+    }(_wrapNativeSuper$$1(Error));
+
     var API_URL = "https://statsbot.co/cubejs-api/v1";
     var mutexCounter = 0;
     var MUTEX_ERROR = 'Mutex has been changed';
@@ -36371,11 +36181,6 @@
         });
       });
     };
-    /**
-     * Main class for accessing Cube.js API
-     * @order -5
-     */
-
 
     var CubejsApi =
     /*#__PURE__*/
@@ -36392,10 +36197,12 @@
         this.apiToken = apiToken;
         this.apiUrl = options.apiUrl || API_URL;
         this.headers = options.headers || {};
+        this.credentials = options.credentials;
         this.transport = options.transport || new HttpTransport({
           authorization: typeof apiToken === 'function' ? undefined : apiToken,
           apiUrl: this.apiUrl,
-          headers: this.headers
+          headers: this.headers,
+          credentials: this.credentials
         });
         this.pollInterval = options.pollInterval || 5;
         this.parseDateMeasures = options.parseDateMeasures;
@@ -36665,7 +36472,7 @@
                       return requestInstance.unsubscribe();
 
                     case 25:
-                      error = new Error(body.error); // TODO error class
+                      error = new RequestError(body.error, body); // TODO error class
 
                       if (!callback) {
                         _context4.next = 30;
@@ -36817,34 +36624,6 @@
 
           return updateTransportAuthorization;
         }()
-        /**
-         * Fetch data for passed `query`.
-         *
-         * ```js
-         * import cubejs from '@cubejs-client/core';
-         * import Chart from 'chart.js';
-         * import chartjsConfig from './toChartjsData';
-         *
-         * const cubejsApi = cubejs('CUBEJS_TOKEN');
-         *
-         * const resultSet = await cubejsApi.load({
-         *  measures: ['Stories.count'],
-         *  timeDimensions: [{
-         *    dimension: 'Stories.time',
-         *    dateRange: ['2015-01-01', '2015-12-31'],
-         *    granularity: 'month'
-         *   }]
-         * });
-         *
-         * const context = document.getElementById('myChart');
-         * new Chart(context, chartjsConfig(resultSet));
-         * ```
-         * @param query - [Query object](query-format)
-         * @param [options] - See {@link CubejsApi#loadMethod}
-         * @param [callback] - See {@link CubejsApi#loadMethod}
-         * @returns {Promise} for {@link ResultSet} if `callback` isn't passed
-         */
-
       }, {
         key: "load",
         value: function load(query, options, callback) {
@@ -36860,14 +36639,6 @@
             });
           }, options, callback);
         }
-        /**
-         * Get generated SQL string for given `query`.
-         * @param query - [Query object](query-format)
-         * @param [options] - See {@link CubejsApi#loadMethod}
-         * @param [callback] - See {@link CubejsApi#loadMethod}
-         * @return {Promise} for {@link SqlQuery} if `callback` isn't passed
-         */
-
       }, {
         key: "sql",
         value: function sql(query, options, callback) {
@@ -36881,13 +36652,6 @@
             return new SqlQuery(body);
           }, options, callback);
         }
-        /**
-         * Get meta description of cubes available for querying.
-         * @param [options] - See {@link CubejsApi#loadMethod}
-         * @param [callback] - See {@link CubejsApi#loadMethod}
-         * @return {Promise} for {@link Meta} if `callback` isn't passed
-         */
-
       }, {
         key: "meta",
         value: function meta(options, callback) {
@@ -36920,30 +36684,6 @@
 
       return CubejsApi;
     }();
-    /**
-     * Create instance of `CubejsApi`.
-     * API entry point.
-     *
-     * ```javascript
-     import cubejs from '@cubejs-client/core';
-    
-     const cubejsApi = cubejs(
-     'CUBEJS-API-TOKEN',
-     { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
-     );
-     ```
-     * @name cubejs
-     * @param [apiToken] - [API token](security) is used to authorize requests and determine SQL database you're accessing.
-     * In the development mode, Cube.js Backend will print the API token to the console on on startup.
-     * Can be an async function without arguments that returns API token.
-     * @param [options] - options object.
-     * @param options.apiUrl - URL of your Cube.js Backend.
-     * By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`.
-     * @param options.transport - transport implementation to use. {@link HttpTransport} will be used by default.
-     * @returns {CubejsApi}
-     * @order -10
-     */
-
 
     var index = function index(apiToken, options) {
       return new CubejsApi(apiToken, options);
@@ -37312,21 +37052,35 @@
                   _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                   if (!(finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                    _context2.next = 10;
+                    _context2.next = 17;
                     break;
                   }
 
-                  _context2.next = 7;
+                  _context2.prev = 5;
+                  _context2.next = 8;
                   return this.cubejsApi().sql(query, {
                     mutexObj: this.mutexObj
                   });
 
-                case 7:
+                case 8:
                   _ref4 = _context2.sent;
                   sqlQuery = _ref4.sqlQuery;
                   finalState.query.order = sqlQuery.sql.order;
+                  _context2.next = 17;
+                  break;
 
-                case 10:
+                case 13:
+                  _context2.prev = 13;
+                  _context2.t0 = _context2["catch"](5);
+
+                  if (!(_context2.t0.response.code !== 'MISSING_DATE_RANGE')) {
+                    _context2.next = 17;
+                    break;
+                  }
+
+                  throw _context2.t0;
+
+                case 17:
                   activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                   updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread({}, this.state, {}, finalState)));
                   currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -37371,12 +37125,12 @@
                     setVizState(toSet);
                   }
 
-                case 22:
+                case 29:
                 case "end":
                   return _context2.stop();
               }
             }
-          }, _callee2, this);
+          }, _callee2, this, [[5, 13]]);
         }));
 
         function updateVizState(_x) {

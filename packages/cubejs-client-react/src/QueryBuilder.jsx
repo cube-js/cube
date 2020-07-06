@@ -272,11 +272,17 @@ export default class QueryBuilder extends React.Component {
     const { order: _, ...query } = finalState.query || {};
     
     if (finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
-      const { sqlQuery } = await this.cubejsApi().sql(query, {
-        mutexObj: this.mutexObj
-      });
+      try {
+        const { sqlQuery } = await this.cubejsApi().sql(query, {
+          mutexObj: this.mutexObj,
+        });
 
-      finalState.query.order = sqlQuery.sql.order;
+        finalState.query.order = sqlQuery.sql.order;
+      } catch (error) {
+        if (error.response.code !== 'MISSING_DATE_RANGE') {
+          throw error;
+        }
+      }
     }
     
     const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;

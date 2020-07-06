@@ -4,6 +4,7 @@ import SqlQuery from './SqlQuery';
 import Meta from './Meta';
 import ProgressResult from './ProgressResult';
 import HttpTransport from './HttpTransport';
+import RequestError from './RequestError';
 
 const API_URL = process.env.CUBEJS_API_URL;
 
@@ -25,10 +26,12 @@ class CubejsApi {
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
     this.headers = options.headers || {};
+    this.credentials = options.credentials;
     this.transport = options.transport || new HttpTransport({
       authorization: typeof apiToken === 'function' ? undefined : apiToken,
       apiUrl: this.apiUrl,
-      headers: this.headers
+      headers: this.headers,
+      credentials: this.credentials
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
@@ -128,7 +131,8 @@ class CubejsApi {
         if (!options.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
         }
-        const error = new Error(body.error); // TODO error class
+        
+        const error = new RequestError(body.error, body); // TODO error class
         if (callback) {
           callback(error);
         } else {

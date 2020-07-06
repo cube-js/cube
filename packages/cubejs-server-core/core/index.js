@@ -85,7 +85,7 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
     `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${withColor(warning, colors.yellow)}`
   );
   const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${error}`);
-  const logDetails = () => console.log(`${withColor(type)}: ${format(message)}`);
+  const logDetails = (showRestParams) => console.log(`${withColor(type)}: ${format({ ...message, showRestParams })}`);
 
   if (error) {
     logError();
@@ -96,7 +96,7 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
   switch ((level || 'info').toLowerCase()) {
     case "trace": {
       if (!error && !warning) {
-        logDetails();
+        logDetails(true);
         break;
       }
     }
@@ -171,7 +171,20 @@ class CubejsServerCore {
   constructor(options) {
     options = options || {};
     options = {
-      driverFactory: () => CubejsServerCore.createDriver(options.dbType),
+      driverFactory: () => typeof options.dbType === 'string' && CubejsServerCore.createDriver(options.dbType),
+      dialectFactory: () => typeof options.dbType === 'string' &&
+        CubejsServerCore.lookupDriverClass(options.dbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(options.dbType).dialectClass(),
+      externalDriverFactory: process.env.CUBEJS_EXT_DB_TYPE && (
+        () => new (CubejsServerCore.lookupDriverClass(process.env.CUBEJS_EXT_DB_TYPE))({
+          host: process.env.CUBEJS_EXT_DB_HOST,
+          database: process.env.CUBEJS_EXT_DB_NAME,
+          port: process.env.CUBEJS_EXT_DB_PORT,
+          user: process.env.CUBEJS_EXT_DB_USER,
+          password: process.env.CUBEJS_EXT_DB_PASS,
+        })
+      ),
+      externalDbType: process.env.CUBEJS_EXT_DB_TYPE,
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
       devServer: process.env.NODE_ENV !== 'production',
@@ -188,6 +201,8 @@ class CubejsServerCore {
     this.options = options;
     this.driverFactory = options.driverFactory;
     this.externalDriverFactory = options.externalDriverFactory;
+    this.dialectFactory = options.dialectFactory;
+    this.externalDialectFactory = options.externalDialectFactory;
     this.apiSecret = options.apiSecret;
     this.schemaPath = options.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema';
     this.dbType = options.dbType;
@@ -419,6 +434,9 @@ class CubejsServerCore {
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
+          dialectClass: (dataSourceContext) => this.dialectFactory &&
+            this.dialectFactory({ ...context, ...dataSourceContext }),
+          externalDialectClass: this.externalDialectFactory && this.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
           context
@@ -444,6 +462,9 @@ class CubejsServerCore {
         getDriver: async () => {
           if (!driverPromise) {
             const driver = await this.driverFactory(context);
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
             driverPromise = driver.testConnection().then(() => driver).catch(e => {
               driverPromise = null;
               throw e;
@@ -454,6 +475,9 @@ class CubejsServerCore {
         getExternalDriverFactory: this.externalDriverFactory && (async () => {
           if (!externalPreAggregationsDriverPromise) {
             const driver = await this.externalDriverFactory(context);
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
             externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
               externalPreAggregationsDriverPromise = null;
               throw e;
@@ -477,7 +501,9 @@ class CubejsServerCore {
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
       allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey,
-      compileContext: options.context
+      compileContext: options.context,
+      dialectClass: options.dialectClass,
+      externalDialectClass: options.externalDialectClass,
     });
   }
 
@@ -506,15 +532,21 @@ class CubejsServerCore {
 
   static createDriver(dbType) {
     checkEnvForPlaceholders();
+    return new (CubejsServerCore.lookupDriverClass(dbType))();
+  }
+
+  static lookupDriverClass(dbType) {
     // eslint-disable-next-line global-require,import/no-dynamic-require
-    return new (require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE)))();
+    return require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
   }
 
   static driverDependencies(dbType) {
-    if (!DriverDependencies[dbType]) {
-      throw new Error(`Unsupported db type: ${dbType}`);
+    if (DriverDependencies[dbType]) {
+      return DriverDependencies[dbType];
+    } else if (fs.existsSync(path.join('node_modules', `${dbType}-cubejs-driver`))) {
+      return `${dbType}-cubejs-driver`;
     }
-    return DriverDependencies[dbType];
+    throw new Error(`Unsupported db type: ${dbType}`);
   }
 
   testConnections() {

@@ -41,14 +41,16 @@ class BigQueryDriver extends BaseDriver {
     });
   }
 
-  query(query, values) {
-    return this.bigquery.query({
+  async query(query, values, options) {
+    const data = await this.runQueryJob({
       query,
-      params: values
-    }).then(
-      (data) => data[0] && data[0].map(
-        row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
-      )
+      params: values,
+      parameterMode: 'positional',
+      useLegacySql: false
+    }, options);
+
+    return data[0] && data[0].map(
+      row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
     );
   }
 
@@ -144,16 +146,21 @@ class BigQueryDriver extends BaseDriver {
     await this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }
 
-  async loadPreAggregationIntoTable(preAggregationTableName, loadSql, params) {
+  async loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
     const [dataSet, tableName] = preAggregationTableName.split('.');
-    const [job] = await this.bigquery.createQueryJob({
+    const bigQueryQuery = {
       query: loadSql,
       params,
       parameterMode: 'positional',
       destination: this.bigquery.dataset(dataSet).table(tableName),
       createDisposition: "CREATE_IF_NEEDED",
       useLegacySql: false
-    });
+    };
+    return this.runQueryJob(bigQueryQuery, options, false);
+  }
+
+  async runQueryJob(bigQueryQuery, options, withResults = true) {
+    const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
     const awaitForJobStatus = async () => {
       const [result] = await job.getMetadata();
       if (result.status && result.status.state === 'DONE') {
@@ -164,17 +171,20 @@ class BigQueryDriver extends BaseDriver {
               JSON.stringify(result.status.errorResult)
           );
         }
+        this.reportQueryUsage(result.statistics, options);
       } else {
-        return false;
+        return null;
       }
-      return true;
+      return withResults ? job.getQueryResults() : true;
     };
-    for (let i = 0; i < 10 * 60 / 5; i++) {
-      if (await awaitForJobStatus()) {
-        break;
+    for (let i = 0; i < 15 * 60 / 5; i++) {
+      const result = await awaitForJobStatus();
+      if (result) {
+        return result;
       }
-      await pause(5000);
+      await pause(Math.min(5000, 200 * i));
     }
+    throw new Error('BigQuery job timeout');
   }
 
   quoteIdentifier(identifier) {

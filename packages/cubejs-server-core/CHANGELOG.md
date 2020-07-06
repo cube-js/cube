@@ -3,6 +3,52 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.46](https://github.com/cube-js/cube.js/compare/v0.19.45...v0.19.46) (2020-07-06)
+
+
+### Features
+
+* Report query usage for Athena and BigQuery ([697b53f](https://github.com/cube-js/cube.js/commit/697b53f))
+
+
+
+
+
+## [0.19.45](https://github.com/cube-js/cube.js/compare/v0.19.44...v0.19.45) (2020-07-04)
+
+
+### Bug Fixes
+
+* Error: Error: Class constructor cannot be invoked without 'new' ([beb75df](https://github.com/cube-js/cube.js/commit/beb75df))
+* TypeError: (queryOptions.dialectClass || ADAPTERS[dbType]) is not a constructor ([502480c](https://github.com/cube-js/cube.js/commit/502480c))
+
+
+
+
+
+## [0.19.44](https://github.com/cube-js/cube.js/compare/v0.19.43...v0.19.44) (2020-07-04)
+
+
+### Bug Fixes
+
+* Error: Unsupported db type: function ([13d1b93](https://github.com/cube-js/cube.js/commit/13d1b93))
+
+
+
+
+
+## [0.19.43](https://github.com/cube-js/cube.js/compare/v0.19.42...v0.19.43) (2020-07-04)
+
+
+### Features
+
+* `CUBEJS_EXT_DB_*` env variables support ([3a4c921](https://github.com/cube-js/cube.js/commit/3a4c921))
+* Pluggable dialects support ([f786fdd](https://github.com/cube-js/cube.js/commit/f786fdd)), closes [#590](https://github.com/cube-js/cube.js/issues/590)
+
+
+
+
+
 ## [0.19.42](https://github.com/cube-js/cube.js/compare/v0.19.41...v0.19.42) (2020-07-01)
 
 

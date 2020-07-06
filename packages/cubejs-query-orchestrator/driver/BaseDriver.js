@@ -93,12 +93,12 @@ class BaseDriver {
     );
   }
 
-  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx) {
-    return this.query(loadSql, params, tx);
+  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+    return this.query(loadSql, params, options);
   }
 
-  dropTable(tableName, tx) {
-    return this.query(`DROP TABLE ${tableName}`, [], tx);
+  dropTable(tableName, options) {
+    return this.query(`DROP TABLE ${tableName}`, [], options);
   }
 
   param(/* paramIndex */) {
@@ -179,6 +179,19 @@ class BaseDriver {
 
   cancelCombinator(fn) {
     return cancelCombinator(fn);
+  }
+
+  setLogger(logger) {
+    this.logger = logger;
+  }
+
+  reportQueryUsage(usage, queryOptions) {
+    if (this.logger) {
+      this.logger('SQL Query Usage', {
+        ...usage,
+        ...queryOptions
+      });
+    }
   }
 }
 

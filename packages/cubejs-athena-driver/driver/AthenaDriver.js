@@ -3,9 +3,7 @@ const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const SqlString = require('sqlstring');
 
-const applyParams = (query, params) => {
-  return SqlString.format(query, params);
-};
+const applyParams = (query, params) => SqlString.format(query, params);
 
 class AthenaDriver extends BaseDriver {
   constructor(config) {
@@ -34,7 +32,7 @@ class AthenaDriver extends BaseDriver {
     });
   }
 
-  async query(query, values) {
+  async query(query, values, options) {
     const queryString = applyParams(
       query,
       (values || []).map(s => (typeof s === 'string' ? {
@@ -63,9 +61,12 @@ class AthenaDriver extends BaseDriver {
       ) {
         const allRows = [];
         let columnInfo;
+        this.reportQueryUsage({
+          dataScannedInBytes: queryExecution.QueryExecution.Statistics.DataScannedInBytes
+        }, options);
         for (
           let results = await this.athena.getQueryResultsAsync({ QueryExecutionId });
-          !!results;
+          results;
           results = results.NextToken && (await this.athena.getQueryResultsAsync({
             QueryExecutionId, NextToken: results.NextToken
           }))
@@ -73,15 +74,13 @@ class AthenaDriver extends BaseDriver {
           const [header, ...tableRows] = results.ResultSet.Rows;
           allRows.push(...(allRows.length ? results.ResultSet.Rows : tableRows));
           if (!columnInfo) {
-            columnInfo = results.ResultSet.ResultSetMetadata.ColumnInfo
+            columnInfo = results.ResultSet.ResultSetMetadata.ColumnInfo;
           }
         }
 
-        return allRows.map(r =>
-          columnInfo
-            .map((c, i) => ({ [c.Name]: r.Data[i].VarCharValue }))
-            .reduce((a, b) => ({...a, ...b}), {})
-        );
+        return allRows.map(r => columnInfo
+          .map((c, i) => ({ [c.Name]: r.Data[i].VarCharValue }))
+          .reduce((a, b) => ({ ...a, ...b }), {}));
       }
       await this.sleep(500);
     }
