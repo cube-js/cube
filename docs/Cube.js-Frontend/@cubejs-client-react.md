@@ -1,118 +1,61 @@
 ---
+title: '@cubejs-client/react'
+permalink: /@cubejs-client-react
+category: Cube.js Frontend
+subCategory: Reference
+menuOrder: 3
 ---
 
-## QueryBuilder
+`@cubejs-client/react` provides React Components for easy Cube.js integration in a React app.
 
-### • **QueryBuilder** extends **React.Component** ‹[QueryBuilderProps](#query-builder-props)›:
+## useCubeQuery
 
-`<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
+▸  **useCubeQuery**‹**TData**›(**query**: Query, **options?**: [UseCubeQueryOptions](#use-cube-query-options)) => *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
 
-Example: **orderMembers**
+A React hook for executing Cube.js queries
 ```js
-// Ex: `orderMembers`
-// [
-//   {
-//     id: 'Users.country',
-//     title: 'Users Country',
-//     order: 'desc'
-//   },
-//   //...
-// ]
-
 import React from 'react';
-import ReactDOM from 'react-dom';
-import { Button, Layout, Divider, Empty, Select, Row, Col } from 'antd';
-import { QueryBuilder } from '@cubejs-client/react';
-import cubejs from '@cubejs-client/core';
-import 'antd/dist/antd.css';
+import { Table } from 'antd';
+import { useCubeQuery }  from '@cubejs-client/react';
 
-import ChartRenderer from './ChartRenderer';
+export default function App() {
+  const { resultSet, isLoading, error } = useCubeQuery({
+    measures: ['Orders.count'],
+    dimensions: ['Orders.createdAt.month'],
+  });
 
-const API_URL = 'https://react-dashboard.cubecloudapp.dev';
-const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9. * eyJpYXQiOjE1OTE3MDcxNDgsImV4cCI6MTU5NDI5OTE0OH0. * n5jGLQJ14igg6_Hri_Autx9qOIzVqp4oYxmX27V-4T4';
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
-const cubejsApi = cubejs(CUBEJS_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
-});
+  if (error) {
+    return <div>{error.toString()}</div>;
+  }
 
-const App = () => {
-  return (
-    <QueryBuilder
-      query={{
-        measures: ['Orders.count'],
-        timeDimensions: [
-          {
-            dimension: 'Orders.createdAt',
-            granularity: 'month',
-            dateRange: ['2016-01-01', '2016-12-31'],
-          },
-        ],
-      }}
-      cubejsApi={cubejsApi}
-      render={({ resultSet, measures, orderMembers, updateOrder }) => {
-        return (
-          <Layout.Content style={{ padding: 20 }}>
-            {orderMembers.map((orderMember, index) => (
-              <Row gutter={[8, 16]} align="middle">
-                <Col span={6}>{orderMember.title}</Col>
+  if (!resultSet) {
+    return null;
+  }
 
-                <Col>
-                  <Select
-                    value={orderMember.order}
-                    placeholder="Select order"
-                    onSelect={(order) => updateOrder.set(orderMember.id,  * order)}
-                  >
-                    {['none', 'asc', 'desc'].map((order) => (
-                      <Select.Option key={order} value={order}>
-                        {order}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Col>
+  const dataSource = resultSet.tablePivot();
+  const columns = resultSet.tableColumns();
 
-                <Col>
-                  <Button
-                    onClick={() => {
-                      index - 1 >= 0 && updateOrder.reorder(index, index - 1);
-                    }}
-                  >
-                    Move up
-                  </Button>
+  return <Table columns={columns} dataSource={dataSource} />;
+}
 
-                  <Button
-                    onClick={() => {
-                      index + 1 < orderMembers.length &&
-                        updateOrder.reorder(index, index + 1);
-                    }}
-                  >
-                    Move down
-                  </Button>
-                </Col>
-              </Row>
-            ))}
-            <Divider />
-            {measures.length > 0 ? (
-              <ChartRenderer resultSet={resultSet} />
-            ) : (
-              <Empty description="Select measure or dimension to get started"  * />
-            )}
-          </Layout.Content>
-        );
-      }}
-    />
-  );
-};
-
-const rootElement = document.getElementById('root');
-ReactDOM.render(<App />, rootElement);
 ```
 
-## QueryRenderer
+**Type parameters:**
 
-### • **QueryRenderer** extends **React.Component** ‹[QueryRendererProps](#query-renderer-props)›:
+- **TData**
 
-`<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
+**Parameters:**
+
+Name | Type |
+------ | ------ |
+query | Query |
+options? | [UseCubeQueryOptions](#use-cube-query-options) |
+
+**Returns:** *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
 
 ## isQueryPresent
 
@@ -128,22 +71,101 @@ query | Query |
 
 **Returns:** *boolean*
 
-## useCubeQuery
+## QueryBuilder
 
-▸  **useCubeQuery**‹**TData**›(**query**: Query, **options?**: [UseCubeQueryOptions](#use-cube-query-options)) => *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
+### • **QueryBuilder** extends **React.Component** ‹[QueryBuilderProps](#query-builder-props), [QueryBuilderState](#query-builder-state)›:
 
-**Type parameters:**
+`<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
 
-- **TData**
+**Example**
+[Open in CodeSandbox](https://codesandbox.io/s/z6r7qj8wm)
+```js
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { Layout, Divider, Empty, Select } from 'antd';
+import { QueryBuilder } from '@cubejs-client/react';
+import cubejs from '@cubejs-client/core';
+import 'antd/dist/antd.css';
 
-**Parameters:**
+import ChartRenderer from './ChartRenderer';
 
-Name | Type |
------- | ------ |
-query | Query |
-options? | [UseCubeQueryOptions](#use-cube-query-options) |
+const cubejsApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
+  apiUrl: 'http://localhost:4000/cubejs-api/v1',
+});
 
-**Returns:** *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
+const App = () => (
+  <QueryBuilder
+    query={{
+      timeDimensions: [
+        {
+          dimension: 'LineItems.createdAt',
+          granularity: 'month',
+        },
+      ],
+    }}
+    cubejsApi={cubejsApi}
+    render={({ resultSet, measures, availableMeasures, updateMeasures }) => (
+      <Layout.Content style={{ padding: '20px' }}>
+        <Select
+          mode="multiple"
+          style={{ width: '100%' }}
+          placeholder="Please select"
+          onSelect={(measure) => updateMeasures.add(measure)}
+          onDeselect={(measure) => updateMeasures.remove(measure)}
+        >
+          {availableMeasures.map((measure) => (
+            <Select.Option key={measure.name} value={measure}>
+              {measure.title}
+            </Select.Option>
+          ))}
+        </Select>
+        <Divider />
+        {measures.length > 0 ? (
+          <ChartRenderer resultSet={resultSet} />
+        ) : (
+          <Empty description="Select measure or dimension to get started" />
+        )}
+      </Layout.Content>
+    )}
+  />
+);
+
+const rootElement = document.getElementById("root");
+ReactDOM.render(<App />, rootElement);
+```
+
+## QueryRenderer
+
+### • **QueryRenderer** extends **React.Component** ‹[QueryRendererProps](#query-renderer-props)›:
+
+`<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
+
+## CubeProvider
+
+### • **CubeProvider**: *React.FC‹[CubeProviderVariables](#cube-provider-variables)›*
+
+Cube.js context provider
+```js
+import React from 'react';
+import cubejs from '@cubejs-client/core';
+import { CubeProvider } from '@cubejs-client/react';
+
+const API_URL = 'https://react-dashboard.cubecloudapp.dev';
+const CUBEJS_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.* eyJpYXQiOjE1OTE3MDcxNDgsImV4cCI6MTU5NDI5OTE0OH0.* n5jGLQJ14igg6_Hri_Autx9qOIzVqp4oYxmX27V-4T4';
+
+const cubejsApi = cubejs(CUBEJS_TOKEN, {
+  apiUrl: `${API_URL}/cubejs-api/v1`,
+});
+
+export default function App() {
+  return (
+    <CubeProvider cubejsApi={cubejsApi}>
+      //...
+    </CubeProvider>
+  )
+}
+```
 
 ## ChartType
 
@@ -151,16 +173,12 @@ options? | [UseCubeQueryOptions](#use-cube-query-options) |
 
 ## CubeProviderVariables
 
-Ƭ **CubeProviderVariables**: *object*
-
 Name | Type |
 ------ | ------ |
 children | React.ReactNode |
 cubejsApi | CubejsApi |
 
 ## MemberUpdater
-
-Ƭ **MemberUpdater**: *object*
 
 Name | Type |
 ------ | ------ |
@@ -170,24 +188,20 @@ update |  (**member**: [TMember](#t-member), **updateWith**: [TMember](#t-member
 
 ## QueryBuilderProps
 
-Ƭ **QueryBuilderProps**: *object*
-
 Name | Type | Description |
 ------ | ------ | ------ |
 cubejsApi | CubejsApi | `CubejsApi` instance to use |
-defaultChartType | [ChartType](#chart-type) | - |
-disableHeuristics | boolean | - |
+defaultChartType? | [ChartType](#chart-type) | - |
+disableHeuristics? | boolean | Defaults to `false`. This means that the default heuristics will be applied. For example: when the query is empty and you select a measure that has a default time dimension it will be pushed to the query. |
 query? | Query | Default query |
 render |  (**renderProps**: [QueryBuilderRenderProps](#query-builder-render-props)) => *React.ReactNode* | - |
-setQuery |  (**query**: Query) => *void* | Called by the `QueryBuilder` when the query state has changed. Use it when state is maintained outside of the `QueryBuilder` component. |
-setVizState |  (**vizState**: [VizState](#viz-state)) => *void* | - |
-stateChangeHeuristics |  () => *any* | todo: wip |
-vizState | [VizState](#viz-state) | - |
-wrapWithQueryRenderer | boolean | - |
+setQuery? |  (**query**: Query) => *void* | Called by the `QueryBuilder` when the query state has changed. Use it when state is maintained outside of the `QueryBuilder` component. |
+setVizState? |  (**vizState**: [VizState](#viz-state)) => *void* | - |
+stateChangeHeuristics? |  (**state**: [QueryBuilderState](#query-builder-state)) => *[QueryBuilderState](#query-builder-state)* | A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way. |
+vizState? | [VizState](#viz-state) | - |
+wrapWithQueryRenderer? | boolean | - |
 
 ## QueryBuilderRenderProps
-
-Ƭ **QueryBuilderRenderProps**: *object*
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -206,23 +220,23 @@ updateQuery |  (**query**: Query) => *void* | Used for partial of full query upd
 updateSegments | [MemberUpdater](#member-updater) | - |
 updateTimeDimensions | [MemberUpdater](#member-updater) | - |
 
-## QueryRendererProps
+## QueryBuilderState
 
-Ƭ **QueryRendererProps**: *object*
+Ƭ **QueryBuilderState**: *[VizState](#viz-state) & object*
+
+## QueryRendererProps
 
 Name | Type | Description |
 ------ | ------ | ------ |
 cubejsApi | CubejsApi | `CubejsApi` instance to use |
-loadSql? | "only" &#124; boolean | Indicates whether the generated by `Cube.js` SQL Code should be requested. See [rest-api#sql](rest-api#api-reference-v-1-sql). When set to `only` |
+loadSql? | "only" &#124; boolean | Indicates whether the generated by `Cube.js` SQL Code should be requested. See [rest-api#sql](rest-api#api-reference-v-1-sql). When set to `only` then only the request to [/v1/sql](/docs/rest-api#api-reference-v-1-sql) will be performed. When set to `true` the sql request will be performed along with the query request. Will not be performed if set to `false` |
 queries? | object | - |
 query | Query | Analytic query. [Learn more about it's format](query-format) |
 render |  (**QueryRendererRenderProp**: any) => *void* | Output of this function will be rendered by the `QueryRenderer` |
-resetResultSetOnChange? | boolean | - |
+resetResultSetOnChange? | boolean | When `true` the **resultSet** will be reset to `null` first on every state change |
 updateOnlyOnStateChange? | boolean | - |
 
 ## QueryRendererRenderProp
-
-Ƭ **QueryRendererRenderProp**: *object*
 
 Name | Type |
 ------ | ------ |
@@ -232,15 +246,13 @@ resultSet | ResultSet &#124; null |
 
 ## TAvailableDimension
 
-Ƭ **TAvailableDimension**: *[TMember](#t-member) & [TMemberType](#t-member-type) & object*
+Ƭ **TAvailableDimension**: *[TMember](#t-member) & object*
 
 ## TAvailableMeasure
 
-Ƭ **TAvailableMeasure**: *[TMember](#t-member) & [TMemberType](#t-member-type) & object*
+Ƭ **TAvailableMeasure**: *[TMember](#t-member) & object*
 
 ## TMember
-
-Ƭ **TMember**: *object*
 
 Name | Type |
 ------ | ------ |
@@ -250,15 +262,9 @@ title | string |
 
 ## TMemberType
 
-Ƭ **TMemberType**: *object*
-
-Name | Type |
------- | ------ |
-type | "time" &#124; "number" &#124; "string" &#124; "boolean" |
+Ƭ **TMemberType**: *"time" | "number" | "string" | "boolean"*
 
 ## UseCubeQueryOptions
-
-Ƭ **UseCubeQueryOptions**: *object*
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -269,8 +275,6 @@ subscribe? | boolean | When `true` the resultSet will be reset to `null` first |
 
 ## UseCubeQueryResult
 
-Ƭ **UseCubeQueryResult**: *object*
-
 Name | Type |
 ------ | ------ |
 error | Error &#124; null |
@@ -279,8 +283,8 @@ resultSet | ResultSet‹TData› &#124; null |
 
 ## VizState
 
-Ƭ **VizState**: *object*
-
-## CubeProvider
-
-### • **CubeProvider**: *React.FC‹[CubeProviderVariables](#cube-provider-variables)›*
+Name | Type |
+------ | ------ |
+chartType? | [ChartType](#chart-type) |
+pivotConfig? | PivotConfig |
+shouldApplyHeuristicOrder? | boolean |

@@ -1,14 +1,13 @@
-import { DeclarationReflection, ReflectionKind, ParameterType } from 'typedoc';
+import { DeclarationReflection, ReflectionKind } from 'typedoc';
+import { ReferenceType, ReferenceReflection } from 'typedoc/dist/lib/models';
 import { heading } from './heading';
 import { memberSymbol } from './member-symbol';
 import { type } from './type';
-import { ReferenceType, Type, TypeParameterReflection, IntrinsicType } from 'typedoc/dist/lib/models';
-import { TypeReference } from 'typescript';
 
 export function declarationTitle(this: DeclarationReflection, showSymbol: boolean) {
-  // if (this.type?.type !== 'union' && this.type?.type !== 'tuple' && this.kind !== ReflectionKind.EnumMember) {
-  //   return '';
-  // }
+  if (this.type && type.call(this.type).toString() === 'object') {
+    return '';
+  }
 
   const md = [];
   const isOptional = this.flags.map((flag) => flag).includes('Optional');
@@ -29,6 +28,9 @@ export function declarationTitle(this: DeclarationReflection, showSymbol: boolea
   md.push(`**${this.name}**${isOptional ? '? ' : ''}`);
 
   if (this.typeHierarchy?.types.length) {
+    if (this.typeHierarchy?.isTarget) {
+      return '';
+    }
     const [parent] = this.typeHierarchy.types;
     if (parent instanceof ReferenceType) {
       const name = parent.reflection === undefined ? parent.symbolFullyQualifiedName : parent.name;

@@ -15,7 +15,6 @@
   },
   "peerDependencies": {
     "@cubejs-client/core": "^0.19.35",
-    "prop-types": "^15.6.2",
     "react": "^16.10.2"
   },
   "main": "dist/cubejs-client-react.js",
@@ -38,7 +37,6 @@
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-node": "^10.0.0",
     "eslint-plugin-react": "^7.15.1",
-    "prop-types": "^15.6.2",
     "react": "^16.10.2"
   }
 }

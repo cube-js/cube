@@ -12,5 +12,3 @@ yarn-error.log
 .rpt2_cache/
 **/.nyc_output
 **/coverage
-docs/Cube.js-Frontend/@cubejs-client-core.md
-docs/Cube.js-Frontend/@cubejs-client-react.md

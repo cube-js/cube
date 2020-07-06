@@ -1,5 +1,4 @@
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import { equals, toPairs, fromPairs } from 'ramda';
 import isQueryPresent from './isQueryPresent';
 import CubeContext from './CubeContext';
@@ -145,16 +144,6 @@ export default class QueryRenderer extends React.Component {
 }
 
 QueryRenderer.contextType = CubeContext;
-
-QueryRenderer.propTypes = {
-  render: PropTypes.func,
-  cubejsApi: PropTypes.object,
-  query: PropTypes.object,
-  queries: PropTypes.object,
-  loadSql: PropTypes.any,
-  resetResultSetOnChange: PropTypes.bool,
-  updateOnlyOnStateChange: PropTypes.bool
-};
 
 QueryRenderer.defaultProps = {
   cubejsApi: null,

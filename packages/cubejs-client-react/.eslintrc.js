@@ -20,6 +20,7 @@ module.exports = {
     'react/jsx-tag-spacing': 0,
     'react/prefer-stateless-function': 0,
     'react/forbid-prop-types': 0,
+    'react/prop-types': 0,
     'import/extensions': 0,
     quotes: ['warn', 'single'],
     'no-prototype-builtins': 0,
