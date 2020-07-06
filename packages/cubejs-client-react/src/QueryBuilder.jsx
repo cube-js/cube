@@ -1,5 +1,4 @@
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import {
   prop, uniqBy, indexBy, fromPairs
 } from 'ramda';
@@ -273,11 +272,17 @@ export default class QueryBuilder extends React.Component {
     const { order: _, ...query } = finalState.query || {};
     
     if (finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
-      const { sqlQuery } = await this.cubejsApi().sql(query, {
-        mutexObj: this.mutexObj
-      });
+      try {
+        const { sqlQuery } = await this.cubejsApi().sql(query, {
+          mutexObj: this.mutexObj,
+        });
 
-      finalState.query.order = sqlQuery.sql.order;
+        finalState.query.order = sqlQuery.sql.order;
+      } catch (error) {
+        if (error.response.code !== 'MISSING_DATE_RANGE') {
+          throw error;
+        }
+      }
     }
     
     const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
@@ -507,17 +512,17 @@ export default class QueryBuilder extends React.Component {
 
 QueryBuilder.contextType = CubeContext;
 
-QueryBuilder.propTypes = {
-  render: PropTypes.func,
-  stateChangeHeuristics: PropTypes.func,
-  setQuery: PropTypes.func,
-  setVizState: PropTypes.func,
-  cubejsApi: PropTypes.object,
-  disableHeuristics: PropTypes.bool,
-  wrapWithQueryRenderer: PropTypes.bool,
-  query: PropTypes.object,
-  vizState: PropTypes.object
-};
+// QueryBuilder.propTypes = {
+//   render: PropTypes.func,
+//   stateChangeHeuristics: PropTypes.func,
+//   setQuery: PropTypes.func,
+//   setVizState: PropTypes.func,
+//   cubejsApi: PropTypes.object,
+//   disableHeuristics: PropTypes.bool,
+//   wrapWithQueryRenderer: PropTypes.bool,
+//   query: PropTypes.object,
+//   vizState: PropTypes.object
+// };
 
 QueryBuilder.defaultProps = {
   cubejsApi: null,

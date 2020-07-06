@@ -47,6 +47,10 @@ import 'core-js/modules/web.dom-collections.iterator';
 import 'core-js/modules/web.url';
 import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
+import _possibleConstructorReturn from '@babel/runtime/helpers/possibleConstructorReturn';
+import _getPrototypeOf from '@babel/runtime/helpers/getPrototypeOf';
+import _inherits from '@babel/runtime/helpers/inherits';
+import _wrapNativeSuper from '@babel/runtime/helpers/wrapNativeSuper';
 
 var moment = momentRange.extendMoment(Moment);
 var TIME_SERIES = {
@@ -947,13 +951,15 @@ function () {
     var authorization = _ref.authorization,
         apiUrl = _ref.apiUrl,
         _ref$headers = _ref.headers,
-        headers = _ref$headers === void 0 ? {} : _ref$headers;
+        headers = _ref$headers === void 0 ? {} : _ref$headers,
+        credentials = _ref.credentials;
 
     _classCallCheck(this, HttpTransport);
 
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.headers = headers;
+    this.credentials = credentials;
   }
 
   _createClass(HttpTransport, [{
@@ -977,7 +983,8 @@ function () {
           headers: _objectSpread2({
             Authorization: _this.authorization,
             'x-request-id': baseRequestId && "".concat(baseRequestId, "-span-").concat(spanCounter++)
-          }, _this.headers)
+          }, _this.headers),
+          credentials: _this.credentials
         });
       };
 
@@ -1017,6 +1024,24 @@ function () {
   return HttpTransport;
 }();
 
+var RequestError =
+/*#__PURE__*/
+function (_Error) {
+  _inherits(RequestError, _Error);
+
+  function RequestError(message, response) {
+    var _this;
+
+    _classCallCheck(this, RequestError);
+
+    _this = _possibleConstructorReturn(this, _getPrototypeOf(RequestError).call(this, message));
+    _this.response = response;
+    return _this;
+  }
+
+  return RequestError;
+}(_wrapNativeSuper(Error));
+
 var API_URL = "https://statsbot.co/cubejs-api/v1";
 var mutexCounter = 0;
 var MUTEX_ERROR = 'Mutex has been changed';
@@ -1046,10 +1071,12 @@ function () {
     this.apiToken = apiToken;
     this.apiUrl = options.apiUrl || API_URL;
     this.headers = options.headers || {};
+    this.credentials = options.credentials;
     this.transport = options.transport || new HttpTransport({
       authorization: typeof apiToken === 'function' ? undefined : apiToken,
       apiUrl: this.apiUrl,
-      headers: this.headers
+      headers: this.headers,
+      credentials: this.credentials
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
@@ -1319,7 +1346,7 @@ function () {
                   return requestInstance.unsubscribe();
 
                 case 25:
-                  error = new Error(body.error); // TODO error class
+                  error = new RequestError(body.error, body); // TODO error class
 
                   if (!callback) {
                     _context4.next = 30;

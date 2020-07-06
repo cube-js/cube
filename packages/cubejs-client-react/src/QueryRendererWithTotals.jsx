@@ -1,5 +1,4 @@
 import React from 'react';
-import * as PropTypes from 'prop-types';
 import QueryRenderer from './QueryRenderer.jsx';
 
 const QueryRendererWithTotals = ({ query, ...restProps }) => (
@@ -17,14 +16,6 @@ const QueryRendererWithTotals = ({ query, ...restProps }) => (
     {...restProps}
   />
 );
-
-QueryRendererWithTotals.propTypes = {
-  render: PropTypes.func,
-  cubejsApi: PropTypes.object.isRequired,
-  query: PropTypes.object,
-  queries: PropTypes.object,
-  loadSql: PropTypes.any
-};
 
 QueryRendererWithTotals.defaultProps = {
   query: null,

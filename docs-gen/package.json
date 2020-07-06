@@ -9,7 +9,7 @@
   "scripts": {
     "lint": "tslint --project ./tsconfig.json",
     "generate": "yarn build && yarn gen-docs",
-    "gen-docs": "typedoc --excludeExternals --includeDeclarations --plugin ./dist/index.js --hideSources --hideIndexes --out ../docs/Cube.js-Frontend --name @cubejs-client-core ../packages/cubejs-client-core/index.d.ts",
+    "gen-docs": "node tasks/generate.js",
     "dev-gen": "copyfiles --up 1 ./src/**/*.hbs ./dist/ && yarn gen-docs",
     "build": "rm -rf dist && tsc --sourceMap false --declaration false && copyfiles --up 1 ./src/**/*.hbs ./dist/",
     "watch": "tsc-watch",

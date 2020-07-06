@@ -2,12 +2,16 @@ import { ProjectReflection } from 'typedoc';
 import { CommentTag, ContainerReflection } from 'typedoc/dist/lib/models';
 
 export function meta(this: ProjectReflection) {
-  function findModuleRelection(reflection: ContainerReflection) {
-    if (reflection.comment) {
+  function findModuleRelection(reflection?: ContainerReflection) {
+    if (!reflection) {
+      return null;
+    }
+    
+    if (reflection?.comment) {
       return reflection;
     }
 
-    return findModuleRelection(reflection.children?.[0]);
+    return findModuleRelection(reflection?.children?.[0]);
   }
   
   function tagConverter(tag: string)  {

@@ -3,7 +3,7 @@ import { SignatureReflection } from 'typedoc';
 import { memberSymbol } from './member-symbol';
 import { type } from './type';
 
-export function signatureTitle(this: SignatureReflection, showSymbol: boolean) {
+export function signatureTitle(this: SignatureReflection, showSymbol: boolean = false, useArrow: boolean = false) {
   const md = [];
 
   if (showSymbol) {
@@ -44,7 +44,8 @@ export function signatureTitle(this: SignatureReflection, showSymbol: boolean) {
     : '';
   md.push(`(${params})`);
   if (this.type) {
-    md.push(`: *${type.call(this.type)}*`);
+    md.push(useArrow ? ' =>' : ':');
+    md.push(` *${type.call(this.type)}*`);
   }
   return md.join('') + '\n';
 }
