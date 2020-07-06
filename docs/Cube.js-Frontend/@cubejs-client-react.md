@@ -73,7 +73,7 @@ query | Query |
 
 ## QueryBuilder
 
-### • **QueryBuilder** extends **React.Component** ‹[QueryBuilderProps](#query-builder-props), [QueryBuilderState](#query-builder-state)›:
+• **QueryBuilder** extends **React.Component** ‹[QueryBuilderProps](#query-builder-props), [QueryBuilderState](#query-builder-state)›:
 
 `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
 
@@ -136,13 +136,13 @@ ReactDOM.render(<App />, rootElement);
 
 ## QueryRenderer
 
-### • **QueryRenderer** extends **React.Component** ‹[QueryRendererProps](#query-renderer-props)›:
+• **QueryRenderer** extends **React.Component** ‹[QueryRendererProps](#query-renderer-props)›:
 
 `<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
 
 ## CubeProvider
 
-### • **CubeProvider**: *React.FC‹[CubeProviderVariables](#cube-provider-variables)›*
+• **CubeProvider**: *React.FC‹[CubeProviderVariables](#cube-provider-variables)›*
 
 Cube.js context provider
 ```js
