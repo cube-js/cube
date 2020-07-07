@@ -279,7 +279,9 @@ export default class QueryBuilder extends React.Component {
 
         finalState.query.order = sqlQuery.sql.order;
       } catch (error) {
-        if (error.response.code !== 'MISSING_DATE_RANGE') {
+        if (error.response?.type === 'UserError') {
+          console.error(error.response.error);
+        } else {
           throw error;
         }
       }

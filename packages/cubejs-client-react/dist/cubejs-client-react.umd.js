@@ -1,8 +1,8 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react'), require('prop-types')) :
-  typeof define === 'function' && define.amd ? define(['exports', 'react', 'prop-types'], factory) :
-  (global = global || self, factory(global.cubejsReact = {}, global.React, global.PropTypes));
-}(this, function (exports, React, PropTypes) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.cubejsReact = {}, global.React));
+}(this, function (exports, React) { 'use strict';
 
   var React__default = 'default' in React ? React['default'] : React;
 
@@ -8329,15 +8329,6 @@
     return QueryRenderer;
   }(React__default.Component);
   QueryRenderer.contextType = CubeContext;
-  QueryRenderer.propTypes = {
-    render: PropTypes.func,
-    cubejsApi: PropTypes.object,
-    query: PropTypes.object,
-    queries: PropTypes.object,
-    loadSql: PropTypes.any,
-    resetResultSetOnChange: PropTypes.bool,
-    updateOnlyOnStateChange: PropTypes.bool
-  };
   QueryRenderer.defaultProps = {
     cubejsApi: null,
     query: null,
@@ -8367,13 +8358,6 @@
     }, restProps));
   };
 
-  QueryRendererWithTotals.propTypes = {
-    render: PropTypes.func,
-    cubejsApi: PropTypes.object.isRequired,
-    query: PropTypes.object,
-    queries: PropTypes.object,
-    loadSql: PropTypes.any
-  };
   QueryRendererWithTotals.defaultProps = {
     query: null,
     render: null,
@@ -37040,7 +37024,7 @@
         var _updateVizState = _asyncToGenerator(
         /*#__PURE__*/
         regeneratorRuntime.mark(function _callee2(state) {
-          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+          var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, _error$response, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
           return regeneratorRuntime.wrap(function _callee2$(_context2) {
             while (1) {
@@ -37052,7 +37036,7 @@
                   _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                   if (!(finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                    _context2.next = 17;
+                    _context2.next = 20;
                     break;
                   }
 
@@ -37066,21 +37050,26 @@
                   _ref4 = _context2.sent;
                   sqlQuery = _ref4.sqlQuery;
                   finalState.query.order = sqlQuery.sql.order;
-                  _context2.next = 17;
+                  _context2.next = 20;
                   break;
 
                 case 13:
                   _context2.prev = 13;
                   _context2.t0 = _context2["catch"](5);
 
-                  if (!(_context2.t0.response.code !== 'MISSING_DATE_RANGE')) {
-                    _context2.next = 17;
+                  if (!(((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.type) === 'UserError')) {
+                    _context2.next = 19;
                     break;
                   }
 
+                  console.error(_context2.t0.response.error);
+                  _context2.next = 20;
+                  break;
+
+                case 19:
                   throw _context2.t0;
 
-                case 17:
+                case 20:
                   activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                   updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread({}, this.state, {}, finalState)));
                   currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -37125,7 +37114,7 @@
                     setVizState(toSet);
                   }
 
-                case 29:
+                case 32:
                 case "end":
                   return _context2.stop();
               }
@@ -37315,18 +37304,18 @@
 
     return QueryBuilder;
   }(React__default.Component);
-  QueryBuilder.contextType = CubeContext;
-  QueryBuilder.propTypes = {
-    render: PropTypes.func,
-    stateChangeHeuristics: PropTypes.func,
-    setQuery: PropTypes.func,
-    setVizState: PropTypes.func,
-    cubejsApi: PropTypes.object,
-    disableHeuristics: PropTypes.bool,
-    wrapWithQueryRenderer: PropTypes.bool,
-    query: PropTypes.object,
-    vizState: PropTypes.object
-  };
+  QueryBuilder.contextType = CubeContext; // QueryBuilder.propTypes = {
+  //   render: PropTypes.func,
+  //   stateChangeHeuristics: PropTypes.func,
+  //   setQuery: PropTypes.func,
+  //   setVizState: PropTypes.func,
+  //   cubejsApi: PropTypes.object,
+  //   disableHeuristics: PropTypes.bool,
+  //   wrapWithQueryRenderer: PropTypes.bool,
+  //   query: PropTypes.object,
+  //   vizState: PropTypes.object
+  // };
+
   QueryBuilder.defaultProps = {
     cubejsApi: null,
     query: {},
@@ -37347,11 +37336,6 @@
         cubejsApi: cubejsApi
       }
     }, children);
-  };
-
-  CubeProvider.propTypes = {
-    cubejsApi: PropTypes.object.isRequired,
-    children: PropTypes.any.isRequired
   };
 
   function useDeepCompareMemoize(value) {
