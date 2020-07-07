@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.19.43",
+  "version": "0.19.47",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
