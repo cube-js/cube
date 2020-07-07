@@ -1,7 +1,7 @@
-import palette from "../palette";
+import palette from '../palette';
 
 export default {
   root: {
-    backgroundColor: palette.primary.action
-  }
+    backgroundColor: palette.primary.action,
+  },
 };

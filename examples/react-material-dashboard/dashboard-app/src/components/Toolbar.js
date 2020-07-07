@@ -1,20 +1,17 @@
-import "date-fns";
-import React from "react";
-import PropTypes from "prop-types";
-import clsx from "clsx";
-import { makeStyles } from "@material-ui/styles";
-import Grid from "@material-ui/core/Grid";
-import Typography from "@material-ui/core/Typography";
-import Tab from "@material-ui/core/Tab";
-import Tabs from "@material-ui/core/Tabs";
-import withStyles from "@material-ui/core/styles/withStyles";
-import palette from "../theme/palette";
-import Slider from "@material-ui/core/Slider";
-import DateFnsUtils from "@date-io/date-fns";
-import {
-  MuiPickersUtilsProvider,
-  KeyboardDatePicker
-} from "@material-ui/pickers";
+import 'date-fns';
+import React from 'react';
+import PropTypes from 'prop-types';
+import clsx from 'clsx';
+import { makeStyles } from '@material-ui/styles';
+import Grid from '@material-ui/core/Grid';
+import Typography from '@material-ui/core/Typography';
+import Tab from '@material-ui/core/Tab';
+import Tabs from '@material-ui/core/Tabs';
+import withStyles from '@material-ui/core/styles/withStyles';
+import palette from '../theme/palette';
+import Slider from '@material-ui/core/Slider';
+import DateFnsUtils from '@date-io/date-fns';
+import { MuiPickersUtilsProvider, KeyboardDatePicker } from '@material-ui/pickers';
 
 const AntTabs = withStyles({
   root: {
@@ -49,40 +46,40 @@ const AntTab = withStyles((theme) => ({
   },
   selected: {},
 }))((props) => <Tab disableRipple {...props} />);
-const useStyles = makeStyles(theme => ({
+const useStyles = makeStyles((theme) => ({
   root: {},
   row: {
-    marginTop: theme.spacing(1)
+    marginTop: theme.spacing(1),
   },
   spacer: {
-    flexGrow: 1
+    flexGrow: 1,
   },
   importButton: {
-    marginRight: theme.spacing(1)
+    marginRight: theme.spacing(1),
   },
   exportButton: {
-    marginRight: theme.spacing(1)
+    marginRight: theme.spacing(1),
   },
   searchInput: {
-    marginRight: theme.spacing(1)
+    marginRight: theme.spacing(1),
   },
   formControl: {
     margin: 25,
     fullWidth: true,
-    display: "flex",
-    wrap: "nowrap"
+    display: 'flex',
+    wrap: 'nowrap',
   },
   date: {
-    marginTop: 3
+    marginTop: 3,
   },
   range: {
-    marginTop: 13
-  }
+    marginTop: 13,
+  },
 }));
 
-
-const Toolbar = props => {
-  const { className,
+const Toolbar = (props) => {
+  const {
+    className,
     startDate,
     setStartDate,
     finishDate,
@@ -92,7 +89,8 @@ const Toolbar = props => {
     statusFilter,
     setStatusFilter,
     tabs,
-    ...rest } = props;
+    ...rest
+  } = props;
   const [tabValue, setTabValue] = React.useState(statusFilter);
   const [rangeValue, rangeSetValue] = React.useState(priceFilter);
 
@@ -116,86 +114,56 @@ const Toolbar = props => {
   };
 
   return (
-    <div
-      {...rest}
-      className={clsx(classes.root, className)}
-    >
+    <div {...rest} className={clsx(classes.root, className)}>
       <Grid container spacing={4}>
-        <Grid
-          item
-          lg={3}
-          sm={6}
-          xl={3}
-          xs={12}
-          m={2}
-        >
+        <Grid item lg={3} sm={6} xl={3} xs={12} m={2}>
           <div className={classes}>
-            <AntTabs value={tabValue} onChange={(e,value) => {handleChangeTab(e,value)}} aria-label="ant example">
-              {tabs.map((item) => (<AntTab key={item} label={item} />))}
+            <AntTabs
+              value={tabValue}
+              onChange={handleChangeTab}
+              aria-label="ant example"
+            >
+              {tabs.map((item) => (
+                <AntTab key={item} label={item} />
+              ))}
             </AntTabs>
             <Typography className={classes.padding} />
           </div>
         </Grid>
-        <Grid
-          className={classes.date}
-          item
-          lg={3}
-          sm={6}
-          xl={3}
-          xs={12}
-          m={2}
-        >
+        <Grid className={classes.date} item lg={3} sm={6} xl={3} xs={12} m={2}>
           <MuiPickersUtilsProvider utils={DateFnsUtils}>
             <Grid container justify="space-around">
               <KeyboardDatePicker
                 id="date-picker-dialog"
-                label={<span style={{opacity: 0.6}}>Start Date</span>}
+                label={<span style={{ opacity: 0.6 }}>Start Date</span>}
                 format="MM/dd/yyyy"
                 value={startDate}
                 onChange={handleDateChange}
                 KeyboardButtonProps={{
-                  "aria-label": "change date"
+                  'aria-label': 'change date',
                 }}
               />
             </Grid>
           </MuiPickersUtilsProvider>
         </Grid>
-        <Grid
-          className={classes.date}
-          item
-          lg={3}
-          sm={6}
-          xl={3}
-          xs={12}
-          m={2}
-        >
+        <Grid className={classes.date} item lg={3} sm={6} xl={3} xs={12} m={2}>
           <MuiPickersUtilsProvider utils={DateFnsUtils}>
             <Grid container justify="space-around">
               <KeyboardDatePicker
                 id="date-picker-dialog-finish"
-                label={<span style={{opacity: 0.6}}>Finish Date</span>}
+                label={<span style={{ opacity: 0.6 }}>Finish Date</span>}
                 format="MM/dd/yyyy"
                 value={finishDate}
                 onChange={handleDateChangeFinish}
                 KeyboardButtonProps={{
-                  "aria-label": "change date"
+                  'aria-label': 'change date',
                 }}
               />
             </Grid>
           </MuiPickersUtilsProvider>
         </Grid>
-        <Grid
-          className={classes.range}
-          item
-          lg={3}
-          sm={6}
-          xl={3}
-          xs={12}
-          m={2}
-        >
-          <Typography id="range-slider">
-            Order price range
-          </Typography>
+        <Grid className={classes.range} item lg={3} sm={6} xl={3} xs={12} m={2}>
+          <Typography id="range-slider">Order price range</Typography>
           <Slider
             value={rangeValue}
             onChange={handleChangeRange}
@@ -212,7 +180,7 @@ const Toolbar = props => {
 };
 
 Toolbar.propTypes = {
-  className: PropTypes.string
+  className: PropTypes.string,
 };
 
 export default Toolbar;

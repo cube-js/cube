@@ -15,5 +15,5 @@ export default {
   MuiTableHead,
   MuiTypography,
   MuiInput,
-  MuiCard
+  MuiCard,
 };

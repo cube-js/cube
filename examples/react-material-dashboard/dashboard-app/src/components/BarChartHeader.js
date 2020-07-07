@@ -1,22 +1,18 @@
-import React from "react";
-import PropTypes from "prop-types";
+import React from 'react';
+import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
-import {
-  CardHeader,
-  Button
-} from "@material-ui/core";
-import ArrowDropDownIcon from "@material-ui/icons/ArrowDropDown"
-import Menu from "@material-ui/core/Menu";
-import MenuItem from "@material-ui/core/MenuItem";
+import { CardHeader, Button } from '@material-ui/core';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import Menu from '@material-ui/core/Menu';
+import MenuItem from '@material-ui/core/MenuItem';
 
 const useStyles = makeStyles(() => ({
   headerButton: {
-    letterSpacing: '0.4px'
-  }
+    letterSpacing: '0.4px',
+  },
 }));
 
-
-const BarChartHeader = props => {
+const BarChartHeader = (props) => {
   const { setDateRange, dateRange, dates } = props;
   const classes = useStyles();
 
@@ -49,19 +45,20 @@ const BarChartHeader = props => {
             open={Boolean(anchorEl)}
             onClose={() => handleClose(dateRange)}
           >
-            {dates ?
+            {dates ? (
               <React.Fragment>
-                {dates.map((date) => (<MenuItem onClick={() => handleClose(date)}>{date}</MenuItem>))}
+                {dates.map((date) => (
+                  <MenuItem onClick={() => handleClose(date)}>{date}</MenuItem>
+                ))}
               </React.Fragment>
-              :
+            ) : (
               <React.Fragment>
                 <MenuItem onClick={() => handleClose('This week')}>This week</MenuItem>
                 <MenuItem onClick={() => handleClose('This month')}>This month</MenuItem>
                 <MenuItem onClick={() => handleClose('Last 7 days')}>Last 7 days</MenuItem>
                 <MenuItem onClick={() => handleClose('Last month')}>Last month</MenuItem>
               </React.Fragment>
-            }
-
+            )}
           </Menu>
         </div>
       }
@@ -71,7 +68,7 @@ const BarChartHeader = props => {
 };
 
 BarChartHeader.propTypes = {
-  className: PropTypes.string
+  className: PropTypes.string,
 };
 
 export default BarChartHeader;

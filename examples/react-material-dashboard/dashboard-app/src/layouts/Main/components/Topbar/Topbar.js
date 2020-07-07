@@ -1,22 +1,22 @@
-import React from "react";
-import { Link as RouterLink } from "react-router-dom";
-import clsx from "clsx";
-import PropTypes from "prop-types";
-import { makeStyles } from "@material-ui/styles";
-import { AppBar, Toolbar } from "@material-ui/core";
-import palette from "../../../../theme/palette";
+import React from 'react';
+import { Link as RouterLink } from 'react-router-dom';
+import clsx from 'clsx';
+import PropTypes from 'prop-types';
+import { makeStyles } from '@material-ui/styles';
+import { AppBar, Toolbar } from '@material-ui/core';
+import palette from '../../../../theme/palette';
 
-const useStyles = makeStyles(theme => ({
+const useStyles = makeStyles((theme) => ({
   root: {
-    boxShadow: "none",
-    backgroundColor: palette.primary.dark
+    boxShadow: 'none',
+    backgroundColor: palette.primary.dark,
   },
   flexGrow: {
-    flexGrow: 1
+    flexGrow: 1,
   },
   link: {
-    display: "flex",
-    alignItems: "center",
+    display: 'flex',
+    alignItems: 'center',
     padding: '10px 15px',
     textDecoration: 'none',
     color: palette.text.link,
@@ -25,57 +25,40 @@ const useStyles = makeStyles(theme => ({
     '&:hover': {
       textDecoration: 'none',
       color: palette.text.link,
-      backgroundColor: 'rgba(213,213,226,.1)'
-    }
+      backgroundColor: 'rgba(213,213,226,.1)',
+    },
   },
   signOutButton: {
-    marginLeft: theme.spacing(1)
+    marginLeft: theme.spacing(1),
   },
   git: {
-    fontStyle: "normal",
-    fontWeight: "normal",
+    fontStyle: 'normal',
+    fontWeight: 'normal',
     fontSize: 16,
-    lineHeight: "26px",
-    marginLeft: 7
-  }
+    lineHeight: '26px',
+    marginLeft: 7,
+  },
 }));
 
-const Topbar = props => {
+const Topbar = (props) => {
   const { className, onSidebarOpen, ...rest } = props;
 
   const classes = useStyles();
 
-
   return (
-    <AppBar
-      {...rest}
-      className={clsx(classes.root, className)}
-    >
+    <AppBar {...rest} className={clsx(classes.root, className)}>
       <Toolbar>
         <RouterLink to="/">
-          <img
-            alt="Logo"
-            src="/images/logo/logo.svg"
-          />
+          <img alt="Logo" src="/images/logo/logo.svg" />
         </RouterLink>
-        <div className={classes.flexGrow}/>
+        <div className={classes.flexGrow} />
         <a className={classes.link} rel="noopener noreferrer" target="_blank" href="https://github.com/cube-js/cube.js">
-          <img
-            alt="GitHub"
-            src="/images/github.svg"
-          />
-          <span className={classes.git}>
-            Github
-          </span>
+          <img alt="GitHub" src="/images/github.svg" />
+          <span className={classes.git}>Github</span>
         </a>
         <a className={classes.link} rel="noopener noreferrer" target="_blank" href="https://slack.cube.dev/">
-          <img
-            alt="Slack"
-            src="/images/slack.svg"
-          />
-          <span className={classes.git}>
-            Slack
-          </span>
+          <img alt="Slack" src="/images/slack.svg" />
+          <span className={classes.git}>Slack</span>
         </a>
       </Toolbar>
     </AppBar>
@@ -84,7 +67,7 @@ const Topbar = props => {
 
 Topbar.propTypes = {
   className: PropTypes.string,
-  onSidebarOpen: PropTypes.func
+  onSidebarOpen: PropTypes.func,
 };
 
 export default Topbar;

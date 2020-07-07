@@ -1,14 +1,14 @@
-import React, { useState } from "react";
-import { useHistory } from "react-router-dom";
-import clsx from "clsx";
-import PropTypes from "prop-types";
-import moment from "moment";
-import PerfectScrollbar from "react-perfect-scrollbar";
-import { makeStyles } from "@material-ui/styles";
-import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
-import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
-import { useCubeQuery } from "@cubejs-client/react";
-import CircularProgress from "@material-ui/core/CircularProgress";
+import React, { useState } from 'react';
+import { useHistory } from 'react-router-dom';
+import clsx from 'clsx';
+import PropTypes from 'prop-types';
+import moment from 'moment';
+import PerfectScrollbar from 'react-perfect-scrollbar';
+import { makeStyles } from '@material-ui/styles';
+import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
+import { useCubeQuery } from '@cubejs-client/react';
+import CircularProgress from '@material-ui/core/CircularProgress';
 import {
   Card,
   CardActions,
@@ -18,61 +18,62 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TablePagination, Typography
-} from "@material-ui/core";
+  TablePagination,
+  Typography,
+} from '@material-ui/core';
 
-import StatusBullet from "./StatusBullet";
-import palette from "../theme/palette";
+import StatusBullet from './StatusBullet';
+import palette from '../theme/palette';
 
-const useStyles = makeStyles(theme => ({
+const useStyles = makeStyles((theme) => ({
   root: {
-    padding: 0
+    padding: 0,
   },
   content: {
-    padding: 0
+    padding: 0,
   },
   head: {
-    backgroundColor: palette.background.gray
+    backgroundColor: palette.background.gray,
   },
   inner: {
-    minWidth: 1050
+    minWidth: 1050,
   },
   nameContainer: {
-    display: "flex",
-    alignItems: "baseline"
+    display: 'flex',
+    alignItems: 'baseline',
   },
   status: {
-    marginRight: theme.spacing(2)
+    marginRight: theme.spacing(2),
   },
   actions: {
-    justifyContent: "flex-end"
+    justifyContent: 'flex-end',
   },
   tableRow: {
     padding: '0 5px',
-    cursor: "pointer",
+    cursor: 'pointer',
     '.MuiTableRow-root.MuiTableRow-hover&:hover': {
-      backgroundColor: palette.primary.action
-    }
+      backgroundColor: palette.primary.action,
+    },
   },
   hoverable: {
-    "&:hover": {
+    '&:hover': {
       color: `${palette.primary.normal}`,
-      cursor: `pointer`
-    }
+      cursor: `pointer`,
+    },
   },
   arrow: {
     fontSize: 10,
-    position: "absolute"
-  }
+    position: 'absolute',
+  },
 }));
 
 const statusColors = {
-  completed: "success",
-  processing: "info",
-  shipped: "danger"
+  completed: 'success',
+  processing: 'info',
+  shipped: 'danger',
 };
 
-const TableComponent = props => {
+const TableComponent = (props) => {
   const history = useHistory();
 
   function handleClick(str) {
@@ -88,40 +89,47 @@ const TableComponent = props => {
 
   const tableHeaders = [
     {
-      text: "Order id",
-      value: "Orders.id"
+      text: 'Order id',
+      value: 'Orders.id',
     },
     {
-      text: "Orders size",
-      value: "Orders.size"
+      text: 'Orders size',
+      value: 'Orders.size',
     },
     {
-      text: "Full Name",
-      value: "Users.fullName"
+      text: 'Full Name',
+      value: 'Users.fullName',
     },
     {
-      text: "User city",
-      value: "Users.city"
+      text: 'User city',
+      value: 'Users.city',
     },
     {
-      text: "Order price",
-      value: "Orders.price"
+      text: 'Order price',
+      value: 'Orders.price',
     },
     {
-      text: "Status",
-      value: "Orders.status"
+      text: 'Status',
+      value: 'Orders.status',
     },
     {
-      text: "Created at",
-      value: "Orders.createdAt"
-    }
+      text: 'Created at',
+      value: 'Orders.createdAt',
+    },
   ];
-  const { resultSet, error, isLoading } = useCubeQuery(query, { cubejsApi });
+  const { resultSet, error, isLoading } = useCubeQuery(query);
   if (isLoading) {
-    return <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}><CircularProgress color="secondary" /></div>;
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress color="secondary" />
+      </div>
+    );
   }
   if (error) {
     return <pre>{error.toString()}</pre>;
+  }
+  if (!resultSet) {
+    return null
   }
   if (resultSet) {
     let orders = resultSet.tablePivot();
@@ -129,19 +137,15 @@ const TableComponent = props => {
     const handlePageChange = (event, page) => {
       setPage(page);
     };
-    const handleRowsPerPageChange = event => {
+    const handleRowsPerPageChange = (event) => {
       setRowsPerPage(event.target.value);
     };
-    const handleSetSorting = str => {
-      setSorting([str, sorting[1] === "desc" ? "asc" : "desc"]);
+    const handleSetSorting = (str) => {
+      setSorting([str, sorting[1] === 'desc' ? 'asc' : 'desc']);
     };
 
     return (
-      <Card
-        {...rest}
-        padding={"0"}
-        className={clsx(classes.root, className)}
-      >
+      <Card {...rest} padding={'0'} className={clsx(classes.root, className)}>
         <CardContent className={classes.content}>
           <PerfectScrollbar>
             <div className={classes.inner}>
@@ -149,58 +153,45 @@ const TableComponent = props => {
                 <TableHead className={classes.head}>
                   <TableRow>
                     {tableHeaders.map((item) => (
-                      <TableCell key={item.value + Math.random()} className={classes.hoverable}
-                                 onClick={() => {
-                                   handleSetSorting(`${item.value}`);
-                                 }}
+                      <TableCell
+                        key={item.value + Math.random()}
+                        className={classes.hoverable}
+                        onClick={() => {
+                          handleSetSorting(`${item.value}`);
+                        }}
                       >
                         <span>{item.text}</span>
-                        <Typography
-                          className={classes.arrow}
-                          variant="body2"
-                          component="span"
-                        >
-                          {(sorting[0] === item.value) ? (sorting[1] === "desc" ? <KeyboardArrowUpIcon/> :
-                            <KeyboardArrowDownIcon/>) : null}
+                        <Typography className={classes.arrow} variant="body2" component="span">
+                          {sorting[0] === item.value ? (
+                            sorting[1] === 'desc' ? (
+                              <KeyboardArrowUpIcon />
+                            ) : (
+                              <KeyboardArrowDownIcon />
+                            )
+                          ) : null}
                         </Typography>
                       </TableCell>
                     ))}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(obj => (
+                  {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((obj) => (
                     <TableRow
                       className={classes.tableRow}
                       hover
-                      onClick={() => handleClick(`/user/${obj["Users.id"]}`)}
-                      key={obj["Orders.id"]}
+                      onClick={() => handleClick(`/user/${obj['Users.id']}`)}
+                      key={obj['Orders.id']}
                     >
+                      <TableCell>{obj['Orders.id']}</TableCell>
+                      <TableCell>{obj['Orders.size']}</TableCell>
+                      <TableCell>{obj['Users.fullName']}</TableCell>
+                      <TableCell>{obj['Users.city']}</TableCell>
+                      <TableCell>{'$ ' + obj['Orders.price']}</TableCell>
                       <TableCell>
-                        {obj["Orders.id"]}
+                        <StatusBullet className={classes.status} color={statusColors[obj['Orders.status']]} size="sm" />
+                        {obj['Orders.status']}
                       </TableCell>
-                      <TableCell>
-                        {obj["Orders.size"]}
-                      </TableCell>
-                      <TableCell>
-                        {obj["Users.fullName"]}
-                      </TableCell>
-                      <TableCell>
-                        {obj["Users.city"]}
-                      </TableCell>
-                      <TableCell>
-                        {"$ " + obj["Orders.price"]}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBullet
-                          className={classes.status}
-                          color={statusColors[obj["Orders.status"]]}
-                          size="sm"
-                        />
-                        {obj["Orders.status"]}
-                      </TableCell>
-                      <TableCell>
-                        {moment(obj["Orders.createdAt"]).format("DD/MM/YYYY")}
-                      </TableCell>
+                      <TableCell>{moment(obj['Orders.createdAt']).format('DD/MM/YYYY')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -221,14 +212,12 @@ const TableComponent = props => {
         </CardActions>
       </Card>
     );
-  } else {
-    return null
   }
 };
 
 TableComponent.propTypes = {
   className: PropTypes.string,
-  query: PropTypes.object.isRequired
+  query: PropTypes.object.isRequired,
 };
 
 export default TableComponent;

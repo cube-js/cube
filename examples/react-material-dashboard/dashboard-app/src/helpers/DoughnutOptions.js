@@ -1,7 +1,7 @@
-import palette from "../theme/palette";
+import palette from '../theme/palette';
 export const options = {
   legend: {
-    display: false
+    display: false,
   },
   responsive: true,
   maintainAspectRatio: false,
@@ -9,13 +9,13 @@ export const options = {
   layout: { padding: 0 },
   tooltips: {
     enabled: true,
-    mode: "index",
+    mode: 'index',
     intersect: false,
     borderWidth: 1,
     borderColor: palette.divider,
     backgroundColor: palette.white,
     titleFontColor: palette.text.primary,
     bodyFontColor: palette.text.secondary,
-    footerFontColor: palette.text.secondary
-  }
+    footerFontColor: palette.text.secondary,
+  },
 };
