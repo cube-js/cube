@@ -154,7 +154,7 @@ workflows:
       - publish:
           filters:
             branches:
-              ignore: .*
+              ignore: /.*/
             tags:
               only: /^v.*$/
   guides:
