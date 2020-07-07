@@ -25,7 +25,8 @@
   },
   "files": [
     "src",
-    "dist"
+    "dist",
+    "index.d.ts"
   ],
   "license": "MIT",
   "devDependencies": {
