@@ -25,9 +25,6 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-/**
- * @return {null}
- */
 const UserSearch = (props) => {
   const history = useHistory();
   const { cubejsApi } = props;
