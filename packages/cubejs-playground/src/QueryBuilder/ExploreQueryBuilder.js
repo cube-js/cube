@@ -19,17 +19,17 @@ const ExploreQueryBuilder = ({
     cubejsApi={cubejsApi}
     wrapWithQueryRenderer={false}
     render={({
-      validatedQuery, chartType, updateChartType,
+      validatedQuery, isQueryPresent, chartType, updateChartType,
       measures, availableMeasures, updateMeasures,
       dimensions, availableDimensions, updateDimensions,
       segments, availableSegments, updateSegments,
       filters, updateFilters,
       timeDimensions, availableTimeDimensions, updateTimeDimensions
     }) => [
-      <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }} key="1">
+      <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }} key="1">
         <Col span={24}>
           <Card>
-            <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+            <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
               <Col span={24}>
                 <MemberGroup
                   members={measures}
@@ -60,7 +60,7 @@ const ExploreQueryBuilder = ({
                 />
               </Col>
             </Row>
-            <Row type="flex" justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+            <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
               <Col span={24}>
                 <FilterGroup
                   members={filters}
@@ -70,7 +70,7 @@ const ExploreQueryBuilder = ({
                 />
               </Col>
             </Row>
-            <Row type="flex" justify="space-around" align="top" gutter={24}>
+            <Row justify="space-around" align="top" gutter={24}>
               <Col span={24}>
                 <SelectChartType
                   chartType={chartType}
@@ -81,7 +81,7 @@ const ExploreQueryBuilder = ({
           </Card>
         </Col>
       </Row>,
-      <Row type="flex" justify="space-around" align="top" gutter={24} key="2">
+      <Row justify="space-around" align="top" gutter={24} key="2">
         <Col span={24}>
           {isQueryPresent ? (
             <Card
