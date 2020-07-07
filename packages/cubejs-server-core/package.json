@@ -55,7 +55,7 @@
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
     "jest": "^24.9.0",
-    "mocha": "^5.2.0",
+    "mocha": "^8.0.1",
     "should": "^13.2.3"
   },
   "license": "Apache-2.0"
