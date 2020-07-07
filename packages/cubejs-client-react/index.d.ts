@@ -265,7 +265,7 @@ declare module '@cubejs-client/react' {
    * ```
    * @order 1
    */
-  export function useCubeQuery(query: Query, options?: UseCubeQueryOptions): () => number;
+  export function useCubeQuery<TData>(query: Query, options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
 
   type UseCubeQueryOptions = {
     /**
