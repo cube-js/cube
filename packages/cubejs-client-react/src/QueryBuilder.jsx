@@ -279,11 +279,7 @@ export default class QueryBuilder extends React.Component {
 
         finalState.query.order = sqlQuery.sql.order;
       } catch (error) {
-        if (error.response?.type === 'UserError') {
-          console.error(error.response.error);
-        } else {
-          throw error;
-        }
+        console.error(error);
       }
     }
     
