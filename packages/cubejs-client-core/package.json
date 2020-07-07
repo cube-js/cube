@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.19.42",
+  "version": "0.19.43",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -8,7 +8,7 @@
   },
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
-  "types": "dist/index.d.ts",
+  "types": "index.d.ts",
   "author": "Statsbot, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",

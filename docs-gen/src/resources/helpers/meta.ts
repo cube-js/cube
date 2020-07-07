@@ -2,17 +2,22 @@ import { ProjectReflection } from 'typedoc';
 import { CommentTag, ContainerReflection } from 'typedoc/dist/lib/models';
 
 export function meta(this: ProjectReflection) {
-  function findModuleRelection(reflection: ContainerReflection) {
-    if (reflection.comment) {
+  function findModuleRelection(reflection?: ContainerReflection) {
+    if (!reflection) {
+      return null;
+    }
+    
+    if (reflection?.comment) {
       return reflection;
     }
 
-    return findModuleRelection(reflection.children?.[0]);
+    return findModuleRelection(reflection?.children?.[0]);
   }
   
   function tagConverter(tag: string)  {
     const tags = {
       menucategory: 'category',
+      subcategory: 'subCategory',
       menuorder: 'menuOrder'
     };
     
@@ -27,8 +32,7 @@ export function meta(this: ProjectReflection) {
 
     (comment?.tags || []).forEach((tag: CommentTag) => {
       if (tag.tagName !== 'description') {
-        const escape = tag.tagName !== 'menuorder';
-        const text = escape ? `'${tag.text}'` : tag.text;
+        const text = tag.text.startsWith('@') ? `'${tag.text}'` : tag.text;
         md.push(`${tagConverter(tag.tagName)}: ${text}`.replace('\n', ''));
       }
     });

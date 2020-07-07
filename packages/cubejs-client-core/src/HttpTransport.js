@@ -2,10 +2,11 @@ import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
 class HttpTransport {
-  constructor({ authorization, apiUrl, headers = {} }) {
+  constructor({ authorization, apiUrl, headers = {}, credentials }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.headers = headers;
+    this.credentials = credentials;
   }
 
   request(method, { baseRequestId, ...params }) {
@@ -25,7 +26,8 @@ class HttpTransport {
           Authorization: this.authorization,
           'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
           ...this.headers
-        }
+        },
+        credentials: this.credentials
       }
     );
 

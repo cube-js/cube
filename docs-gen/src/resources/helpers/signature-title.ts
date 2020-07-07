@@ -2,12 +2,24 @@ import { SignatureReflection } from 'typedoc';
 
 import { memberSymbol } from './member-symbol';
 import { type } from './type';
+import { ReflectionType } from 'typedoc/dist/lib/models';
 
-export function signatureTitle(this: SignatureReflection, showSymbol: boolean) {
+export function signatureTitle(this: SignatureReflection, showSymbol: boolean = false) {
   const md = [];
 
   if (showSymbol) {
     md.push(`${memberSymbol.call(this)} `);
+  }
+
+  // eg: `static`
+  if (this.parent?.flags) {
+    md.push(
+      this.parent.flags
+        .map((flag) => `\`${flag}\``)
+        .join(' ')
+        .toLowerCase()
+    );
+    md.push(' ');
   }
 
   if (this.name === '__get') {
@@ -37,8 +49,16 @@ export function signatureTitle(this: SignatureReflection, showSymbol: boolean) {
         .join(', ')
     : '';
   md.push(`(${params})`);
+
   if (this.type) {
-    md.push(`: *${type.call(this.type)}*`);
+    md.push(!showSymbol ? ' =>' : ':');
+
+    if (this.type instanceof ReflectionType && type.call(this.type).toString() === 'function') {
+      const declarations = this.type.declaration.signatures?.map((sig) => signatureTitle.call(sig, false, true));
+      md.push(declarations.join(' | ').replace(/\n/, ''));
+    } else {
+      md.push(` *${type.call(this.type)}*`);
+    }
   }
   return md.join('') + '\n';
 }

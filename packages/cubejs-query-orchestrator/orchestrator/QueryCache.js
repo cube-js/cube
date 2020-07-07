@@ -148,7 +148,7 @@ class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
-          return client.query(q.query, q.values);
+          return client.query(q.query, q.values, q);
         }, {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
@@ -169,7 +169,7 @@ class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
-          return client.query(q.query, q.values);
+          return client.query(q.query, q.values, q);
         },
         {
           logger: this.logger,

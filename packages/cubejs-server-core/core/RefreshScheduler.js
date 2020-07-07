@@ -6,9 +6,8 @@ class RefreshScheduler {
   }
 
   async refreshQueriesForPreAggregation(context, compilerApi, preAggregation, queryingOptions) {
-    const dbType = compilerApi.getDbType();
     const compilers = await compilerApi.getCompilers();
-    const query = compilerApi.createQuery(compilers, dbType, queryingOptions);
+    const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity) {
       const dataSource = query.cubeDataSource(preAggregation.cube);
 
@@ -45,7 +44,7 @@ class RefreshScheduler {
           dateRange
         }]
       };
-      const partitionQuery = compilerApi.createQuery(compilers, dbType, baseQuery);
+      const partitionQuery = compilerApi.createQueryByDataSource(compilers, baseQuery);
       const { partitionDimension } = partitionQuery.preAggregations.partitionDimension(preAggregation);
       return partitionDimension.timeSeries().map(range => ({
         ...baseQuery,
@@ -116,9 +115,8 @@ class RefreshScheduler {
   }
 
   async refreshCubesRefreshKey(context, compilerApi, queryingOptions) {
-    const dbType = compilerApi.getDbType();
     const compilers = await compilerApi.getCompilers();
-    const queryForEvaluation = compilerApi.createQuery(compilers, dbType, {});
+    const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNamesWithRefreshKeys().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;

@@ -21,6 +21,7 @@ declare module '@cubejs-client/core' {
      * custom headers
      */
     headers?: Record<string, string>;
+    credentials?: 'omit' | 'same-origin' | 'include';
   };
 
   export interface ITransport {
@@ -47,6 +48,7 @@ declare module '@cubejs-client/core' {
     transport?: ITransport;
     headers?: Record<string, string>;
     pollInterval?: number;
+    credentials?: 'omit' | 'same-origin' | 'include';
   };
 
   export type LoadMethodOptions = {
@@ -584,8 +586,6 @@ declare module '@cubejs-client/core' {
   };
 
   export class ProgressResult {
-    constructor(progressResponse: ProgressResponse);
-
     stage(): string;
     timeElapsed(): string;
   }
@@ -607,8 +607,6 @@ declare module '@cubejs-client/core' {
   };
 
   export class SqlQuery {
-    constructor(sqlQuery: SqlApiResponse);
-
     rawQuery(): SqlData;
     sql(): string;
   }
@@ -620,8 +618,6 @@ declare module '@cubejs-client/core' {
    * @order 4
    */
   export class Meta {
-    constructor(metaResponse: Object);
-
     /**
      * Get all members of a specific type for a given query.
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -652,27 +648,10 @@ declare module '@cubejs-client/core' {
 
   /**
    * Main class for accessing Cube.js API
-   * 
+   *
    * @order 2
    */
   export class CubejsApi {
-    constructor(apiToken: string, options: CubeJSApiOptions);
-
-    /**
-     * Base method for performing all API calls. Shouldn't be used directly.
-     *
-     * @param request - function that is invoked to perform the actual request using `transport.request()` method.
-     * @param toResult - function that maps results of invocation to method return result
-     * @param options - options object
-     */
-    loadMethod<TResult>(request: () => any, toResult: (body: JSON) => TResult, options?: LoadMethodOptions): Promise<TResult>;
-    loadMethod<TResult>(
-      request: () => any,
-      toResult: (body: JSON) => TResult,
-      options: LoadMethodOptions,
-      callback: LoadMethodCallback<ResultSet>
-    ): Promise<{ unsubscribe: () => any }>;
-
     /**
      * Fetch data for the passed `query`.
      *

@@ -6,6 +6,7 @@ class CompilerApi {
   constructor(repository, dbType, options) {
     this.repository = repository;
     this.dbType = dbType;
+    this.dialectClass = options.dialectClass;
     this.options = options || {};
     this.allowNodeRequire = options.allowNodeRequire == null ? true : options.allowNodeRequire;
     this.logger = this.options.logger;
@@ -47,12 +48,16 @@ class CompilerApi {
     return this.dbType;
   }
 
+  getDialectClass(dataSource) {
+    return this.dialectClass && this.dialectClass({ dataSource: dataSource || 'default' });
+  }
+
   async getSql(query, options) {
     options = options || {};
     const { includeDebugInfo } = options;
-    const dbType = this.getDbType('default');
+    const dbType = this.getDbType();
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = this.createQuery(compilers, dbType, query);
+    let sqlGenerator = this.createQueryByDataSource(compilers, query);
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
@@ -61,7 +66,11 @@ class CompilerApi {
 
     if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
       // TODO consider more efficient way than instantiating query
-      sqlGenerator = this.createQuery(compilers, this.getDbType(dataSource), query);
+      sqlGenerator = this.createQueryByDataSource(
+        compilers,
+        query,
+        dataSource
+      );
     }
 
     return compilers.compiler.withQuery(sqlGenerator, () => ({
@@ -85,11 +94,17 @@ class CompilerApi {
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  createQuery(compilers, dbType, query) {
+  createQueryByDataSource(compilers, query, dataSource) {
+    return this.createQuery(compilers, this.getDbType(dataSource), this.getDialectClass(dataSource), query);
+  }
+
+  createQuery(compilers, dbType, dialectClass, query) {
     return QueryBuilder.query(
       compilers,
       dbType, {
         ...query,
+        dialectClass,
+        externalDialectClass: this.options.externalDialectClass,
         externalDbType: this.options.externalDbType,
         preAggregationsSchema: this.preAggregationsSchema,
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey

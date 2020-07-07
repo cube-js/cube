@@ -335,17 +335,16 @@ class ResultSet {
 
   tablePivot(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
+    const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
 
     return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
       normalizedPivotConfig.x
         .map((key, index) => [key, xValues[index]])
         .concat(
-          (yValuesArray[0][0].length &&
-              yValuesArray.map(([yValues, measure]) => [
-                yValues.join('.'),
-                measure
-              ])) ||
-              []
+          isMeasuresPresent ? yValuesArray.map(([yValues, measure]) => [
+            yValues.length ? yValues.join('.') : 'value',
+            measure
+          ]) : []
         )
     ));
   }
@@ -421,9 +420,21 @@ class ResultSet {
       });
     };
     
-    let measureColumns = [];
-    if (!pivot.length && normalizedPivotConfig.y.find((key) => key === 'measures')) {
-      measureColumns = (this.query().measures || []).map((key) => ({ ...extractFields(key), dataIndex: key }));
+    let otherColumns = [];
+    
+    if (!pivot.length && normalizedPivotConfig.y.includes('measures')) {
+      otherColumns = (this.query().measures || []).map((key) => ({ ...extractFields(key), dataIndex: key }));
+    }
+    
+    // Syntatic column to display the measure value
+    if (!normalizedPivotConfig.y.length && normalizedPivotConfig.x.includes('measures')) {
+      otherColumns.push({
+        key: 'value',
+        dataIndex: 'value',
+        title: 'Value',
+        shortTitle: 'Value',
+        type: 'string',
+      });
     }
     
     return normalizedPivotConfig.x
@@ -441,7 +452,7 @@ class ResultSet {
         return ({ ...extractFields(key), dataIndex: key });
       })
       .concat(toColumns(schema))
-      .concat(measureColumns);
+      .concat(otherColumns);
   }
 
   totalRow() {

@@ -3,13 +3,15 @@ import { ParameterReflection } from 'typedoc';
 import MarkdownTheme from '../../theme';
 import { stripLineBreaks } from './strip-line-breaks';
 import { type } from './type';
+import { signatureTitle } from './signature-title';
+import { ReferenceType, ReflectionType } from 'typedoc/dist/lib/models';
 
 export function parameterTable(this: ParameterReflection[]) {
   const defaultValues = this.map((param) => !!param.defaultValue);
   const hasDefaultValues = !defaultValues.every((value) => !value);
 
   const comments = this.map(
-    (param) => (param.comment && !!param.comment.text) || (param.comment && !!param.comment.shortText),
+    (param) => (param.comment && !!param.comment.text) || (param.comment && !!param.comment.shortText)
   );
   const hasComments = !comments.every((value) => !value);
 
@@ -25,7 +27,14 @@ export function parameterTable(this: ParameterReflection[]) {
 
   const rows = this.map((parameter) => {
     const isOptional = parameter.flags.includes('Optional');
-    const typeOut = type.call(parameter.type);
+
+    let typeOut;
+    if (parameter.type instanceof ReflectionType && parameter.type.toString() === 'function') {
+      const declarations = parameter.type.declaration.signatures?.map((sig) => signatureTitle.call(sig, false, true));
+      typeOut = declarations.join(' | ').replace(/\n/, '');
+    } else {
+      typeOut = type.call(parameter.type);
+    }
 
     const row = [
       `${parameter.flags.isRest ? '...' : ''}${parameter.name}${isOptional ? '?' : ''}`,
@@ -34,11 +43,11 @@ export function parameterTable(this: ParameterReflection[]) {
     if (hasDefaultValues) {
       row.push(parameter.defaultValue ? parameter.defaultValue : '-');
     }
-    if (hasComments)  {
+    if (hasComments) {
       const commentsText = [];
       if (parameter.comment && parameter.comment.shortText) {
         commentsText.push(
-          MarkdownTheme.handlebars.helpers.comment.call(stripLineBreaks.call(parameter.comment.shortText)),
+          MarkdownTheme.handlebars.helpers.comment.call(stripLineBreaks.call(parameter.comment.shortText))
         );
       }
       if (parameter.comment && parameter.comment.text) {
@@ -50,6 +59,6 @@ export function parameterTable(this: ParameterReflection[]) {
   });
 
   const output = `\n${headers.join(' | ')} |\n${headers.map(() => '------').join(' | ')} |\n${rows.join('')}`;
-  
+
   return output;
 }

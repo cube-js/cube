@@ -1,5 +1,4 @@
 import * as path from 'path';
-import * as fs from 'fs-extra';
 import { Renderer } from 'typedoc';
 import { Converter } from 'typedoc/dist/lib/converter';
 import { Component, ConverterComponent } from 'typedoc/dist/lib/converter/components';
@@ -10,7 +9,6 @@ export class MarkdownPlugin extends ConverterComponent {
     this.listenTo(this.owner, {
       [Converter.EVENT_BEGIN]: this.onBegin,
       [Converter.EVENT_RESOLVE_BEGIN]: this.onResolveBegin,
-      [Converter.EVENT_END]: this.onEnd,
     });
   }
 
@@ -39,27 +37,5 @@ export class MarkdownPlugin extends ConverterComponent {
     if (subThemes.includes(theme)) {
       options.setValue('theme', path.join(__dirname, 'subthemes', theme));
     }
-
-    options.setValue('out', options.getValue('out') + '/__tmp__');
-  }
-
-  onEnd() {
-    const { options } = this.application;
-    const tmpOut = options.getValue('out');
-    
-    setImmediate(() => {
-      if (fs.existsSync(tmpOut)) {
-        fs.readdirSync(tmpOut).map((fileName) => {
-          const pathArr = tmpOut.split('/');
-          pathArr.splice(-1, 1);
-          const out = path.join(...pathArr);
-          const currentPath = path.join(out, fileName);
- 
-          fs.copyFileSync(path.join(tmpOut, fileName), currentPath);
-        });
-        
-        fs.removeSync(tmpOut);
-      }
-    })
   }
 }

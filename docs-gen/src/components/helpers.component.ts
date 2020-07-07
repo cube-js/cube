@@ -55,7 +55,7 @@ export class ContextAwareHelpersComponent extends ContextAwareRendererComponent 
     this.includes = this.application.options.getValue('includes');
     this.mediaDirectory = this.application.options.getValue('media');
     this.listInvalidSymbolLinks = this.application.options.getValue('listInvalidSymbolLinks');
-
+    
     this.listenTo(
       this.owner,
       {
