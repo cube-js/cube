@@ -20,44 +20,6 @@
 
 **Parameters:**
 
-{{!-- {{#ifHasTypeDeclarations true}}
-
-{{#each parameters}}
-
-{{{parameterNameAndType}}}
-
-{{> comment}}
-
-{{#if type.declaration}}
-
-{{#if type.declaration.children}}
-
-{{#with type.declaration.children}}
-
-{{{parameterTable}}}
-
-{{/with}}
-
-{{/if}}
-
-{{#if type.declaration.signatures}}
-
-{{#with type.declaration}}
-
-{{> parameter}}
-
-{{/with}}
-
-{{/if}}
-
-{{/if}}
-
-{{/each}}
-
-{{/ifHasTypeDeclarations}} 
-
-{{!-- {{#ifHasTypeDeclarations false}} --}}
-
 {{#with parameters}}
 
 {{{parameterTable}}}
@@ -70,9 +32,12 @@
 
 {{#if type}}
 
+{{#with type}}
+{{#ifIsFunctionType false}}
+
 {{#unless hideSources}}
 
-**Returns:** {{#with type}}*{{{type}}}*{{/with}}
+**Returns:** *{{{type}}}*
 
 {{#if comment.returns}}
 
@@ -95,5 +60,8 @@
 {{/with}}
 
 {{/if}}
+
+{{/ifIsFunctionType}}
+{{/with}}
 
 {{/if}}

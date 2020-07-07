@@ -10,7 +10,7 @@ Vanilla JavaScript Cube.js client.
 
 ## cubejs
 
-▸  **cubejs**(**apiToken**: string, **options**: [CubeJSApiOptions](#cube-js-api-options)) => *[CubejsApi](#cubejs-api)*
+▸  **cubejs**(**apiToken**: string, **options**: [CubeJSApiOptions](#cube-js-api-options)): *[CubejsApi](#cubejs-api)*
 
 Creates an instance of the `CubejsApi`. The API entry point.
 
@@ -37,7 +37,7 @@ Main class for accessing Cube.js API
 
 ### load
 
-▸  **load**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options)) => *Promise‹[ResultSet](#result-set)›*
+▸  **load**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options)): *Promise‹[ResultSet](#result-set)›*
 
 Fetch data for the passed `query`.
 
@@ -70,7 +70,7 @@ options? | [LoadMethodOptions](#load-method-options) | - |
 
 **Returns:** *Promise‹[ResultSet](#result-set)›*
 
-▸  **load**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[ResultSet](#result-set)›) => *void*
+▸  **load**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[ResultSet](#result-set)›): *void*
 
 **Parameters:**
 
@@ -84,7 +84,7 @@ callback? | [LoadMethodCallback](#load-method-callback)‹[ResultSet](#result-se
 
 ### meta
 
-▸  **meta**(**options?**: [LoadMethodOptions](#load-method-options)) => *Promise‹[Meta](#meta)›*
+▸  **meta**(**options?**: [LoadMethodOptions](#load-method-options)): *Promise‹[Meta](#meta)›*
 
 Get meta description of cubes available for querying.
 
@@ -96,7 +96,7 @@ options? | [LoadMethodOptions](#load-method-options) |
 
 **Returns:** *Promise‹[Meta](#meta)›*
 
-▸  **meta**(**options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[Meta](#meta)›) => *void*
+▸  **meta**(**options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[Meta](#meta)›): *void*
 
 **Parameters:**
 
@@ -109,7 +109,7 @@ callback? | [LoadMethodCallback](#load-method-callback)‹[Meta](#meta)› |
 
 ### sql
 
-▸  **sql**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options)) => *Promise‹[SqlQuery](#sql-query)›*
+▸  **sql**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
 
 Get generated SQL string for the given `query`.
 
@@ -122,7 +122,7 @@ options? | [LoadMethodOptions](#load-method-options) | - |
 
 **Returns:** *Promise‹[SqlQuery](#sql-query)›*
 
-▸  **sql**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[SqlQuery](#sql-query)›) => *void*
+▸  **sql**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[SqlQuery](#sql-query)›): *void*
 
 **Parameters:**
 
@@ -140,7 +140,7 @@ Default transport implementation.
 
 ### constructor
 
-\+  **new HttpTransport**(**options**: [TransportOptions](#transport-options)) => *[HttpTransport](#http-transport)*
+\+  **new HttpTransport**(**options**: [TransportOptions](#transport-options)): *[HttpTransport](#http-transport)*
 
 **Parameters:**
 
@@ -152,7 +152,7 @@ options | [TransportOptions](#transport-options) |
 
 ### request
 
-▸  **request**(**method**: string, **params**: any) => *function*
+▸  **request**(**method**: string, **params**: any): () => *Promise‹any›*
 
 *Implementation of ITransport*
 
@@ -163,17 +163,13 @@ Name | Type |
 method | string |
 params | any |
 
-**Returns:** *function*
-
-▸  () => *Promise‹any›*
-
 ## Meta
 
 Contains information about available cubes and it's members.
 
 ### defaultTimeDimensionNameFor
 
-▸  **defaultTimeDimensionNameFor**(**memberName**: string) => *string*
+▸  **defaultTimeDimensionNameFor**(**memberName**: string): *string*
 
 **Parameters:**
 
@@ -185,7 +181,7 @@ memberName | string |
 
 ### filterOperatorsForMember
 
-▸  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#member-type)) => *any*
+▸  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#member-type)): *any*
 
 **Parameters:**
 
@@ -198,7 +194,7 @@ memberType | [MemberType](#member-type) |
 
 ### membersForQuery
 
-▸  **membersForQuery**(**query**: [Query](#query), **memberType**: [MemberType](#member-type)) => *any*
+▸  **membersForQuery**(**query**: [Query](#query), **memberType**: [MemberType](#member-type)): *any*
 
 Get all members of a specific type for a given query.
 If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -214,7 +210,7 @@ memberType | [MemberType](#member-type) | - |
 
 ### resolveMember
 
-▸  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#member-type)) => *Object*
+▸  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#member-type)): *Object*
 
 Get meta information for member of a cube
 Member meta information contains:
@@ -238,19 +234,17 @@ memberType | [MemberType](#member-type) | - |
 
 **Returns:** *Object*
 
-An object containing meta information about member
-
 ## ProgressResult
 
 ### stage
 
-▸  **stage**() => *string*
+▸  **stage**(): *string*
 
 **Returns:** *string*
 
 ### timeElapsed
 
-▸  **timeElapsed**() => *string*
+▸  **timeElapsed**(): *string*
 
 **Returns:** *string*
 
@@ -260,7 +254,7 @@ Provides a convenient interface for data manipulation.
 
 ### constructor
 
-\+  **new ResultSet**(**loadResponse**: [LoadResponse](#load-response)‹T›, **options?**: Object) => *[ResultSet](#result-set)*
+\+  **new ResultSet**(**loadResponse**: [LoadResponse](#load-response)‹T›, **options?**: Object): *[ResultSet](#result-set)*
 
 Creates a new instance of ResultSet based on [LoadResponse](#load-response) data.
 
@@ -292,7 +286,7 @@ options? | Object |
 
 ### chartPivot
 
-▸  **chartPivot**(**pivotConfig?**: [PivotConfig](#pivot-config)) => *[ChartPivotRow](#chart-pivot-row)[]*
+▸  **chartPivot**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[ChartPivotRow](#chart-pivot-row)[]*
 
 Returns normalized query result data in the following format.
 
@@ -327,7 +321,7 @@ pivotConfig? | [PivotConfig](#pivot-config) |
 
 ### drillDown
 
-▸  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drill-down-locator), **pivotConfig?**: [PivotConfig](#pivot-config)) => *[Query](#query) | null*
+▸  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drill-down-locator), **pivotConfig?**: [PivotConfig](#pivot-config)): *[Query](#query) | null*
 
 Returns a measure drill down query.
 
@@ -377,11 +371,9 @@ pivotConfig? | [PivotConfig](#pivot-config) |
 
 **Returns:** *[Query](#query) | null*
 
-Drill down query
-
 ### pivot
 
-▸  **pivot**(**pivotConfig?**: [PivotConfig](#pivot-config)) => *[PivotRow](#pivot-row)[]*
+▸  **pivot**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[PivotRow](#pivot-row)[]*
 
 Base method for pivoting [ResultSet](#result-set) data.
 Most of the times shouldn't be used directly and [chartPivot](#result-set-chart-pivot)
@@ -430,23 +422,21 @@ pivotConfig? | [PivotConfig](#pivot-config) |
 
 **Returns:** *[PivotRow](#pivot-row)[]*
 
-An array of pivoted rows.
-
 ### query
 
-▸  **query**() => *[Query](#query)*
+▸  **query**(): *[Query](#query)*
 
 **Returns:** *[Query](#query)*
 
 ### rawData
 
-▸  **rawData**() => *T[]*
+▸  **rawData**(): *T[]*
 
 **Returns:** *T[]*
 
 ### series
 
-▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#pivot-config)) => *[Series](#series)‹SeriesItem›[]*
+▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#pivot-config)): *[Series](#series)‹SeriesItem›[]*
 
 Returns an array of series with key, title and series data.
 ```js
@@ -489,7 +479,7 @@ pivotConfig? | [PivotConfig](#pivot-config) |
 
 ### seriesNames
 
-▸  **seriesNames**(**pivotConfig?**: [PivotConfig](#pivot-config)) => *[SeriesNamesColumn](#series-names-column)[]*
+▸  **seriesNames**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[SeriesNamesColumn](#series-names-column)[]*
 
 Returns an array of series objects, containing `key` and `title` parameters.
 ```js
@@ -521,11 +511,9 @@ pivotConfig? | [PivotConfig](#pivot-config) |
 
 **Returns:** *[SeriesNamesColumn](#series-names-column)[]*
 
-An array of series names
-
 ### tableColumns
 
-▸  **tableColumns**(**pivotConfig?**: [PivotConfig](#pivot-config)) => *[TableColumn](#table-column)[]*
+▸  **tableColumns**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[TableColumn](#table-column)[]*
 
 Returns an array of column definitions for `tablePivot`.
 
@@ -627,11 +615,9 @@ pivotConfig? | [PivotConfig](#pivot-config) |
 
 **Returns:** *[TableColumn](#table-column)[]*
 
-An array of columns
-
 ### tablePivot
 
-▸  **tablePivot**(**pivotConfig?**: [PivotConfig](#pivot-config)) => *Array‹object›*
+▸  **tablePivot**(**pivotConfig?**: [PivotConfig](#pivot-config)): *Array‹object›*
 
 Returns normalized query result data prepared for visualization in the table format.
 
@@ -666,11 +652,9 @@ pivotConfig? | [PivotConfig](#pivot-config) |
 
 **Returns:** *Array‹object›*
 
-An array of pivoted rows
-
 ### getNormalizedPivotConfig
 
-▸ `static` **getNormalizedPivotConfig**(**query**: [Query](#query), **pivotConfig?**: Partial‹[PivotConfig](#pivot-config)›) => *[PivotConfig](#pivot-config)*
+▸ `static` **getNormalizedPivotConfig**(**query**: [Query](#query), **pivotConfig?**: Partial‹[PivotConfig](#pivot-config)›): *[PivotConfig](#pivot-config)*
 
 **Parameters:**
 
@@ -685,13 +669,13 @@ pivotConfig? | Partial‹[PivotConfig](#pivot-config)› |
 
 ### rawQuery
 
-▸  **rawQuery**() => *[SqlData](#sql-data)*
+▸  **rawQuery**(): *[SqlData](#sql-data)*
 
 **Returns:** *[SqlData](#sql-data)*
 
 ### sql
 
-▸  **sql**() => *string*
+▸  **sql**(): *string*
 
 **Returns:** *string*
 
@@ -699,7 +683,7 @@ pivotConfig? | Partial‹[PivotConfig](#pivot-config)› |
 
 ### request
 
-▸  **request**(**method**: string, **params**: any) => *function*
+▸  **request**(**method**: string, **params**: any): () => *Promise‹void›*
 
 **Parameters:**
 
@@ -707,10 +691,6 @@ Name | Type |
 ------ | ------ |
 method | string |
 params | any |
-
-**Returns:** *function*
-
-▸  () => *Promise‹void›*
 
 ## TimeDimensionGranularities
 

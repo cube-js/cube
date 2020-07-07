@@ -574,7 +574,6 @@ class ApiGateway {
       });
       res(
         {
-          code: e.code,
           type: e.type,
           error: e.message
         },
