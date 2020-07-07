@@ -10,7 +10,7 @@ menuOrder: 3
 
 ## useCubeQuery
 
-▸  **useCubeQuery**(**query**: Query, **options?**: [UseCubeQueryOptions](#use-cube-query-options)): () => *number*
+▸  **useCubeQuery**‹**TData**›(**query**: Query, **options?**: [UseCubeQueryOptions](#use-cube-query-options)): *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
 
 A React hook for executing Cube.js queries
 ```js
@@ -44,12 +44,18 @@ export default function App() {
 
 ```
 
+**Type parameters:**
+
+- **TData**
+
 **Parameters:**
 
 Name | Type |
 ------ | ------ |
 query | Query |
 options? | [UseCubeQueryOptions](#use-cube-query-options) |
+
+**Returns:** *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
 
 ## isQueryPresent
 
