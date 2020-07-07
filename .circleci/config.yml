@@ -94,7 +94,7 @@ jobs:
 
       - run: yarn lerna link
       - run: yarn build
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver yarn build
+      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver build
       - run: yarn lerna publish from-git
       
   react_dashboard_guide:
