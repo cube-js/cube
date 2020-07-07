@@ -14,7 +14,7 @@
     "ramda": "^0.27.0"
   },
   "peerDependencies": {
-    "@cubejs-client/core": "^0.19.35",
+    "@cubejs-client/core": "^0.19.43",
     "react": "^16.10.2"
   },
   "main": "dist/cubejs-client-react.js",
@@ -30,6 +30,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@cubejs-client/core": "^0.19.43",
     "@types/react": "^16.9.41",
     "eslint": "^6.5.1",
     "eslint-config-airbnb": "^18.0.1",
