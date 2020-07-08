@@ -1,5 +1,6 @@
 /* globals describe,test,expect */
 
+const moment = require('moment-timezone');
 const dateParser = require('./dateParser');
 
 describe(`dateParser`, () => {
@@ -39,6 +40,22 @@ describe(`dateParser`, () => {
       [
         new Date((Math.floor(new Date().getTime() / (1000 * 60 * 60)) - 23) * (1000 * 60 * 60)).toISOString().replace('Z', ''),
         new Date((Math.ceil(new Date().getTime() / (1000 * 60 * 60))) * (1000 * 60 * 60) - 1).toISOString().replace('Z', '')
+      ]
+    );
+  });
+
+  test(`from 1 hour ago to now LA`, () => {
+    const date = new Date();
+    const from = moment().tz('America/Los_Angeles').subtract({
+      hours: 1,
+      minutes: date.getMinutes(),
+      seconds: date.getSeconds(),
+      milliseconds: date.getMilliseconds()
+    });
+    expect(dateParser('from 1 hour ago to now', 'America/Los_Angeles')).toStrictEqual(
+      [
+        from.format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
+        from.clone().add({ hours: 2 }).subtract({ milliseconds: 1 }).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)
       ]
     );
   });
