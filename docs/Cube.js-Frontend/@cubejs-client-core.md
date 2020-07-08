@@ -692,18 +692,6 @@ Name | Type |
 method | string |
 params | any |
 
-## TimeDimensionGranularities
-
-• **DAY** = "day"
-
-• **HOUR** = "hour"
-
-• **MONTH** = "month"
-
-• **WEEK** = "week"
-
-• **YEAR** = "year"
-
 ## Annotation
 
 Name | Type |
@@ -939,7 +927,11 @@ Name | Type |
 ------ | ------ |
 dateRange? | string &#124; string[] |
 dimension | string |
-granularity? | [TimeDimensionGranularities](#time-dimension-granularities) |
+granularity? | [TimeDimensionGranularity](#time-dimension-granularity) |
+
+## TimeDimensionGranularity
+
+Ƭ **TimeDimensionGranularity**: *"hour" | "day" | "week" | "month" | "year"*
 
 ## TransportOptions
 
