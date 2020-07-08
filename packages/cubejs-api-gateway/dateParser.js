@@ -55,8 +55,6 @@ module.exports = (dateString, timezone) => {
       throw new UserError(`Can't parse date: '${to}'`);
     }
     const exactGranularity = ['second', 'minute', 'hour'].find(g => dateString.indexOf(g) !== -1) || 'day';
-    console.log(fromResults[0].start);
-    console.log(toResults[0].start);
     momentRange = [
       momentFromResult(fromResults[0].start, timezone),
       momentFromResult(toResults[0].start, timezone)
