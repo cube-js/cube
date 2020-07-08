@@ -704,7 +704,7 @@ params | any |
 
 • **YEAR** = "year"
 
-## Annotation
+#### Annotation
 
 Name | Type |
 ------ | ------ |
@@ -713,14 +713,14 @@ shortTitle | string |
 title | string |
 type | string |
 
-## ChartPivotRow
+#### ChartPivotRow
 
 Name | Type |
 ------ | ------ |
 x | string |
 xValues | string[] |
 
-## Column
+#### Column
 
 Name | Type |
 ------ | ------ |
@@ -728,7 +728,7 @@ key | string |
 series | [] |
 title | string |
 
-## CubeJSApiOptions
+#### CubeJSApiOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -738,14 +738,14 @@ headers? | Record‹string, string› | - |
 pollInterval? | number | - |
 transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
 
-## DrillDownLocator
+#### DrillDownLocator
 
 Name | Type |
 ------ | ------ |
 xValues | string[] |
 yValues? | string[] |
 
-## Filter
+#### Filter
 
 Name | Type |
 ------ | ------ |
@@ -754,11 +754,11 @@ member? | string |
 operator | string |
 values? | string[] |
 
-## LoadMethodCallback
+#### LoadMethodCallback
 
 Ƭ **LoadMethodCallback**: *function*
 
-## LoadMethodOptions
+#### LoadMethodOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -767,7 +767,7 @@ mutexKey? | string | Key to store the current request's MUTEX inside the `mutexO
 mutexObj? | Object | Object to store MUTEX |
 subscribe? | boolean | Pass `true` to use continuous fetch behavior. |
 
-## LoadResponse
+#### LoadResponse
 
 Name | Type |
 ------ | ------ |
@@ -776,11 +776,11 @@ data | T[] |
 lastRefreshTime | string |
 query | [Query](#query) |
 
-## MemberType
+#### MemberType
 
 Ƭ **MemberType**: *"measures" | "dimensions" | "segments"*
 
-## PivotConfig
+#### PivotConfig
 
 Configuration object that contains information about pivot axes and other options.
 
@@ -842,21 +842,21 @@ fillMissingDates? | boolean &#124; null | If `true` missing dates on the time di
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
 y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
-## PivotRow
+#### PivotRow
 
 Name | Type |
 ------ | ------ |
 xValues | Array‹string &#124; number› |
 yValuesArray | Array‹[string[], number]› |
 
-## ProgressResponse
+#### ProgressResponse
 
 Name | Type |
 ------ | ------ |
 stage | string |
 timeElapsed | number |
 
-## Query
+#### Query
 
 Name | Type |
 ------ | ------ |
@@ -872,7 +872,7 @@ timeDimensions? | [TimeDimension](#time-dimension)[] |
 timezone? | string |
 ungrouped? | boolean |
 
-## QueryAnnotations
+#### QueryAnnotations
 
 Name | Type |
 ------ | ------ |
@@ -880,11 +880,11 @@ dimensions | Record‹string, [Annotation](#annotation)› |
 measures | Record‹string, [Annotation](#annotation)› |
 timeDimensions | Record‹string, [Annotation](#annotation)› |
 
-## QueryOrder
+#### QueryOrder
 
 Ƭ **QueryOrder**: *"asc" | "desc"*
 
-## Series
+#### Series
 
 Name | Type |
 ------ | ------ |
@@ -892,7 +892,7 @@ key | string |
 series | T[] |
 title | string |
 
-## SeriesNamesColumn
+#### SeriesNamesColumn
 
 Name | Type |
 ------ | ------ |
@@ -900,13 +900,13 @@ key | string |
 title | string |
 yValues | string[] |
 
-## SqlApiResponse
+#### SqlApiResponse
 
 Name | Type |
 ------ | ------ |
 sql | [SqlData](#sql-data) |
 
-## SqlData
+#### SqlData
 
 Name | Type |
 ------ | ------ |
@@ -916,11 +916,11 @@ dataSource | boolean |
 external | boolean |
 sql | [SqlQueryTuple](#sql-query-tuple) |
 
-## SqlQueryTuple
+#### SqlQueryTuple
 
 Ƭ **SqlQueryTuple**: *[string, boolean | string | number]*
 
-## TableColumn
+#### TableColumn
 
 Name | Type |
 ------ | ------ |
@@ -933,7 +933,7 @@ shortTitle | string |
 title | string |
 type | string &#124; number |
 
-## TimeDimension
+#### TimeDimension
 
 Name | Type |
 ------ | ------ |
@@ -941,7 +941,7 @@ dateRange? | string &#124; string[] |
 dimension | string |
 granularity? | [TimeDimensionGranularities](#time-dimension-granularities) |
 
-## TransportOptions
+#### TransportOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
