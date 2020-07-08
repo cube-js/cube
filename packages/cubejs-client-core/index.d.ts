@@ -550,18 +550,12 @@ declare module '@cubejs-client/core' {
     values?: string[];
   };
 
-  export enum TimeDimensionGranularities {
-    HOUR = 'hour',
-    DAY = 'day',
-    WEEK = 'week',
-    MONTH = 'month',
-    YEAR = 'year',
-  }
+  type TimeDimensionGranularity = 'hour' | 'day' | 'week' | 'month' | 'year';
 
   export type TimeDimension = {
     dimension: string;
     dateRange?: string | string[];
-    granularity?: TimeDimensionGranularities;
+    granularity?: TimeDimensionGranularity;
   };
 
   export type Query = {
