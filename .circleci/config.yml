@@ -85,18 +85,17 @@ jobs:
             - yarn-packages-v1-
 
       - run: yarn install
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver yarn
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
 
       - save_cache:
           paths:
             - ~/.cache/yarn
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
-      - run: yarn lerna link
       - run: yarn build
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver build
-      - run: yarn lerna publish from-git
-      
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/ngx --ignore @cubejs-client/vue build
+      - run: ./node_modules/.bin/lerna publish from-git --github-release --conventional-commits --yes
+
   react_dashboard_guide:
     docker:
       - image: circleci/node:10.15
