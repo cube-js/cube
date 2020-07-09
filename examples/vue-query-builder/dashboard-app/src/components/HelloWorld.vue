@@ -1,11 +1,11 @@
 <template xmlns:v-slot="http://www.w3.org/1999/XSL/Transform">
   <v-container>
     <v-row class="text-center">
-      <query-builder :cubejs-api="cubejsApi" :query="query">
+      <query-builder :cubejs-api="cubejsApi" :query="query" style="width: 100%">
         <template v-slot:builder="{measures,setMeasures,availableMeasures, dimensions, setDimensions, availableDimensions}"
         >
           <v-row>
-            <v-col cols="6">
+            <v-col cols="3">
               <v-select
                 multiple
                 :value="measures.map(i => (i.name))"
@@ -13,7 +13,7 @@
                 :items="availableMeasures.map(i => (i.name))"
               />
             </v-col>
-            <v-col cols="6">
+            <v-col cols="3">
               <v-select
                 multiple
                 :value="dimensions.map(i => (i.name))"
