@@ -18,15 +18,11 @@
 
 {{#if parameters}}
 
-**Parameters:**
-
 {{#with parameters}}
 
-{{{parameterTable}}}
+{{{parameterTable true}}}
 
 {{/with}}
-
-{{!-- {{/ifHasTypeDeclarations}} --}}
 
 {{/if}}
 
@@ -37,9 +33,9 @@
 
 {{#unless hideSources}}
 
-**Returns:** *{{{type}}}*
-
 {{#if comment.returns}}
+
+**Returns:** *{{{type}}}*
 
 {{#with comment.returns}}
 

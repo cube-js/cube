@@ -1,8 +1,10 @@
-import { ReflectionKind, Reflection, ContainerReflection, DeclarationReflection } from 'typedoc';
-import { Component } from 'typedoc/dist/lib/utils';
-import { Converter, Context } from 'typedoc/dist/lib/converter';
-import { SourceDirectory, ReflectionGroup, Comment } from 'typedoc/dist/lib/models';
+import { ContainerReflection, DeclarationReflection, Reflection, ReflectionKind } from 'typedoc';
+import { Context, Converter } from 'typedoc/dist/lib/converter';
 import { ConverterComponent } from 'typedoc/dist/lib/converter/components';
+import { Comment, ReferenceType, ReflectionGroup, SourceDirectory } from 'typedoc/dist/lib/models';
+import { Component } from 'typedoc/dist/lib/utils';
+
+const STICKY_TAG_NAME = 'stickytypes';
 
 @Component({ name: 'cubejs-group' })
 export default class CubejsGroupPlugin extends ConverterComponent {
@@ -85,7 +87,8 @@ export default class CubejsGroupPlugin extends ConverterComponent {
       const orderTag = (comment?.tags || []).find((tag) => tag.tagName === 'order');
 
       if (orderTag) {
-        comment.tags = (comment.tags || []).filter((tag) => tag.tagName !== 'order');
+        comment.removeTags('order');
+        // CommentPlugin.removeTags(comment, 'order');
         return parseInt(orderTag.text, 10) - MAGIC;
       }
     }
@@ -93,8 +96,8 @@ export default class CubejsGroupPlugin extends ConverterComponent {
     function getOrder(reflection: Reflection) {
       if (reflection.hasComment()) {
         return findOrderAndRemove(reflection.comment);
-      } else if (reflection instanceof DeclarationReflection) { 
-        return findOrderAndRemove(reflection.signatures?.[0]?.comment);    
+      } else if (reflection instanceof DeclarationReflection) {
+        return findOrderAndRemove(reflection.signatures?.[0]?.comment);
       }
 
       return 0;
@@ -104,7 +107,7 @@ export default class CubejsGroupPlugin extends ConverterComponent {
       if (!CubejsGroupPlugin.orderByName.has(reflection.name)) {
         CubejsGroupPlugin.orderByName.set(reflection.name, getOrder(reflection) || 0);
       }
-    }); 
+    });
   }
 
   private onResolve(context: Context, reflection: ContainerReflection) {
@@ -147,6 +150,57 @@ export default class CubejsGroupPlugin extends ConverterComponent {
     });
   }
 
+  private static getStickyTypes(reflection: DeclarationReflection): string[] {
+    const typeNames = [];
+    let comment: Comment;
+
+    if (reflection.comment?.getTag(STICKY_TAG_NAME) != null) {
+      comment = reflection.comment;
+    }
+
+    if (!comment) {
+      reflection.signatures?.some((sig) => {
+        if (sig.comment?.getTag(STICKY_TAG_NAME) != null) {
+          comment = sig.comment;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    if (comment) {
+      const { text } = comment.getTag(STICKY_TAG_NAME);
+      comment.removeTags(STICKY_TAG_NAME);
+      // CommentPlugin.removeTags(comment, STICKY_TAG_NAME);
+      
+      if (text.trim()) {
+        return text.split(',').map((name) => name.trim());
+      }
+      
+      reflection.signatures?.forEach((sig) => {
+        // Parameter types
+        sig.parameters?.forEach((param) => {
+          if (param.type instanceof ReferenceType) {
+            typeNames.push(param.type.name);
+          }
+        });
+
+        // Return type
+        if (sig.type && sig.type instanceof ReferenceType) {
+          typeNames.push(sig.type.name);
+        }
+      });
+
+      reflection.extendedTypes?.forEach((type: ReferenceType) => {
+        type.typeArguments?.forEach((typeArgument: any) => {
+          typeArgument.name && typeNames.push(typeArgument.name);
+        });
+      });
+    }
+    
+    return typeNames;
+  }
+
   /**
    * Create a grouped representation of the given list of reflections.
    *
@@ -156,50 +210,38 @@ export default class CubejsGroupPlugin extends ConverterComponent {
    * @returns An array containing all children of the given reflection grouped by their kind.
    */
   static getReflectionGroups(reflections: Reflection[]): ReflectionGroup[] {
-    const groups: ReflectionGroup[] = [];
-    reflections.forEach((child) => {
-      for (let i = 0; i < groups.length; i++) {
-        const group = groups[i];
-        if (group.kind !== child.kind) {
-          continue;
-        }
+    const groups = new Map<ReflectionKind, ReflectionGroup>();
+    const handledReflections = new Set<string>();
+    const reflectionByName = new Map<string, Reflection>();
 
-        group.children.push(child);
+    reflections.forEach((child) => reflectionByName.set(child.name, child));
+
+    reflections.forEach((child) => {
+      if (handledReflections.has(child.name)) {
         return;
       }
 
-      const group = new ReflectionGroup(CubejsGroupPlugin.getKindPlural(child.kind), child.kind);
-      group.children.push(child);
-      groups.push(group);
-    });
+      let typeNames = [];
+      if (child instanceof DeclarationReflection) {
+        typeNames = CubejsGroupPlugin.getStickyTypes(child);
+      }
 
-    groups.forEach((group) => {
-      let someExported = false,
-        allInherited = true,
-        allPrivate = true,
-        allProtected = true,
-        allExternal = true;
-      group.children.forEach((child) => {
-        someExported = child.flags.isExported || someExported;
-        allPrivate = child.flags.isPrivate && allPrivate;
-        allProtected = (child.flags.isPrivate || child.flags.isProtected) && allProtected;
-        allExternal = child.flags.isExternal && allExternal;
+      if (!groups.has(child.kind)) {
+        groups.set(child.kind, new ReflectionGroup(CubejsGroupPlugin.getKindPlural(child.kind), child.kind));
+      }
 
-        if (child instanceof DeclarationReflection) {
-          allInherited = !!child.inheritedFrom && allInherited;
-        } else {
-          allInherited = false;
+      groups.get(child.kind).children.push(child);
+
+      typeNames.forEach((name) => {
+        if (reflectionByName.has(name)) {
+          (reflectionByName.get(name) as any).stickToParent = child.name;
+          groups.get(child.kind).children.push(reflectionByName.get(name));
+          handledReflections.add(name);
         }
       });
-
-      group.someChildrenAreExported = someExported;
-      group.allChildrenAreInherited = allInherited;
-      group.allChildrenArePrivate = allPrivate;
-      group.allChildrenAreProtectedOrPrivate = allProtected;
-      group.allChildrenAreExternal = allExternal;
     });
 
-    return groups;
+    return [...groups.values()];
   }
 
   /**

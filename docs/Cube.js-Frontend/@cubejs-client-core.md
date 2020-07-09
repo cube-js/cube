@@ -10,7 +10,7 @@ Vanilla JavaScript Cube.js client.
 
 ## cubejs
 
-▸  **cubejs**(**apiToken**: string, **options**: [CubeJSApiOptions](#cube-js-api-options)): *[CubejsApi](#cubejs-api)*
+▸  **cubejs**(**apiToken**: string, **options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
 
 Creates an instance of the `CubejsApi`. The API entry point.
 
@@ -23,13 +23,10 @@ const cubejsApi = cubejs(
 ```
 
 **Parameters:**
-
 Name | Type | Description |
 ------ | ------ | ------ |
 apiToken | string | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token. |
-options | [CubeJSApiOptions](#cube-js-api-options) | - |
-
-**Returns:** *[CubejsApi](#cubejs-api)*
+options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 ## CubejsApi
 
@@ -37,7 +34,9 @@ Main class for accessing Cube.js API
 
 ### load
 
-▸  **load**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options)): *Promise‹[ResultSet](#result-set)›*
+▸  **load**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[ResultSet](#result-set)›*
+
+▸  **load**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
 
 Fetch data for the passed `query`.
 
@@ -62,77 +61,34 @@ new Chart(context, chartjsConfig(resultSet));
 ```
 
 **Parameters:**
-
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#query) | [Query object](query-format)  |
-options? | [LoadMethodOptions](#load-method-options) | - |
-
-**Returns:** *Promise‹[ResultSet](#result-set)›*
-
-▸  **load**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[ResultSet](#result-set)›): *void*
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-query | [Query](#query) |
-options? | [LoadMethodOptions](#load-method-options) |
-callback? | [LoadMethodCallback](#load-method-callback)‹[ResultSet](#result-set)› |
-
-**Returns:** *void*
+query | [Query](#types-query) | [Query object](query-format)  |
+options? | [LoadMethodOptions](#types-load-method-options) | - |
+callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)› | - |
 
 ### meta
 
-▸  **meta**(**options?**: [LoadMethodOptions](#load-method-options)): *Promise‹[Meta](#meta)›*
+▸  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[Meta](#meta)›*
+
+▸  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[Meta](#meta)›): *void*
 
 Get meta description of cubes available for querying.
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-options? | [LoadMethodOptions](#load-method-options) |
-
-**Returns:** *Promise‹[Meta](#meta)›*
-
-▸  **meta**(**options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[Meta](#meta)›): *void*
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-options? | [LoadMethodOptions](#load-method-options) |
-callback? | [LoadMethodCallback](#load-method-callback)‹[Meta](#meta)› |
-
-**Returns:** *void*
-
 ### sql
 
-▸  **sql**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
+▸  **sql**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
+
+▸  **sql**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)›): *void*
 
 Get generated SQL string for the given `query`.
 
 **Parameters:**
-
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#query) | [Query object](query-format)  |
-options? | [LoadMethodOptions](#load-method-options) | - |
-
-**Returns:** *Promise‹[SqlQuery](#sql-query)›*
-
-▸  **sql**(**query**: [Query](#query), **options?**: [LoadMethodOptions](#load-method-options), **callback?**: [LoadMethodCallback](#load-method-callback)‹[SqlQuery](#sql-query)›): *void*
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-query | [Query](#query) |
-options? | [LoadMethodOptions](#load-method-options) |
-callback? | [LoadMethodCallback](#load-method-callback)‹[SqlQuery](#sql-query)› |
-
-**Returns:** *void*
+query | [Query](#types-query) | [Query object](query-format)  |
+options? | [LoadMethodOptions](#types-load-method-options) | - |
+callback? | [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)› | - |
 
 ## HttpTransport
 
@@ -140,28 +96,13 @@ Default transport implementation.
 
 ### constructor
 
-\+  **new HttpTransport**(**options**: [TransportOptions](#transport-options)): *[HttpTransport](#http-transport)*
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-options | [TransportOptions](#transport-options) |
-
-**Returns:** *[HttpTransport](#http-transport)*
+\+  **new HttpTransport**(**options**: [TransportOptions](#types-transport-options)): *[HttpTransport](#http-transport)*
 
 ### request
 
 ▸  **request**(**method**: string, **params**: any): () => *Promise‹any›*
 
 *Implementation of ITransport*
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-method | string |
-params | any |
 
 ## Meta
 
@@ -171,46 +112,26 @@ Contains information about available cubes and it's members.
 
 ▸  **defaultTimeDimensionNameFor**(**memberName**: string): *string*
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-memberName | string |
-
-**Returns:** *string*
-
 ### filterOperatorsForMember
 
-▸  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#member-type)): *any*
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-memberName | string |
-memberType | [MemberType](#member-type) |
-
-**Returns:** *any*
+▸  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *any*
 
 ### membersForQuery
 
-▸  **membersForQuery**(**query**: [Query](#query), **memberType**: [MemberType](#member-type)): *any*
+▸  **membersForQuery**(**query**: [Query](#types-query), **memberType**: [MemberType](#types-member-type)): *any*
 
 Get all members of a specific type for a given query.
 If empty query is provided no filtering is done based on query context and all available members are retrieved.
 
 **Parameters:**
-
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#query) | context query to provide filtering of members available to add to this query  |
-memberType | [MemberType](#member-type) | - |
-
-**Returns:** *any*
+query | [Query](#types-query) | context query to provide filtering of members available to add to this query  |
+memberType | [MemberType](#types-member-type) | - |
 
 ### resolveMember
 
-▸  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#member-type)): *Object*
+▸  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *Object*
 
 Get meta information for member of a cube
 Member meta information contains:
@@ -226,13 +147,10 @@ Member meta information contains:
 ```
 
 **Parameters:**
-
 Name | Type | Description |
 ------ | ------ | ------ |
 memberName | string | Fully qualified member name in a form `Cube.memberName` |
-memberType | [MemberType](#member-type) | - |
-
-**Returns:** *Object*
+memberType | [MemberType](#types-member-type) | - |
 
 ## ProgressResult
 
@@ -240,13 +158,9 @@ memberType | [MemberType](#member-type) | - |
 
 ▸  **stage**(): *string*
 
-**Returns:** *string*
-
 ### timeElapsed
 
 ▸  **timeElapsed**(): *string*
-
-**Returns:** *string*
 
 ## ResultSet
 
@@ -254,7 +168,7 @@ Provides a convenient interface for data manipulation.
 
 ### constructor
 
-\+  **new ResultSet**(**loadResponse**: [LoadResponse](#load-response)‹T›, **options?**: Object): *[ResultSet](#result-set)*
+\+  **new ResultSet**(**loadResponse**: [LoadResponse](#types-load-response)‹T›, **options?**: Object): *[ResultSet](#result-set)*
 
 Creates a new instance of ResultSet based on [LoadResponse](#load-response) data.
 
@@ -275,18 +189,9 @@ const resultSet = await cubejsApi.load({
 const copy = new ResultSet(resultSet.loadResponse);
 ```
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-loadResponse | [LoadResponse](#load-response)‹T› |
-options? | Object |
-
-**Returns:** *[ResultSet](#result-set)*
-
 ### chartPivot
 
-▸  **chartPivot**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[ChartPivotRow](#chart-pivot-row)[]*
+▸  **chartPivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[ChartPivotRow](#types-chart-pivot-row)[]*
 
 Returns normalized query result data in the following format.
 
@@ -311,17 +216,9 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 ]
 ```
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-pivotConfig? | [PivotConfig](#pivot-config) |
-
-**Returns:** *[ChartPivotRow](#chart-pivot-row)[]*
-
 ### drillDown
 
-▸  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drill-down-locator), **pivotConfig?**: [PivotConfig](#pivot-config)): *[Query](#query) | null*
+▸  **drillDown**(**drillDownLocator**: [DrillDownLocator](#types-drill-down-locator), **pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Query](#types-query) | null*
 
 Returns a measure drill down query.
 
@@ -362,18 +259,9 @@ the result will be a query with the required filters applied and the dimensions/
 }
 ```
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-drillDownLocator | [DrillDownLocator](#drill-down-locator) |
-pivotConfig? | [PivotConfig](#pivot-config) |
-
-**Returns:** *[Query](#query) | null*
-
 ### pivot
 
-▸  **pivot**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[PivotRow](#pivot-row)[]*
+▸  **pivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[PivotRow](#types-pivot-row)[]*
 
 Base method for pivoting [ResultSet](#result-set) data.
 Most of the times shouldn't be used directly and [chartPivot](#result-set-chart-pivot)
@@ -414,29 +302,17 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 ]
 ```
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-pivotConfig? | [PivotConfig](#pivot-config) |
-
-**Returns:** *[PivotRow](#pivot-row)[]*
-
 ### query
 
-▸  **query**(): *[Query](#query)*
-
-**Returns:** *[Query](#query)*
+▸  **query**(): *[Query](#types-query)*
 
 ### rawData
 
 ▸  **rawData**(): *T[]*
 
-**Returns:** *T[]*
-
 ### series
 
-▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#pivot-config)): *[Series](#series)‹SeriesItem›[]*
+▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
 
 Returns an array of series with key, title and series data.
 ```js
@@ -469,17 +345,9 @@ Returns an array of series with key, title and series data.
 
 - **SeriesItem**
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-pivotConfig? | [PivotConfig](#pivot-config) |
-
-**Returns:** *[Series](#series)‹SeriesItem›[]*
-
 ### seriesNames
 
-▸  **seriesNames**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[SeriesNamesColumn](#series-names-column)[]*
+▸  **seriesNames**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[SeriesNamesColumn](#types-series-names-column)[]*
 
 Returns an array of series objects, containing `key` and `title` parameters.
 ```js
@@ -503,17 +371,9 @@ Returns an array of series objects, containing `key` and `title` parameters.
 ]
 ```
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-pivotConfig? | [PivotConfig](#pivot-config) |
-
-**Returns:** *[SeriesNamesColumn](#series-names-column)[]*
-
 ### tableColumns
 
-▸  **tableColumns**(**pivotConfig?**: [PivotConfig](#pivot-config)): *[TableColumn](#table-column)[]*
+▸  **tableColumns**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[TableColumn](#types-table-column)[]*
 
 Returns an array of column definitions for `tablePivot`.
 
@@ -607,17 +467,9 @@ then `tableColumns` will group the table head and return
 // ...
 ```
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-pivotConfig? | [PivotConfig](#pivot-config) |
-
-**Returns:** *[TableColumn](#table-column)[]*
-
 ### tablePivot
 
-▸  **tablePivot**(**pivotConfig?**: [PivotConfig](#pivot-config)): *Array‹object›*
+▸  **tablePivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *Array‹object›*
 
 Returns normalized query result data prepared for visualization in the table format.
 
@@ -644,40 +496,19 @@ For example:
 ]
 ```
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-pivotConfig? | [PivotConfig](#pivot-config) |
-
-**Returns:** *Array‹object›*
-
 ### getNormalizedPivotConfig
 
-▸ `static` **getNormalizedPivotConfig**(**query**: [Query](#query), **pivotConfig?**: Partial‹[PivotConfig](#pivot-config)›): *[PivotConfig](#pivot-config)*
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-query | [Query](#query) |
-pivotConfig? | Partial‹[PivotConfig](#pivot-config)› |
-
-**Returns:** *[PivotConfig](#pivot-config)*
+▸ `static` **getNormalizedPivotConfig**(**query**: [Query](#types-query), **pivotConfig?**: Partial‹[PivotConfig](#types-pivot-config)›): *[PivotConfig](#types-pivot-config)*
 
 ## SqlQuery
 
 ### rawQuery
 
-▸  **rawQuery**(): *[SqlData](#sql-data)*
-
-**Returns:** *[SqlData](#sql-data)*
+▸  **rawQuery**(): *[SqlData](#types-sql-data)*
 
 ### sql
 
 ▸  **sql**(): *string*
-
-**Returns:** *string*
 
 ## ITransport
 
@@ -685,14 +516,9 @@ pivotConfig? | Partial‹[PivotConfig](#pivot-config)› |
 
 ▸  **request**(**method**: string, **params**: any): () => *Promise‹void›*
 
-**Parameters:**
+## Types
 
-Name | Type |
------- | ------ |
-method | string |
-params | any |
-
-## Annotation
+#### Annotation
 
 Name | Type |
 ------ | ------ |
@@ -701,14 +527,14 @@ shortTitle | string |
 title | string |
 type | string |
 
-## ChartPivotRow
+#### ChartPivotRow
 
 Name | Type |
 ------ | ------ |
 x | string |
 xValues | string[] |
 
-## Column
+#### Column
 
 Name | Type |
 ------ | ------ |
@@ -716,7 +542,7 @@ key | string |
 series | [] |
 title | string |
 
-## CubeJSApiOptions
+#### CubeJSApiOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -726,14 +552,14 @@ headers? | Record‹string, string› | - |
 pollInterval? | number | - |
 transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
 
-## DrillDownLocator
+#### DrillDownLocator
 
 Name | Type |
 ------ | ------ |
 xValues | string[] |
 yValues? | string[] |
 
-## Filter
+#### Filter
 
 Name | Type |
 ------ | ------ |
@@ -742,11 +568,11 @@ member? | string |
 operator | string |
 values? | string[] |
 
-## LoadMethodCallback
+#### LoadMethodCallback
 
 Ƭ **LoadMethodCallback**: *function*
 
-## LoadMethodOptions
+#### LoadMethodOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -755,20 +581,20 @@ mutexKey? | string | Key to store the current request's MUTEX inside the `mutexO
 mutexObj? | Object | Object to store MUTEX |
 subscribe? | boolean | Pass `true` to use continuous fetch behavior. |
 
-## LoadResponse
+#### LoadResponse
 
 Name | Type |
 ------ | ------ |
-annotation | [QueryAnnotations](#query-annotations) |
+annotation | [QueryAnnotations](#types-query-annotations) |
 data | T[] |
 lastRefreshTime | string |
-query | [Query](#query) |
+query | [Query](#types-query) |
 
-## MemberType
+#### MemberType
 
 Ƭ **MemberType**: *"measures" | "dimensions" | "segments"*
 
-## PivotConfig
+#### PivotConfig
 
 Configuration object that contains information about pivot axes and other options.
 
@@ -830,49 +656,49 @@ fillMissingDates? | boolean &#124; null | If `true` missing dates on the time di
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
 y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
-## PivotRow
+#### PivotRow
 
 Name | Type |
 ------ | ------ |
 xValues | Array‹string &#124; number› |
 yValuesArray | Array‹[string[], number]› |
 
-## ProgressResponse
+#### ProgressResponse
 
 Name | Type |
 ------ | ------ |
 stage | string |
 timeElapsed | number |
 
-## Query
+#### Query
 
 Name | Type |
 ------ | ------ |
 dimensions? | string[] |
-filters? | [Filter](#filter)[] |
+filters? | [Filter](#types-filter)[] |
 limit? | number |
 measures? | string[] |
 offset? | number |
 order? | object |
 renewQuery? | boolean |
 segments? | string[] |
-timeDimensions? | [TimeDimension](#time-dimension)[] |
+timeDimensions? | [TimeDimension](#types-time-dimension)[] |
 timezone? | string |
 ungrouped? | boolean |
 
-## QueryAnnotations
+#### QueryAnnotations
 
 Name | Type |
 ------ | ------ |
-dimensions | Record‹string, [Annotation](#annotation)› |
-measures | Record‹string, [Annotation](#annotation)› |
-timeDimensions | Record‹string, [Annotation](#annotation)› |
+dimensions | Record‹string, [Annotation](#types-annotation)› |
+measures | Record‹string, [Annotation](#types-annotation)› |
+timeDimensions | Record‹string, [Annotation](#types-annotation)› |
 
-## QueryOrder
+#### QueryOrder
 
 Ƭ **QueryOrder**: *"asc" | "desc"*
 
-## Series
+#### Series
 
 Name | Type |
 ------ | ------ |
@@ -880,7 +706,7 @@ key | string |
 series | T[] |
 title | string |
 
-## SeriesNamesColumn
+#### SeriesNamesColumn
 
 Name | Type |
 ------ | ------ |
@@ -888,13 +714,13 @@ key | string |
 title | string |
 yValues | string[] |
 
-## SqlApiResponse
+#### SqlApiResponse
 
 Name | Type |
 ------ | ------ |
-sql | [SqlData](#sql-data) |
+sql | [SqlData](#types-sql-data) |
 
-## SqlData
+#### SqlData
 
 Name | Type |
 ------ | ------ |
@@ -902,17 +728,17 @@ aliasNameToMember | Record‹string, string› |
 cacheKeyQueries | object |
 dataSource | boolean |
 external | boolean |
-sql | [SqlQueryTuple](#sql-query-tuple) |
+sql | [SqlQueryTuple](#types-sql-query-tuple) |
 
-## SqlQueryTuple
+#### SqlQueryTuple
 
 Ƭ **SqlQueryTuple**: *[string, boolean | string | number]*
 
-## TableColumn
+#### TableColumn
 
 Name | Type |
 ------ | ------ |
-children? | [TableColumn](#table-column)[] |
+children? | [TableColumn](#types-table-column)[] |
 dataIndex | string |
 format? | any |
 key | string |
@@ -921,19 +747,19 @@ shortTitle | string |
 title | string |
 type | string &#124; number |
 
-## TimeDimension
+#### TimeDimension
 
 Name | Type |
 ------ | ------ |
 dateRange? | string &#124; string[] |
 dimension | string |
-granularity? | [TimeDimensionGranularity](#time-dimension-granularity) |
+granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
 
-## TimeDimensionGranularity
+#### TimeDimensionGranularity
 
 Ƭ **TimeDimensionGranularity**: *"hour" | "day" | "week" | "month" | "year"*
 
-## TransportOptions
+#### TransportOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |

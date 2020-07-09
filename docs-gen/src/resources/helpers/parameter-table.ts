@@ -4,9 +4,10 @@ import MarkdownTheme from '../../theme';
 import { stripLineBreaks } from './strip-line-breaks';
 import { type } from './type';
 import { signatureTitle } from './signature-title';
-import { ReferenceType, ReflectionType } from 'typedoc/dist/lib/models';
+import { ReflectionType } from 'typedoc/dist/lib/models';
 
-export function parameterTable(this: ParameterReflection[]) {
+export function parameterTable(this: ParameterReflection[], hideUncommented: boolean) {
+  const md = [];
   const defaultValues = this.map((param) => !!param.defaultValue);
   const hasDefaultValues = !defaultValues.every((value) => !value);
 
@@ -23,6 +24,14 @@ export function parameterTable(this: ParameterReflection[]) {
 
   if (hasComments) {
     headers.push('Description');
+  }
+  
+  if (hideUncommented && !hasComments) {
+    return '';
+  }
+  
+  if (hideUncommented) {
+    md.push('**Parameters:**');
   }
 
   const rows = this.map((parameter) => {
@@ -58,7 +67,7 @@ export function parameterTable(this: ParameterReflection[]) {
     return `${row.join(' | ')} |\n`;
   });
 
-  const output = `\n${headers.join(' | ')} |\n${headers.map(() => '------').join(' | ')} |\n${rows.join('')}`;
+  md.push(`\n${headers.join(' | ')} |\n${headers.map(() => '------').join(' | ')} |\n${rows.join('')}`);
 
-  return output;
+  return md.join('');
 }

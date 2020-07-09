@@ -39,6 +39,7 @@ declare module '@cubejs-client/react' {
    *   )
    * }
    * ```
+   * @stickyTypes
    * @order 10
    */
   export const CubeProvider: React.FC<CubeProviderVariables>;
@@ -80,6 +81,7 @@ declare module '@cubejs-client/react' {
 
   /**
    * `<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
+   * @stickyTypes QueryRendererProps, QueryRendererRenderProps
    * @noInheritDoc
    */
   export class QueryRenderer extends React.Component<QueryRendererProps> {}
@@ -226,6 +228,7 @@ declare module '@cubejs-client/react' {
    * const rootElement = document.getElementById("root");
    * ReactDOM.render(<App />, rootElement);
    * ```
+   * @stickyTypes QueryBuilderProps, QueryBuilderRenderProps, QueryBuilderState
    * @noInheritDoc
    * @order 2
    */
@@ -264,6 +267,7 @@ declare module '@cubejs-client/react' {
    *
    * ```
    * @order 1
+   * @stickyTypes
    */
   export function useCubeQuery<TData>(query: Query, options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
 

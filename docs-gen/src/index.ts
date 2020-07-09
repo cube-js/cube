@@ -4,6 +4,7 @@ import { ParameterType } from 'typedoc/dist/lib/utils/options/declaration';
 import { MarkdownPlugin } from './plugin';
 import CubejsGroupPlugin from './plugins/CubejsGroupPlugin';
 import NoInheritPlugin from './plugins/NoInheritPlugin';
+import {LinkPlugin} from './plugins/LinkPlugin';
 
 export = (PluginHost: Application) => {
   const app = PluginHost.owner;
@@ -68,4 +69,5 @@ export = (PluginHost: Application) => {
   app.converter.addComponent('cubejs-group', new CubejsGroupPlugin(app.converter))
   
   app.converter.addComponent('no-inherit', new NoInheritPlugin(app.converter));
+  app.converter.addComponent('link', new LinkPlugin(app.converter));
 };
