@@ -38,11 +38,9 @@
 {{else}}
 
 {{#ifCond kindString '!=' 'Module'}}
-{{!-- {{#ifParentIsModule false}} --}}
 
 {{> member.declaration}}
 
-{{!-- {{/ifParentIsModule}} --}}
 {{/ifCond}}
 
 {{/if}}
@@ -50,6 +48,10 @@
 {{/if}}
 
 {{#each groups}}
+
+{{#ifCond title '===' 'Type aliases'}}
+## Types
+{{/ifCond}}
 
 {{#each children}}
 

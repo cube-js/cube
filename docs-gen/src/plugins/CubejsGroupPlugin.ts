@@ -1,9 +1,10 @@
 import { ContainerReflection, DeclarationReflection, Reflection, ReflectionKind } from 'typedoc';
 import { Context, Converter } from 'typedoc/dist/lib/converter';
 import { ConverterComponent } from 'typedoc/dist/lib/converter/components';
-import { CommentPlugin } from 'typedoc/dist/lib/converter/plugins';
 import { Comment, ReferenceType, ReflectionGroup, SourceDirectory } from 'typedoc/dist/lib/models';
 import { Component } from 'typedoc/dist/lib/utils';
+
+const STICKY_TAG_NAME = 'stickytypes';
 
 @Component({ name: 'cubejs-group' })
 export default class CubejsGroupPlugin extends ConverterComponent {
@@ -86,7 +87,8 @@ export default class CubejsGroupPlugin extends ConverterComponent {
       const orderTag = (comment?.tags || []).find((tag) => tag.tagName === 'order');
 
       if (orderTag) {
-        CommentPlugin.removeTags(comment, 'order');
+        comment.removeTags('order');
+        // CommentPlugin.removeTags(comment, 'order');
         return parseInt(orderTag.text, 10) - MAGIC;
       }
     }
@@ -148,18 +150,17 @@ export default class CubejsGroupPlugin extends ConverterComponent {
     });
   }
 
-  private static shouldTypesStickToParent(reflection: DeclarationReflection): boolean {
-    let comment;
-    let shouldTypesStickToParent = false;
+  private static getStickyTypes(reflection: DeclarationReflection): string[] {
+    const typeNames = [];
+    let comment: Comment;
 
-    if (reflection.comment?.getTag('typesshouldsticktoparent') != null) {
-      shouldTypesStickToParent = true;
+    if (reflection.comment?.getTag(STICKY_TAG_NAME) != null) {
       comment = reflection.comment;
     }
 
-    if (!shouldTypesStickToParent) {
-      shouldTypesStickToParent = reflection.signatures?.some((sig) => {
-        if (sig.comment?.getTag('typesshouldsticktoparent') != null) {
+    if (!comment) {
+      reflection.signatures?.some((sig) => {
+        if (sig.comment?.getTag(STICKY_TAG_NAME) != null) {
           comment = sig.comment;
           return true;
         }
@@ -168,10 +169,36 @@ export default class CubejsGroupPlugin extends ConverterComponent {
     }
 
     if (comment) {
-      CommentPlugin.removeTags(comment, 'typesshouldsticktoparent');
-    }
+      const { text } = comment.getTag(STICKY_TAG_NAME);
+      comment.removeTags(STICKY_TAG_NAME);
+      // CommentPlugin.removeTags(comment, STICKY_TAG_NAME);
+      
+      if (text.trim()) {
+        return text.split(',').map((name) => name.trim());
+      }
+      
+      reflection.signatures?.forEach((sig) => {
+        // Parameter types
+        sig.parameters?.forEach((param) => {
+          if (param.type instanceof ReferenceType) {
+            typeNames.push(param.type.name);
+          }
+        });
 
-    return shouldTypesStickToParent;
+        // Return type
+        if (sig.type && sig.type instanceof ReferenceType) {
+          typeNames.push(sig.type.name);
+        }
+      });
+
+      reflection.extendedTypes?.forEach((type: ReferenceType) => {
+        type.typeArguments?.forEach((typeArgument: any) => {
+          typeArgument.name && typeNames.push(typeArgument.name);
+        });
+      });
+    }
+    
+    return typeNames;
   }
 
   /**
@@ -194,30 +221,9 @@ export default class CubejsGroupPlugin extends ConverterComponent {
         return;
       }
 
-      const typeNames = [];
-
+      let typeNames = [];
       if (child instanceof DeclarationReflection) {
-        if (CubejsGroupPlugin.shouldTypesStickToParent(child)) {
-          child.signatures?.forEach((sig) => {
-            // Parameter types
-            sig.parameters?.forEach((param) => {
-              if (param.type instanceof ReferenceType) {
-                typeNames.push(param.type.name);
-              }
-            });
-
-            // Return type
-            if (sig.type && sig.type instanceof ReferenceType) {
-              typeNames.push(sig.type.name);
-            }
-          });
-
-          child.extendedTypes?.forEach((type: ReferenceType) => {
-            type.typeArguments?.forEach((typeArgument: any) => {
-              typeArgument.name && typeNames.push(typeArgument.name);
-            });
-          });
-        }
+        typeNames = CubejsGroupPlugin.getStickyTypes(child);
       }
 
       if (!groups.has(child.kind)) {
@@ -228,7 +234,7 @@ export default class CubejsGroupPlugin extends ConverterComponent {
 
       typeNames.forEach((name) => {
         if (reflectionByName.has(name)) {
-          (reflectionByName.get(name) as any).stickToParent = true;
+          (reflectionByName.get(name) as any).stickToParent = child.name;
           groups.get(child.kind).children.push(reflectionByName.get(name));
           handledReflections.add(name);
         }

@@ -9,9 +9,10 @@ import {
   TypeOperatorType,
   UnionType,
 } from 'typedoc/dist/lib/models/types';
-import { dasherize, underscore, camelize } from 'inflection';
 
 import MarkdownTheme from '../../theme';
+import { ReflectionKind } from 'typedoc';
+import { LinkPlugin } from '../../plugins/LinkPlugin';
 
 export function type(
   this:
@@ -59,20 +60,28 @@ export function type(
   return this;
 }
 
-function anchorName(link) {
-  return (
-    '#' + dasherize(underscore(link.replace(/[A-Z]{2,}(?=[A-Z])/, (v) => camelize(v.toLowerCase())).replace(/#/g, '-')))
-  );
-}
-
 function getReferenceType(model: ReferenceType) {
-  const reflection = model.reflection
-    ? [`[${model.reflection.name}](${MarkdownTheme.handlebars.helpers.relativeURL(anchorName(model.reflection.name))})`]
-    : [model.name];
+  const md = [];
+
+  // let parentName = '';
+  // if (model.reflection?.kindOf(ReflectionKind.TypeAlias) && !(model.reflection as any).stickToParent) {
+  //   parentName = 'Types';
+  // }
+
+  md.push(
+    model.reflection ? LinkPlugin.toLink(model.name, model.reflection) : model.name
+    // model.reflection
+    //   ? `[${model.reflection.name}](${MarkdownTheme.handlebars.helpers.relativeURL(
+    //       LinkPlugin.anchorName(parentName + model.reflection.name)
+    //     )})`
+    //   : model.name
+  );
+
   if (model.typeArguments) {
-    reflection.push(`‹${model.typeArguments.map((typeArgument) => `${type.call(typeArgument)}`).join(', ')}›`);
+    md.push(`‹${model.typeArguments.map((typeArgument) => `${type.call(typeArgument)}`).join(', ')}›`);
   }
-  return reflection.join('');
+
+  return md.join('');
 }
 
 function getArrayType(model: ArrayType) {

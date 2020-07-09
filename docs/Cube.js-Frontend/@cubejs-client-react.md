@@ -48,15 +48,6 @@ export default function App() {
 
 - **TData**
 
-**Parameters:**
-
-Name | Type |
------- | ------ |
-query | Query |
-options? | [UseCubeQueryOptions](#use-cube-query-options) |
-
-**Returns:** *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
-
 ### UseCubeQueryOptions
 
 Name | Type | Description |
@@ -79,14 +70,6 @@ resultSet | ResultSet‹TData› &#124; null |
 ▸  **isQueryPresent**(**query**: Query): *boolean*
 
 Checks whether the query is ready
-
-**Parameters:**
-
-Name | Type |
------- | ------ |
-query | Query |
-
-**Returns:** *boolean*
 
 ## QueryBuilder
 
@@ -157,19 +140,38 @@ ReactDOM.render(<App />, rootElement);
 Name | Type | Description |
 ------ | ------ | ------ |
 cubejsApi | CubejsApi | `CubejsApi` instance to use |
-defaultChartType? | [ChartType](#chart-type) | - |
+defaultChartType? | [ChartType](#types-chart-type) | - |
 disableHeuristics? | boolean | Defaults to `false`. This means that the default heuristics will be applied. For example: when the query is empty and you select a measure that has a default time dimension it will be pushed to the query. |
 query? | Query | Default query |
 render |  (**renderProps**: [QueryBuilderRenderProps](#query-builder-render-props)) => *React.ReactNode* | - |
 setQuery? |  (**query**: Query) => *void* | Called by the `QueryBuilder` when the query state has changed. Use it when state is maintained outside of the `QueryBuilder` component. |
-setVizState? |  (**vizState**: [VizState](#viz-state)) => *void* | - |
+setVizState? |  (**vizState**: [VizState](#types-viz-state)) => *void* | - |
 stateChangeHeuristics? |  (**state**: [QueryBuilderState](#query-builder-state)) => *[QueryBuilderState](#query-builder-state)* | A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way. |
-vizState? | [VizState](#viz-state) | - |
+vizState? | [VizState](#types-viz-state) | - |
 wrapWithQueryRenderer? | boolean | - |
+
+### QueryBuilderRenderProps
+
+Name | Type | Description |
+------ | ------ | ------ |
+availableDimensions | [TAvailableDimension](#types-t-available-dimension)[] | An array of available dimensions to select. They are loaded via the API from Cube.js Backend. |
+availableMeasures | [TAvailableMeasure](#types-t-available-measure)[] | An array of available measures to select. They are loaded via the API from Cube.js Backend. |
+availableSegments | [TMember](#types-t-member)[] | An array of available segments to select. They are loaded via the API from Cube.js Backend. |
+availableTimeDimensions | [TAvailableDimension](#types-t-available-dimension)[] | An array of available time dimensions to select. They are loaded via the API from Cube.js Backend. |
+dimensions | string[] | - |
+isQueryPresent | boolean | Indicates whether the query is ready to be displayed or not |
+measures | string[] | - |
+segments | string[] | - |
+timeDimensions | Filter[] | - |
+updateDimensions | [MemberUpdater](#types-member-updater) | - |
+updateMeasures | [MemberUpdater](#types-member-updater) | - |
+updateQuery |  (**query**: Query) => *void* | Used for partial of full query update |
+updateSegments | [MemberUpdater](#types-member-updater) | - |
+updateTimeDimensions | [MemberUpdater](#types-member-updater) | - |
 
 ### QueryBuilderState
 
-Ƭ **QueryBuilderState**: *[VizState](#viz-state) & object*
+Ƭ **QueryBuilderState**: *[VizState](#types-viz-state) & object*
 
 ## QueryRenderer
 
@@ -189,9 +191,17 @@ render |  (**renderProps**: [QueryRendererRenderProps](#query-renderer-render-pr
 resetResultSetOnChange? | boolean | When `true` the **resultSet** will be reset to `null` first on every state change |
 updateOnlyOnStateChange? | boolean | - |
 
+### QueryRendererRenderProps
+
+Name | Type |
+------ | ------ |
+error | Error &#124; null |
+loadingState | [TLoadingState](#types-t-loading-state) |
+resultSet | ResultSet &#124; null |
+
 ## CubeProvider
 
-• **CubeProvider**: *React.FC‹[CubeProviderVariables](#cube-provider-variables)›*
+• **CubeProvider**: *React.FC‹[CubeProviderVariables](#types-cube-provider-variables)›*
 
 Cube.js context provider
 ```js
@@ -216,6 +226,8 @@ export default function App() {
 }
 ```
 
+## Types
+
 #### ChartType
 
 Ƭ **ChartType**: *"line" | "bar" | "table" | "area"*
@@ -231,44 +243,17 @@ cubejsApi | CubejsApi |
 
 Name | Type |
 ------ | ------ |
-add |  (**member**: [TMember](#t-member)) => *void* |
-remove |  (**member**: [TMember](#t-member)) => *void* |
-update |  (**member**: [TMember](#t-member), **updateWith**: [TMember](#t-member)) => *void* |
-
-#### QueryBuilderRenderProps
-
-Name | Type | Description |
------- | ------ | ------ |
-availableDimensions | [TAvailableDimension](#t-available-dimension)[] | An array of available dimensions to select. They are loaded via the API from Cube.js Backend. |
-availableMeasures | [TAvailableMeasure](#t-available-measure)[] | An array of available measures to select. They are loaded via the API from Cube.js Backend. |
-availableSegments | [TMember](#t-member)[] | An array of available segments to select. They are loaded via the API from Cube.js Backend. |
-availableTimeDimensions | [TAvailableDimension](#t-available-dimension)[] | An array of available time dimensions to select. They are loaded via the API from Cube.js Backend. |
-dimensions | string[] | - |
-isQueryPresent | boolean | Indicates whether the query is ready to be displayed or not |
-measures | string[] | - |
-segments | string[] | - |
-timeDimensions | Filter[] | - |
-updateDimensions | [MemberUpdater](#member-updater) | - |
-updateMeasures | [MemberUpdater](#member-updater) | - |
-updateQuery |  (**query**: Query) => *void* | Used for partial of full query update |
-updateSegments | [MemberUpdater](#member-updater) | - |
-updateTimeDimensions | [MemberUpdater](#member-updater) | - |
-
-#### QueryRendererRenderProps
-
-Name | Type |
------- | ------ |
-error | Error &#124; null |
-loadingState | [TLoadingState](#t-loading-state) |
-resultSet | ResultSet &#124; null |
+add |  (**member**: [TMember](#types-t-member)) => *void* |
+remove |  (**member**: [TMember](#types-t-member)) => *void* |
+update |  (**member**: [TMember](#types-t-member), **updateWith**: [TMember](#types-t-member)) => *void* |
 
 #### TAvailableDimension
 
-Ƭ **TAvailableDimension**: *[TMember](#t-member) & object*
+Ƭ **TAvailableDimension**: *[TMember](#types-t-member) & object*
 
 #### TAvailableMeasure
 
-Ƭ **TAvailableMeasure**: *[TMember](#t-member) & object*
+Ƭ **TAvailableMeasure**: *[TMember](#types-t-member) & object*
 
 #### TLoadingState
 
@@ -292,6 +277,6 @@ title | string |
 
 Name | Type |
 ------ | ------ |
-chartType? | [ChartType](#chart-type) |
+chartType? | [ChartType](#types-chart-type) |
 pivotConfig? | PivotConfig |
 shouldApplyHeuristicOrder? | boolean |
