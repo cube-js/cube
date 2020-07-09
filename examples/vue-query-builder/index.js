@@ -13,7 +13,7 @@ app.use(require('cors')());
 const cubejsServer = CubejsServerCore.create();
 
 if (process.env.NODE_ENV === 'production') {
-  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
+  app.use(serveStatic(path.join(__dirname, 'dashboard-app/dist')));
 }
 
 app.get('/healthy', (req, res) => {
