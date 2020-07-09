@@ -8,12 +8,12 @@ import theme from './theme';
 import 'typeface-roboto';
 import { Main } from './layouts';
 
-const API_URL = 'http://localhost:4000';
+const API_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000'
 const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTMxODM0MzYsImV4cCI6MTU5MzI2OTgzNn0.KRPeq-JYxBx4Ow-9Dkxz6s8aCV_h9A3TB353eIabUNk';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTE4NjM4MDEsImV4cCI6MTU5NDQ1NTgwMX0.NW6yiMgiZz_LCnkRn-dunzyqTRO9K7L-k5FpNn2-iCA'
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
-});
+  apiUrl: `${API_URL}/cubejs-api/v1`
+})
 
 const useStyles = makeStyles((theme) => ({
   root: {
