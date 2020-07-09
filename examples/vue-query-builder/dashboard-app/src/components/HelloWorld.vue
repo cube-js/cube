@@ -39,12 +39,12 @@
 import cubejs from '@cubejs-client/core'
 import { QueryBuilder } from '@cubejs-client/vue'
 
-const API_URL = process.env.NODE_ENV === 'production' ? '' : "http://localhost:4000";
+const API_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000'
 const CUBEJS_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTE4NjM4MDEsImV4cCI6MTU5NDQ1NTgwMX0.NW6yiMgiZz_LCnkRn-dunzyqTRO9K7L-k5FpNn2-iCA";
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTE4NjM4MDEsImV4cCI6MTU5NDQ1NTgwMX0.NW6yiMgiZz_LCnkRn-dunzyqTRO9K7L-k5FpNn2-iCA'
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`
-});
+})
 
 export default {
   name: 'HelloWorld',
