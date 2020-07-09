@@ -31,7 +31,7 @@ export function parameterTable(this: ParameterReflection[], hideUncommented: boo
   }
   
   if (hideUncommented) {
-    md.push('**Parameters:**');
+    md.push('**Parameters:**\n');
   }
 
   const rows = this.map((parameter) => {
