@@ -54,6 +54,7 @@ export default {
   },
   data: () => {
     const query = {
+      limit: 100,
       measures: [
         'Orders.count'
       ],
