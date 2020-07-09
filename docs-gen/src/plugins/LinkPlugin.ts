@@ -21,6 +21,9 @@ export class LinkPlugin extends ConverterComponent {
       if (reflection.kindOf(ReflectionKind.TypeAlias) && !(reflection as any).stickToParent) {
         link = `Types${name}`;
       }
+      if ((reflection as any).stickToParent) {
+        link = (reflection as any).stickToParent + name;
+      }
     }
 
     return `[${name}](${LinkPlugin.anchorName(link)})`;

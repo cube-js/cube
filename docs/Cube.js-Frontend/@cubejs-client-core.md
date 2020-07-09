@@ -23,6 +23,7 @@ const cubejsApi = cubejs(
 ```
 
 **Parameters:**
+
 Name | Type | Description |
 ------ | ------ | ------ |
 apiToken | string | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token. |
@@ -61,6 +62,7 @@ new Chart(context, chartjsConfig(resultSet));
 ```
 
 **Parameters:**
+
 Name | Type | Description |
 ------ | ------ | ------ |
 query | [Query](#types-query) | [Query object](query-format)  |
@@ -84,6 +86,7 @@ Get meta description of cubes available for querying.
 Get generated SQL string for the given `query`.
 
 **Parameters:**
+
 Name | Type | Description |
 ------ | ------ | ------ |
 query | [Query](#types-query) | [Query object](query-format)  |
@@ -124,6 +127,7 @@ Get all members of a specific type for a given query.
 If empty query is provided no filtering is done based on query context and all available members are retrieved.
 
 **Parameters:**
+
 Name | Type | Description |
 ------ | ------ | ------ |
 query | [Query](#types-query) | context query to provide filtering of members available to add to this query  |
@@ -147,6 +151,7 @@ Member meta information contains:
 ```
 
 **Parameters:**
+
 Name | Type | Description |
 ------ | ------ | ------ |
 memberName | string | Fully qualified member name in a form `Cube.memberName` |
@@ -518,7 +523,7 @@ For example:
 
 ## Types
 
-#### Annotation
+### Annotation
 
 Name | Type |
 ------ | ------ |
@@ -527,14 +532,14 @@ shortTitle | string |
 title | string |
 type | string |
 
-#### ChartPivotRow
+### ChartPivotRow
 
 Name | Type |
 ------ | ------ |
 x | string |
 xValues | string[] |
 
-#### Column
+### Column
 
 Name | Type |
 ------ | ------ |
@@ -542,7 +547,7 @@ key | string |
 series | [] |
 title | string |
 
-#### CubeJSApiOptions
+### CubeJSApiOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -552,14 +557,14 @@ headers? | Record‹string, string› | - |
 pollInterval? | number | - |
 transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
 
-#### DrillDownLocator
+### DrillDownLocator
 
 Name | Type |
 ------ | ------ |
 xValues | string[] |
 yValues? | string[] |
 
-#### Filter
+### Filter
 
 Name | Type |
 ------ | ------ |
@@ -568,11 +573,11 @@ member? | string |
 operator | string |
 values? | string[] |
 
-#### LoadMethodCallback
+### LoadMethodCallback
 
 Ƭ **LoadMethodCallback**: *function*
 
-#### LoadMethodOptions
+### LoadMethodOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -581,7 +586,7 @@ mutexKey? | string | Key to store the current request's MUTEX inside the `mutexO
 mutexObj? | Object | Object to store MUTEX |
 subscribe? | boolean | Pass `true` to use continuous fetch behavior. |
 
-#### LoadResponse
+### LoadResponse
 
 Name | Type |
 ------ | ------ |
@@ -590,11 +595,11 @@ data | T[] |
 lastRefreshTime | string |
 query | [Query](#types-query) |
 
-#### MemberType
+### MemberType
 
 Ƭ **MemberType**: *"measures" | "dimensions" | "segments"*
 
-#### PivotConfig
+### PivotConfig
 
 Configuration object that contains information about pivot axes and other options.
 
@@ -656,21 +661,21 @@ fillMissingDates? | boolean &#124; null | If `true` missing dates on the time di
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
 y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
-#### PivotRow
+### PivotRow
 
 Name | Type |
 ------ | ------ |
 xValues | Array‹string &#124; number› |
 yValuesArray | Array‹[string[], number]› |
 
-#### ProgressResponse
+### ProgressResponse
 
 Name | Type |
 ------ | ------ |
 stage | string |
 timeElapsed | number |
 
-#### Query
+### Query
 
 Name | Type |
 ------ | ------ |
@@ -686,7 +691,7 @@ timeDimensions? | [TimeDimension](#types-time-dimension)[] |
 timezone? | string |
 ungrouped? | boolean |
 
-#### QueryAnnotations
+### QueryAnnotations
 
 Name | Type |
 ------ | ------ |
@@ -694,11 +699,11 @@ dimensions | Record‹string, [Annotation](#types-annotation)› |
 measures | Record‹string, [Annotation](#types-annotation)› |
 timeDimensions | Record‹string, [Annotation](#types-annotation)› |
 
-#### QueryOrder
+### QueryOrder
 
 Ƭ **QueryOrder**: *"asc" | "desc"*
 
-#### Series
+### Series
 
 Name | Type |
 ------ | ------ |
@@ -706,7 +711,7 @@ key | string |
 series | T[] |
 title | string |
 
-#### SeriesNamesColumn
+### SeriesNamesColumn
 
 Name | Type |
 ------ | ------ |
@@ -714,13 +719,13 @@ key | string |
 title | string |
 yValues | string[] |
 
-#### SqlApiResponse
+### SqlApiResponse
 
 Name | Type |
 ------ | ------ |
 sql | [SqlData](#types-sql-data) |
 
-#### SqlData
+### SqlData
 
 Name | Type |
 ------ | ------ |
@@ -730,11 +735,11 @@ dataSource | boolean |
 external | boolean |
 sql | [SqlQueryTuple](#types-sql-query-tuple) |
 
-#### SqlQueryTuple
+### SqlQueryTuple
 
 Ƭ **SqlQueryTuple**: *[string, boolean | string | number]*
 
-#### TableColumn
+### TableColumn
 
 Name | Type |
 ------ | ------ |
@@ -747,7 +752,7 @@ shortTitle | string |
 title | string |
 type | string &#124; number |
 
-#### TimeDimension
+### TimeDimension
 
 Name | Type |
 ------ | ------ |
@@ -755,11 +760,11 @@ dateRange? | string &#124; string[] |
 dimension | string |
 granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
 
-#### TimeDimensionGranularity
+### TimeDimensionGranularity
 
 Ƭ **TimeDimensionGranularity**: *"hour" | "day" | "week" | "month" | "year"*
 
-#### TransportOptions
+### TransportOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |

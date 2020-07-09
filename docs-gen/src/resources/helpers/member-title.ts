@@ -14,7 +14,8 @@ export function memberTitle(this: DeclarationReflection) {
       headingLevel = 2;
 
       if (this.kind === ReflectionKind.TypeAlias) {
-        headingLevel = 4;
+        // headingLevel = 4;
+        headingLevel = 3;
       }
     }
   }
