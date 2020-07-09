@@ -4,6 +4,7 @@ import AppBar from "@material-ui/core/AppBar";
 import Toolbar from "@material-ui/core/Toolbar";
 import Button from "@material-ui/core/Button";
 import GitHubIcon from '@material-ui/icons/GitHub';
+import DescriptionIcon from '@material-ui/icons/Description';
 import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
 
@@ -25,6 +26,14 @@ const Header = ({ location }) => {
           Cube.js Web Analytics Demo
         </Typography>
         <div className={classes.grow} />
+        <Button
+          component="a"
+          href="https://web-analytics.cube.dev"
+          endIcon={<DescriptionIcon />}
+          color="inherit"
+        >
+          Tutorial
+        </Button>
         <Button
           component="a"
           href="https://github.com/cube-js/cube.js/tree/master/examples/web-analytics"

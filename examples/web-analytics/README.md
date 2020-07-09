@@ -1,18 +1,16 @@
-# Cube.js Web Analytics
-
-Use this template to build your own open-source Google Analytics alternative. It’s developer friendly, hackable, and embeddable. It is easy to install the full working application and then customize every part of it from data collection to metrics definitions and visualizations. By self-hosting and managing the full lifecycle of the data you fully control the privacy and don’t need to send your users’ data to 3rd parties.
+# Cube.js Web Analytics Example application
 
 The example application uses Cube.js as the analytics backend, Snowplow for data collection, and Athena as the main data warehouse. The frontend is built with React, Material UI, and Recharts.
 
-**Online demo:** [web-analytics-demo.cube.dev](https://web-analytics-demo.cube.dev/)
+**Online demo:** [web-analytics-demo.cubecloudapp.dev](https://web-analytics-demo.cubecloudapp.dev)
+
+**Tutorial**: [Building an Open Source Web Analytics Platform](http://web-analytics.cube.dev)
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/examples/web-analytics/screenshot.png)
 
 **Ready-to-use.** Follow the installation guide below to install the whole stack from data collection to the frontend application. It comes with all Cube.js schema definitions for sessionization and attribution, as well as configured pre-aggregations for optimal performance.
 
-**Hackable.** Use this template as a starting point to create your own web analytics platform. It’s designed to be completely customizable on every level. You can switch to a different data collection engine or build your own, use any SQL database as a warehouse, change how metrics are defined, and completely customize the frontend.
-
-**Embeddable.** Backend components can be easily deployed as microservices into your existing stack. The frontend is a pure React application based on Material UI without any custom styles. You can embed any part of the frontend into your existing application and customize the look and feel to match your styles.
+**Hackable.** Use this demo application as a starting point to create your own web analytics platform. It’s designed to be completely customizable on every level. You can switch to a different data collection engine or build your own, use any SQL database as a warehouse, change how metrics are defined, and completely customize the frontend.
 
 **Performance first.** The response time is under 50 ms by using Cube.js pre-aggregations. It scales well for tracking up to several million daily active users. To achieve this performance, Cube.js stores and manages aggregated tables in MySQL with a 5-minute refresh rate. You can learn more about performance optimization with external pre-aggregations in [this blog post](https://cube.dev/blog/when-mysql-is-faster-than-bigquery/).
 
