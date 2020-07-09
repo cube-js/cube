@@ -9,17 +9,6 @@ import Dropdown from "../components/Dropdown";
 import SwitchTable from "../components/SwitchTable";
 
 const queries = {
-  usersOvertime: {
-    chartType: 'line',
-    legend: false,
-    query: {
-      measures: ['SessionUsers.usersCount'],
-      timeDimensions: [{
-        granularity: 'day'
-      }]
-    }
-  },
-
   usersCount: {
     chartType: 'number',
     query: {
@@ -83,30 +72,52 @@ const queries = {
   }
 };
 
-const measuresForSwitch = {
-  "Users": "SessionUsers.usersCount",
-  "Sessions": "Sessions.count",
-  "New Users": "SessionUsers.newUsersCount"
+const overTimeQueries = {
+  "Users": {
+    measures: ["SessionUsers.usersCount"],
+    timeDimensions: [{
+      granularity: 'day',
+      dimension: "SessionUsers.sessionStart"
+    }]
+  },
+  "Sessions": {
+    measures: ["Sessions.count"],
+    timeDimensions: [{
+      granularity: 'day',
+      dimension: "Sessions.sessionStart"
+    }]
+  },
+  "Page Views": {
+    measures: ["PageViews.count"],
+    timeDimensions: [{
+      granularity: 'day',
+      dimension: "PageViews.time"
+    }]
+  }
 };
 
 const AudiencePage = ({ withTime }) => {
-  const [overTimeMeasure, setOverTimeMeasure] = useState("Users");
+  const [overTimeQuery, setOverTimeQuery] = useState("Users");
   return (
     <>
       <Grid item xs={12}>
         <OverTimeChart
           title={
             <Dropdown
-              value={overTimeMeasure}
+              value={overTimeQuery}
               options={
-                Object.keys(measuresForSwitch).reduce((out, measure) => {
-                  out[measure] = () => setOverTimeMeasure(measure)
+                Object.keys(overTimeQueries).reduce((out, measure) => {
+                  out[measure] = () => setOverTimeQuery(measure)
                   return out;
                 }, {})
               }
             />
           }
-          vizState={withTime({ ...queries.usersOvertime, query: { ...queries.usersOvertime.query, measures: [measuresForSwitch[overTimeMeasure]] } })}
+          vizState={withTime({
+            chartType: 'line',
+            legend: false,
+            query: overTimeQueries[overTimeQuery]
+          })}
         />
       </Grid>
       <Grid item xs={6}>

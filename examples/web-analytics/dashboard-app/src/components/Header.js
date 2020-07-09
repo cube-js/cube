@@ -22,7 +22,7 @@ const Header = ({ location }) => {
     <AppBar position="fixed" className={classes.appBar}>
       <Toolbar>
         <Typography variant="h6" color="inherit" noWrap className={classes.title}>
-          Cube.js Web Analytics Template
+          Cube.js Web Analytics Demo
         </Typography>
         <div className={classes.grow} />
         <Button
