@@ -1,0 +1,105 @@
+{
+  "_from": "@cubejs-client/vue",
+  "_id": "@cubejs-client/vue@0.19.43",
+  "_inBundle": false,
+  "_integrity": "sha512-84ezAa30EcsH+Dx9dvY+7Ht7zxF4YwdakpcXN5Ml5Av0Gh9ZoCeLIgmEbr0izUZmUE/qvMwc7GBqUNti0PT35g==",
+  "_location": "/@cubejs-client/vue",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "tag",
+    "registry": true,
+    "raw": "@cubejs-client/vue",
+    "name": "@cubejs-client/vue",
+    "escapedName": "@cubejs-client%2fvue",
+    "scope": "@cubejs-client",
+    "rawSpec": "",
+    "saveSpec": null,
+    "fetchSpec": "latest"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/@cubejs-client/vue/-/vue-0.19.43.tgz",
+  "_shasum": "20f6d97b9e6470a30690c9b49c40ae1c1f24cae3",
+  "_spec": "@cubejs-client/vue",
+  "_where": "/Users/lonya/Desktop/cube.js/examples/vue-query-builder/dashboard-app",
+  "author": {
+    "name": "Ricardo Tapia"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not ie <= 8"
+  ],
+  "bugs": {
+    "url": "https://github.com/cube-js/cube.js/issues"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "core-js": "^3.6.5",
+    "ramda": "^0.27.0"
+  },
+  "deprecated": false,
+  "description": "Vue.js components for cube.js",
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "^3.5.0",
+    "@vue/cli-plugin-eslint": "^4.2.3",
+    "@vue/cli-plugin-unit-jest": "^4.2.3",
+    "@vue/cli-service": "^4.2.3",
+    "@vue/test-utils": "1.0.0-beta.31",
+    "babel-core": "7.0.0-bridge.0",
+    "babel-eslint": "^10.0.1",
+    "babel-jest": "^23.6.0",
+    "eslint": "^6.8.0",
+    "eslint-plugin-vue": "^6.2.1",
+    "vue": "^2.6.6",
+    "vue-template-compiler": "^2.5.21"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/essential",
+      "eslint:recommended"
+    ],
+    "rules": {},
+    "parserOptions": {
+      "parser": "babel-eslint"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "gitHead": "5f410311bb883b00eb4d94c0f8c2ace9bcbd8aee",
+  "homepage": "https://github.com/cube-js/cube.js#readme",
+  "license": "MIT",
+  "main": "dist/cubejs-client-vue.js",
+  "module": "dist/cubejs-client-vue.esm.js",
+  "name": "@cubejs-client/vue",
+  "postcss": {
+    "plugins": {
+      "autoprefixer": {}
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-client-vue"
+  },
+  "scripts": {
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "serve": "vue-cli-service serve",
+    "test": "vue-cli-service test:unit",
+    "test:unit": "vue-cli-service test:unit",
+    "test:unit:watch": "vue-cli-service test:unit --watch --require tests/setup.js"
+  },
+  "version": "0.19.43"
+}

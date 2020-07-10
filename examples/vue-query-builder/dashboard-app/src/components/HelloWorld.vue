@@ -1,13 +1,26 @@
 <template xmlns:v-slot="http://www.w3.org/1999/XSL/Transform">
   <v-container>
     <v-row class="text-center">
-      <query-builder :cubejs-api="cubejsApi" :query="query" style="width: 100%">
-        <template v-slot:builder="{measures,setMeasures,availableMeasures, dimensions, setDimensions, availableDimensions}"
+      <query-builder :cubejs-api="cubejsApi" :query="innerQuery" style="width: 100%">
+        <template
+          v-slot:builder="{
+          measures,
+          setMeasures,
+          availableMeasures,
+          dimensions,
+          setDimensions,
+          availableDimensions,
+          timeDimensions,
+          setTimeDimensions,
+          availableTimeDimensions,
+          query
+          }"
         >
           <v-row>
             <v-col cols="3">
               <v-select
                 multiple
+                label="Measures"
                 :value="measures.map(i => (i.name))"
                 @change="setMeasures"
                 :items="availableMeasures.map(i => (i.name))"
@@ -16,9 +29,24 @@
             <v-col cols="3">
               <v-select
                 multiple
+                label="Dimensions"
                 :value="dimensions.map(i => (i.name))"
                 @change="setDimensions"
                 :items="availableDimensions.map(i => (i.name))"
+              />
+            </v-col>
+            <v-col cols="3">
+              <v-select
+                label="Time Dimensions"
+                v-model="innerQuery.timeDimensions[0]['dimension']"
+                :items="availableTimeDimensions.map(i => (i.name))"
+              />
+            </v-col>
+            <v-col cols="3">
+              <v-select
+                label="Time Dimensions"
+                v-model="innerQuery.timeDimensions[0]['granularity']"
+                :items="granularity"
               />
             </v-col>
           </v-row>
@@ -37,7 +65,7 @@
 
 <script>
 import cubejs from '@cubejs-client/core'
-import { QueryBuilder } from '@cubejs-client/vue'
+import { QueryBuilder } from './vue/src'
 
 const API_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000'
 const CUBEJS_TOKEN =
@@ -53,7 +81,7 @@ export default {
     QueryBuilder
   },
   data: () => {
-    const query = {
+    const innerQuery = {
       limit: 100,
       measures: [
         'Orders.count'
@@ -69,7 +97,8 @@ export default {
     return {
       cubejsApi,
       innerMeasures: [],
-      query
+      granularity: ['day', 'week', 'month', 'year'],
+      innerQuery
     }
   },
   methods: {
