@@ -30,7 +30,7 @@
     "eslint-plugin-node": "^5.2.1",
     "express": "^4.17.1",
     "jest": "^24.9.0",
-    "mocha": "^5.2.0",
+    "mocha": "^8.0.1",
     "should": "^13.2.3",
     "supertest": "^4.0.2"
   },
