@@ -646,7 +646,7 @@ function (_React$Component) {
       var _updateVizState = _asyncToGenerator(
       /*#__PURE__*/
       _regeneratorRuntime.mark(function _callee2(state) {
-        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, _error$response, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
+        var _this$props, setQuery, setVizState, _this$state3, stateQuery, statePivotConfig, finalState, _ref3, _, query, _ref4, sqlQuery, activePivotConfig, updatedOrderMembers, currentOrderMemberIds, currentOrderMembers, nextOrder, nextQuery, _finalState, _meta, toSet;
 
         return _regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
@@ -658,7 +658,7 @@ function (_React$Component) {
                 _ref3 = finalState.query || {}, _ = _ref3.order, query = _objectWithoutProperties(_ref3, ["order"]);
 
                 if (!(finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query))) {
-                  _context2.next = 20;
+                  _context2.next = 16;
                   break;
                 }
 
@@ -672,26 +672,15 @@ function (_React$Component) {
                 _ref4 = _context2.sent;
                 sqlQuery = _ref4.sqlQuery;
                 finalState.query.order = sqlQuery.sql.order;
-                _context2.next = 20;
+                _context2.next = 16;
                 break;
 
               case 13:
                 _context2.prev = 13;
                 _context2.t0 = _context2["catch"](5);
+                console.error(_context2.t0);
 
-                if (!(((_error$response = _context2.t0.response) === null || _error$response === void 0 ? void 0 : _error$response.type) === 'UserError')) {
-                  _context2.next = 19;
-                  break;
-                }
-
-                console.error(_context2.t0.response.error);
-                _context2.next = 20;
-                break;
-
-              case 19:
-                throw _context2.t0;
-
-              case 20:
+              case 16:
                 activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
                 updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers(_objectSpread2({}, this.state, {}, finalState)));
                 currentOrderMemberIds = (finalState.orderMembers || []).map(function (_ref5) {
@@ -736,7 +725,7 @@ function (_React$Component) {
                   setVizState(toSet);
                 }
 
-              case 32:
+              case 28:
               case "end":
                 return _context2.stop();
             }

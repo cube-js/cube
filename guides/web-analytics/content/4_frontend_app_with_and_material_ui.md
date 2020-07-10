@@ -11,7 +11,10 @@ It will create the `dashboard-app` folder with the frontend application inside t
 
 To keep things simple we're not going to build the [full demo
 application](https://web-analytics-demo.cube.dev/), but
-focus on the foundations of working with Cube.js API on the frontend, building the data schema and optimize the queries performance.
+focus on the foundations of working with Cube.js API on the frontend, building the data schema and optimize the queries performance. We're going to build the [Audience Dashboard](https://web-analytics-demo.cube.dev/) and you can check [the source code of the rest of application on Github](https://github.com/cube-js/cube.js/tree/master/examples/web-analytics).
+
+
+Let's
 
 ## Page Views Chart
 

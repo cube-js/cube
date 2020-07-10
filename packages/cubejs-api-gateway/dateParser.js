@@ -46,8 +46,8 @@ module.exports = (dateString, timezone) => {
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
     // eslint-disable-next-line no-unused-vars
     const [all, from, to] = dateString.match(/^from (.*) to (.*)$/);
-    const fromResults = chrono.parse(from, moment().tz(timezone));
-    const toResults = chrono.parse(to, moment().tz(timezone));
+    const fromResults = chrono.parse(from, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+    const toResults = chrono.parse(to, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
     if (!fromResults) {
       throw new UserError(`Can't parse date: '${from}'`);
     }
@@ -61,7 +61,7 @@ module.exports = (dateString, timezone) => {
     ];
     momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   } else {
-    const results = chrono.parse(dateString, moment().tz(timezone));
+    const results = chrono.parse(dateString, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
     if (!results) {
       throw new UserError(`Can't parse date: '${dateString}'`);
     }

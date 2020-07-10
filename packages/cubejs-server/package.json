@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Statsbot, Inc.",
-  "version": "0.19.46",
+  "version": "0.19.47",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
@@ -27,7 +27,7 @@
     "test:debug": "node --inspect-brk scripts/test.js --testPathPattern=./index\\.test\\.js --runInBand"
   },
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.19.46",
+    "@cubejs-backend/server-core": "^0.19.47",
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
@@ -41,7 +41,7 @@
     "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
     "jest": "^24.9.0",
-    "mocha": "^5.2.0",
+    "mocha": "^8.0.1",
     "should": "^13.2.3"
   },
   "license": "Apache-2.0"

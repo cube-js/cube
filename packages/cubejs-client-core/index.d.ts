@@ -550,18 +550,12 @@ declare module '@cubejs-client/core' {
     values?: string[];
   };
 
-  export enum TimeDimensionGranularities {
-    HOUR = 'hour',
-    DAY = 'day',
-    WEEK = 'week',
-    MONTH = 'month',
-    YEAR = 'year',
-  }
+  type TimeDimensionGranularity = 'hour' | 'day' | 'week' | 'month' | 'year';
 
   export type TimeDimension = {
     dimension: string;
     dateRange?: string | string[];
-    granularity?: TimeDimensionGranularities;
+    granularity?: TimeDimensionGranularity;
   };
 
   export type Query = {
@@ -652,6 +646,7 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
+    load(query: Query, options?: LoadMethodOptions): Promise<ResultSet>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -676,20 +671,19 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: Query, options?: LoadMethodOptions): Promise<ResultSet>;
     load(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
 
+    sql(query: Query, options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: Query, options?: LoadMethodOptions): Promise<SqlQuery>;
     sql(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
+    meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
      * Get meta description of cubes available for querying.
      */
-    meta(options?: LoadMethodOptions): Promise<Meta>;
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
   }
 
