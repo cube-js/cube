@@ -1,14 +1,17 @@
 module.exports = {
-  extends: 'airbnb',
+  extends: 'react-app',
   plugins: ['react', 'jsx-a11y', 'import'],
   rules: {
+    'jsx-a11y/click-events-have-key-events': 0,
+    'jsx-a11y/no-static-element-interactions': 0,
+    'jsx-a11y/anchor-is-valid': 0,
     'react/jsx-no-bind': 0,
     'react/jsx-first-prop-new-line': 0,
     'react/jsx-indent-props': 0,
     'react/jsx-filename-extension': 0,
+    'react/destructuring-assignment': 0,
     'react/react-in-jsx-scope': 0, // remove when import React is ready
     'import/no-unresolved': 0,
-    'react/jsx-props-no-spreading': 0,
     'comma-dangle': 0,
     'no-console': 0,
     'no-plusplus': 0,
@@ -46,6 +49,11 @@ module.exports = {
       {
         order: ['static-methods', 'lifecycle', 'everything-else', 'render']
       }
-    ]
+    ],
+    'react/jsx-props-no-spreading': [false, {
+      "html": "ignore",
+      "custom": "ignore",
+      "explicitSpread": "ignore"
+    }],
   }
 };

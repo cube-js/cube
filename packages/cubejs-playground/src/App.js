@@ -2,11 +2,11 @@
 import React, { Component } from 'react';
 import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
-import "./index.less";
-import "./index.css";
-import { Layout, Alert, notification } from "antd";
+import './index.less';
+import './index.css';
+import { Layout, Alert, notification } from 'antd';
 import { fetch } from 'whatwg-fetch';
-import { withRouter } from "react-router";
+import { withRouter } from 'react-router';
 import Header from './components/Header';
 import { event, setAnonymousId } from './events';
 
@@ -19,8 +19,12 @@ const selectedTab = (pathname) => {
 };
 
 class App extends Component {
+  static getDerivedStateFromError(error) {
+    return { fatalError: error };
+  }
+
   async componentDidMount() {
-    window.addEventListener("unhandledrejection", (promiseRejectionEvent) => {
+    window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
       const error = promiseRejectionEvent.reason;
       console.log(error);
       const e = (error.stack || error).toString();
@@ -55,10 +59,6 @@ class App extends Component {
       coreServerVersion: result.coreServerVersion,
       projectFingerprint: result.projectFingerprint
     });
-  }
-
-  static getDerivedStateFromError(error) {
-    return { fatalError: error };
   }
 
   componentDidCatch(error, info) {

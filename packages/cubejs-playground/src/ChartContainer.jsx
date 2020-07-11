@@ -18,7 +18,7 @@ import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
 import { Redirect, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
-import sqlFormatter from "sql-formatter";
+import sqlFormatter from 'sql-formatter';
 import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
@@ -55,11 +55,11 @@ class ChartContainer extends React.Component {
       codeSandboxSource,
       dependencies
     } = this.props;
-    const codeSandboxRes = await fetch("https://codesandbox.io/api/v1/sandboxes/define?json=1", {
-      method: "POST",
+    const codeSandboxRes = await fetch('https://codesandbox.io/api/v1/sandboxes/define?json=1', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json"
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
       },
       body: JSON.stringify(this.codeSandboxDefinition(codeSandboxSource, dependencies))
     });
@@ -321,17 +321,17 @@ class ChartContainer extends React.Component {
     const copyCodeToClipboard = async () => {
       if (!navigator.clipboard) {
         notification.error({
-          message: `Your browser doesn't support copy to clipboard`
+          message: 'Your browser doesn\'t support copy to clipboard'
         });
       }
       try {
         await navigator.clipboard.writeText(showCode === 'query' ? queryText : codeExample);
         notification.success({
-          message: `Copied to clipboard`
+          message: 'Copied to clipboard'
         });
       } catch (e) {
         notification.error({
-          message: `Can't copy to clipboard`,
+          message: 'Can\'t copy to clipboard',
           description: e,
         });
       }

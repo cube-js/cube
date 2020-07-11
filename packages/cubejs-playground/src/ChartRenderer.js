@@ -34,11 +34,11 @@ export const babelConfig = {
 const prettify = (object) => {
   let str = object;
   if (typeof object === 'object') {
-    str = JSON.stringify(object, null, 2)
+    str = JSON.stringify(object, null, 2);
   }
   
-  return str.split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n')
-}
+  return str.split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n');
+};
 
 const sourceCodeTemplate = (props) => {
   const {
@@ -90,7 +90,7 @@ export const chartLibraries = Object.keys(libraryToTemplate)
   .map(k => ({ value: k, title: libraryToTemplate[k].title }));
 
 export const ChartRenderer = (props) => {
-  const [jsCompilingError, setError] = useState(null)
+  const [jsCompilingError, setError] = useState(null);
   const [chartLibrary, setChartLibrary] = useState('bizcharts');
 
   const {
@@ -105,7 +105,7 @@ export const ChartRenderer = (props) => {
     pivotConfig
   } = props;
 
-  const sourceCodeFn = sourceCodeFnProp || sourceCodeTemplate
+  const sourceCodeFn = sourceCodeFnProp || sourceCodeTemplate;
 
   const selectedChartLibrary = selectChartLibrary(chartType, chartLibrary);
   const source = sourceCodeFn({
@@ -123,9 +123,9 @@ export const ChartRenderer = (props) => {
 
   useEffect(() => {
     if (jsCompilingError) {
-      setError(null)
+      setError(null);
     }
-  }, [source, chartType])
+  }, [source, chartType]);
 
   return (
     <ChartContainer
@@ -149,21 +149,21 @@ export const ChartRenderer = (props) => {
               description={<pre>{jsCompilingError.toString()}</pre>}
               type="error"
             />
-          )
+          );
         }
 
         return (
           <SourceRender
-            onRender={(error) => {
-              if (error) {
-                setError(error)
+            onRender={(renderError) => {
+              if (renderError) {
+                setError(renderError);
               }
             }}
             babelConfig={babelConfig}
             resolver={importName => dependencies[importName]}
             source={source}
           />
-        )
+        );
       }}
     />
   );

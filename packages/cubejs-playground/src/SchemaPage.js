@@ -258,8 +258,7 @@ class SchemaPage extends Component {
           }
           {selectedFile
             ? <PrismCode code={this.selectedFileContent()} style={{ padding: 12 }}/>
-            : <Empty style={{ marginTop: 50 }} description="Select tables to generate Cube.js schema" />
-          }
+            : <Empty style={{ marginTop: 50 }} description="Select tables to generate Cube.js schema" />}
 
         </Content>
       </Layout>
