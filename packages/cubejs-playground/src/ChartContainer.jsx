@@ -10,7 +10,9 @@ import {
   SyncOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { Card, Button, Menu, Dropdown, notification, Modal } from 'antd';
+import {
+  Card, Button, Menu, Dropdown, notification, Modal
+} from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';

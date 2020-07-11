@@ -123,7 +123,8 @@ const CachePane = ({ query, cubejsApi }) => (
             />
           </Tabs.TabPane>
         </Tabs>
-      )}
+      )
+    }
   />
 );
 

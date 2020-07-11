@@ -50,10 +50,10 @@
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
-    "start": "PORT=3080 react-app-rewired start",
-    "build": "react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
-    "test": "react-app-rewired test",
-    "eject": "react-scripts eject",
+    "start": "EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
+    "build": "EXTEND_ESLINT=true react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
+    "test": "EXTEND_ESLINT=true react-app-rewired --max-old-space-size=2048 build && react-app-rewired test",
+    "eject": "EXTEND_ESLINT=true react-scripts eject",
     "lint": "eslint src/*.js src/*.jsx"
   },
   "eslintConfig": {

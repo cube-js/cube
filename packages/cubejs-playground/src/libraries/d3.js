@@ -161,5 +161,5 @@ const ${renderFnName} = ({ resultSet }) => (
 );
 
 export const imports = {
-  'd3': d3
+  d3
 };
