@@ -7,8 +7,7 @@ module.exports = function override(config, env) {
     minimizer: [
       new TerserPlugin({
         cache: true,
-        parallel: true,
-        exclude: /babel|vendors/
+        parallel: 1
       })
     ],
     splitChunks: {
