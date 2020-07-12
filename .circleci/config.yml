@@ -36,14 +36,15 @@ jobs:
             - yarn-packages-v1-
 
       - run: yarn install
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver yarn
 
       - save_cache:
           paths:
             - ~/.cache/yarn
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test
       - run: bash <(curl -s https://codecov.io/bash)
 
   lint:
@@ -61,14 +62,15 @@ jobs:
             - yarn-packages-v1-
 
       - run: yarn install
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver yarn
 
       - save_cache:
           paths:
             - ~/.cache/yarn
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground lint
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
 
   publish:
     docker:
