@@ -51,7 +51,7 @@
   },
   "scripts": {
     "start": "EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
-    "build": "EXTEND_ESLINT=true printenv && react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
+    "build": "EXTEND_ESLINT=true react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
     "eject": "EXTEND_ESLINT=true react-scripts eject",
     "lint": "eslint src/*.js src/*.jsx"
   },
