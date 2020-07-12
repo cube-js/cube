@@ -50,10 +50,6 @@ module.exports = {
         order: ['static-methods', 'lifecycle', 'everything-else', 'render']
       }
     ],
-    'react/jsx-props-no-spreading': [false, {
-      "html": "ignore",
-      "custom": "ignore",
-      "explicitSpread": "ignore"
-    }],
+    'react/jsx-props-no-spreading': 0
   }
 };

@@ -125,7 +125,7 @@ export const ChartRenderer = (props) => {
     if (jsCompilingError) {
       setError(null);
     }
-  }, [source, chartType]);
+  }, [source, chartType, jsCompilingError]);
 
   return (
     <ChartContainer

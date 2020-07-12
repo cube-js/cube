@@ -54,7 +54,7 @@ const drawByChartType = {
 
   ${xAxisTime}
 
-  ${yAxis(`d3.max(data.map((s) => d3.max(s.values, (i) => i.value)))`)}
+  ${yAxis('d3.max(data.map((s) => d3.max(s.values, (i) => i.value)))')}
 
   // Draw the lines
   svg.selectAll(".line")
@@ -83,7 +83,7 @@ const drawByChartType = {
     .attr("transform", "translate(0," + height + ")")
     .call(d3.axisBottom(x))
 
-  ${yAxis(`d3.max(data.map((s) => d3.max(s, (i) => i[1])))`)}
+  ${yAxis('d3.max(data.map((s) => d3.max(s, (i) => i[1])))')}
 
   // Add the bars
   svg.append("g")
@@ -106,7 +106,7 @@ const drawByChartType = {
 
   ${xAxisTime}
 
-  ${yAxis(`d3.max(data.map((s) => d3.max(s, (i) => i[1])))`)}
+  ${yAxis('d3.max(data.map((s) => d3.max(s, (i) => i[1])))')}
 
   // Add the areas
   svg

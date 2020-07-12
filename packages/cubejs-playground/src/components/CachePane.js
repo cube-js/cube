@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Table, Tabs } from 'antd';
 import { QueryRenderer } from '@cubejs-client/react';
-import sqlFormatter from "sql-formatter";
+import sqlFormatter from 'sql-formatter';
 import PropTypes from 'prop-types';
 import PrismCode from '../PrismCode';
 
