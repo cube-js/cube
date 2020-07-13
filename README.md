@@ -49,11 +49,13 @@ Cube.js has necessary infrastructure for every analytic application that heavily
 
 ## Getting Started
 
-### 1. Install with NPM or Yarn
+### 1. Install with NPM, Yarn, or Homebrew
 ```bash
 $ npm install -g cubejs-cli
 # or
 $ yarn global add cubejs-cli
+# or
+$ brew install cubejs-cli
 ```
 
 ### 2. Connect to Your Database
