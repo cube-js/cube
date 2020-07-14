@@ -40,3 +40,5 @@ cube(`Events`, {
 In this case we use standard Javascript functions [Object.assign](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign), [Array.map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map) and [Array.reduce](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce) to add user count measure definitions based on `events` array.
 This approach allows you to maintain list of events in very concise manner without boilerplate code.
 This configuration can be reused using [export / import feature](export-import).
+
+Please refer to [asyncModule](schema-execution-environment#async-module) documentation to learn how to use databases and other data sources for schema generation.
