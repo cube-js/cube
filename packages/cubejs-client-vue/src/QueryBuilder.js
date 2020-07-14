@@ -353,14 +353,18 @@ export default {
             };
           }
         } else if (element === 'filters') {
-          const member = {
-            ...this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-          };
+          if (!m) {
+            mem = null
+          } else {
+            const member = {
+              ...this.meta.resolveMember(m.member.name || m.dimension, ['dimensions', 'measures']),
+            };
 
-          mem = {
-            ...m,
-            member,
-          };
+            mem = {
+              ...m,
+              member,
+            };
+          }
         } else {
           mem = this[`available${name}`].find(x => x.name === m);
         }

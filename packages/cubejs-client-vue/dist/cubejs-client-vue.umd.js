@@ -9488,11 +9488,15 @@
               });
             }
           } else if (element === 'filters') {
-            var member = _objectSpread({}, _this5.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
+            if (!m) {
+              mem = null;
+            } else {
+              var member = _objectSpread({}, _this5.meta.resolveMember(m.member.name || m.dimension, ['dimensions', 'measures']));
 
-            mem = _objectSpread({}, m, {
-              member: member
-            });
+              mem = _objectSpread({}, m, {
+                member: member
+              });
+            }
           } else {
             mem = _this5["available".concat(name)].find(function (x) {
               return x.name === m;
@@ -9526,15 +9530,18 @@
       }
     },
     watch: {
-      query: function query() {
-        if (!this.meta) {
-          // this is ok as if meta has not been loaded by the time query prop has changed,
-          // then the promise for loading meta (found in mounted()) will call
-          // copyQueryFromProps and will therefore update anyway.
-          return;
-        }
+      query: {
+        deep: true,
+        handler: function handler() {
+          if (!this.meta) {
+            // this is ok as if meta has not been loaded by the time query prop has changed,
+            // then the promise for loading meta (found in mounted()) will call
+            // copyQueryFromProps and will therefore update anyway.
+            return;
+          }
 
-        this.copyQueryFromProps();
+          this.copyQueryFromProps();
+        }
       }
     }
   };
