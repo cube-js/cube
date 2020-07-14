@@ -3005,7 +3005,7 @@
 	      };
 	    };
 
-	    function AsyncIterator(generator, PromiseImpl) {
+	    function AsyncIterator(generator) {
 	      function invoke(method, arg, resolve, reject) {
 	        var record = tryCatch(generator[method], generator, arg);
 
@@ -3016,14 +3016,14 @@
 	          var value = result.value;
 
 	          if (value && _typeof(value) === "object" && hasOwn.call(value, "__await")) {
-	            return PromiseImpl.resolve(value.__await).then(function (value) {
+	            return Promise.resolve(value.__await).then(function (value) {
 	              invoke("next", value, resolve, reject);
 	            }, function (err) {
 	              invoke("throw", err, resolve, reject);
 	            });
 	          }
 
-	          return PromiseImpl.resolve(value).then(function (unwrapped) {
+	          return Promise.resolve(value).then(function (unwrapped) {
 	            // When a yielded Promise is resolved, its final value becomes
 	            // the .value of the Promise<{value,done}> result for the
 	            // current iteration.
@@ -3041,7 +3041,7 @@
 
 	      function enqueue(method, arg) {
 	        function callInvokeWithMethodAndArg() {
-	          return new PromiseImpl(function (resolve, reject) {
+	          return new Promise(function (resolve, reject) {
 	            invoke(method, arg, resolve, reject);
 	          });
 	        }
@@ -3078,9 +3078,8 @@
 	    // AsyncIterator objects; they just return a Promise for the value of
 	    // the final result produced by the iterator.
 
-	    exports.async = function (innerFn, outerFn, self, tryLocsList, PromiseImpl) {
-	      if (PromiseImpl === void 0) PromiseImpl = Promise;
-	      var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList), PromiseImpl);
+	    exports.async = function (innerFn, outerFn, self, tryLocsList) {
+	      var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList));
 	      return exports.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
 	      : iter.next().then(function (result) {
 	        return result.done ? result.value : iter.next();
@@ -15983,12 +15982,14 @@
 	var ResultSet =
 	/*#__PURE__*/
 	function () {
-	  function ResultSet(loadResponse, options) {
+	  function ResultSet(loadResponse) {
+	    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
 	    _classCallCheck(this, ResultSet);
 
-	    options = options || {};
 	    this.loadResponse = loadResponse;
 	    this.parseDateMeasures = options.parseDateMeasures;
+	    this.options = options;
 	  }
 
 	  _createClass(ResultSet, [{
@@ -16531,6 +16532,14 @@
 
 	      return this.backwardCompatibleData;
 	    }
+	  }, {
+	    key: "serialize",
+	    value: function serialize() {
+	      return JSON.stringify({
+	        loadResponse: this.loadResponse,
+	        options: this.options
+	      });
+	    }
 	  }], [{
 	    key: "timeDimensionMember",
 	    value: function timeDimensionMember(td) {
@@ -16611,6 +16620,19 @@
 	    key: "measureFromAxis",
 	    value: function measureFromAxis(axisValues) {
 	      return axisValues[axisValues.length - 1];
+	    }
+	  }, {
+	    key: "deserialize",
+	    value: function deserialize(json) {
+	      try {
+	        var _JSON$parse = JSON.parse(json),
+	            loadResponse = _JSON$parse.loadResponse,
+	            options = _JSON$parse.options;
+
+	        return new ResultSet(loadResponse, options);
+	      } catch (error) {
+	        throw new Error('Deserialization failed');
+	      }
 	    }
 	  }]);
 

@@ -27,10 +27,10 @@ const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
 class ResultSet {
-  constructor(loadResponse, options) {
-    options = options || {};
+  constructor(loadResponse, options = {}) {
     this.loadResponse = loadResponse;
     this.parseDateMeasures = options.parseDateMeasures;
+    this.options = options;
   }
   
   drillDown(drillDownLocator, pivotConfig) {
@@ -511,6 +511,22 @@ class ResultSet {
       ));
     }
     return this.backwardCompatibleData;
+  }
+  
+  serialize() {
+    return JSON.stringify({
+      loadResponse: this.loadResponse,
+      options: this.options
+    });
+  }
+  
+  static deserialize(json) {
+    try {
+      const { loadResponse, options } = JSON.parse(json);
+      return new ResultSet(loadResponse, options);
+    } catch (error) {
+      throw new Error('Deserialization failed');
+    }
   }
 }
 

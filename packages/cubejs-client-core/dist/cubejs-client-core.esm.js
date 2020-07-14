@@ -96,12 +96,14 @@ var LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 var ResultSet =
 /*#__PURE__*/
 function () {
-  function ResultSet(loadResponse, options) {
+  function ResultSet(loadResponse) {
+    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
     _classCallCheck(this, ResultSet);
 
-    options = options || {};
     this.loadResponse = loadResponse;
     this.parseDateMeasures = options.parseDateMeasures;
+    this.options = options;
   }
 
   _createClass(ResultSet, [{
@@ -644,6 +646,14 @@ function () {
 
       return this.backwardCompatibleData;
     }
+  }, {
+    key: "serialize",
+    value: function serialize() {
+      return JSON.stringify({
+        loadResponse: this.loadResponse,
+        options: this.options
+      });
+    }
   }], [{
     key: "timeDimensionMember",
     value: function timeDimensionMember(td) {
@@ -724,6 +734,19 @@ function () {
     key: "measureFromAxis",
     value: function measureFromAxis(axisValues) {
       return axisValues[axisValues.length - 1];
+    }
+  }, {
+    key: "deserialize",
+    value: function deserialize(json) {
+      try {
+        var _JSON$parse = JSON.parse(json),
+            loadResponse = _JSON$parse.loadResponse,
+            options = _JSON$parse.options;
+
+        return new ResultSet(loadResponse, options);
+      } catch (error) {
+        throw new Error('Deserialization failed');
+      }
     }
   }]);
 
