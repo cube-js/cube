@@ -48,7 +48,7 @@ const RecipeCard = styled(Card)`
   && .ant-card-cover {
     height: 168px;
     border-radius: 4px;
-    background: ${props => props.createYourOwn ? "#F8F8FB" : "#EEEEF5"};
+    background: ${props => props.createYourOwn ? '#F8F8FB' : '#EEEEF5'};
     display: flex;
     align-items: center;
     position: relative;
@@ -73,7 +73,7 @@ const RecipeCard = styled(Card)`
       stroke: #7A77FF;
     }
     &:hover .ant-card-cover:after {
-      opacity: ${props => props.createYourOwn ? "0" : "1"};
+      opacity: ${props => props.createYourOwn ? '0' : '1'};
     }
   }
 
@@ -145,13 +145,13 @@ class TemplateGalleryPage extends Component {
     const recipes = [{
       name: 'Dynamic Dashboard with React, AntD, and Recharts',
       description: 'Use this template to create a dynamic dashboard application with React, AntD, and Chart.js. It comes with a dynamic query builder and Apollo GraphQL client. Use it when you want to allow users to edit dashboards.',
-      coverUrl: "https://cube.dev/downloads/template-react-dashboard.png",
+      coverUrl: 'https://cube.dev/downloads/template-react-dashboard.png',
       templatePackages: ['create-react-app', 'react-antd-dynamic', 'recharts-charts', 'antd-tables', 'credentials']
     }, {
       name: 'Real-Time Dashboard with React, AntD, and Chart.js',
       description: 'Use this template to create a static dashboard application with real-time WebSocket transport. Use it when users should not be allowed to edit dashboards and you want to provide them with real-time data refresh.',
       templatePackages: ['create-react-app', 'react-antd-static', 'chartjs-charts', 'antd-tables', 'credentials', 'web-socket-transport'],
-      coverUrl: "https://cube.dev/downloads/template-real-time-dashboard.png"
+      coverUrl: 'https://cube.dev/downloads/template-real-time-dashboard.png'
     }, {
       name: 'Material UI React Dashboard',
       coverUrl: 'https://cube.dev/downloads/template-material-ui.jpg',
@@ -229,7 +229,8 @@ class TemplateGalleryPage extends Component {
     return (
       <MarginFrame>
         <StyledTitle>
-          Build your app from one the popular templates below or <a onClick={() => this.setState({ createOwnModalVisible: true })}>create your own</a>
+          Build your app from one the popular templates below or
+          <a onClick={() => this.setState({ createOwnModalVisible: true })}>create your own</a>
         </StyledTitle>
         <Row type="flex" align="top" gutter={24}>
           {recipeCards}

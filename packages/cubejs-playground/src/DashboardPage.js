@@ -1,11 +1,12 @@
 /* globals window */
 import React, { Component } from 'react';
 import '@ant-design/compatible/assets/index.css';
-import { Spin, Button, Alert, Menu, Dropdown } from 'antd';
+import {
+  Spin, Button, Alert
+} from 'antd';
 import { Link, withRouter, Redirect } from 'react-router-dom';
-import DashboardSource from "./DashboardSource";
+import DashboardSource from './DashboardSource';
 import fetch from './playgroundFetch';
-import { chartLibraries } from "./ChartRenderer";
 
 const Frame = ({ children }) => (
   <div style={{ textAlign: 'center', marginTop: 50 }}>
@@ -14,19 +15,19 @@ const Frame = ({ children }) => (
 );
 
 const Hint = () => (
-  <p style={{ width: 450, margin: "20px auto" }}>
-    Dashboard App is a convenient way to setup and deploy frontend app to work with Cube.js backend. You can learn more about it the <a href="https://cube.dev/docs/dashboard-app" target="_blankl">Cube.js docs</a>.
+  <p style={{ width: 450, margin: '20px auto' }}>
+    Dashboard App is a convenient way to setup and deploy frontend app to work with Cube.js backend.
+    You can learn more about in the
+    {' '}
+    <a href="https://cube.dev/docs/dashboard-app" target="_blankl">Cube.js docs</a>
+    .
   </p>
 );
 
 class DashboardPage extends Component {
   constructor(props) {
     super(props);
-    this.state = {
-      chartLibrary: chartLibraries[0].value,
-      framework: 'react',
-      templatePackageName: 'react-antd-dynamic'
-    };
+    this.state = {};
   }
 
   async componentDidMount() {
@@ -140,7 +141,7 @@ class DashboardPage extends Component {
     return (
       <div
         style={{
-          height: '100%', width: '100%', padding: "15px 30px 30px 30px", background: "#fff"
+          height: '100%', width: '100%', padding: '15px 30px 30px 30px', background: '#fff'
         }}
       >
         <Alert

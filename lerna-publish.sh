@@ -4,4 +4,4 @@ BUMP=$1
 if [ "x$BUMP" == "x" ]; then
   BUMP=patch
 fi
-lerna publish --github-release --conventional-commits $BUMP
+yarn lerna version --github-release --conventional-commits $BUMP

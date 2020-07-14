@@ -1,6 +1,6 @@
 import React from 'react';
-import Prism from "prismjs";
-import "./prism.css";
+import Prism from 'prismjs';
+import './prism.css';
 
 class PrismCode extends React.Component {
   componentDidMount() {
@@ -14,11 +14,11 @@ class PrismCode extends React.Component {
   render() {
     return (
       <pre style={this.props.style}>
-        <code className='language-javascript'>
+        <code className="language-javascript">
           { this.props.code }
         </code>
       </pre>
-    )
+    );
   }
 }
 

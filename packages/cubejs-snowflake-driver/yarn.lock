@@ -2,14 +2,14 @@
 # yarn lockfile v1
 
 
-"@cubejs-backend/query-orchestrator@^0.18.3":
-  version "0.18.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.18.3.tgz#a05825432699ace9987457779d64f1bae3e7b196"
-  integrity sha512-piqdLy2ni+x+B1WDydrM3FFWbS7Zc1ZkkaiRj9bHSPGyOaobuAnWZD/ps4/rRmgkE/57Dq9+I7lmkUQdbxDiJQ==
+"@cubejs-backend/query-orchestrator@^0.19.47":
+  version "0.19.47"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.47.tgz#27caa4f9e9ba69fa6f81bd85ab45875e6985a2dd"
+  integrity sha512-HLsZGY77UnhuKsX6Zc+++tUAl6+1CusjBJi43nI2kVRWiqng648IMhtqaa3H+XYybCXqELlBEgA8V1NufYBmcA==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
-    redis "^2.8.0"
+    redis "^3.0.2"
 
 agent-base@^2.1.1:
   version "2.1.1"
@@ -235,6 +235,11 @@ delayed-stream@~1.0.0:
   resolved "https://registry.yarnpkg.com/delayed-stream/-/delayed-stream-1.0.0.tgz#df3ae199acadfb7d440aaae0b29e2272b24ec619"
   integrity sha1-3zrhmayt+31ECqrgsp4icrJOxhk=
 
+denque@^1.4.1:
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/denque/-/denque-1.4.1.tgz#6744ff7641c148c3f8a69c307e51235c1f4a37cf"
+  integrity sha512-OfzPuSZKGcgr96rf1oODnfjqBFmr1DVoc/TrItj3Ohe0Ah1C5WX5Baquw/9U9KovnQ88EqmJbD66rKYUQYN1tQ==
+
 diagnostics@^1.1.1:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/diagnostics/-/diagnostics-1.1.1.tgz#cab6ac33df70c9d9a727490ae43ac995a769b22a"
@@ -243,11 +248,6 @@ diagnostics@^1.1.1:
     colorspace "1.1.x"
     enabled "1.0.x"
     kuler "1.0.x"
-
-double-ended-queue@^2.1.0-0:
-  version "2.1.0-0"
-  resolved "https://registry.yarnpkg.com/double-ended-queue/-/double-ended-queue-2.1.0-0.tgz#103d3527fd31528f40188130c841efdd78264e5c"
-  integrity sha1-ED01J/0xUo9AGIEwyEHv3XgmTlw=
 
 ecc-jsbn@~0.1.1:
   version "0.1.2"
@@ -472,17 +472,10 @@ minimalistic-assert@^1.0.0:
   resolved "https://registry.yarnpkg.com/minimalistic-assert/-/minimalistic-assert-1.0.1.tgz#2e194de044626d4a10e7f7fbc00ce73e83e4d5c7"
   integrity sha512-UtJcAD4yEaGtjPezWuO9wC4nwUnVH/8/Im3yEHQP4b67cXlD/Qr9hdITCU1xDbSEXg2XKNaP8jsReV7vQd00/A==
 
-minimist@0.0.8:
-  version "0.0.8"
-  resolved "https://registry.yarnpkg.com/minimist/-/minimist-0.0.8.tgz#857fcabfc3397d2625b8228262e86aa7a011b05d"
-  integrity sha1-hX/Kv8M5fSYluCKCYuhqp6ARsF0=
-
-mkdirp@^0.5.1:
-  version "0.5.1"
-  resolved "https://registry.yarnpkg.com/mkdirp/-/mkdirp-0.5.1.tgz#30057438eac6cf7f8c4767f38648d6697d75c903"
-  integrity sha1-MAV0OOrGz3+MR2fzhkjWaX11yQM=
-  dependencies:
-    minimist "0.0.8"
+mkdirp@^1.0.3:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.4.tgz#3eb5ed62622756d79a5f0e2a221dfebad75c2f7e"
+  integrity sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==
 
 moment-timezone@^0.5.15:
   version "0.5.25"
@@ -579,24 +572,32 @@ readable-stream@^3.1.1:
     string_decoder "^1.1.1"
     util-deprecate "^1.0.1"
 
-redis-commands@^1.2.0:
+redis-commands@^1.5.0:
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/redis-commands/-/redis-commands-1.5.0.tgz#80d2e20698fe688f227127ff9e5164a7dd17e785"
   integrity sha512-6KxamqpZ468MeQC3bkWmCB1fp56XL64D4Kf0zJSwDZbVLLm7KFkoIcHrgRvQ+sk8dnhySs7+yBg94yIkAK7aJg==
 
-redis-parser@^2.6.0:
-  version "2.6.0"
-  resolved "https://registry.yarnpkg.com/redis-parser/-/redis-parser-2.6.0.tgz#52ed09dacac108f1a631c07e9b69941e7a19504b"
-  integrity sha1-Uu0J2srBCPGmMcB+m2mUHnoZUEs=
+redis-errors@^1.0.0, redis-errors@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/redis-errors/-/redis-errors-1.2.0.tgz#eb62d2adb15e4eaf4610c04afe1529384250abad"
+  integrity sha1-62LSrbFeTq9GEMBK/hUpOEJQq60=
 
-redis@^2.8.0:
-  version "2.8.0"
-  resolved "https://registry.yarnpkg.com/redis/-/redis-2.8.0.tgz#202288e3f58c49f6079d97af7a10e1303ae14b02"
-  integrity sha512-M1OkonEQwtRmZv4tEWF2VgpG0JWJ8Fv1PhlgT5+B+uNq2cA3Rt1Yt/ryoR+vQNOQcIEgdCdfH0jr3bDpihAw1A==
+redis-parser@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/redis-parser/-/redis-parser-3.0.0.tgz#b66d828cdcafe6b4b8a428a7def4c6bcac31c8b4"
+  integrity sha1-tm2CjNyv5rS4pCin3vTGvKwxyLQ=
   dependencies:
-    double-ended-queue "^2.1.0-0"
-    redis-commands "^1.2.0"
-    redis-parser "^2.6.0"
+    redis-errors "^1.0.0"
+
+redis@^3.0.2:
+  version "3.0.2"
+  resolved "https://registry.yarnpkg.com/redis/-/redis-3.0.2.tgz#bd47067b8a4a3e6a2e556e57f71cc82c7360150a"
+  integrity sha512-PNhLCrjU6vKVuMOyFu7oSP296mwBkcE6lrAjruBYG5LgdSqtRBoVQIylrMyVZD/lkF24RSNNatzvYag6HRBHjQ==
+  dependencies:
+    denque "^1.4.1"
+    redis-commands "^1.5.0"
+    redis-errors "^1.2.0"
+    redis-parser "^3.0.0"
 
 request@^2.88.0:
   version "2.88.0"
@@ -652,9 +653,9 @@ simple-swizzle@^0.2.2:
     is-arrayish "^0.3.1"
 
 snowflake-sdk@^1.1.15:
-  version "1.5.0"
-  resolved "https://registry.yarnpkg.com/snowflake-sdk/-/snowflake-sdk-1.5.0.tgz#5c1289ec96113b35a201ce932105d8e9d685b70b"
-  integrity sha512-s52rGMwe3wxGnetekhdy3BHSjIfRRUNOYtqilfqQkL/PjXTt6xK6tqASVMNd0ZH9+Q6udcExwfJUK35wZfW+OA==
+  version "1.5.2"
+  resolved "https://registry.yarnpkg.com/snowflake-sdk/-/snowflake-sdk-1.5.2.tgz#17769f9dad4d4769735320a24086c1835e2cdc12"
+  integrity sha512-HILZU35gXUGTUVxja5g/WY8eAcMK52xEijCFphAU6Cf5Mbq3xrtISbHlI47rYDz0+l8Br/TM7xCw8QAzQvNUrg==
   dependencies:
     agent-base "^2.1.1"
     asn1.js-rfc2560 "^5.0.0"
@@ -666,7 +667,7 @@ snowflake-sdk@^1.1.15:
     extend "^3.0.2"
     https-proxy-agent "^3.0.0"
     lodash "^4.17.15"
-    mkdirp "^0.5.1"
+    mkdirp "^1.0.3"
     moment "^2.23.0"
     moment-timezone "^0.5.15"
     ocsp "^1.2.0"

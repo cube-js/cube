@@ -8,7 +8,7 @@ import SchemaPage from './SchemaPage';
 import DashboardPage from './DashboardPage';
 import App from './App';
 import { page } from './events';
-import TemplateGalleryPage from "./TemplateGallery/TemplateGalleryPage";
+import TemplateGalleryPage from './TemplateGallery/TemplateGalleryPage';
 
 const history = createHashHistory();
 history.listen((location) => {

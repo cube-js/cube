@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.19.47",
+  "version": "0.19.49",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -16,8 +16,8 @@
     "@babel/standalone": "^7.3.4",
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
-    "@cubejs-client/core": "^0.19.47",
-    "@cubejs-client/react": "^0.19.47",
+    "@cubejs-client/core": "^0.19.48",
+    "@cubejs-client/react": "^0.19.48",
     "antd": "^4.2.0",
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
@@ -50,14 +50,10 @@
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
-    "start": "PORT=3080 react-app-rewired start",
-    "build": "react-app-rewired --max-old-space-size=2048 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
-    "test": "react-app-rewired test",
-    "eject": "react-scripts eject",
+    "start": "EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
+    "build": "EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
+    "eject": "EXTEND_ESLINT=true react-scripts eject",
     "lint": "eslint src/*.js src/*.jsx"
-  },
-  "eslintConfig": {
-    "extends": "react-app"
   },
   "browserslist": [
     ">0.2%",
