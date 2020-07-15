@@ -717,7 +717,7 @@ var QueryBuilder = {
       var name = element.charAt(0).toUpperCase() + element.slice(1);
       var mem;
       var elements = [];
-      members.forEach(function (m) {
+      members.filter(Boolean).forEach(function (m) {
         if (element === 'timeDimensions') {
           mem = _this5["available".concat(name)].find(function (x) {
             return x.name === m.dimension;
@@ -774,15 +774,18 @@ var QueryBuilder = {
     }
   },
   watch: {
-    query: function query() {
-      if (!this.meta) {
-        // this is ok as if meta has not been loaded by the time query prop has changed,
-        // then the promise for loading meta (found in mounted()) will call
-        // copyQueryFromProps and will therefore update anyway.
-        return;
-      }
+    query: {
+      deep: true,
+      handler: function handler() {
+        if (!this.meta) {
+          // this is ok as if meta has not been loaded by the time query prop has changed,
+          // then the promise for loading meta (found in mounted()) will call
+          // copyQueryFromProps and will therefore update anyway.
+          return;
+        }
 
-      this.copyQueryFromProps();
+        this.copyQueryFromProps();
+      }
     }
   }
 };
