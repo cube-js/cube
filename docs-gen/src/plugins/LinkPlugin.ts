@@ -44,8 +44,10 @@ export class LinkPlugin extends ConverterComponent {
 
   onEndResolve(context: Context) {
     const reflections = Object.values(context.project.reflections);
-
+    
     reflections.forEach((reflection) => {
+      reflection.comment && LinkPlugin.replaceAnnotations(reflection.comment, reflections);
+      
       if (reflection instanceof DeclarationReflection) {
         reflection.signatures?.forEach((sig) => {
           sig.comment && LinkPlugin.replaceAnnotations(sig.comment, reflections);
