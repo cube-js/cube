@@ -136,10 +136,3 @@
   }
 </script>
 
-<style>
-  /*.filter-card {*/
-    /*background: #F3F3FB;*/
-    /*border-radius: 4px;*/
-  /*}*/
-</style>
-
