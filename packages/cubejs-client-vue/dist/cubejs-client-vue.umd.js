@@ -9491,7 +9491,7 @@
             if (!m) {
               mem = null;
             } else {
-              var member = _objectSpread({}, _this5.meta.resolveMember(m.member.name || m.dimension, ['dimensions', 'measures']));
+              var member = _objectSpread({}, _this5.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
 
               mem = _objectSpread({}, m, {
                 member: member

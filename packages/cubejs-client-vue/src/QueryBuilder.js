@@ -357,7 +357,7 @@ export default {
             mem = null
           } else {
             const member = {
-              ...this.meta.resolveMember(m.member.name || m.dimension, ['dimensions', 'measures']),
+              ...this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
             };
 
             mem = {

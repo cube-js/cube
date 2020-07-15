@@ -739,7 +739,7 @@ var QueryBuilder = {
           if (!m) {
             mem = null;
           } else {
-            var member = _objectSpread2({}, _this5.meta.resolveMember(m.member.name || m.dimension, ['dimensions', 'measures']));
+            var member = _objectSpread2({}, _this5.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']));
 
             mem = _objectSpread2({}, m, {
               member: member
