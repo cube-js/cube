@@ -8670,7 +8670,7 @@
         };
       };
 
-      function AsyncIterator(generator, PromiseImpl) {
+      function AsyncIterator(generator) {
         function invoke(method, arg, resolve, reject) {
           var record = tryCatch(generator[method], generator, arg);
 
@@ -8681,14 +8681,14 @@
             var value = result.value;
 
             if (value && _typeof(value) === "object" && hasOwn.call(value, "__await")) {
-              return PromiseImpl.resolve(value.__await).then(function (value) {
+              return Promise.resolve(value.__await).then(function (value) {
                 invoke("next", value, resolve, reject);
               }, function (err) {
                 invoke("throw", err, resolve, reject);
               });
             }
 
-            return PromiseImpl.resolve(value).then(function (unwrapped) {
+            return Promise.resolve(value).then(function (unwrapped) {
               // When a yielded Promise is resolved, its final value becomes
               // the .value of the Promise<{value,done}> result for the
               // current iteration.
@@ -8706,7 +8706,7 @@
 
         function enqueue(method, arg) {
           function callInvokeWithMethodAndArg() {
-            return new PromiseImpl(function (resolve, reject) {
+            return new Promise(function (resolve, reject) {
               invoke(method, arg, resolve, reject);
             });
           }
@@ -8743,9 +8743,8 @@
       // AsyncIterator objects; they just return a Promise for the value of
       // the final result produced by the iterator.
 
-      exports.async = function (innerFn, outerFn, self, tryLocsList, PromiseImpl) {
-        if (PromiseImpl === void 0) PromiseImpl = Promise;
-        var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList), PromiseImpl);
+      exports.async = function (innerFn, outerFn, self, tryLocsList) {
+        var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList));
         return exports.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
         : iter.next().then(function (result) {
           return result.done ? result.value : iter.next();
@@ -14440,7 +14439,7 @@
         };
       };
 
-      function AsyncIterator(generator, PromiseImpl) {
+      function AsyncIterator(generator) {
         function invoke(method, arg, resolve, reject) {
           var record = tryCatch(generator[method], generator, arg);
 
@@ -14451,14 +14450,14 @@
             var value = result.value;
 
             if (value && _typeof(value) === "object" && hasOwn.call(value, "__await")) {
-              return PromiseImpl.resolve(value.__await).then(function (value) {
+              return Promise.resolve(value.__await).then(function (value) {
                 invoke("next", value, resolve, reject);
               }, function (err) {
                 invoke("throw", err, resolve, reject);
               });
             }
 
-            return PromiseImpl.resolve(value).then(function (unwrapped) {
+            return Promise.resolve(value).then(function (unwrapped) {
               // When a yielded Promise is resolved, its final value becomes
               // the .value of the Promise<{value,done}> result for the
               // current iteration.
@@ -14476,7 +14475,7 @@
 
         function enqueue(method, arg) {
           function callInvokeWithMethodAndArg() {
-            return new PromiseImpl(function (resolve, reject) {
+            return new Promise(function (resolve, reject) {
               invoke(method, arg, resolve, reject);
             });
           }
@@ -14513,9 +14512,8 @@
       // AsyncIterator objects; they just return a Promise for the value of
       // the final result produced by the iterator.
 
-      exports.async = function (innerFn, outerFn, self, tryLocsList, PromiseImpl) {
-        if (PromiseImpl === void 0) PromiseImpl = Promise;
-        var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList), PromiseImpl);
+      exports.async = function (innerFn, outerFn, self, tryLocsList) {
+        var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList));
         return exports.isGeneratorFunction(outerFn) ? iter // If outerFn is a generator, return the full iterator.
         : iter.next().then(function (result) {
           return result.done ? result.value : iter.next();
@@ -16452,49 +16450,32 @@
 
   var v4_1 = v4;
 
-  function _arrayLikeToArray(arr, len) {
-    if (len == null || len > arr.length) len = arr.length;
-
-    for (var i = 0, arr2 = new Array(len); i < len; i++) {
-      arr2[i] = arr[i];
-    }
-
-    return arr2;
-  }
-
-  var arrayLikeToArray = _arrayLikeToArray;
-
   function _arrayWithoutHoles$1(arr) {
-    if (Array.isArray(arr)) return arrayLikeToArray(arr);
+    if (Array.isArray(arr)) {
+      for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) {
+        arr2[i] = arr[i];
+      }
+
+      return arr2;
+    }
   }
 
   var arrayWithoutHoles = _arrayWithoutHoles$1;
 
   function _iterableToArray$1(iter) {
-    if (typeof Symbol !== "undefined" && Symbol.iterator in Object(iter)) return Array.from(iter);
+    if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
   }
 
   var iterableToArray = _iterableToArray$1;
 
-  function _unsupportedIterableToArray(o, minLen) {
-    if (!o) return;
-    if (typeof o === "string") return arrayLikeToArray(o, minLen);
-    var n = Object.prototype.toString.call(o).slice(8, -1);
-    if (n === "Object" && o.constructor) n = o.constructor.name;
-    if (n === "Map" || n === "Set") return Array.from(o);
-    if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return arrayLikeToArray(o, minLen);
-  }
-
-  var unsupportedIterableToArray = _unsupportedIterableToArray;
-
   function _nonIterableSpread$1() {
-    throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+    throw new TypeError("Invalid attempt to spread non-iterable instance");
   }
 
   var nonIterableSpread = _nonIterableSpread$1;
 
   function _toConsumableArray$1(arr) {
-    return arrayWithoutHoles(arr) || iterableToArray(arr) || unsupportedIterableToArray(arr) || nonIterableSpread();
+    return arrayWithoutHoles(arr) || iterableToArray(arr) || nonIterableSpread();
   }
 
   var toConsumableArray = _toConsumableArray$1;
@@ -16565,7 +16546,10 @@
   var arrayWithHoles = _arrayWithHoles$1;
 
   function _iterableToArrayLimit$1(arr, i) {
-    if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return;
+    if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) {
+      return;
+    }
+
     var _arr = [];
     var _n = true;
     var _d = false;
@@ -16594,13 +16578,13 @@
   var iterableToArrayLimit = _iterableToArrayLimit$1;
 
   function _nonIterableRest$1() {
-    throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+    throw new TypeError("Invalid attempt to destructure non-iterable instance");
   }
 
   var nonIterableRest = _nonIterableRest$1;
 
   function _slicedToArray$1(arr, i) {
-    return arrayWithHoles(arr) || iterableToArrayLimit(arr, i) || unsupportedIterableToArray(arr, i) || nonIterableRest();
+    return arrayWithHoles(arr) || iterableToArrayLimit(arr, i) || nonIterableRest();
   }
 
   var slicedToArray = _slicedToArray$1;
@@ -35040,24 +35024,22 @@
     }
   });
 
-  function _isNativeReflectConstruct() {
-    if (typeof Reflect === "undefined" || !Reflect.construct) return false;
-    if (Reflect.construct.sham) return false;
-    if (typeof Proxy === "function") return true;
-
-    try {
-      Date.prototype.toString.call(Reflect.construct(Date, [], function () {}));
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  var isNativeReflectConstruct$1 = _isNativeReflectConstruct;
-
   var construct$3 = createCommonjsModule(function (module) {
+    function isNativeReflectConstruct() {
+      if (typeof Reflect === "undefined" || !Reflect.construct) return false;
+      if (Reflect.construct.sham) return false;
+      if (typeof Proxy === "function") return true;
+
+      try {
+        Date.prototype.toString.call(Reflect.construct(Date, [], function () {}));
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
     function _construct(Parent, args, Class) {
-      if (isNativeReflectConstruct$1()) {
+      if (isNativeReflectConstruct()) {
         module.exports = _construct = Reflect.construct;
       } else {
         module.exports = _construct = function _construct(Parent, args, Class) {
@@ -35206,12 +35188,14 @@
     var ResultSet =
     /*#__PURE__*/
     function () {
-      function ResultSet(loadResponse, options) {
+      function ResultSet(loadResponse) {
+        var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
         _classCallCheck$$1(this, ResultSet);
 
-        options = options || {};
         this.loadResponse = loadResponse;
         this.parseDateMeasures = options.parseDateMeasures;
+        this.options = options;
       }
 
       _createClass$$1(ResultSet, [{
@@ -35754,6 +35738,13 @@
 
           return this.backwardCompatibleData;
         }
+      }, {
+        key: "serialize",
+        value: function serialize() {
+          return {
+            loadResponse: ramda.clone(this.loadResponse)
+          };
+        }
       }], [{
         key: "timeDimensionMember",
         value: function timeDimensionMember(td) {
@@ -35834,6 +35825,12 @@
         key: "measureFromAxis",
         value: function measureFromAxis(axisValues) {
           return axisValues[axisValues.length - 1];
+        }
+      }, {
+        key: "deserialize",
+        value: function deserialize(data) {
+          var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+          return new ResultSet(data.loadResponse, options);
         }
       }]);
 

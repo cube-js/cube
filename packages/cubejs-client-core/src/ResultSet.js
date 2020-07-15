@@ -1,5 +1,5 @@
 import {
-  groupBy, pipe, fromPairs, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
+  groupBy, pipe, fromPairs, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -27,10 +27,10 @@ const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
 class ResultSet {
-  constructor(loadResponse, options) {
-    options = options || {};
+  constructor(loadResponse, options = {}) {
     this.loadResponse = loadResponse;
     this.parseDateMeasures = options.parseDateMeasures;
+    this.options = options;
   }
   
   drillDown(drillDownLocator, pivotConfig) {
@@ -511,6 +511,16 @@ class ResultSet {
       ));
     }
     return this.backwardCompatibleData;
+  }
+  
+  serialize() {
+    return {
+      loadResponse: clone(this.loadResponse)
+    };
+  }
+  
+  static deserialize(data, options = {}) {
+    return new ResultSet(data.loadResponse, options);
   }
 }
 

@@ -327,6 +327,10 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 
 ▸  **rawData**(): *T[]*
 
+### serialize
+
+▸  **serialize**(): *Object*
+
 ### series
 
 ▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
@@ -512,6 +516,14 @@ For example:
   //...
 ]
 ```
+
+### deserialize
+
+▸ `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#result-set)‹TData›*
+
+**Type parameters:**
+
+- **TData**
 
 ### getNormalizedPivotConfig
 

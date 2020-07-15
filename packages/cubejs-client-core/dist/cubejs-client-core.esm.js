@@ -37,7 +37,7 @@ import _toConsumableArray from '@babel/runtime/helpers/toConsumableArray';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
-import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, fromPairs, dropLast } from 'ramda';
+import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, fromPairs, dropLast, clone } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
 import 'core-js/modules/es.array.is-array';
@@ -96,12 +96,14 @@ var LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 var ResultSet =
 /*#__PURE__*/
 function () {
-  function ResultSet(loadResponse, options) {
+  function ResultSet(loadResponse) {
+    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
     _classCallCheck(this, ResultSet);
 
-    options = options || {};
     this.loadResponse = loadResponse;
     this.parseDateMeasures = options.parseDateMeasures;
+    this.options = options;
   }
 
   _createClass(ResultSet, [{
@@ -644,6 +646,13 @@ function () {
 
       return this.backwardCompatibleData;
     }
+  }, {
+    key: "serialize",
+    value: function serialize() {
+      return {
+        loadResponse: clone(this.loadResponse)
+      };
+    }
   }], [{
     key: "timeDimensionMember",
     value: function timeDimensionMember(td) {
@@ -724,6 +733,12 @@ function () {
     key: "measureFromAxis",
     value: function measureFromAxis(axisValues) {
       return axisValues[axisValues.length - 1];
+    }
+  }, {
+    key: "deserialize",
+    value: function deserialize(data) {
+      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+      return new ResultSet(data.loadResponse, options);
     }
   }]);
 
