@@ -10,8 +10,6 @@ import {
   UnionType,
 } from 'typedoc/dist/lib/models/types';
 
-import MarkdownTheme from '../../theme';
-import { ReflectionKind } from 'typedoc';
 import { LinkPlugin } from '../../plugins/LinkPlugin';
 
 export function type(
@@ -63,19 +61,7 @@ export function type(
 function getReferenceType(model: ReferenceType) {
   const md = [];
 
-  // let parentName = '';
-  // if (model.reflection?.kindOf(ReflectionKind.TypeAlias) && !(model.reflection as any).stickToParent) {
-  //   parentName = 'Types';
-  // }
-
-  md.push(
-    model.reflection ? LinkPlugin.toLink(model.name, model.reflection) : model.name
-    // model.reflection
-    //   ? `[${model.reflection.name}](${MarkdownTheme.handlebars.helpers.relativeURL(
-    //       LinkPlugin.anchorName(parentName + model.reflection.name)
-    //     )})`
-    //   : model.name
-  );
+  md.push(model.reflection ? LinkPlugin.toLink(model.name, model.reflection) : model.name);
 
   if (model.typeArguments) {
     md.push(`‹${model.typeArguments.map((typeArgument) => `${type.call(typeArgument)}`).join(', ')}›`);

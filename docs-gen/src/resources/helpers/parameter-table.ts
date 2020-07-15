@@ -2,9 +2,7 @@ import { ParameterReflection } from 'typedoc';
 
 import MarkdownTheme from '../../theme';
 import { stripLineBreaks } from './strip-line-breaks';
-import { type } from './type';
-import { signatureTitle } from './signature-title';
-import { ReflectionType } from 'typedoc/dist/lib/models';
+import paramTypeToString from './param-type-to-string';
 
 export function parameterTable(this: ParameterReflection[], hideUncommented: boolean) {
   const md = [];
@@ -25,11 +23,11 @@ export function parameterTable(this: ParameterReflection[], hideUncommented: boo
   if (hasComments) {
     headers.push('Description');
   }
-  
+
   if (hideUncommented && !hasComments) {
     return '';
   }
-  
+
   if (hideUncommented) {
     md.push('**Parameters:**\n');
   }
@@ -37,13 +35,7 @@ export function parameterTable(this: ParameterReflection[], hideUncommented: boo
   const rows = this.map((parameter) => {
     const isOptional = parameter.flags.includes('Optional');
 
-    let typeOut;
-    if (parameter.type instanceof ReflectionType && parameter.type.toString() === 'function') {
-      const declarations = parameter.type.declaration.signatures?.map((sig) => signatureTitle.call(sig, false, true));
-      typeOut = declarations.join(' | ').replace(/\n/, '');
-    } else {
-      typeOut = type.call(parameter.type);
-    }
+    const typeOut = paramTypeToString(parameter);
 
     const row = [
       `${parameter.flags.isRest ? '...' : ''}${parameter.name}${isOptional ? '?' : ''}`,

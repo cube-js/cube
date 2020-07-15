@@ -10,7 +10,7 @@ Vanilla JavaScript Cube.js client.
 
 ## cubejs
 
-▸  **cubejs**(**apiToken**: string, **options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
+▸  **cubejs**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
 
 Creates an instance of the `CubejsApi`. The API entry point.
 
@@ -22,12 +22,24 @@ const cubejsApi = cubejs(
 );
 ```
 
+You can also pass an async function or a promise that will resolve to the API token
+
+```js
+import cubejs from '@cubejs-client/core';
+const cubejsApi = cubejs(
+  async () => await Auth.getJwtToken(),
+  { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+);
+```
+
 **Parameters:**
 
 Name | Type | Description |
 ------ | ------ | ------ |
-apiToken | string | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token. |
+apiToken | string &#124;  () => *Promise‹string›* | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token. |
 options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
+
+▸  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
 
 ## CubejsApi
 
