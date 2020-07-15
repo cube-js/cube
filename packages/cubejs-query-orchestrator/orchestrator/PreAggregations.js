@@ -180,6 +180,7 @@ class PreAggregationLoader {
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
+    this.externalRefresh = options.externalRefresh;
   }
 
   async loadPreAggregation() {
@@ -199,7 +200,17 @@ class PreAggregationLoader {
       const versionEntryByStructureVersion = versionEntries.find(
         v => v.table_name === this.preAggregation.tableName && v.structure_version === structureVersion
       );
+      if (this.externalRefresh) {
+        if (!versionEntryByStructureVersion) {
+          throw new Error("One or more pre-aggregation tables could not be found to satisfy that query");
+        }
+
+        // the rollups are being maintained independently of this instance of cube.js, immediately return the latest data it already has
+        return this.targetTableName(versionEntryByStructureVersion);
+     }
+
       if (versionEntryByStructureVersion) {
+        // this triggers an asyncronous/background load of the pre-aggregation but immediately returns the latest data it already has
         this.loadPreAggregationWithKeys().catch(e => {
           if (!(e instanceof ContinueWaitError)) {
             this.logger('Error loading pre-aggregation', {
@@ -211,9 +222,12 @@ class PreAggregationLoader {
         });
         return this.targetTableName(versionEntryByStructureVersion);
       } else {
+        // no rollup has been built yet - build it syncronously as part of responding to this request
         return this.loadPreAggregationWithKeys();
       }
     } else {
+      // either we have no data cached for this rollup or waitForRenew is true, either way,
+      // syncronously renew what data is needed so that the most current data will be returned for the current request
       return {
         targetTableName: await this.loadPreAggregationWithKeys(),
         refreshKeyValues: await this.getInvalidationKeyValues()
@@ -599,6 +613,7 @@ class PreAggregations {
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
     this.usedTablePersistTime = options.usedTablePersistTime || 600;
+    this.externalRefresh = options.externalRefresh;
   }
 
   tablesUsedRedisKey(tableName) {
@@ -629,7 +644,7 @@ class PreAggregations {
         p,
         preAggregationsTablesToTempTables,
         loadCache,
-        { waitForRenew: queryBody.renewQuery, requestId: queryBody.requestId }
+        { waitForRenew: queryBody.renewQuery, requestId: queryBody.requestId, externalRefresh: this.externalRefresh }
       );
       const preAggregationPromise = () => loader.loadPreAggregation().then(async targetTableName => {
         const usedPreAggregation = typeof targetTableName === 'string' ? { targetTableName } : targetTableName;
@@ -655,7 +670,7 @@ class PreAggregations {
           preAggregation,
           preAggregationsTablesToTempTables,
           new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this, { requestId }),
-          { requestId }
+          { requestId, externalRefresh: this.externalRefresh }
         );
         return loader.refresh(newVersionEntry, invalidationKeys)(client);
       }, {

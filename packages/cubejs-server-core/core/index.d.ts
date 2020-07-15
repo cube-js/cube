@@ -54,6 +54,7 @@ declare module "@cubejs-backend/server-core" {
 
   export interface PreAggregationsOptions {
     queueOptions?: QueueOptions;
+    externalRefresh?: boolean;
   }
 
   export interface QueueOptions {
