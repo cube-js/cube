@@ -7408,6 +7408,34 @@
 	}
 
 	/**
+	 * Creates a deep copy of the value which may contain (nested) `Array`s and
+	 * `Object`s, `Number`s, `String`s, `Boolean`s and `Date`s. `Function`s are
+	 * assigned by reference rather than copied
+	 *
+	 * Dispatches to a `clone` method if present.
+	 *
+	 * @func
+	 * @memberOf R
+	 * @since v0.1.0
+	 * @category Object
+	 * @sig {*} -> {*}
+	 * @param {*} value The object or array to clone
+	 * @return {*} A deeply cloned copy of `val`
+	 * @example
+	 *
+	 *      const objects = [{}, {}, {}];
+	 *      const objectsClone = R.clone(objects);
+	 *      objects === objectsClone; //=> false
+	 *      objects[0] === objectsClone[0]; //=> false
+	 */
+
+	var clone =
+	/*#__PURE__*/
+	_curry1(function clone(value) {
+	  return value != null && typeof value.clone === 'function' ? value.clone() : _clone(value, [], [], true);
+	});
+
+	/**
 	 * A function that returns the `!` of its argument. It will return `true` when
 	 * passed false-y value, and `false` when passed a truth-y one.
 	 *
@@ -16535,10 +16563,9 @@
 	  }, {
 	    key: "serialize",
 	    value: function serialize() {
-	      return JSON.stringify({
-	        loadResponse: this.loadResponse,
-	        options: this.options
-	      });
+	      return {
+	        loadResponse: clone(this.loadResponse)
+	      };
 	    }
 	  }], [{
 	    key: "timeDimensionMember",
@@ -16623,16 +16650,9 @@
 	    }
 	  }, {
 	    key: "deserialize",
-	    value: function deserialize(json) {
-	      try {
-	        var _JSON$parse = JSON.parse(json),
-	            loadResponse = _JSON$parse.loadResponse,
-	            options = _JSON$parse.options;
-
-	        return new ResultSet(loadResponse, options);
-	      } catch (error) {
-	        throw new Error('Deserialization failed');
-	      }
+	    value: function deserialize(data) {
+	      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+	      return new ResultSet(data.loadResponse, options);
 	    }
 	  }]);
 

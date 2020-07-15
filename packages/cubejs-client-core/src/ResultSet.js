@@ -1,5 +1,5 @@
 import {
-  groupBy, pipe, fromPairs, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy
+  groupBy, pipe, fromPairs, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -514,19 +514,13 @@ class ResultSet {
   }
   
   serialize() {
-    return JSON.stringify({
-      loadResponse: this.loadResponse,
-      options: this.options
-    });
+    return {
+      loadResponse: clone(this.loadResponse)
+    };
   }
   
-  static deserialize(json) {
-    try {
-      const { loadResponse, options } = JSON.parse(json);
-      return new ResultSet(loadResponse, options);
-    } catch (error) {
-      throw new Error('Deserialization failed');
-    }
+  static deserialize(data, options = {}) {
+    return new ResultSet(data.loadResponse, options);
   }
 }
 

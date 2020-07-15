@@ -218,7 +218,7 @@ declare module '@cubejs-client/core' {
      */
     static measureFromAxis(axisValues: string[]): string;
     static getNormalizedPivotConfig(query: Query, pivotConfig?: Partial<PivotConfig>): PivotConfig;
-    static deserialize<TData>(json: string): ResultSet<TData>;
+    static deserialize<TData>(data: Object, options?: Object): ResultSet<TData>;
 
     /**
      * Creates a new instance of ResultSet based on [LoadResponse](#load-response) data.
@@ -242,7 +242,7 @@ declare module '@cubejs-client/core' {
      */
     constructor(loadResponse: LoadResponse<T>, options?: Object);
 
-    serialize(): string;
+    serialize(): Object;
     
     /**
      * @hidden

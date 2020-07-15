@@ -35741,10 +35741,9 @@
       }, {
         key: "serialize",
         value: function serialize() {
-          return JSON.stringify({
-            loadResponse: this.loadResponse,
-            options: this.options
-          });
+          return {
+            loadResponse: ramda.clone(this.loadResponse)
+          };
         }
       }], [{
         key: "timeDimensionMember",
@@ -35829,16 +35828,9 @@
         }
       }, {
         key: "deserialize",
-        value: function deserialize(json) {
-          try {
-            var _JSON$parse = JSON.parse(json),
-                loadResponse = _JSON$parse.loadResponse,
-                options = _JSON$parse.options;
-
-            return new ResultSet(loadResponse, options);
-          } catch (error) {
-            throw new Error('Deserialization failed');
-          }
+        value: function deserialize(data) {
+          var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+          return new ResultSet(data.loadResponse, options);
         }
       }]);
 

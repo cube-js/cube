@@ -37,7 +37,7 @@ import _toConsumableArray from '@babel/runtime/helpers/toConsumableArray';
 import _defineProperty from '@babel/runtime/helpers/defineProperty';
 import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 import _slicedToArray from '@babel/runtime/helpers/slicedToArray';
-import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, fromPairs, dropLast } from 'ramda';
+import { pipe, map, filter, reduce, minBy, maxBy, groupBy, equals, unnest, toPairs, uniq, fromPairs, dropLast, clone } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
 import 'core-js/modules/es.array.is-array';
@@ -649,10 +649,9 @@ function () {
   }, {
     key: "serialize",
     value: function serialize() {
-      return JSON.stringify({
-        loadResponse: this.loadResponse,
-        options: this.options
-      });
+      return {
+        loadResponse: clone(this.loadResponse)
+      };
     }
   }], [{
     key: "timeDimensionMember",
@@ -737,16 +736,9 @@ function () {
     }
   }, {
     key: "deserialize",
-    value: function deserialize(json) {
-      try {
-        var _JSON$parse = JSON.parse(json),
-            loadResponse = _JSON$parse.loadResponse,
-            options = _JSON$parse.options;
-
-        return new ResultSet(loadResponse, options);
-      } catch (error) {
-        throw new Error('Deserialization failed');
-      }
+    value: function deserialize(data) {
+      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+      return new ResultSet(data.loadResponse, options);
     }
   }]);
 
