@@ -11,13 +11,13 @@
           alt="Vuetify Logo"
           class="shrink mr-2"
           contain
-          src="https://material-ui-dashboard.cubecloudapp.dev/images/logo/logo.svg"
+          src="https://cube.dev/downloads/logo-full.svg"
           transition="scale-transition"
         />
       </div>
       <v-spacer></v-spacer>
       <v-hover v-slot:default="{ hover }">
-        <a class="custom-btn mr-4" href="https://github.com/cube-js/cube.js" target="_blank">
+        <a class="custom-btn mr-4" href="https://github.com/cube-js/cube.js/tree/master/examples/vue-query-builder" target="_blank">
           <v-img v-if="!hover"
             alt="GitHub Logo"
             src="./assets/github.svg"
