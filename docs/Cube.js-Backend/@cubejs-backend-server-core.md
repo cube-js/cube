@@ -351,7 +351,7 @@ CubejsServerCore.create({
 });
 ```
 
-Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance. 
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance.
 For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
 ### extendContext
@@ -397,10 +397,14 @@ _Please note that this is advanced configuration._
 | Option | Description | Default Value |
 | ------ | ----------- | ------------- |
 | redisPrefix | Prefix to be set an all Redis keys | `STANDALONE` |
+| rollupOnlyMode | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup) | `false`
 | queryCacheOptions | Query cache options for DB queries | `{}`
 | queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check | `defined by DB dialect`
 | queryCacheOptions.backgroundRenew | Controls whether to wait in foreground for refreshed query data if `refreshKey` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [refreshKey](cube#parameters-refresh-key) check to renew in foreground. Default value before 0.15.0 was `true` | `false`
+| queryCacheOptions.queueOptions | Query queue options for DB queries | `{}`
 | preAggregationsOptions | Query cache options for pre-aggregations | `{}`
+| preAggregationsOptions.queueOptions | Query queue options for pre-aggregations | `{}`
+| preAggregationsOptions.externalRefresh | When running a separate instance of Cube.js to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true` | `false`
 
 To set options for `queryCache` and `preAggregations`, set an object with key queueOptions. `queryCacheOptions` are used while querying database tables, while `preAggregationsOptions` settings are used to query pre-aggregated tables.
 
