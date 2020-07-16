@@ -78,7 +78,7 @@ class PreAggregationLoadCache {
 
   async fetchTables(preAggregation) {
     if (preAggregation.external && !this.externalDriverFactory) {
-      throw new Error(`externalDriverFactory should be set in order to use external pre-aggregations`);
+      throw new Error('externalDriverFactory should be set in order to use external pre-aggregations');
     }
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
@@ -202,15 +202,17 @@ class PreAggregationLoader {
       );
       if (this.externalRefresh) {
         if (!versionEntryByStructureVersion) {
-          throw new Error("One or more pre-aggregation tables could not be found to satisfy that query");
+          throw new Error('One or more pre-aggregation tables could not be found to satisfy that query');
         }
 
-        // the rollups are being maintained independently of this instance of cube.js, immediately return the latest data it already has
+        // the rollups are being maintained independently of this instance of cube.js,
+        // immediately return the latest data it already has
         return this.targetTableName(versionEntryByStructureVersion);
-     }
+      }
 
       if (versionEntryByStructureVersion) {
-        // this triggers an asyncronous/background load of the pre-aggregation but immediately returns the latest data it already has
+        // this triggers an asyncronous/background load of the pre-aggregation but immediately
+        // returns the latest data it already has
         this.loadPreAggregationWithKeys().catch(e => {
           if (!(e instanceof ContinueWaitError)) {
             this.logger('Error loading pre-aggregation', {
@@ -491,7 +493,7 @@ class PreAggregationLoader {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
     if (!client.downloadQueryResults) {
-      throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadQueryResults()`);
+      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadQueryResults()');
     }
 
     this.logExecutingSql(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
@@ -510,7 +512,7 @@ class PreAggregationLoader {
 
   async downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn) {
     if (!client.downloadTable) {
-      throw new Error(`Can't load external pre-aggregation: source driver doesn't support downloadTable()`);
+      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
     }
     const table = this.targetTableName(newVersionEntry);
     this.logger('Downloading external pre-aggregation', {
@@ -526,7 +528,7 @@ class PreAggregationLoader {
     const table = this.targetTableName(newVersionEntry);
     const externalDriver = await this.externalDriverFactory();
     if (!externalDriver.uploadTable) {
-      throw new Error(`Can't load external pre-aggregation: destination driver doesn't support uploadTable()`);
+      throw new Error('Can\'t load external pre-aggregation: destination driver doesn\'t support uploadTable()');
     }
     this.logger('Uploading external pre-aggregation', {
       preAggregation: this.preAggregation,
