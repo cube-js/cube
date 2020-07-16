@@ -94,7 +94,7 @@ jobs:
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
       - run: yarn build
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/ngx --ignore @cubejs-client/vue build
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
       - run: ./node_modules/.bin/lerna publish from-git --yes
 
   build:
@@ -120,7 +120,7 @@ jobs:
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
       - run: yarn build
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/ngx --ignore @cubejs-client/vue build
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
 
   react_dashboard_guide:
     docker:

@@ -804,10 +804,10 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@cubejs-client/core@^0.19.35":
-  version "0.19.35"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.35.tgz#4f9e44dbc938c2780a1cd8a56129ce7039d724a7"
-  integrity sha512-Bs/bwDjwxN/2yteAEJGLC7v9/X1h+zpQO68miQbn8C56VvDGq1uCGpK7seqkLO62i0AQi05MfZwRx21RhG0z+Q==
+"@cubejs-client/core@^0.19.50":
+  version "0.19.50"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.50.tgz#1cf8ca676e63ad70c2a68574d1aa97a247722b50"
+  integrity sha512-SeHlnS0m1jwWu1E8PxQRa+UFHpERChEy3CFasmvKiwof3+EcY4g3HH7lU+KNdD8uzaDo9jw28Ou28M7s4z8jjQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -6694,10 +6694,10 @@ trim-right@^1.0.1:
   resolved "https://registry.yarnpkg.com/trim-right/-/trim-right-1.0.1.tgz#cb2e1203067e0c8de1f614094b9fe45704ea6003"
   integrity sha1-yy4SAwZ+DI3h9hQJS5/kVwTqYAM=
 
-tsickle@^0.38.0:
-  version "0.38.1"
-  resolved "https://registry.yarnpkg.com/tsickle/-/tsickle-0.38.1.tgz#30762db759d40c435943093b6972c7f2efb384ef"
-  integrity sha512-4xZfvC6+etRu6ivKCNqMOd1FqcY/m6JY3Y+yr5+Xw+i751ciwrWINi6x/3l1ekcODH9GZhlf0ny2LpzWxnjWYA==
+tsickle@^0.37.0:
+  version "0.37.1"
+  resolved "https://registry.yarnpkg.com/tsickle/-/tsickle-0.37.1.tgz#2f8a87c1b15766e866457bd06fb6c0e0d84eed09"
+  integrity sha512-0GwgOJEnsmRsrONXCvcbAWY0CvdqF3UugPVoupUpA8Ul0qCPTuqqq0ou/hLqtKZOyyulzCP6MYRjb9/J1g9bJg==
 
 tslib@1.10.0:
   version "1.10.0"
