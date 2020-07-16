@@ -84,6 +84,7 @@ jobs:
             - yarn-packages-v1-{{ .Branch }}-
             - yarn-packages-v1-
 
+      - run: echo //registry.npmjs.org/:_authToken=$NPM_TOKEN > ~/.npmrc
       - run: yarn install
       - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
 
