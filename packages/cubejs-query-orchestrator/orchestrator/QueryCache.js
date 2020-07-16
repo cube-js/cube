@@ -111,9 +111,9 @@ class QueryCache {
   }
 
   static replaceAll(replaceThis, withThis, inThis) {
-    withThis = withThis.replace(/\$/g, "$$$$");
+    withThis = withThis.replace(/\$/g, '$$$$');
     return inThis.replace(
-      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, "\\$&"), "g"),
+      new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
       withThis
     );
   }
@@ -377,7 +377,7 @@ class QueryCache {
   }
 
   queryRedisKey(cacheKey) {
-    return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest("hex")}`;
+    return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest('hex')}`;
   }
 }
 
