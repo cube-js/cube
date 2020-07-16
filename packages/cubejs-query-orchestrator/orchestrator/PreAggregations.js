@@ -181,6 +181,9 @@ class PreAggregationLoader {
     this.requestId = options.requestId;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
     this.externalRefresh = options.externalRefresh;
+    if (this.externalRefresh && this.waitForRenew) {
+      throw new Error("Invalid configuration - when externalRefresh is true, it will not perform a renew, therefore you cannot wait for it using waitForRenew.");
+    }
   }
 
   async loadPreAggregation() {
