@@ -21,11 +21,12 @@
     "rxjs": "^6.0.0"
   },
   "scripts": {
-    "build": "ng build && rm dist/package.json"
+    "build": "yarn ng build && rm dist/package.json"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.803.6",
     "@angular-devkit/build-ng-packagr": "^0.803.6",
+    "@angular/cli": "^10.0.3",
     "@angular/compiler": "^7.2.14",
     "@angular/compiler-cli": "^7.2.14",
     "@angular/core": "^8.2.5",
