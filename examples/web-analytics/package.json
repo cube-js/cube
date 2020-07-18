@@ -7,9 +7,9 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@cubejs-backend/athena-driver": "^0.19.36",
-    "@cubejs-backend/mysql-driver": "^0.19.38",
-    "@cubejs-backend/server": "^0.19.39",
+    "@cubejs-backend/athena-driver": "^0.19.52",
+    "@cubejs-backend/mysql-driver": "^0.19.52",
+    "@cubejs-backend/server": "^0.19.52",
     "express-session": "^1.17.0",
     "passport": "^0.4.1",
     "passport-google-oauth20": "^2.0.0"
