@@ -27,7 +27,6 @@ const useStyles = makeStyles((theme) => ({
 
 const UserSearch = (props) => {
   const history = useHistory();
-  const { cubejsApi } = props;
   const classes = useStyles();
 
   const { resultSet, error, isLoading } = useCubeQuery(

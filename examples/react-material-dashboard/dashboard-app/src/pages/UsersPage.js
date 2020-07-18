@@ -35,7 +35,6 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 const UsersPage = (props) => {
-  const { cubejsApi } = props;
   const classes = useStyles();
   let { id } = useParams();
   const query = {

@@ -81,6 +81,7 @@ const DoughnutChart = (props) => {
         hoverBackgroundColor: COLORS_SERIES,
       })),
     };
+    const reducer = (accumulator, currentValue) => accumulator + currentValue;
     return (
       <Card {...rest} className={clsx(classes.root, className)}>
         <CardHeader title="Orders status" />
@@ -95,7 +96,7 @@ const DoughnutChart = (props) => {
                 <Typography variant="body1" className={classes.title}>
                   {status.category}
                 </Typography>
-                <Typography variant="h2">{(status.value / 100).toFixed(0)}%</Typography>
+                <Typography variant="h2">{((status.value/resultSet.series()[0].series.map(el => el.value).reduce(reducer)) * 100).toFixed(0)}%</Typography>
               </div>
             ))}
           </div>

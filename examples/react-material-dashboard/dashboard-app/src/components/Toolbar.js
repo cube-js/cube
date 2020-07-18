@@ -171,7 +171,7 @@ const Toolbar = (props) => {
             aria-labelledby="range-slider"
             valueLabelDisplay="auto"
             min={0}
-            max={300}
+            max={2000}
           />
         </Grid>
       </Grid>
