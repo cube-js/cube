@@ -143,6 +143,61 @@ const QueryQueueTest = (name, options) => {
       const result = await queue.executeInQueue('foo', query, query);
       expect(result).toBe('select * from bar');
     });
+
+    test('queue driver lock obtain race condition', async () => {
+      const redisClient = await queue.queueDriver.createConnection();
+      const redisClient2 = await queue.queueDriver.createConnection();
+      const priority = 10;
+      const time = new Date().getTime();
+      const keyScore = time + (10000 - priority) * 1E14;
+
+      // console.log(await redisClient.getQueryAndRemove('race'));
+      // console.log(await redisClient.getQueryAndRemove('race1'));
+
+      if (redisClient.redisClient) {
+        await redisClient2.redisClient.setAsync(redisClient.queryProcessingLockKey('race'), '100');
+        await redisClient.redisClient.watchAsync(redisClient.queryProcessingLockKey('race'));
+        await redisClient2.redisClient.setAsync(redisClient.queryProcessingLockKey('race'), Math.random());
+
+        const res = await redisClient.redisClient.multi()
+          .set(redisClient.queryProcessingLockKey('race'), '100')
+          .set(redisClient.queryProcessingLockKey('race1'), '100')
+          .execAsync();
+
+        expect(res).toBe(null);
+        await redisClient.redisClient.delAsync(redisClient.queryProcessingLockKey('race'));
+        await redisClient.redisClient.delAsync(redisClient.queryProcessingLockKey('race1'));
+      }
+
+      await queue.reconcileQueue();
+
+      await redisClient.addToQueue(
+        keyScore, 'race', time, 'handler', ['select'], priority, { stageQueryKey: 'race' }
+      );
+
+      await redisClient.addToQueue(
+        keyScore + 100, 'race2', time + 100, 'handler2', ['select2'], priority, { stageQueryKey: 'race2' }
+      );
+
+      const processingId1 = await redisClient.getNextProcessingId();
+      const processingId4 = await redisClient.getNextProcessingId();
+
+      await redisClient.freeProcessingLock('race', processingId1, true);
+      await redisClient.freeProcessingLock('race2', processingId4, true);
+
+      await redisClient2.retrieveForProcessing('race2', await redisClient.getNextProcessingId());
+
+      const processingId = await redisClient.getNextProcessingId();
+      const retrieve6 = await redisClient.retrieveForProcessing('race', processingId);
+      console.log(retrieve6);
+      expect(!!retrieve6[5]).toBe(true);
+
+      console.log(await redisClient.getQueryAndRemove('race'));
+      console.log(await redisClient.getQueryAndRemove('race2'));
+
+      await queue.queueDriver.release(redisClient);
+      await queue.queueDriver.release(redisClient2);
+    });
   });
 };
 
