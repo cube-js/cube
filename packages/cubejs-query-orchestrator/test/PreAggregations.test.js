@@ -136,15 +136,13 @@ describe('PreAggregations', () => {
     });
 
     test('fail if waitForRenew is also specified', async () => {
-      await expect(async () => {
-        await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
-      }).rejects.toThrowError(/Invalid configuration/);
+      await expect(preAggregations.loadAllPreAggregationsIfNeeded(basicQueryWithRenew))
+        .rejects.toThrowError(/Invalid configuration/);
     });
 
     test('fail if rollup doesn\'t already exist', async () => {
-      await expect(async () => {
-        await preAggregations.loadAllPreAggregationsIfNeeded(basicQuery);
-      }).rejects.toThrowError(/One or more pre-aggregation tables could not be found to satisfy that query/);
+      await expect(preAggregations.loadAllPreAggregationsIfNeeded(basicQuery))
+        .rejects.toThrowError(/One or more pre-aggregation tables could not be found to satisfy that query/);
     });
   });
 });
