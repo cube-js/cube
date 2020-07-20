@@ -11,9 +11,10 @@ import client from "./graphql/client";
 import Header from "./components/Header";
 import Dashboard from "./components/Dashboard";
 
-const API_URL = "http://localhost:4000";
+
+const API_URL = process.env.NODE_ENV === 'production' ? '' : "http://localhost:4000";
 const CUBEJS_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQyMDYxNTEsImV4cCI6MTU5NDI5MjU1MX0.DYrEvATxGzn6xEEVrTzS2sEHmAyXJYi8ZCcWoeZBE-0";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjExMzQsImV4cCI6MTYyNjE5NzEzNH0._sWwksID3MLJxXmqNnECV_A3x7gUcVzSgn4szFox76s";
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`
 });
@@ -31,7 +32,7 @@ const AppLayout = () => (
   </Layout>
 );
 
-const App = ({ children }) => (
+const App = () => (
   <CubeProvider cubejsApi={cubejsApi}>
     <ApolloProvider client={client}>
       <AppLayout></AppLayout>
