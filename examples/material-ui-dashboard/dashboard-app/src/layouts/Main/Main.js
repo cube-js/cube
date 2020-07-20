@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { makeStyles, useTheme } from '@material-ui/styles';
 import { useMediaQuery } from '@material-ui/core';
 
-import { Sidebar, Topbar, Footer } from './components';
+import { Sidebar, Topbar } from './components';
 import palette from '../../theme/palette';
 
 const useStyles = makeStyles((theme) => ({
@@ -21,6 +21,7 @@ const useStyles = makeStyles((theme) => ({
   content: {
     height: '100%',
     minHeight: 'calc(100vh - 64px)',
+    margin: '-8px',
     backgroundColor: palette.primary.light,
   },
 }));
@@ -57,7 +58,6 @@ const Main = (props) => {
       <Sidebar onClose={handleSidebarClose} open={shouldOpenSidebar} variant={isDesktop ? 'persistent' : 'temporary'} />
       <main className={classes.content}>
         {children}
-        <Footer />
       </main>
     </div>
   );

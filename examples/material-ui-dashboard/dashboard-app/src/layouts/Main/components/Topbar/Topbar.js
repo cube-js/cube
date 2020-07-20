@@ -15,6 +15,7 @@ const useStyles = makeStyles((theme) => ({
     flexGrow: 1,
   },
   link: {
+    "font-family": "Roboto",
     display: 'flex',
     alignItems: 'center',
     padding: '10px 15px',

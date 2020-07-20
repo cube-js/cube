@@ -1,6 +1,4 @@
 import React from 'react';
-import './App.css';
-import './body.css';
 import { makeStyles, ThemeProvider } from '@material-ui/core/styles';
 import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
