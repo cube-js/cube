@@ -27,7 +27,6 @@ const DataTablePage = () => {
     order: {
       [`${sorting[0]}`]: sorting[1],
     },
-    measures: ['Orders.count'],
     timeDimensions: [
       {
         dimension: 'Orders.createdAt',
