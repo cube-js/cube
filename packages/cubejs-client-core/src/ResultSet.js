@@ -26,6 +26,24 @@ const TIME_SERIES = {
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
+const groupByToPairs = (keyFn) => {
+  const acc = new Map();
+  
+  return (data) => {
+    data.forEach((row) => {
+      const key = keyFn(row);
+      
+      if (!acc.has(key)) {
+        acc.set(key, []);
+      }
+  
+      acc.get(key).push(row);
+    });
+    
+    return Array.from(acc.entries());
+  };
+};
+
 class ResultSet {
   constructor(loadResponse, options = {}) {
     this.loadResponse = loadResponse;
@@ -233,7 +251,7 @@ class ResultSet {
 
   pivot(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    let groupByXAxis = groupBy(({ xValues }) => this.axisValuesString(xValues));
+    let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
 
     // eslint-disable-next-line no-unused-vars
     let measureValue = (row, measure, xValues) => row[measure];
@@ -255,8 +273,8 @@ class ResultSet {
             ({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
             rows
           );
-          return series.map(d => ({ [d]: byXValues[d] || [{ xValues: [d], row: {} }] }))
-            .reduce((a, b) => Object.assign(a, b), {});
+          return toPairs(series.map(d => ({ [d]: byXValues[d] || [{ xValues: [d], row: {} }] }))
+            .reduce((a, b) => Object.assign(a, b), {}));
         };
 
         // eslint-disable-next-line no-unused-vars
@@ -267,8 +285,7 @@ class ResultSet {
     const xGrouped = pipe(
       map(row => this.axisValues(pivotConfig.x)(row).map(xValues => ({ xValues, row }))),
       unnest,
-      groupByXAxis,
-      toPairs
+      groupByXAxis
     )(this.timeDimensionBackwardCompatibleData());
 
     const allYValues = pipe(
@@ -284,7 +301,7 @@ class ResultSet {
     )(xGrouped);
 
     // eslint-disable-next-line no-unused-vars
-    return xGrouped.map(([xValuesString, rows]) => {
+    return xGrouped.map(([, rows]) => {
       const { xValues } = rows[0];
       const yGrouped = pipe(
         map(({ row }) => this.axisValues(pivotConfig.y)(row).map(yValues => ({ yValues, row }))),
