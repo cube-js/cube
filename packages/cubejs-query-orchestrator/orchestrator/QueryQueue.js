@@ -318,9 +318,26 @@ class QueryQueue {
           processingLockAcquired,
           query,
           insertedCount,
-          activeKeys
+          activeKeys,
+          activated,
+          queryExists: !!query
         });
-        await redisClient.freeProcessingLock(queryKey, processingId, activated);
+        const currentProcessingId = await redisClient.freeProcessingLock(queryKey, processingId, activated);
+        if (currentProcessingId) {
+          this.logger('Skipping free processing lock', {
+            processingId,
+            currentProcessingId,
+            queryKey: query && query.queryKey || queryKey,
+            requestId: query && query.requestId,
+            queuePrefix: this.redisQueuePrefix,
+            processingLockAcquired,
+            query,
+            insertedCount,
+            activeKeys,
+            activated,
+            queryExists: !!query
+          });
+        }
       }
     } catch (e) {
       this.logger('Queue storage error', {

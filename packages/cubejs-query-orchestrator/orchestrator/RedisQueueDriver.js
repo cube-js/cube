@@ -160,6 +160,9 @@ class RedisQueueDriverConnection {
         }
         await removeCommand
           .execAsync();
+        return null;
+      } else {
+        return currentProcessId;
       }
     } finally {
       await this.redisClient.unwatchAsync();
