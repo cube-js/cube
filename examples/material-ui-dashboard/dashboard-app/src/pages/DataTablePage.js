@@ -31,7 +31,7 @@ const DataTablePage = () => {
       {
         dimension: 'Orders.createdAt',
         dateRange: [startDate, finishDate],
-        granularity: 'day',
+        granularity: null,
       },
     ],
     dimensions: [
