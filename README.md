@@ -244,7 +244,7 @@ export default () => {
 |[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](./examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js|
 |[Open Source Web Analytics Platform](https://web-analytics-demo.cubecloudapp.dev/)|[web-analytics](./examples/web-analytics)|[Building Google Analytics alternative with Snowplow, Athena, Material UI, using pre-aggregations](https://web-analytics.cube.dev)|
 |[Drill Down Table API](https://drill-downs.cubecloudapp.dev/)|[drill-downs](./examples/drill-downs)|[Quick introduction in drill downs concept](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/) |
-|[Vue Query Builder](https://vue-query-builder.cubecloudapp.dev)|[vue-query-builder](./examples/vue-query-builder)|[A tool for building interactive reports with Vue.js, Vuetify, Vue Chartkick and Cube.js(https://cube.dev/blog/vue-query-builder-with-cubejs/)]|
+|[Vue Query Builder](https://vue-query-builder.cubecloudapp.dev)|[vue-query-builder](./examples/vue-query-builder)|[A tool for building interactive reports with Vue.js, Vuetify, Vue Chartkick and Cube.js](https://cube.dev/blog/vue-query-builder-with-cubejs/)|
 |[Examples Gallery](https://statsbotco.github.io/cubejs-client/)|[examples-gallery](./examples/examples-gallery)|Examples Gallery with different visualizations libraries|
 
 ## Tutorials
