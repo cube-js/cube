@@ -19,5 +19,8 @@
       }
     }
   },
-  "defaultProject": "cubejs-client-ngx"
+  "defaultProject": "cubejs-client-ngx",
+  "cli": {
+    "analytics": "24ffae35-fafc-41e6-b395-db5f2f6f12d4"
+  }
 }

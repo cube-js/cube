@@ -26,6 +26,17 @@ const DbTypeToGenericType = {
   'double precision': 'decimal'
 };
 
+// Order of keys is important here: from more specific to less specific
+const DbTypeValueMatcher = {
+  timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
+  date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
+  int: (v) => Number.isInteger(v) || v.toString().match(/^\d+$/),
+  decimal: (v) => v instanceof Number || v.toString().match(/^\d+(\.\d+)?$/),
+  boolean: (v) => v === false || v === true || v.toLowerCase() === 'true' || v.toLowerCase === 'false',
+  string: (v) => v.length < 256,
+  text: () => true
+};
+
 class BaseDriver {
   informationSchemaQuery() {
     return `
@@ -46,8 +57,22 @@ class BaseDriver {
     throw new Error('Not implemented');
   }
 
-  downloadQueryResults() {
-    throw new Error('Not implemented');
+  async downloadQueryResults(query, values) {
+    const rows = await this.query(query, values);
+    const fields = Object.keys(rows[0]);
+
+    const types = fields.map(field => ({
+      name: field,
+      type: Object.keys(DbTypeValueMatcher).find(
+        type => !rows.filter(row => !!row[field]).find(row => !DbTypeValueMatcher[type](row[field])) &&
+          rows.find(row => !!row[field])
+      ) || 'text'
+    }));
+
+    return {
+      rows,
+      types,
+    };
   }
 
   readOnly() {

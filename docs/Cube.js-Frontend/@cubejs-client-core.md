@@ -36,7 +36,7 @@ const cubejsApi = cubejs(
 
 Name | Type | Description |
 ------ | ------ | ------ |
-apiToken | string &#124;  () => *Promise‹string›* | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token. |
+apiToken | string &#124;  () => *Promise‹string›* | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
 options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 ▸  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
@@ -327,6 +327,10 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 
 ▸  **rawData**(): *T[]*
 
+### serialize
+
+▸  **serialize**(): *Object*
+
 ### series
 
 ▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
@@ -512,6 +516,14 @@ For example:
   //...
 ]
 ```
+
+### deserialize
+
+▸ `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#result-set)‹TData›*
+
+**Type parameters:**
+
+- **TData**
 
 ### getNormalizedPivotConfig
 

@@ -75,21 +75,25 @@ class RedisQueueDriverConnection {
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
-    await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
-    const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
-    if (processingId !== currentProcessId) {
-      return false;
-    }
+    try {
+      await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
+      const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
+      if (processingId !== currentProcessId) {
+        return false;
+      }
 
-    return this.redisClient.multi()
-      .lpush([this.resultListKey(queryKey), JSON.stringify(executionResult)])
-      .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
-      .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
-      .del(this.queryProcessingLockKey(queryKey))
-      .execAsync();
+      return this.redisClient.multi()
+        .lpush([this.resultListKey(queryKey), JSON.stringify(executionResult)])
+        .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
+        .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
+        .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
+        .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
+        .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
+        .del(this.queryProcessingLockKey(queryKey))
+        .execAsync();
+    } finally {
+      await this.redisClient.unwatchAsync();
+    }
   }
 
   getOrphanedQueries() {
@@ -144,43 +148,51 @@ class RedisQueueDriverConnection {
   }
 
   async freeProcessingLock(queryKey, processingId, activated) {
-    const lockKey = this.queryProcessingLockKey(queryKey);
-    await this.redisClient.watchAsync(lockKey);
-    const currentProcessId = await this.redisClient.getAsync(lockKey);
-    if (currentProcessId === processingId) {
-      let removeCommand = this.redisClient.multi()
-        .del(lockKey);
-      if (activated) {
-        removeCommand = removeCommand.zrem([this.activeRedisKey(), this.redisHash(queryKey)]);
+    try {
+      const lockKey = this.queryProcessingLockKey(queryKey);
+      await this.redisClient.watchAsync(lockKey);
+      const currentProcessId = await this.redisClient.getAsync(lockKey);
+      if (currentProcessId === processingId) {
+        let removeCommand = this.redisClient.multi()
+          .del(lockKey);
+        if (activated) {
+          removeCommand = removeCommand.zrem([this.activeRedisKey(), this.redisHash(queryKey)]);
+        }
+        await removeCommand
+          .execAsync();
       }
-      await removeCommand
-        .execAsync();
+    } finally {
+      await this.redisClient.unwatchAsync();
     }
   }
 
   async optimisticQueryUpdate(queryKey, toUpdate, processingId) {
-    let query = await this.getQueryDef(queryKey);
-    for (let i = 0; i < 10; i++) {
-      if (query) {
-        // eslint-disable-next-line no-await-in-loop
-        await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
-        const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
-        if (currentProcessId !== processingId) {
-          return false;
+    try {
+      let query = await this.getQueryDef(queryKey);
+      for (let i = 0; i < 10; i++) {
+        if (query) {
+          // eslint-disable-next-line no-await-in-loop
+          await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
+          const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
+          if (currentProcessId !== processingId) {
+            return false;
+          }
+          let [beforeUpdate] = await this.redisClient
+            .multi()
+            .hget([this.queriesDefKey(), this.redisHash(queryKey)])
+            .hset([this.queriesDefKey(), this.redisHash(queryKey), JSON.stringify({ ...query, ...toUpdate })])
+            .execAsync();
+          beforeUpdate = JSON.parse(beforeUpdate);
+          if (JSON.stringify(query) === JSON.stringify(beforeUpdate)) {
+            return true;
+          }
+          query = beforeUpdate;
         }
-        let [beforeUpdate] = await this.redisClient
-          .multi()
-          .hget([this.queriesDefKey(), this.redisHash(queryKey)])
-          .hset([this.queriesDefKey(), this.redisHash(queryKey), JSON.stringify({ ...query, ...toUpdate })])
-          .execAsync();
-        beforeUpdate = JSON.parse(beforeUpdate);
-        if (JSON.stringify(query) === JSON.stringify(beforeUpdate)) {
-          return true;
-        }
-        query = beforeUpdate;
       }
+      throw new Error(`Can't update ${queryKey} with ${JSON.stringify(toUpdate)}`);
+    } finally {
+      await this.redisClient.unwatchAsync();
     }
-    throw new Error(`Can't update ${queryKey} with ${JSON.stringify(toUpdate)}`);
   }
 
   release() {

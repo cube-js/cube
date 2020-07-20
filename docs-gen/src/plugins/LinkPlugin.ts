@@ -1,9 +1,11 @@
 import { camelize, dasherize, underscore } from 'inflection';
-import { DeclarationReflection, Reflection, ReflectionKind } from 'typedoc';
+import { DeclarationReflection, Reflection, ReflectionKind, ParameterReflection, SignatureReflection } from 'typedoc';
 import { Context, Converter } from 'typedoc/dist/lib/converter';
 import { ConverterComponent } from 'typedoc/dist/lib/converter/components';
 import { Comment } from 'typedoc/dist/lib/models/comments';
 import { Component } from 'typedoc/dist/lib/utils';
+
+const linkRegex = /{@see\s([^}]*)}/g;
 
 @Component({ name: 'link' })
 export class LinkPlugin extends ConverterComponent {
@@ -30,10 +32,12 @@ export class LinkPlugin extends ConverterComponent {
   }
 
   private static replaceAnnotations(comment: Comment, reflections: Reflection[]) {
-    comment.shortText = comment.shortText.replace(/{@see\s([^}]*)}/g, (_, name) => {
+    const replacer = (_, name) => {
       const reflection = reflections.find((reflection) => reflection.name === name);
       return this.toLink(name, reflection);
-    });
+    }
+    comment.text = comment.text.replace(linkRegex, replacer);
+    comment.shortText = comment.shortText.replace(linkRegex, replacer);
   }
 
   initialize() {
@@ -44,11 +48,19 @@ export class LinkPlugin extends ConverterComponent {
 
   onEndResolve(context: Context) {
     const reflections = Object.values(context.project.reflections);
-
+    
     reflections.forEach((reflection) => {
+      reflection.comment && LinkPlugin.replaceAnnotations(reflection.comment, reflections);
+      
       if (reflection instanceof DeclarationReflection) {
         reflection.signatures?.forEach((sig) => {
           sig.comment && LinkPlugin.replaceAnnotations(sig.comment, reflections);
+        });
+      }
+      
+      if (reflection instanceof SignatureReflection) {
+        reflection.parameters?.forEach((param) => {
+          param.comment && LinkPlugin.replaceAnnotations(param.comment, reflections);
         });
       }
     });

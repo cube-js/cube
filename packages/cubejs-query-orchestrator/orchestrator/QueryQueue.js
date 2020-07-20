@@ -247,7 +247,7 @@ class QueryQueue {
                   try {
                     return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
                   } catch (e) {
-                    this.logger(`Error while query update`, {
+                    this.logger('Error while query update', {
                       queryKey: query.queryKey,
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
@@ -301,7 +301,7 @@ class QueryQueue {
         if (!(await redisClient.setResultAndRemoveQuery(queryKey, executionResult, processingId))) {
           this.logger('Orphaned execution result', {
             processingId,
-            warn: `Result for query was not set due to processing lock wasn't acquired`,
+            warn: 'Result for query was not set due to processing lock wasn\'t acquired',
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId
@@ -342,7 +342,7 @@ class QueryQueue {
       }
       await this.cancelHandlers[queryHandler](query);
     } catch (e) {
-      this.logger(`Error while cancel`, {
+      this.logger('Error while cancel', {
         queryKey: query.queryKey,
         error: e.stack || e,
         queuePrefix: this.redisQueuePrefix,

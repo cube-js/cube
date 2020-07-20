@@ -105,6 +105,7 @@ cube(`Products`, {
 
 [USER_CONTEXT](cube#context-variables-user-context) great for use cases where you want to get explicit control over filtering of underlying data seen by users.
 However for use cases where you want to reuse pre-aggregation tables for different users or even tenants [queryTransformer](@cubejs-backend-server-core#options-reference-query-transformer) is much better choice.
+[queryTransformer](@cubejs-backend-server-core#options-reference-query-transformer) is also very convenient way of enforcing row level security by means of join logic defined in your cubes instead of embedding [USER_CONTEXT](cube#context-variables-user-context) filtering boiler plate into each cube.
 Together with [contextToDataSourceId](@cubejs-backend-server-core#options-reference-context-to-data-source-id) it allows to define both row level security filtering as well as reuse the same pre-aggregation set for each tenant.
 
 ## Same DB Instance with per Tenant Row Level Security

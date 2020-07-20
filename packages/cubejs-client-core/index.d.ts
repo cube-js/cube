@@ -218,6 +218,7 @@ declare module '@cubejs-client/core' {
      */
     static measureFromAxis(axisValues: string[]): string;
     static getNormalizedPivotConfig(query: Query, pivotConfig?: Partial<PivotConfig>): PivotConfig;
+    static deserialize<TData>(data: Object, options?: Object): ResultSet<TData>;
 
     /**
      * Creates a new instance of ResultSet based on [LoadResponse](#load-response) data.
@@ -241,6 +242,8 @@ declare module '@cubejs-client/core' {
      */
     constructor(loadResponse: LoadResponse<T>, options?: Object);
 
+    serialize(): Object;
+    
     /**
      * @hidden
      */
@@ -708,7 +711,7 @@ declare module '@cubejs-client/core' {
    * );
    * ```
    *
-   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token.
+   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. In case of async function `authorization` is updated for `options.transport` on each request.
    * @order 1
    */
   export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;

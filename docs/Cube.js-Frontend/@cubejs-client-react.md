@@ -241,6 +241,75 @@ cubejsApi | CubejsApi |
 
 ### MemberUpdater
 
+You can use the following methods for member manipulaltion
+```js
+<QueryBuilder
+  // ...
+  cubejsApi={cubejsApi}
+  render={({
+    // ...
+    availableMeasures,
+    updateMeasures,
+  }) => {
+    return (
+      // ...
+      <Select
+        mode="multiple"
+        placeholder="Please select"
+        onSelect={(measure) => updateMeasures.add(measure)}
+        onDeselect={(measure) => updateMeasures.remove(measure)}
+      >
+        {availableMeasures.map((measure) => (
+          <Select.Option key={measure.name} value={measure}>
+            {measure.title}
+          </Select.Option>
+        ))}
+      </Select>
+    );
+  }}
+/>
+```
+
+NOTE: if you need to add or remove more than one member at a time you need to use `updateQuery` prop of [QueryBuilderRenderProps](#query-builder-query-builder-render-props)
+
+```js
+<QueryBuilder
+  // ...
+  cubejsApi={cubejsApi}
+  render={({
+    // ...
+    measures,
+    updateMeasures,
+    updateQuery,
+  }) => {
+    // ...
+    return (
+      <>
+        // WRONG: This code will not work properly
+        <button
+          onClick={() =>
+            measures.forEach((measure) => updateMeasures.remove(measure))
+          }
+        >
+          Remove all
+        </button>
+
+        // CORRECT: Using `updateQuery` for removing all measures
+        <button
+          onClick={() =>
+            updateQuery({
+              measures: [],
+            })
+          }
+        >
+          Remove all
+        </button>
+      </>
+    );
+  }}
+/>
+```
+
 Name | Type |
 ------ | ------ |
 add |  (**member**: [TMember](#types-t-member)) => *void* |
