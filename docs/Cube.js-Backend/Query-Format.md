@@ -1,8 +1,8 @@
 ---
 title: Query Format
 permalink: /query-format
-category: Cube.js Frontend
-menuOrder: 1
+category: Cube.js Backend
+menuOrder: 3
 ---
 
 Cube Queries are plain JavaScript objects, describing an analytics query. The basic elements of a query (query members) are `measures`, `dimensions`, and `segments`.

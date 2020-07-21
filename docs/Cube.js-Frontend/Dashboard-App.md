@@ -2,7 +2,7 @@
 title: Dashboard App
 permalink: /dashboard-app
 category: Cube.js Frontend
-menuOrder: 3
+menuOrder: 6
 ---
 
 You can generate a Dashboard App in the Cube.js developer playground. The

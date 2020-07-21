@@ -1,8 +1,8 @@
 ---
 title: Real-Time Data Fetch
 permalink: /real-time-data-fetch
-category: Cube.js Backend
-menuOrder: 6
+category: Cube.js Frontend
+menuOrder: 3
 ---
 
 Most of databases supported by Cube.js are retroactive.

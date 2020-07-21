@@ -2,7 +2,7 @@
 title: Deployment
 permalink: /deployment
 category: Cube.js Backend
-menuOrder: 3
+menuOrder: 4
 ---
 
 Below you can find guides for popular deployment environments:
