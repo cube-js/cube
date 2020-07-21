@@ -1,0 +1,11 @@
+{
+  "name": "vue-antd-static-template",
+  "version": "0.1.0",
+  "description": "the vue antd template for cube.js",
+  "main": "prompts.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "DonDonDonDonDonDon",
+}

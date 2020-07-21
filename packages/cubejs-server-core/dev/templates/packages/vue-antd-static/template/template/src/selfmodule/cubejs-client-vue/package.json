@@ -1,0 +1,71 @@
+{
+  "name": "@cubejs-client/vue",
+  "version": "0.19.31",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-client-vue"
+  },
+  "description": "Vue.js components for cube.js",
+  "author": "Ricardo Tapia",
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "test": "vue-cli-service test:unit",
+    "test:unit": "vue-cli-service test:unit",
+    "test:unit:watch": "vue-cli-service test:unit --watch --require tests/setup.js"
+  },
+  "main": "dist/cubejs-client-vue.js",
+  "module": "dist/cubejs-client-vue.esm.js",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "core-js": "^3.6.5",
+    "ramda": "^0.27.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "^3.5.0",
+    "@vue/cli-plugin-eslint": "^4.2.3",
+    "@vue/cli-plugin-unit-jest": "^4.2.3",
+    "@vue/cli-service": "^4.2.3",
+    "@vue/test-utils": "1.0.0-beta.31",
+    "babel-core": "7.0.0-bridge.0",
+    "babel-eslint": "^10.0.1",
+    "babel-jest": "^23.6.0",
+    "eslint": "^6.8.0",
+    "eslint-plugin-vue": "^6.2.1",
+    "vue": "^2.6.6",
+    "vue-template-compiler": "^2.5.21"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/essential",
+      "eslint:recommended"
+    ],
+    "rules": {},
+    "parserOptions": {
+      "parser": "babel-eslint"
+    }
+  },
+  "postcss": {
+    "plugins": {
+      "autoprefixer": {}
+    }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not ie <= 8"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
