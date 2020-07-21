@@ -74,7 +74,7 @@ class FooDriver extends BaseDriver {
 ```
 If driver class contains `static dialectClass()` method it'll be used to lookup corresponding SQL dialect. Otherwise default dialect for the database type will be used.
 
-### Publishing Separate Driver npm package
+### Publishing Driver npm Package
 
 Cube.js looks up `{dbType}-cubejs-driver` package among installed modules to fullfil driver dependency if there's no corresponding default driver for the specified database type.
 For example one can publish `foo-cubejs-driver` npm package to fullfil driver dependency for the `foo` database type.
