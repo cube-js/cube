@@ -26,7 +26,7 @@ const AppLayout = () => (
     }}
   >
     <Header />
-    <Layout.Content style={{ padding: '40px' }}>
+    <Layout.Content className='examples__container'>
       <Dashboard />
     </Layout.Content>
   </Layout>

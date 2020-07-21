@@ -1,31 +1,27 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { withRouter } from "react-router";
-import { Layout, Menu } from "antd";
+import { Layout } from "antd";
+import * as Icon from '@ant-design/icons';
+import logo from './../logo.svg';
 
-const Header = ({ location }) => (
-  <Layout.Header
-    style={{
-      padding: "0 32px"
-    }}
-  >
-    <div
-      style={{
-        float: "left"
-      }}
-    >
-      <h2
-        style={{
-          color: "#fff",
-          margin: 0,
-          marginRight: "1em",
-          display: "inline",
-          width: 100,
-          lineHeight: "54px"
-        }}
-      >
-        Highcharts
-      </h2>
+const Header = () => (
+  <Layout.Header className='example__header'>
+    <div className="examples__nav">
+      <div className="examples__title">
+        <Link to='//cube.dev' target="_blank"><img src={logo} alt="Cube.js" /></Link>
+        <h1>Highcharts Example</h1>
+      </div>
+      <div className="examples__nav__buttons">
+        <a href='//github.com/statsbotco/cube.js'>
+          <Icon.GithubOutlined />
+            Github
+        </a>
+        <a href='//slack.cube.dev'>
+          <Icon.SlackOutlined />
+            Slack
+        </a>
+      </div>
     </div>
   </Layout.Header>
 );

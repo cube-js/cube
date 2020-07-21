@@ -11,10 +11,17 @@ export default ({ data }) => {
         plotBackgroundColor: null,
         plotBorderWidth: null,
         plotShadow: false,
-        type: 'pie'
+        type: 'pie',
+        style:  {"fontFamily": "\"DM Sans\", sans-serif","fontSize":"14px"}
+      },
+      credits: {
+        enabled: false
       },
       title: {
-        text: 'Top Categories (Drill down)'
+        text: 'Top Categories'
+      },
+      subtitle: {
+        text: 'Highcharts API, Pie'
       },
       tooltip: {
         pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
@@ -27,7 +34,8 @@ export default ({ data }) => {
       plotOptions: {
         pie: {
           shadow: false,
-          center: ['50%', '50%']
+          center: ['50%', '50%'],
+          colors: ['#45446F', '#BE3D7F', '#FF6492', '#FF93A8', '#FFC3BA', '#FFEAE4', '#DFD7FF', '#B5ACFF', '#7A77FF', '#5251C9'],
         }
       },
       series: [{

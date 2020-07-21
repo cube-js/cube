@@ -14,18 +14,8 @@ cube(`LineItems`, {
   },
   
   measures: {
-    count: {
-      type: `count`,
-      drillMembers: [id, createdAt]
-    },
-    
     quantity: {
       sql: `quantity`,
-      type: `sum`
-    },
-    
-    price: {
-      sql: `price`,
       type: `sum`
     }
   },
@@ -35,11 +25,6 @@ cube(`LineItems`, {
       sql: `id`,
       type: `number`,
       primaryKey: true
-    },
-    
-    createdAt: {
-      sql: `created_at`,
-      type: `time`
     }
   }
 });

@@ -1,12 +1,10 @@
 cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
-
   joins: {
     Users: {
       sql: `${CUBE}.user_id = ${Users}.id`,
       relationship: `belongsTo`
     },
-
     Products: {
       sql: `${CUBE}.product_id = ${Products}.id`,
       relationship: `belongsTo`
@@ -15,13 +13,7 @@ cube(`Orders`, {
 
   measures: {
     count: {
-      type: `count`,
-      drillMembers: [id, createdAt]
-    },
-
-    number: {
-      sql: `number`,
-      type: `sum`
+      type: `count`
     }
   },
 
@@ -31,24 +23,12 @@ cube(`Orders`, {
       type: `number`,
       primaryKey: true
     },
-
-    productId: {
-      sql: `product_id`,
-      type: `number`,
-    },
-
     status: {
       sql: `status`,
       type: `string`
     },
-
     createdAt: {
       sql: `created_at`,
-      type: `time`
-    },
-
-    completedAt: {
-      sql: `completed_at`,
       type: `time`
     }
   }

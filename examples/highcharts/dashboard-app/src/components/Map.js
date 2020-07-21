@@ -13,16 +13,17 @@ export default ({ data, setRegion }) => {
   useEffect(() => {
     setOptions({
       chart: {
-        map: 'countries/us/custom/us-all-mainland'
-      },
-      title: {
-        text: 'Sales by regions'
+        map: 'countries/us/custom/us-all-mainland',
+        style:  {"fontFamily": "\"DM Sans\", sans-serif","fontSize":"14px"},
       },
       credits: {
         enabled: false
       },
-      mapNavigation: {
-        enabled: true
+      title: {
+        text: 'Orders by region'
+      },
+      subtitle: {
+        text: 'Highcharts Map API'
       },
       colorAxis: {
         min: 0
@@ -33,16 +34,21 @@ export default ({ data, setRegion }) => {
     <b>{point.freq}</b><br><b>{point.keyword}</b>                      
     <br>lat: {point.lat}, lon: {point.lon}`
       },
+      colorAxis:{
+        minColor: '#DFD7FF',
+        maxColor: '#7A77FF'
+      },
       series: [{
         name: 'Basemap',
         mapData: mapDataIE,
         data: data,
-        borderColor: '#A0A0A0',
-        nullColor: 'rgba(200, 200, 200, 0.3)',
+        borderColor: '#FFEAE4',
+        nullColor: '#FFEAE480',
         showInLegend: false,
         dataLabels: {
           enabled: true,
-          format: "{point.name}"
+          format: "{point.name}",
+          color: '#000'
         },
         point: {
           events: {

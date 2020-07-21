@@ -7,17 +7,23 @@ export default ({ categories, data }) => {
   const [options, setOptions] = useState({});
   useEffect(() => {
     setOptions({
-      title: {
-        text: 'Solar Employment Growth by Sector, 2010-2016'
+      chart: {
+        style:  {"fontFamily": "\"DM Sans\", sans-serif","fontSize":"14px"},
+        type: 'area'
       },
-
+      credits: {
+        enabled: false
+      },
+      title: {
+        text: 'Categories sales'
+      },
       subtitle: {
-        text: 'Source: thesolarfoundation.com'
+        text: 'Highcharts API, Area Chart'
       },
 
       yAxis: {
         title: {
-          text: 'Number of Employees'
+          text: 'Number of sales'
         }
       },
 
@@ -26,18 +32,27 @@ export default ({ categories, data }) => {
       },
 
       legend: {
-        layout: 'vertical',
-        align: 'right',
-        verticalAlign: 'middle'
+        align: 'center',
+        width: '90%'
       },
 
+      colors: ['#45446F', '#BE3D7F', '#FF6492', '#FF93A8', '#FFC3BA', '#FFEAE4', '#DFD7FF', '#B5ACFF', '#7A77FF', '#5251C9'],
       plotOptions: {
+        area: {
+            stacking: 'normal',
+            lineWidth: 1,
+            marker: {
+                enabled: false
+            }
+        },
         series: {
           label: {
             connectorAllowed: false
           }
         }
       },
+
+
       series: data,
       responsive: {
         rules: [{
@@ -61,7 +76,7 @@ export default ({ categories, data }) => {
   return (
     <HighchartsReact
       highcharts={Highcharts}
-      options={{ ...options, title: { text: 'Daily sales/Line && Area' } }}
+      options={{ ...options }}
     />
   )
 }

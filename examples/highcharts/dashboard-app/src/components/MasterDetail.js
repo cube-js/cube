@@ -15,13 +15,23 @@ export default ({ data, setRange }) => {
   useEffect(() => {
     setOptions(
       {
+        chart: {
+          style:  {"fontFamily": "\"DM Sans\", sans-serif","fontSize":"14px"}
+        },
+
+        credits: {
+          enabled: false
+        },
+
         title: {
-          text: 'Orders sum amount'
+          text: 'Orders by date'
         },
 
         subtitle: {
-          text: 'Using explicit breaks for nights and weekends'
+          text: 'Highcharts Stock API'
         },
+
+        
 
         xAxis: {
           events: {
@@ -36,22 +46,25 @@ export default ({ data, setRange }) => {
           }
         },
 
+
         rangeSelector: {
           buttons: [{
             type: 'month',
+            count: 3,
+            text: '3m'
+          },
+          {
+            type: 'month',
             count: 6,
             text: '6m'
-          }, {
-            type: 'year',
-            count: 1,
-            text: '1y'
-          },
+          }, 
           {
             type: 'all',
             count: 1,
             text: 'All'
           }],
-          inputEnabled: true
+          inputEnabled: true,
+          inputBoxBorderColor: '#eaeaea',
         },
 
         series: [{
@@ -62,6 +75,8 @@ export default ({ data, setRange }) => {
           tooltip: {
             valueDecimals: 2
           },
+          color: '#B5ACFF',
+          lineWidth: 1,
           fillColor: {
             linearGradient: {
               x1: 0,
@@ -70,8 +85,8 @@ export default ({ data, setRange }) => {
               y2: 1
             },
             stops: [
-              [0, Highcharts.getOptions().colors[0]],
-              [1, Highcharts.color(Highcharts.getOptions().colors[0]).setOpacity(0).get('rgba')]
+              [0, '#DFD7FF'],
+              [1, '#DFD7FF']
             ]
           },
           threshold: null
