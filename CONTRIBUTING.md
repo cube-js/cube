@@ -58,9 +58,26 @@ In case you need to tweak it a little bit please follow [Implementing Driver](#i
 
 ### Implementing SQL Dialect
 
-1. Find most similar `BaseQuery` implementation in `@cubejs-backend/schema-compiler/adapter`.
-2. Copy it and adjust SQL generation accordingly.
-3. Add `BaseQuery` implementation to `@cubejs-backend/schema-compiler/adapter/QueryBuilder.js` with same name as driver.
+1. Find the most similar `BaseQuery` implementation in `@cubejs-backend/schema-compiler/adapter`.
+2. Copy it, adjust SQL generation accordingly and put it in driver package. Driver package will obtain `@cubejs-backend/schema-compiler` dependency from that point.
+3. Add `static dialectClass()` method to your driver class which returns `BaseQuery` implementation for the database. For example:
+```javascript
+const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const FooQuery = require('./FooQuery');
+
+class FooDriver extends BaseDriver {
+  // ...
+  static dialectClass() {
+    return FooQuery;
+  }
+}
+```
+If driver class contains `static dialectClass()` method it'll be used to lookup corresponding SQL dialect. Otherwise default dialect for the database type will be used.
+
+### Publishing Separate Driver npm package
+
+Cube.js looks up `{dbType}-cubejs-driver` package among installed modules to fullfil driver dependency if there's no corresponding default driver for the specified database type.
+For example one can publish `foo-cubejs-driver` npm package to fullfil driver dependency for the `foo` database type.
 
 ### Testing Schema Compiler
 
