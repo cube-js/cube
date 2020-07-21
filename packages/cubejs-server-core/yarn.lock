@@ -933,10 +933,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.19.49":
-  version "0.19.49"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.19.49.tgz#f0a9e2b8d2171b415ca5c3da58da7bcfcc80b439"
-  integrity sha512-amxIq7ZmE/byd7GY0uSVNwSX7qKgrLNFnRE13bcR7QDDLDtEV2cEXT6ajRUOTRLvrbEHK6boyfo+5WE+gKR68g==
+"@cubejs-backend/api-gateway@^0.19.50":
+  version "0.19.50"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.19.50.tgz#cafb4139e7e911c9b867a457c74fcd2e497923f9"
+  integrity sha512-RVwEwo/qxEwoqI2AV10vX3cH9XQPHPIqDL6274AiR28c9F4eHFw5cHVyy0M/tnabOHIHaJrMl+jIzmWqKwKloQ==
   dependencies:
     "@hapi/joi" "^15.1.1"
     chrono-node "1.4.4"
@@ -946,19 +946,19 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.19.47":
-  version "0.19.47"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.47.tgz#27caa4f9e9ba69fa6f81bd85ab45875e6985a2dd"
-  integrity sha512-HLsZGY77UnhuKsX6Zc+++tUAl6+1CusjBJi43nI2kVRWiqng648IMhtqaa3H+XYybCXqELlBEgA8V1NufYBmcA==
+"@cubejs-backend/query-orchestrator@^0.19.53":
+  version "0.19.53"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.53.tgz#9ef7bebfdfd69af8118f18ee93944b427a63e102"
+  integrity sha512-Ma3MYnDaqfetalrTM9RHPzOn+gOAw4GbwMPbbuV1R8xocg0s+k2VSOyoNWKRU1Yn1/P72frn3bG3d7fcr+HzAQ==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.19.48":
-  version "0.19.48"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.19.48.tgz#0f7ed3325162c1c63895380945133f191f61e5a7"
-  integrity sha512-BMCuS36n0vZZKSCFs7JcxTrTuiYhwl8y6MhbraOqisww9DJ84uhXNHJMMqRRyPyp78Rzh6OgIvUDb+/AXFDOdQ==
+"@cubejs-backend/schema-compiler@^0.19.50":
+  version "0.19.50"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.19.50.tgz#4b7b2a428553112f8b1357ae364c528058bd7567"
+  integrity sha512-Mk7/ye6TEZnwQ38210TWJibd6PA+4qrN99cRuwf1V9VGKfbNS2n0WzVYLl111ajYiQ0b7VfjBaVtKfqNNCqMyg==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -4059,12 +4059,7 @@ lodash.sortby@^4.7.0:
   resolved "https://registry.yarnpkg.com/lodash.sortby/-/lodash.sortby-4.7.0.tgz#edd14c824e2cc9c1e0b0a1b42bb5210516a42438"
   integrity sha1-7dFMgk4sycHgsKG0K7UhBRakJDg=
 
-lodash@^4.17.13, lodash@^4.17.14, lodash@^4.17.15:
-  version "4.17.15"
-  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.15.tgz#b447f6670a0455bbfeedd11392eff330ea097548"
-  integrity sha512-8xOcRHvCjnocdS5cpwXQXVzmmh5e5+saE2QGoeQmbKmRS6J3VQppPOIt0MnmE+4xlZoumy0GPG0D0MVIQbNA1A==
-
-lodash@^4.17.19:
+lodash@^4.17.13, lodash@^4.17.14, lodash@^4.17.15, lodash@^4.17.19:
   version "4.17.19"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.19.tgz#e48ddedbe30b3321783c5b4301fbd353bc1e4a4b"
   integrity sha512-JNvd8XER9GQX0v2qJgsaN/mzFCNA5BRe/j8JN9d+tWyGLSodKQHKFicdwNYzWwI3wjRnaKPsGj1XkBjx/F96DQ==
