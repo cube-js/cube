@@ -218,7 +218,20 @@ declare module '@cubejs-client/core' {
      */
     static measureFromAxis(axisValues: string[]): string;
     static getNormalizedPivotConfig(query: Query, pivotConfig?: Partial<PivotConfig>): PivotConfig;
-    static deserialize<TData>(data: Object, options?: Object): ResultSet<TData>;
+    /**
+     * ```js
+     * import { ResultSet } from '@cubejs-client/core';
+     * 
+     * const resultSet = await cubejsApi.load(query);
+     * // You can store the result somewhere
+     * const tmp = resultSet.serialize();
+     * 
+     * // and restore it later 
+     * const resultSet = ResultSet.deserialize(tmp);
+     * ```
+     * @param data the result of [serialize](#result-set-serialize)
+     */
+    static deserialize<TData = any>(data: Object, options?: Object): ResultSet<TData>;
 
     /**
      * Creates a new instance of ResultSet based on [LoadResponse](#load-response) data.
@@ -242,6 +255,9 @@ declare module '@cubejs-client/core' {
      */
     constructor(loadResponse: LoadResponse<T>, options?: Object);
 
+    /**
+     * Can be used to stash the `ResultSet` in a storage and restored later with [serialize](#result-set-deserialize)
+     */
     serialize(): Object;
     
     /**

@@ -331,6 +331,8 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 
 ▸  **serialize**(): *Object*
 
+Can be used to stash the `ResultSet` in a storage and restored later with [serialize](#result-set-deserialize)
+
 ### series
 
 ▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
@@ -521,9 +523,27 @@ For example:
 
 ▸ `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#result-set)‹TData›*
 
+```js
+import { ResultSet } from '@cubejs-client/core';
+
+const resultSet = await cubejsApi.load(query);
+// You can store the result somewhere
+const tmp = resultSet.serialize();
+
+// and restore it later
+const resultSet = ResultSet.deserialize(tmp);
+```
+
 **Type parameters:**
 
 - **TData**
+
+**Parameters:**
+
+Name | Type | Description |
+------ | ------ | ------ |
+data | Object | the result of [serialize](#result-set-serialize)  |
+options? | Object | - |
 
 ### getNormalizedPivotConfig
 
