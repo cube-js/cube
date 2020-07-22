@@ -129,6 +129,13 @@ $ npm i --save @cubejs-client/core
 $ npm i --save @cubejs-client/vue
 ```
 
+Angular:
+
+```bash
+$ npm i --save @cubejs-client/core
+$ npm i --save @cubejs-client/ngx
+```
+
 ### Example Usage
 
 #### Vanilla Javascript
@@ -266,4 +273,51 @@ export default {
   },
 };
 </script>
+```
+
+#### Angular
+Add CubejsClientModule to your app.module.ts file:
+
+```typescript
+import { CubejsClientModule } from '@cubejs-client/ngx';
+import { environment } from '../../environments/environment';
+
+const cubejsOptions = {
+  token: environment.CUBEJS_API_TOKEN,
+  options: { apiUrl: environment.CUBEJS_API_URL }
+};
+
+@NgModule({
+  declarations: [
+    ...
+  ],
+  imports: [
+    ...,
+    CubejsClientModule.forRoot(cubejsOptions)
+  ],
+  providers: [...],
+  bootstrap: [...]
+})
+export class AppModule { }
+```
+
+Then you can inject `CubejsClient` into your components or services:
+
+```typescript
+import { CubejsClient } from '@cubejs-client/ngx';
+
+export class AppComponent {
+  constructor(private cubejs:CubejsClient){}
+
+  ngOnInit(){
+    this.cubejs.load({
+      measures: ["some_measure"]
+    }).subscribe(
+      resultSet => {
+        this.data = resultSet.chartPivot();
+      },
+      err => console.log('HTTP Error', err)
+    );
+  }
+}
 ```
