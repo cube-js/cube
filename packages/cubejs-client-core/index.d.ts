@@ -256,7 +256,7 @@ declare module '@cubejs-client/core' {
     constructor(loadResponse: LoadResponse<T>, options?: Object);
 
     /**
-     * Can be used to stash the `ResultSet` in a storage and restored later with [serialize](#result-set-deserialize)
+     * Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
      */
     serialize(): Object;
     
