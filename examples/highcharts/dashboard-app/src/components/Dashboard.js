@@ -143,6 +143,16 @@ export default () => {
     }
   }, [solidGauge]);
 
+  const formatPie = (data) => {
+    if (!data) { return [{ name: '', y: 1180 }] }
+    return pie.tablePivot().map((item) => (
+      {
+        name: item['ProductCategories.name'],
+        y: parseInt(item['LineItems.quantity']),
+      }
+    ));
+  }
+
   useEffect(() => {
     if (pie) {
       let temp = [];
@@ -230,7 +240,7 @@ export default () => {
       <Row gutter={20} className='dashboard__row'>
         <Col sm={24} lg={8}>
           <div className='dashboard__cell'>
-            <Pie data={pieData} />
+            <Pie data={formatPie(pie)} />
           </div>
         </Col>
         <Col sm={24} lg={16}>
