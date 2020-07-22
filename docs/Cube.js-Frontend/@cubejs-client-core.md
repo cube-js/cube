@@ -331,7 +331,7 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 
 ▸  **serialize**(): *Object*
 
-Can be used to stash the `ResultSet` in a storage and restored later with [serialize](#result-set-deserialize)
+Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
 
 ### series
 
