@@ -270,8 +270,7 @@ You can use the following methods for member manipulaltion
 />
 ```
 
-NOTE: if you need to add or remove more than one member at a time you need to use `updateQuery` prop of [QueryBuilderRenderProps](#query-builder-query-builder-render-props)
-
+NOTE: if you need to add or remove more than one member at a time you should use `updateQuery` prop of [QueryBuilderRenderProps](#query-builder-query-builder-render-props)
 ```js
 <QueryBuilder
   // ...
