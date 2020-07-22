@@ -1,5 +1,5 @@
 import palette from '../theme/palette';
-export const options = {
+export const BarOptions = {
   responsive: true,
   legend: { display: false },
   cornerRadius: 50,

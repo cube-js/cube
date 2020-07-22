@@ -21,7 +21,8 @@ cube(`LineItems`, {
 
     price: {
       sql: `price`,
-      type: `sum`
+      type: `sum`,
+      format: `currency`
     },
 
     quantity: {

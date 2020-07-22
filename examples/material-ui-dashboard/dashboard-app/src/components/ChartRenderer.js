@@ -9,7 +9,11 @@ import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
+import palette from '../theme/palette'
+import moment from 'moment';
+import { BarOptions } from '../helpers/BarOptions.js';
+const COLORS_SERIES = [palette.secondary.main, palette.primary.light, palette.secondary.light];
+
 const TypeToChartComponent = {
   line: ({ resultSet }) => {
     const data = {
@@ -26,7 +30,7 @@ const TypeToChartComponent = {
   },
   bar: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => moment(c.category).format('DD/MM/YYYY')),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
@@ -34,16 +38,7 @@ const TypeToChartComponent = {
         fill: false,
       })),
     };
-    const options = {
-      scales: {
-        xAxes: [
-          {
-            stacked: true,
-          },
-        ],
-      },
-    };
-    return <Bar data={data} options={options} />;
+    return <Bar data={data} options={BarOptions} />;
   },
   area: ({ resultSet }) => {
     const data = {

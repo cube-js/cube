@@ -6,7 +6,7 @@ import { makeStyles, useTheme } from '@material-ui/styles';
 import { Card, CardHeader, CardContent, Divider, Typography } from '@material-ui/core';
 import { useCubeQuery } from '@cubejs-client/react';
 import CircularProgress from '@material-ui/core/CircularProgress';
-import { options } from '../helpers/DoughnutOptions.js';
+import { DoughnutOptions } from '../helpers/DoughnutOptions.js';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -88,7 +88,7 @@ const DoughnutChart = (props) => {
         <Divider />
         <CardContent>
           <div className={classes.chartContainer}>
-            <Doughnut data={data} options={options} />
+            <Doughnut data={data} options={DoughnutOptions} />
           </div>
           <div className={classes.stats}>
             {resultSet.series()[0].series.map((status) => (

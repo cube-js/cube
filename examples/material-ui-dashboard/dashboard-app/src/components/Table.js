@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useHistory } from 'react-router-dom';
 import clsx from 'clsx';
 import PropTypes from 'prop-types';
@@ -80,12 +80,9 @@ const TableComponent = (props) => {
     history.push(str);
   }
 
-  const { className, sorting, setSorting, query, cubejsApi, ...rest } = props;
+  const { className, sorting, setSorting, query, countQuery, rowsPerPage, page, setRowsPerPage, setPage, ...rest } = props;
 
   const classes = useStyles();
-
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [page, setPage] = useState(0);
 
   const tableHeaders = [
     {
@@ -117,22 +114,23 @@ const TableComponent = (props) => {
       value: 'Orders.createdAt',
     },
   ];
-  const { resultSet, error, isLoading } = useCubeQuery(query);
-  if (isLoading) {
+  const load = useCubeQuery(query);
+  const count = useCubeQuery(countQuery);
+  if (load.isLoading || count.isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress color="secondary" />
       </div>
     );
   }
-  if (error) {
-    return <pre>{error.toString()}</pre>;
+  if (load.error || count.error) {
+    return <pre>{load.error.toString()}</pre>;
   }
-  if (!resultSet) {
+  if (!load.resultSet || !count.resultSet) {
     return null
   }
-  if (resultSet) {
-    let orders = resultSet.tablePivot();
+  if (load.resultSet && count.resultSet) {
+    let orders = load.resultSet.tablePivot();
 
     const handlePageChange = (event, page) => {
       setPage(page);
@@ -175,7 +173,7 @@ const TableComponent = (props) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((obj) => (
+                  {orders.map((obj) => (
                     <TableRow
                       className={classes.tableRow}
                       hover
@@ -202,7 +200,7 @@ const TableComponent = (props) => {
         <CardActions className={classes.actions}>
           <TablePagination
             component="div"
-            count={orders.length}
+            count={parseInt(count.resultSet.tablePivot()[0]['Orders.count'])}
             onChangePage={handlePageChange}
             onChangeRowsPerPage={handleRowsPerPageChange}
             page={page}

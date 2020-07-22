@@ -44,23 +44,38 @@ const useStyles = makeStyles((theme) => ({
 
 const KPIChart = (props) => {
   const classes = useStyles();
-  const { className, cubejsApi, title, progress, query, prefix, postfix, difference, value, duration, ...rest } = props;
+  const { className, title, progress, query, prefix, postfix, difference, duration, ...rest } = props;
   const { resultSet, error, isLoading } = useCubeQuery(query);
+  const differenceQuery = {...query,
+    "timeDimensions": [
+      {
+        "dimension": `${difference || query.measures[0].split('.')[0]}.createdAt`,
+        "granularity": null,
+        "dateRange": "This year"
+      }
+    ]};
+  const differenceValue = useCubeQuery(differenceQuery);
 
-  if (isLoading) {
+  if (isLoading || differenceValue.isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress color="secondary" />
       </div>
     );
   }
-  if (error) {
-    return <pre>{error.toString()}</pre>;
+  if (error || differenceValue.error) {
+    return <pre>{(error || differenceValue.error).toString()}</pre>;
   }
-  if (!resultSet) {
+  if (!resultSet || !differenceValue.resultSet) {
     return null
   }
-  if (resultSet) {
+  if (resultSet && differenceValue.resultSet) {
+
+    let value = null;
+    let fullValue = resultSet.seriesNames().map((s) => resultSet.totalRow()[s.key])[0];
+    if (difference) {
+      value = differenceValue.resultSet.totalRow()[differenceQuery.measures[0]] / fullValue * 100;
+    }
     return (
       <Card {...rest} className={clsx(classes.root, className)}>
         <CardContent>
@@ -72,7 +87,7 @@ const KPIChart = (props) => {
               <Typography variant="h3">
                 {prefix}
                 <CountUp
-                  end={resultSet.seriesNames().map((s) => resultSet.totalRow()[s.key])[0]}
+                  end={fullValue}
                   duration={duration}
                   separator=","
                   decimals={0}
@@ -84,21 +99,21 @@ const KPIChart = (props) => {
           {progress ? (
             <LinearProgress
               className={classes.progress}
-              value={resultSet.seriesNames().map((s) => resultSet.totalRow()[s.key])[0]}
+              value={fullValue}
               variant="determinate"
             />
           ) : null}
           {difference ? (
             <div className={classes.difference}>
               <Typography className={classes.differenceValue} variant="body2">
-                {value > 0 ? (
-                  <span className={classes.green}>{value}%</span>
+                {value > 1 ? (
+                  <span className={classes.green}>{value.toFixed(1)}%</span>
                 ) : (
-                  <span className={classes.red}>{value}%</span>
+                  <span className={classes.red}>{value.toFixed(1)}%</span>
                 )}
               </Typography>
               <Typography className={classes.caption} variant="caption">
-                {difference}
+                Since this year
               </Typography>
             </div>
           ) : null}

@@ -1,5 +1,5 @@
 import palette from '../theme/palette';
-export const options = {
+export const DoughnutOptions = {
   legend: {
     display: false,
   },

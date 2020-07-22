@@ -16,14 +16,14 @@ const cards = [
   {
     title: 'ORDERS',
     query: { measures: ['Orders.count'] },
-    difference: 'Since last month',
+    difference: 'Orders',
     value: -12,
     duration: 1.25,
   },
   {
     title: 'TOTAL USERS',
     query: { measures: ['Users.count'] },
-    difference: 'Since last month',
+    difference: 'Users',
     value: 16,
     duration: 1.5,
   },

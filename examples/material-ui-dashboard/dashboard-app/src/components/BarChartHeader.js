@@ -14,6 +14,7 @@ const useStyles = makeStyles(() => ({
 
 const BarChartHeader = (props) => {
   const { setDateRange, dateRange, dates } = props;
+  const defaultDates = ['This week', 'This month', 'Last 7 days', 'Last month'];
   const classes = useStyles();
 
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -45,20 +46,13 @@ const BarChartHeader = (props) => {
             open={Boolean(anchorEl)}
             onClose={() => handleClose(dateRange)}
           >
-            {dates ? (
-              <React.Fragment>
-                {dates.map((date) => (
-                  <MenuItem onClick={() => handleClose(date)}>{date}</MenuItem>
-                ))}
-              </React.Fragment>
-            ) : (
-              <React.Fragment>
-                <MenuItem onClick={() => handleClose('This week')}>This week</MenuItem>
-                <MenuItem onClick={() => handleClose('This month')}>This month</MenuItem>
-                <MenuItem onClick={() => handleClose('Last 7 days')}>Last 7 days</MenuItem>
-                <MenuItem onClick={() => handleClose('Last month')}>Last month</MenuItem>
-              </React.Fragment>
-            )}
+            {dates ?
+              dates.map((date) => (
+                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
+              ))
+             : defaultDates.map((date) => (
+                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
+              ))}
           </Menu>
         </div>
       }
