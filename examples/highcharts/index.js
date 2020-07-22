@@ -1,14 +1,14 @@
 const CubejsServer = require('@cubejs-backend/server');
 const CubejsServerCore = require('@cubejs-backend/server-core');
 const express = require('express');
-const bodyParser = require("body-parser");
-const path = require("path");
-const http = require("http");
+const bodyParser = require('body-parser');
+const path = require('path');
+const http = require('http');
 const serveStatic = require('serve-static');
 require('dotenv').config();
 
 const app = express();
-app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.json({ limit: '50mb' }));
 app.use(require('cors')());
 
 const cubejsServer = CubejsServerCore.create();
@@ -27,5 +27,7 @@ const port = process.env.PORT || 4000;
 const server = http.createServer({}, app);
 
 server.listen(port, () => {
-  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
+  console.log(
+    `🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`
+  );
 });
