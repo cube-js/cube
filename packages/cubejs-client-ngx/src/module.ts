@@ -5,7 +5,7 @@ import { CubejsClient } from './client';
   providers: [CubejsClient]
 })
 export class CubejsClientModule {
-  public static forRoot(config: any): ModuleWithProviders {
+  public static forRoot(config: any): ModuleWithProviders<CubejsClientModule> {
     return {
         ngModule: CubejsClientModule,
         providers: [
