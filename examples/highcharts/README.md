@@ -1,4 +1,4 @@
-## Example of e-commerce dashboard with Cube.js, React and Highcharts
+## Example of an e-commerce dashboard with Cube.js, React and Highcharts
 
 The analytics dashboard with [Highcharts](https://www.highcharts.com/) and React.
 You can find [the live demo here.](https://highcharts.cubecloudapp.dev/)
