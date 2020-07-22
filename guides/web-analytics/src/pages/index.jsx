@@ -28,9 +28,9 @@ class Index extends React.Component {
         <Helmet title={config.siteTitle} />
         <Header githubUrl={config.githubUrl} />
         <Hero
-          title="Building Open Source Google Analytics Alternative"
-          subtitle="Learn how to build open source web analytics platform with Cube.js."
-          demoUrl="https://web-analytics-demo.cube.dev"
+          title="Building an Open Source Web Analytics Platform"
+          subtitle="Learn how to build open source Google Analytics alternative with Cube.js."
+          demoUrl="https://web-analytics-demo.cubecloudapp.dev"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={

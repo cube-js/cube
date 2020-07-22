@@ -114,4 +114,83 @@ pre-aggregation to refresh every 5 minute. Refresh strategy can be much
 complicated depending on the required use case, you can [learn more about it in
 the docs](https://cube.dev/docs/caching#pre-aggregations-refresh-strategy).
 
+Now, with the above pre-aggregation in place, the following query will be
+executed against the pre-aggregated data and not raw data.
+
+```js
+{
+  "measures": [
+    "Sessions.count"
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "Sessions.timestamp",
+      "granularity": "day"
+    }
+  ]
+}
+```
+
+You can use "Cache" button in the Playground to check whether the query uses
+pre-aggregation or not.
+
+![](/images/7-screenshot-1.png)
+
+### Background Scheduled Refresh
+
+You can configure Cube.js to always keep pre-aggregations up-to-date by
+refreshing them in the background. To enable it we need to add
+`scheduledRefresh: true` to pre-aggregation definition. Without this flag pre-aggregations are always built on-demand.
+
+Update your pre-aggregation to enable `scheduledRefresh`.
+
+```diff
+preAggregations: {
+  additive: {
+    type: `rollup`,
+    measureReferences: [count],
+    timeDimensionReference: timestamp,
+    granularity: `day`,
+    refreshKey: {
+      every: `5 minutes`
+    },
+    external: true,
++   scheduledRefresh: true
+  }
+}
+```
+
+Refresh Scheduler isn't enabled by default. We need to trigger it externally.
+The simplest way to do that would be to make it constantly run by using `setInterval` in our
+`index.js` file.
+
+```diff
+const CubejsServer = require("@cubejs-backend/server");
+const MySQLDriver = require('@cubejs-backend/mysql-driver');
+
+const server = new CubejsServer({
+  externalDbType: 'mysql',
+  externalDriverFactory: () => new MySQLDriver({
+    host: process.env.CUBEJS_EXT_DB_HOST,
+    database: process.env.CUBEJS_EXT_DB_NAME,
+    user: process.env.CUBEJS_EXT_DB_USER,
+    password: process.env.CUBEJS_EXT_DB_PASS.toString()
+  })
+});
+
++ setInterval(() => server.runScheduledRefresh(), 5000);
+
+server.listen().then(({ port }) => {
+  console.log(`🚀 Cube.js server is listening on ${port}`);
+});
+```
+
+That is the basics we need to know to start configuring pre-aggregations for our example. You
+can inspect query by query in your dashboard and apply pre-aggregations to speed them up and also to keep your AWS Athena cost down.
+
+Congratulations on completing this guide! 🎉
+
+You can check [the online demo here](https://web-analytics-demo.cubecloudapp.dev/) and [the source code is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/web-analytics).
+
+I’d love to hear from you about your experience following this guide. Please send any comments or feedback you might have in this [Slack Community](http://slack.cube.dev/). Thank you and I hope you found this guide helpful!
 

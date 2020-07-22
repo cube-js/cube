@@ -3,71 +3,165 @@ order: 5
 title: "Building a Dashboard"
 ---
 
-In the previous part we've built our basic data schema and first few charts. In
-this part we'll build a dashboard with the users chart and several new metrics.
+In the previous part we've created our basic data schema and built first few charts. In
+this part we'll add more measures and dimensions to our data schema and build new charts on the dashboard.
 
-First, we need to slightly update the `DashboardPage` component to extract
-setting `timeDimensions` property into a separate function. It's going to be a common property for all our queries. We also are going to make it dynamic based on the user's input in the next part of this tutorial.
+We are going to add several KPI charts and one pie chart to our dashboard, like
+on the schreenshot below.
 
-Replace the content of the `dashboard-app/src/pages/DashboardPage.js` with the
-following.
+Let's first create `<Chart />` component, which we're going to use to render
+the KPI and Pie charts.
+
+Create the `dashboard-app/src/components/Chart.js` file with the following
+content.
 
 ```jsx
 import React from "react";
-import Grid from "@material-ui/core/Grid";
-import ChartRenderer from "../components/ChartRenderer";
-import Dashboard from "../components/Dashboard";
-import DashboardItem from "../components/DashboardItem";
-const DashboardItems = [
-  {
-    id: 0,
-    name: "Users",
-    vizState: {
-      query: {
-        measures: ["Sessions.usersCount"]
-      },
-      chartType: "line"
-    }
-  },
-];
+import Card from "@material-ui/core/Card";
+import CardContent from "@material-ui/core/CardContent";
+import Typography from "@material-ui/core/Typography";
 
-const withTimeDimension = ({ query, ...options }) => ({
-  ...options,
-  query: {
-    timeDimensions: [
-      {
-        dimension: "Sessions.timestamp",
-        granularity: "day",
-        dateRange: "Last 30 days"
-      }
-    ],
-    ...query
-  }
-});
+import ChartRenderer from "./ChartRenderer";
 
-const DashboardPage = () => {
-  const dashboardItem = item => (
-    <Grid item xs={12} lg={6} key={item.id}>
-      <DashboardItem title={item.name}>
-        <ChartRenderer vizState={withTimeDimension(item.vizState)} />
-      </DashboardItem>
-    </Grid>
-  );
+const Chart = ({ title, vizState }) => (
+  <Card>
+    <CardContent>
+      <Typography component="p" color="primary" gutterBottom>
+        {title}
+      </Typography>
+      <ChartRenderer vizState={vizState} />
+    </CardContent>
+  </Card>
+);
 
-  return <Dashboard>{DashboardItems.map(dashboardItem)}</Dashboard>
-};
+export default Chart;
+```
+
+Let's use this `<Chart />` component to render couple KPI charts for measures we already
+have in the data schema: Users and Sessions.
+
+Make the following changes to the `dashboard-app/src/components/DashboardPage.js` file.
+
+```diff
+@@ -3,6 +3,7 @@ import { makeStyles } from "@material-ui/core/styles";
+ import Grid from "@material-ui/core/Grid";
+ import OverTimeChart from "../components/OverTimeChart";
+ import Dropdown from "../components/Dropdown";
++import Chart from "../components/Chart";
+
+ const useStyles = makeStyles(theme => ({
+   root: {
+@@ -37,30 +38,65 @@ const overTimeQueries = {
+   },
+ };
+
++const queries = {
++  users: {
++    chartType: 'number',
++    query: {
++      measures: ['Sessions.usersCount'],
++      timeDimensions: [{
++        dimension: 'Sessions.timestamp',
++        dateRange: "Last 30 days"
++      }]
++    }
++  },
++  sessions: {
++    chartType: 'number',
++    query: {
++      measures: ['Sessions.count'],
++      timeDimensions: [{
++        dimension: 'Sessions.timestamp',
++        dateRange: "Last 30 days"
++      }]
++    }
++  },
++}
++
+ const DashboardPage = () => {
+   const classes = useStyles();
+   const [overTimeQuery, setOverTimeQuery] = useState("Users");
+   return (
+-    <Grid item xs={12} className={classes.root}>
+-      <OverTimeChart
+-        title={
+-          <Dropdown
+-            value={overTimeQuery}
+-            options={
+-              Object.keys(overTimeQueries).reduce((out, measure) => {
+-                out[measure] = () => setOverTimeQuery(measure)
+-                return out;
+-              }, {})
+-            }
+-          />
+-        }
+-        vizState={{
+-          chartType: 'line',
+-          query: overTimeQueries[overTimeQuery]
+-        }}
+-      />
++    <Grid container spacing={3}  className={classes.root}>
++      <Grid item xs={12}>
++        <OverTimeChart
++          title={
++            <Dropdown
++              value={overTimeQuery}
++              options={
++                Object.keys(overTimeQueries).reduce((out, measure) => {
++                  out[measure] = () => setOverTimeQuery(measure)
++                  return out;
++                }, {})
++              }
++            />
++          }
++          vizState={{
++            chartType: 'line',
++            query: overTimeQueries[overTimeQuery]
++          }}
++        />
++      </Grid>
++      <Grid item xs={6}>
++        <Grid container spacing={3}>
++          <Grid item xs={6}>
++            <Chart title="Users" vizState={queries.users} />
++          </Grid>
++          <Grid item xs={6}>
++            <Chart title="Sessions" vizState={queries.sessions} />
++          </Grid>
++        </Grid>
++      </Grid>
+     </Grid>
+   )
+ };
 
 export default DashboardPage;
 ```
 
-## New Users
+Refresh the dashboard after making the above changes and you should see something
+like on the screenshot below.
 
-We already have created the Users chart in the previous part. Let's add few more. First, let's add the chart to display the number of new users. To do that, we need to
-a create a new measure in our data schema to count only new users. To
+![](/images/5-screenshot-1.png)
+
+To add more charts on the dashboard, we first need to define new measures and
+dimensions in our data schema.
+
+## New Measures and Dimensions in Data Schema
+
+In the previous part we've already built the foundation for our data schema and
+covered some topics like sessionization. Now, we're going to add new measures on
+top of the cubes we've created earlier.
+
+Feel free to use Cube.js Playground to test new measures and dimensions as we
+adding them. We'll update our dashboard with all newly created metrics in the
+end of this part.
+
+### Returning vs News Users
+
+Let's add a way to figure out whether users are new or returning. To
 distinguish **New** users from **Returning** we're going to use session's index
 set by Snowplow tracker - `domain_sessionidx`.
 
-Let's first create a new `type` dimension in the `Sessions` cube. We're using
+First, create a new `type` dimension in the `Sessions` cube. We're using
 [case property](https://cube.dev/docs/dimensions#parameters-case) to make this dimension return either `New` or `Returning` based on the
 value of `domain_sessionidx`.
 
@@ -82,7 +176,7 @@ type: {
 }
 ```
 
-Next, let's define `newUsersCount` measure by using [filters
+Next, let's create a new measure to count only for "New Users". We're going to define `newUsersCount` measure by using [filters
 property](https://cube.dev/docs/measures#parameters-filters) to select
 only **new** sessions.
 
@@ -100,22 +194,9 @@ newUsersCount: {
 }
 ```
 
-Finally, on the frontend in the `dashboard-app/src/pages/DashboardPage.js` file add the following query to the `DashboardItems` array.
+We'll use `type` dimension to build "New vs Returning" pie chart. And `newUsersCount` measure for "New Users" KPI chart. Feel free to test these measure and dimension in the Playground meanwhile.
 
-```js
-{
-  id: 1,
-  name: "New Users",
-  vizState: {
-    query: {
-      measures: ["Sessions.newUsersCount"]
-    },
-    chartType: "bar"
-  }
-}
-```
-
-## Average Number of Events per Session
+### Average Number of Events per Session
 
 To calculate the average we need to have the number of events per session first. We can achieve that by creating a [subQuery dimension](https://cube.dev/docs/subquery#top). Subquery dimensions are used to reference measures from other cubes inside a dimension.
 
@@ -150,81 +231,68 @@ avgEvents: {
   sql: `round(avg(${eventsCount}))`
 }
 ```
+### Average Session Durarion
 
-Same as the previous one we'll add average number of events per sessions as a
-KPI chart. Add the following query to the `DashboardItems` array.
+To calculate the average session duration we need first calculate the
+duration of sessions as a dimension and then take the average of this dimension as a
+measure.
+
+To get the duration of the session we need to know when it
+starts and when it ends. We already have the start time, which is our `time`
+dimension. To get the `sessionEnd` we need to find the timestamp of the last
+event in the session. we'll take the same approach here with the subQuery dimension as we did for number of events per session.
+
+First, create the following measure in the `Events` cube.
 
 ```js
-{
-  id: 2,
-  name: "Avg. Events per Session",
-  vizState: {
-    query: {
-      measures: ["Sessions.avgEvents"]
-    },
-    chartType: "line"
+maxTimestamp: {
+  type: `max`,
+  sql: `derived_tstamp`
+}
+```
+
+Next, create the subQuery dimension to find the last max timestamp for the
+session. Add the following dimension to the `Sessions` cube.
+
+```js
+sessionEnd: {
+  type: `time`,
+  sql: `${Events.maxTimestamp}`,
+  subQuery: true
+}
+```
+
+Now, we have everything to calculate the duration of the session. Add the
+`durationSeconds` dimension to the `Sessions` cube.
+
+```js
+durationSeconds: {
+  sql: `date_diff('second', ${timestamp}, ${sessionEnd})`,
+  type: `number`
+}
+```
+
+The last step is to define the `averageDurationSeconds` measure in the
+`Sessions` cube.
+
+```js
+averageDurationSeconds: {
+  type: `avg`,
+  sql: `${durationSeconds}`,
+  meta: {
+    format: 'time'
   }
 }
 ```
 
-## Users by Type
+In the above definition we're also using measure's [meta
+property](https://cube.dev/docs/measures#parameters-meta). Cube.js has [several built-in measure
+formats](https://cube.dev/docs/types-and-formats#measures-formats) like
+`currency` or `percent`, but it doesn't have `time` format. In this case we can use
+`meta` property to pass this information to the frontend to format it properly.
 
-Now, let's plot New vs Returning users over time with a bar chart! We already have the `type` dimension which shows exactly this, so all we need here is to add the following query to
-our `DashboardItems` array in the frontend app.
-
-```js
-{
-  id: 3,
-  name: "Users by Type",
-  vizState: {
-    query: {
-      measures: ["Sessions.usersCount"],
-      dimensions: ["Sessions.type"],
-    },
-    chartType: "bar"
-  }
-}
-```
-
-## Sessions by Referrer Medium
-
-This metric would help us to figure which channel or medium bring the
-most traffic to our website. Snowplow sets the `refr_medium`, so we just
-need to clean up the values a little bit in the data schema.
-
-```js
-referrerMedium: {
-  type: `string`,
-  case: {
-    when: [
-      { sql: `${CUBE}.refr_medium IS NULL`, label: 'direct' },
-      { sql: `${CUBE}.refr_medium = 'unknown'`, label: 'other' },
-      { sql: `${CUBE}.refr_medium != ''`, label: { sql: `${CUBE}.refr_medium` } }
-    ],
-    else: { label: '(none)' }
-  }
-}
-```
-
-Add let's add it to the `DashboardItems` on the frontend as an area chart.
-
-```js
-{
-  id: 3,
-  size: 6,
-  name: "Sessions by Medium",
-  vizState: {
-    query: {
-      measures: ["Sessions.count"],
-      dimensions: ["Sessions.referrerMedium"]
-    },
-    chartType: "area"
-  }
-}
-```
-
-## Bounce Rate
-The last metric we're going to add to our dashboard is the **Bounce Rate**.
+### Bounce Rate
+The last metric for today is the **Bounce Rate**.
 
 A bounced session is usually defined as a session with only one event. Since we’ve already defined the number of events per session, we can easily add a dimension `isBounced` to identify bounced sessions to the `Sessions` cube. Using this dimension, we can add two measures to the `Sessions` cube as well - a count of bounced sessions and a bounce rate.
 
@@ -253,25 +321,146 @@ bounceRate: {
 }
 ```
 
-Now, let's add to the `DashboardItems` array as a line chart.
 
-```js
-{
-  id: 4,
-  name: "Bounce Rate",
-  vizState: {
-    query: {
-      measures: ["Sessions.bounceRate"]
-    },
-    chartType: "line"
-  }
-}
+## Adding New Charts to the Dahsboard
+
+Now, we can use these new measures and dimensions to add more charts to our
+dashboard. But before doing it, let's make some changes on how we render the KPI
+chart. We want to format the value differently depending on the format of the
+measure - whether it is number,
+percent or time.
+
+Make the following changes to the `dashboard-app/src/components/ChartRenderer.js` file.
+
+```diff
+-  number: ({ resultSet }) => (
+-    <Typography
+-      variant="h4"
+-      style={{
+-        textAlign: "center"
+-      }}
+-    >
+-      {resultSet.seriesNames().map(s => resultSet.totalRow()[s.key])}
+-    </Typography>
+-  ),
++  number: ({ resultSet }) => {
++    const measureKey = resultSet.seriesNames()[0].key;
++    const annotations = resultSet.tableColumns().find(tableColumn => tableColumn.key === measureKey)
++    const format = annotations.format || (annotations.meta && annotations.meta.format);
++    const value = resultSet.totalRow()[measureKey];
++    let formattedValue;
++    const percentFormatter = item => numeral(item/100.0).format('0.00%');
++    const timeNumberFormatter = item => numeral(item).format('00:00:00');
++    if (format === 'percent') {
++      formattedValue = percentFormatter(value);
++    } else if (format === 'time') {
++      formattedValue = timeNumberFormatter(value);
++    } else {
++      formattedValue = numberFormatter(value);
++    }
++    return (<Typography variant="h4" > {formattedValue} </Typography>)
++  },
 ```
 
-That's it for this chapter. We have added 5 more new charts to our dashboard.
+Finally, we can make a simple change to the `<DashboardPage />` component. All
+we need to do is to update the list of queries and chart items on the dashboard
+with new metrics: New Users, Average Events per Sessions, Average Sessions
+Duration, Bounce Rate and the breakdown of Users by Type.
+
+Make the following changes to the `dashboard-app/src/pages/DashboardPage.js` file.
+
+```diff
+@@ -58,6 +58,57 @@ const queries = {
+         dateRange: "Last 30 days"
+       }]
+     }
++  },
++  newUsers: {
++    chartType: 'number',
++    query: {
++      measures: ['Sessions.newUsersCount'],
++      timeDimensions: [{
++        dimension: 'Sessions.timestamp',
++        dateRange: "Last 30 days"
++      }]
++    }
++  },
++  avgEvents: {
++    chartType: 'number',
++    query: {
++      measures: ['Sessions.avgEvents'],
++      timeDimensions: [{
++        dimension: 'Sessions.timestamp',
++        dateRange: "Last 30 days"
++      }]
++    }
++  },
++  avgSessionDuration: {
++    chartType: 'number',
++    query: {
++      measures: ['Sessions.averageDurationSeconds'],
++      timeDimensions: [{
++        dimension: 'Sessions.timestamp',
++        dateRange: "Last 30 days"
++      }]
++    }
++  },
++  bounceRate: {
++    chartType: 'number',
++    query: {
++      measures: ['Sessions.bounceRate'],
++      timeDimensions: [{
++        dimension: 'Sessions.timestamp',
++        dateRange: "Last 30 days"
++      }]
++    }
++  },
++  usersByType: {
++    chartType: 'pie',
++    query: {
++      measures: ['Sessions.usersCount'],
++      dimensions: ['Sessions.type'],
++      timeDimensions: [{
++        dimension: 'Sessions.timestamp',
++        dateRange: "Last 30 days"
++      }]
++    }
+   }
+ }
+
+@@ -93,8 +144,26 @@ const DashboardPage = () => {
+           <Grid item xs={6}>
+             <Chart title="Sessions" vizState={queries.sessions} />
+           </Grid>
++          <Grid item xs={6}>
++            <Chart title="New Users" vizState={queries.newUsers} />
++          </Grid>
++          <Grid item xs={6}>
++            <Chart title="Avg. Events per Session" vizState={queries.avgEvents} />
++          </Grid>
++          <Grid item xs={6}>
++            <Chart title="Avg. Session Duration" vizState={queries.avgSessionDuration} />
++          </Grid>
++          <Grid item xs={6}>
++            <Chart title="Bounce Rate" vizState={queries.bounceRate} />
++          </Grid>
+         </Grid>
+       </Grid>
++      <Grid item xs={6}>
++        <Chart
++          title="Users by Type"
++          vizState={queries.usersByType}
++        />
++      </Grid>
+     </Grid>
+   )
+ };
+```
+
+That's it for this chapter. We have added 7 more new charts to our dashboard.
 If you navigate to the [http://localhost:3000](http://localhost:3000) you should see the dashboard with all these charts like on the screenshot below.
 
-![](/images/5-screenshot-1.png)
+![](/images/5-screenshot-2.png)
 
 In the next part, we'll add some filters to our dashboard to make it more
 interactive and let users slice and filter the data.
