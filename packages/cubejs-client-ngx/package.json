@@ -14,25 +14,26 @@
   "license": "MIT",
   "dependencies": {
     "@cubejs-client/core": "^0.19.53",
-    "tslib": "^1.9.0"
+    "tslib": "^2.0.0"
   },
   "peerDependencies": {
-    "@angular/core": "^6.1.0 || ^7.0.0 || ^8.0.0",
-    "rxjs": "^6.0.0"
+    "@angular/core": "^10.0.5",
+    "rxjs": "^6.6.0"
   },
   "scripts": {
-    "build": "yarn ng build && rm dist/package.json"
+    "build": "yarn ng build && rm dist/package.json",
+    "postinstall": "ngcc"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^0.803.6",
-    "@angular-devkit/build-ng-packagr": "^0.803.6",
+    "@angular-devkit/build-angular": "^0.1000.3",
+    "@angular-devkit/build-ng-packagr": "^0.1000.3",
     "@angular/cli": "^10.0.3",
-    "@angular/compiler": "^7.2.14",
-    "@angular/compiler-cli": "^7.2.14",
-    "@angular/core": "^8.2.5",
-    "ng-packagr": "^5.1.0",
-    "tsickle": "^0.37.0",
-    "typescript": "3.1.1"
+    "@angular/compiler": "^10.0.5",
+    "@angular/compiler-cli": "^10.0.5",
+    "@angular/core": "^10.0.5",
+    "ng-packagr": "^10.0.3",
+    "tsickle": "^0.39.1",
+    "typescript": "^3.9.7"
   },
   "publishConfig": {
     "access": "public"
