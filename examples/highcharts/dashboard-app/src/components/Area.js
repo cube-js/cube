@@ -8,7 +8,7 @@ export default ({ categories, data }) => {
   useEffect(() => {
     setOptions({
       chart: {
-        type: 'column',
+        type: 'area',
         styledMode: true,
         spacingRight: 25,
         spacingLeft: 20,
@@ -17,29 +17,26 @@ export default ({ categories, data }) => {
         enabled: false,
       },
       title: {
-        text:
-          'Categories sales<small>Highcharts API, Stacked column Chart</small>',
+        text: 'Sales by category<small>Highcharts API, Area Chart</small>',
         useHTML: true,
       },
-      xAxis: {
-        categories: categories,
-      },
+
       yAxis: {
         title: {
           enabled: false,
         },
         gridLineColor: '#D0D0DA30',
-        stackLabels: {
-          enabled: true,
-          style: {
-            fontWeight: 'normal',
-            color:
-              (Highcharts.defaultOptions.title.style &&
-                Highcharts.defaultOptions.title.style.color) ||
-              'gray',
-          },
-        },
       },
+
+      xAxis: {
+        categories: categories,
+      },
+
+      legend: {
+        align: 'center',
+        width: '90%',
+      },
+
       colors: [
         '#45446F',
         '#BE3D7F',
@@ -52,22 +49,40 @@ export default ({ categories, data }) => {
         '#7A77FF',
         '#5251C9',
       ],
-      legend: {
-        align: 'center',
-        width: '90%',
-      },
-      tooltip: {
-        headerFormat: '<b>{point.x}</b><br/>',
-        pointFormat: '{series.name}: {point.y}<br/>Total: {point.stackTotal}',
-      },
       plotOptions: {
-        column: {
+        area: {
           stacking: 'normal',
+          lineWidth: 1,
+          marker: {
+            enabled: false,
+          },
+        },
+        series: {
+          label: {
+            connectorAllowed: false,
+          },
+          connectNulls: true,
         },
       },
       series: data,
+      responsive: {
+        rules: [
+          {
+            condition: {
+              maxWidth: 500,
+            },
+            chartOptions: {
+              legend: {
+                layout: 'horizontal',
+                align: 'center',
+                verticalAlign: 'bottom',
+              },
+            },
+          },
+        ],
+      },
     });
   }, [data, categories]);
 
-  return <HighchartsReact highcharts={Highcharts} options={options} />;
+  return <HighchartsReact highcharts={Highcharts} options={{ ...options }} />;
 };

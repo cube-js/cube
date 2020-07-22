@@ -1,5 +1,4 @@
 import React from "react";
-import logo from "./logo.svg";
 import "./App.css";
 import "./body.css";
 import "antd/dist/antd.css";
@@ -20,11 +19,7 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
 });
 
 const AppLayout = () => (
-  <Layout
-    style={{
-      height: "100%"
-    }}
-  >
+  <Layout>
     <Header />
     <Layout.Content className='examples__container'>
       <Dashboard />

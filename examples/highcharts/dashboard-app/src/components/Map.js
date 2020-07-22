@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 
-import highchartsMap from "highcharts/modules/map";
-import mapDataIE from "@highcharts/map-collection/countries/us/us-all.geo.json";
+import highchartsMap from 'highcharts/modules/map';
+import mapDataIE from '@highcharts/map-collection/countries/us/us-all.geo.json';
 highchartsMap(Highcharts);
-
 
 export default ({ data, setRegion }) => {
   const [options, setOptions] = useState({});
@@ -14,51 +13,58 @@ export default ({ data, setRegion }) => {
     setOptions({
       chart: {
         map: 'countries/us/custom/us-all-mainland',
-        style:  {"fontFamily": "\"DM Sans\", sans-serif","fontSize":"14px"},
+        styledMode: true,
       },
       credits: {
-        enabled: false
+        enabled: false,
       },
       title: {
-        text: 'Orders by region'
-      },
-      subtitle: {
-        text: 'Highcharts Map API'
+        text: 'Orders by region<small>Highcharts Map API</small>',
+        useHTML: true,
       },
       colorAxis: {
-        min: 0
+        min: 0,
       },
       tooltip: {
         headerFormat: '',
         pointFormat: `
-    <b>{point.freq}</b><br><b>{point.keyword}</b>                      
-    <br>lat: {point.lat}, lon: {point.lon}`
+          <b>{point.name}</b>: {point.value}`,
       },
-      colorAxis:{
-        minColor: '#DFD7FF',
-        maxColor: '#7A77FF'
+      colorAxis: {
+        minColor: '#FFEAE4',
+        maxColor: '#FF6492',
       },
-      series: [{
-        name: 'Basemap',
-        mapData: mapDataIE,
-        data: data,
-        borderColor: '#FFEAE4',
-        nullColor: '#FFEAE480',
-        showInLegend: false,
-        dataLabels: {
-          enabled: true,
-          format: "{point.name}",
-          color: '#000'
+      series: [
+        {
+          name: 'Basemap',
+          mapData: mapDataIE,
+          data: data,
+          borderColor: '#FFC3BA',
+          borderWidth: 0.5,
+          nullColor: '#FFEAE4',
+          showInLegend: false,
+          allowPointSelect: true,
+          dataLabels: {
+            enabled: true,
+            format: '{point.name}',
+            color: '#000',
+          },
+          states: {
+            select: {
+              borderColor: '#B5ACFF',
+              color: '#7A77FF',
+            },
+          },
+          point: {
+            events: {
+              click: function () {
+                setRegion(this['hc-key']);
+              },
+            },
+          },
         },
-        point: {
-          events: {
-            click: function () {
-              setRegion(this['hc-key']);
-            }
-          }
-        }
-      }]
-    })
+      ],
+    });
   }, [data]);
   return (
     <HighchartsReact
@@ -66,5 +72,5 @@ export default ({ data, setRegion }) => {
       constructorType={'mapChart'}
       options={options}
     />
-  )
-}
+  );
+};
