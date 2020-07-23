@@ -217,9 +217,14 @@ class QueryQueue {
     let processingLockAcquired;
     try {
       const processingId = await redisClient.getNextProcessingId();
-      [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] =
-        await redisClient.retrieveForProcessing(queryKey, processingId);
-      const activated = activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
+      const retrieveResult = await redisClient.retrieveForProcessing(queryKey, processingId);
+      if (retrieveResult) {
+        [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+      }
+      const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
+      if (!query) {
+        query = await redisClient.getQueryDef(this.redisHash(queryKey));
+      }
       if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
         const startQueryTime = (new Date()).getTime();

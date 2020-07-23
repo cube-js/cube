@@ -134,17 +134,33 @@ class RedisQueueDriverConnection {
   }
 
   async retrieveForProcessing(queryKey, processingId) {
-    const [insertedCount, removedCount, activeKeys, queueSize, queryDef, processingLockAcquired] =
-      await this.redisClient.multi()
-        .zadd([this.activeRedisKey(), 'NX', processingId, this.redisHash(queryKey)])
-        .zremrangebyrank([this.activeRedisKey(), this.concurrency, -1])
-        .zrange([this.activeRedisKey(), 0, this.concurrency - 1])
-        .zcard(this.toProcessRedisKey())
-        .hget(([this.queriesDefKey(), this.redisHash(queryKey)]))
-        .set(this.queryProcessingLockKey(queryKey), processingId, 'NX')
-        .zadd([this.heartBeatRedisKey(), 'NX', new Date().getTime(), this.redisHash(queryKey)])
-        .execAsync();
-    return [insertedCount, removedCount, activeKeys, queueSize, JSON.parse(queryDef), processingLockAcquired];
+    try {
+      const lockKey = this.queryProcessingLockKey(queryKey);
+      await this.redisClient.watchAsync(lockKey);
+
+      const currentProcessId = await this.redisClient.getAsync(lockKey);
+
+      if (currentProcessId) {
+        return null;
+      }
+
+      const result =
+        await this.redisClient.multi()
+          .zadd([this.activeRedisKey(), 'NX', processingId, this.redisHash(queryKey)])
+          .zremrangebyrank([this.activeRedisKey(), this.concurrency, -1])
+          .zrange([this.activeRedisKey(), 0, this.concurrency - 1])
+          .zcard(this.toProcessRedisKey())
+          .hget(([this.queriesDefKey(), this.redisHash(queryKey)]))
+          .set(lockKey, processingId, 'NX')
+          .zadd([this.heartBeatRedisKey(), 'NX', new Date().getTime(), this.redisHash(queryKey)])
+          .execAsync();
+      if (result) {
+        result[4] = JSON.parse(result[4]);
+      }
+      return result;
+    } finally {
+      await this.redisClient.unwatchAsync();
+    }
   }
 
   async freeProcessingLock(queryKey, processingId, activated) {
