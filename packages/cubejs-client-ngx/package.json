@@ -21,8 +21,7 @@
     "rxjs": "^6.6.0"
   },
   "scripts": {
-    "build": "yarn ng build && rm dist/package.json",
-    "postinstall": "ngcc"
+    "build": "yarn ng build && rm dist/package.json"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.1000.3",
