@@ -50,7 +50,7 @@ jobs:
             DOCKERIZE_VERSION: v0.3.0
       - run:
           name: Wait for db
-          command: dockerize -wait tcp://localhost:1433 -timeout 1m
+          command: dockerize -wait tcp://localhost:1433 -timeout 2m
 
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test
       - run: bash <(curl -s https://codecov.io/bash)
