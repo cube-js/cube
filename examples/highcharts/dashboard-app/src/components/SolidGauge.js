@@ -174,7 +174,7 @@ export default ({ data }) => {
           data: [
             {
               ...staticOptions.series[2].data[0],
-              y: data ? Math.round((data.status[2][1] * 100) / data.count) : 0,
+              y: (data && data.status[2]) ? Math.round((data.status[2][1] * 100) / data.count) : 0,
             },
           ],
         },

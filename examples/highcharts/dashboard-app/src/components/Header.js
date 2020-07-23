@@ -10,7 +10,7 @@ const Header = () => (
     <div className="examples__nav">
       <div className="examples__title">
         <Link to='//cube.dev' target="_blank"><img src={logo} alt="Cube.js" /></Link>
-        <h1>Highcharts Example</h1>
+        <h1>React Highcharts Example</h1>
       </div>
       <div className="examples__nav__buttons">
         <a href='//github.com/statsbotco/cube.js'>
