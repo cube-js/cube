@@ -28,7 +28,9 @@ export default () => {
         dateRange: range,
       },
     ],
-  });
+  },
+  { subscribe: true }
+  );
 
   const { resultSet: pie } = useCubeQuery({
     measures: ['LineItems.quantity'],
@@ -53,7 +55,9 @@ export default () => {
           ],
         }
       : {}),
-  });
+  },
+  { subscribe: true }
+  );
 
   const { resultSet: orders } = useCubeQuery({
     measures: ['Orders.count'],
@@ -78,7 +82,9 @@ export default () => {
           ],
         }
       : {}),
-  });
+  },
+  { subscribe: true }
+  );
 
   const { resultSet: stacked } = useCubeQuery({
     measures: ['LineItems.quantity'],
@@ -144,6 +150,7 @@ export default () => {
   }, [solidGauge]);
 
   const formatPie = (data) => {
+    return [{ name: '', y: 1180 }]
     if (!data) { return [{ name: '', y: 1180 }] }
     return pie.tablePivot().map((item) => (
       {
