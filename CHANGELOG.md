@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.55](https://github.com/cube-js/cube.js/compare/v0.19.54...v0.19.55) (2020-07-23)
+
+
+### Bug Fixes
+
+* ngx client installation ([#898](https://github.com/cube-js/cube.js/issues/898)) ([31ab9a0](https://github.com/cube-js/cube.js/commit/31ab9a0))
+
+
+### Features
+
+* expose loadResponse annotation ([#894](https://github.com/cube-js/cube.js/issues/894)) ([2875d47](https://github.com/cube-js/cube.js/commit/2875d47))
+
+
+
+
+
 ## [0.19.54](https://github.com/cube-js/cube.js/compare/v0.19.53...v0.19.54) (2020-07-23)
 
 
