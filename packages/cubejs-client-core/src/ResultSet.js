@@ -507,6 +507,10 @@ class ResultSet {
   rawData() {
     return this.loadResponse.data;
   }
+  
+  annotation() {
+    return this.loadResponse.annotation;
+  }
 
   timeDimensionBackwardCompatibleData() {
     if (!this.backwardCompatibleData) {

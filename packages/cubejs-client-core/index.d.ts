@@ -560,6 +560,7 @@ declare module '@cubejs-client/core' {
 
     query(): Query;
     rawData(): T[];
+    annotation(): QueryAnnotations;
   }
 
   export type Filter = {
