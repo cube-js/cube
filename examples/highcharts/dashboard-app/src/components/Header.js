@@ -13,7 +13,7 @@ const Header = () => (
         <h1>React Highcharts Example</h1>
       </div>
       <div className="examples__nav__buttons">
-        <a href='//github.com/statsbotco/cube.js'>
+        <a href='//github.com/cube-js/cube.js/tree/master/examples/highcharts'>
           <Icon.GithubOutlined />
             Github
         </a>
