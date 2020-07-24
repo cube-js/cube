@@ -23,6 +23,7 @@
     "test": "jest --testPathPattern test/*.test.js --runInBand"
   },
   "dependencies": {
+    "@cubejs-playground/core": "^0.0.1",
     "@babel/core": "^7.7.4",
     "@babel/generator": "^7.4.0",
     "@babel/parser": "^7.4.2",

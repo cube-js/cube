@@ -3,7 +3,8 @@
 const fs = require('fs-extra');
 const path = require('path');
 const spawn = require('cross-spawn');
-const AppContainer = require('../dev/templates/AppContainer');
+const AppContainer = require('../dev/AppContainer');
+const DependencyTree = require('../dev/DependencyTree');
 
 class DevServer {
   constructor(cubejsServer) {
@@ -90,8 +91,8 @@ class DevServer {
     let lastApplyTemplatePackagesError = null;
 
     app.get('/playground/dashboard-app-create-status', catchErrors(async (req, res) => {
-      const sourcePath = await path.join(dashboardAppPath, 'src');
-
+      const sourcePath = path.join(dashboardAppPath, 'src');
+      
       if (lastApplyTemplatePackagesError) {
         const toThrow = lastApplyTemplatePackagesError;
         lastApplyTemplatePackagesError = null;
@@ -106,9 +107,9 @@ class DevServer {
         await this.applyTemplatePackagesPromise;
       }
 
-      if (!(await fs.pathExists(sourcePath))) {
+      if (!(fs.pathExistsSync(sourcePath))) {
         res.status(404).json({
-          error: await fs.pathExists(dashboardAppPath) ?
+          error: fs.pathExistsSync(dashboardAppPath) ?
             `Dashboard app corrupted. Please remove '${path.resolve(dashboardAppPath)}' directory and recreate it` :
             `Dashboard app not found in '${path.resolve(dashboardAppPath)}' directory`
         });
@@ -175,7 +176,13 @@ class DevServer {
     app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server App File Write');
       const { templatePackages, templateConfig } = req.body;
-      const appContainer = new AppContainer(dashboardAppPath, templatePackages, templateConfig);
+      
+      // todo: tmp folder
+      const manifestJson = fs.readJSONSync(path.join(__dirname, '..', '__tmp__', 'manifest.json'));
+      
+      const dt = new DependencyTree(manifestJson, manifestJson.templates[0].templatePackages);
+      const appContainer = new AppContainer(dt.getRootNode(), dashboardAppPath, templateConfig);
+      
       const applyTemplates = async () => {
         this.cubejsServer.event('Dev Server Create Dashboard App');
         await appContainer.applyTemplates();
@@ -185,12 +192,14 @@ class DevServer {
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
       };
+      
       if (this.applyTemplatePackagesPromise) {
         this.applyTemplatePackagesPromise = this.applyTemplatePackagesPromise.then(applyTemplates);
       } else {
         this.applyTemplatePackagesPromise = applyTemplates();
       }
       const promise = this.applyTemplatePackagesPromise;
+      
       promise.then(() => {
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
@@ -201,6 +210,7 @@ class DevServer {
           this.applyTemplatePackagesPromise = null;
         }
       });
+      
       res.json(true); // TODO
     }));
 
