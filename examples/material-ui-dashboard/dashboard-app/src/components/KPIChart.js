@@ -44,7 +44,7 @@ const useStyles = makeStyles((theme) => ({
 
 const KPIChart = (props) => {
   const classes = useStyles();
-  const { className, title, progress, query, prefix, postfix, difference, duration, ...rest } = props;
+  const { className, title, progress, query, difference, duration, ...rest } = props;
   const { resultSet, error, isLoading } = useCubeQuery(query);
   const differenceQuery = {...query,
     "timeDimensions": [
@@ -70,6 +70,16 @@ const KPIChart = (props) => {
     return null
   }
   if (resultSet && differenceValue.resultSet) {
+    let postfix = null;
+    let prefix = null;
+    const measureKey = resultSet.seriesNames()[0].key;
+    const annotations = resultSet.tableColumns().find(tableColumn => tableColumn.key === measureKey);
+    const format = annotations.format || (annotations.meta && annotations.meta.format);
+    if (format === 'percent') {
+      postfix = '%'
+    } else if (format === 'currency') {
+      prefix = '$'
+    }
 
     let value = null;
     let fullValue = resultSet.seriesNames().map((s) => resultSet.totalRow()[s.key])[0];

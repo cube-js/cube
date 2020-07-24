@@ -111,7 +111,7 @@ const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)
   .reduce((a, b) => ({ ...a, ...b }));
 
 const renderChart = (Component) => ({ resultSet, error, ...props }) =>
-  (resultSet && <Component resultSet={resultSet} {...props} />) || (error && error.toString()) || <CircularProgress />;
+  (resultSet && <Component resultSet={resultSet} {...props} />) || (error && error.toString()) || <CircularProgress color="secondary" />;
 
 const ChartRenderer = ({ vizState = {} }) => {
   const { query, chartType, ...options } = vizState;

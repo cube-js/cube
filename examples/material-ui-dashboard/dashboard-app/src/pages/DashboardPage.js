@@ -31,13 +31,11 @@ const cards = [
     title: 'COMPLETED ORDERS',
     query: { measures: ['Orders.percentOfCompletedOrders'] },
     progress: true,
-    postfix: '%',
     duration: 1.75,
   },
   {
     title: 'TOTAL PROFIT',
     query: { measures: ['LineItems.price'], timeDimensions: [], filters: [] },
-    prefix: '$',
     duration: 2.25,
   },
 ];
