@@ -217,9 +217,14 @@ class QueryQueue {
     let processingLockAcquired;
     try {
       const processingId = await redisClient.getNextProcessingId();
-      [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] =
-        await redisClient.retrieveForProcessing(queryKey, processingId);
-      const activated = activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
+      const retrieveResult = await redisClient.retrieveForProcessing(queryKey, processingId);
+      if (retrieveResult) {
+        [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+      }
+      const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
+      if (!query) {
+        query = await redisClient.getQueryDef(this.redisHash(queryKey));
+      }
       if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
         const startQueryTime = (new Date()).getTime();
@@ -247,7 +252,7 @@ class QueryQueue {
                   try {
                     return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
                   } catch (e) {
-                    this.logger(`Error while query update`, {
+                    this.logger('Error while query update', {
                       queryKey: query.queryKey,
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
@@ -301,7 +306,7 @@ class QueryQueue {
         if (!(await redisClient.setResultAndRemoveQuery(queryKey, executionResult, processingId))) {
           this.logger('Orphaned execution result', {
             processingId,
-            warn: `Result for query was not set due to processing lock wasn't acquired`,
+            warn: 'Result for query was not set due to processing lock wasn\'t acquired',
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId
@@ -318,9 +323,26 @@ class QueryQueue {
           processingLockAcquired,
           query,
           insertedCount,
-          activeKeys
+          activeKeys,
+          activated,
+          queryExists: !!query
         });
-        await redisClient.freeProcessingLock(queryKey, processingId, activated);
+        const currentProcessingId = await redisClient.freeProcessingLock(queryKey, processingId, activated);
+        if (currentProcessingId) {
+          this.logger('Skipping free processing lock', {
+            processingId,
+            currentProcessingId,
+            queryKey: query && query.queryKey || queryKey,
+            requestId: query && query.requestId,
+            queuePrefix: this.redisQueuePrefix,
+            processingLockAcquired,
+            query,
+            insertedCount,
+            activeKeys,
+            activated,
+            queryExists: !!query
+          });
+        }
       }
     } catch (e) {
       this.logger('Queue storage error', {
@@ -342,7 +364,7 @@ class QueryQueue {
       }
       await this.cancelHandlers[queryHandler](query);
     } catch (e) {
-      this.logger(`Error while cancel`, {
+      this.logger('Error while cancel', {
         queryKey: query.queryKey,
         error: e.stack || e,
         queuePrefix: this.redisQueuePrefix,

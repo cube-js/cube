@@ -14,7 +14,7 @@ class QueryOrchestrator {
       process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
     );
     if (cacheAndQueueDriver !== 'redis' && cacheAndQueueDriver !== 'memory') {
-      throw new Error(`Only 'redis' or 'memory' are supported for cacheAndQueueDriver option`);
+      throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
     }
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool() : undefined;
 
@@ -35,12 +35,16 @@ class QueryOrchestrator {
         ...options.preAggregationsOptions
       }
     );
+    this.rollupOnlyMode = options.rollupOnlyMode;
   }
 
   async fetchQuery(queryBody) {
     return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
       .then(async preAggregationsTablesToTempTables => {
         const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
+        if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
+          throw new Error('No pre-aggregation exists for that query');
+        }
         if (!queryBody.query) {
           return {
             usedPreAggregations

@@ -218,6 +218,20 @@ declare module '@cubejs-client/core' {
      */
     static measureFromAxis(axisValues: string[]): string;
     static getNormalizedPivotConfig(query: Query, pivotConfig?: Partial<PivotConfig>): PivotConfig;
+    /**
+     * ```js
+     * import { ResultSet } from '@cubejs-client/core';
+     * 
+     * const resultSet = await cubejsApi.load(query);
+     * // You can store the result somewhere
+     * const tmp = resultSet.serialize();
+     * 
+     * // and restore it later 
+     * const resultSet = ResultSet.deserialize(tmp);
+     * ```
+     * @param data the result of [serialize](#result-set-serialize)
+     */
+    static deserialize<TData = any>(data: Object, options?: Object): ResultSet<TData>;
 
     /**
      * Creates a new instance of ResultSet based on [LoadResponse](#load-response) data.
@@ -241,6 +255,11 @@ declare module '@cubejs-client/core' {
      */
     constructor(loadResponse: LoadResponse<T>, options?: Object);
 
+    /**
+     * Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
+     */
+    serialize(): Object;
+    
     /**
      * @hidden
      */
@@ -541,6 +560,7 @@ declare module '@cubejs-client/core' {
 
     query(): Query;
     rawData(): T[];
+    annotation(): QueryAnnotations;
   }
 
   export type Filter = {
@@ -550,18 +570,12 @@ declare module '@cubejs-client/core' {
     values?: string[];
   };
 
-  export enum TimeDimensionGranularities {
-    HOUR = 'hour',
-    DAY = 'day',
-    WEEK = 'week',
-    MONTH = 'month',
-    YEAR = 'year',
-  }
+  type TimeDimensionGranularity = 'hour' | 'day' | 'week' | 'month' | 'year';
 
   export type TimeDimension = {
     dimension: string;
     dateRange?: string | string[];
-    granularity?: TimeDimensionGranularities;
+    granularity?: TimeDimensionGranularity;
   };
 
   export type Query = {
@@ -652,6 +666,7 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
+    load(query: Query, options?: LoadMethodOptions): Promise<ResultSet>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -676,23 +691,22 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: Query, options?: LoadMethodOptions): Promise<ResultSet>;
     load(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
 
+    sql(query: Query, options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: Query, options?: LoadMethodOptions): Promise<SqlQuery>;
     sql(query: Query, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
+    meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
      * Get meta description of cubes available for querying.
      */
-    meta(options?: LoadMethodOptions): Promise<Meta>;
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
   }
-
+  
   /**
    * Creates an instance of the `CubejsApi`. The API entry point.
    *
@@ -703,8 +717,20 @@ declare module '@cubejs-client/core' {
    *   { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
    * );
    * ```
-   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. Can be an async function without arguments that returns the API token.
+   *
+   * You can also pass an async function or a promise that will resolve to the API token
+   *
+   * ```js
+   * import cubejs from '@cubejs-client/core';
+   * const cubejsApi = cubejs(
+   *   async () => await Auth.getJwtToken(),
+   *   { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+   * );
+   * ```
+   *
+   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. In case of async function `authorization` is updated for `options.transport` on each request.
    * @order 1
    */
-  export default function cubejs(apiToken: string, options: CubeJSApiOptions): CubejsApi;
+  export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;
+  export default function cubejs(options: CubeJSApiOptions): CubejsApi;
 }

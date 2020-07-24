@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link } from "react-router-dom";
+import { Link } from 'react-router-dom';
 import { BookOutlined, MenuOutlined, SlackOutlined } from '@ant-design/icons';
-import { Layout, Menu, Dropdown } from "antd";
+import { Layout, Menu, Dropdown } from 'antd';
 import * as PropTypes from 'prop-types';
 import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
@@ -9,7 +9,7 @@ import { useMediaQuery } from 'react-responsive';
 const StyledMenu = styled(Menu)`
   background: #EEEEF5 !important;
   border-bottom: 0;
-`
+`;
 
 const StyledMenuItem = styled(Menu.Item)`
   font-size: 15px;
@@ -30,12 +30,12 @@ const StyledMenuItem = styled(Menu.Item)`
       border-bottom: 2px solid transparent;
     }
   }
-`
+`;
 
 const StyledMenuButton = styled.a`
   float: right;
   height: 32px;
-  margin: 8px ${props => props.noMargin ? "0" : "8px"};
+  margin: 8px ${props => (props.noMargin ? '0' : '8px')};
   border: 0.5px solid rgba(67, 67, 107, 0.4);
   border-radius: 3px;
   display: flex;
@@ -102,7 +102,7 @@ const Header = ({ selectedKeys }) => {
         </StyledMenu>
       )}
       { isMobileOrTable && (
-        <div style={{float: "right"}}>
+        <div style={{float: 'right'}}>
           <Dropdown
             overlay={
               <Menu>

@@ -58,7 +58,7 @@ export default class NoInheritPlugin extends ConverterComponent {
         reflection.comment.hasTag('noinheritdoc')
       ) {
         this.noInherit.push(reflection);
-        CommentPlugin.removeTags(reflection.comment, 'noinheritdoc');
+        reflection.comment.removeTags('noinheritdoc')
       }
       // class or interface member inherited from a super
       if (
@@ -83,7 +83,7 @@ export default class NoInheritPlugin extends ConverterComponent {
   private onBeginResolve(context: Context) {
     if (this.noInherit) {
       const project = context.project;
-      const removals = [];
+      const removals: Reflection[] = [];
 
       this.inheritedReflections.forEach((reflection) => {
         // Look through the inheritance chain for a reflection that is flagged as noInherit for this reflection
@@ -93,7 +93,7 @@ export default class NoInheritPlugin extends ConverterComponent {
       });
 
       removals.forEach((removal) => {
-        CommentPlugin.removeReflection(project, removal);
+        project.removeReflection(removal);
       });
     }
   }

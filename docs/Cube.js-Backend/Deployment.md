@@ -2,7 +2,7 @@
 title: Deployment
 permalink: /deployment
 category: Cube.js Backend
-menuOrder: 3
+menuOrder: 4
 ---
 
 Below you can find guides for popular deployment environments:
@@ -27,6 +27,8 @@ It uses Redis for query caching and queue.
 Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. In case your Redis instance has password, please set password via `REDIS_PASSWORD` environment variable.
 Make sure, your Redis allows at least 15 concurrent connections.
 Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
+
+> **NOTE:** Cube.js server instances used by same tenant environments should have same Redis instances. Otherwise they will have different query queues which can lead to incorrect pre-aggregation states and intermittent data access errors.
 
 ### Redis Pool
 

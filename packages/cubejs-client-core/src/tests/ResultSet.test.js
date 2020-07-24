@@ -912,5 +912,57 @@ describe('ResultSet', () => {
         { 'Orders.createdAt': '2020-01-10T13:50:05.000' }
       ]);
     });
+    
+    test('order is preserved', () => {
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['User.total'],
+          dimensions: ['User.visits'],
+          filters: [],
+          timezone: 'UTC'
+        },
+        data: [
+          {
+            'User.total': 1,
+            'User.visits': 1
+          },
+          {
+            'User.total': 15,
+            'User.visits': 0.9
+          },
+          {
+            'User.total': 20,
+            'User.visits': 0.7
+          },
+          {
+            'User.total': 10,
+            'User.visits': 0
+          },
+        ],
+        annotation: {
+          measures: {
+            'User.total': {}
+          },
+          dimensions: {
+            'User.visits': {
+              title: 'User Visits',
+              shortTitle: 'Visits',
+              type: 'number'
+            }
+          },
+          segments: {},
+          timeDimensions: {}
+        }
+      });
+
+      expect(resultSet.pivot()).toEqual(
+        [
+          { xValues: [1], yValuesArray: [[['User.total'], 1]] },
+          { xValues: [0.9], yValuesArray: [[['User.total'], 15]] },
+          { xValues: [0.7], yValuesArray: [[['User.total'], 20]] },
+          { xValues: [0], yValuesArray: [[['User.total'], 10]] },
+        ]
+      );
+    });
   });
 });

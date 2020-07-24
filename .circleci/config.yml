@@ -36,14 +36,23 @@ jobs:
             - yarn-packages-v1-
 
       - run: yarn install
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
 
       - save_cache:
           paths:
             - ~/.cache/yarn
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground test
+      - run:
+          name: install dockerize
+          command: wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz && sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+          environment:
+            DOCKERIZE_VERSION: v0.3.0
+      - run:
+          name: Wait for db
+          command: dockerize -wait tcp://localhost:1433 -timeout 2m
+
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test
       - run: bash <(curl -s https://codecov.io/bash)
 
   lint:
@@ -61,15 +70,67 @@ jobs:
             - yarn-packages-v1-
 
       - run: yarn install
-      - run: yarn lerna exec --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground yarn
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
 
       - save_cache:
           paths:
             - ~/.cache/yarn
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/playground lint
-      
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
+
+  publish:
+    docker:
+      - image: circleci/node:10.16
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+            - yarn-packages-v1-{{ .Branch }}-
+            - yarn-packages-v1-
+
+      - run: echo //registry.npmjs.org/:_authToken=$NPM_TOKEN > ~/.npmrc
+      - run: yarn install
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+
+      - run: yarn build
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
+      - run: ./node_modules/.bin/lerna publish from-git --yes
+
+  build:
+    docker:
+      - image: circleci/node:10.16
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+            - yarn-packages-v1-{{ .Branch }}-
+            - yarn-packages-v1-
+
+      - run: yarn install
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+
+      - run: yarn build
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
+
   react_dashboard_guide:
     docker:
       - image: circleci/node:10.15
@@ -119,9 +180,18 @@ workflows:
   test:
     jobs:
       - test
+      - build
   lint:
     jobs:
       - lint
+  publish:
+    jobs:
+      - publish:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*$/
   guides:
     jobs:
       - react_dashboard_guide

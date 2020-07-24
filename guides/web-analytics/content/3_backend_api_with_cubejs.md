@@ -70,13 +70,9 @@ Your database and table name may be different
 Now, we can start Cube.js server and open [http://localhost:4000](http://localhost:4000). In development mode, Cube.js run Playground. It is an application to help you explore the data schema and send test queries.
 
 Let's test our newly created data schema!
-Cube.js accepts queries as JSON objects in the [specific query format](https://cube.dev/docs/query-format). Playground lets you visually build and explore queries. For example, we can construct the test query to load all the events over time like on the screenshot below.
+Cube.js accepts queries as JSON objects in the [specific query format](https://cube.dev/docs/query-format). Playground lets you visually build and explore queries. For example, we can construct the test query to load all the events over time. Also, you can always inspect the underlying JSON query by clicking **JSON Query** button.
 
-SCREENSHOT
-
-Or we can group queries by X. You can always inspect the underlying JSON query by clicking **JSON Query** button.
-
-GIF
+![](https://cube.dev/downloads/media/web-analytics-json-query.gif)
 
 You can explore other queries as well, test different charting libraries used to
 visualize results and explore the frontend javascript code. If you are just starting with Cube.js I recommend checking [this tutorial](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide/) as well.

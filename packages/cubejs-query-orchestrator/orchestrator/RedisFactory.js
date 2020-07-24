@@ -2,7 +2,11 @@ const redis = require('redis');
 const { promisify } = require('util');
 
 module.exports = function createRedisClient(url) {
-  redis.Multi.prototype.execAsync = promisify(redis.Multi.prototype.exec);
+  redis.Multi.prototype.execAsync = function execAsync() {
+    return new Promise((resolve, reject) => this.exec((err, res) => (
+      err ? reject(err) : resolve(res)
+    )));
+  };
 
   const options = {
     url,
@@ -30,6 +34,7 @@ module.exports = function createRedisClient(url) {
     'zrangebyscore',
     'keys',
     'watch',
+    'unwatch',
     'incr',
     'decr',
     'lpush'

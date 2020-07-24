@@ -164,6 +164,8 @@ class LocalQueueDriverConnection {
     if (!this.processingLocks[key]) {
       this.processingLocks[key] = processingId;
       lockAcquired = true;
+    } else {
+      return null;
     }
     let added = 0;
     if (Object.keys(this.active).length < this.concurrency && !this.active[key]) {

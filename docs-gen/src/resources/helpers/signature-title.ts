@@ -3,6 +3,7 @@ import { SignatureReflection } from 'typedoc';
 import { memberSymbol } from './member-symbol';
 import { type } from './type';
 import { ReflectionType } from 'typedoc/dist/lib/models';
+import paramTypeToString from './param-type-to-string';
 
 export function signatureTitle(this: SignatureReflection, showSymbol: boolean = false) {
   const md = [];
@@ -43,7 +44,7 @@ export function signatureTitle(this: SignatureReflection, showSymbol: boolean = 
           if (param.flags.isOptional) {
             paramsmd.push('?');
           }
-          paramsmd.push(`**: ${type.call(param.type)}`);
+          paramsmd.push(`**: ${paramTypeToString(param)}`);
           return paramsmd.join('');
         })
         .join(', ')

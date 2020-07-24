@@ -3,6 +3,57 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.55](https://github.com/cube-js/cube.js/compare/v0.19.54...v0.19.55) (2020-07-23)
+
+
+### Bug Fixes
+
+* ngx client installation ([#898](https://github.com/cube-js/cube.js/issues/898)) ([31ab9a0](https://github.com/cube-js/cube.js/commit/31ab9a0))
+
+
+
+
+
+## [0.19.54](https://github.com/cube-js/cube.js/compare/v0.19.53...v0.19.54) (2020-07-23)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
+
+
+
+
+## [0.19.53](https://github.com/cube-js/cube.js/compare/v0.19.52...v0.19.53) (2020-07-20)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
+
+
+
+
+## [0.19.51](https://github.com/cube-js/cube.js/compare/v0.19.50...v0.19.51) (2020-07-17)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
+
+
+
+
+## [0.19.50](https://github.com/cube-js/cube.js/compare/v0.19.49...v0.19.50) (2020-07-16)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
+
+
+
+
+## [0.19.48](https://github.com/cube-js/cube.js/compare/v0.19.47...v0.19.48) (2020-07-11)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
+
+
+
+
 ## [0.19.43](https://github.com/cube-js/cube.js/compare/v0.19.42...v0.19.43) (2020-07-04)
 
 **Note:** Version bump only for package @cubejs-client/ngx

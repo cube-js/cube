@@ -148,6 +148,10 @@ class MongoBIDriver extends BaseDriver {
   quoteIdentifier(identifier) {
     return `\`${identifier}\``;
   }
+
+  readOnly() {
+    return true;
+  }
 }
 
 module.exports = MongoBIDriver;

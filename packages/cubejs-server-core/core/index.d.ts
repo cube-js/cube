@@ -43,6 +43,7 @@ declare module "@cubejs-backend/server-core" {
     redisPrefix?: string;
     queryCacheOptions?: QueryCacheOptions;
     preAggregationsOptions?: PreAggregationsOptions;
+    rollupOnlyMode?: boolean;
   }
 
   export interface QueryCacheOptions {
@@ -53,6 +54,7 @@ declare module "@cubejs-backend/server-core" {
 
   export interface PreAggregationsOptions {
     queueOptions?: QueueOptions;
+    externalRefresh?: boolean;
   }
 
   export interface QueueOptions {

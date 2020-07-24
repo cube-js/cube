@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/serverless-aws",
   "description": "Cube.js Serverless AWS support",
   "author": "Statsbot, Inc.",
-  "version": "0.19.46",
+  "version": "0.19.55",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,13 +13,13 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/serverless": "^0.19.46",
+    "@cubejs-backend/serverless": "^0.19.55",
     "aws-sdk": "^2.404.0"
   },
   "devDependencies": {
     "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
-    "mocha": "^5.2.0",
+    "mocha": "^8.0.1",
     "should": "^13.2.3"
   },
   "license": "Apache-2.0",

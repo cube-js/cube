@@ -39,14 +39,15 @@ declare module '@cubejs-client/react' {
    *   )
    * }
    * ```
+   * @stickyTypes
    * @order 10
    */
   export const CubeProvider: React.FC<CubeProviderVariables>;
 
   type TLoadingState = {
     isLoading: boolean;
-  }
-  
+  };
+
   type QueryRendererRenderProps = {
     resultSet: ResultSet | null;
     error: Error | null;
@@ -80,6 +81,7 @@ declare module '@cubejs-client/react' {
 
   /**
    * `<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
+   * @stickyTypes QueryRendererProps, QueryRendererRenderProps
    * @noInheritDoc
    */
   export class QueryRenderer extends React.Component<QueryRendererProps> {}
@@ -170,7 +172,7 @@ declare module '@cubejs-client/react' {
    * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
    *
    * **Example**
-   * 
+   *
    * [Open in CodeSandbox](https://codesandbox.io/s/z6r7qj8wm)
    * ```js
    * import React from 'react';
@@ -226,6 +228,7 @@ declare module '@cubejs-client/react' {
    * const rootElement = document.getElementById("root");
    * ReactDOM.render(<App />, rootElement);
    * ```
+   * @stickyTypes QueryBuilderProps, QueryBuilderRenderProps, QueryBuilderState
    * @noInheritDoc
    * @order 2
    */
@@ -264,6 +267,7 @@ declare module '@cubejs-client/react' {
    *
    * ```
    * @order 1
+   * @stickyTypes
    */
   export function useCubeQuery<TData>(query: Query, options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
 
@@ -316,6 +320,75 @@ declare module '@cubejs-client/react' {
     suggestFilterValues: boolean;
   };
 
+  /**
+   * You can use the following methods for member manipulaltion
+   * ```js
+   * <QueryBuilder
+   *   // ...
+   *   cubejsApi={cubejsApi}
+   *   render={({
+   *     // ...
+   *     availableMeasures,
+   *     updateMeasures,
+   *   }) => {
+   *     return (
+   *       // ...
+   *       <Select
+   *         mode="multiple"
+   *         placeholder="Please select"
+   *         onSelect={(measure) => updateMeasures.add(measure)}
+   *         onDeselect={(measure) => updateMeasures.remove(measure)}
+   *       >
+   *         {availableMeasures.map((measure) => (
+   *           <Select.Option key={measure.name} value={measure}>
+   *             {measure.title}
+   *           </Select.Option>
+   *         ))}
+   *       </Select>
+   *     );
+   *   }}
+   * />
+   * ```
+   *
+   * NOTE: if you need to add or remove more than one member at a time you should use `updateQuery` prop of {@see QueryBuilderRenderProps}
+   * ```js
+   * <QueryBuilder
+   *   // ...
+   *   cubejsApi={cubejsApi}
+   *   render={({
+   *     // ...
+   *     measures,
+   *     updateMeasures,
+   *     updateQuery,
+   *   }) => {
+   *     // ...
+   *     return (
+   *       <>
+   *         // WRONG: This code will not work properly
+   *         <button
+   *           onClick={() =>
+   *             measures.forEach((measure) => updateMeasures.remove(measure))
+   *           }
+   *         >
+   *           Remove all
+   *         </button>
+   *
+   *         // CORRECT: Using `updateQuery` for removing all measures
+   *         <button
+   *           onClick={() =>
+   *             updateQuery({
+   *               measures: [],
+   *             })
+   *           }
+   *         >
+   *           Remove all
+   *         </button>
+   *       </>
+   *     );
+   *   }}
+   * />
+   * ```
+   */
   type MemberUpdater = {
     add: (member: TMember) => void;
     remove: (member: TMember) => void;

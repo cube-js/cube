@@ -3,17 +3,15 @@ order: 2
 title: "Data Collection and Storage"
 ---
 
-We're going to use Snowplow for data collection, S3 for storage and Athena to query the data in S3.
+We're going to use Snowplow for data collection, S3 for storage, and Athena to query the data in S3.
 
 ## Data Collection with Snowplow
 
-Snowplow is an analytics platform to collect, enrich and store data.
-We'll use Snowplow Javascript tracker on our website, which generates event-data and send it
-to the Snowplow Collector to load to S3.
+Snowplow is an analytics platform to collect, enrich, and store data. We'll use the Snowplow Javascript tracker on our website, which generates event-data and send it to the Snowplow Collector to load to S3.
 
-Before loading the data we'll use Enricher to turn IP addresses into coordinates. We'll use AWS Kinesis to manage data streams for collection, enrichment and then finally loading into S3. Schema below illustrates the whole process.
+Before loading the data, we'll use Enricher to turn IP addresses into coordinates. We'll use AWS Kinesis to manage data streams for collection, enrichment, and then finally loading into S3. The schema below illustrates the whole process.
 
-SCHEMA
+![](/images/2-schema-1.png)
 
 Let's start by setting up the tracker. Adding Snowplow's tracker to the website is the same, as adding Google Analytics or Mixpanel tracker. You need to add the asynchronous Javascript code, which loads the tracker itself.
 
@@ -35,11 +33,11 @@ window.snowplow('trackPageView');
 <!-- Snowplow stops plowing -->
 ```
 
-The above snippet references a Snowplow Analytics hosted version of the Snowplow JavaScript tracker v2.10.2 (//d1fc8wv8zag5ca.cloudfront.net/2.10.2/sp.js). Snowplow Analytics no longer hosts the latest versions of the Snowplow JavaScript tracker. It is recommended to self-host `sp.js` by following [Self-hosting Snowplow.js](https://github.com/snowplow/snowplow/wiki/self-hosting-snowplow-js) guide.
+The above snippet references a Snowplow Analytics hosted version of the Snowplow JavaScript tracker v2.10.2 (//d1fc8wv8zag5ca.cloudfront.net/2.10.2/sp.js). Snowplow Analytics no longer hosts the latest versions of the Snowplow JavaScript tracker. It is recommended to self-host `sp.js` by following the [Self-hosting Snowplow.js](https://github.com/snowplow/snowplow/wiki/self-hosting-snowplow-js) guide.
 
-For more details about setting up the tracker please refer to the [official Snowplow Javascript Tracker Setup guide](https://github.com/snowplow/snowplow/wiki/Setting-up-a-Tracker).
+For more details about setting up the tracker, please refer to the [official Snowplow Javascript Tracker Setup guide](https://github.com/snowplow/snowplow/wiki/Setting-up-a-Tracker).
 
-To collect the data from the tracker we need to setup Snowplow Collector. We'll use Scala Stream Collector. Here the detailed guide on how to install and configure it. This repository with the Docker images for the Snowplow components is very helpful if you plan to deploy Snowplow with Docker.
+To collect the data from the tracker, we need to setup Snowplow Collector. We'll use Scala Stream Collector. Here the detailed guide on how to install and configure it. This repository with the Docker images for the Snowplow components is very helpful if you plan to deploy Snowplow with Docker.
 
 Next, we need to install Snowplow Stream Enrich. Same as for collector, I
 recommend following the official guide here and use these Docker images.
@@ -49,7 +47,7 @@ from AWS Kinesis and writes them to S3. You can follow [this guide](https://gith
 
 ## Query S3 with Athena
 
-Once we have data in the S3 we can query it with AWS Athena or Presto. We’ll use Athena in our guide, but you can easily find a lot of materials online on how to set up an alternative configuration.
+Once we have data in S3 we can query it with AWS Athena or Presto. We’ll use Athena in our guide, but you can easily find a lot of materials online on how to set up an alternative configuration.
 
 To query S3 data with Athena, we need to create a table for Snowplow events. Copy and paste the following DDL statement into the Athena console. Modify the LOCATION for the S3 bucket that stores your enriched Snowplow events.
 

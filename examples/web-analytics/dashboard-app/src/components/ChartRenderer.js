@@ -1,7 +1,7 @@
 import React from "react";
 import PropTypes from "prop-types";
 import { useCubeQuery } from "@cubejs-client/react";
-import Skeleton from "@material-ui/lab/Skeleton";
+
 import {
   CartesianGrid,
   PieChart,
@@ -27,6 +27,7 @@ import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
 import TableContainer from '@material-ui/core/TableContainer';
 import Paper from '@material-ui/core/Paper';
+import Skeleton from '@material-ui/lab/Skeleton';
 
 import moment from "moment";
 import numeral from "numeral";

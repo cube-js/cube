@@ -4,10 +4,10 @@ import * as cubejsReact from '@cubejs-client/react';
 import * as antd from 'antd';
 import { Spin } from 'antd';
 import ChartContainer from './ChartContainer';
-import { libraryToTemplate } from "./ChartRenderer";
+import { libraryToTemplate } from './ChartRenderer';
 
 const DashboardRenderer = (props) => {
-  let {
+  const {
     source,
     sourceFiles
   } = props;

@@ -1,6 +1,8 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Row, Col, Divider, Card, Button, Popover } from 'antd';
+import {
+  Row, Col, Divider, Card, Button, Popover
+} from 'antd';
 import { SortAscendingOutlined, BorderInnerOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
@@ -12,30 +14,31 @@ import SelectChartType from './QueryBuilder/SelectChartType';
 import OrderGroup from './components/Order/OrderGroup';
 import Pivot from './components/Pivot/Pivot';
 
-const playgroundActionUpdateMethods = (updateMethods, memberName) =>
-  Object.keys(updateMethods)
-    .map((method) => ({
-      [method]: (member, values, ...rest) => {
-        let actionName = `${method
-          .split('')
-          .map((c, i) => (i === 0 ? c.toUpperCase() : c))
-          .join('')} Member`;
-        if (values && values.values) {
-          actionName = 'Update Filter Values';
-        }
-        if (values && values.dateRange) {
-          actionName = 'Update Date Range';
-        }
-        if (values && values.granularity) {
-          actionName = 'Update Granularity';
-        }
-        playgroundAction(actionName, { memberName });
-        return updateMethods[method].apply(null, [member, values, ...rest]);
-      },
-    }))
-    .reduce((a, b) => ({ ...a, ...b }), {});
+const playgroundActionUpdateMethods = (updateMethods, memberName) => Object.keys(updateMethods)
+  .map((method) => ({
+    [method]: (member, values, ...rest) => {
+      let actionName = `${method
+        .split('')
+        .map((c, i) => (i === 0 ? c.toUpperCase() : c))
+        .join('')} Member`;
+      if (values && values.values) {
+        actionName = 'Update Filter Values';
+      }
+      if (values && values.dateRange) {
+        actionName = 'Update Date Range';
+      }
+      if (values && values.granularity) {
+        actionName = 'Update Granularity';
+      }
+      playgroundAction(actionName, { memberName });
+      return updateMethods[method].apply(null, [member, values, ...rest]);
+    },
+  }))
+  .reduce((a, b) => ({ ...a, ...b }), {});
 
-export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubejsToken, dashboardSource, setQuery }) {
+export default function PlaygroundQueryBuilder({
+  query, cubejsApi, apiUrl, cubejsToken, dashboardSource, setQuery
+}) {
   return (
     <QueryBuilder
       query={query}
@@ -66,110 +69,109 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
         updateOrder,
         pivotConfig,
         updatePivotConfig,
-      }) => {
-        return (
-          <>
-            <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
-              <Col span={24}>
-                <Card>
-                  <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
-                    <Col span={24}>
-                      <MemberGroup
+      }) => (
+        <>
+          <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+            <Col span={24}>
+              <Card>
+                <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+                  <Col span={24}>
+                    <MemberGroup
                         members={measures}
                         availableMembers={availableMeasures}
                         addMemberName="Measure"
                         updateMethods={playgroundActionUpdateMethods(updateMeasures, 'Measure')}
-                      />
-                      <Divider type="vertical" />
-                      <MemberGroup
+                    />
+                    <Divider type="vertical" />
+                    <MemberGroup
                         members={dimensions}
                         availableMembers={availableDimensions}
                         addMemberName="Dimension"
                         updateMethods={playgroundActionUpdateMethods(updateDimensions, 'Dimension')}
-                      />
-                      <Divider type="vertical" />
-                      <MemberGroup
+                    />
+                    <Divider type="vertical" />
+                    <MemberGroup
                         members={segments}
                         availableMembers={availableSegments}
                         addMemberName="Segment"
                         updateMethods={playgroundActionUpdateMethods(updateSegments, 'Segment')}
-                      />
-                      <Divider type="vertical" />
-                      <TimeGroup
+                    />
+                    <Divider type="vertical" />
+                    <TimeGroup
                         members={timeDimensions}
                         availableMembers={availableTimeDimensions}
                         addMemberName="Time"
                         updateMethods={playgroundActionUpdateMethods(updateTimeDimensions, 'Time')}
-                      />
-                    </Col>
-                  </Row>
+                    />
+                  </Col>
+                </Row>
 
-                  <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
-                    <Col span={24}>
-                      <FilterGroup
+                <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+                  <Col span={24}>
+                    <FilterGroup
                         members={filters}
                         availableMembers={availableDimensions.concat(availableMeasures)}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(updateFilters, 'Filter')}
-                      />
-                    </Col>
-                  </Row>
+                    />
+                  </Col>
+                </Row>
 
-                  <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
-                    <Col span={24}>
-                      <SelectChartType
+                <Row justify="space-around" align="top" gutter={24} style={{ marginBottom: 12 }}>
+                  <Col span={24}>
+                    <SelectChartType
                         chartType={chartType}
                         updateChartType={(type) => {
                           playgroundAction('Change Chart Type');
                           updateChartType(type);
                         }}
-                      />
+                    />
 
-                      <Divider type="vertical" />
+                    <Divider type="vertical" />
 
-                      <Popover
-                        content={
+                    <Popover
+                        content={(
                           <OrderGroup
                             orderMembers={orderMembers}
                             onReorder={updateOrder.reorder}
                             onOrderChange={updateOrder.set}
                           />
-                        }
+                        )}
                         placement="bottomLeft"
                         trigger="click"
-                      >
-                        <Button disabled={!isQueryPresent} icon={<SortAscendingOutlined />}>
-                          Order
-                        </Button>
-                      </Popover>
+                    >
+                      <Button disabled={!isQueryPresent} icon={<SortAscendingOutlined />}>
+                        Order
+                      </Button>
+                    </Popover>
 
-                      <Divider type="vertical" />
+                    <Divider type="vertical" />
 
-                      <Popover
-                        content={
+                    <Popover
+                        content={(
                           <Pivot
                             pivotConfig={pivotConfig}
                             onMove={updatePivotConfig.moveItem}
                             onUpdate={updatePivotConfig.update}
                           />
-                        }
+                        )}
                         placement="bottomLeft"
                         trigger="click"
-                      >
-                        <Button disabled={!isQueryPresent} icon={<BorderInnerOutlined />}>
-                          Pivot
-                        </Button>
-                      </Popover>
-                    </Col>
-                  </Row>
-                </Card>
-              </Col>
-            </Row>
+                    >
+                      <Button disabled={!isQueryPresent} icon={<BorderInnerOutlined />}>
+                        Pivot
+                      </Button>
+                    </Popover>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+          </Row>
 
-            <Row justify="space-around" align="top" gutter={24}>
-              <Col span={24}>
-                {isQueryPresent ? (
-                  <ChartRenderer
+          <Row justify="space-around" align="top" gutter={24}>
+            <Col span={24}>
+              {isQueryPresent ? (
+                <ChartRenderer
                     query={validatedQuery}
                     resultSet={resultSet}
                     error={error}
@@ -179,15 +181,14 @@ export default function PlaygroundQueryBuilder({ query, cubejsApi, apiUrl, cubej
                     cubejsApi={cubejsApi}
                     dashboardSource={dashboardSource}
                     pivotConfig={pivotConfig}
-                  />
-                ) : (
-                  <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>
-                )}
-              </Col>
-            </Row>
-          </>
-        );
-      }}
+                />
+              ) : (
+                <h2 style={{ textAlign: 'center' }}>Choose a measure or dimension to get started</h2>
+              )}
+            </Col>
+          </Row>
+        </>
+      )}
     />
   );
 }
