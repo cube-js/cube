@@ -1077,3 +1077,13 @@ const TableComponent = props => {
                 </TableHead>
 						 // ...
 ```
+
+### Done
+
+Congratulations on completing this guide! 🎉
+
+You can check [the online demo here](https://material-ui-dashboard.cubecloudapp.dev/#/dashboard) and [the source code is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard)
+
+![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/f5e5c93c-6ca1-48cc-b7a5-471ec3f9b0db/Screenshot_2020-07-06_at_16.49.24.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/f5e5c93c-6ca1-48cc-b7a5-471ec3f9b0db/Screenshot_2020-07-06_at_16.49.24.png)
+
+![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/846fe504-dc76-4eca-8d54-81aaa319e288/Screenshot_2020-07-06_at_17.01.25.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/846fe504-dc76-4eca-8d54-81aaa319e288/Screenshot_2020-07-06_at_17.01.25.png)
