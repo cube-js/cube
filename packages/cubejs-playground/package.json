@@ -53,7 +53,8 @@
     "start": "EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
     "build": "EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
     "eject": "EXTEND_ESLINT=true react-scripts eject",
-    "lint": "eslint src/*.js src/*.jsx"
+    "lint": "eslint src/*.js src/*.jsx",
+    "window-start": "react-app-rewired --max-old-space-size=4096 start"
   },
   "browserslist": [
     ">0.2%",

@@ -1,0 +1,25 @@
+{
+  "useTaobaoRegistry": true,
+  "packageManager": "yarn",
+  "useConfigFiles": true,
+  "router": false,
+  "vuex": false,
+  "cssPreprocessor": "node-sass",
+  "plugins": {
+    "@vue/cli-plugin-babel": {},
+    "@vue/cli-plugin-eslint": {
+      "config": "standard",
+      "lintOn": [
+        "save",
+        "commit"
+      ]
+    }
+  },
+  "configs": {
+    "eslintConfig": {
+      "rules": {
+        "no-alert": 0
+      }
+    }
+  }
+}
