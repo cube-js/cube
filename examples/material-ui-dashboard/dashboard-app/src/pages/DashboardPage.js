@@ -17,14 +17,12 @@ const cards = [
     title: 'ORDERS',
     query: { measures: ['Orders.count'] },
     difference: 'Orders',
-    value: -12,
     duration: 1.25,
   },
   {
     title: 'TOTAL USERS',
     query: { measures: ['Users.count'] },
     difference: 'Users',
-    value: 16,
     duration: 1.5,
   },
   {
@@ -35,7 +33,7 @@ const cards = [
   },
   {
     title: 'TOTAL PROFIT',
-    query: { measures: ['LineItems.price'], timeDimensions: [], filters: [] },
+    query: { measures: ['LineItems.price'] },
     duration: 2.25,
   },
 ];
