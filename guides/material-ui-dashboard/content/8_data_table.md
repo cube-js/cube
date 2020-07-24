@@ -1,5 +1,5 @@
 ---
-order: 7
+order: 8
 title: "Data Table"
 ---
 
@@ -40,7 +40,7 @@ const AppLayout = ({children}) => {
 };
 ```
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9c1cad10-68a1-466c-8c5d-92835e915cfa/Screenshot_2020-06-28_at_19.55.31.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9c1cad10-68a1-466c-8c5d-92835e915cfa/Screenshot_2020-06-28_at_19.55.31.png)
+![Result screen](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9c1cad10-68a1-466c-8c5d-92835e915cfa/Screenshot_2020-06-28_at_19.55.31.png)
 
 For create data table we need to customize schema
 
@@ -524,7 +524,7 @@ export default StatusBullet;
 
 Nice! We created a simple table. 🎉
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/21f47d32-33f8-4a26-b646-52cd6b9fe0e4/Screenshot_2020-07-05_at_18.16.47.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/21f47d32-33f8-4a26-b646-52cd6b9fe0e4/Screenshot_2020-07-05_at_18.16.47.png)
+![Simple table screen](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/21f47d32-33f8-4a26-b646-52cd6b9fe0e4/Screenshot_2020-07-05_at_18.16.47.png)
 
 But will be better if we do this table with filters! I hide these filters in the toolbar component. Let's create this component and to our table interactive.
 
@@ -738,7 +738,7 @@ export default DataTablePage;
 
 Yes, we got something similar to a data table.🎉
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/04cc0215-f4ed-4a7b-ac69-2113792eb4b4/ezgif.com-video-to-gif_(1).gif](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/04cc0215-f4ed-4a7b-ac69-2113792eb4b4/ezgif.com-video-to-gif_(1).gif)
+![Data table gif](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/04cc0215-f4ed-4a7b-ac69-2113792eb4b4/ezgif.com-video-to-gif_(1).gif)
 
 After that, it would be good to add new filters.
 
@@ -1084,6 +1084,6 @@ Congratulations on completing this guide! 🎉
 
 You can check [the online demo here](https://material-ui-dashboard.cubecloudapp.dev/#/dashboard) and [the source code is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard)
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/f5e5c93c-6ca1-48cc-b7a5-471ec3f9b0db/Screenshot_2020-07-06_at_16.49.24.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/f5e5c93c-6ca1-48cc-b7a5-471ec3f9b0db/Screenshot_2020-07-06_at_16.49.24.png)
+![Result Dashboard Page screen](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/f5e5c93c-6ca1-48cc-b7a5-471ec3f9b0db/Screenshot_2020-07-06_at_16.49.24.png)
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/846fe504-dc76-4eca-8d54-81aaa319e288/Screenshot_2020-07-06_at_17.01.25.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/846fe504-dc76-4eca-8d54-81aaa319e288/Screenshot_2020-07-06_at_17.01.25.png)
+![Result Table Page screen](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/846fe504-dc76-4eca-8d54-81aaa319e288/Screenshot_2020-07-06_at_17.01.25.png)

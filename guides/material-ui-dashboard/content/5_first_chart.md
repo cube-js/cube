@@ -5,7 +5,7 @@ title: "First Chart"
 
 We can generate a query in Cube.js playground. For example, go to [http://localhost:4000/](http://localhost:4000/), select the Build tab, and choose Orders Count measure, then choose Orders Status dimension, date range this weak, and chart type - Bar. Then we can copy this query to use in our component.
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/6aee8217-2bca-4bca-8161-bbbb1a8b747d/ezgif.com-video-to-gif.gif](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/6aee8217-2bca-4bca-8161-bbbb1a8b747d/ezgif.com-video-to-gif.gif)
+![generate a query in Cube.js playground](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/6aee8217-2bca-4bca-8161-bbbb1a8b747d/ezgif.com-video-to-gif.gif)
 
 Let's create a `<BarChart/>` component. In this component, we use ChartRenderer component.
 
@@ -217,6 +217,6 @@ export default Dashboard;
 
 That's all we need to display our first chart! 🎉
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/1d7ebc9f-457e-46e4-8eb3-c1b29e4eee07/Screenshot_2020-07-02_at_20.23.51.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/1d7ebc9f-457e-46e4-8eb3-c1b29e4eee07/Screenshot_2020-07-02_at_20.23.51.png)
+![display our first chart](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/1d7ebc9f-457e-46e4-8eb3-c1b29e4eee07/Screenshot_2020-07-02_at_20.23.51.png)
 
 In the next part we'll make this chart interactive and let users to change the date range.

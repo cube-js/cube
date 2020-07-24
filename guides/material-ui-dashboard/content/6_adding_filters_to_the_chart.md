@@ -106,6 +106,6 @@ return (
 // ...
 ```
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9214b4d6-9104-48a6-9a69-6ffe6163414f/Screenshot_2020-07-02_at_20.24.48.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9214b4d6-9104-48a6-9a69-6ffe6163414f/Screenshot_2020-07-02_at_20.24.48.png)
+![Well done](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9214b4d6-9104-48a6-9a69-6ffe6163414f/Screenshot_2020-07-02_at_20.24.48.png)
 
 Well done! 🎉
