@@ -241,9 +241,8 @@ export default () => {
 |[Node Express Dashboard](https://express-analytics-dashboard.herokuapp.com)|[node-express-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/express-analytics-dashboard)|Analytics Dashboard with Node, Express, and Cube.js [[tutorial](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)]|
 |[External Rollups](https://cubejs-external-rollups.herokuapp.com/)|[external-rollups](https://github.com/cube-js/cube.js/tree/master/examples/external-rollups)|Compare performance of direct BigQuery querying vs MySQL cached version for the same data|
 |[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](./examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js [[tutorial](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)]|
-|[Open Source Web Analytics Platform](https://web-analytics-demo.cubecloudapp.dev/)|[web-analytics](./examples/web-analytics)|Building Google Analytics alternative with Snowplow, Athena, Material UI, using pre-aggregations. [[guide](https://web-analytics.cube.dev)]|
-|[Drill Down Table API](https://drill-downs.cubecloudapp.dev/)|[drill-downs](./examples/drill-downs)|Quick introduction in drill downs concept [[tutorial](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/)] |
-|[Stripe Dashboard](http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/)|[stripe-dashboard](./examples/stripe-dashboard)|Stripe Demo Dashboard built with Cube.js and Recharts|
+|[Open Source Web Analytics Platform](https://web-analytics-demo.cubecloudapp.dev/)|[web-analytics](./examples/web-analytics)|Building Google Analytics alternative with Snowplow, AWS Athena, Cube.js and React. It shows the usage of external pre-aggregations to speed-up queries. [[guide](https://web-analytics.cube.dev)]|
+|[Drill Down Table API](https://drill-downs.cubecloudapp.dev/)|[drill-downs](./examples/drill-downs)|Quick introduction to the drill downs concept [[tutorial](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/)] |
 |[Examples Gallery](https://statsbotco.github.io/cubejs-client/)|[examples-gallery](./examples/examples-gallery)|Examples Gallery with different visualizations libraries|
 
 ## Tutorials
