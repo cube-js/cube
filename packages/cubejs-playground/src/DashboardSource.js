@@ -3,6 +3,11 @@ import fetch from './playgroundFetch';
 
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
+const repo = {
+  owner: 'cube.js',
+  name: 'cubejs-playground-templates'
+};
+
 class DashboardSource {
   async load(instant) {
     this.loadError = null;
@@ -18,7 +23,7 @@ class DashboardSource {
     }
   }
 
-  async applyTemplatePackages(templatePackages, templateConfig) {
+  async applyTemplatePackages(templateName, templateConfig) {
     if (!this.playgroundContext) {
       this.playgroundContext = await this.loadContext();
     }
@@ -28,7 +33,7 @@ class DashboardSource {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        templatePackages,
+        templateName,
         templateConfig: templateConfig || {
           credentials: this.playgroundContext
         }
@@ -75,6 +80,16 @@ class DashboardSource {
         chartCode
       }
     });
+  }
+  
+  async templates() {
+    const response = await (await fetch(
+      `https://api.github.com/repos/${repo.owner}/${repo.name}/contents/manifest.json`
+    )).json();
+    
+    const { templates = [] } = JSON.parse(Buffer.from(response.content, 'base64').toString());
+    
+    return templates;
   }
 }
 

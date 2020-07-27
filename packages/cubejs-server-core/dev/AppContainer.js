@@ -1,31 +1,31 @@
 const fs = require('fs-extra');
 const path = require('path');
-const spawn = require('cross-spawn');
 
-const { SourceContainer, utils } = require('@cubejs-playground/core');
+const SourceContainer = require('./SourceContainer');
+const { fileContentsRecursive, executeCommand } = require('./utils');
 
 class AppContainer {
-  static packagesPath() {
-    // Will be the path of the dowloaded packages
-    return path.join(__dirname, '..', '__tmp__');
+  static getPackageVersions(appPath) {
+    return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};
   }
-
-  constructor(dependencyTree, appPath, playgroundContext) {
-    this.dependencyTree = dependencyTree;
-    this.appPath = appPath;
+  
+  constructor(rootNode, { appPath, packagesPath }, playgroundContext) {
+    this.rootNode = rootNode;
     this.playgroundContext = playgroundContext;
+    this.appPath = appPath;
+    this.packagesPath = packagesPath;
 
     this.initDependencyTree();
   }
 
   async applyTemplates() {
     this.sourceContainer = await this.loadSources();
-    await this.dependencyTree.packageInstance.applyPackage(this.sourceContainer);
+    await this.rootNode.packageInstance.applyPackage(this.sourceContainer);
   }
 
   initDependencyTree() {
-    this.createInstances(this.dependencyTree);
-    this.setChildren(this.dependencyTree);
+    this.createInstances(this.rootNode);
+    this.setChildren(this.rootNode);
   }
 
   setChildren(node) {
@@ -45,9 +45,9 @@ class AppContainer {
     while (stack.length) {
       const child = stack.pop();
 
-      const scaffoldingPath = path.join(AppContainer.packagesPath(), child.package.name, 'scaffolding');
+      const scaffoldingPath = path.join(this.packagesPath, child.package.name, 'scaffolding');
       // eslint-disable-next-line
-      const instance = require(path.join(AppContainer.packagesPath(), child.package.name))({
+      const instance = require(path.join(this.packagesPath, child.package.name))({
         appContainer: this,
         package: {
           ...child.package,
@@ -65,11 +65,7 @@ class AppContainer {
   }
 
   async loadSources() {
-    return new SourceContainer(await utils.fileContentsRecursive(this.appPath));
-  }
-
-  getPackageVersions() {
-    return fs.readJsonSync(path.join(this.appPath, 'package.json')).cubejsTemplates || {};
+    return new SourceContainer(await fileContentsRecursive(this.appPath));
   }
 
   async persistSources(sourceContainer, packageVersions) {
@@ -86,16 +82,7 @@ class AppContainer {
   }
 
   executeCommand(command, args, options) {
-    const child = spawn(command, args, { stdio: 'inherit', ...options });
-    return new Promise((resolve, reject) => {
-      child.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}. Please check your console.`));
-          return;
-        }
-        resolve();
-      });
-    });
+    return executeCommand(command, args, options);
   }
 
   async ensureDependencies() {
@@ -150,6 +137,10 @@ class AppContainer {
       };
     }
     return result;
+  }
+  
+  getPackageVersions() {
+    return AppContainer.getPackageVersions(this.appPath);
   }
 }
 

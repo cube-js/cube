@@ -858,10 +858,10 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.19.54":
-  version "0.19.54"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.19.54.tgz#820af4c1b174570fb1b3c312c6065ac797c3361d"
-  integrity sha512-fpAOlMt294RQLoWIhg/82ydYSYUg1k/EDQeoY3lohyrvBo/0r+lAzqXc6VeS7Mq8FFfCEZXklzDMA3xGyBV8Zw==
+"@cubejs-backend/server-core@^0.19.55":
+  version "0.19.55"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.19.55.tgz#d1f68657e2a7649f38e26cda4881d06737b0c8b7"
+  integrity sha512-+XyTtVI71xwDL/8RM5FZEyFYCvCU2sW08DOiEO4PJMW9B1LlzwOuNr7J5Gq0BB9pMgIbAFcB+T3HLoz6qd8Qhw==
   dependencies:
     "@babel/core" "^7.7.4"
     "@babel/generator" "^7.4.0"
@@ -1917,9 +1917,10 @@ domexception@^1.0.1:
   dependencies:
     webidl-conversions "^4.0.2"
 
-dotenv@^8.1.0:
-  version "8.1.0"
-  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-8.1.0.tgz#d811e178652bfb8a1e593c6dd704ec7e90d85ea2"
+dotenv@^8.2.0:
+  version "8.2.0"
+  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-8.2.0.tgz#97e619259ada750eea3e4ea3e26bceea5424b16a"
+  integrity sha512-8sJ78ElpbDJBHNeBzUbUVLsqKdccaa/BXF1uPTw3GrvQTBgrQrtObr2mUrE38vzYd8cEv+m/JBfDLioYcfXoaw==
 
 ecc-jsbn@~0.1.1:
   version "0.1.2"
