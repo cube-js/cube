@@ -28,14 +28,14 @@ class Index extends React.Component {
         <Helmet title={config.siteTitle} />
         <Header githubUrl={config.githubUrl} />
         <Hero
-          title="Building Open Source Google Analytics Alternative"
-          subtitle="Learn how to build open source web analytics platform with Cube.js."
-          demoUrl="https://web-analytics-demo.cube.dev"
+          title="Building Material UI Dashboard with Cube.js"
+          subtitle="Learn how to build Material UI Dashboard with Cube.js."
+          demoUrl="https://material-ui-dashboard.cubecloudapp.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={
             <video muted autoPlay playsInline loop preload="auto" poster={hero}>
-              <source type="video/mp4" src="videos/web-analytics.mp4" />
+              <source type="video/mp4" src="video/preview.mp4" />
             </video>
           }
           withFrame
@@ -43,16 +43,16 @@ class Index extends React.Component {
         <Feature
           imageAlign='left'
           image={featureOneImg}
-          metaTitle="Hackable"
-          title="Fully Customizable"
-          text="Learn how to create your own, completely custom web analytics platform. You will learn how to setup the data collection engine, SQL database, define metrics and build custom  frontend."
+          metaTitle="Clear"
+          title="Step by step"
+          text="Learn how to create your own, React Material UI dashboard. You will learn step by step how to create dashboard with queries to your database without writing SQL code."
         />
         <Feature
           imageAlign='right'
           image={featureTwoImg}
-          metaTitle="Embeddable"
-          title="Easy to Integrate into Existing App"
-          text="Backend components can be easily deployed as microservices into your existing stack. The frontend is a pure React application based on Material UI without any custom styles. You can embed any part of the frontend into your existing application and customize the look and feel to match your styles."
+          metaTitle="Visualisation"
+          title="Easy to create"
+          text="You can visualize your data in any format that is convenient for you, for better data analysis using the chartRenderer component."
         />
         <Feature
           imageAlign='left'

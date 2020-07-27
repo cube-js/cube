@@ -1,16 +1,16 @@
 const config = {
-  siteTitle: "Building Open Source Google Analytics Alternative", // Site title.
-  siteTitleShort: "Building Open Source Google Analytics Alternative", // Short site title for homescreen (PWA). Preferably should be under 12 characters to prevent truncation.
-  siteTitleAlt: "Building Open Source Google Analytics Alternative", // Alternative site title for SEO.
+  siteTitle: "Building Material UI Dashboard with Cube.js", // Site title.
+  siteTitleShort: "Building Material UI Dashboard with Cube.js", // Short site title for homescreen (PWA). Preferably should be under 12 characters to prevent truncation.
+  siteTitleAlt: "Building Material UI Dashboard with Cube.js", // Alternative site title for SEO.
   siteLogo: "/logos/icon.png", // Logo used for SEO and manifest.
   previewImage: "/logos/preview.png",
   siteUrl: "https://web-analytics.cube.dev", // Domain of your website without pathPrefix.
-  siteDescription: "Learn how to build open source web analytics platform with Cube.js.", // Website description used for RSS feeds/meta description tag.
+  siteDescription: "Learn how to build Material UI Dashboard with Cube.js.", // Website description used for RSS feeds/meta description tag.
   googleAnalyticsID: "UA-70480064-3", // GA tracking ID.
   themeColor: "#c62828", // Used for setting manifest and progress theme colors.
   backgroundColor: "#e0e0e0", // Used for setting manifest background color.
   pathPrefix: "",
-  githubUrl: "https://github.com/cube-js/cube.js/tree/master/guides/web-analytics"
+  githubUrl: "https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard"
 };
 
 // Validate
