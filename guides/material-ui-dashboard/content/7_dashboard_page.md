@@ -276,7 +276,7 @@ const Dashboard = () => {
 };
 ```
 
-![Example gif](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/045224cb-9d96-4c80-a416-bf03f7fd4953/Screenshot_2020-07-01_at_19.08.18.png)
+![KPI screen](/images/kpi_screen.png)
 
 ### Doughnut Chart
 
