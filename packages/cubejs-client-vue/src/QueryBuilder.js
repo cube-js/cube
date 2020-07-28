@@ -1,7 +1,9 @@
 import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
-
+import {
+  fromPairs
+} from 'ramda';
 export default {
   components: {
     QueryRenderer,
@@ -32,6 +34,7 @@ export default {
       offset: null,
       renewQuery: false,
       order: null,
+      orderMembers:null,
     };
 
     data.granularities = [
@@ -69,6 +72,7 @@ export default {
       setOffset,
       removeOffset,
       renewQuery,
+      orderMembers,
       order
     } = this;
 
@@ -98,8 +102,10 @@ export default {
         removeOffset,
         renewQuery,
         order,
+        orderMembers,
         setOrder: this.setOrder
       };
+
 
       QUERY_ELEMENTS.forEach((e) => {
         const name = e.charAt(0).toUpperCase() + e.slice(1);
@@ -120,6 +126,13 @@ export default {
           this.setMembers(e, members);
         };
       });
+
+      builderProps["updateOrderMembers"] = (id,order)=>{
+        this.updateOrderMembers(id,order)
+      }
+      builderProps["reOrder"] = (sourceIndex, destinationIndex)=>{
+        this.reOrder(sourceIndex,destinationIndex)
+      }
     }
 
     // Pass parent slots to child QueryRenderer component
@@ -189,8 +202,8 @@ export default {
           validatedQuery.offset = this.offset;
         }
 
-        if (this.order) {
-          validatedQuery.order = this.order;
+        if (this.orderMembers) {
+          validatedQuery.order =fromPairs(this.orderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean));
         }
 
         if (this.renewQuery) {
@@ -220,12 +233,14 @@ export default {
         dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
         index: i
       }));
+
       this.filters = (filters || []).map((m, i) => ({
         ...m,
         member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
         operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
         index: i
       }));
+
 
       this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
       this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
@@ -259,18 +274,25 @@ export default {
         }
       } else if (element === 'filters') {
         const filterMember = {
-          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
+          ...this.meta.resolveMember(member.dimension || member.member, ['dimensions', 'measures']),
+        };
+
+        const filterOperator = {
+          ...this.meta.filterOperatorsForMember(member.member || member.dimension, ['dimensions', 'measures']),
         };
 
         mem = {
           ...member,
           member: filterMember,
+          operators:filterOperator,
         };
       } else {
         mem = this[`available${name}`].find(m => m.name === member);
       }
 
       if (mem) { this[element].push(mem); }
+
+      this.getOrderMembers();
     },
     removeMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
@@ -288,6 +310,8 @@ export default {
         const index = this[element].findIndex(x => x.name === mem);
         this[element].splice(index, 1);
       }
+      this.getOrderMembers();
+
     },
     updateMember(element, old, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
@@ -313,8 +337,9 @@ export default {
         }
       } else if (element === 'filters') {
         index = this[element].findIndex(x => x.dimension === old);
+
         const filterMember = {
-          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
+          ...this.meta.resolveMember(member.dimension || member.member , ['dimensions', 'measures']),
         };
 
         mem = {
@@ -329,6 +354,39 @@ export default {
       if (mem) {
         this[element].splice(index, 1, mem);
       }
+      this.getOrderMembers();
+
+    },
+    getOrderMembers(){
+      const toOrderMember = (member) => ({
+        id: member.name,
+        title: member.title
+      });
+
+      const orderMembers = this.measures.map(toOrderMember)
+        .concat(this.dimensions.map(toOrderMember))
+        .concat(this.timeDimensions.map((td)=>toOrderMember(td.dimension)))
+        .map((member) => ({
+          ...member,
+          order: (this.query.order && this.query.order[member.id]) || 'none'
+        }))
+      this.setOrderMembers(orderMembers)
+    },
+    updateOrderMembers(id,order){
+      this.orderMembers.map(o=>{
+        if(o.id==id){
+          o.order = order;
+        }
+        return o;
+      })
+      this.orderMembers = JSON.parse(JSON.stringify(this.orderMembers))
+    },
+    reOrder(sourceIndex, destinationIndex){
+      if (sourceIndex == null || destinationIndex == null) {
+        return;
+      }
+      const [removed] = this.orderMembers.splice(sourceIndex,1)
+      this.orderMembers.splice(destinationIndex, 0, removed);
     },
     setMembers(element, members) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
@@ -387,10 +445,14 @@ export default {
     },
     setOrder(order = {}) {
       this.order = order;
+    },
+    setOrderMembers(orderMembers = {}) {
+      this.orderMembers = orderMembers;
     }
   },
 
   watch: {
+
     query: {
       deep: true,
       handler() {
