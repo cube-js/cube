@@ -51,9 +51,9 @@ The table below shows which environment variables are used for different databas
 | Snowflake | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`|
 | Presto | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 
-### Configuring a Connection to an External Database
+### Configuring a Connection to an External Pre-aggregations Database
 
-To enable the pre-aggregation engine and leverage the two-level [caching](caching) system, an external database should be configured.
+To enable [external pre-aggregations](pre-aggregations#external-pre-aggregations) you need to confiure an external database to store these pre-aggregations.
 
 Cube.js provides a set of environment variables to configure a connection to an external database:
 
