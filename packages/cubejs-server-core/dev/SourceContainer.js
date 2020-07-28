@@ -8,10 +8,8 @@ class SourceContainer {
   }
 
   mergeSnippetToFile(snippet, fileName, content) {
-    console.log('!mergeSnippetToFile!', fileName, content);
     const targetSource = this.targetSourceByFile(fileName, content);
     
-    console.log('will .mergeTo on snippet', snippet);
     snippet.mergeTo(targetSource);
   }
 

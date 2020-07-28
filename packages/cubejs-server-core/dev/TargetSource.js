@@ -1,10 +1,7 @@
 const { parse } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const generator = require('@babel/generator').default;
-
-// const prettier = require('prettier/standalone');
-// eslint-disable-next-line global-require
-// const plugins = [require('prettier/parser-babylon')];
+const prettier = require('prettier');
 
 class TargetSource {
   constructor(fileName, source) {
@@ -68,9 +65,10 @@ class TargetSource {
   }
 
   static formatCode(code) {
-    return code;
-    // todo: fix prettier
-    // return prettier.format(code, { parser: 'babylon', plugins });
+    return prettier.format(code, {
+      parser: 'babel',
+      singleQuote: true,
+    });
   }
 }
 

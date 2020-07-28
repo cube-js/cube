@@ -4,7 +4,7 @@ import fetch from './playgroundFetch';
 const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
 
 const repo = {
-  owner: 'cube.js',
+  owner: 'cube-js',
   name: 'cubejs-playground-templates'
 };
 
@@ -23,7 +23,7 @@ class DashboardSource {
     }
   }
 
-  async applyTemplatePackages(templateName, templateConfig) {
+  async applyTemplatePackages(toApply, templateConfig = null) {
     if (!this.playgroundContext) {
       this.playgroundContext = await this.loadContext();
     }
@@ -33,7 +33,7 @@ class DashboardSource {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        templateName,
+        toApply,
         templateConfig: templateConfig || {
           credentials: this.playgroundContext
         }
@@ -75,11 +75,7 @@ class DashboardSource {
       'create-react-app',
       Object.keys(this.installedTemplates).find(template => template.match(/-static$/)), // TODO
       'static-chart'
-    ], {
-      'static-chart': {
-        chartCode
-      }
-    });
+    ], { chartCode });
   }
   
   async templates() {

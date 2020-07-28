@@ -194,8 +194,8 @@ class TemplateGalleryPage extends Component {
               templatePackageName,
               `${chartLibrary}-charts`,
               `${templatePackageName.match(/^react-(\w+)/)[1]}-tables`, // TODO
-              'credentials'
-            ].concat(enableWebSocketTransport ? ['web-socket-transport'] : []);
+              'react-credentials'
+            ].concat(enableWebSocketTransport ? ['react-web-socket-transport'] : []);
             await this.dashboardSource.applyTemplatePackages(templatePackages);
             history.push('/dashboard');
           }}

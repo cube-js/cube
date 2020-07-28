@@ -6,7 +6,11 @@ const { fileContentsRecursive, executeCommand } = require('./utils');
 
 class AppContainer {
   static getPackageVersions(appPath) {
-    return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};
+    try {
+      return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};
+    } catch (error) {
+      return {};
+    }
   }
   
   constructor(rootNode, { appPath, packagesPath }, playgroundContext) {
@@ -35,7 +39,11 @@ class AppContainer {
 
     node.children.forEach((currentNode) => {
       this.setChildren(currentNode);
-      node.packageInstance.children.push(currentNode.packageInstance);
+      const [installsTo] = Object.keys(currentNode.package.installsTo);
+      if (!node.packageInstance.children[installsTo]) {
+        node.packageInstance.children[installsTo] = [];
+      }
+      node.packageInstance.children[installsTo].push(currentNode.packageInstance);
     });
   }
 

@@ -8,7 +8,7 @@ const DependencyTree = require('../dev/DependencyTree');
 const PackageFetcher = require('../dev/PackageFetcher');
 
 const repo = {
-  owner: 'cube.js',
+  owner: 'cube-js',
   name: 'cubejs-playground-templates'
 };
 
@@ -183,14 +183,20 @@ class DevServer {
       const fetcher = new PackageFetcher(repo);
 
       this.cubejsServer.event('Dev Server App File Write');
-      const { templateName, templateConfig } = req.body;
+      const { toApply, templateConfig } = req.body;
       
       const manifestJson = await fetcher.manifestJSON();
       const response = await fetcher.downloadPackages();
       
-      const { templatePackages } = manifestJson.templates.find(({ name }) => name === templateName);
+      let templatePackages = [];
+      if (typeof toApply === 'string') {
+        templatePackages = manifestJson.templates.find(({ name }) => name === toApply);
+      } else {
+        templatePackages = toApply;
+      }
       
       const dt = new DependencyTree(manifestJson, templatePackages);
+      
       const appContainer = new AppContainer(
         dt.getRootNode(),
         {
@@ -206,6 +212,7 @@ class DevServer {
         this.cubejsServer.event('Dev Server Create Dashboard App Success');
 
         this.cubejsServer.event('Dev Server Dashboard Npm Install');
+        
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
         
