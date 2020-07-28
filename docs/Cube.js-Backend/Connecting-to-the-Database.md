@@ -24,7 +24,7 @@ Cube.js currently provides connectors to the following databases:
 
 _If you'd like to connect to a database which is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver)._
 
-### Configuring Connection for Cube.js CLI Created Apps
+### Configuring a Connection for Cube.js CLI Created Apps
 
 When you create a new Cube.js service with the [Cube.js CLI](using-the-cubejs-cli), the `.env` will be
 generated to manage all connection credentials. The set of variables could be different based on your database type. For example, for PostgreSQL the `.env` will look like this:
@@ -50,6 +50,21 @@ The table below shows which environment variables are used for different databas
 | MongoDB | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` |
 | Snowflake | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`|
 | Presto | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
+
+### Configuring a Connection to an External Database
+
+To enable the pre-aggregation engine and leverage the two-level [caching](caching) system, an external database should be configured.
+
+Cube.js provides a set of environment variables to configure a connection to an external database:
+
+```bash
+CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
+CUBEJS_EXT_DB_PORT=<YOUR_DB_PORT_HERE>
+CUBEJS_EXT_DB_NAME=<YOUR_DB_NAME_HERE>
+CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
+CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
+CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
+```  
 
 ## Notes
 
