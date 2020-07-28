@@ -278,7 +278,7 @@ cube(`Orders`, {
 ```
 
 In order to make external pre-aggregations work you should set
-[externalDriverFactory](@cubejs-backend-server-core#external-driver-factory) and [externalDbType](@cubejs-backend-server-core#external-db-type) params while creating your server instance.
+[externalDriverFactory](@cubejs-backend-server-core#external-driver-factory) and [externalDbType](@cubejs-backend-server-core#external-db-type) params while creating your server instance. Also, you can set these params via [environment variables](connecting-to-the-database#configuring-a-connection-to-an-external-database).
 
 Note that by default, Cube.js materializes the pre-aggregration query results as new tables in the source database. For external pre-aggregations, these source tables are temporary - once downloaded and uploaded to the external database, they are cleaned-up.
 
