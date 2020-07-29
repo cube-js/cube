@@ -190,7 +190,8 @@ class DevServer {
       
       let templatePackages = [];
       if (typeof toApply === 'string') {
-        templatePackages = manifestJson.templates.find(({ name }) => name === toApply);
+        const template = manifestJson.templates.find(({ name }) => name === toApply);
+        templatePackages = template.templatePackages;
       } else {
         templatePackages = toApply;
       }
