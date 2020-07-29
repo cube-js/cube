@@ -150,6 +150,7 @@ export default function PlaygroundQueryBuilder({
                     <Popover
                         content={(
                           <Pivot
+                            limit={query.limit}
                             pivotConfig={pivotConfig}
                             onMove={updatePivotConfig.moveItem}
                             onUpdate={updatePivotConfig.update}
