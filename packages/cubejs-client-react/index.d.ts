@@ -44,6 +44,8 @@ declare module '@cubejs-client/react' {
    */
   export const CubeProvider: React.FC<CubeProviderVariables>;
 
+  export const CubeContext: Context<{ cubejsApi: CubejsApi }>;
+
   type TLoadingState = {
     isLoading: boolean;
   };
