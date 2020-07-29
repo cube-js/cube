@@ -65,8 +65,9 @@ declare module '@cubejs-client/react' {
    *   };
    *
    *   React.useEffect(() => {
-   *     const resultSet = await cubejsApi.load(query);
-   *     setRawResults(resultSet.rawData());
+   *     const resultSet = cubejsApi.load(query).then(resultSet => {
+   *       setRawResults(resultSet.rawData());
+   *     });
    *   }, [query]);
    *
    *   return (
