@@ -53,6 +53,26 @@ declare module '@cubejs-client/react' {
    * @order 10
    */
   export const CubeProvider: React.FC<CubeProviderVariables>;
+  
+  type CubeContextProps = {
+    cubejsApi: CubejsApi;
+  }
+  
+  /**
+   * In case when you need access to `cubejsApi` directly you can use `CubeContext` anywhere in your app
+   * ```js
+   * import { useContext } from 'react'
+   * import { CubeContext } from '@cubejs-client/react';
+   * 
+   * function MyComponent() {
+   *   const { cubejsApi } = useContext(CubeContext);
+   * 
+   *   return ...
+   * }
+   * 
+   * ```
+   */
+  export const CubeContext: React.Context<CubeContextProps>
 
   type TLoadingState = {
     isLoading: boolean;

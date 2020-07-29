@@ -226,11 +226,34 @@ export default function App() {
 }
 ```
 
+## CubeContext
+
+• **CubeContext**: *Context‹[CubeContextProps](#types-cube-context-props)›*
+
+In case when you need to access `cubejsApi` directly somewhere in your app you can use `CubeContext`
+```js
+import { useContext } from 'react'
+import { CubeContext } from '@cubejs-client/react';
+
+function MyComponent() {
+  const { cubejsApi } = useContext(CubeContext);
+
+  return ...
+}
+
+```
+
 ## Types
 
 ### ChartType
 
 Ƭ **ChartType**: *"line" | "bar" | "table" | "area"*
+
+### CubeContextProps
+
+Name | Type |
+------ | ------ |
+cubejsApi | CubejsApi |
 
 ### CubeProviderVariables
 
