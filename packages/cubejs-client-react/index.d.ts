@@ -44,22 +44,34 @@ declare module '@cubejs-client/react' {
    */
   export const CubeProvider: React.FC<CubeProviderVariables>;
 
+  type CubeContextVariables = {
+    cubejsApi: CubejsApi;
+  };
+
   /**
    * Cube.js context consumer
+   * In case when you need access to cubejsApi directly you can use CubeContext anywhere in your app
+   *
    * ```js
    * import React from 'react';
    * import { CubeContext } from '@cubejs-client/react';
    *
    *
    * export default function DisplayComponent() {
-   * const { cubejsApi } = React.useContext(CubeContext);
-   * const query = {
-   *   ...
-   * };
-   * const resultSet = await cubejsApi.load(query);
+   *   const { cubejsApi } = React.useContext(CubeContext);
+   *   const [rawResults, setRawResults] = React.useState([]);
+   *   const query = {
+   *     ...
+   *   };
+   *
+   *   React.useEffect(() => {
+   *     const resultSet = await cubejsApi.load(query);
+   *     setRawResults(resultSet.rawData());
+   *   }, [query]);
+   *
    *   return (
    *     <>
-   *       {resultSet.rawData().map(row => (
+   *       {rawResults.map(row => (
    *         ...
    *       ))}
    *     </>
@@ -67,7 +79,7 @@ declare module '@cubejs-client/react' {
    * }
    * ```
    */
-  export const CubeContext: Context<{ cubejsApi: CubejsApi }>;
+  export const CubeContext: React.Context<CubeContextVariables>;
 
   type TLoadingState = {
     isLoading: boolean;
