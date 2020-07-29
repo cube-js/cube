@@ -41,33 +41,10 @@ class Meta {
     ]));
   }
 
-  /**
-   * Get all members of specific type for a given query.
-   * If empty query is provided no filtering is done based on query context and all available members are retrieved.
-   * @param query - context query to provide filtering of members available to add to this query
-   * @param memberType - `measures`, `dimensions` or `segments`
-   */
   membersForQuery(query, memberType) {
     return unnest(this.cubes.map(c => c[memberType]));
   }
-
-  /**
-   * Get meta information for member of a cube
-   * Member meta information contains:
-   * ```javascript
-   * {
-   *   name,
-   *   title,
-   *   shortTitle,
-   *   type,
-   *   description,
-   *   format
-   * }
-   * ```
-   * @param memberName - Fully qualified member name in a form `Cube.memberName`
-   * @param memberType - `measures`, `dimensions` or `segments`
-   * @return {Object} containing meta information about member
-   */
+  
   resolveMember(memberName, memberType) {
     const [cube] = memberName.split('.');
     if (!this.cubesMap[cube]) {

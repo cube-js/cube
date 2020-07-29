@@ -1,5 +1,15 @@
 import * as React from 'react';
-import { CubejsApi, Query, ResultSet, Filter, PivotConfig } from '@cubejs-client/core';
+import {
+  CubejsApi,
+  Query,
+  ResultSet,
+  Filter,
+  PivotConfig,
+  MemberType,
+  TCubeMeasure,
+  TCubeDimension,
+  TCubeMember,
+} from '@cubejs-client/core';
 
 /**
  * @title @cubejs-client/react
@@ -144,19 +154,19 @@ declare module '@cubejs-client/react' {
     /**
      * An array of available measures to select. They are loaded via the API from Cube.js Backend.
      */
-    availableMeasures: TAvailableMeasure[];
+    availableMeasures: TCubeMeasure[];
     /**
      * An array of available dimensions to select. They are loaded via the API from Cube.js Backend.
      */
-    availableDimensions: TAvailableDimension[];
+    availableDimensions: TCubeDimension[];
     /**
      * An array of available time dimensions to select. They are loaded via the API from Cube.js Backend.
      */
-    availableTimeDimensions: TAvailableDimension[];
+    availableTimeDimensions: TCubeDimension[];
     /**
      * An array of available segments to select. They are loaded via the API from Cube.js Backend.
      */
-    availableSegments: TMember[];
+    availableSegments: TCubeMember[];
 
     updateMeasures: MemberUpdater;
     updateDimensions: MemberUpdater;
@@ -298,28 +308,6 @@ declare module '@cubejs-client/react' {
    */
   export function isQueryPresent(query: Query): boolean;
 
-  type TMember = {
-    name: string;
-    title: string;
-    shortTitle: string;
-  };
-
-  type TMemberType = 'time' | 'number' | 'string' | 'boolean';
-
-  type TAvailableMeasure = TMember & {
-    type: TMemberType;
-    drillMembers: string[];
-    drillMembersGrouped: {
-      measures: TMember[];
-      dimensions: TMember[];
-    };
-  };
-
-  type TAvailableDimension = TMember & {
-    type: TMemberType;
-    suggestFilterValues: boolean;
-  };
-
   /**
    * You can use the following methods for member manipulaltion
    * ```js
@@ -390,8 +378,8 @@ declare module '@cubejs-client/react' {
    * ```
    */
   type MemberUpdater = {
-    add: (member: TMember) => void;
-    remove: (member: TMember) => void;
-    update: (member: TMember, updateWith: TMember) => void;
+    add: (member: MemberType) => void;
+    remove: (member: MemberType) => void;
+    update: (member: MemberType, updateWith: MemberType) => void;
   };
 }
