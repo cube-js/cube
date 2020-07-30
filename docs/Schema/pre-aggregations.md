@@ -523,3 +523,12 @@ cube(`Orders`, {
   }
 });
 ```
+
+## Pre-aggregations Garbage Collection
+
+When pre-aggregations are refreshed Cube.js will create new pre-aggregation table each time it's version change.
+It allows to seamlessly hot swap tables for any database and even for those without DDL transactions support.
+It leads to orphaned tables which need to be collected over time though.
+By default Cube.js will store all content versions for 10 minutes and all structure versions for 7 days. 
+Then it'll retain only the most recent ones and orphaned tables are dropped from database.
+
