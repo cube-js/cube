@@ -201,7 +201,7 @@ resultSet | ResultSet &#124; null |
 
 ## CubeProvider
 
-• **CubeProvider**: *React.FC‹[CubeProviderVariables](#types-cube-provider-variables)›*
+• **CubeProvider**: *React.FC‹[CubeProviderProps](#types-cube-provider-props)›*
 
 Cube.js context provider
 ```js
@@ -230,17 +230,33 @@ export default function App() {
 
 • **CubeContext**: *Context‹[CubeContextProps](#types-cube-context-props)›*
 
-In case when you need to access `cubejsApi` directly somewhere in your app you can use `CubeContext`
+In case when you need access to `cubejsApi` directly you can use `CubeContext` anywhere in your app
+
 ```js
-import { useContext } from 'react'
+import React from 'react';
 import { CubeContext } from '@cubejs-client/react';
 
-function MyComponent() {
-  const { cubejsApi } = useContext(CubeContext);
+export default function DisplayComponent() {
+  const { cubejsApi } = React.useContext(CubeContext);
+  const [rawResults, setRawResults] = React.useState([]);
+  const query = {
+    ...
+  };
 
-  return ...
+  React.useEffect(() => {
+    cubejsApi.load(query).then((resultSet) => {
+      setRawResults(resultSet.rawData());
+    });
+  }, [query]);
+
+  return (
+    <>
+      {rawResults.map(row => (
+        ...
+      ))}
+    </>
+  )
 }
-
 ```
 
 ## Types
@@ -255,7 +271,7 @@ Name | Type |
 ------ | ------ |
 cubejsApi | CubejsApi |
 
-### CubeProviderVariables
+### CubeProviderProps
 
 Name | Type |
 ------ | ------ |

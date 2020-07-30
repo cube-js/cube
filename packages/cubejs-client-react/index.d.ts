@@ -21,7 +21,7 @@ import {
  */
 
 declare module '@cubejs-client/react' {
-  type CubeProviderVariables = {
+  type CubeProviderProps = {
     cubejsApi: CubejsApi;
     children: React.ReactNode;
   };
@@ -52,40 +52,18 @@ declare module '@cubejs-client/react' {
    * @stickyTypes
    * @order 10
    */
-  export const CubeProvider: React.FC<CubeProviderVariables>;
+  export const CubeProvider: React.FC<CubeProviderProps>;
   
   type CubeContextProps = {
     cubejsApi: CubejsApi;
   }
-  
-  /**
-   * In case when you need access to `cubejsApi` directly you can use `CubeContext` anywhere in your app
-   * ```js
-   * import { useContext } from 'react'
-   * import { CubeContext } from '@cubejs-client/react';
-   * 
-   * function MyComponent() {
-   *   const { cubejsApi } = useContext(CubeContext);
-   * 
-   *   return ...
-   * }
-   * 
-   * ```
-   */
-  export const CubeContext: React.Context<CubeContextProps>
-
-  type CubeContextVariables = {
-    cubejsApi: CubejsApi;
-  };
 
   /**
-   * Cube.js context consumer
-   * In case when you need access to cubejsApi directly you can use CubeContext anywhere in your app
+   * In case when you need direct access to `cubejsApi` you can use `CubeContext` anywhere in your app
    *
    * ```js
    * import React from 'react';
    * import { CubeContext } from '@cubejs-client/react';
-   *
    *
    * export default function DisplayComponent() {
    *   const { cubejsApi } = React.useContext(CubeContext);
@@ -95,7 +73,7 @@ declare module '@cubejs-client/react' {
    *   };
    *
    *   React.useEffect(() => {
-   *     const resultSet = cubejsApi.load(query).then(resultSet => {
+   *     cubejsApi.load(query).then((resultSet) => {
    *       setRawResults(resultSet.rawData());
    *     });
    *   }, [query]);
@@ -110,7 +88,7 @@ declare module '@cubejs-client/react' {
    * }
    * ```
    */
-  export const CubeContext: React.Context<CubeContextVariables>;
+  export const CubeContext: React.Context<CubeContextProps>;
 
   type TLoadingState = {
     isLoading: boolean;
