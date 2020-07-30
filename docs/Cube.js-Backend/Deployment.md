@@ -362,7 +362,7 @@ To test just built docker image, you need to set environment variables required 
 Generate a secret for JWT Tokens as described in [Security](/security) section and fill in database credentials.
 
 ```bash
-$ docker --rm \
+$ docker run --rm \
   --name cubejs-docker-demo \
   -e CUBEJS_API_SECRET=<YOUR-API-SECRET> \
   -e CUBEJS_DB_HOST=<YOUR-DB-HOST-HERE> \
