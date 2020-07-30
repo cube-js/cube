@@ -240,6 +240,11 @@ class DevServer {
       
       res.json(true); // TODO
     }));
+    
+    app.get('/playground/manifest', catchErrors(async (_, res) => {
+      const fetcher = new PackageFetcher(repo);
+      res.json(await fetcher.manifestJSON());
+    }));
 
     app.use(serveStatic(path.join(__dirname, '../playground'), {
       lastModified: false,

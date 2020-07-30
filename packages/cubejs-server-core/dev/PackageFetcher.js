@@ -7,7 +7,7 @@ const path = require('path');
 class PackageFetcher {
   constructor(repo) {
     this.repo = repo;
-    this.tmpFolderPath = path.join(__dirname, '__tmp__');
+    this.tmpFolderPath = path.resolve('.', 'node_modules', '.tmp');
     
     try {
       fs.mkdirSync(this.tmpFolderPath);
@@ -55,7 +55,7 @@ class PackageFetcher {
     });
 
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
-
+    
     return {
       packagesPath: path.join(this.tmpFolderPath, dir, 'packages'),
     };
