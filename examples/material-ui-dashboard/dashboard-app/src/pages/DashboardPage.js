@@ -37,6 +37,34 @@ const cards = [
     duration: 2.25,
   },
 ];
+const barChartQuery = {
+  measures: ['Orders.count'],
+  timeDimensions: [
+    {
+      dimension: 'Orders.createdAt',
+      granularity: 'day',
+      dateRange: 'This week',
+    },
+  ],
+  dimensions: ['Orders.status'],
+  filters: [
+      {
+        dimension: 'Orders.status',
+        operator: 'notEquals',
+        values: ['completed'],
+      },
+    ],
+};
+const doughnutChartQuery = {
+  measures: ['Orders.count'],
+  timeDimensions: [
+    {
+      dimension: 'Orders.createdAt',
+    },
+  ],
+  filters: [],
+  dimensions: ['Orders.status'],
+};
 
 const Dashboard = () => {
   const classes = useStyles();
@@ -51,10 +79,10 @@ const Dashboard = () => {
           );
         })}
         <Grid item lg={8} md={12} xl={9} xs={12}>
-          <BarChart />
+          <BarChart query={barChartQuery}/>
         </Grid>
         <Grid item lg={4} md={6} xl={3} xs={12}>
-          <DoughnutChart />
+          <DoughnutChart query={doughnutChartQuery}/>
         </Grid>
       </Grid>
     </div>

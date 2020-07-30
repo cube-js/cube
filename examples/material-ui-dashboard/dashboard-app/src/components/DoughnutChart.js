@@ -35,19 +35,9 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const query = {
-  measures: ['Orders.count'],
-  timeDimensions: [
-    {
-      dimension: 'Orders.createdAt',
-    },
-  ],
-  filters: [],
-  dimensions: ['Orders.status'],
-};
 
 const DoughnutChart = (props) => {
-  const { className, cubejsApi, ...rest } = props;
+  const { className, cubejsApi, query, ...rest } = props;
 
   const classes = useStyles();
   const theme = useTheme();
