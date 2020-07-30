@@ -42,7 +42,7 @@ async function fileContentsRecursive(dir, rootPath, includeNodeModules) {
 
 function executeCommand(command, args, options = {}) {
   const child = spawn(command, args, { stdio: 'inherit', ...options });
-  
+
   return new Promise((resolve, reject) => {
     child.on('close', (code) => {
       if (code !== 0) {
@@ -56,5 +56,5 @@ function executeCommand(command, args, options = {}) {
 
 module.exports = {
   fileContentsRecursive,
-  executeCommand
+  executeCommand,
 };

@@ -1,5 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
+const traverse = require('@babel/traverse').default;
+const { parse } = require('@babel/parser');
 
 const SourceContainer = require('./SourceContainer');
 const { fileContentsRecursive, executeCommand } = require('./utils');
@@ -66,8 +68,8 @@ class AppContainer {
 
       child.packageInstance = instance;
 
-      child.children.forEach((child) => {
-        stack.push(child);
+      child.children.forEach((currentChild) => {
+        stack.push(currentChild);
       });
     }
   }
@@ -111,11 +113,27 @@ class AppContainer {
 
   async importDependencies() {
     const sourceContainer = await this.loadSources();
-
-    const allImports = sourceContainer.sourceFiles
+    
+    const allImports = sourceContainer.outputSources()
       .filter((f) => f.fileName.match(/\.js$/))
-      .map((f) => sourceContainer.targetSourceByFile(f.fileName).imports)
+      .map(({ fileName, content }) => {
+        const imports = [];
+        
+        const ast = parse(content, {
+          sourceFilename: fileName,
+          sourceType: 'module',
+          plugins: ['jsx'],
+        });
+
+        traverse(ast, {
+          ImportDeclaration(currentPath) {
+            imports.push(currentPath);
+          },
+        });
+        return imports;
+      })
       .reduce((a, b) => a.concat(b));
+      
     const dependencies = allImports
       .filter((i) => i.get('source').node.value.indexOf('.') !== 0)
       .map((i) => {

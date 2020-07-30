@@ -1,47 +1,27 @@
-const TargetSource = require('./TargetSource');
-const CssTargetSource = require('./CssTargetSource');
+const { toPairs, fromPairs } = require('ramda');
 
 class SourceContainer {
   constructor(sourceFiles) {
-    this.sourceFiles = sourceFiles || [];
     this.fileToTargetSource = {};
+    this.fileContent = fromPairs(sourceFiles.map(({ fileName, content }) => [fileName, content]));
   }
 
-  mergeSnippetToFile(snippet, fileName, content) {
-    const targetSource = this.targetSourceByFile(fileName, content);
-    
-    snippet.mergeTo(targetSource);
-  }
-
-  targetSourceByFile(fileName, content) {
-    let file = this.sourceFiles.find((f) => f.fileName === fileName);
-    if (!file) {
-      file = {
-        fileName,
-        content,
-      };
-    }
-    if (!this.fileToTargetSource[fileName]) {
-      this.fileToTargetSource[fileName] = this.createTargetSource(
-        file.fileName,
-        file.content
-      );
-    }
+  getTargetSource(fileName) {
     return this.fileToTargetSource[fileName];
   }
 
-  createTargetSource(fileName, content) {
-    if (fileName.match(/\.css$/)) {
-      return new CssTargetSource(fileName, content);
-    } else {
-      return new TargetSource(fileName, content);
-    }
+  addTargetSource(fileName, target) {
+    this.fileToTargetSource[fileName] = target;
+  }
+
+  add(fileName, content) {
+    this.fileContent[fileName] = content;
   }
 
   outputSources() {
-    return Object.keys(this.fileToTargetSource).map((fileName) => ({
+    return toPairs(this.fileContent).map(([fileName, content]) => ({
       fileName,
-      content: this.fileToTargetSource[fileName].formattedCode(),
+      content,
     }));
   }
 }
