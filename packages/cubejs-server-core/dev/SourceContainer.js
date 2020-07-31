@@ -4,6 +4,7 @@ class SourceContainer {
   constructor(sourceFiles) {
     this.fileToTargetSource = {};
     this.fileContent = fromPairs(sourceFiles.map(({ fileName, content }) => [fileName, content]));
+    this.importDependencies = {};
   }
 
   getTargetSource(fileName) {
@@ -16,6 +17,14 @@ class SourceContainer {
 
   add(fileName, content) {
     this.fileContent[fileName] = content;
+  }
+  
+  addImportDependencies(importDependencies = {}) {
+    // todo: version validation
+    this.importDependencies = {
+      ...this.importDependencies,
+      ...importDependencies
+    };
   }
 
   outputSources() {

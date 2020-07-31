@@ -1,7 +1,6 @@
+const R = require('ramda');
 const fs = require('fs-extra');
 const path = require('path');
-const traverse = require('@babel/traverse').default;
-const { parse } = require('@babel/parser');
 
 const SourceContainer = require('./SourceContainer');
 const { fileContentsRecursive, executeCommand } = require('./utils');
@@ -14,7 +13,7 @@ class AppContainer {
       return {};
     }
   }
-  
+
   constructor(rootNode, { appPath, packagesPath }, playgroundContext) {
     this.rootNode = rootNode;
     this.playgroundContext = playgroundContext;
@@ -96,75 +95,23 @@ class AppContainer {
   }
 
   async ensureDependencies() {
-    const dependencies = await this.importDependencies();
-    const packageJson = await fs.readJson(path.join(this.appPath, 'package.json'));
+    const dependencies = this.sourceContainer.importDependencies;
+    const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+
     if (!packageJson || !packageJson.dependencies) {
       return [];
     }
-    const toInstall = Object.keys(dependencies)
-      .filter((dependency) => !packageJson.dependencies[dependency])
-      .map((dependency) => (dependency === 'graphql-tools' ? `${dependency}@5.0.0` : dependency));
 
+    const toInstall = R.toPairs(dependencies)
+      .filter(([dependency]) => !packageJson.dependencies[dependency])
+      .map(([dependency, version]) => (version !== 'latest' ? `${dependency}@${version}` : dependency));
+      
     if (toInstall.length) {
       await this.executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(this.appPath) });
     }
     return toInstall;
   }
 
-  async importDependencies() {
-    const sourceContainer = await this.loadSources();
-    
-    const allImports = sourceContainer.outputSources()
-      .filter((f) => f.fileName.match(/\.js$/))
-      .map(({ fileName, content }) => {
-        const imports = [];
-        
-        const ast = parse(content, {
-          sourceFilename: fileName,
-          sourceType: 'module',
-          plugins: ['jsx'],
-        });
-
-        traverse(ast, {
-          ImportDeclaration(currentPath) {
-            imports.push(currentPath);
-          },
-        });
-        return imports;
-      })
-      .reduce((a, b) => a.concat(b));
-      
-    const dependencies = allImports
-      .filter((i) => i.get('source').node.value.indexOf('.') !== 0)
-      .map((i) => {
-        const importName = i.get('source').node.value.split('/');
-        const dependency = importName[0].indexOf('@') === 0 ? [importName[0], importName[1]].join('/') : importName[0];
-        return this.withPeerDependencies(dependency);
-      })
-      .reduce((a, b) => ({ ...a, ...b }));
-
-    return dependencies;
-  }
-
-  withPeerDependencies(dependency) {
-    let result = {
-      [dependency]: 'latest',
-    };
-    if (dependency === 'graphql-tag') {
-      result = {
-        ...result,
-        graphql: 'latest',
-      };
-    }
-    if (dependency === 'react-chartjs-2') {
-      result = {
-        ...result,
-        'chart.js': 'latest',
-      };
-    }
-    return result;
-  }
-  
   getPackageVersions() {
     return AppContainer.getPackageVersions(this.appPath);
   }

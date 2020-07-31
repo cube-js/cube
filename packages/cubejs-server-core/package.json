@@ -23,14 +23,6 @@
     "test": "jest --testPathPattern test/*.test.js --runInBand"
   },
   "dependencies": {
-    "@babel/core": "^7.7.4",
-    "@babel/generator": "^7.4.0",
-    "@babel/parser": "^7.4.2",
-    "@babel/preset-env": "^7.3.4",
-    "@babel/preset-react": "^7.0.0",
-    "@babel/standalone": "^7.3.4",
-    "@babel/traverse": "^7.4.0",
-    "@babel/types": "^7.4.0",
     "@cubejs-backend/api-gateway": "^0.19.54",
     "@cubejs-backend/query-orchestrator": "^0.19.54",
     "@cubejs-backend/schema-compiler": "^0.19.54",

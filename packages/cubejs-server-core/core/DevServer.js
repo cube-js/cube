@@ -185,29 +185,29 @@ class DevServer {
       this.cubejsServer.event('Dev Server App File Write');
       const { toApply, templateConfig } = req.body;
       
-      const manifestJson = await fetcher.manifestJSON();
-      const response = await fetcher.downloadPackages();
-      
-      let templatePackages = [];
-      if (typeof toApply === 'string') {
-        const template = manifestJson.templates.find(({ name }) => name === toApply);
-        templatePackages = template.templatePackages;
-      } else {
-        templatePackages = toApply;
-      }
-      
-      const dt = new DependencyTree(manifestJson, templatePackages);
-      
-      const appContainer = new AppContainer(
-        dt.getRootNode(),
-        {
-          appPath: dashboardAppPath,
-          packagesPath: response.packagesPath
-        },
-        templateConfig
-      );
-      
       const applyTemplates = async () => {
+        const manifestJson = await fetcher.manifestJSON();
+        const response = await fetcher.downloadPackages();
+        
+        let templatePackages = [];
+        if (typeof toApply === 'string') {
+          const template = manifestJson.templates.find(({ name }) => name === toApply);
+          templatePackages = template.templatePackages;
+        } else {
+          templatePackages = toApply;
+        }
+        
+        const dt = new DependencyTree(manifestJson, templatePackages);
+        
+        const appContainer = new AppContainer(
+          dt.getRootNode(),
+          {
+            appPath: dashboardAppPath,
+            packagesPath: response.packagesPath
+          },
+          templateConfig
+        );
+        
         this.cubejsServer.event('Dev Server Create Dashboard App');
         await appContainer.applyTemplates();
         this.cubejsServer.event('Dev Server Create Dashboard App Success');
@@ -237,7 +237,6 @@ class DevServer {
           this.applyTemplatePackagesPromise = null;
         }
       });
-      
       res.json(true); // TODO
     }));
     

@@ -4,6 +4,8 @@ const decompress = require('decompress');
 const decompressTargz = require('decompress-targz');
 const path = require('path');
 
+const { executeCommand } = require('./utils');
+
 class PackageFetcher {
   constructor(repo) {
     this.repo = repo;
@@ -53,8 +55,9 @@ class PackageFetcher {
     await decompress(this.repoArchivePath, this.tmpFolderPath, {
       plugins: [decompressTargz()],
     });
-
+    
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
+    await executeCommand('npm', ['install'], { cwd: path.resolve(this.tmpFolderPath, dir) });
     
     return {
       packagesPath: path.join(this.tmpFolderPath, dir, 'packages'),
