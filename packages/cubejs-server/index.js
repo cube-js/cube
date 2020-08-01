@@ -12,6 +12,7 @@ class CubejsServer {
     this.webSockets = config.webSockets;
     this.redirector = null;
     this.server = null;
+    this.initApp = config.initApp;
   }
 
   async listen(options = {}) {
@@ -28,6 +29,10 @@ class CubejsServer {
       const bodyParser = require("body-parser");
       app.use(require("cors")());
       app.use(bodyParser.json({ limit: "50mb" }));
+
+      if (this.initApp) {
+        await this.initApp(app);
+      }
 
       await this.core.initApp(app);
 
