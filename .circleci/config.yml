@@ -2,7 +2,7 @@ version: 2
 
 jobs:
   test:
-    resource_class: medium+
+    resource_class: large
     docker:
       - image: circleci/node:10.16
         environment:
@@ -108,7 +108,7 @@ jobs:
       - run: ./node_modules/.bin/lerna publish from-git --yes
 
   build:
-    resource_class: medium+
+    resource_class: large
     docker:
       - image: circleci/node:10.16
 
