@@ -41,10 +41,10 @@ class MongoBIDriver extends BaseDriver {
       database: process.env.CUBEJS_DB_NAME,
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
       ssl,
       authSwitchHandler: (data, cb) => {
-        const password = config.password || process.env.CUBEJS_DB_PASS || '';
+        const password = config.password || process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD || '';
         const buffer = Buffer.from((password).concat('\0'));
         cb(null, buffer);
       },

@@ -44,7 +44,7 @@ class OracleDriver extends BaseDriver {
 
     this.config = config || {
       user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
       db: process.env.CUBEJS_DB_NAME,
       host: process.env.CUBEJS_DB_HOST,
       port: 1521,

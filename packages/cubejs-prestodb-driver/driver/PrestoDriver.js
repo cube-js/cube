@@ -15,9 +15,9 @@ class PrestoDriver extends BaseDriver {
       catalog: process.env.CUBEJS_DB_CATALOG,
       schema: process.env.CUBEJS_DB_SCHEMA,
       user: process.env.CUBEJS_DB_USER,
-      basic_auth: process.env.CUBEJS_DB_PASS ? {
+      basic_auth: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD ? {
         user: process.env.CUBEJS_DB_USER,
-        password: process.env.CUBEJS_DB_PASS
+        password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD
       } : undefined,
       ...config
     };

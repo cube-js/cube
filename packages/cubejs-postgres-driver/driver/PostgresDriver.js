@@ -58,7 +58,7 @@ class PostgresDriver extends BaseDriver {
       database: process.env.CUBEJS_DB_NAME,
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
       ssl,
       ...config
     });

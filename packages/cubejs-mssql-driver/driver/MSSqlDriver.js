@@ -9,7 +9,7 @@ class MSSqlDriver extends BaseDriver {
       database: process.env.CUBEJS_DB_NAME,
       port: process.env.CUBEJS_DB_PORT && parseInt(process.env.CUBEJS_DB_PORT, 10),
       user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
       domain: process.env.CUBEJS_DB_DOMAIN && process.env.CUBEJS_DB_DOMAIN.trim().length > 0 ?
         process.env.CUBEJS_DB_DOMAIN : undefined,
       requestTimeout: 10 * 60 * 1000, // 10 minutes

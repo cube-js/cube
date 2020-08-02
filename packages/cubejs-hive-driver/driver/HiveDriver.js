@@ -46,7 +46,7 @@ class HiveDriver extends BaseDriver {
       dbName: process.env.CUBEJS_DB_NAME || 'default',
       timeout: 10000,
       username: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
       hiveType: process.env.CUBEJS_DB_HIVE_TYPE === 'CDH' ? HS2Util.HIVE_TYPE.CDH : HS2Util.HIVE_TYPE.HIVE,
       hiveVer: process.env.CUBEJS_DB_HIVE_VER || '2.1.1',
       thriftVer: process.env.CUBEJS_DB_HIVE_THRIFT_VER || '0.9.3',

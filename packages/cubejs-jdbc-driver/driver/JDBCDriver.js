@@ -38,7 +38,7 @@ const DbTypes = {
     },
     properties: {
       user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
     },
     jdbcUrl: () => `jdbc:mysql://${process.env.CUBEJS_DB_HOST}:3306/${process.env.CUBEJS_DB_NAME}`
   },
@@ -68,7 +68,7 @@ const DbTypes = {
     jdbcUrl: () => `jdbc:hive2://${process.env.CUBEJS_DB_HOST}:${process.env.CUBEJS_DB_PORT || "10000"}/${process.env.CUBEJS_DB_NAME}`,
     properties: {
       user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
     }
   },
   hive: {
@@ -82,7 +82,7 @@ const DbTypes = {
     jdbcUrl: () => `jdbc:hive2://${process.env.CUBEJS_DB_HOST}:${process.env.CUBEJS_DB_PORT || "10000"}/${process.env.CUBEJS_DB_NAME}`,
     properties: {
       user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      password: process.env.CUBEJS_DB_PASS || process.env.CUBEJS_DB_PASSWORD,
     }
   }
 };
