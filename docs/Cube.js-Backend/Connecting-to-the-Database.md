@@ -53,7 +53,7 @@ The table below shows which environment variables are used for different databas
 
 ### Configuring a Connection to an External Pre-aggregations Database
 
-To enable [external pre-aggregations](pre-aggregations#external-pre-aggregations) you need to confiure an external database to store these pre-aggregations.
+To enable [external pre-aggregations](pre-aggregations#external-pre-aggregations) you need to configure an external database to store these pre-aggregations.
 
 Cube.js provides a set of environment variables to configure a connection to an external database:
 
