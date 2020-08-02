@@ -425,7 +425,7 @@ class BaseQuery {
       )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure)))
     };
 
-    const toJoin =
+    let toJoin =
       (regularMeasures.length ? [
         this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(regularMeasures))
       ] : [])
@@ -450,6 +450,27 @@ class BaseQuery {
             )
           )(cumulativeMeasures)
         );
+
+    // Move regular measures to multiplied ones if there're same cubes to calculate.
+    // Most of the times it'll be much faster to calculate as there will be only single scan per cube
+    if (
+      regularMeasures.length &&
+      multipliedMeasures.length &&
+      !cumulativeMeasures.length
+    ) {
+      const cubeNames = R.pipe(R.map(m => m.cube().name), R.uniq, R.sortBy(R.identity));
+      const regularMeasuresCubes = cubeNames(regularMeasures);
+      const multipliedMeasuresCubes = cubeNames(multipliedMeasures);
+      if (R.equals(regularMeasuresCubes, multipliedMeasuresCubes)) {
+        toJoin = R.pipe(
+          R.groupBy(m => m.cube().name),
+          R.toPairs,
+          R.map(
+            ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+          )
+        )(regularMeasures.concat(multipliedMeasures));
+      }
+    }
 
     const join = R.drop(1, toJoin)
       .map(
@@ -1639,26 +1660,30 @@ class BaseQuery {
       return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
     }
     if (index.columns) {
-      const columns = this.cubeEvaluator.evaluateReferences(cube, index.columns, { originalSorting: true });
-      const escapedColumns = columns.map(column => {
-        const path = column.split('.');
-        if (path[0] &&
-          this.cubeEvaluator.cubeExists(path[0]) &&
-          (
-            this.cubeEvaluator.isMeasure(path) ||
-              this.cubeEvaluator.isDimension(path) ||
-              this.cubeEvaluator.isSegment(path)
-          )
-        ) {
-          return this.aliasName(column);
-        } else {
-          return column;
-        }
-      }).map(c => this.escapeColumnName(c));
+      const escapedColumns = this.evaluateIndexColumns(cube, index);
       return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
     } else {
       throw new Error(`Index SQL support is not implemented`);
     }
+  }
+
+  evaluateIndexColumns(cube, index) {
+    const columns = this.cubeEvaluator.evaluateReferences(cube, index.columns, { originalSorting: true });
+    return columns.map(column => {
+      const path = column.split('.');
+      if (path[0] &&
+        this.cubeEvaluator.cubeExists(path[0]) &&
+        (
+          this.cubeEvaluator.isMeasure(path) ||
+          this.cubeEvaluator.isDimension(path) ||
+          this.cubeEvaluator.isSegment(path)
+        )
+      ) {
+        return this.aliasName(column);
+      } else {
+        return column;
+      }
+    }).map(c => this.escapeColumnName(c));
   }
 
   createIndexSql(indexName, tableName, escapedColumns) {

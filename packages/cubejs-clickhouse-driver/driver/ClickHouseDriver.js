@@ -12,12 +12,12 @@ class ClickHouseDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
       queryOptions: {
-        database: process.env.CUBEJS_DB_NAME || config.database
+        database: process.env.CUBEJS_DB_NAME || config && config.database || 'default'
       },
       ...config
     };
     this.pool = genericPool.createPool({
-      create: () => new ClickHouse({
+      create: async () => new ClickHouse({
         ...this.config,
         queryOptions: {
           join_use_nulls: 1,
@@ -25,22 +25,13 @@ class ClickHouseDriver extends BaseDriver {
           ...this.config.queryOptions,
         }
       }),
-      destroy: () => Promise.resolve(),
-      validate: async (connection) => {
-        try {
-          await connection.querying('SELECT 1');
-        } catch (e) {
-          return false;
-        }
-        return true;
-      }
+      destroy: () => Promise.resolve()
     }, {
       min: 0,
       max: 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
-      testOnBorrow: true,
       acquireTimeoutMillis: 20000
     });
   }
