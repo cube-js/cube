@@ -2,7 +2,7 @@ version: 2
 
 jobs:
   test:
-    resource_class: large
+    resource_class: medium
     docker:
       - image: circleci/node:10.16
         environment:
@@ -81,7 +81,7 @@ jobs:
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
 
   publish:
-    resource_class: large
+    resource_class: medium
     docker:
       - image: circleci/node:10.16
 
@@ -109,7 +109,7 @@ jobs:
       - run: ./node_modules/.bin/lerna publish from-git --yes
 
   build:
-    resource_class: large
+    resource_class: medium
     docker:
       - image: circleci/node:10.16
 
