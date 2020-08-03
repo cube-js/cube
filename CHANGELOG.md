@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.56](https://github.com/cube-js/cube.js/compare/v0.19.55...v0.19.56) (2020-08-03)
+
+
+### Bug Fixes
+
+* allow renewQuery in dev mode with warning ([#868](https://github.com/cube-js/cube.js/issues/868)) Thanks to [@jcw](https://github.com/jcw)-! ([dbdbb5f](https://github.com/cube-js/cube.js/commit/dbdbb5f))
+* CubeContext ts type missing ([#913](https://github.com/cube-js/cube.js/issues/913)) ([f5f72cd](https://github.com/cube-js/cube.js/commit/f5f72cd))
+* membersForQuery return type ([#909](https://github.com/cube-js/cube.js/issues/909)) ([4976fcf](https://github.com/cube-js/cube.js/commit/4976fcf))
+* readme examples updates ([#893](https://github.com/cube-js/cube.js/issues/893)) ([0458af8](https://github.com/cube-js/cube.js/commit/0458af8))
+* using limit and offset together in MSSql ([9ba875c](https://github.com/cube-js/cube.js/commit/9ba875c))
+* Various ClickHouse improvements ([6f40847](https://github.com/cube-js/cube.js/commit/6f40847))
+
+
+
+
+
 ## [0.19.55](https://github.com/cube-js/cube.js/compare/v0.19.54...v0.19.55) (2020-07-23)
 
 
