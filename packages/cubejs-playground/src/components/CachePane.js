@@ -76,6 +76,7 @@ const CachePane = ({ query, cubejsApi }) => (
                   title: 'Refresh Key Value',
                   key: 'value',
                   render: (text, record) => rs && rs.loadResponse.usedPreAggregations
+                    && rs.loadResponse.usedPreAggregations[record.tableName].refreshKeyValues
                     && rs.loadResponse.usedPreAggregations[record.tableName].refreshKeyValues.map(k => (
                       <PrismCode
                         key={JSON.stringify(k)}

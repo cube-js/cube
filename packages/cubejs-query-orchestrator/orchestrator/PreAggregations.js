@@ -182,7 +182,16 @@ class PreAggregationLoader {
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
     this.externalRefresh = options.externalRefresh;
     if (this.externalRefresh && this.waitForRenew) {
-      throw new Error("Invalid configuration - when externalRefresh is true, it will not perform a renew, therefore you cannot wait for it using waitForRenew.");
+      const message = 'Invalid configuration - when externalRefresh is true, it will not perform a renew, therefore you cannot wait for it using waitForRenew.';
+      if (['production', 'test'].includes(process.env.NODE_ENV)) {
+        throw new Error(message);
+      } else {
+        this.logger('Invalid Configuration', {
+          requestId: this.requestId,
+          warning: message,
+        });
+        this.waitForRenew = false;
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
+const UserError = require('../compiler/UserError');
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'Day',
@@ -14,6 +15,14 @@ const GRANULARITY_TO_INTERVAL = {
 class ClickHouseFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
     return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('%', lower(?), '%')`;
+  }
+
+  castParameter() {
+    if (this.measure || this.definition().type === 'number') {
+      // TODO here can be measure type of string actually
+      return 'toFloat64(?)';
+    }
+    return '?';
   }
 }
 
@@ -44,7 +53,7 @@ class ClickHouseQuery extends BaseQuery {
       return `toDateTime(toMonday(${dimension}, '${this.timezone}'), '${this.timezone}')`;
     } else {
       const interval = GRANULARITY_TO_INTERVAL[granularity];
-      return `toDateTime(toStartOf${interval}(${dimension}, '${this.timezone}'), '${this.timezone}')`;
+      return `toDateTime(${granularity === 'second' ? 'toDateTime' : `toStartOf${interval}`}(${dimension}, '${this.timezone}'), '${this.timezone}')`;
     }
   }
 
@@ -194,6 +203,24 @@ class ClickHouseQuery extends BaseQuery {
   concatStringsSql(strings) {
     // eslint-disable-next-line prefer-template
     return "toString(" + strings.join(") || toString(") + ")";
+  }
+
+  unixTimestampSql() {
+    return `toUnixTimestamp(${this.nowTimestampSql()})`;
+  }
+
+  preAggregationLoadSql(cube, preAggregation, tableName) {
+    const sqlAndParams = this.preAggregationSql(cube, preAggregation);
+    if (!preAggregation.indexes) {
+      throw new UserError(`ClickHouse doesn't support pre-aggregations without indexes`);
+    }
+    const firstIndexName = Object.keys(preAggregation.indexes)[0];
+    const indexColumns = this.evaluateIndexColumns(cube, preAggregation.indexes[firstIndexName]);
+    return [`CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY ${indexColumns.join(', ')} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+  }
+
+  createIndexSql(indexName, tableName, escapedColumns) {
+    return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 }
 
