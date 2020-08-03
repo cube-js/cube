@@ -37,7 +37,7 @@ const useStyles = makeStyles((theme) => ({
 
 
 const DoughnutChart = (props) => {
-  const { className, cubejsApi, query, ...rest } = props;
+  const { className, query, ...rest } = props;
 
   const classes = useStyles();
   const theme = useTheme();

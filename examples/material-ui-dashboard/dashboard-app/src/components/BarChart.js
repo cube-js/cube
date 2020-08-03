@@ -15,14 +15,14 @@ const useStyles = makeStyles(() => ({
 }));
 
 const BarChart = (props) => {
-  const { className, id, query, dates, ...rest } = props;
+  const { className, query, dates, ...rest } = props;
   const classes = useStyles();
 
   const [dateRange, setDateRange] = React.useState(dates ? dates[0] : 'This week');
   let queryWithDate = {...query,
     timeDimensions: [
       {
-        dimension: "Orders.createdAt",
+        dimension: query.timeDimensions[0].dimension,
         granularity: query.timeDimensions[0].granularity,
         dateRange: `${dateRange}`
       }
