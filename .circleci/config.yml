@@ -81,6 +81,7 @@ jobs:
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
 
   publish:
+    resource_class: large
     docker:
       - image: circleci/node:10.16
 
