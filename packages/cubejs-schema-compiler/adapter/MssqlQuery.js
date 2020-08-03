@@ -75,10 +75,17 @@ class MssqlQuery extends BaseQuery {
   }
 
   groupByDimensionLimit() {
-    return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
+    if (this.rowLimit) {
+      return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS FETCH NEXT ${parseInt(this.rowLimit, 10)} ROWS ONLY` : '';
+    } else {
+      return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
+    }
   }
 
   topLimit() {
+    if (this.offset) {
+      return '';
+    }
     return this.rowLimit === null ? '' : ` TOP ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
   }
 

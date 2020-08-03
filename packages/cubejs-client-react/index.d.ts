@@ -1,5 +1,15 @@
 import * as React from 'react';
-import { CubejsApi, Query, ResultSet, Filter, PivotConfig } from '@cubejs-client/core';
+import {
+  CubejsApi,
+  Query,
+  ResultSet,
+  Filter,
+  PivotConfig,
+  MemberType,
+  TCubeMeasure,
+  TCubeDimension,
+  TCubeMember,
+} from '@cubejs-client/core';
 
 /**
  * @title @cubejs-client/react
@@ -11,7 +21,7 @@ import { CubejsApi, Query, ResultSet, Filter, PivotConfig } from '@cubejs-client
  */
 
 declare module '@cubejs-client/react' {
-  type CubeProviderVariables = {
+  type CubeProviderProps = {
     cubejsApi: CubejsApi;
     children: React.ReactNode;
   };
@@ -42,20 +52,18 @@ declare module '@cubejs-client/react' {
    * @stickyTypes
    * @order 10
    */
-  export const CubeProvider: React.FC<CubeProviderVariables>;
-
-  type CubeContextVariables = {
+  export const CubeProvider: React.FC<CubeProviderProps>;
+  
+  type CubeContextProps = {
     cubejsApi: CubejsApi;
-  };
+  }
 
   /**
-   * Cube.js context consumer
-   * In case when you need access to cubejsApi directly you can use CubeContext anywhere in your app
+   * In case when you need direct access to `cubejsApi` you can use `CubeContext` anywhere in your app
    *
    * ```js
    * import React from 'react';
    * import { CubeContext } from '@cubejs-client/react';
-   *
    *
    * export default function DisplayComponent() {
    *   const { cubejsApi } = React.useContext(CubeContext);
@@ -65,7 +73,7 @@ declare module '@cubejs-client/react' {
    *   };
    *
    *   React.useEffect(() => {
-   *     const resultSet = cubejsApi.load(query).then(resultSet => {
+   *     cubejsApi.load(query).then((resultSet) => {
    *       setRawResults(resultSet.rawData());
    *     });
    *   }, [query]);
@@ -80,7 +88,7 @@ declare module '@cubejs-client/react' {
    * }
    * ```
    */
-  export const CubeContext: React.Context<CubeContextVariables>;
+  export const CubeContext: React.Context<CubeContextProps>;
 
   type TLoadingState = {
     isLoading: boolean;
@@ -182,19 +190,19 @@ declare module '@cubejs-client/react' {
     /**
      * An array of available measures to select. They are loaded via the API from Cube.js Backend.
      */
-    availableMeasures: TAvailableMeasure[];
+    availableMeasures: TCubeMeasure[];
     /**
      * An array of available dimensions to select. They are loaded via the API from Cube.js Backend.
      */
-    availableDimensions: TAvailableDimension[];
+    availableDimensions: TCubeDimension[];
     /**
      * An array of available time dimensions to select. They are loaded via the API from Cube.js Backend.
      */
-    availableTimeDimensions: TAvailableDimension[];
+    availableTimeDimensions: TCubeDimension[];
     /**
      * An array of available segments to select. They are loaded via the API from Cube.js Backend.
      */
-    availableSegments: TMember[];
+    availableSegments: TCubeMember[];
 
     updateMeasures: MemberUpdater;
     updateDimensions: MemberUpdater;
@@ -336,28 +344,6 @@ declare module '@cubejs-client/react' {
    */
   export function isQueryPresent(query: Query): boolean;
 
-  type TMember = {
-    name: string;
-    title: string;
-    shortTitle: string;
-  };
-
-  type TMemberType = 'time' | 'number' | 'string' | 'boolean';
-
-  type TAvailableMeasure = TMember & {
-    type: TMemberType;
-    drillMembers: string[];
-    drillMembersGrouped: {
-      measures: TMember[];
-      dimensions: TMember[];
-    };
-  };
-
-  type TAvailableDimension = TMember & {
-    type: TMemberType;
-    suggestFilterValues: boolean;
-  };
-
   /**
    * You can use the following methods for member manipulaltion
    * ```js
@@ -428,8 +414,8 @@ declare module '@cubejs-client/react' {
    * ```
    */
   type MemberUpdater = {
-    add: (member: TMember) => void;
-    remove: (member: TMember) => void;
-    update: (member: TMember, updateWith: TMember) => void;
+    add: (member: MemberType) => void;
+    remove: (member: MemberType) => void;
+    update: (member: MemberType, updateWith: MemberType) => void;
   };
 }
