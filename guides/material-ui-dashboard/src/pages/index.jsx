@@ -43,9 +43,9 @@ class Index extends React.Component {
         <Feature
           imageAlign="left"
           image={featureOneImg}
-          metaTitle="Clear"
-          title="Step by step"
-          text="Learn how to create your own, React Material UI dashboard. You will learn step by step how to create dashboard with queries to your database without writing SQL code."
+          metaTitle="Efficiency"
+          title="Quick development"
+          text="Cube.js provides a convenient API for working with your database. You will not need to think about how to build database queries for your Analytics application. This will allow you to focus on the main thing developing quickly and efficiently."
         />
         <Feature
           imageAlign="right"
