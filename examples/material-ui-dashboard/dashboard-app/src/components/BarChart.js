@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { makeStyles } from '@material-ui/styles';
 import { Card, CardContent, Divider } from '@material-ui/core';
 import BarChartHeader from './BarChartHeader';
-import ChartRenderer from './ChartRenderer'
+import ChartRenderer from './ChartRenderer';
 
 const useStyles = makeStyles(() => ({
   root: {},
@@ -19,13 +19,14 @@ const BarChart = (props) => {
   const classes = useStyles();
 
   const [dateRange, setDateRange] = React.useState(dates ? dates[0] : 'This week');
-  let queryWithDate = {...query,
+  let queryWithDate = {
+    ...query,
     timeDimensions: [
       {
         dimension: query.timeDimensions[0].dimension,
         granularity: query.timeDimensions[0].granularity,
-        dateRange: `${dateRange}`
-      }
+        dateRange: `${dateRange}`,
+      },
     ],
   };
 
@@ -35,11 +36,11 @@ const BarChart = (props) => {
       <Divider />
       <CardContent>
         <div className={classes.chartContainer}>
-          <ChartRenderer vizState={{ query: queryWithDate, chartType: 'bar' }}/>
+          <ChartRenderer vizState={{ query: queryWithDate, chartType: 'bar' }} />
         </div>
       </CardContent>
     </Card>
-  )
+  );
 };
 
 BarChart.propTypes = {

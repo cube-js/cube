@@ -4,7 +4,7 @@ const config = {
   siteTitleAlt: "Building Material UI Dashboard with Cube.js", // Alternative site title for SEO.
   siteLogo: "/logos/icon.png", // Logo used for SEO and manifest.
   previewImage: "/logos/preview.png",
-  siteUrl: "https://web-analytics.cube.dev", // Domain of your website without pathPrefix.
+  siteUrl: "https://material-ui-dashboard.cube.dev", // Domain of your website without pathPrefix.
   siteDescription: "Learn how to build Material UI Dashboard with Cube.js.", // Website description used for RSS feeds/meta description tag.
   googleAnalyticsID: "UA-70480064-3", // GA tracking ID.
   themeColor: "#c62828", // Used for setting manifest and progress theme colors.

@@ -29,21 +29,19 @@ const UserSearch = (props) => {
   const history = useHistory();
   const classes = useStyles();
 
-  const { resultSet, error, isLoading } = useCubeQuery(
-    {
-      measures: ['Users.count'],
-      timeDimensions: [
-        {
-          dimension: 'Users.createdAt',
-        },
-      ],
-      order: {
-        'Users.id': 'asc',
+  const { resultSet, error, isLoading } = useCubeQuery({
+    measures: ['Users.count'],
+    timeDimensions: [
+      {
+        dimension: 'Users.createdAt',
       },
-      dimensions: ['Users.id', 'Users.firstName', 'Users.lastName'],
-      filters: [],
-    }
-  );
+    ],
+    order: {
+      'Users.id': 'asc',
+    },
+    dimensions: ['Users.id', 'Users.firstName', 'Users.lastName'],
+    filters: [],
+  });
 
   const handleChange = (value) => {
     history.push(`/user/${value.id}`);

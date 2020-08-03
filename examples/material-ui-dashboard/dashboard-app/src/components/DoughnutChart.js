@@ -35,7 +35,6 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-
 const DoughnutChart = (props) => {
   const { className, query, ...rest } = props;
 
@@ -54,7 +53,7 @@ const DoughnutChart = (props) => {
     return <pre>{error.toString()}</pre>;
   }
   if (!resultSet) {
-    return null
+    return null;
   }
   if (resultSet) {
     const COLORS_SERIES = [
@@ -86,7 +85,17 @@ const DoughnutChart = (props) => {
                 <Typography variant="body1" className={classes.title}>
                   {status.category}
                 </Typography>
-                <Typography variant="h2">{((status.value/resultSet.series()[0].series.map(el => el.value).reduce(reducer)) * 100).toFixed(0)}%</Typography>
+                <Typography variant="h2">
+                  {(
+                    (status.value /
+                      resultSet
+                        .series()[0]
+                        .series.map((el) => el.value)
+                        .reduce(reducer)) *
+                    100
+                  ).toFixed(0)}
+                  %
+                </Typography>
               </div>
             ))}
           </div>

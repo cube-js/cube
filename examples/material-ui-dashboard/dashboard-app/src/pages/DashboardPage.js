@@ -48,12 +48,12 @@ const barChartQuery = {
   ],
   dimensions: ['Orders.status'],
   filters: [
-      {
-        dimension: 'Orders.status',
-        operator: 'notEquals',
-        values: ['completed'],
-      },
-    ],
+    {
+      dimension: 'Orders.status',
+      operator: 'notEquals',
+      values: ['completed'],
+    },
+  ],
 };
 const doughnutChartQuery = {
   measures: ['Orders.count'],
@@ -79,10 +79,10 @@ const Dashboard = () => {
           );
         })}
         <Grid item lg={8} md={12} xl={9} xs={12}>
-          <BarChart query={barChartQuery}/>
+          <BarChart query={barChartQuery} />
         </Grid>
         <Grid item lg={4} md={6} xl={3} xs={12}>
-          <DoughnutChart query={doughnutChartQuery}/>
+          <DoughnutChart query={doughnutChartQuery} />
         </Grid>
       </Grid>
     </div>

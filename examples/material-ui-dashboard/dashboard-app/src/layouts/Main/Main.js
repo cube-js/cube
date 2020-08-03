@@ -53,9 +53,7 @@ const Main = (props) => {
     >
       <Topbar onSidebarOpen={handleSidebarOpen} />
       <Sidebar onClose={handleSidebarClose} open={shouldOpenSidebar} variant={isDesktop ? 'persistent' : 'temporary'} />
-      <main className={classes.content}>
-        {children}
-      </main>
+      <main className={classes.content}>{children}</main>
     </div>
   );
 };

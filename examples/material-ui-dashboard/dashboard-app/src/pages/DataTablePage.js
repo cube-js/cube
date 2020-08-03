@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import { makeStyles } from '@material-ui/styles';
 
 import Toolbar from '../components/Toolbar.js';
@@ -110,14 +110,16 @@ const DataTablePage = () => {
         tabs={tabs}
       />
       <div className={classes.content}>
-        <Table sorting={sorting}
-               setSorting={setSorting}
-               query={query}
-               countQuery={countQuery}
-               rowsPerPage={rowsPerPage}
-               setRowsPerPage={setRowsPerPage}
-               page={page}
-               setPage={setPage}/>
+        <Table
+          sorting={sorting}
+          setSorting={setSorting}
+          query={query}
+          countQuery={countQuery}
+          rowsPerPage={rowsPerPage}
+          setRowsPerPage={setRowsPerPage}
+          page={page}
+          setPage={setPage}
+        />
       </div>
     </div>
   );

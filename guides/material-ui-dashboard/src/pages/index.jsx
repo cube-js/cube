@@ -1,20 +1,20 @@
-import React from "react";
-import Helmet from "react-helmet";
-import { graphql } from "gatsby";
-import { Header, Hero, Footer, Feature, Social, SEO, PartsListing, Layout } from "guides-base";
-import config from "../../data/SiteConfig";
+import React from 'react';
+import Helmet from 'react-helmet';
+import { graphql } from 'gatsby';
+import { Header, Hero, Footer, Feature, Social, SEO, PartsListing, Layout } from 'guides-base';
+import config from '../../data/SiteConfig';
 
-import featureOneImg from "./feature-1.png";
-import featureTwoImg from "./feature-2.png";
-import featureThreeImg from "./feature-3.png";
+import featureOneImg from './feature-1.svg';
+import featureTwoImg from './feature-2.svg';
+import featureThreeImg from './feature-3.svg';
 
 import styled from 'styled-components';
-import media from "styled-media-query";
+import media from 'styled-media-query';
 
-import hero from "./hero.png";
+import hero from './hero.png';
 
 const StyledHeroImage = styled.img`
-  ${media.greaterThan("large")`
+  ${media.greaterThan('large')`
     margin-top: -50px;
   `}
 `;
@@ -41,21 +41,21 @@ class Index extends React.Component {
           withFrame
         />
         <Feature
-          imageAlign='left'
+          imageAlign="left"
           image={featureOneImg}
           metaTitle="Clear"
           title="Step by step"
           text="Learn how to create your own, React Material UI dashboard. You will learn step by step how to create dashboard with queries to your database without writing SQL code."
         />
         <Feature
-          imageAlign='right'
+          imageAlign="right"
           image={featureTwoImg}
           metaTitle="Visualisation"
           title="Easy to create"
-          text="You can visualize your data in any format that is convenient for you, for better data analysis using the chartRenderer component."
+          text="This guide shows you how to build different types of graphs and how to display any data. This guide includes a Bar chart, Doughnut chart, KPI cards, and Datatable. Using them as an example or using the chart renderer component, you can develop your dashboard using any chart/data display."
         />
         <Feature
-          imageAlign='left'
+          imageAlign="left"
           image={featureThreeImg}
           metaTitle="Performance first"
           title="Fast and Scalable"
@@ -73,10 +73,7 @@ export default Index;
 /* eslint no-undef: "off" */
 export const pageQuery = graphql`
   query IndexQuery {
-    allMarkdownRemark(
-      limit: 2000
-      sort: { fields: [frontmatter___order], order: ASC }
-    ) {
+    allMarkdownRemark(limit: 2000, sort: { fields: [frontmatter___order], order: ASC }) {
       edges {
         node {
           fields {

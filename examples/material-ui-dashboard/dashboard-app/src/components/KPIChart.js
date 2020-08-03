@@ -46,14 +46,16 @@ const KPIChart = (props) => {
   const classes = useStyles();
   const { className, title, progress, query, difference, duration, ...rest } = props;
   const { resultSet, error, isLoading } = useCubeQuery(query);
-  const differenceQuery = {...query,
-    "timeDimensions": [
+  const differenceQuery = {
+    ...query,
+    timeDimensions: [
       {
-        "dimension": `${difference || query.measures[0].split('.')[0]}.createdAt`,
-        "granularity": null,
-        "dateRange": "This year"
-      }
-    ]};
+        dimension: `${difference || query.measures[0].split('.')[0]}.createdAt`,
+        granularity: null,
+        dateRange: 'This year',
+      },
+    ],
+  };
   const differenceValue = useCubeQuery(differenceQuery);
 
   if (isLoading || differenceValue.isLoading) {
@@ -67,24 +69,24 @@ const KPIChart = (props) => {
     return <pre>{(error || differenceValue.error).toString()}</pre>;
   }
   if (!resultSet || !differenceValue.resultSet) {
-    return null
+    return null;
   }
   if (resultSet && differenceValue.resultSet) {
     let postfix = null;
     let prefix = null;
     const measureKey = resultSet.seriesNames()[0].key;
-    const annotations = resultSet.tableColumns().find(tableColumn => tableColumn.key === measureKey);
+    const annotations = resultSet.tableColumns().find((tableColumn) => tableColumn.key === measureKey);
     const format = annotations.format || (annotations.meta && annotations.meta.format);
     if (format === 'percent') {
-      postfix = '%'
+      postfix = '%';
     } else if (format === 'currency') {
-      prefix = '$'
+      prefix = '$';
     }
 
     let value = null;
     let fullValue = resultSet.seriesNames().map((s) => resultSet.totalRow()[s.key])[0];
     if (difference) {
-      value = differenceValue.resultSet.totalRow()[differenceQuery.measures[0]] / fullValue * 100;
+      value = (differenceValue.resultSet.totalRow()[differenceQuery.measures[0]] / fullValue) * 100;
     }
     return (
       <Card {...rest} className={clsx(classes.root, className)}>
@@ -96,23 +98,12 @@ const KPIChart = (props) => {
               </Typography>
               <Typography variant="h3">
                 {prefix}
-                <CountUp
-                  end={fullValue}
-                  duration={duration}
-                  separator=","
-                  decimals={0}
-                />
+                <CountUp end={fullValue} duration={duration} separator="," decimals={0} />
                 {postfix}
               </Typography>
             </Grid>
           </Grid>
-          {progress ? (
-            <LinearProgress
-              className={classes.progress}
-              value={fullValue}
-              variant="determinate"
-            />
-          ) : null}
+          {progress ? <LinearProgress className={classes.progress} value={fullValue} variant="determinate" /> : null}
           {difference ? (
             <div className={classes.difference}>
               <Typography className={classes.differenceValue} variant="body2">

@@ -118,11 +118,7 @@ const Toolbar = (props) => {
       <Grid container spacing={4}>
         <Grid item lg={3} sm={6} xl={3} xs={12} m={2}>
           <div className={classes}>
-            <AntTabs
-              value={tabValue}
-              onChange={handleChangeTab}
-              aria-label="ant example"
-            >
+            <AntTabs value={tabValue} onChange={handleChangeTab} aria-label="ant example">
               {tabs.map((item) => (
                 <AntTab key={item} label={item} />
               ))}

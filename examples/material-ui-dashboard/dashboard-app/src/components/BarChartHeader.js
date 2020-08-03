@@ -46,13 +46,17 @@ const BarChartHeader = (props) => {
             open={Boolean(anchorEl)}
             onClose={() => handleClose(dateRange)}
           >
-            {dates ?
-              dates.map((date) => (
-                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
-              ))
-             : defaultDates.map((date) => (
-                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
-              ))}
+            {dates
+              ? dates.map((date) => (
+                  <MenuItem key={date} onClick={() => handleClose(date)}>
+                    {date}
+                  </MenuItem>
+                ))
+              : defaultDates.map((date) => (
+                  <MenuItem key={date} onClick={() => handleClose(date)}>
+                    {date}
+                  </MenuItem>
+                ))}
           </Menu>
         </div>
       }

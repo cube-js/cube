@@ -9,7 +9,7 @@ import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-import palette from '../theme/palette'
+import palette from '../theme/palette';
 import moment from 'moment';
 import { BarOptions } from '../helpers/BarOptions.js';
 const COLORS_SERIES = [palette.secondary.main, palette.primary.light, palette.secondary.light];
@@ -111,7 +111,8 @@ const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)
   .reduce((a, b) => ({ ...a, ...b }));
 
 const renderChart = (Component) => ({ resultSet, error, ...props }) =>
-  (resultSet && <Component resultSet={resultSet} {...props} />) || (error && error.toString()) || <CircularProgress color="secondary" />;
+  (resultSet && <Component resultSet={resultSet} {...props} />) ||
+  (error && error.toString()) || <CircularProgress color="secondary" />;
 
 const ChartRenderer = ({ vizState = {} }) => {
   const { query, chartType, ...options } = vizState;
