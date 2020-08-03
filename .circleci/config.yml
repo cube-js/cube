@@ -19,11 +19,43 @@ jobs:
           POSTGRES_USER: root
           POSTGRES_DB: model_test
       - image: yandex/clickhouse-server:19.10
+
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+            - yarn-packages-v1-{{ .Branch }}-
+            - yarn-packages-v1-
+
+      - run: yarn install
+      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
+
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test
+      - run: bash <(curl -s https://codecov.io/bash)
+
+  test-mssql:
+    resource_class: medium
+    docker:
+      - image: circleci/node:10.16
+        environment:
+          TEST_PG_USER: root
+          TEST_CLICKHOUSE_HOST: localhost
+          TEST_LOCAL: true
+          TEST_DB_PASSWORD: Test1test
       - image: mcr.microsoft.com/mssql/server:2017-latest
         environment:
           ACCEPT_EULA: Y
           SA_PASSWORD: Test1test
-
 
     working_directory: ~/repo
 
@@ -53,7 +85,7 @@ jobs:
           name: Wait for db
           command: dockerize -wait tcp://localhost:1433 -timeout 2m
 
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test
+      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver test-mssql
       - run: bash <(curl -s https://codecov.io/bash)
 
   lint:
@@ -183,6 +215,7 @@ workflows:
   test:
     jobs:
       - test
+      - test-mssql
       - build
   lint:
     jobs:
