@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-feature-settings: 'ss03' on;
+  font-feature-settings: 'ss04' on;
+}
+
+::selection {
+  background-color: #7a77ff !important;
+}
+
+.ant-layout-header.example__header {
+  padding: 16px 24px;
+  background: #43436b;
+  height: auto;
+  line-height: 0;
+}
+
+.examples__nav {
+  display: flex;
+  justify-content: space-between;
+}
+
+.examples__nav__buttons a {
+  display: inline-block;
+  background: rgba(213, 213, 226, 0.1);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-left: 15px;
+  color: white;
+  line-height: 1.6em;
+}
+
+.examples__nav__buttons a .anticon {
+  margin-right: 4px;
+  color: #a1a1b5;
+}
+
+.examples__nav__buttons a:hover {
+  background: rgba(213, 213, 226, 0.2);
+  color: white;
+}
+
+.examples__nav__buttons a:hover .anticon {
+  color: #d5d5e2;
+}
