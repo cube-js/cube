@@ -13,6 +13,8 @@ import media from "styled-media-query";
 
 import hero from "./hero.png";
 
+import { page } from 'cubedev-tracking';
+
 const StyledHeroImage = styled.img`
   ${media.greaterThan("large")`
     margin-top: -50px;
@@ -20,6 +22,10 @@ const StyledHeroImage = styled.img`
 `;
 
 class Index extends React.Component {
+  componentDidMount() {
+    page();
+  }
+
   render() {
     const partsEdges = this.props.data.allMarkdownRemark.edges;
     return (
