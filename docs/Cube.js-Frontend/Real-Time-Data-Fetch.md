@@ -51,7 +51,7 @@ cubejsApi.subscribe({
     granularity: 'hour',
     dateRange: 'last 1440 minutes'
   }]
-}, (e, result) => {
+},{/*options*/}, (e, result) => {
   if (e) {
     // handle new error
   } else {
