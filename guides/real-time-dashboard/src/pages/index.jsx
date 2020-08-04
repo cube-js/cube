@@ -10,12 +10,7 @@ import featureOneThree from "./feature-3.png";
 
 import hero from "./hero.png";
 
-import { page } from 'cubedev-tracking';
-
 class Index extends React.Component {
-  componentDidMount() {
-    page();
-  }
 
   render() {
     const partsEdges = this.props.data.allMarkdownRemark.edges;
