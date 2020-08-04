@@ -20,7 +20,6 @@ const StyledHeroImage = styled.img`
 `;
 
 class Index extends React.Component {
-
   render() {
     const partsEdges = this.props.data.allMarkdownRemark.edges;
     return (

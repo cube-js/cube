@@ -11,7 +11,6 @@ import featureOneThree from "./feature-3.png";
 import hero from "./hero.png";
 
 class Index extends React.Component {
-
   render() {
     const partsEdges = this.props.data.allMarkdownRemark.edges;
     return (

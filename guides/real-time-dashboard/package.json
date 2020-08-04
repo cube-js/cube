@@ -15,7 +15,6 @@
     "gatsby-plugin-react-helmet": "^3.1.10",
     "gatsby-plugin-sharp": "^2.2.27",
     "gatsby-plugin-sitemap": "^2.2.16",
-    "gatsby-plugin-snowplow-tracker": "^1.0.1",
     "gatsby-plugin-styled-components": "^3.1.9",
     "gatsby-plugin-twitter": "^2.1.9",
     "gatsby-remark-autolink-headers": "^2.1.13",
