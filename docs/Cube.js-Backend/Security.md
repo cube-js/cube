@@ -9,14 +9,13 @@ Cube.js uses [JSON Web Tokens (JWT)](https://jwt.io/) which should be passed in 
 additional information about the user, which can be accessed in the [USER_CONTEXT](cube#context-variables-user-context) object in the Data
 Schema. 
 
-The
-`Authorization` header is parsed and the JWT's contents set to the [authInfo](@cubejs-backend-server-core#authinfo) variable which can be used to support [Multitenancy](multitenancy-setup).
+The `Authorization` header is parsed and the JWT's contents set to the [authInfo](@cubejs-backend-server-core#authinfo) variable which can be used to support [Multitenancy](multitenancy-setup).
 
 Cube.js tokens are designed to work well in microservice-based environments. Typical use case would be:
 
 1. A web server serves an HTML page containing the cube.js client, which needs to communicate securely with the cube.js back-end.
 2. The web server should generate an expirable cube.js token to achieve this. The server could include the token in the HTML it serves or provide the token to the front-end via an XHR request, which stores it in local storage or a cookie.
-3. The JS client is initiallised using this token, and includes it in calls to the cube.js server API.
+3. The JS client is initialized using this token, and includes it in calls to the cube.js server API.
 
 If you are using the [REST API](rest-api) you must pass the API Token via the Authorization Header. The Cube.js Javascript client accepts an authentication token as the first argument to the [cubejs(authToken, options) function](@cubejs-client-core#cubejs).
 
