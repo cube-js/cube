@@ -19,8 +19,7 @@
     "playground"
   ],
   "scripts": {
-    "lint": "eslint core/**/*.js",
-    "test": "jest --testPathPattern test/*.test.js --runInBand"
+    "lint": "eslint core/**/*.js"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.19.54",
