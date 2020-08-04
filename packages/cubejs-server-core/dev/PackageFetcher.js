@@ -10,12 +10,12 @@ class PackageFetcher {
   constructor(repo) {
     this.repo = repo;
     this.tmpFolderPath = path.resolve('.', 'node_modules', '.tmp');
-    
+
     try {
       fs.mkdirSync(this.tmpFolderPath);
     } catch (err) {
       if (err.code === 'EEXIST') {
-        fs.rmdirSync(this.tmpFolderPath, { recursive: true });
+        fs.removeSync(this.tmpFolderPath);
         fs.mkdirSync(this.tmpFolderPath);
       } else {
         throw err;
@@ -55,19 +55,17 @@ class PackageFetcher {
     await decompress(this.repoArchivePath, this.tmpFolderPath, {
       plugins: [decompressTargz()],
     });
-    
+
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
     await executeCommand('npm', ['install'], { cwd: path.resolve(this.tmpFolderPath, dir) });
-    
+
     return {
       packagesPath: path.join(this.tmpFolderPath, dir, 'packages'),
     };
   }
-  
+
   cleanup() {
-    if (fs.existsSync(this.tmpFolderPath)) {
-      fs.rmdirSync(this.tmpFolderPath, { recursive: true });
-    }
+    fs.removeSync(this.tmpFolderPath);
   }
 }
 
