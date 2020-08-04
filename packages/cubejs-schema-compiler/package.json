@@ -12,7 +12,8 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "nyc --reporter=lcov mocha",
+    "test": "nyc --reporter=lcov mocha -i -g MSSql",
+    "test-mssql": "nyc --reporter=lcov mocha -g MSSql",
     "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js"
   },
   "dependencies": {
