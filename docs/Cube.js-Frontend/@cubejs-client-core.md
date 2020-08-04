@@ -133,7 +133,7 @@ Contains information about available cubes and it's members.
 
 ### membersForQuery
 
-▸  **membersForQuery**(**query**: [Query](#types-query), **memberType**: [MemberType](#types-member-type)): *any*
+▸  **membersForQuery**(**query**: [Query](#types-query) | null, **memberType**: [MemberType](#types-member-type)): *[TCubeMeasure](#types-t-cube-measure)[] | [TCubeDimension](#types-t-cube-dimension)[] | [TCubeMember](#types-t-cube-member)[]*
 
 Get all members of a specific type for a given query.
 If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -142,14 +142,14 @@ If empty query is provided no filtering is done based on query context and all a
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) | context query to provide filtering of members available to add to this query  |
+query | [Query](#types-query) &#124; null | context query to provide filtering of members available to add to this query  |
 memberType | [MemberType](#types-member-type) | - |
 
 ### resolveMember
 
 ▸  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *Object*
 
-Get meta information for member of a cube
+Get meta information for a cube member
 Member meta information contains:
 ```javascript
 {
@@ -205,6 +205,10 @@ const resultSet = await cubejsApi.load({
 
 const copy = new ResultSet(resultSet.loadResponse);
 ```
+
+### annotation
+
+▸  **annotation**(): *[QueryAnnotations](#types-query-annotations)*
 
 ### chartPivot
 
@@ -782,6 +786,27 @@ sql | [SqlQueryTuple](#types-sql-query-tuple) |
 ### SqlQueryTuple
 
 Ƭ **SqlQueryTuple**: *[string, boolean | string | number]*
+
+### TCubeDimension
+
+Ƭ **TCubeDimension**: *[TCubeMember](#types-t-cube-member) & object*
+
+### TCubeMeasure
+
+Ƭ **TCubeMeasure**: *[TCubeMember](#types-t-cube-member) & object*
+
+### TCubeMember
+
+Name | Type |
+------ | ------ |
+name | string |
+shortTitle | string |
+title | string |
+type | [TCubeMemberType](#types-t-cube-member-type) |
+
+### TCubeMemberType
+
+Ƭ **TCubeMemberType**: *"time" | "number" | "string" | "boolean"*
 
 ### TableColumn
 

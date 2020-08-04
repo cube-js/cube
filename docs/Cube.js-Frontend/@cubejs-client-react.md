@@ -154,10 +154,10 @@ wrapWithQueryRenderer? | boolean | - |
 
 Name | Type | Description |
 ------ | ------ | ------ |
-availableDimensions | [TAvailableDimension](#types-t-available-dimension)[] | An array of available dimensions to select. They are loaded via the API from Cube.js Backend. |
-availableMeasures | [TAvailableMeasure](#types-t-available-measure)[] | An array of available measures to select. They are loaded via the API from Cube.js Backend. |
-availableSegments | [TMember](#types-t-member)[] | An array of available segments to select. They are loaded via the API from Cube.js Backend. |
-availableTimeDimensions | [TAvailableDimension](#types-t-available-dimension)[] | An array of available time dimensions to select. They are loaded via the API from Cube.js Backend. |
+availableDimensions | TCubeDimension[] | An array of available dimensions to select. They are loaded via the API from Cube.js Backend. |
+availableMeasures | TCubeMeasure[] | An array of available measures to select. They are loaded via the API from Cube.js Backend. |
+availableSegments | TCubeMember[] | An array of available segments to select. They are loaded via the API from Cube.js Backend. |
+availableTimeDimensions | TCubeDimension[] | An array of available time dimensions to select. They are loaded via the API from Cube.js Backend. |
 dimensions | string[] | - |
 isQueryPresent | boolean | Indicates whether the query is ready to be displayed or not |
 measures | string[] | - |
@@ -201,7 +201,7 @@ resultSet | ResultSet &#124; null |
 
 ## CubeProvider
 
-• **CubeProvider**: *React.FC‹[CubeProviderVariables](#types-cube-provider-variables)›*
+• **CubeProvider**: *React.FC‹[CubeProviderProps](#types-cube-provider-props)›*
 
 Cube.js context provider
 ```js
@@ -226,13 +226,52 @@ export default function App() {
 }
 ```
 
+## CubeContext
+
+• **CubeContext**: *Context‹[CubeContextProps](#types-cube-context-props)›*
+
+In case when you need access to `cubejsApi` directly you can use `CubeContext` anywhere in your app
+
+```js
+import React from 'react';
+import { CubeContext } from '@cubejs-client/react';
+
+export default function DisplayComponent() {
+  const { cubejsApi } = React.useContext(CubeContext);
+  const [rawResults, setRawResults] = React.useState([]);
+  const query = {
+    ...
+  };
+
+  React.useEffect(() => {
+    cubejsApi.load(query).then((resultSet) => {
+      setRawResults(resultSet.rawData());
+    });
+  }, [query]);
+
+  return (
+    <>
+      {rawResults.map(row => (
+        ...
+      ))}
+    </>
+  )
+}
+```
+
 ## Types
 
 ### ChartType
 
 Ƭ **ChartType**: *"line" | "bar" | "table" | "area"*
 
-### CubeProviderVariables
+### CubeContextProps
+
+Name | Type |
+------ | ------ |
+cubejsApi | CubejsApi |
+
+### CubeProviderProps
 
 Name | Type |
 ------ | ------ |
@@ -311,35 +350,15 @@ NOTE: if you need to add or remove more than one member at a time you should use
 
 Name | Type |
 ------ | ------ |
-add |  (**member**: [TMember](#types-t-member)) => *void* |
-remove |  (**member**: [TMember](#types-t-member)) => *void* |
-update |  (**member**: [TMember](#types-t-member), **updateWith**: [TMember](#types-t-member)) => *void* |
-
-### TAvailableDimension
-
-Ƭ **TAvailableDimension**: *[TMember](#types-t-member) & object*
-
-### TAvailableMeasure
-
-Ƭ **TAvailableMeasure**: *[TMember](#types-t-member) & object*
+add |  (**member**: MemberType) => *void* |
+remove |  (**member**: MemberType) => *void* |
+update |  (**member**: MemberType, **updateWith**: MemberType) => *void* |
 
 ### TLoadingState
 
 Name | Type |
 ------ | ------ |
 isLoading | boolean |
-
-### TMember
-
-Name | Type |
------- | ------ |
-name | string |
-shortTitle | string |
-title | string |
-
-### TMemberType
-
-Ƭ **TMemberType**: *"time" | "number" | "string" | "boolean"*
 
 ### VizState
 

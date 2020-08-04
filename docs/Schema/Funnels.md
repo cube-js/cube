@@ -6,15 +6,15 @@ subCategory: Tutorials
 menuOrder: 13
 ---
 
-Funnels are representing a series of events that lead users towards a defined goal. It's commonly used in product, marketing and sales analytics.
+Funnels represent a series of events that lead users towards a defined goal. Funnel analysis is an approach commonly used in product, marketing and sales analytics.
 
 Regardless of the domain, every funnel has the following traits:
-* identity of the object moving through the funnel, ex. user or lead;
-* set of steps, through object moves;
-* date and time of each step;
-* time to convert between steps;
+* The identity of the object moving through the funnel – e.g. user or lead
+* A set of steps, through which the object moves
+* The date and time of each step
+* The time to convert between steps
 
-Since funnels have pretty standard structure, they are good candidates for being extracted into reasable packages. Cube.js goes pre-packaged with a standard funnel package.
+Since funnels have a pretty standard structure, they are good candidates for being extracted into reusable packages. Cube.js comes pre-packaged with a standard funnel package.
 
 ```javascript
 // First step is to require the Funnel package
@@ -43,8 +43,8 @@ cube(`PurchaseFunnel`, {
   })
 });
 ```
-Cube.js will generate an SQL for this funnel. Since funnel analysis in SQL is
-not straightforward and easy, the SQL code itself is quite complicated,
+Cube.js will generate an SQL query for this funnel. Since funnel analysis in SQL is
+not straight forward, the SQL code itself is quite complicated,
 even for such a small funnel.
 
 <a href="#" class="accordion-trigger" id="show-sql-accordion"> Show Funnel's SQL </a>
@@ -143,7 +143,7 @@ LIMIT
 ## Funnel parameters
 
 ### userId
-A unique key to identify users, moving through the funnel.
+A unique key to identify the users moving through the funnel.
 ```javascript
   userId: {
     sql: `user_id`
@@ -151,8 +151,8 @@ A unique key to identify users, moving through the funnel.
 ```
 
 ### nextStepUserId
-A unique key to join two adjacent steps when source of user id changes when moving from one step to another one.
-For exampe you can use it to build funnel that tracked by anonymous id at the first step and then by identified user id on subsequent steps.
+In the situation where `user_id` changes between steps, you can pass a unique key to join two adjacent steps.
+For example, if a user signs in after having been tracked anonymously until that point in the funnel, you could use `nextStepUserId` to define a funnel where users are tracked by anonymous ID on the first step and then by an identified user ID on subsequent steps.
 ```javascript
 const Funnels = require(`Funnels`);
 
@@ -200,8 +200,8 @@ A timestamp of the event.
 ### steps
 An array of steps. Each step has 2 required and 1 optional parameters:
  * __name__ *(required)* - Name of the step. It must be unique within a funnel.
- * __eventsView__ *(required)* - Events table for the step. It must contain userId and time fields. For example, if we have defined the userId as `user_id` and time as `timestamp`, we need to have these fields in a table we're selecting.
- * __timeToConvert__ *(optional)* - A time window for conversion to happen. Set it, depending on your funnel logic. If set to `1 day`, for instance, it means the funnel will include only users who made a purchase within 1 day after visiting the product page.
+ * __eventsView__ *(required)* - Events table for the step. It must contain `userId` and `time` fields. For example, if we have defined the userId as `user_id` and time as `timestamp`, we need to have these fields in the table we're selecting from.
+ * __timeToConvert__ *(optional)* - A time window during which conversion should happen. Set it depending on your funnel logic. If this is set to `1 day`, for instance, it means the funnel will include only users who made a purchase within 1 day of visiting the product page.
 
 ```javascript
   steps: [{
@@ -215,11 +215,11 @@ An array of steps. Each step has 2 required and 1 optional parameters:
 
 ## Joining funnels
 
-In order to provide additional dimensions funnels can be joined with other cubes using user id at the first step of a funnel.
-It'll be always `belongsTo` relationship and hence you should always join corresponding user cube.
-Here by 'user' we understand any entity that can go through sequence of steps within funnel.
-It can be real web user with some auto assigned id or specific email sent by some email automation that goes through typical flow of events like 'sent', 'opened', 'clicked'.
-For example for our `PurchaseFunnel` we can add join as following:
+In order to provide additional dimensions, funnels can be joined with other cubes using `user_id` at the first step of a funnel.
+This will always use a `belongsTo` relationship, so hence you should always join with the corresponding user cube.
+Here, by 'user' we understand this to be any entity that can go through a sequence of steps within funnel.
+It could be a real web user with an auto assigned ID or a specific email sent by an email automation that goes through a typical flow of events like 'sent', 'opened', 'clicked', and so on.
+For example, for our `PurchaseFunnel` we can add a join to another funnel as following:
 
 ```javascript
 cube(`PurchaseFunnel`, {
@@ -246,24 +246,23 @@ Funnel-based cubes have the following structure:
 * __conversions__ - Count of conversions in the funnel. The most useful when
   broken down by __steps__. It's the classic funnel view.
 * __conversionsPercent__ - Percentage of conversions. It is useful when you
-  want to inspect a specific step, or set of steps, and find out how a conversion was changing
-over time.
+  want to inspect a specific step, or set of steps, and find out how a conversion has changed over time.
 
 ### Dimensions
 * __step__ - Describes funnels' steps. Use it to break down __conversions__ or
   __conversionsPercent__ by steps, or to filter for a specific step.
 * __time__ - time dimension for the funnel. Use it to filter your analysis for
-  specific dates or to analyze how conversion was changing over time.
+  specific dates or to analyze how conversion changes over time.
 
-In the following example, we use measure `conversions` with dimension `steps`
+In the following example, we use the `conversions` measure along with the `steps` dimension
 to display a classic bar chart showing the funnel's steps.
 
 <iframe src="https://codesandbox.io/embed/nw87w1nnjm?fontsize=14" style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;" sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
 
 ## Performance considerations
 
-Funnel joins are extremely heavy for most of modern DBs and complexity grows non-linear with addition of steps.
-However in case of cardinality of the first event isn't too high very simple optimization can be applied: [originalSql pre-aggregation](pre-aggregations#original-sql).
+Funnel joins are extremely heavy for most modern databases and complexity grows in a non-linear way with the addition of steps.
+However, if the cardinality of the first event isn't too high, very simple optimization can be applied: [originalSql pre-aggregation](pre-aggregations#original-sql).
 
 Just add it to `Funnel` cube as follows:
 
@@ -281,6 +280,6 @@ cube(`PurchaseFunnel`, {
 });
 ```
 
-In this case heavy Funnel join will be materialized and stored as a table which will save significant amount of time for subsequent Funnel queries.
+In this case, the heavy Funnel join will be materialized and stored as a table, which will save significant amount of time for subsequent Funnel queries.
 
-In case cardinality of first event is too high for `originalSql` pre-aggregation, [partitioned rollups](pre-aggregations#rollup-time-partitioning) can be used.
+In the case where the cardinality of the first event is too high for `originalSql` pre-aggregation, [partitioned rollups](pre-aggregations#rollup-time-partitioning) can be used.

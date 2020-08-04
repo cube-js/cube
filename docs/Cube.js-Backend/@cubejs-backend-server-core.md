@@ -351,6 +351,11 @@ CubejsServerCore.create({
 });
 ```
 
+You can pass comma separated list of timezones to refresh in `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable. For example:
+```
+CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
+```
+
 Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance.
 For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
