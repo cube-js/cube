@@ -54,10 +54,10 @@ An example usage is customizing the base route `/` in production mode to return 
 
 `initApp.ts`
 ```
-import type { Application, Request, Response } from "express";
+import type { Application, Request, Response } from 'express';
 
 export function initApp(app: Application) {
-  app.get("/", (req: Request, res: Response) => {
+  app.get('/', (req: Request, res: Response) => {
     res.sendStatus(404);
   });
 }
@@ -65,13 +65,13 @@ export function initApp(app: Application) {
 
 `index.ts`
 ```
-import { initApp } from "./initApp";
+import { initApp } from './initApp';
 
 const options = {};
 
 // ...
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.NODE_ENV === 'production') {
   options.initApp = initApp;
 }
 
