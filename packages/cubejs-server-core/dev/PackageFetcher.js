@@ -1,5 +1,5 @@
 const fs = require('fs-extra');
-const axios = require('axios').default;
+const fetch = require('node-fetch').default;
 const decompress = require('decompress');
 const decompressTargz = require('decompress-targz');
 const path = require('path');
@@ -26,22 +26,18 @@ class PackageFetcher {
   }
 
   async manifestJSON() {
-    const response = await axios.get(
+    const response = await fetch(
       `https://api.github.com/repos/${this.repo.owner}/${this.repo.name}/contents/manifest.json`
     );
 
-    return JSON.parse(Buffer.from(response.data.content, 'base64').toString());
+    return JSON.parse(Buffer.from((await response.json()).content, 'base64').toString());
   }
 
   async downloadRepo() {
     const url = `https://github.com/${this.repo.owner}/${this.repo.name}/archive/master.tar.gz`;
     const writer = fs.createWriteStream(this.repoArchivePath);
 
-    const response = await axios.get(url, {
-      responseType: 'stream',
-    });
-
-    response.data.pipe(writer);
+    (await fetch(url)).body.pipe(writer);
 
     return new Promise((resolve, reject) => {
       writer.on('finish', resolve);
