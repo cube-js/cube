@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@amcharts/amcharts4": "^4.9.34",
+    "@amcharts/amcharts4-geodata": "^4.1.17",
     "@ant-design/compatible": "^1.0.5",
     "@ant-design/icons": "^4.2.1",
     "@apollo/react-hooks": "^4.0.0",

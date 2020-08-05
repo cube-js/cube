@@ -9,21 +9,14 @@ import { CubeProvider } from '@cubejs-client/react';
 import client from './graphql/client';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
-import WebSocketTransport from '@cubejs-client/ws-transport';
-
-const API_URL =
-  process.env.NODE_ENV === 'production'
-    ? `wss://${window.location.host}`
-    : 'ws://localhost:4000/'; //'ws://localhost:4000';
 
 const CUBEJS_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjExMzQsImV4cCI6MTYyNjE5NzEzNH0._sWwksID3MLJxXmqNnECV_A3x7gUcVzSgn4szFox76s';
 
-const cubejsApi = cubejs({
-  transport: new WebSocketTransport({
-    authorization: CUBEJS_TOKEN,
-    apiUrl: API_URL,
-  }),
+const API_URL = 'http://localhost:4000';
+
+const cubejsApi = cubejs(CUBEJS_TOKEN, {
+  apiUrl: `${API_URL}/cubejs-api/v1`,
 });
 
 const AppLayout = () => (

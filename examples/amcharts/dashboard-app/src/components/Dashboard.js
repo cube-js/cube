@@ -3,50 +3,20 @@ import { AutoComplete, Row, Col } from 'antd';
 import { useCubeQuery } from '@cubejs-client/react';
 import LineChart from './LineChart';
 import Bubble from './Bubble';
+import Map from './Map';
 import Heatmap from './Heatmap';
+import Table from './Table';
 import moment from 'moment';
 
 export default () => {
-  /*const [msgByDate, setMsgByDate] = useState([0, 0]);
+  const [msgByDate, setMsgByDate] = useState([0, 0]);
   const { resultSet: msg } = useCubeQuery({
-    measures: ['Data.count'],
+    measures: ['Messages.count'],
     timeDimensions: [
       {
-        dimension: 'Data.ts',
+        dimension: 'Messages.date',
         granularity: 'day',
         dateRange: 'last year',
-      },
-    ],
-  });
-
-  const [msgByHour, setMsgByHour] = useState([0, 0]);
-  const { resultSet: msgHour } = useCubeQuery({
-    measures: ['Data.count'],
-    timeDimensions: [
-      {
-        dimension: 'Data.ts',
-        dateRange: 'last week',
-        granularity: 'hour',
-      },
-    ],
-  });
-
-  const [joinsByDate, setJoinsByDate] = useState([0, 0]);
-  const { resultSet: joins } = useCubeQuery({
-    measures: ['Data.count'],
-    //dimensions: ['Data.subtype'],
-    renewQuery: true,
-    filters: [
-      {
-        member: 'Data.subtype',
-        operator: 'equals',
-        values: ['channel_join'],
-      },
-    ],
-    timeDimensions: [
-      {
-        dimension: 'Data.ts',
-        granularity: 'day',
       },
     ],
   });
@@ -56,42 +26,150 @@ export default () => {
       let temp = [];
       msg.tablePivot().map((item) => {
         temp.push({
-          date: new Date(item['Data.ts.day']),
-          month: moment(item['Data.ts.day']).format('MMM'),
-          weekday: moment(item['Data.ts.day']).format('dddd'),
-          value: parseInt(item['Data.count']),
+          date: new Date(item['Messages.date.day']),
+          month: moment(item['Messages.date.day']).format('MMM'),
+          weekday: moment(item['Messages.date.day']).format('dddd'),
+          value: parseInt(item['Messages.count']),
         });
       });
       setMsgByDate(temp);
     }
   }, [msg]);
 
+  const [msgByHour, setMsgByHour] = useState([0, 0]);
+  const { resultSet: msgHour } = useCubeQuery({
+    measures: ['Messages.count'],
+    timeDimensions: [
+      {
+        dimension: 'Messages.date_time',
+        dateRange: 'last week',
+        granularity: 'hour',
+      },
+    ],
+  });
+
   useEffect(() => {
     if (msgHour) {
       let temp = [];
       msgHour.tablePivot().map((item) => {
         temp.push({
-          hour: moment(item['Data.ts.hour']).format('ha'),
-          weekday: moment(item['Data.ts.hour']).format('dddd'),
-          value: parseInt(item['Data.count']),
+          hour: moment(item['Messages.date_time.hour']).format('ha'),
+          weekday: moment(item['Messages.date_time.hour']).format('dddd'),
+          value: parseInt(item['Messages.count']),
         });
       });
       setMsgByHour(temp);
     }
   }, [msgHour]);
 
+  const [joinsByDate, setJoinsByDate] = useState([0, 0]);
+  const { resultSet: joins } = useCubeQuery({
+    measures: ['Memberships.sum'],
+    timeDimensions: [
+      {
+        dimension: 'Memberships.date',
+        dateRange: 'from 360 days ago to now',
+        granularity: 'day',
+      },
+    ],
+  });
+
   useEffect(() => {
     if (joins) {
       let temp = [];
       joins.tablePivot().map((item) => {
         temp.push({
-          date: new Date(item['Data.ts.day']),
-          value: parseInt(item['Data.count']),
+          date: new Date(item['Memberships.date.day']),
+          value: parseInt(item['Memberships.sum']),
         });
       });
       setJoinsByDate(temp);
     }
   }, [joins]);
+
+  const [usersList, setUsersList] = useState({ columns: [], data: [] });
+  const { resultSet: users } = useCubeQuery({
+    measures: ['Messages.count'],
+    dimensions: ['Users.name', 'Users.real_name', 'Users.image'],
+  });
+
+  useEffect(() => {
+    if (users) {
+      let temp = [];
+      users.tablePivot().map((item, i) => {
+        temp.push({
+          key: i,
+          name: item['Users.name'],
+          real_name: item['Users.real_name'],
+          image: item['Users.image'],
+          messages: item['Messages.count'],
+        });
+      });
+      setUsersList({
+        column: [
+          {
+            title: 'Image',
+            dataIndex: 'image',
+            key: 'image',
+            width: 50,
+            align: 'center',
+            render: (url) => <img src={url} width={40} height={40} />,
+          },
+          {
+            title: 'Name',
+            dataIndex: 'name',
+            key: 'name',
+          },
+          {
+            title: 'Real Name',
+            dataIndex: 'real_name',
+            key: 'real_name',
+          },
+          {
+            title: 'Messages',
+            dataIndex: 'messages',
+            align: 'center',
+            key: 'messages',
+          },
+        ],
+        data: [...temp],
+      });
+    }
+  }, [users]);
+
+  const [channelsList, setChannelsList] = useState({ columns: [], data: [] });
+  const { resultSet: channels } = useCubeQuery({
+    measures: ['Memberships.count'],
+    dimensions: ['Channels.name'],
+  });
+
+  useEffect(() => {
+    if (channels) {
+      let temp = [];
+      channels.tablePivot().map((item, i) => {
+        temp.push({
+          key: i,
+          name: `#${item['Channels.name']}`,
+          users: item['Memberships.count'],
+        });
+      });
+      setChannelsList({
+        column: [
+          {
+            title: 'Name',
+            dataIndex: 'name',
+            key: 'name',
+          },
+          {
+            title: 'Users',
+            dataIndex: 'users',
+            key: 'users',
+          },
+        ],
+        data: [...temp],
+      });
+    }
+  }, [channels]);
 
   return (
     <React.Fragment>
@@ -131,22 +209,29 @@ export default () => {
       </Row>
 
       <Row className='dashboard__row' gutter={20}>
-        <Col sm={24} lg={24}>
+        <Col sm={24} lg={12}>
           <h2>Messages by date </h2>
           <div className='dashboard__cell'>
             <LineChart data={msgByDate} />
+          </div>
+        </Col>
+        <Col sm={24} lg={12}>
+          <h2>Users by date</h2>
+          <div className='dashboard__cell'>
+            <LineChart data={joinsByDate} />
           </div>
         </Col>
       </Row>
 
       <Row className='dashboard__row' gutter={20}>
         <Col sm={24} lg={24}>
-          <h2>Joins by date</h2>
+          <h2>Users by time zone</h2>
           <div className='dashboard__cell'>
-            <LineChart data={joinsByDate} />
+            <Map data={joinsByDate} />
           </div>
         </Col>
       </Row>
+
       <Row className='dashboard__row' gutter={20}>
         <Col sm={24} lg={12}>
           <h2>Messages by day last year</h2>
@@ -161,7 +246,21 @@ export default () => {
           </div>
         </Col>
       </Row>
+
+      <Row className='dashboard__row' gutter={20}>
+        <Col sm={24} lg={12}>
+          <h2>Channels</h2>
+          <div className='dashboard__cell'>
+            <Table data={channelsList} />
+          </div>
+        </Col>
+        <Col sm={24} lg={12}>
+          <h2>Users</h2>
+          <div className='dashboard__cell'>
+            <Table data={usersList} />
+          </div>
+        </Col>
+      </Row>
     </React.Fragment>
-  );*/
-  return '<div>123</div>';
+  );
 };
