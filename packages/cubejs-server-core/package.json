@@ -19,23 +19,16 @@
     "playground"
   ],
   "scripts": {
-    "lint": "eslint core/**/*.js",
-    "test": "jest --testPathPattern test/*.test.js --runInBand"
+    "lint": "eslint core/**/*.js"
   },
   "dependencies": {
-    "@babel/core": "^7.7.4",
-    "@babel/generator": "^7.4.0",
-    "@babel/parser": "^7.4.2",
-    "@babel/preset-env": "^7.3.4",
-    "@babel/preset-react": "^7.0.0",
-    "@babel/standalone": "^7.3.4",
-    "@babel/traverse": "^7.4.0",
-    "@babel/types": "^7.4.0",
     "@cubejs-backend/api-gateway": "^0.19.54",
     "@cubejs-backend/query-orchestrator": "^0.19.56",
     "@cubejs-backend/schema-compiler": "^0.19.56",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
+    "decompress": "^4.2.1",
+    "decompress-targz": "^4.1.1",
     "fs-extra": "^8.1.0",
     "jsonwebtoken": "^8.4.0",
     "lru-cache": "^5.1.1",
