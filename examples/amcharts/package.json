@@ -3,10 +3,15 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "start": "node index.js",
     "dev": "node index.js"
   },
   "dependencies": {
-    "@cubejs-backend/postgres-driver": "^0.19.56",
-    "@cubejs-backend/server": "^0.19.56"
+    "@cubejs-backend/server": "^0.19.56",
+    "@cubejs-backend/sqlite-driver": "^0.19.56",
+    "dotenv": "^8.2.0",
+    "node-stream-zip": "^1.11.2",
+    "sqlite3": "^5.0.0",
+    "uuid": "^8.3.0"
   }
 }

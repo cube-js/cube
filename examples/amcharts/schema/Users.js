@@ -1,34 +1,49 @@
 cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
+    sql: `SELECT * FROM users WHERE deleted = 0`,
 
-  joins: {},
-
-  measures: {
-    count: {
-      type: `count`,
-    },
-  },
-
-  dimensions: {
-    id: {
-      sql: `id`,
-      type: `string`,
-      primaryKey: true,
+    joins: {
+        Reactions: {
+            relationship: `hasMany`,
+            sql: `${Users}.id = ${Reactions}.user_id`
+        }
     },
 
-    name: {
-      sql: `name`,
-      type: `string`,
+    measures: {
+        count: {
+            type: `count`,
+        }
     },
 
-    image: {
-      sql: `${CUBE}."profile.image_48"`,
-      type: `string`,
+    dimensions: {
+        id: {
+            sql: `id`,
+            type: `string`,
+            primaryKey: true
+        },
+        name: {
+            sql: `name`,
+            type: `string`
+        },
+        real_name: {
+            sql: `real_name`,
+            type: `string`
+        },
+        image: {
+            sql: `image_512`,
+            type: `string`
+        },
+        is_admin: {
+            sql: `is_admin`,
+            type: `boolean`
+        }
     },
 
-    updated: {
-      sql: `TO_TIMESTAMP(updated)`,
-      type: `time`,
-    },
-  },
+    segments: {
+        admin: {
+            sql: `${Users}.is_admin = 1`
+        },
+        regular: {
+            sql: `${Users}.is_admin = 0`
+        }
+    }
 });

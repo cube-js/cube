@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const CubejsServerCore = require('@cubejs-backend/server-core');
 const WebSocketServer = require('@cubejs-backend/server/WebSocketServer');
 const express = require('express');
@@ -28,3 +29,20 @@ server.listen(port, () => {
     `🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`
   );
 });
+=======
+const importSlackArchive = require('./import');
+const CubejsServer = require('@cubejs-backend/server');
+
+(async function() {
+    await importSlackArchive(process.argv[2]);
+
+    const server = new CubejsServer();
+
+    server.listen().then(({ version, port }) => {
+        console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+    }).catch(e => {
+        console.error('Fatal error during server start: ');
+        console.error(e.stack || e);
+    });
+})();
+>>>>>>> a38e028fa6cdebc631523b577568e2ce2e6d869b
