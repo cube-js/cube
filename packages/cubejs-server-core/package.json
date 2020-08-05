@@ -25,6 +25,7 @@
     "@cubejs-backend/api-gateway": "^0.19.54",
     "@cubejs-backend/query-orchestrator": "^0.19.56",
     "@cubejs-backend/schema-compiler": "^0.19.57",
+    "axios": "^0.19.2",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
     "decompress": "^4.2.1",

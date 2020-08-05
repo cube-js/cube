@@ -850,19 +850,19 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.19.54":
-  version "0.19.54"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.54.tgz#abee60387ecb91f2f5febc17beaa5471032eeebd"
-  integrity sha512-rr1LpvfS9HIO5y/BfGQL6xIaji7yKtyVnPLt80E14e8/1svlX0XXN+yTW18ACjvbs2Ms3Cyo9l7xa1P/kXNR1g==
+"@cubejs-backend/query-orchestrator@^0.19.56":
+  version "0.19.56"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.56.tgz#d8ffcbff226cc25d7039cf42dff6439f9f3193a9"
+  integrity sha512-n1fJbhJPdcjpdB1pJbH2RWlWWZyhKzA6pqbkYbuA/7e5VgOPixQU3+gXpanSpyFc+7vovzD7In+NQieIOaLfYA==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.19.54":
-  version "0.19.54"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.19.54.tgz#3a7ff27febfe0f9849c40345ae97f995adeacc70"
-  integrity sha512-X3Tbcw3yokVHcGENt5mzDuCkb1AK8cD0fRqlw11PaDjH/O/z/L+S6Sx/GOx+2rxLoDMV7OYiYgEFOdSQzT9qgw==
+"@cubejs-backend/schema-compiler@^0.19.57":
+  version "0.19.57"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.19.57.tgz#50b559c8344d45d0377da781937cd63552f21ac2"
+  integrity sha512-omzlHEVmO+6WHvbZNOWbZ2yYIYiivsaQMq66J7XbC3lPn3lM9WsPjuXo9G3m6O+HoiWQnOT/n3l3LCf4aJnQ9g==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
