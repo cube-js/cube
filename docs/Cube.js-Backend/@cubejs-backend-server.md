@@ -36,7 +36,7 @@ The options for `CubejsServer` include the `CubejsServerCore` [options](@cubejs-
 {
   webSockets?: boolean;
   initApp?(app: express.Application): void | Promise<void>;
-}	}
+}
 ```
 
 ##### webSockets
