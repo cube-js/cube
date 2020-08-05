@@ -7,9 +7,12 @@ import logo from './../logo.svg';
 export default () => (
   <Layout.Header className='example__header'>
     <div className='examples__nav'>
-      <a href='//cube.dev' target='_blank'>
-        <img src={logo} alt='Cube.js' />
-      </a>
+      <div className='examples__title'>
+        Slack Analytics by
+        <a href='//cube.dev' target='_blank'>
+          <img src={logo} alt='Cube.js' />
+        </a>
+      </div>
       <div className='examples__nav__buttons'>
         <a href='//github.com/statsbotco/cube.js'>
           <Icon.GithubOutlined />

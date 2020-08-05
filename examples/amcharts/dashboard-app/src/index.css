@@ -13,9 +13,14 @@ body {
 
 .ant-layout-header.example__header {
   padding: 16px 24px;
-  background: #43436b;
+  background: white;
   height: auto;
   line-height: 0;
+}
+
+.ant-layout-content.example__content {
+  background-color: white;
+  padding: 24px;
 }
 
 .examples__nav {
@@ -23,14 +28,32 @@ body {
   justify-content: space-between;
 }
 
-.examples__nav__buttons a {
+.examples__nav__buttons a,
+.examples__buttons .examples__button {
   display: inline-block;
-  background: rgba(213, 213, 226, 0.1);
+  background: rgba(213, 213, 226, 0.3);
   border-radius: 4px;
   padding: 8px 12px;
   margin-left: 15px;
-  color: white;
+  color: #43436b;
   line-height: 1.6em;
+  cursor: pointer;
+}
+
+.examples__buttons .examples__button {
+  margin: 0 15px 0 0;
+}
+
+.examples__title {
+  display: flex;
+  align-items: center;
+  color: #a1a1b5;
+  font-size: 26px;
+  line-height: 1.2em;
+}
+
+.examples__title img {
+  margin-left: 16px;
 }
 
 .examples__nav__buttons a .anticon {
@@ -38,11 +61,28 @@ body {
   color: #a1a1b5;
 }
 
-.examples__nav__buttons a:hover {
+.examples__nav__buttons a:hover,
+.examples__buttons span:hover {
   background: rgba(213, 213, 226, 0.2);
-  color: white;
+  color: #141446;
 }
 
 .examples__nav__buttons a:hover .anticon {
   color: #d5d5e2;
+}
+
+.dashboard__cell {
+  border-radius: 4px;
+  overflow: hidden !important;
+  background-color: white;
+}
+
+@media (min-width: 640px) {
+  .examples__nav {
+    display: flex;
+    justify-content: space-between;
+  }
+  .dashboard__row {
+    margin-bottom: 20px;
+  }
 }

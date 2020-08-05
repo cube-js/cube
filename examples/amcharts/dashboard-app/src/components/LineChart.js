@@ -6,13 +6,16 @@ import am4themes_animated from '@amcharts/amcharts4/themes/animated';
 am4core.useTheme(am4themes_animated);
 
 class LineChart extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { id: Math.random() };
+  }
   componentDidMount() {
-    let chart = am4core.create('chartdiv', am4charts.XYChart);
+    let chart = am4core.create(`line${this.state.id}`, am4charts.XYChart);
 
     chart.paddingRight = 20;
 
-    let data = [];
-    chart.data = data;
+    chart.data = [];
 
     let dateAxis = chart.xAxes.push(new am4charts.DateAxis());
     dateAxis.renderer.grid.template.location = 0;
@@ -48,8 +51,12 @@ class LineChart extends Component {
   }
 
   render() {
-    console.log(this.props.data);
-    return <div id='chartdiv' style={{ width: '100%', height: '500px' }}></div>;
+    return (
+      <div
+        id={`line${this.state.id}`}
+        style={{ width: '100%', height: '500px' }}
+      ></div>
+    );
   }
 }
 

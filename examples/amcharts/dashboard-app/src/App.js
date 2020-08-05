@@ -11,13 +11,18 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 
-const API_URL = 'http://localhost:4000';
+const API_URL =
+  process.env.NODE_ENV === 'production'
+    ? `wss://${window.location.host}`
+    : 'ws://localhost:4000/'; //'ws://localhost:4000';
+
 const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTY0NTIxNDUsImV4cCI6MTU5NjUzODU0NX0.kf7_kYKxS6y9FTpsyshlpzxxx2P9KY9xAijvGWlUpnE';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjExMzQsImV4cCI6MTYyNjE5NzEzNH0._sWwksID3MLJxXmqNnECV_A3x7gUcVzSgn4szFox76s';
+
 const cubejsApi = cubejs({
   transport: new WebSocketTransport({
     authorization: CUBEJS_TOKEN,
-    apiUrl: API_URL.replace('http', 'ws'),
+    apiUrl: API_URL,
   }),
 });
 
@@ -28,7 +33,7 @@ const AppLayout = () => (
     }}
   >
     <Header />
-    <Layout.Content>
+    <Layout.Content className='example__content'>
       <Dashboard />
     </Layout.Content>
   </Layout>
