@@ -7,7 +7,7 @@ import Heatmap from './Heatmap';
 import moment from 'moment';
 
 export default () => {
-  const [msgByDate, setMsgByDate] = useState([0, 0]);
+  /*const [msgByDate, setMsgByDate] = useState([0, 0]);
   const { resultSet: msg } = useCubeQuery({
     measures: ['Data.count'],
     timeDimensions: [
@@ -162,5 +162,6 @@ export default () => {
         </Col>
       </Row>
     </React.Fragment>
-  );
+  );*/
+  return '<div>123</div>';
 };
