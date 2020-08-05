@@ -3910,15 +3910,14 @@ csstype@^2.2.0:
   resolved "https://registry.yarnpkg.com/csstype/-/csstype-2.6.6.tgz#c34f8226a94bbb10c32cc0d714afdf942291fc41"
   integrity sha512-RpFbQGUE74iyPgvr46U9t1xoQBM8T4BL8SxrN66Le2xYAPSaDJJKeztV3awugusb3g3G9iL8StmkBBXhcbbXhg==
 
-cubedev-tracking@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/cubedev-tracking/-/cubedev-tracking-1.0.0.tgz#6a8bc81f0919970e49b7ab85f5fa876103ddf4d5"
-  integrity sha512-Agvvt/7fYqqRJ6JS6YyNcSh0azXj2KYj5s674/FILLw37e2XtODzEl6WZDt4UHaaTkCL+p0JsleRdBTXyZqfWg==
+cubedev-tracking@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/cubedev-tracking/-/cubedev-tracking-1.0.1.tgz#fb470f298e3ff120e8d3c0c623fd5658e8d382fa"
+  integrity sha512-XHZOfrj3n1xmgZyITU/u9Oe8+mAQjXHEywZZDkLqv4d3Bxr0ArVQwaoHN8/uNyUaYEUw74PShad1mVfITUiRZA==
   dependencies:
     "@babel/runtime" "^7.11.0"
     component-cookie "^1.1.4"
     uuid "^3.3.3"
-    whatwg-fetch "^3.2.0"
 
 currently-unhandled@^0.4.1:
   version "0.4.1"
@@ -14996,11 +14995,6 @@ whatwg-fetch@>=0.10.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/whatwg-fetch/-/whatwg-fetch-3.0.0.tgz#fc804e458cc460009b1a2b966bc8817d2578aefb"
   integrity sha512-9GSJUgz1D4MfyKU7KRqwOjXCXTqWdFNvEr7eUBYchQiVc744mqK/MzXPNR2WsPkmkOa4ywfg8C2n8h+13Bey1Q==
-
-whatwg-fetch@^3.2.0:
-  version "3.3.1"
-  resolved "https://registry.yarnpkg.com/whatwg-fetch/-/whatwg-fetch-3.3.1.tgz#6c1acf37dec176b0fd6bc9a74b616bec2f612935"
-  integrity sha512-faXTmGDcLuEPBpJwb5LQfyxvubKiE+RlbmmweFGKjvIPFj4uHTTfdtTIkdTRhC6OSH9S9eyYbx8kZ0UEaQqYTA==
 
 which-module@^2.0.0:
   version "2.0.0"
