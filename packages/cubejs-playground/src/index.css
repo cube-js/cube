@@ -3,20 +3,27 @@ body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #F8F8FB;
+  background: #f8f8fb;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 #root {
   height: 100%;
 }
 
-.schema-sidebar, .schema-sidebar .ant-tabs, .schema-sidebar .ant-tabs-content {
+.schema-sidebar,
+.schema-sidebar .ant-tabs,
+.schema-sidebar .ant-tabs-content {
   height: 100%;
+}
+
+.schema-sidebar {
+  background: #fff;
+  border-right: 1px solid #eee;
+  padding: 0 12px;
 }
 
 .schema-sidebar .ant-tabs-tabpane {

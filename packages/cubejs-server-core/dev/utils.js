@@ -9,7 +9,7 @@ async function fileContentsRecursive(dir, rootPath, includeNodeModules) {
   if (!(await fs.pathExists(dir))) {
     return [];
   }
-  if (dir.indexOf('node_modules') !== -1 && !includeNodeModules) {
+  if ((dir.includes('node_modules') && !includeNodeModules) || dir.includes('.git')) {
     return [];
   }
   
