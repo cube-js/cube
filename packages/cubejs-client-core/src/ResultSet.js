@@ -47,6 +47,7 @@ const groupByToPairs = (keyFn) => {
 class ResultSet {
   constructor(loadResponse, options = {}) {
     this.loadResponse = loadResponse;
+    this.loadResponses = Array.isArray(loadResponse) ? loadResponse : [loadResponse];
     this.parseDateMeasures = options.parseDateMeasures;
     this.options = options;
   }
@@ -516,6 +517,7 @@ class ResultSet {
     if (!this.backwardCompatibleData) {
       const { query } = this.loadResponse;
       const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+      
       this.backwardCompatibleData = this.loadResponse.data.map(row => (
         {
           ...row,

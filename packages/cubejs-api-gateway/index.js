@@ -144,8 +144,9 @@ const querySchema = Joi.object().keys({
     dateRange: [
       Joi.array().items(Joi.string()).min(1).max(2),
       Joi.string()
-    ]
-  })),
+    ],
+    compareDateRange: Joi.array()
+  }).xor('dateRange', 'compareDateRange')),
   order: Joi.object().pattern(id, Joi.valid('asc', 'desc')),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
@@ -196,9 +197,11 @@ const normalizeQuery = (query) => {
       'afterDate',
       'measureFilter',
     ].indexOf(f.operator) === -1);
+    
   if (filterWithIncorrectOperator) {
     throw new UserError(`Operator ${filterWithIncorrectOperator.operator} not supported for filter: ${JSON.stringify(filterWithIncorrectOperator)}`);
   }
+  
   const filterWithoutValues = (query.filters || [])
     .find(f => !f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1);
   if (filterWithoutValues) {
@@ -213,6 +216,7 @@ const normalizeQuery = (query) => {
     id: k,
     desc: query.order[k] === 'desc'
   }));
+  
   return {
     ...query,
     rowLimit: query.rowLimit || query.limit,
@@ -227,6 +231,9 @@ const normalizeQuery = (query) => {
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
+      
+      const compareDateRange = td.compareDateRange ? td.compareDateRange.map((currentDateRange) => (typeof currentDateRange === 'string' ? dateParser(currentDateRange, timezone) : currentDateRange)) : null;
+      
       if (typeof td.dateRange === 'string') {
         dateRange = dateParser(td.dateRange, timezone);
       } else {
@@ -240,7 +247,8 @@ const normalizeQuery = (query) => {
               moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
               moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
           )
-        )
+        ),
+        ...(compareDateRange ? { compareDateRange } : {})
       };
     }).concat(regularToTimeDimension)
   };
@@ -320,6 +328,17 @@ class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+    
+    // todo: remove
+    app.get(`${this.basePath}/v1/test`, this.requestMiddleware, (async (req, res) => {
+      // await this.load({
+      //   query: req.query.query,
+      //   context: req.context,
+      //   res: this.resToResultFn(res)
+      // });
+      
+      res.json(this.compareDateRangeTransformer(normalizeQuery(JSON.parse(req.query.query))));
+    }));
   }
 
   initSubscriptionServer(sendMessage) {
@@ -386,66 +405,84 @@ class ApiGateway {
     query, context, res
   }) {
     const requestStarted = new Date();
+    
     try {
-      query = this.parseQueryParam(query);
+      query = this.compareDateRangeTransformer(this.parseQueryParam(query));
+      const shouldReturnArray = Array.isArray(query);
+      const queries = Array.isArray(query) ? query : [query];
+      
       this.log(context, {
         type: 'Load Request',
         query
       });
       const loadRequestSQLStarted = new Date();
-      const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
-      if (!normalizedQuery) {
+      const normalizedQueries = await this.queryTransformer(queries.map(normalizeQuery), context);
+      
+      if (!normalizedQueries) {
         throw new Error(`queryTransformer returned null query. Please check your queryTransformer implementation`);
       }
-      const [compilerSqlResult, metaConfigResult] = await Promise.all([
-        this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context)),
-        this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
-      ]);
-      const sqlQuery = compilerSqlResult;
-      this.log(context, {
-        type: 'Load Request SQL',
-        duration: this.duration(loadRequestSQLStarted),
-        query,
-        sqlQuery
+      
+      const [metaConfigResult, ...sqlQueries] = await Promise.all(
+        [
+          this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
+        ].concat(normalizedQueries.map(
+          (normalizedQuery) => this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context))
+        ))
+      );
+      
+      // todo: should the logs reflect that the queries come in a batch?
+      sqlQueries.forEach((sqlQuery, index) => {
+        this.log(context, {
+          type: 'Load Request SQL',
+          duration: this.duration(loadRequestSQLStarted),
+          query: queries[index],
+          sqlQuery
+        });
       });
-
-      const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
-      const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
-      const toExecute = {
-        ...sqlQuery,
-        query: sqlQuery.sql[0],
-        values: sqlQuery.sql[1],
-        continueWait: true,
-        renewQuery: normalizedQuery.renewQuery,
-        requestId: context.requestId
-      };
-      const response = await this.getAdapterApi({
-        ...context, dataSource: sqlQuery.dataSource
-      }).executeQuery(toExecute);
-
-      const flattenAnnotation = {
-        ...annotation.measures,
-        ...annotation.dimensions,
-        ...annotation.timeDimensions
-      };
-
-      const result = {
-        query: normalizedQuery,
-        data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data, normalizedQuery),
-        lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
-        ...(process.env.NODE_ENV === 'production' ? undefined : {
-          refreshKeyValues: response.refreshKeyValues,
-          usedPreAggregations: response.usedPreAggregations
-        }),
-        annotation
-      };
+      
+      const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
+        const sqlQuery = sqlQueries[index];
+        const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
+        const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
+        
+        const toExecute = {
+          ...sqlQuery,
+          query: sqlQuery.sql[0],
+          values: sqlQuery.sql[1],
+          continueWait: true,
+          renewQuery: normalizedQuery.renewQuery,
+          requestId: context.requestId
+        };
+        
+        const response = await this.getAdapterApi({
+          ...context,
+          dataSource: sqlQuery.dataSource
+        }).executeQuery(toExecute);
+  
+        const flattenAnnotation = {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        };
+  
+        return {
+          query: normalizedQuery,
+          data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data, normalizedQuery),
+          lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
+          ...(process.env.NODE_ENV === 'production' ? undefined : {
+            refreshKeyValues: response.refreshKeyValues,
+            usedPreAggregations: response.usedPreAggregations
+          }),
+          annotation
+        };
+      }));
 
       this.log(context, {
         type: 'Load Request Success',
         query,
         duration: this.duration(requestStarted)
       });
-      res(result);
+      res(shouldReturnArray ? results : results[0]);
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
@@ -646,6 +683,41 @@ class ApiGateway {
     if (next) {
       next();
     }
+  }
+
+  compareDateRangeTransformer(query) {
+    let queryCompareDateRanges;
+    let compareDateRangeTDIndex;
+    
+    (query.timeDimensions || []).forEach((td, index) => {
+      if (td.compareDateRange != null) {
+        if (queryCompareDateRanges != null) {
+          throw new UserError('compareDateRange can only exist for one timeDimension');
+        }
+        
+        queryCompareDateRanges = td.compareDateRange;
+        compareDateRangeTDIndex = index;
+      }
+    });
+    
+    if (queryCompareDateRanges == null) {
+      return query;
+    }
+    
+    return queryCompareDateRanges.map((dateRange) => ({
+      ...R.clone(query),
+      timeDimensions: query.timeDimensions.map((td, index) => {
+        if (compareDateRangeTDIndex === index) {
+          const { compareDateRange, ...timeDimension } = td;
+          return {
+            ...timeDimension,
+            dateRange
+          };
+        }
+          
+        return td;
+      })
+    }));
   }
 
   log(context, event) {
