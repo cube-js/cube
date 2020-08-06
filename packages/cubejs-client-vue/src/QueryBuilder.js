@@ -18,6 +18,7 @@ export default {
   data() {
     const data = {
       meta: undefined,
+      metaError:undefined,
       chartType: undefined,
       measures: [],
       dimensions: [],
@@ -53,6 +54,7 @@ export default {
       filters,
       measures,
       meta,
+      metaError,
       query,
       segments,
       timeDimensions,
@@ -121,6 +123,13 @@ export default {
         };
       });
     }
+
+    if(metaError){
+      builderProps ={
+        metaError,
+      }
+    }
+
 
     // Pass parent slots to child QueryRenderer component
     const children = Object.keys(this.$slots).map(slot =>
@@ -203,9 +212,13 @@ export default {
   },
 
   async mounted() {
-    this.meta = await this.cubejsApi.meta();
-
-    this.copyQueryFromProps();
+    try {
+      this.meta = await this.cubejsApi.meta();
+      this.copyQueryFromProps();
+      this.metaError = undefined;
+    } catch (e) {
+      this.metaError = e;
+    }
   },
 
   methods: {

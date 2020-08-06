@@ -74,6 +74,8 @@ export default {
       slot = $scopedSlots.error ? $scopedSlots.error({ error, sqlQuery }) : slot;
     }
 
+    slot= ($scopedSlots.error && this.builderProps.metaError)?$scopedSlots.error({metaError:this.builderProps.metaError}):slot;
+
     return createElement(
       'div',
       {},
