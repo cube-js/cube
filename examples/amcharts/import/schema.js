@@ -3,14 +3,15 @@ const schema = {
         create: 'CREATE TABLE users (' +
             'id TEXT PRIMARY KEY,' +
             'name TEXT,' +
+            'title TEXT,' +
             'deleted INTEGER,' +
             'real_name TEXT,' +
             'image_512 TEXT,' +
             'is_admin INTEGER' +
             ')',
         insert: 'INSERT INTO users (' +
-            'id, name, deleted, real_name, image_512, is_admin' +
-            ') VALUES (?, ?, ?, ?, ?, ?)'
+            'id, name, title, deleted, real_name, image_512, is_admin' +
+            ') VALUES (?, ?, ?, ?, ?, ?, ?)'
     },
     channels: {
         create: 'CREATE TABLE channels (' +

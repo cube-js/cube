@@ -24,6 +24,10 @@ cube(`Users`, {
             sql: `name`,
             type: `string`
         },
+        title: {
+            sql: `title`,
+            type: `string`
+        },
         real_name: {
             sql: `real_name`,
             type: `string`

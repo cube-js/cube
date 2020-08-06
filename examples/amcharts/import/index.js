@@ -103,6 +103,7 @@ async function importUsers(runQuery, users) {
         await runQuery(schema['users'].insert, [
             user.id,
             user.name,
+            user.profile.title,
             user.deleted,
             user.real_name,
             user.profile.image_512,
