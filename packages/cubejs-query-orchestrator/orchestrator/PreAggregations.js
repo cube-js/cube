@@ -110,7 +110,14 @@ class PreAggregationLoadCache {
         await this.getTablesQuery(preAggregation)
       );
     }
-    return this.versionEntries;
+    const [active, toProcess, queries] = await this.fetchQueryStageState();
+    const targetTableNamesInQueue = (Object.keys(queries))
+      // eslint-disable-next-line no-use-before-define
+      .map(q => PreAggregations.targetTableName(queries[q].query.newVersionEntry));
+    return this.versionEntries.filter(
+      // eslint-disable-next-line no-use-before-define
+      e => targetTableNamesInQueue.indexOf(PreAggregations.targetTableName(e)) === -1
+    );
   }
 
   async keyQueryResult(keyQuery, waitForRenew, priority, renewalThreshold) {
@@ -141,10 +148,16 @@ class PreAggregationLoadCache {
 
   async getQueryStage(stageQueryKey) {
     const queue = this.preAggregations.getQueue();
+    await this.fetchQueryStageState(queue);
+    return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
+  }
+
+  async fetchQueryStageState(queue) {
+    queue = queue || this.preAggregations.getQueue();
     if (!this.queryStageState) {
       this.queryStageState = await queue.fetchQueryStageState();
     }
-    return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
+    return this.queryStageState;
   }
 
   async reset(preAggregation) {
@@ -419,7 +432,8 @@ class PreAggregationLoader {
   }
 
   targetTableName(versionEntry) {
-    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
+    // eslint-disable-next-line no-use-before-define
+    return PreAggregations.targetTableName(versionEntry);
   }
 
   refresh(newVersionEntry, invalidationKeys) {
@@ -721,6 +735,10 @@ class PreAggregations {
 
   static preAggregationQueryCacheKey(preAggregation) {
     return preAggregation.tableName;
+  }
+
+  static targetTableName(versionEntry) {
+    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }
 
