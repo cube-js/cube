@@ -15,7 +15,6 @@
     "reactstrap": "^7.1.0",
     "recharts": "^1.5.0"
   },
-  "homepage": "https://statsbotco.github.io/cubejs/react-dashboard",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
