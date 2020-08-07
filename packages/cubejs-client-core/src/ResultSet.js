@@ -1,5 +1,5 @@
 import {
-  groupBy, pipe, fromPairs, toPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone
+  groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -46,10 +46,13 @@ const groupByToPairs = (keyFn) => {
 
 class ResultSet {
   constructor(loadResponse, options = {}) {
-    this.loadResponse = loadResponse;
+    // todo: !
+    this.loadResponse = Array.isArray(loadResponse) ? loadResponse[0] : loadResponse;
     this.loadResponses = Array.isArray(loadResponse) ? loadResponse : [loadResponse];
     this.parseDateMeasures = options.parseDateMeasures;
     this.options = options;
+    
+    this.backwardCompatibleData = [];
   }
   
   drillDown(drillDownLocator, pivotConfig) {
@@ -250,7 +253,7 @@ class ResultSet {
     );
   }
 
-  pivot(pivotConfig) {
+  pivot(pivotConfig, responseIndex = 0) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
 
@@ -267,15 +270,17 @@ class ResultSet {
           .map(td => ResultSet.timeDimensionMember(td))
       )
     ) {
-      const series = this.timeSeries(this.loadResponse.query.timeDimensions[0]);
-      if (series) {
+      const series = this.loadResponses.map(
+        (loadResponse) => this.timeSeries(loadResponse.query.timeDimensions[0])
+      );
+      
+      if (series[0]) {
         groupByXAxis = (rows) => {
           const byXValues = groupBy(
             ({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
             rows
           );
-          return toPairs(series.map(d => ({ [d]: byXValues[d] || [{ xValues: [d], row: {} }] }))
-            .reduce((a, b) => Object.assign(a, b), {}));
+          return series[responseIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
         };
 
         // eslint-disable-next-line no-unused-vars
@@ -287,7 +292,7 @@ class ResultSet {
       map(row => this.axisValues(pivotConfig.x)(row).map(xValues => ({ xValues, row }))),
       unnest,
       groupByXAxis
-    )(this.timeDimensionBackwardCompatibleData());
+    )(this.timeDimensionBackwardCompatibleData(responseIndex));
 
     const allYValues = pipe(
       map(
@@ -309,6 +314,7 @@ class ResultSet {
         unnest,
         groupBy(({ yValues }) => this.axisValuesString(yValues))
       )(rows);
+      
       return {
         xValues,
         yValuesArray: unnest(allYValues.map(yValues => {
@@ -321,7 +327,22 @@ class ResultSet {
       };
     });
   }
-
+  
+  mergePivots(pivots) {
+    return pivots[0].map((_, index) => {
+      const xValues = [pivots.map((pivot) => pivot[index].xValues).join(', ')];
+  
+      return {
+        xValues,
+        yValuesArray: unnest(pivots.map((pivot, responseIndex) => {
+          const { dateRange } = this.loadResponses[responseIndex].query.timeDimensions[0];
+          
+          return pivot[index].yValuesArray.map(([members, measure]) => [[dateRange.join(' - ')].concat(members), measure]);
+        }))
+      };
+    });
+  }
+  
   pivotedRows(pivotConfig) { // TODO
     return this.chartPivot(pivotConfig);
   }
@@ -337,7 +358,13 @@ class ResultSet {
       return value;
     };
 
-    return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
+    const pivots = this.loadResponses.length > 0
+      ? this.loadResponses.map((_, index) => this.pivot(pivotConfig, index))
+      : [];
+      
+    const pivot = pivots.length ? mergePivots(pivots, this.loadResponses) : this.pivot(pivotConfig);
+    
+    return pivot.map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ', '), // TODO deprecated
       x: this.axisValuesString(xValues, ', '),
       xValues,
@@ -513,27 +540,28 @@ class ResultSet {
     return this.loadResponse.annotation;
   }
 
-  timeDimensionBackwardCompatibleData() {
-    if (!this.backwardCompatibleData) {
-      const { query } = this.loadResponse;
+  timeDimensionBackwardCompatibleData(responseIndex = 0) {
+    if (!this.backwardCompatibleData[responseIndex]) {
+      const { data, query } = this.loadResponses[responseIndex];
       const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
-      
-      this.backwardCompatibleData = this.loadResponse.data.map(row => (
+        
+      this.backwardCompatibleData[responseIndex] = data.map(row => (
         {
           ...row,
           ...(
-            Object.keys(row)
+            fromPairs(Object.keys(row)
               .filter(
                 field => timeDimensions.find(d => d.dimension === field) &&
                   !row[ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field))]
-              ).map(field => ({
-                [ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field))]: row[field]
-              })).reduce((a, b) => ({ ...a, ...b }), {})
+              ).map(field => (
+                [ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field)), row[field]]
+              )))
           )
         }
       ));
     }
-    return this.backwardCompatibleData;
+    
+    return this.backwardCompatibleData[responseIndex];
   }
   
   serialize() {
@@ -543,6 +571,7 @@ class ResultSet {
   }
   
   static deserialize(data, options = {}) {
+    // todo: support for array
     return new ResultSet(data.loadResponse, options);
   }
 }
