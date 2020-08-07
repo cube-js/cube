@@ -41,22 +41,6 @@ class CubejsApi {
     return this.transport.request(method, { baseRequestId: uuid(), ...params });
   }
 
-  /**
-   * Base method used to perform all API calls.
-   * Shouldn't be used directly.
-   * @param request - function that invoked to perform actual request using `transport.request()` method.
-   * @param toResult - function that maps results of invocation to method return result
-   * @param [options] - options object
-   * @param options.mutexObj - object to use to store MUTEX
-   * @param [options.mutexKey='default'] - key to use to store current request MUTEX inside `mutexObj`.
-   * MUTEX object is used to reject orphaned queries results when new queries are sent.
-   * For example if two queries are sent with same `mutexKey` only last one will return results.
-   * @param options.subscribe - pass `true` to use continuous fetch behavior.
-   * @param {Function} options.progressCallback - function that receives `ProgressResult` on each
-   * `Continue wait` message.
-   * @param [callback] - if passed `callback` function will be called instead of `Promise` returned
-   * @return {{unsubscribe: function()}}
-   */
   loadMethod(request, toResult, options, callback) {
     const mutexValue = ++mutexCounter;
     if (typeof options === 'function' && !callback) {

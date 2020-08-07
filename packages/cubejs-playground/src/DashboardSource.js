@@ -18,7 +18,7 @@ class DashboardSource {
     }
   }
 
-  async applyTemplatePackages(templatePackages, templateConfig) {
+  async applyTemplatePackages(toApply, templateConfig = null) {
     if (!this.playgroundContext) {
       this.playgroundContext = await this.loadContext();
     }
@@ -28,7 +28,7 @@ class DashboardSource {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        templatePackages,
+        toApply,
         templateConfig: templateConfig || {
           credentials: this.playgroundContext
         }
@@ -70,11 +70,12 @@ class DashboardSource {
       'create-react-app',
       Object.keys(this.installedTemplates).find(template => template.match(/-static$/)), // TODO
       'static-chart'
-    ], {
-      'static-chart': {
-        chartCode
-      }
-    });
+    ], { chartCode });
+  }
+  
+  async templates() {
+    const { templates } = await (await fetch('/playground/manifest')).json();
+    return templates;
   }
 }
 

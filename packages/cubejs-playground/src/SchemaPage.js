@@ -1,9 +1,8 @@
 import React, { Component } from 'react';
 import * as PropTypes from 'prop-types';
 import cubejs from '@cubejs-client/core';
-import { PlusOutlined } from '@ant-design/icons';
 import {
-  Layout, Menu, Button, Tree, Tabs, Dropdown, Spin, Alert, Modal, Empty
+  Layout, Menu, Button, Tree, Tabs, Spin, Alert, Modal, Empty
 } from 'antd';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
@@ -173,14 +172,6 @@ class SchemaPage extends Component {
       return <TreeNode {...item} />;
     });
 
-    const menu = (
-      <Menu>
-        <Menu.Item onClick={() => this.generateSchema()}>
-          Generate Schema
-        </Menu.Item>
-      </Menu>
-    );
-
     const renderTree = () => (Object.keys(tablesSchema || {}).length > 0 ? (
       <Tree
         checkable
@@ -214,24 +205,20 @@ class SchemaPage extends Component {
       <Layout style={{ height: '100%' }}>
         <Sider
           width={300}
-          style={{
-            background: '#fff',
-            borderRight: '1px solid #eee',
-          }}
           className="schema-sidebar"
         >
           <Tabs
             activeKey={activeTab}
             onChange={(tab) => this.setState({ activeTab: tab })}
             tabBarExtraContent={(
-              <Dropdown overlay={menu} placement="bottomRight" disabled={!checkedKeys.length}>
-                <Button
-                  shape="circle"
-                  icon={<PlusOutlined />}
-                  type="primary"
-                />
-              </Dropdown>
-)}
+              <Button
+                disabled={!checkedKeys.length}
+                type="primary"
+                onClick={() => this.generateSchema()}
+              >
+                Generate Schema
+              </Button>
+            )}
           >
             <TabPane tab="Tables" key="schema">
               {schemaLoading ? <Spin style={{ width: '100%' }}/> : renderTreeOrError()}

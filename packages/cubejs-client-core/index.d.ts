@@ -221,12 +221,12 @@ declare module '@cubejs-client/core' {
     /**
      * ```js
      * import { ResultSet } from '@cubejs-client/core';
-     * 
+     *
      * const resultSet = await cubejsApi.load(query);
      * // You can store the result somewhere
      * const tmp = resultSet.serialize();
-     * 
-     * // and restore it later 
+     *
+     * // and restore it later
      * const resultSet = ResultSet.deserialize(tmp);
      * ```
      * @param data the result of [serialize](#result-set-serialize)
@@ -259,7 +259,7 @@ declare module '@cubejs-client/core' {
      * Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
      */
     serialize(): Object;
-    
+
     /**
      * @hidden
      */
@@ -627,6 +627,30 @@ declare module '@cubejs-client/core' {
 
   export type MemberType = 'measures' | 'dimensions' | 'segments';
 
+  type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
+
+  type TCubeMember = {
+    type: TCubeMemberType;
+    name: string;
+    title: string;
+    shortTitle: string;
+  };
+
+  type TCubeMeasure = TCubeMember & {
+    aggType: 'count' | 'number';
+    cumulative: boolean;
+    cumulativeTotal: boolean;
+    drillMembers: string[];
+    drillMembersGrouped: {
+      measures: string[];
+      dimensions: string[];
+    };
+  };
+
+  type TCubeDimension = TCubeMember & {
+    suggestFilterValues: boolean;
+  };
+
   /**
    * Contains information about available cubes and it's members.
    * @order 4
@@ -637,10 +661,10 @@ declare module '@cubejs-client/core' {
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
      * @param query - context query to provide filtering of members available to add to this query
      */
-    membersForQuery(query: Query, memberType: MemberType);
+    membersForQuery(query: Query | null, memberType: MemberType): TCubeMeasure[] | TCubeDimension[] | TCubeMember[];
 
     /**
-     * Get meta information for member of a cube
+     * Get meta information for a cube member
      * Member meta information contains:
      * ```javascript
      * {
@@ -706,7 +730,7 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
   }
-  
+
   /**
    * Creates an instance of the `CubejsApi`. The API entry point.
    *

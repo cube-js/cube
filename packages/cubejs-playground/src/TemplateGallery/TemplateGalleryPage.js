@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import styled from 'styled-components';
 import '@ant-design/compatible/assets/index.css';
-import { Card, Col, Row, Typography } from 'antd';
+import { Card, Col, Row, Typography, Spin } from 'antd';
 import { Redirect, withRouter } from 'react-router-dom';
 import DashboardSource from '../DashboardSource';
 import { frameworks } from '../ChartContainer';
@@ -113,24 +113,33 @@ class TemplateGalleryPage extends Component {
     this.state = {
       chartLibrary: chartLibraries[0].value,
       framework: 'react',
-      templatePackageName: 'react-antd-dynamic'
+      templatePackageName: 'react-antd-dynamic',
+      templates: null
     };
   }
 
   async componentDidMount() {
     this.dashboardSource = new DashboardSource();
     await this.dashboardSource.load(true);
+    
     this.setState({
-      loadError: this.dashboardSource.loadError
+      loadError: this.dashboardSource.loadError,
+      templates: await this.dashboardSource.templates()
     });
   }
 
   render() {
     const {
-      loadError
+      loadError,
+      templates
     } = this.state;
+    
     if (loadError && loadError.indexOf('Dashboard app not found') === -1) {
       return <Redirect to="/dashboard" />;
+    }
+
+    if (templates == null) {
+      return <Spin />
     }
 
     const {
@@ -142,30 +151,8 @@ class TemplateGalleryPage extends Component {
     const templatePackage = this.dashboardSource && this.dashboardSource.templatePackages
       .find(m => m.name === templatePackageName);
 
-    const recipes = [{
-      name: 'Dynamic Dashboard with React, AntD, and Recharts',
-      description: 'Use this template to create a dynamic dashboard application with React, AntD, and Chart.js. It comes with a dynamic query builder and Apollo GraphQL client. Use it when you want to allow users to edit dashboards.',
-      coverUrl: 'https://cube.dev/downloads/template-react-dashboard.png',
-      templatePackages: ['create-react-app', 'react-antd-dynamic', 'recharts-charts', 'antd-tables', 'credentials']
-    }, {
-      name: 'Real-Time Dashboard with React, AntD, and Chart.js',
-      description: 'Use this template to create a static dashboard application with real-time WebSocket transport. Use it when users should not be allowed to edit dashboards and you want to provide them with real-time data refresh.',
-      templatePackages: ['create-react-app', 'react-antd-static', 'chartjs-charts', 'antd-tables', 'credentials', 'web-socket-transport'],
-      coverUrl: 'https://cube.dev/downloads/template-real-time-dashboard.png'
-    }, {
-      name: 'Material UI React Dashboard',
-      coverUrl: 'https://cube.dev/downloads/template-material-ui.jpg',
-      description: 'Use this template to create a Material UI–based static dashboard application and add charts to it by editing the source code or via Cube.js Playground. Use it when users should not be allowed to edit dashboards.',
-      templatePackages: ['create-react-app', 'react-material-static', 'recharts-charts', 'material-tables', 'credentials']
-    }, {
-      name: 'Material UI D3 Dashboard',
-      coverUrl: 'https://cube.dev/downloads/template-material-d3.png',
-      description: 'Use this template to create a Material UI–based dashboard with D3.js. Add charts to it by editing the source code or via Cube.js Playground. Use it when users should not be allowed to edit dashboards.',
-      templatePackages: ['create-react-app', 'react-material-static', 'd3-charts', 'material-tables', 'credentials']
-    }];
 
-
-    const recipeCards = recipes.map(({ name, description, templatePackages, coverUrl }) => (
+    const recipeCards = templates.map(({ name, description, templatePackages, coverUrl }) => (
       <Col xs={{ span: 24 }} md={{span: 12 }} lg={{ span: 8 }} xl={{ span: 6 }} key={name}>
         <RecipeCard
           hoverable
@@ -176,7 +163,7 @@ class TemplateGalleryPage extends Component {
           <Button
             type="primary"
             onClick={async () => {
-              await this.dashboardSource.applyTemplatePackages(templatePackages);
+              await this.dashboardSource.applyTemplatePackages(name);
               history.push('/dashboard');
             }}
           >
@@ -207,8 +194,8 @@ class TemplateGalleryPage extends Component {
               templatePackageName,
               `${chartLibrary}-charts`,
               `${templatePackageName.match(/^react-(\w+)/)[1]}-tables`, // TODO
-              'credentials'
-            ].concat(enableWebSocketTransport ? ['web-socket-transport'] : []);
+              'react-credentials'
+            ].concat(enableWebSocketTransport ? ['react-web-socket-transport'] : []);
             await this.dashboardSource.applyTemplatePackages(templatePackages);
             history.push('/dashboard');
           }}
@@ -229,10 +216,10 @@ class TemplateGalleryPage extends Component {
     return (
       <MarginFrame>
         <StyledTitle>
-          Build your app from one the popular templates below or
+          Build your app from one the popular templates below or{' '}
           <a onClick={() => this.setState({ createOwnModalVisible: true })}>create your own</a>
         </StyledTitle>
-        <Row type="flex" align="top" gutter={24}>
+        <Row align="top" gutter={24}>
           {recipeCards}
         </Row>
       </MarginFrame>
