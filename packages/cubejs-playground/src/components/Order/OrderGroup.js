@@ -14,10 +14,6 @@ export default function OrderGroup({ orderMembers, onOrderChange, onReorder }) {
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            style={{
-              paddingTop: 8,
-              width: 260
-            }}
           >
             {orderMembers.map(({ id, title, order }, index) => (
               <DraggableItem
