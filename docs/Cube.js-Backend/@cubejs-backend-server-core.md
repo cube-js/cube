@@ -18,7 +18,7 @@ const CubejsServerCore = require('@cubejs-backend/server-core');
 const express = require('express');
 const path = require('path');
 
-const express = express();
+const expressApp = express();
 
 const dbType = 'mysql';
 const options = {
@@ -31,7 +31,7 @@ const options = {
 };
 
 const core = CubejsServerCore.create(options);
-core.initApp(express);
+core.initApp(expressApp);
 ```
 
 ## Options Reference
