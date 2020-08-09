@@ -714,7 +714,7 @@ class PreAggregations {
 
   getLoadCacheQueue() {
     if (!this.loadCacheQueue) {
-      this.loadCacheQueue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}`, this.driverFactory, (client, q) => {
+      this.loadCacheQueue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}`, () => {}, (_, q) => {
         const {
           preAggregation,
           requestId
