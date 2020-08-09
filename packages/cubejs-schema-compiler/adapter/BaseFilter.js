@@ -79,8 +79,15 @@ class BaseFilter extends BaseDimension {
     return this.operator === 'contains' || this.operator === 'not_contains';
   }
 
+  isDateOperator() {
+    // Fix camelCase => snake_case
+    const operator = this.operator.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+    return contains(operator, DATE_OPERATORS);
+  }
+
   filterParams() {
-    if (contains(this.operator, DATE_OPERATORS)) {
+    if (this.isDateOperator()) {
       return [this.inDbTimeZoneDateFrom(this.values[0]), this.inDbTimeZoneDateTo(this.values[1])];
     }
     if (this.operator === 'set' || this.operator === 'not_set' || this.operator === 'expressionEquals') {
