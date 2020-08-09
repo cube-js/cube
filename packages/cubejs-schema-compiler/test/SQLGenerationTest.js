@@ -1681,7 +1681,7 @@ describe('SQL Generation', function test() {
   it('Should date with TZ, when pass timeDimensions', () => {
     const result = compiler.compile().then(() => {
 
-      let query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
         ...baseQuery,
         timeDimensions: [{
           dimension: 'visitors.created_at',
@@ -1689,6 +1689,7 @@ describe('SQL Generation', function test() {
           dateRange: ['2017-01-01', '2017-01-10']
         }]
       });
+      
       const sqlBuild = query.buildSqlAndParams()
 
       sqlBuild[1][0].should.be.equal('2017-01-01T08:00:00Z');
@@ -1700,7 +1701,7 @@ describe('SQL Generation', function test() {
 
   it('Should date with TZ, when pass filter with inDateRange operator', () => {
     const result = compiler.compile().then(() => {
-      let query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
         ...baseQuery,
         filters: [{
           dimension: 'visitors.created_at',
