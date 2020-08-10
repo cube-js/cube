@@ -66,6 +66,22 @@ If the `order` property is not specified in the query, Cube.js sorts results by 
 - The first measure, descending. If no measure exists...
 - The first dimension, ascending.
 
+### Аlternative order format
+
+Also you can control the ordering of the `order` specification, Cube.js support alternative order format - array of tuples:  
+
+```js
+{
+  ...,
+  order: [
+      ['Stories.time', 'asc'],
+      ['Stories.count', 'asc']
+    ]
+  },
+  ...
+}
+```
+
 ## Filters Format
 
 A filter is a Javascript object with the following properties:
