@@ -47,8 +47,8 @@ Both [CubejsServerCore](@cubejs-backend-server-core) `create` method and [Cubejs
   webSocketsBasePath: String,
   devServer: Boolean,
   logger: (msg: String, params: Object) => any,
-  driverFactory: (context: DriverContext) => BaseDriver,
-  externalDriverFactory: (context: RequestContext) => BaseDriver,
+  driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>,
+  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>,
   contextToAppId: (context: RequestContext) => String,
   contextToDataSourceId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => SchemaFileRepository,
@@ -160,7 +160,7 @@ Set a custom database driver. The function accepts context object as an argument
 to let dynamically load database drivers, which is usually used
 in [Multitenancy Applications](multitenancy-setup).
 
-Called once per [dataSourceId](#options-reference-context-to-data-source-id).
+Called once per [dataSourceId](#options-reference-context-to-data-source-id). Can return a `Promise` for a driver.
 
 ```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -178,7 +178,7 @@ The function accepts context object as an argument
 to let dynamically load database drivers, which is usually used
 in [Multitenancy Applications](multitenancy-setup).
 
-Called once per [appId](#options-reference-context-to-app-id).
+Called once per [appId](#options-reference-context-to-app-id). Can return a `Promise` for a driver.
 
 ```javascript
 const MySQLDriver = require('@cubejs-backend/mysql-driver');
