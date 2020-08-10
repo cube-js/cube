@@ -381,19 +381,32 @@ class ApiGateway {
     query, context, res
   }) {
     const requestStarted = new Date();
+    
     try {
-      query = this.parseQueryParam(query);
-      const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
-      const sqlQuery = await this.getCompilerApi(context).getSql(
-        coerceForSqlQuery(normalizedQuery, context),
-        { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+      query = this.compareDateRangeTransformer(this.parseQueryParam(query));
+      const queries = Array.isArray(query) ? query : [query];
+      
+      const normalizedQueries = await Promise.all(
+        queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
       );
-      res({
-        sql: {
-          ...sqlQuery,
-          order: R.fromPairs(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
-        }
+      const sqlQueries = await Promise.all(
+        normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
+          coerceForSqlQuery(normalizedQuery, context),
+          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+        ))
+      );
+      
+      const toQuery = (sqlQuery) => ({
+        ...sqlQuery,
+        order: R.fromPairs(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
       });
+      
+      res(Array.isArray(query) ?
+        sqlQueries.map((sqlQuery) => ({
+          sql: toQuery(sqlQuery)
+        })) : {
+          sql: toQuery(sqlQueries[0])
+        });
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
@@ -408,7 +421,6 @@ class ApiGateway {
     
     try {
       query = this.compareDateRangeTransformer(this.parseQueryParam(query));
-      const shouldReturnArray = Array.isArray(query);
       const queries = Array.isArray(query) ? query : [query];
       
       this.log(context, {
@@ -482,7 +494,7 @@ class ApiGateway {
         query,
         duration: this.duration(requestStarted)
       });
-      res(shouldReturnArray ? results : results[0]);
+      res(Array.isArray(query) ? results : results[0]);
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted

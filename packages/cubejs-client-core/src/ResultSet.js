@@ -204,7 +204,7 @@ class ResultSet {
   }
   
   normalizePivotConfig(pivotConfig) {
-    const { query } = this.loadResponse;
+    const [{ query }] = this.loadResponses;
     
     return ResultSet.getNormalizedPivotConfig(query, pivotConfig);
   }
@@ -328,7 +328,16 @@ class ResultSet {
     });
   }
   
+  mergedPivot(pivotConfig) {
+    const pivots = this.loadResponses.length > 1
+      ? this.loadResponses.map((_, index) => this.pivot(pivotConfig, index))
+      : [];
+    return pivots.length ? this.mergePivots(pivots) : this.pivot(pivotConfig);
+  }
+  
   mergePivots(pivots) {
+    // console.log('PIVOTS', pivots);
+    // todo: merging pivots of different size
     return pivots[0].map((_, index) => {
       const xValues = [pivots.map((pivot) => pivot[index].xValues).join(', ')];
   
@@ -357,14 +366,8 @@ class ResultSet {
 
       return value;
     };
-
-    const pivots = this.loadResponses.length > 0
-      ? this.loadResponses.map((_, index) => this.pivot(pivotConfig, index))
-      : [];
-      
-    const pivot = pivots.length ? mergePivots(pivots, this.loadResponses) : this.pivot(pivotConfig);
     
-    return pivot.map(({ xValues, yValuesArray }) => ({
+    return this.mergedPivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ', '), // TODO deprecated
       x: this.axisValuesString(xValues, ', '),
       xValues,
@@ -379,10 +382,10 @@ class ResultSet {
   }
 
   tablePivot(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
-
-    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
+    
+    return this.mergedPivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
       normalizedPivotConfig.x
         .map((key, index) => [key, xValues[index]])
         .concat(
@@ -412,7 +415,7 @@ class ResultSet {
       };
     };
     
-    const pivot = this.pivot(normalizedPivotConfig);
+    const pivot = this.mergedPivot(normalizedPivotConfig);
 
     (pivot[0] && pivot[0].yValuesArray || []).forEach(([yValues]) => {
       if (yValues.length > 0) {
@@ -510,10 +513,28 @@ class ResultSet {
 
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
+    let seriesNames = [];
 
-    return pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(
-      this.timeDimensionBackwardCompatibleData()
-    ).map(axisValues => ({
+    if (this.loadResponses.length > 1) {
+      seriesNames = unnest(this.loadResponses.map((loadResponse, index) => {
+        const { dateRange } = loadResponse.query.timeDimensions[0];
+        
+        return pipe(
+          map(this.axisValues(pivotConfig.y)),
+          unnest,
+          uniq,
+          map((values) => [dateRange.join(' - ')].concat(values))
+        )(
+          this.timeDimensionBackwardCompatibleData(index)
+        );
+      }));
+    } else {
+      seriesNames = pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(
+        this.timeDimensionBackwardCompatibleData()
+      );
+    }
+    
+    return seriesNames.map(axisValues => ({
       title: this.axisValuesString(
         pivotConfig.y.find(d => d === 'measures') ?
           dropLast(1, axisValues).concat(
