@@ -650,7 +650,7 @@
     to-fast-properties "^2.0.0"
 
 "@cubejs-client/core@../../packages/cubejs-client-core":
-  version "0.19.50"
+  version "0.19.56"
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -3868,9 +3868,9 @@ postcss@^6.0.1, postcss@^6.0.23:
     source-map "^0.6.1"
     supports-color "^5.4.0"
 
-prismjs@^1.15.0:
-  version "1.15.0"
-  resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.15.0.tgz#8801d332e472091ba8def94976c8877ad60398d9"
+prismjs@^1.21.0:
+  version "1.21.0"
+  resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.21.0.tgz#36c086ec36b45319ec4218ee164c110f9fc015a3"
   optionalDependencies:
     clipboard "^2.0.0"
 
