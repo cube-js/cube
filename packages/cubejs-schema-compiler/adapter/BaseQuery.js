@@ -1582,7 +1582,10 @@ class BaseQuery {
       if (timeDimensions.length) {
         const dimension = timeDimensions.filter(f => f.toLowerCase().indexOf('update') !== -1)[0] || timeDimensions[0];
         const foundMainTimeDimension = this.newTimeDimension({ dimension });
-        const aggSelect = this.aggSelectForDimension(cube, foundMainTimeDimension, 'max');
+        const aggSelect = this.evaluateSymbolSqlWithContext(
+          () => this.aggSelectForDimension(cube, foundMainTimeDimension, 'max'),
+          { preAggregationQuery: true }
+        );
         if (aggSelect) {
           return aggSelect;
         }
