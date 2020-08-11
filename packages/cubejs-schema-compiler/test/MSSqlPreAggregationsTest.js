@@ -178,155 +178,177 @@ describe('MSSqlPreAggregations', function test() {
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
       preAggregation.reduce(
-        (replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`), toReplace
+        (replacedQuery, desc) =>
+          replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`),
+        toReplace
       ),
-      params
+      params,
     ];
   }
 
   function tempTablePreAggregations(preAggregationsDescriptions) {
-    return R.unnest(preAggregationsDescriptions.map(
-      desc => desc.invalidateKeyQueries.concat([[desc.loadSql[0], desc.loadSql[1]]])
-    ));
+    return R.unnest(
+      preAggregationsDescriptions.map((desc) => desc.invalidateKeyQueries.concat([[desc.loadSql[0], desc.loadSql[1]]]))
+    );
   }
 
-  it('simple pre-aggregation', () => compiler.compile().then(() => {
-    const query = new MSSqlQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitors.count'
-      ],
-      timeDimensions: [{
-        dimension: 'visitors.createdAt',
-        granularity: 'day',
-        dateRange: ['2017-01-01', '2017-01-30']
-      }],
-      timezone: 'UTC',
-      order: [{
-        id: 'visitors.createdAt'
-      }],
-      preAggregationsSchema: ''
-    });
-
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
-      res.should.be.deepEqual(
-        [
-          {
-            "visitors__created_at_day": "2017-01-03T00:00:00.000",
-            "visitors__count": 1
-          },
-          {
-            "visitors__created_at_day": "2017-01-05T00:00:00.000",
-            "visitors__count": 1
-          },
-          {
-            "visitors__created_at_day": "2017-01-06T00:00:00.000",
-            "visitors__count": 1
-          },
-          {
-            "visitors__created_at_day": "2017-01-07T00:00:00.000",
-            "visitors__count": 2
-          }
-        ]
+  it('simple pre-aggregation', () =>
+    compiler.compile().then(() => {
+      const query = new MSSqlQuery(
+        { joinGraph, cubeEvaluator, compiler },
+        {
+          measures: ['visitors.count'],
+          timeDimensions: [
+            {
+              dimension: 'visitors.createdAt',
+              granularity: 'day',
+              dateRange: ['2017-01-01', '2017-01-30'],
+            },
+          ],
+          timezone: 'UTC',
+          order: [
+            {
+              id: 'visitors.createdAt',
+            },
+          ],
+          preAggregationsSchema: '',
+        }
       );
-    });
-  }));
 
-  it('leaf measure pre-aggregation', () => compiler.compile().then(() => {
-    const query = new MSSqlQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitors.ratio'
-      ],
-      timeDimensions: [{
-        dimension: 'visitors.createdAt',
-        granularity: 'day',
-        dateRange: ['2017-01-01', '2017-01-30']
-      }],
-      timezone: 'UTC',
-      order: [{
-        id: 'visitors.createdAt'
-      }],
-      preAggregationsSchema: ''
-    });
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(preAggregationsDescription);
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-    preAggregationsDescription[0].loadSql[0].should.match(/visitors_ratio/);
+      return dbRunner
+        .testQueries(
+          tempTablePreAggregations(preAggregationsDescription)
+            .concat([query.buildSqlAndParams()])
+            .map((q) => replaceTableName(q, preAggregationsDescription, 1))
+        )
+        .then((res) => {
+          res.should.be.deepEqual([
+            {
+              visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+              visitors__count: 1,
+            },
+            {
+              visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+              visitors__count: 1,
+            },
+            {
+              visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+              visitors__count: 1,
+            },
+            {
+              visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+              visitors__count: 2,
+            },
+          ]);
+        });
+    }));
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 10))).then(res => {
-      res.should.be.deepEqual(
-        [
-          {
-            "visitors__created_at_day": "2017-01-03T00:00:00.000",
-            "visitors__ratio": 0.333333333333
-          },
-          {
-            "visitors__created_at_day": "2017-01-05T00:00:00.000",
-            "visitors__ratio": 0.5
-          },
-          {
-            "visitors__created_at_day": "2017-01-06T00:00:00.000",
-            "visitors__ratio": 1
-          },
-          {
-            "visitors__created_at_day": "2017-01-07T00:00:00.000",
-            "visitors__ratio": null
-          }
-        ]
+  it('leaf measure pre-aggregation', () =>
+    compiler.compile().then(() => {
+      const query = new MSSqlQuery(
+        { joinGraph, cubeEvaluator, compiler },
+        {
+          measures: ['visitors.ratio'],
+          timeDimensions: [
+            {
+              dimension: 'visitors.createdAt',
+              granularity: 'day',
+              dateRange: ['2017-01-01', '2017-01-30'],
+            },
+          ],
+          timezone: 'UTC',
+          order: [
+            {
+              id: 'visitors.createdAt',
+            },
+          ],
+          preAggregationsSchema: '',
+        }
       );
-    });
-  }));
 
-  it('segment', () => compiler.compile().then(() => {
-    const query = new MSSqlQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitors.checkinsTotal'
-      ],
-      dimensions: [],
-      segments: ['visitors.google'],
-      timezone: 'UTC',
-      preAggregationsSchema: '',
-      timeDimensions: [{
-        dimension: 'visitors.createdAt',
-        granularity: 'day',
-        dateRange: ['2016-12-30', '2017-01-06']
-      }],
-      order: [{
-        id: 'visitors.createdAt'
-      }],
-    });
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+      preAggregationsDescription[0].loadSql[0].should.match(/visitors_ratio/);
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    console.log(preAggregationsDescription);
+      return dbRunner
+        .testQueries(
+          tempTablePreAggregations(preAggregationsDescription)
+            .concat([query.buildSqlAndParams()])
+            .map((q) => replaceTableName(q, preAggregationsDescription, 10))
+        )
+        .then((res) => {
+          res.should.be.deepEqual([
+            {
+              visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+              visitors__ratio: 0.333333333333,
+            },
+            {
+              visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+              visitors__ratio: 0.5,
+            },
+            {
+              visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+              visitors__ratio: 1,
+            },
+            {
+              visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+              visitors__ratio: null,
+            },
+          ]);
+        });
+    }));
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
-
-    console.log(JSON.stringify(queries.concat(queryAndParams)));
-
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 142))
-    ).then(res => {
-      console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [
-          {
-            "visitors__created_at_day": "2017-01-06T00:00:00.000",
-            "visitors__checkins_total": 1
-          }
-        ]
+  it('segment', () =>
+    compiler.compile().then(() => {
+      const query = new MSSqlQuery(
+        { joinGraph, cubeEvaluator, compiler },
+        {
+          measures: ['visitors.checkinsTotal'],
+          dimensions: [],
+          segments: ['visitors.google'],
+          timezone: 'UTC',
+          preAggregationsSchema: '',
+          timeDimensions: [
+            {
+              dimension: 'visitors.createdAt',
+              granularity: 'day',
+              dateRange: ['2016-12-30', '2017-01-06'],
+            },
+          ],
+          order: [
+            {
+              id: 'visitors.createdAt',
+            },
+          ],
+        }
       );
-    });
-  }));
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+
+      const queries = tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner
+        .testQueries(queries.concat([queryAndParams]).map((q) => replaceTableName(q, preAggregationsDescription, 142)))
+        .then((res) => {
+          console.log(JSON.stringify(res));
+          res.should.be.deepEqual([
+            {
+              visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+              visitors__checkins_total: 1,
+            },
+          ]);
+        });
+    }));
 });
