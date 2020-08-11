@@ -386,7 +386,7 @@ class ResultSet {
   }
 
   tablePivot(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
     
     return this.mergedPivot(normalizedPivotConfig, false).map(({ xValues, yValuesArray }) => fromPairs(
