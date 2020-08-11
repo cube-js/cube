@@ -61,7 +61,7 @@ Since our frontend application is just a static app, it easy to build and
 deploy. Same as for the backend, there are multiple ways you can deploy it. You can serve it with your favorite HTTP server or just select one of the popular cloud providers. We'll
 use [Netlify](https://www.netlify.com/) in this tutorial.
 
-First, we need to set Cube.js API URL for production. It is Cube.js Backend URL on Heroku; it has the form of https://your-app-name.herokuapp.com, e.g. https://react-dashboard-demo.herokuapp.com.
+First, we need to set Cube.js API URL for production. It is Cube.js Backend URL on Heroku; it has the form of https://your-app-name.herokuapp.com.
 
 Update the `src/App.js` file with the following.
 
