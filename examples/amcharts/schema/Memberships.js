@@ -42,12 +42,12 @@ cube(`Memberships`, {
         },
 
         date: {
-            sql: `DATE(ts, 'unixepoch')`,
+            sql: `DATE(${Memberships}.ts, 'unixepoch')`,
             type: `time`
         },
 
         date_time: {
-            sql: `DATETIME(ts, 'unixepoch')`,
+            sql: `DATETIME(${Memberships}.ts, 'unixepoch')`,
             type: `time`
         }
     }

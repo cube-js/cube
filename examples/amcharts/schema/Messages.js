@@ -50,27 +50,27 @@ cube(`Messages`, {
         },
 
         date: {
-            sql: `DATE(ts, 'unixepoch')`,
+            sql: `DATE(${Messages}.ts, 'unixepoch')`,
             type: `time`
         },
 
         date_time: {
-            sql: `DATETIME(ts, 'unixepoch')`,
+            sql: `DATETIME(${Messages}.ts, 'unixepoch')`,
             type: `time`
         },
 
         hour: {
-            sql: `STRFTIME('%H', ts, 'unixepoch')`,
+            sql: `STRFTIME('%H', ${Messages}.ts, 'unixepoch')`,
             type: `number`
         },
 
         day_of_week: {
-            sql: `STRFTIME('%w', ts, 'unixepoch')`,
+            sql: `STRFTIME('%w', ${Messages}.ts, 'unixepoch')`,
             type: `number`
         },
 
         week_year: {
-            sql: `STRFTIME('%Y-%W', ts, 'unixepoch')`,
+            sql: `STRFTIME('%Y-%W', ${Messages}.ts, 'unixepoch')`,
             type: `number`
         },
     }

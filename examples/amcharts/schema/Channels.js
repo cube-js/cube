@@ -13,7 +13,8 @@ cube(`Channels`, {
         id: {
             sql: `id`,
             type: `string`,
-            primaryKey: true
+            primaryKey: true,
+            shown: true
         },
 
         name: {

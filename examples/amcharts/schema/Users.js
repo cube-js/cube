@@ -18,7 +18,8 @@ cube(`Users`, {
         id: {
             sql: `id`,
             type: `string`,
-            primaryKey: true
+            primaryKey: true,
+            shown: true
         },
         name: {
             sql: `name`,
