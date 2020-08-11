@@ -46,8 +46,7 @@ const groupByToPairs = (keyFn) => {
 
 class ResultSet {
   constructor(loadResponse, options = {}) {
-    // todo: !
-    this.loadResponse = Array.isArray(loadResponse) ? loadResponse[0] : loadResponse;
+    this.loadResponse = loadResponse;
     this.loadResponses = Array.isArray(loadResponse) ? loadResponse : [loadResponse];
     this.parseDateMeasures = options.parseDateMeasures;
     this.options = options;
@@ -121,7 +120,7 @@ class ResultSet {
   }
 
   axisValues(axis) {
-    const { query } = this.loadResponse;
+    const [{ query }] = this.loadResponses;
     return row => {
       const value = (measure) => axis.filter(d => d !== 'measures')
         .map(d => (row[d] != null ? row[d] : null)).concat(measure ? [measure] : []);
@@ -259,13 +258,14 @@ class ResultSet {
 
     // eslint-disable-next-line no-unused-vars
     let measureValue = (row, measure, xValues) => row[measure];
+    const { query } = this.loadResponses[responseIndex];
 
     if (
       pivotConfig.fillMissingDates &&
       pivotConfig.x.length === 1 &&
       equals(
         pivotConfig.x,
-        (this.loadResponse.query.timeDimensions || [])
+        (query.timeDimensions || [])
           .filter(td => !!td.granularity)
           .map(td => ResultSet.timeDimensionMember(td))
       )
@@ -328,24 +328,28 @@ class ResultSet {
     });
   }
   
-  mergedPivot(pivotConfig) {
+  mergedPivot(pivotConfig, joinDateRanges) {
     const pivots = this.loadResponses.length > 1
       ? this.loadResponses.map((_, index) => this.pivot(pivotConfig, index))
       : [];
-    return pivots.length ? this.mergePivots(pivots) : this.pivot(pivotConfig);
+    return pivots.length ? this.mergePivots(pivots, joinDateRanges) : this.pivot(pivotConfig);
   }
   
-  mergePivots(pivots) {
-    // console.log('PIVOTS', pivots);
-    // todo: merging pivots of different size
-    return pivots[0].map((_, index) => {
-      const xValues = [pivots.map((pivot) => pivot[index].xValues).join(', ')];
+  mergePivots(pivots, joinDateRanges = true) {
+    const minLengthPivot = pivots.reduce(
+      (current, memo) => (current != null && current.length < memo.length ? current : memo), null
+    );
+    
+    return minLengthPivot.map((_, index) => {
+      const xValues = joinDateRanges
+        ? [pivots.map((pivot) => pivot[index] && pivot[index].xValues || []).join(', ')]
+        : minLengthPivot[index].xValues;
   
       return {
         xValues,
         yValuesArray: unnest(pivots.map((pivot, responseIndex) => {
-          const { dateRange } = this.loadResponses[responseIndex].query.timeDimensions[0];
-          
+          const [{ dateRange }] = this.loadResponses[responseIndex].query.timeDimensions;
+
           return pivot[index].yValuesArray.map(([members, measure]) => [[dateRange.join(' - ')].concat(members), measure]);
         }))
       };
@@ -385,7 +389,7 @@ class ResultSet {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
     
-    return this.mergedPivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
+    return this.mergedPivot(normalizedPivotConfig, false).map(({ xValues, yValuesArray }) => fromPairs(
       normalizedPivotConfig.x
         .map((key, index) => [key, xValues[index]])
         .concat(
@@ -399,10 +403,11 @@ class ResultSet {
 
   tableColumns(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const [{ annotation }] = this.loadResponses;
     const schema = {};
     
     const extractFields = (key) => {
-      const flatMeta = Object.values(this.loadResponse.annotation).reduce((a, b) => ({ ...a, ...b }), {});
+      const flatMeta = Object.values(annotation).reduce((a, b) => ({ ...a, ...b }), {});
       const { title, shortTitle, type, format, meta } = flatMeta[key] || {};
   
       return {
@@ -513,6 +518,7 @@ class ResultSet {
 
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
+    const [{ annotation }] = this.loadResponses;
     let seriesNames = [];
 
     if (this.loadResponses.length > 1) {
@@ -538,7 +544,7 @@ class ResultSet {
       title: this.axisValuesString(
         pivotConfig.y.find(d => d === 'measures') ?
           dropLast(1, axisValues).concat(
-            this.loadResponse.annotation.measures[
+            annotation.measures[
               ResultSet.measureFromAxis(axisValues)
             ].title
           ) :
@@ -549,16 +555,16 @@ class ResultSet {
     }));
   }
 
-  query() {
-    return this.loadResponse.query;
+  query(index = 0) {
+    return this.loadResponses[index].query;
   }
 
-  rawData() {
-    return this.loadResponse.data;
+  rawData(index = 0) {
+    return this.loadResponses[index].data;
   }
   
-  annotation() {
-    return this.loadResponse.annotation;
+  annotation(index = 0) {
+    return this.loadResponses[index].annotation;
   }
 
   timeDimensionBackwardCompatibleData(responseIndex = 0) {
@@ -592,7 +598,7 @@ class ResultSet {
   }
   
   static deserialize(data, options = {}) {
-    // todo: support for array
+    // todo: return an array in case of batching
     return new ResultSet(data.loadResponse, options);
   }
 }

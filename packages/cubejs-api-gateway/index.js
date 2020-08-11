@@ -328,17 +328,6 @@ class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
-    
-    // todo: remove
-    app.get(`${this.basePath}/v1/test`, this.requestMiddleware, (async (req, res) => {
-      // await this.load({
-      //   query: req.query.query,
-      //   context: req.context,
-      //   res: this.resToResultFn(res)
-      // });
-      
-      res.json(this.compareDateRangeTransformer(normalizeQuery(JSON.parse(req.query.query))));
-    }));
   }
 
   initSubscriptionServer(sendMessage) {
@@ -698,25 +687,25 @@ class ApiGateway {
   }
 
   compareDateRangeTransformer(query) {
-    let queryCompareDateRanges;
+    let queryCompareDateRange;
     let compareDateRangeTDIndex;
     
     (query.timeDimensions || []).forEach((td, index) => {
       if (td.compareDateRange != null) {
-        if (queryCompareDateRanges != null) {
+        if (queryCompareDateRange != null) {
           throw new UserError('compareDateRange can only exist for one timeDimension');
         }
         
-        queryCompareDateRanges = td.compareDateRange;
+        queryCompareDateRange = td.compareDateRange;
         compareDateRangeTDIndex = index;
       }
     });
     
-    if (queryCompareDateRanges == null) {
+    if (queryCompareDateRange == null) {
       return query;
     }
     
-    return queryCompareDateRanges.map((dateRange) => ({
+    return queryCompareDateRange.map((dateRange) => ({
       ...R.clone(query),
       timeDimensions: query.timeDimensions.map((td, index) => {
         if (compareDateRangeTDIndex === index) {

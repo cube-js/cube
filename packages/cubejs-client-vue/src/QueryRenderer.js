@@ -33,6 +33,7 @@ export default {
     };
   },
   async mounted() {
+    console.log(',QueryRenderer');
     const { query, queries } = this;
 
     if (query) {
