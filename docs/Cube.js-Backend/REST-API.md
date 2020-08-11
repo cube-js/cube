@@ -78,12 +78,23 @@ Response
 Example request:
 
 ```bash
+# Request with http method GET
 curl \
  -H "Authorization: EXAMPLE-API-TOKEN" \
  -G \
  --data-urlencode 'query={"measures":["Users.count"]}' \
  http://localhost:4000/cubejs-api/v1/load
-````
+
+# Request with http method POST
+# Use POST to fix problem with query length limits
+curl \
+ -X POST
+ -H "Content-Type: application/json" \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -G \
+ --data '{"query": {"measures":["Users.count"]}}' \
+ http://localhost:4000/cubejs-api/v1/load
+```
 
 Example response:
 
