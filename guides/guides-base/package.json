@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cubedev-tracking": "^1.0.0",
+    "cubedev-tracking": "^1.0.1",
     "lodash": "^4.17.15",
     "react": "^16.11.0",
     "react-helmet": "^5.2.1",

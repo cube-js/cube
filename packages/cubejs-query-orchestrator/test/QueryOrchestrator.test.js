@@ -1,9 +1,10 @@
-/* globals describe, beforeAll, afterAll, test, expect */
+/* globals describe, beforeEach, afterEach, test, expect */
 const QueryOrchestrator = require('../orchestrator/QueryOrchestrator');
 
 class MockDriver {
   constructor() {
     this.tables = [];
+    this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
   }
@@ -14,7 +15,16 @@ class MockDriver {
     if (query.match(`orders_too_big`)) {
       promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 3000)));
     }
-    promise.cancel = async () => {
+
+    if (query.match(`orders_delay`)) {
+      promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 800)));
+    }
+
+    if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
+      promise = promise.then(res => res.concat({ tableReady: true }));
+    }
+
+    promise.cancel = () => {
       this.cancelledQueries.push(query);
     };
     return promise;
@@ -31,7 +41,10 @@ class MockDriver {
 
   loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
     this.tables.push(preAggregationTableName.substring(0, 100));
-    return this.query(loadSql);
+    const promise = this.query(loadSql);
+    const resPromise = promise.then(() => this.tablesReady.push(preAggregationTableName.substring(0, 100)));
+    resPromise.cancel = promise.cancel;
+    return resPromise;
   }
 
   async dropTable(tableName) {
@@ -55,11 +68,11 @@ describe('QueryOrchestrator', () => {
     }
   );
 
-  beforeAll(() => {
+  beforeEach(() => {
     mockDriver = new MockDriver();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await queryOrchestrator.cleanup();
   });
 
@@ -222,5 +235,67 @@ describe('QueryOrchestrator', () => {
     }
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
+  });
+
+  test('intermittent empty rollup', async () => {
+    const firstQuery = queryOrchestrator.fetchQuery({
+      query: `SELECT * FROM stb_pre_aggregations.orders_d20181102`,
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: "stb_pre_aggregations",
+        tableName: "stb_pre_aggregations.orders_d20181102",
+        loadSql: ["CREATE TABLE stb_pre_aggregations.orders_d20181102 AS SELECT * FROM public.orders_delay", []],
+        invalidateKeyQueries: [["SELECT 2", []]]
+      }],
+      requestId: 'intermittent empty rollup'
+    });
+
+    queryOrchestrator.fetchQuery({
+      query: "SELECT \"orders__created_at_week\" \"orders__created_at_week\", sum(\"orders__count\") \"orders__count\" FROM (SELECT * FROM stb_pre_aggregations.orders_d20181101) as partition_union  WHERE (\"orders__created_at_week\" >= ($1::timestamptz::timestamptz AT TIME ZONE 'UTC') AND \"orders__created_at_week\" <= ($2::timestamptz::timestamptz AT TIME ZONE 'UTC')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000",
+      values: ["2018-11-01T00:00:00Z", "2018-11-30T23:59:59Z"],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: "stb_pre_aggregations",
+        tableName: "stb_pre_aggregations.orders_d20181101",
+        loadSql: [
+          "CREATE TABLE stb_pre_aggregations.orders_d20181101 AS SELECT\n      date_trunc('week', (\"orders\".created_at::timestamptz AT TIME ZONE 'UTC')) \"orders__created_at_week\", count(\"orders\".id) \"orders__count\", sum(\"orders\".number) \"orders__number\"\n    FROM\n      public.orders_delay AS \"orders\"\n  WHERE (\"orders\".created_at >= $1::timestamptz AND \"orders\".created_at <= $2::timestamptz) GROUP BY 1",
+          ["2018-11-01T00:00:00Z", "2018-11-30T23:59:59Z"]
+        ],
+        invalidateKeyQueries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]]
+      }],
+      requestId: 'intermittent empty rollup'
+    });
+
+    await firstQuery;
+
+    const res = await queryOrchestrator.fetchQuery({
+      query: "SELECT \"orders__created_at_week\" \"orders__created_at_week\", sum(\"orders__count\") \"orders__count\" FROM (SELECT * FROM stb_pre_aggregations.orders_d20181101) as partition_union  WHERE (\"orders__created_at_week\" >= ($1::timestamptz::timestamptz AT TIME ZONE 'UTC') AND \"orders__created_at_week\" <= ($2::timestamptz::timestamptz AT TIME ZONE 'UTC')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000",
+      values: ["2018-11-01T00:00:00Z", "2018-11-30T23:59:59Z"],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: "stb_pre_aggregations",
+        tableName: "stb_pre_aggregations.orders_d20181101",
+        loadSql: [
+          "CREATE TABLE stb_pre_aggregations.orders_d20181101 AS SELECT\n      date_trunc('week', (\"orders\".created_at::timestamptz AT TIME ZONE 'UTC')) \"orders__created_at_week\", count(\"orders\".id) \"orders__count\", sum(\"orders\".number) \"orders__number\"\n    FROM\n      public.orders_delay AS \"orders\"\n  WHERE (\"orders\".created_at >= $1::timestamptz AND \"orders\".created_at <= $2::timestamptz) GROUP BY 1",
+          ["2018-11-01T00:00:00Z", "2018-11-30T23:59:59Z"]
+        ],
+        invalidateKeyQueries: [["SELECT date_trunc('hour', (NOW()::timestamptz AT TIME ZONE 'UTC')) as current_hour", []]]
+      }],
+      requestId: 'intermittent empty rollup'
+    });
+
+    console.log(res);
+
+    expect(res.data).toContainEqual(expect.objectContaining({ tableReady: true }));
   });
 });
