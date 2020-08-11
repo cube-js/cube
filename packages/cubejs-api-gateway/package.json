@@ -19,7 +19,7 @@
   "dependencies": {
     "@hapi/joi": "^15.1.1",
     "body-parser": "^1.19.0",
-    "chrono-node": "1.4.4",
+    "chrono-node": "2.1.7",
     "jsonwebtoken": "^8.3.0",
     "moment": "^2.24.0",
     "moment-timezone": "^0.5.27",
