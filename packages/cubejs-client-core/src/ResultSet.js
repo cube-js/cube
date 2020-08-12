@@ -255,9 +255,8 @@ class ResultSet {
   pivot(pivotConfig, responseIndex = 0) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
-
-    // eslint-disable-next-line no-unused-vars
-    let measureValue = (row, measure, xValues) => row[measure];
+    
+    let measureValue = (row, measure) => row[measure];
     const { query } = this.loadResponses[responseIndex];
 
     if (
@@ -283,8 +282,7 @@ class ResultSet {
           return series[responseIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
         };
 
-        // eslint-disable-next-line no-unused-vars
-        measureValue = (row, measure, xValues) => row[measure] || 0;
+        measureValue = (row, measure) => row[measure] || 0;
       }
     }
 
@@ -296,7 +294,6 @@ class ResultSet {
 
     const allYValues = pipe(
       map(
-        // eslint-disable-next-line no-unused-vars
         ([, rows]) => unnest(
           // collect Y values only from filled rows
           rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
@@ -306,7 +303,6 @@ class ResultSet {
       uniq
     )(xGrouped);
 
-    // eslint-disable-next-line no-unused-vars
     return xGrouped.map(([, rows]) => {
       const { xValues } = rows[0];
       const yGrouped = pipe(
@@ -402,12 +398,12 @@ class ResultSet {
   }
 
   tableColumns(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const [{ annotation }] = this.loadResponses;
+    const flatMeta = Object.values(annotation).reduce((a, b) => ({ ...a, ...b }), {});
     const schema = {};
     
     const extractFields = (key) => {
-      const flatMeta = Object.values(annotation).reduce((a, b) => ({ ...a, ...b }), {});
       const { title, shortTitle, type, format, meta } = flatMeta[key] || {};
   
       return {
@@ -421,7 +417,9 @@ class ResultSet {
     };
     
     const pivot = this.mergedPivot(normalizedPivotConfig);
-
+    // todo: move to pivotConfig?
+    const pivotConfigY = this.loadResponses.length > 1 ? ['compareDateRange'].concat(normalizedPivotConfig.y) : normalizedPivotConfig.y;
+    
     (pivot[0] && pivot[0].yValuesArray || []).forEach(([yValues]) => {
       if (yValues.length > 0) {
         let currentItem = schema;
@@ -429,7 +427,7 @@ class ResultSet {
         yValues.forEach((value, index) => {
           currentItem[value] = {
             key: value,
-            memberId: normalizedPivotConfig.y[index] === 'measures' ? value : normalizedPivotConfig.y[index],
+            memberId: ['measures', 'compareDateRange'].includes(pivotConfigY[index]) ? value : pivotConfigY[index],
             children: (currentItem[value] && currentItem[value].children) || {}
           };
     
@@ -437,7 +435,7 @@ class ResultSet {
         });
       }
     });
-  
+    
     const toColumns = (item = {}, path = []) => {
       if (Object.keys(item).length === 0) {
         return [];
@@ -451,7 +449,7 @@ class ResultSet {
 
         const { title, shortTitle, ...fields } = extractFields(currentItem.memberId);
         
-        const dimensionValue = key !== currentItem.memberId ? key : '';
+        const dimensionValue = key !== currentItem.memberId || title == null ? key : '';
         
         if (!children.length) {
           return {

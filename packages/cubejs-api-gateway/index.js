@@ -176,8 +176,7 @@ const normalizeQueryOrder = order => {
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 const normalizeQuery = (query) => {
-  // eslint-disable-next-line no-unused-vars
-  const { error, value } = Joi.validate(query, querySchema);
+  const { error } = Joi.validate(query, querySchema);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -377,19 +376,30 @@ class ApiGateway {
       });
     }
   }
-
+  
+  async getNormalizedQueries(query, context) {
+    query = this.compareDateRangeTransformer(this.parseQueryParam(query));
+    const queries = Array.isArray(query) ? query : [query];
+    
+    const normalizedQueries = await Promise.all(
+      queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
+    );
+    
+    if (normalizedQueries.find((currentQuery) => !currentQuery)) {
+      throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
+    }
+    
+    return normalizedQueries;
+  }
+  
   async sql({
     query, context, res
   }) {
     const requestStarted = new Date();
     
     try {
-      query = this.compareDateRangeTransformer(this.parseQueryParam(query));
-      const queries = Array.isArray(query) ? query : [query];
+      const normalizedQueries = await this.getNormalizedQueries(query, context);
       
-      const normalizedQueries = await Promise.all(
-        queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
-      );
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           coerceForSqlQuery(normalizedQuery, context),
@@ -402,7 +412,7 @@ class ApiGateway {
         order: R.fromPairs(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
       });
       
-      res(Array.isArray(query) ?
+      res(Array.isArray(query) || normalizedQueries.length > 1 ?
         sqlQueries.map((sqlQuery) => ({
           sql: toQuery(sqlQuery)
         })) : {
@@ -421,19 +431,12 @@ class ApiGateway {
     const requestStarted = new Date();
     
     try {
-      query = this.compareDateRangeTransformer(this.parseQueryParam(query));
-      const queries = Array.isArray(query) ? query : [query];
-      
       this.log(context, {
         type: 'Load Request',
         query
       });
       const loadRequestSQLStarted = new Date();
-      const normalizedQueries = await this.queryTransformer(queries.map(normalizeQuery), context);
-      
-      if (!normalizedQueries) {
-        throw new Error(`queryTransformer returned null query. Please check your queryTransformer implementation`);
-      }
+      const normalizedQueries = await this.getNormalizedQueries(query, context);
       
       const [metaConfigResult, ...sqlQueries] = await Promise.all(
         [
@@ -443,12 +446,11 @@ class ApiGateway {
         ))
       );
       
-      // todo: should the logs reflect that the queries come in a batch?
       sqlQueries.forEach((sqlQuery, index) => {
         this.log(context, {
           type: 'Load Request SQL',
           duration: this.duration(loadRequestSQLStarted),
-          query: queries[index],
+          query: normalizedQueries[index],
           sqlQuery
         });
       });
@@ -495,7 +497,7 @@ class ApiGateway {
         query,
         duration: this.duration(requestStarted)
       });
-      res(Array.isArray(query) ? results : results[0]);
+      res(Array.isArray(query) || normalizedQueries.length > 1 ? results : results[0]);
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
