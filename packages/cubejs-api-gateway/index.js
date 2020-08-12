@@ -3,6 +3,7 @@ const R = require('ramda');
 const Joi = require('@hapi/joi');
 const moment = require('moment');
 const uuid = require('uuid/v4');
+const bodyParser = require('body-parser');
 
 const dateParser = require('./dateParser');
 const requestParser = require('./requestParser');
@@ -298,6 +299,15 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/load`, this.requestMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    const jsonParser = bodyParser.json({ limit: '1mb' });
+    app.post(`${this.basePath}/v1/load`, jsonParser, this.requestMiddleware, (async (req, res) => {
+      await this.load({
+        query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res)
       });
