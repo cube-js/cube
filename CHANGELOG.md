@@ -3,6 +3,90 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.61](https://github.com/cube-js/cube.js/compare/v0.19.60...v0.19.61) (2020-08-11)
+
+
+### Bug Fixes
+
+* avoid opening connection to the source database when caching tables from external rollup db ([#929](https://github.com/cube-js/cube.js/issues/929)) Thanks to [@jcw](https://github.com/jcw)-! ([92cd0b3](https://github.com/cube-js/cube.js/commit/92cd0b3))
+* readOnly originalSql pre-aggregations aren't working without writing rights ([cfa7c7d](https://github.com/cube-js/cube.js/commit/cfa7c7d))
+
+
+### Features
+
+* add support of array of tuples order format ([#973](https://github.com/cube-js/cube.js/issues/973)). Thanks to @RusovDmitriy ([0950b94](https://github.com/cube-js/cube.js/commit/0950b94))
+* **mssql-driver:** add readonly aggregation for mssql sources ([#920](https://github.com/cube-js/cube.js/issues/920)) Thanks to @JoshMentzer! ([dfeccca](https://github.com/cube-js/cube.js/commit/dfeccca))
+
+
+
+
+
+## [0.19.60](https://github.com/cube-js/cube.js/compare/v0.19.59...v0.19.60) (2020-08-08)
+
+
+### Bug Fixes
+
+* Intermittent errors with empty rollups or not ready metadata for Athena and MySQL: HIVE_CANNOT_OPEN_SPLIT errors. ([fa2cf45](https://github.com/cube-js/cube.js/commit/fa2cf45))
+
+
+
+
+
+## [0.19.59](https://github.com/cube-js/cube.js/compare/v0.19.58...v0.19.59) (2020-08-05)
+
+
+### Bug Fixes
+
+* appying templates in a git repo ([#952](https://github.com/cube-js/cube.js/issues/952)) ([3556a74](https://github.com/cube-js/cube.js/commit/3556a74))
+
+
+
+
+
+## [0.19.58](https://github.com/cube-js/cube.js/compare/v0.19.57...v0.19.58) (2020-08-05)
+
+
+### Bug Fixes
+
+* Error: Cannot find module 'axios' ([5fcfa87](https://github.com/cube-js/cube.js/commit/5fcfa87))
+
+
+
+
+
+## [0.19.57](https://github.com/cube-js/cube.js/compare/v0.19.56...v0.19.57) (2020-08-05)
+
+
+### Bug Fixes
+
+* bizcharts incorrect geom type ([#941](https://github.com/cube-js/cube.js/issues/941)) ([7df66d8](https://github.com/cube-js/cube.js/commit/7df66d8))
+
+
+### Features
+
+* Playground templates separate repository open for third party contributions ([#903](https://github.com/cube-js/cube.js/issues/903)) ([fb57bda](https://github.com/cube-js/cube.js/commit/fb57bda))
+* support first chance to define routes ([#931](https://github.com/cube-js/cube.js/issues/931)) Thanks to [@jsw](https://github.com/jsw)- ([69fdebc](https://github.com/cube-js/cube.js/commit/69fdebc))
+
+
+
+
+
+## [0.19.56](https://github.com/cube-js/cube.js/compare/v0.19.55...v0.19.56) (2020-08-03)
+
+
+### Bug Fixes
+
+* allow renewQuery in dev mode with warning ([#868](https://github.com/cube-js/cube.js/issues/868)) Thanks to [@jcw](https://github.com/jcw)-! ([dbdbb5f](https://github.com/cube-js/cube.js/commit/dbdbb5f))
+* CubeContext ts type missing ([#913](https://github.com/cube-js/cube.js/issues/913)) ([f5f72cd](https://github.com/cube-js/cube.js/commit/f5f72cd))
+* membersForQuery return type ([#909](https://github.com/cube-js/cube.js/issues/909)) ([4976fcf](https://github.com/cube-js/cube.js/commit/4976fcf))
+* readme examples updates ([#893](https://github.com/cube-js/cube.js/issues/893)) ([0458af8](https://github.com/cube-js/cube.js/commit/0458af8))
+* using limit and offset together in MSSql ([9ba875c](https://github.com/cube-js/cube.js/commit/9ba875c))
+* Various ClickHouse improvements ([6f40847](https://github.com/cube-js/cube.js/commit/6f40847))
+
+
+
+
+
 ## [0.19.55](https://github.com/cube-js/cube.js/compare/v0.19.54...v0.19.55) (2020-07-23)
 
 

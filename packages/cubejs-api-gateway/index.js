@@ -3,6 +3,7 @@ const R = require('ramda');
 const Joi = require('@hapi/joi');
 const moment = require('moment');
 const uuid = require('uuid/v4');
+const bodyParser = require('body-parser');
 
 const dateParser = require('./dateParser');
 const requestParser = require('./requestParser');
@@ -146,7 +147,10 @@ const querySchema = Joi.object().keys({
       Joi.string()
     ]
   })),
-  order: Joi.object().pattern(id, Joi.valid('asc', 'desc')),
+  order: Joi.alternatives(
+    Joi.object().pattern(id, Joi.valid('asc', 'desc')),
+    Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
+  ),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(1).max(50000),
@@ -154,6 +158,20 @@ const querySchema = Joi.object().keys({
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean()
 });
+
+const normalizeQueryOrder = order => {
+  let result = [];
+  const normalizeOrderItem = (k, direction) => ({
+    id: k,
+    desc: direction === 'desc'
+  });
+  if (order) {
+    result = Array.isArray(order) ?
+      order.map(([k, direction]) => normalizeOrderItem(k, direction)) :
+      Object.keys(order).map(k => normalizeOrderItem(k, order[k]));
+  }
+  return result;
+};
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
@@ -209,15 +227,11 @@ const normalizeQuery = (query) => {
     granularity: d.split('.')[2]
   }));
   const timezone = query.timezone || 'UTC';
-  const order = query.order && Object.keys(query.order).map(k => ({
-    id: k,
-    desc: query.order[k] === 'desc'
-  }));
   return {
     ...query,
     rowLimit: query.rowLimit || query.limit,
     timezone,
-    order,
+    order: normalizeQueryOrder(query.order),
     filters: (query.filters || []).map(f => (
       {
         ...f,
@@ -285,6 +299,15 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/load`, this.requestMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    const jsonParser = bodyParser.json({ limit: '1mb' });
+    app.post(`${this.basePath}/v1/load`, jsonParser, this.requestMiddleware, (async (req, res) => {
+      await this.load({
+        query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res)
       });

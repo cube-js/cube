@@ -7,7 +7,7 @@ category: Examples
 | Demo | Code | Description |
 |:------|:----------:|:-------------|
 |[Real-Time Dashboard](https://real-time-dashboard-demo.cube.dev/)|[real-time-dashboard](./examples/real-time-dashboard)|Real-Time Dashboard Demo using Web Sockets transport|
-|[React Dashboard](https://react-dashboard-demo.cube.dev/)|[react-dashboard](./examples/react-dashboard)|Dynamic dashboard with React, GraphQL, and Cube.js|
+|[React Dashboard](https://react-dashboard-demo.cubecloudapp.dev/)|[react-dashboard](./examples/react-dashboard)|Dynamic dashboard with React, GraphQL, and Cube.js|
 |[D3 Dashboard](https://d3-dashboard-demo.cube.dev)|[d3-dashboard](./examples/d3-dashboard)|Dashboard with Cube.js, D3, and Material UI|
 |[Stripe Dashboard](http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/)|[stripe-dashboard](./examples/stripe-dashboard)|Stripe Demo Dashboard built with Cube.js and Recharts|
 |[Event Analytics](https://d1ygcqhosay4lt.cloudfront.net/)|[event-analytics](https://github.com/cube-js/cube.js/tree/master/examples/event-analytics)|Mixpanel like Event Analytics App built with Cube.js and Snowplow|

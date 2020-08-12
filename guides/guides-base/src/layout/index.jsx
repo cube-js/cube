@@ -5,6 +5,9 @@ import { normalize } from 'styled-normalize'
 import theme from '../theme';
 import "../prism.css";
 
+import { page } from 'cubedev-tracking';
+
+
 const Global = createGlobalStyle`
   ${normalize};
   @import url('https://fonts.googleapis.com/css?family=DM+Sans&display=swap&css');
@@ -15,6 +18,9 @@ const Global = createGlobalStyle`
 `
 
 export default class MainLayout extends React.Component {
+  componentDidMount() {
+    page();
+  }
   render() {
     const { children, config } = this.props;
     return (

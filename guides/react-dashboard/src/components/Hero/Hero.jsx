@@ -137,7 +137,7 @@ const Hero = ({ startUrl }) => (
         </Subtitle>
         <ButtonsContainer>
           <PrimaryButton to={startUrl}>Start Learning</PrimaryButton>
-          <SecondaryButton href="https://react-dashboard-demo.cube.dev">Demo</SecondaryButton>
+          <SecondaryButton href="https://react-dashboard-demo.cubecloudapp.dev/">Demo</SecondaryButton>
         </ButtonsContainer>
         <Social align="flex-start" />
       </CopyContainer>

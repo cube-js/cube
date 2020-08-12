@@ -14,7 +14,8 @@ class MSSqlDriver extends BaseDriver {
         process.env.CUBEJS_DB_DOMAIN : undefined,
       requestTimeout: 10 * 60 * 1000, // 10 minutes
       options: {
-        encrypt: !!process.env.CUBEJS_DB_SSL || false
+        encrypt: !!process.env.CUBEJS_DB_SSL || false,
+        useUTC: false
       },
       pool: {
         max: 8,
@@ -71,6 +72,23 @@ class MSSqlDriver extends BaseDriver {
       }
       return null;
     });
+  }
+
+  async downloadQueryResults(query, values) {
+    const result = await this.query(query, values);
+    const types = Object.keys(result.columns).map((key) => ({
+      name: result.columns[key].name,
+      type: this.toGenericType(result.columns[key].type.declaration),
+    }));
+
+    return {
+      rows: result,
+      types,
+    };
+  }
+
+  readOnly() {
+    return !!this.config.readOnly;
   }
 }
 

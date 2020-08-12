@@ -235,7 +235,7 @@ export default () => {
 | Demo | Code | Description |
 |:------|:----------:|:-------------|
 |[Real-Time Dashboard](https://real-time-dashboard-demo.cube.dev/)|[real-time-dashboard](./examples/real-time-dashboard)|Real-Time Dashboard Demo using Web Sockets transport [[guide](https://real-time-dashboard.cube.dev)]|
-|[React Dashboard](https://react-dashboard-demo.cube.dev/)|[react-dashboard](./guides/react-dashboard)|Dynamic dashboard with React, GraphQL, and Cube.js [[guide](https://react-dashboard.cube.dev)]|
+|[React Dashboard](https://react-dashboard-demo.cubecloudapp.dev/)|[react-dashboard](./guides/react-dashboard)|Dynamic dashboard with React, GraphQL, and Cube.js [[guide](https://react-dashboard.cube.dev)]|
 |[D3 Dashboard](https://d3-dashboard-demo.cube.dev)|[d3-dashboard](./examples/d3-dashboard)|Dashboard with Cube.js, D3, and Material UI [[guide](https://d3-dashboard.cube.dev)]|
 |[Event Analytics](https://d1ygcqhosay4lt.cloudfront.net/)|[event-analytics](https://github.com/cube-js/cube.js/tree/master/examples/event-analytics)|Mixpanel like Event Analytics App built with Cube.js and Snowplow [[tutorial](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)]|
 |[Node Express Dashboard](https://express-analytics-dashboard.herokuapp.com)|[node-express-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/express-analytics-dashboard)|Analytics Dashboard with Node, Express, and Cube.js [[tutorial](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)]|

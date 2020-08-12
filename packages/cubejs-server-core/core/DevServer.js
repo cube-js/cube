@@ -3,7 +3,14 @@
 const fs = require('fs-extra');
 const path = require('path');
 const spawn = require('cross-spawn');
-const AppContainer = require('../dev/templates/AppContainer');
+const AppContainer = require('../dev/AppContainer');
+const DependencyTree = require('../dev/DependencyTree');
+const PackageFetcher = require('../dev/PackageFetcher');
+
+const repo = {
+  owner: 'cube-js',
+  name: 'cubejs-playground-templates'
+};
 
 class DevServer {
   constructor(cubejsServer) {
@@ -90,8 +97,8 @@ class DevServer {
     let lastApplyTemplatePackagesError = null;
 
     app.get('/playground/dashboard-app-create-status', catchErrors(async (req, res) => {
-      const sourcePath = await path.join(dashboardAppPath, 'src');
-
+      const sourcePath = path.join(dashboardAppPath, 'src');
+      
       if (lastApplyTemplatePackagesError) {
         const toThrow = lastApplyTemplatePackagesError;
         lastApplyTemplatePackagesError = null;
@@ -106,9 +113,9 @@ class DevServer {
         await this.applyTemplatePackagesPromise;
       }
 
-      if (!(await fs.pathExists(sourcePath))) {
+      if (!(fs.pathExistsSync(sourcePath))) {
         res.status(404).json({
-          error: await fs.pathExists(dashboardAppPath) ?
+          error: fs.pathExistsSync(dashboardAppPath) ?
             `Dashboard app corrupted. Please remove '${path.resolve(dashboardAppPath)}' directory and recreate it` :
             `Dashboard app not found in '${path.resolve(dashboardAppPath)}' directory`
         });
@@ -120,11 +127,9 @@ class DevServer {
         return;
       }
 
-      const appContainer = new AppContainer(dashboardAppPath);
-
       res.json({
         status: 'created',
-        installedTemplates: await appContainer.getPackageVersions()
+        installedTemplates: AppContainer.getPackageVersions(dashboardAppPath)
       });
     }));
 
@@ -173,24 +178,55 @@ class DevServer {
     }));
 
     app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server Download Template Packages');
+      
+      const fetcher = new PackageFetcher(repo);
+
       this.cubejsServer.event('Dev Server App File Write');
-      const { templatePackages, templateConfig } = req.body;
-      const appContainer = new AppContainer(dashboardAppPath, templatePackages, templateConfig);
+      const { toApply, templateConfig } = req.body;
+      
       const applyTemplates = async () => {
+        const manifestJson = await fetcher.manifestJSON();
+        const response = await fetcher.downloadPackages();
+        
+        let templatePackages = [];
+        if (typeof toApply === 'string') {
+          const template = manifestJson.templates.find(({ name }) => name === toApply);
+          templatePackages = template.templatePackages;
+        } else {
+          templatePackages = toApply;
+        }
+        
+        const dt = new DependencyTree(manifestJson, templatePackages);
+        
+        const appContainer = new AppContainer(
+          dt.getRootNode(),
+          {
+            appPath: dashboardAppPath,
+            packagesPath: response.packagesPath
+          },
+          templateConfig
+        );
+        
         this.cubejsServer.event('Dev Server Create Dashboard App');
         await appContainer.applyTemplates();
         this.cubejsServer.event('Dev Server Create Dashboard App Success');
 
         this.cubejsServer.event('Dev Server Dashboard Npm Install');
+        
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
+        
+        fetcher.cleanup();
       };
+      
       if (this.applyTemplatePackagesPromise) {
         this.applyTemplatePackagesPromise = this.applyTemplatePackagesPromise.then(applyTemplates);
       } else {
         this.applyTemplatePackagesPromise = applyTemplates();
       }
       const promise = this.applyTemplatePackagesPromise;
+      
       promise.then(() => {
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
@@ -202,6 +238,11 @@ class DevServer {
         }
       });
       res.json(true); // TODO
+    }));
+    
+    app.get('/playground/manifest', catchErrors(async (_, res) => {
+      const fetcher = new PackageFetcher(repo);
+      res.json(await fetcher.manifestJSON());
     }));
 
     app.use(serveStatic(path.join(__dirname, '../playground'), {
