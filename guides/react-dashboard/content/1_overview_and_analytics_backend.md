@@ -9,7 +9,7 @@ And I cannot say I always enjoyed the process. Several years ago I was rendering
 
 In this React Dashboard tutorial, we’ll learn step by step how to build a full-stack analytics application, including a report builder and a dynamic dashboard. We’ll build our application in a microservice architecture with the frontend decoupled from the backend. We’ll rely on AWS services for some of the functionality, but that could be easily substituted by your own microservices, which we cover later in the tutorial.
 
-You can check out the [final application we are going to build here.](https://react-dashboard-demo.cube.dev) The diagram below shows the architecture of our app.
+You can check out the [final application we are going to build here.](https://react-dashboard-demo.cubecloudapp.dev/) The diagram below shows the architecture of our app.
 
 ![](/images/1-schema.png)
 

@@ -6,7 +6,7 @@
     "dev": "./node_modules/.bin/cubejs-dev-server"
   },
   "dependencies": {
-    "@cubejs-backend/postgres-driver": "^0.4.4",
-    "@cubejs-backend/server": "^0.4.6"
+    "@cubejs-backend/postgres-driver": "^0.19.36",
+    "@cubejs-backend/server": "^0.19.40"
   }
 }
