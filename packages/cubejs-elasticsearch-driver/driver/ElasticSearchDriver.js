@@ -34,7 +34,7 @@ class ElasticSearchDriver extends BaseDriver {
       })).body;
 
       // TODO: Clean this up, will need a better identifier than the cloud setting
-      if (this.config.cloud) {
+      if (this.config.cloud || this.config.responseInSQLFormat) {
         const compiled = result.rows.map(
           r => result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {})
         );
