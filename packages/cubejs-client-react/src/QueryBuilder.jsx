@@ -241,12 +241,18 @@ export default class QueryBuilder extends React.Component {
           });
         },
         update: (config) => {
-          this.updateVizState({
-            pivotConfig: {
-              ...pivotConfig,
-              ...config
-            }
-          });
+          const { limit } = config;
+          
+          if (limit == null) {
+            this.updateVizState({
+              pivotConfig: {
+                ...pivotConfig,
+                ...config
+              },
+            });
+          } else {
+            this.updateQuery({ limit });
+          }
         }
       },
       ...queryRendererProps
@@ -509,18 +515,6 @@ export default class QueryBuilder extends React.Component {
 }
 
 QueryBuilder.contextType = CubeContext;
-
-// QueryBuilder.propTypes = {
-//   render: PropTypes.func,
-//   stateChangeHeuristics: PropTypes.func,
-//   setQuery: PropTypes.func,
-//   setVizState: PropTypes.func,
-//   cubejsApi: PropTypes.object,
-//   disableHeuristics: PropTypes.bool,
-//   wrapWithQueryRenderer: PropTypes.bool,
-//   query: PropTypes.object,
-//   vizState: PropTypes.object
-// };
 
 QueryBuilder.defaultProps = {
   cubejsApi: null,

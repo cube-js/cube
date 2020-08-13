@@ -3,7 +3,7 @@ import * as PropTypes from 'prop-types';
 import {
   Row, Col, Divider, Card, Button, Popover
 } from 'antd';
-import { SortAscendingOutlined, BorderInnerOutlined } from '@ant-design/icons';
+import { SettingOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
 import { playgroundAction } from './events';
@@ -11,8 +11,7 @@ import MemberGroup from './QueryBuilder/MemberGroup';
 import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
-import OrderGroup from './components/Order/OrderGroup';
-import Pivot from './components/Pivot/Pivot';
+import Settings from './components/Settings/Settings';
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) => Object.keys(updateMethods)
   .map((method) => ({
@@ -128,38 +127,24 @@ export default function PlaygroundQueryBuilder({
                     />
 
                     <Divider type="vertical" />
-
+                    
                     <Popover
-                        content={(
-                          <OrderGroup
-                            orderMembers={orderMembers}
-                            onReorder={updateOrder.reorder}
-                            onOrderChange={updateOrder.set}
-                          />
-                        )}
-                        placement="bottomLeft"
-                        trigger="click"
+                      content={(
+                        <Settings
+                          limit={query.limit}
+                          pivotConfig={pivotConfig}
+                          orderMembers={orderMembers}
+                          onReorder={updateOrder.reorder}
+                          onOrderChange={updateOrder.set}
+                          onMove={updatePivotConfig.moveItem}
+                          onUpdate={updatePivotConfig.update}
+                        />
+                      )}
+                      placement="bottomLeft"
+                      trigger="click"
                     >
-                      <Button disabled={!isQueryPresent} icon={<SortAscendingOutlined />}>
-                        Order
-                      </Button>
-                    </Popover>
-
-                    <Divider type="vertical" />
-
-                    <Popover
-                        content={(
-                          <Pivot
-                            pivotConfig={pivotConfig}
-                            onMove={updatePivotConfig.moveItem}
-                            onUpdate={updatePivotConfig.update}
-                          />
-                        )}
-                        placement="bottomLeft"
-                        trigger="click"
-                    >
-                      <Button disabled={!isQueryPresent} icon={<BorderInnerOutlined />}>
-                        Pivot
+                      <Button disabled={!isQueryPresent} icon={<SettingOutlined />}>
+                        Settings
                       </Button>
                     </Popover>
                   </Col>
