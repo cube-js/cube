@@ -442,18 +442,20 @@ class ApiGateway {
         [
           this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
         ].concat(normalizedQueries.map(
-          (normalizedQuery) => this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context))
+          async (normalizedQuery, index) => {
+            const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
+            
+            this.log(context, {
+              type: 'Load Request SQL',
+              duration: this.duration(loadRequestSQLStarted),
+              query: normalizedQueries[index],
+              sqlQuery
+            });
+            
+            return sqlQuery;
+          }
         ))
       );
-      
-      sqlQueries.forEach((sqlQuery, index) => {
-        this.log(context, {
-          type: 'Load Request SQL',
-          duration: this.duration(loadRequestSQLStarted),
-          query: normalizedQueries[index],
-          sqlQuery
-        });
-      });
       
       const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
         const sqlQuery = sqlQueries[index];

@@ -1,5 +1,5 @@
 import {
-  groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone
+  groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -55,6 +55,10 @@ class ResultSet {
   }
   
   drillDown(drillDownLocator, pivotConfig) {
+    if (this.loadResponses.length > 1) {
+      throw new Error('compareDateRange drillDown query is not currently supported');
+    }
+    
     const { xValues = [], yValues = [] } = drillDownLocator;
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
@@ -149,8 +153,15 @@ class ResultSet {
   }
 
   static getNormalizedPivotConfig(query, pivotConfig = null) {
+    const defaultPivotConfig = {
+      x: [],
+      y: [],
+      fillMissingDates: true,
+      joinDateRange: false
+    };
     const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
     const dimensions = query.dimensions || [];
+    
     pivotConfig = pivotConfig || (timeDimensions.length ? {
       x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
       y: dimensions
@@ -159,11 +170,7 @@ class ResultSet {
       y: []
     });
     
-    pivotConfig = {
-      ...pivotConfig,
-      x: [...(pivotConfig.x || [])],
-      y: [...(pivotConfig.y || [])],
-    };
+    pivotConfig = mergeDeepLeft(pivotConfig, defaultPivotConfig);
 
     const substituteTimeDimensionMembers = axis => axis.map(
       subDim => (
@@ -176,8 +183,8 @@ class ResultSet {
       )
     );
 
-    pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x || []);
-    pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y || []);
+    pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x);
+    pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y);
 
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
     const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
@@ -196,9 +203,7 @@ class ResultSet {
       pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
       pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
     }
-    if (pivotConfig.fillMissingDates == null) {
-      pivotConfig.fillMissingDates = true;
-    }
+    
     return pivotConfig;
   }
   
@@ -317,27 +322,32 @@ class ResultSet {
           const measure = pivotConfig.x.find(d => d === 'measures') ?
             ResultSet.measureFromAxis(xValues) :
             ResultSet.measureFromAxis(yValues);
+            
           return (yGrouped[this.axisValuesString(yValues)] ||
-            [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure, xValues)]);
+            [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure)]);
         }))
       };
     });
   }
   
-  mergedPivot(pivotConfig, joinDateRanges) {
+  mergedPivot(pivotConfig) {
+    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const pivots = this.loadResponses.length > 1
-      ? this.loadResponses.map((_, index) => this.pivot(pivotConfig, index))
+      ? this.loadResponses.map((_, index) => this.pivot(normalizedPivotConfig, index))
       : [];
-    return pivots.length ? this.mergePivots(pivots, joinDateRanges) : this.pivot(pivotConfig);
+      
+    return pivots.length
+      ? this.mergePivots(pivots, normalizedPivotConfig.joinDateRange)
+      : this.pivot(normalizedPivotConfig);
   }
   
-  mergePivots(pivots, joinDateRanges = true) {
+  mergePivots(pivots, joinDateRange) {
     const minLengthPivot = pivots.reduce(
-      (current, memo) => (current != null && current.length < memo.length ? current : memo), null
+      (memo, current) => (memo != null && current.length >= memo.length ? memo : current), null
     );
     
     return minLengthPivot.map((_, index) => {
-      const xValues = joinDateRanges
+      const xValues = joinDateRange
         ? [pivots.map((pivot) => pivot[index] && pivot[index].xValues || []).join(', ')]
         : minLengthPivot[index].xValues;
   
@@ -346,7 +356,7 @@ class ResultSet {
         yValuesArray: unnest(pivots.map((pivot, responseIndex) => {
           const [{ dateRange }] = this.loadResponses[responseIndex].query.timeDimensions;
 
-          return pivot[index].yValuesArray.map(([members, measure]) => [[dateRange.join(' - ')].concat(members), measure]);
+          return pivot[index].yValuesArray.map(([members, measure]) => [[dateRange.join(', ')].concat(members), measure]);
         }))
       };
     });
@@ -385,12 +395,12 @@ class ResultSet {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
     
-    return this.mergedPivot(normalizedPivotConfig, false).map(({ xValues, yValuesArray }) => fromPairs(
+    return this.mergedPivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
       normalizedPivotConfig.x
         .map((key, index) => [key, xValues[index]])
         .concat(
           isMeasuresPresent ? yValuesArray.map(([yValues, measure]) => [
-            yValues.length ? yValues.join('.') : 'value',
+            yValues.length ? yValues.join(', ') : 'value',
             measure
           ]) : []
         )
@@ -455,7 +465,7 @@ class ResultSet {
           return {
             ...fields,
             key,
-            dataIndex: [...path, key].join('.'),
+            dataIndex: [...path, key].join(', '),
             title: [title, dimensionValue].join(' ').trim(),
             shortTitle: dimensionValue || shortTitle,
           };
@@ -521,13 +531,13 @@ class ResultSet {
 
     if (this.loadResponses.length > 1) {
       seriesNames = unnest(this.loadResponses.map((loadResponse, index) => {
-        const { dateRange } = loadResponse.query.timeDimensions[0];
+        const [{ dateRange }] = loadResponse.query.timeDimensions;
         
         return pipe(
           map(this.axisValues(pivotConfig.y)),
           unnest,
           uniq,
-          map((values) => [dateRange.join(' - ')].concat(values))
+          map((values) => [dateRange.join(', ')].concat(values))
         )(
           this.timeDimensionBackwardCompatibleData(index)
         );
