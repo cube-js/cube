@@ -2,6 +2,18 @@
   margin-bottom: 2rem;
 }
 
+.header {
+  display: grid;
+  grid-template-columns: max-content auto;
+  grid-gap: 12px;
+  vertical-align: middle;
+}
+
+.controls {
+  margin-top: -3px;
+  text-align: end;
+}
+
 .list {
   border: 1px solid var(--color-border);
   list-style-type: none;

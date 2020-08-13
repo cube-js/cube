@@ -21,6 +21,8 @@ import HourChart from '../HourChart';
 import MapChart from '../MapChart';
 import ChannelChart from '../ChannelChart';
 
+const defaultListSize = 5;
+
 function App() {
   const [membersList, setMembersList] = useState([]);
   const [channelsList, setChannelsList] = useState([]);
@@ -41,6 +43,9 @@ function App() {
     loadMessagesByChannel().then(setMessagesByChannel);
     loadMembersByChannel().then(setMembersByChannel);
   }, []);
+
+  const [membersListDoShowAll, setMembersListDoShowAll] = useState(false);
+  const [channelsListDoShowAll, setChannelsListDoShowAll] = useState(false);
 
   return (
     <div className={styles.root}>
@@ -68,8 +73,16 @@ function App() {
       </div>
       <div className={styles.sidebar}>
         <Banner />
-        <MemberList data={membersList.slice(0, 10)} />
-        <ChannelList data={channelsList.slice(0, 10)} />
+        <MemberList
+          data={membersList}
+          limit={membersListDoShowAll ? undefined : defaultListSize}
+          onShow={() => setMembersListDoShowAll(!membersListDoShowAll)}
+        />
+        <ChannelList
+          data={channelsList}
+          limit={channelsListDoShowAll ? undefined : defaultListSize}
+          onShow={() => setChannelsListDoShowAll(!channelsListDoShowAll)}
+        />
       </div>
     </div>
   );

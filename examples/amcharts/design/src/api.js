@@ -20,13 +20,15 @@ const membersQuery = {
 
 export function loadMembers() {
   return cubejsApi.load(membersQuery).then((result) =>
-    result.tablePivot().map((row) => ({
-      id: row['Users.id'],
-      name: row['Users.real_name'],
-      title: row['Users.title'],
-      image: row['Users.image'],
-      is_admin: row['Users.is_admin'],
-    }))
+    result.tablePivot()
+      .map((row) => ({
+        id: row['Users.id'],
+        name: row['Users.real_name'],
+        title: row['Users.title'],
+        image: row['Users.image'],
+        is_admin: row['Users.is_admin'],
+      }))
+      .filter(row => row.id)
   );
 }
 
@@ -38,11 +40,13 @@ const channelsQuery = {
 
 export function loadChannels() {
   return cubejsApi.load(channelsQuery).then((result) =>
-    result.tablePivot().map((row) => ({
-      id: row['Channels.id'],
-      name: row['Channels.name'],
-      purpose: row['Channels.purpose'],
-    }))
+    result.tablePivot()
+      .map((row) => ({
+        id: row['Channels.id'],
+        name: row['Channels.name'],
+        purpose: row['Channels.purpose'],
+      }))
+      .filter(row => row.id)
   );
 }
 

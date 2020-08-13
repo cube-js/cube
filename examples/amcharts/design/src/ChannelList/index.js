@@ -3,13 +3,22 @@ import PropTypes from 'prop-types';
 import styles from './ChannelList.module.css';
 
 export default function ChannelList(props) {
-  const { data } = props
+  const { data, limit, onShow } = props;
+
+  const channels = limit
+    ? data.slice(0, limit)
+    : data.sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className={styles.root}>
-      <h2>Most Active Channels</h2>
+      <div className={styles.header}>
+        <h2>{limit ? 'Most Active' : 'All'} Channels</h2>
+        <div className={styles.controls}>
+          <button onClick={onShow}>Show {limit ? 'All' : 'Active'}</button>
+        </div>
+      </div>
       <ul className={styles.list}>
-        {data.map(channel => (
+        {channels.map(channel => (
           <li key={channel.id} className={styles.item}>
             <div className={styles.avatar}>&nbsp;</div>
             <div title={channel.purpose}>
@@ -29,5 +38,7 @@ export default function ChannelList(props) {
 }
 
 ChannelList.propTypes = {
-  data: PropTypes.arrayOf(PropTypes.object).isRequired
+  data: PropTypes.arrayOf(PropTypes.object).isRequired,
+  limit: PropTypes.number,
+  onShow: PropTypes.func.isRequired,
 }
