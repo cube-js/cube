@@ -8,7 +8,7 @@
     "example": "http-server",
     "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w"
   },
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
     "core-js": "^3.6.5",

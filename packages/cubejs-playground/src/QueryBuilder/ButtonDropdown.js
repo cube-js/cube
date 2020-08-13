@@ -9,7 +9,7 @@ const ButtonDropdown = ({ overlay, ...buttonProps }) => (
 );
 
 ButtonDropdown.propTypes = {
-  overlay: PropTypes.object.isRequired
+  overlay: PropTypes.object.isRequired,
 };
 
 export default ButtonDropdown;

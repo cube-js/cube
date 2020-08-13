@@ -57,11 +57,10 @@ const chartTypeToTemplate = {
       <Legend />
       <Tooltip />
     </PieChart>
-  </ResponsiveContainer>`
+  </ResponsiveContainer>`,
 };
 
-
-export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
+export const sourceCodeTemplate = ({ chartType, renderFnName }) =>
   `import {
   CartesianGrid,
   PieChart,
@@ -96,9 +95,8 @@ const CartesianChart = ({ resultSet, children, ChartComponent }) => (
 const colors = ['#FF6492', '#141446', '#7A77FF'];
 
 const ${renderFnName} = ({ resultSet }) => (${chartTypeToTemplate[chartType]}
-);`
-);
+);`;
 
 export const imports = {
-  recharts
+  recharts,
 };

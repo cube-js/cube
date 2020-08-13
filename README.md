@@ -234,16 +234,16 @@ export default () => {
 
 | Demo | Code | Description |
 |:------|:----------:|:-------------|
-|[Real-Time Dashboard](https://real-time-dashboard-demo.cube.dev/)|[real-time-dashboard](./examples/real-time-dashboard)|Real-Time Dashboard Demo using Web Sockets transport [[guide](https://real-time-dashboard.cube.dev)]|
-|[React Dashboard](https://react-dashboard-demo.cubecloudapp.dev/)|[react-dashboard](./guides/react-dashboard)|Dynamic dashboard with React, GraphQL, and Cube.js [[guide](https://react-dashboard.cube.dev)]|
-|[D3 Dashboard](https://d3-dashboard-demo.cube.dev)|[d3-dashboard](./examples/d3-dashboard)|Dashboard with Cube.js, D3, and Material UI [[guide](https://d3-dashboard.cube.dev)]|
+|[Real-Time Dashboard](https://real-time-dashboard-demo.cube.dev/)|[real-time-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/real-time-dashboard)|Real-Time Dashboard Demo using Web Sockets transport [[guide](https://real-time-dashboard.cube.dev)]|
+|[React Dashboard](https://react-dashboard-demo.cubecloudapp.dev/)|[react-dashboard](https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard/demo)|Dynamic dashboard with React, GraphQL, and Cube.js [[guide](https://react-dashboard.cube.dev)]|
+|[D3 Dashboard](https://d3-dashboard.cubecloudapp.dev/)|[d3-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard)|Dashboard with Cube.js, D3, and Material UI [[guide](https://d3-dashboard.cube.dev)]|
 |[Event Analytics](https://d1ygcqhosay4lt.cloudfront.net/)|[event-analytics](https://github.com/cube-js/cube.js/tree/master/examples/event-analytics)|Mixpanel like Event Analytics App built with Cube.js and Snowplow [[tutorial](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)]|
-|[Node Express Dashboard](https://express-analytics-dashboard.herokuapp.com)|[node-express-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/express-analytics-dashboard)|Analytics Dashboard with Node, Express, and Cube.js [[tutorial](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)]|
-|[External Rollups](https://cubejs-external-rollups.herokuapp.com/)|[external-rollups](https://github.com/cube-js/cube.js/tree/master/examples/external-rollups)|Compare performance of direct BigQuery querying vs MySQL cached version for the same data|
-|[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](./examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js [[tutorial](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)]|
-|[Open Source Web Analytics Platform](https://web-analytics-demo.cubecloudapp.dev/)|[web-analytics](./examples/web-analytics)|Building Google Analytics alternative with Snowplow, AWS Athena, Cube.js and React. It shows the usage of external pre-aggregations to speed-up queries. [[guide](https://web-analytics.cube.dev)]|
-|[Drill Down Table API](https://drill-downs.cubecloudapp.dev/)|[drill-downs](./examples/drill-downs)|Quick introduction to the drill downs concept [[tutorial](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/)] |
-|[Examples Gallery](https://statsbotco.github.io/cubejs-client/)|[examples-gallery](./examples/examples-gallery)|Examples Gallery with different visualizations libraries|
+|[Node Express Dashboard](https://express-analytics-dashboard.cubecloudapp.dev)|[node-express-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/express-analytics-dashboard)|Analytics Dashboard with Node, Express, and Cube.js [[tutorial](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)]|
+|[External Rollups](https://external-rollups.cubecloudapp.dev/)|[external-rollups](https://github.com/cube-js/cube.js/tree/master/examples/external-rollups)|Compare performance of direct BigQuery querying vs MySQL cached version for the same data|
+|[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](https://github.com/cube-js/cube.js/tree/master/examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js [[tutorial](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)]|
+|[Open Source Web Analytics Platform](https://web-analytics-demo.cubecloudapp.dev/)|[web-analytics](https://github.com/cube-js/cube.js/tree/master/examples/web-analytics)|Building Google Analytics alternative with Snowplow, AWS Athena, Cube.js and React. It shows the usage of external pre-aggregations to speed-up queries. [[guide](https://web-analytics.cube.dev)]|
+|[Drill Down Table API](https://drill-downs.cubecloudapp.dev/)|[drill-downs](https://github.com/cube-js/cube.js/tree/master/examples/drill-downs)|Quick introduction to the drill downs concept [[tutorial](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/)] |
+|[Examples Gallery](https://statsbotco.github.io/cubejs-client/)|[examples-gallery](https://github.com/cube-js/cube.js/tree/master/examples/examples-gallery)|Examples Gallery with different visualizations libraries|
 
 ## Tutorials
 

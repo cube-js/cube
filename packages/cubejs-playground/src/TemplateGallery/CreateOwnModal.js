@@ -24,7 +24,7 @@ const StyledModal = styled(Modal)`
       text-align: left;
     }
   }
-`
+`;
 
 const StyledForm = styled(Form)`
   && {
@@ -39,16 +39,14 @@ const StyledForm = styled(Form)`
     }
 
     .ant-dropdown-trigger {
-      border-color: #ECECF0;
+      border-color: #ececf0;
       padding: 13px 16px;
       line-height: 13px;
     }
   }
 `;
 
-const DropdownIcon = () => (
-  <CaretDownOutlined style={{ color: '#727290' }} />
-);
+const DropdownIcon = () => <CaretDownOutlined style={{ color: '#727290' }} />;
 
 const CreateOwnModal = ({
   visible,
@@ -62,7 +60,7 @@ const CreateOwnModal = ({
   frameworkItem,
   templatePackages,
   templatePackage,
-  enableWebSocketTransport
+  enableWebSocketTransport,
 }) => {
   const chartLibrariesMenu = (
     <Menu
@@ -71,13 +69,9 @@ const CreateOwnModal = ({
         onChange('chartLibrary', e.key);
       }}
     >
-      {
-        chartLibraries.map(library => (
-          <Menu.Item key={library.value}>
-            {library.title}
-          </Menu.Item>
-        ))
-      }
+      {chartLibraries.map((library) => (
+        <Menu.Item key={library.value}>{library.title}</Menu.Item>
+      ))}
     </Menu>
   );
 
@@ -88,30 +82,24 @@ const CreateOwnModal = ({
         onChange('framework', e.key);
       }}
     >
-      {
-        frameworks.map(f => (
-          <Menu.Item key={f.id}>
-            {f.title}
-          </Menu.Item>
-        ))
-      }
+      {frameworks.map((f) => (
+        <Menu.Item key={f.id}>{f.title}</Menu.Item>
+      ))}
     </Menu>
   );
 
   const templatePackagesMenu = (
     <Menu
       onClick={(e) => {
-        playgroundAction('Set Template Package', { templatePackageName: e.key });
+        playgroundAction('Set Template Package', {
+          templatePackageName: e.key,
+        });
         onChange('templatePackageName', e.key);
       }}
     >
-      {
-        (templatePackages || []).map(f => (
-          <Menu.Item key={f.name}>
-            {f.description}
-          </Menu.Item>
-        ))
-      }
+      {(templatePackages || []).map((f) => (
+        <Menu.Item key={f.name}>{f.description}</Menu.Item>
+      ))}
     </Menu>
   );
 
@@ -127,7 +115,7 @@ const CreateOwnModal = ({
         </Button>,
         <Button key="back" onClick={onCancel}>
           Cancel
-        </Button>
+        </Button>,
       ]}
     >
       <StyledForm>
@@ -139,32 +127,34 @@ const CreateOwnModal = ({
             </Button>
           </Dropdown>
         </Form.Item>
-        {
-          frameworkItem && frameworkItem.docsLink && (
-            <Alert
-              style={{marginBottom: 23}}
-              type="info"
-              message={
-                <span>
-                  We do not support&nbsp;
+        {frameworkItem && frameworkItem.docsLink && (
+          <Alert
+            style={{ marginBottom: 23 }}
+            type="info"
+            message={
+              <span>
+                We do not support&nbsp;
+                {frameworkItem.title}
+                &nbsp;dashboard scaffolding generation yet. Please refer
+                to&nbsp;
+                <a
+                  href={frameworkItem.docsLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    playgroundAction('Unsupported Dashboard Framework Docs', {
+                      framework,
+                    })
+                  }
+                >
                   {frameworkItem.title}
-                  &nbsp;dashboard scaffolding generation yet.
-                  Please refer to&nbsp;
-                  <a
-                    href={frameworkItem.docsLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => playgroundAction('Unsupported Dashboard Framework Docs', { framework })}
-                  >
-                    {frameworkItem.title}
-                    &nbsp;docs
-                  </a>
-                  &nbsp;to see on how to use it with Cube.js.
-                </span>
-              }
-            />
-          )
-        }
+                  &nbsp;docs
+                </a>
+                &nbsp;to see on how to use it with Cube.js.
+              </span>
+            }
+          />
+        )}
         <Form.Item label="Main Template">
           <Dropdown
             overlay={templatePackagesMenu}
@@ -190,7 +180,9 @@ const CreateOwnModal = ({
         <Form.Item label="Web Socket Transport (Real-time)">
           <Switch
             checked={enableWebSocketTransport}
-            onChange={(checked) => onChange('enableWebSocketTransport', checked)}
+            onChange={(checked) =>
+              onChange('enableWebSocketTransport', checked)
+            }
           />
         </Form.Item>
       </StyledForm>

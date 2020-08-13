@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/serverless-aws",
   "description": "Cube.js Serverless AWS support",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "version": "0.19.61",
   "repository": {
     "type": "git",

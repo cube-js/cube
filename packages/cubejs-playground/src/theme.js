@@ -4,8 +4,8 @@ const theme = {
     lightBlue: '#F3F3FB',
     purple: '#43436B',
     darkPurple: '#141446',
-    red: '#FF6492'
-  }
+    red: '#FF6492',
+  },
 };
 
 export default theme;

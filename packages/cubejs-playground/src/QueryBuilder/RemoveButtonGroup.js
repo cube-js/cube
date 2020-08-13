@@ -6,11 +6,7 @@ import { Button } from 'antd';
 const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group style={{ marginRight: 8 }} {...props}>
     {children}
-    <Button
-      type="danger"
-      ghost
-      onClick={onRemoveClick}
-    >
+    <Button type="danger" ghost onClick={onRemoveClick}>
       <CloseOutlined />
     </Button>
   </Button.Group>
@@ -18,7 +14,7 @@ const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
 
 RemoveButtonGroup.propTypes = {
   onRemoveClick: PropTypes.func.isRequired,
-  children: PropTypes.object.isRequired
+  children: PropTypes.object.isRequired,
 };
 
 export default RemoveButtonGroup;

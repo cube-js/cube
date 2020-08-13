@@ -21,14 +21,11 @@ export const libraryToTemplate = {
   chartjs: { library: chartjsLibrary, title: 'Chart.js' },
   recharts: { library: rechartsLibrary, title: 'Recharts' },
   bizcharts: { library: bizChartLibrary, title: 'Bizcharts' },
-  d3: { library: d3ChartLibrary, title: 'D3' }
+  d3: { library: d3ChartLibrary, title: 'D3' },
 };
 
 export const babelConfig = {
-  presets: [
-    presetEnv,
-    presetReact
-  ]
+  presets: [presetEnv, presetReact],
 };
 
 const prettify = (object) => {
@@ -36,14 +33,15 @@ const prettify = (object) => {
   if (typeof object === 'object') {
     str = JSON.stringify(object, null, 2);
   }
-  
-  return str.split('\n').map((l, i) => (i > 0 ? `  ${l}` : l)).join('\n');
+
+  return str
+    .split('\n')
+    .map((l, i) => (i > 0 ? `  ${l}` : l))
+    .join('\n');
 };
 
 const sourceCodeTemplate = (props) => {
-  const {
-    chartLibrary, query, apiUrl, cubejsToken, chartType
-  } = props;
+  const { chartLibrary, query, apiUrl, cubejsToken, chartType } = props;
   const renderFnName = `${chartType}Render`;
   return `import React from 'react';
 import cubejs from '@cubejs-client/core';
@@ -82,12 +80,15 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(<ChartRenderer />, rootElement);
 `;
 
-export const selectChartLibrary = (chartType, chartLibrary) => (
-  ['table', 'number'].indexOf(chartType) !== -1 ? tablesLibrary : libraryToTemplate[chartLibrary].library
-);
+export const selectChartLibrary = (chartType, chartLibrary) =>
+  ['table', 'number'].indexOf(chartType) !== -1
+    ? tablesLibrary
+    : libraryToTemplate[chartLibrary].library;
 
-export const chartLibraries = Object.keys(libraryToTemplate)
-  .map(k => ({ value: k, title: libraryToTemplate[k].title }));
+export const chartLibraries = Object.keys(libraryToTemplate).map((k) => ({
+  value: k,
+  title: libraryToTemplate[k].title,
+}));
 
 export const ChartRenderer = (props) => {
   const [jsCompilingError, setError] = useState(null);
@@ -102,7 +103,7 @@ export const ChartRenderer = (props) => {
     cubejsApi,
     chartType,
     sourceCodeFn: sourceCodeFnProp,
-    pivotConfig
+    pivotConfig,
   } = props;
 
   const sourceCodeFn = sourceCodeFnProp || sourceCodeTemplate;
@@ -111,14 +112,14 @@ export const ChartRenderer = (props) => {
   const source = sourceCodeFn({
     ...props,
     chartLibrary: selectedChartLibrary,
-    pivotConfig
+    pivotConfig,
   });
   const dependencies = {
     '@cubejs-client/core': cubejs,
     '@cubejs-client/react': cubejsReact,
     antd,
     react: React,
-    ...selectedChartLibrary.imports
+    ...selectedChartLibrary.imports,
   };
 
   useEffect(() => {
@@ -160,7 +161,7 @@ export const ChartRenderer = (props) => {
               }
             }}
             babelConfig={babelConfig}
-            resolver={importName => dependencies[importName]}
+            resolver={(importName) => dependencies[importName]}
             source={source}
           />
         );
@@ -177,7 +178,7 @@ ChartRenderer.propTypes = {
   dashboardSource: PropTypes.object,
   cubejsApi: PropTypes.object,
   chartType: PropTypes.string,
-  sourceCodeFn: PropTypes.func
+  sourceCodeFn: PropTypes.func,
 };
 
 ChartRenderer.defaultProps = {
@@ -187,5 +188,5 @@ ChartRenderer.defaultProps = {
   dashboardSource: null,
   cubejsApi: null,
   chartType: null,
-  sourceCodeFn: null
+  sourceCodeFn: null,
 };

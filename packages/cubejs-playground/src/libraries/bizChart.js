@@ -29,11 +29,10 @@ const chartTypeToTemplate = {
     <Legend position='right' />
     <Tooltip />
     {resultSet.seriesNames().map(s => (<Geom type="intervalStack" position={s.key} color="category" />))}
-  </Chart>`
+  </Chart>`,
 };
 
-
-export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
+export const sourceCodeTemplate = ({ chartType, renderFnName }) =>
   `import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
 
 const stackedChartData = (resultSet) => {
@@ -50,9 +49,8 @@ const stackedChartData = (resultSet) => {
 }
 
 const ${renderFnName} = ({ resultSet }) => (${chartTypeToTemplate[chartType]}
-);`
-);
+);`;
 
 export const imports = {
-  bizcharts
+  bizcharts,
 };

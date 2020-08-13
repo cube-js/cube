@@ -2,7 +2,7 @@
   "name": "cubejs-guides-react-dashboard",
   "description": "Building a Data Analytics Platform Tutorial",
   "version": "0.0.1",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "dependencies": {
     "cubedev-tracking": "^1.0.1",
     "gatsby": "^2.15.28",

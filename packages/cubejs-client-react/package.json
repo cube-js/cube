@@ -7,7 +7,7 @@
     "directory": "packages/cubejs-client-react"
   },
   "description": "React components for cube.js",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
     "core-js": "^3.6.5",

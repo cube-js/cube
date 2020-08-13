@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/serverless",
   "description": "Cube.js Serverless",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "version": "0.19.61",
   "repository": {
     "type": "git",

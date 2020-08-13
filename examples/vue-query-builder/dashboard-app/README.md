@@ -38,6 +38,6 @@ To start frontend application use this commands
 ```
 $ cd dashboard-app
 $ yarn
-$ yarn dev
+$ yarn serve
 ```
 

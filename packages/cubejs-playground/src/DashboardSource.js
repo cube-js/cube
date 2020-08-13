@@ -1,13 +1,18 @@
 /* globals window */
 import fetch from './playgroundFetch';
 
-const fetchWithRetry = (url, options, retries) => fetch(url, { ...options, retries });
+const fetchWithRetry = (url, options, retries) =>
+  fetch(url, { ...options, retries });
 
 class DashboardSource {
   async load(instant) {
     this.loadError = null;
     const res = await fetchWithRetry(
-      `/playground/dashboard-app-create-status${instant ? '?instant=true' : ''}`, undefined, 10
+      `/playground/dashboard-app-create-status${
+        instant ? '?instant=true' : ''
+      }`,
+      undefined,
+      10
     );
     const result = await res.json();
     if (result.error) {
@@ -25,14 +30,14 @@ class DashboardSource {
     return fetchWithRetry('/playground/apply-template-packages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         toApply,
         templateConfig: templateConfig || {
-          credentials: this.playgroundContext
-        }
-      })
+          credentials: this.playgroundContext,
+        },
+      }),
     });
   }
 
@@ -41,15 +46,20 @@ class DashboardSource {
     const result = await res.json();
     return {
       cubejsToken: result.cubejsToken,
-      apiUrl: result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, '')
+      apiUrl:
+        result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, ''),
     };
   }
 
-  get templatePackages() { // TODO load
+  get templatePackages() {
+    // TODO load
     return [
       { name: 'react-antd-dynamic', description: 'React Antd Dynamic' },
       { name: 'react-antd-static', description: 'React Antd Static' },
-      { name: 'react-material-static', description: 'React Material UI Static' }
+      {
+        name: 'react-material-static',
+        description: 'React Material UI Static',
+      },
     ];
   }
 
@@ -58,7 +68,9 @@ class DashboardSource {
     if (this.loadError) {
       return this.loadError;
     }
-    return !!Object.keys(this.installedTemplates).find(template => template.match(/-static$/)); // TODO
+    return !!Object.keys(this.installedTemplates).find((template) =>
+      template.match(/-static$/)
+    ); // TODO
   }
 
   async addChart(chartCode) {
@@ -66,13 +78,18 @@ class DashboardSource {
     if (this.loadError) {
       return;
     }
-    await this.applyTemplatePackages([
-      'create-react-app',
-      Object.keys(this.installedTemplates).find(template => template.match(/-static$/)), // TODO
-      'static-chart'
-    ], { chartCode });
+    await this.applyTemplatePackages(
+      [
+        'create-react-app',
+        Object.keys(this.installedTemplates).find((template) =>
+          template.match(/-static$/)
+        ), // TODO
+        'static-chart',
+      ],
+      { chartCode }
+    );
   }
-  
+
   async templates() {
     const { templates } = await (await fetch('/playground/manifest')).json();
     return templates;

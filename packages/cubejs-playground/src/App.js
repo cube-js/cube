@@ -29,7 +29,7 @@ class App extends Component {
       console.log(error);
       const e = (error.stack || error).toString();
       event('Playground Error', {
-        error: e
+        error: e,
       });
       notification.error({
         message: (
@@ -57,14 +57,14 @@ class App extends Component {
     const result = await res.json();
     setAnonymousId(result.anonymousId, {
       coreServerVersion: result.coreServerVersion,
-      projectFingerprint: result.projectFingerprint
+      projectFingerprint: result.projectFingerprint,
     });
   }
 
   componentDidCatch(error, info) {
     event('Playground Error', {
       error: (error.stack || error).toString(),
-      info: info.toString()
+      info: info.toString(),
     });
   }
 
@@ -81,7 +81,9 @@ class App extends Component {
               description={fatalError.stack}
               type="error"
             />
-          ) : children}
+          ) : (
+            children
+          )}
         </Layout.Content>
       </Layout>
     );
@@ -90,11 +92,11 @@ class App extends Component {
 
 App.propTypes = {
   location: PropTypes.object.isRequired,
-  children: PropTypes.array
+  children: PropTypes.array,
 };
 
 App.defaultProps = {
-  children: []
+  children: [],
 };
 
 export default withRouter(App);

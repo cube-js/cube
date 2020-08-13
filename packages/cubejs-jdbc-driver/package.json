@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/jdbc-driver",
   "description": "Cube.js JDBC database driver",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "version": "0.19.35",
   "repository": {
     "type": "git",
