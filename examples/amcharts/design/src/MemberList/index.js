@@ -7,7 +7,7 @@ export default function MemberList(props) {
 
   const members = limit
     ? data.slice(0, limit)
-    : data.sort((a, b) => a.name.localeCompare(b.name));
+    : data.slice().sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className={styles.root}>

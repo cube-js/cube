@@ -7,7 +7,7 @@ export default function ChannelList(props) {
 
   const channels = limit
     ? data.slice(0, limit)
-    : data.sort((a, b) => a.name.localeCompare(b.name));
+    : data.slice().sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className={styles.root}>
