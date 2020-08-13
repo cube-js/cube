@@ -1,13 +1,13 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.19.55",
+  "version": "0.19.56",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-client-react"
   },
   "description": "React components for cube.js",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
     "core-js": "^3.6.5",
@@ -30,7 +30,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-client/core": "^0.19.55",
+    "@cubejs-client/core": "^0.19.56",
     "@types/react": "^16.9.41",
     "eslint": "^6.5.1",
     "eslint-config-airbnb": "^18.0.1",

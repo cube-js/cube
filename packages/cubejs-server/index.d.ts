@@ -5,6 +5,7 @@ import http from 'http';
 
 export interface CreateOptions extends CoreCreateOptions {
   webSockets?: boolean;
+  initApp?(app: express.Application): void | Promise<void>;
 }
 
 declare class CubejsServer {

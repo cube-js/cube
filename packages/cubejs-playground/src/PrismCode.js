@@ -14,9 +14,7 @@ class PrismCode extends React.Component {
   render() {
     return (
       <pre style={this.props.style}>
-        <code className="language-javascript">
-          { this.props.code }
-        </code>
+        <code className="language-javascript">{this.props.code}</code>
       </pre>
     );
   }

@@ -3,6 +3,54 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.19.61](https://github.com/cube-js/cube.js/compare/v0.19.60...v0.19.61) (2020-08-11)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.60](https://github.com/cube-js/cube.js/compare/v0.19.59...v0.19.60) (2020-08-08)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.59](https://github.com/cube-js/cube.js/compare/v0.19.58...v0.19.59) (2020-08-05)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.58](https://github.com/cube-js/cube.js/compare/v0.19.57...v0.19.58) (2020-08-05)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.57](https://github.com/cube-js/cube.js/compare/v0.19.56...v0.19.57) (2020-08-05)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
+## [0.19.56](https://github.com/cube-js/cube.js/compare/v0.19.55...v0.19.56) (2020-08-03)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-aws
+
+
+
+
+
 ## [0.19.55](https://github.com/cube-js/cube.js/compare/v0.19.54...v0.19.55) (2020-07-23)
 
 **Note:** Version bump only for package @cubejs-backend/serverless-aws

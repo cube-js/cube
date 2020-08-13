@@ -5,7 +5,13 @@ import { DragOutlined } from '@ant-design/icons';
 
 const orderOptions = ['asc', 'desc', 'none'];
 
-export default function DraggableItem({ id, index, order = 'none', children, onOrderChange }) {
+export default function DraggableItem({
+  id,
+  index,
+  order = 'none',
+  children,
+  onOrderChange,
+}) {
   const getNextOrder = () => {
     const index = orderOptions.indexOf(order) + 1;
     return orderOptions[index > 2 ? 0 : index];
@@ -26,9 +32,9 @@ export default function DraggableItem({ id, index, order = 'none', children, onO
             marginBottom: 8,
             ...draggableProps.style,
           }}
-          >
+        >
           <DragOutlined />
-          
+
           <Typography.Text ellipsis style={{ margin: '0 auto 0 8px' }}>
             {children}
           </Typography.Text>

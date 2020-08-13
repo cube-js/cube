@@ -8,7 +8,7 @@
   },
   "description": "Cube.js WebSocket transport",
   "main": "dist/cubejs-client-ws-transport.js",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
     "core-js": "^3.6.5",

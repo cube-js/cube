@@ -16,14 +16,13 @@ const chartTypeToTemplate = {
     columns={resultSet.tableColumns(pivotConfig)} 
     dataSource={resultSet.tablePivot(pivotConfig)} 
   />
-  `
+  `,
 };
 
-export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
+export const sourceCodeTemplate = ({ chartType, renderFnName }) =>
   `import { Row, Col, Statistic, Table } from 'antd';
 
 const ${renderFnName} = ({ resultSet, pivotConfig }) => (${chartTypeToTemplate[chartType]}
-);`
-);
+);`;
 
 export const imports = {};

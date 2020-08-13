@@ -2,7 +2,7 @@
   "name": "cubejs-guides-d3-dashboard",
   "description": "D3 Dashboard Guide with Cube.js",
   "version": "0.0.1",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "dependencies": {
     "gatsby": "^2.15.28",
     "gatsby-image": "^2.2.23",

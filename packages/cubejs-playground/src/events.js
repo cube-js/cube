@@ -15,7 +15,7 @@ const track = async (event) => {
     ...event,
     id: uuidv4(),
     clientAnonymousId: cookie('playground_anonymous'),
-    clientTimestamp: new Date().toJSON()
+    clientTimestamp: new Date().toJSON(),
   });
   const flush = async (toFlush, retries) => {
     if (!toFlush) {
@@ -32,7 +32,7 @@ const track = async (event) => {
       const sentAt = new Date().toJSON();
       const result = await fetch('https://track.cube.dev/track', {
         method: 'post',
-        body: JSON.stringify(toFlush.map(r => ({ ...r, sentAt }))),
+        body: JSON.stringify(toFlush.map((r) => ({ ...r, sentAt }))),
         headers: { 'Content-Type': 'application/json' },
       });
       if (result.status !== 200 && retries > 0) {
@@ -47,11 +47,13 @@ const track = async (event) => {
     }
     return null;
   };
-  const currentPromise = (flushPromise || Promise.resolve()).then(() => flush()).then(() => {
-    if (currentPromise === flushPromise) {
-      flushPromise = null;
-    }
-  });
+  const currentPromise = (flushPromise || Promise.resolve())
+    .then(() => flush())
+    .then(() => {
+      if (currentPromise === flushPromise) {
+        flushPromise = null;
+      }
+    });
   flushPromise = currentPromise;
   return flushPromise;
 };

@@ -14,7 +14,13 @@ import featureOneImg from "./feature-1.png";
 import featureOneTwo from "./feature-2.png";
 import featureOneThree from "./feature-3.png";
 
+import { page } from 'cubedev-tracking';
+
 class Index extends React.Component {
+  componentDidMount() {
+    page();
+  }
+
   render() {
     const partsEdges = this.props.data.allMarkdownRemark.edges;
     return (

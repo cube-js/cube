@@ -14,8 +14,6 @@ menuOrder: 7
 
 Creates an instance of `CubejsServer`.
 
-[Here you can find a full reference for a configuration options object](@cubejs-backend-server-core#options-reference).
-
 You can set server port using `PORT` environment variable. Default port is `4000`.
 
 #### Example
@@ -29,6 +27,57 @@ server.listen().then(({ version, port }) => {
   console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
 });
 ```
+
+#### Options Reference
+
+The options for `CubejsServer` include the `CubejsServerCore` [options](@cubejs-backend-server-core#options-reference) plus the following additional ones specific to `CubejsServer`:
+
+```javascript
+{
+  webSockets?: boolean;
+  initApp?(app: express.Application): void | Promise<void>;
+}
+```
+
+##### webSockets
+
+Boolean to enable or disable [web sockets](real-time-data-fetch#web-sockets) on the backend. Can also be enabled using the `CUBEJS_WEB_SOCKETS` environment variable.
+
+##### initApp
+
+A function to setup the instance of Express. It accepts the following argument:
+  * `app`: the instance of Express
+
+This method is invoked prior to any routes having been added. Since routes can't be overridden, this allows customization / overriding of the routes and other aspects of the Express application early in its lifecycle.
+
+An example usage is customizing the base route `/` in production mode to return a 404:
+
+`initApp.ts`
+```
+import type { Application, Request, Response } from 'express';
+
+export function initApp(app: Application) {
+  app.get('/', (req: Request, res: Response) => {
+    res.sendStatus(404);
+  });
+}
+```
+
+`index.ts`
+```
+import { initApp } from './initApp';
+
+const options = {};
+
+// ...
+
+if (process.env.NODE_ENV === 'production') {
+  options.initApp = initApp;
+}
+
+const server = new CubejsServer(options);
+```
+
 
 ### CubejsServer.version()
 
