@@ -4,18 +4,20 @@ import LineChart from "../amCharts/LineChart"
 import PropTypes from "prop-types"
 
 export default function MessagesChart(props) {
-  const { data } = props
+  const { data, granularity } = props
 
   const options = [
     {
       x: "date",
       y: "messages",
-      color: "rgb(29, 155, 209)"
+      color: "rgb(29, 155, 209)",
+      granularity,
     },
     {
       x: "date",
       y: "reactions",
-      color: "rgb(0, 122, 90)"
+      color: "rgb(0, 122, 90)",
+      granularity,
     }
   ];
 
@@ -30,5 +32,6 @@ export default function MessagesChart(props) {
 }
 
 MessagesChart.propTypes = {
-  data: PropTypes.arrayOf(PropTypes.object).isRequired
+  data: PropTypes.arrayOf(PropTypes.object).isRequired,
+  granularity: PropTypes.string.isRequired,
 }

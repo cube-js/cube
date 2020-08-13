@@ -1,0 +1,11 @@
+.root {
+  font-size: 15px;
+}
+
+.root > * {
+  margin: 0 12px;
+}
+
+.root > select {
+  width: 12em;
+}

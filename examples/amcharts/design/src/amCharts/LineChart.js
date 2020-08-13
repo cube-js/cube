@@ -3,6 +3,18 @@ import PropTypes from 'prop-types';
 import * as am4core from '@amcharts/amcharts4/core';
 import * as am4charts from '@amcharts/amcharts4/charts';
 
+const intervals = [
+  { timeUnit: 'hour', count: 1 },
+  { timeUnit: 'day', count: 1 },
+  { timeUnit: 'week', count: 1 },
+  { timeUnit: 'month', count: 1 },
+];
+
+const formats = {
+  'week': "'W' ww\nYYYY",
+  'month': 'MMM\nYYYY',
+};
+
 class LineChart extends Component {
   constructor(props) {
     super(props);
@@ -25,13 +37,16 @@ class LineChart extends Component {
     dateAxis.fontSize = '11px';
     dateAxis.fontWeight = '400';
     dateAxis.renderer.labels.template.fill = am4core.color('#616061');
-    dateAxis.gridIntervals.setAll([{ timeUnit: 'month', count: 1 }]);
-    dateAxis.dateFormats.setKey('month', 'MMM\nYYYY');
-    dateAxis.periodChangeDateFormats.setKey('month', 'MMM\nYYYY');
+    dateAxis.gridIntervals.setAll(intervals);
     dateAxis.renderer.grid.template.location = 0.5;
     dateAxis.renderer.labels.template.location = 0.5;
     dateAxis.startLocation = 0.5;
     dateAxis.endLocation = 0.5;
+
+    Object.keys(formats).forEach(format => {
+      dateAxis.dateFormats.setKey(format, formats[format]);
+      dateAxis.periodChangeDateFormats.setKey(format, formats[format]);
+    });
 
     for (const option of options) {
       const series = chart.series.push(new am4charts.LineSeries());

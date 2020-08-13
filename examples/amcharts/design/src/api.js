@@ -122,22 +122,20 @@ export function loadChannelsWithReactions() {
   return loadStuffWithReactions(loadChannels, loadReactionsInChannels);
 }
 
-const messagesAndReactionsQuery = {
-  measures: ['Messages.count', 'Reactions.count'],
-  timeDimensions: [
-    {
-      dimension: 'Messages.date',
-      granularity: 'month',
-      dateRange: 'Last 365 days',
-    },
-  ],
-  order: { 'Messages.date': 'asc' },
-};
+export function loadMessagesAndReactions(dateRange, granularity) {
+  const query = {
+    measures: ['Messages.count', 'Reactions.count'],
+    timeDimensions: [
+      {
+        dimension: 'Messages.date',
+        granularity,
+        dateRange,
+      },
+    ],
+    order: { 'Messages.date': 'asc' },
+  };
 
-export function loadMessagesAndReactions() {
-  const granularity = messagesAndReactionsQuery.timeDimensions[0].granularity;
-
-  return cubejsApi.load(messagesAndReactionsQuery).then((result) =>
+  return cubejsApi.load(query).then((result) =>
     result.tablePivot().map((row) => ({
       date: new Date(row['Messages.date.' + granularity]),
       month: moment(row['Messages.date.' + granularity]).format('MMM'),
@@ -148,22 +146,20 @@ export function loadMessagesAndReactions() {
   );
 }
 
-const membersAndJoinsQuery = {
-  measures: ['Memberships.sum', 'Memberships.count'],
-  timeDimensions: [
-    {
-      dimension: 'Messages.date',
-      granularity: 'month',
-      dateRange: 'Last 365 days',
-    },
-  ],
-  order: { 'Messages.date': 'asc' },
-};
+export function loadMembersAndJoins(dateRange, granularity) {
+  const query = {
+    measures: ['Memberships.sum', 'Memberships.count'],
+    timeDimensions: [
+      {
+        dimension: 'Messages.date',
+        granularity,
+        dateRange,
+      },
+    ],
+    order: { 'Messages.date': 'asc' },
+  };
 
-export function loadMembersAndJoins() {
-  const granularity = membersAndJoinsQuery.timeDimensions[0].granularity;
-
-  return cubejsApi.load(membersAndJoinsQuery).then((result) =>
+  return cubejsApi.load(query).then((result) =>
     result.tablePivot().map((row) => ({
       date: new Date(row['Messages.date.' + granularity]),
       members: parseInt(row['Memberships.sum']),
@@ -172,22 +168,22 @@ export function loadMembersAndJoins() {
   );
 }
 
-const messagesByWeekdayQuery = {
-  measures: ['Messages.count'],
-  dimensions: ['Messages.day_of_week'],
-  timeDimensions: [
-    {
-      dimension: 'Messages.date',
-      granularity: 'month',
-      dateRange: 'Last 365 days',
-    },
-  ],
-  order: { 'Messages.day_of_week': 'asc' },
-};
+export function loadMessagesByWeekday(dateRange) {
+  const query = {
+    measures: ['Messages.count'],
+    dimensions: ['Messages.day_of_week'],
+    timeDimensions: [
+      {
+        dimension: 'Messages.date',
+        granularity: 'month',
+        dateRange,
+      },
+    ],
+    order: { 'Messages.day_of_week': 'asc' },
+  };
 
-export function loadMessagesByWeekday() {
-  const granularity = messagesByWeekdayQuery.timeDimensions[0].granularity;
-  return cubejsApi.load(messagesByWeekdayQuery).then((result) => {
+  const granularity = query.timeDimensions[0].granularity;
+  return cubejsApi.load(query).then((result) => {
     return result.tablePivot().map((row) => ({
       month: moment(row['Messages.date.' + granularity]).format('MMM'),
       weekday: moment().weekday(row['Messages.day_of_week']).format('dddd'),
@@ -196,14 +192,20 @@ export function loadMessagesByWeekday() {
   });
 }
 
-const messagesByHourQuery = {
-  measures: ['Messages.count'],
-  dimensions: ['Messages.hour', 'Messages.day_of_week'],
-  order: { 'Messages.day_of_week': 'asc', 'Messages.hour': 'asc' },
-};
+export function loadMessagesByHour(dateRange) {
+  const query = {
+    measures: ['Messages.count'],
+    dimensions: ['Messages.hour', 'Messages.day_of_week'],
+    timeDimensions: [
+      {
+        dimension: 'Messages.date',
+        dateRange,
+      },
+    ],
+    order: { 'Messages.day_of_week': 'asc', 'Messages.hour': 'asc' },
+  };
 
-export function loadMessagesByHour() {
-  return cubejsApi.load(messagesByHourQuery).then((result) => {
+  return cubejsApi.load(query).then((result) => {
     return result.tablePivot().map((row) => ({
       hour: row['Messages.hour'] + ':00',
       weekday: moment().weekday(row['Messages.day_of_week']).format('dddd'),
