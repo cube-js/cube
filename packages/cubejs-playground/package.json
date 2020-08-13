@@ -29,6 +29,7 @@
     "less": "^3.10.3",
     "less-loader": "^5.0.0",
     "moment": "^2.24.0",
+    "prettier": "^2.0.5",
     "prismjs": "^1.21.0",
     "prop-types": "^15.7.2",
     "ramda": "^0.27.0",
@@ -75,10 +76,9 @@
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
-    "prettier": "^2.0.5",
     "react-app-rewired": "^2.1.0",
     "recursive-readdir": "^2.2.2",
-    "terser-webpack-plugin": "^3.0.6"
+    "terser-webpack-plugin": "^4.1.0"
   },
   "resolutions": {
     "@babel/preset-env": "7.5.5"
