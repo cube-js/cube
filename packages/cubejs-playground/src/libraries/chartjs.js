@@ -59,19 +59,17 @@ const chartTypeToTemplate = {
     ))
   };
   const options = {};
-  return <Pie data={data} options={options} />;`
+  return <Pie data={data} options={options} />;`,
 };
 
-
-export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
+export const sourceCodeTemplate = ({ chartType, renderFnName }) =>
   `import { Line, Bar, Pie } from 'react-chartjs-2';
 
 const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
 
 const ${renderFnName} = ({ resultSet }) => {${chartTypeToTemplate[chartType]}
-};`
-);
+};`;
 
 export const imports = {
-  'react-chartjs-2': reactChartjs
+  'react-chartjs-2': reactChartjs,
 };

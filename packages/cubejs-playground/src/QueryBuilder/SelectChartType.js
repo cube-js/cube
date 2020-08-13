@@ -1,7 +1,14 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import { Menu } from 'antd';
-import { LineChartOutlined, AreaChartOutlined, BarChartOutlined, PieChartOutlined, TableOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import {
+  LineChartOutlined,
+  AreaChartOutlined,
+  BarChartOutlined,
+  PieChartOutlined,
+  TableOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
 import ButtonDropdown from './ButtonDropdown';
 
 const ChartTypes = [
@@ -10,13 +17,13 @@ const ChartTypes = [
   { name: 'bar', title: 'Bar', icon: <BarChartOutlined /> },
   { name: 'pie', title: 'Pie', icon: <PieChartOutlined /> },
   { name: 'table', title: 'Table', icon: <TableOutlined /> },
-  { name: 'number', title: 'Number', icon: <InfoCircleOutlined /> }
+  { name: 'number', title: 'Number', icon: <InfoCircleOutlined /> },
 ];
 
 const SelectChartType = ({ chartType, updateChartType }) => {
   const menu = (
     <Menu>
-      {ChartTypes.map(m => (
+      {ChartTypes.map((m) => (
         <Menu.Item key={m.title} onClick={() => updateChartType(m.name)}>
           {m.icon} {m.title}
         </Menu.Item>
@@ -24,7 +31,7 @@ const SelectChartType = ({ chartType, updateChartType }) => {
     </Menu>
   );
 
-  const foundChartType = ChartTypes.find(t => t.name === chartType);
+  const foundChartType = ChartTypes.find((t) => t.name === chartType);
   return (
     <ButtonDropdown overlay={menu} icon={foundChartType.icon}>
       {foundChartType.title}
@@ -34,7 +41,7 @@ const SelectChartType = ({ chartType, updateChartType }) => {
 
 SelectChartType.propTypes = {
   chartType: PropTypes.string.isRequired,
-  updateChartType: PropTypes.func.isRequired
+  updateChartType: PropTypes.func.isRequired,
 };
 
 export default SelectChartType;

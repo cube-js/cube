@@ -7,7 +7,15 @@ import Limit from './Limit';
 
 const { TabPane } = Tabs;
 
-export default function Settings({ pivotConfig, orderMembers, limit, onMove, onUpdate, onReorder, onOrderChange }) {
+export default function Settings({
+  pivotConfig,
+  orderMembers,
+  limit,
+  onMove,
+  onUpdate,
+  onReorder,
+  onOrderChange,
+}) {
   return (
     <Tabs style={{ width: 340 }}>
       <TabPane tab="Pivot" key="1">
@@ -17,11 +25,15 @@ export default function Settings({ pivotConfig, orderMembers, limit, onMove, onU
       <TabPane tab="Pivot Options" key="2">
         <Options pivotConfig={pivotConfig} onUpdate={onUpdate} />
       </TabPane>
-      
+
       <TabPane tab="Order" key="3">
-        <OrderGroup orderMembers={orderMembers} onReorder={onReorder} onOrderChange={onOrderChange} />
+        <OrderGroup
+          orderMembers={orderMembers}
+          onReorder={onReorder}
+          onOrderChange={onOrderChange}
+        />
       </TabPane>
-      
+
       <TabPane tab="Limit" key="4">
         <Limit limit={limit} onUpdate={onUpdate} />
       </TabPane>

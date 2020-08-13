@@ -10,9 +10,7 @@ import {
   SyncOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import {
-  Card, Button, Menu, Dropdown, notification, Modal
-} from 'antd';
+import { Card, Button, Menu, Dropdown, notification, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
@@ -24,45 +22,52 @@ import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 
-export const frameworks = [{
-  id: 'vanilla',
-  title: 'Vanilla JavaScript',
-  docsLink: 'https://cube.dev/docs/@cubejs-client-core'
-}, {
-  id: 'react',
-  title: 'React'
-}, {
-  id: 'angular',
-  title: 'Angular',
-  docsLink: 'https://cube.dev/docs/@cubejs-client-ngx'
-}, {
-  id: 'vue',
-  title: 'Vue.js',
-  docsLink: 'https://cube.dev/docs/@cubejs-client-vue'
-}];
+export const frameworks = [
+  {
+    id: 'vanilla',
+    title: 'Vanilla JavaScript',
+    docsLink: 'https://cube.dev/docs/@cubejs-client-core',
+  },
+  {
+    id: 'react',
+    title: 'React',
+  },
+  {
+    id: 'angular',
+    title: 'Angular',
+    docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
+  },
+  {
+    id: 'vue',
+    title: 'Vue.js',
+    docsLink: 'https://cube.dev/docs/@cubejs-client-vue',
+  },
+];
 
 class ChartContainer extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       showCode: false,
-      framework: 'react'
+      framework: 'react',
     };
   }
 
   async componentDidMount() {
-    const {
-      codeSandboxSource,
-      dependencies
-    } = this.props;
-    const codeSandboxRes = await fetch('https://codesandbox.io/api/v1/sandboxes/define?json=1', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify(this.codeSandboxDefinition(codeSandboxSource, dependencies))
-    });
+    const { codeSandboxSource, dependencies } = this.props;
+    const codeSandboxRes = await fetch(
+      'https://codesandbox.io/api/v1/sandboxes/define?json=1',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(
+          this.codeSandboxDefinition(codeSandboxSource, dependencies)
+        ),
+      }
+    );
     const codeSandboxJson = await codeSandboxRes.json();
     this.setState({ sandboxId: codeSandboxJson.sandbox_id });
   }
@@ -70,27 +75,33 @@ class ChartContainer extends React.Component {
   codeSandboxDefinition(codeSandboxSource, dependencies) {
     return {
       files: {
-        ...(typeof codeSandboxSource === 'string' ? {
-          'index.js': {
-            content: codeSandboxSource,
-          }
-        } : codeSandboxSource),
+        ...(typeof codeSandboxSource === 'string'
+          ? {
+              'index.js': {
+                content: codeSandboxSource,
+              },
+            }
+          : codeSandboxSource),
         'package.json': {
           content: {
             dependencies: {
               'react-dom': 'latest',
-              ...map(() => 'latest', dependencies)
-            }
+              ...map(() => 'latest', dependencies),
+            },
           },
         },
       },
-      template: 'create-react-app'
+      template: 'create-react-app',
     };
   }
 
   render() {
     const {
-      redirectToDashboard, showCode, sandboxId, addingToDashboard, framework
+      redirectToDashboard,
+      showCode,
+      sandboxId,
+      addingToDashboard,
+      framework,
     } = this.state;
     const {
       resultSet,
@@ -106,14 +117,16 @@ class ChartContainer extends React.Component {
       chartLibrary,
       setChartLibrary,
       chartLibraries,
-      history
+      history,
     } = this.props;
 
     if (redirectToDashboard) {
       return <Redirect to="/dashboard" />;
     }
 
-    const parameters = getParameters(this.codeSandboxDefinition(codeSandboxSource, dependencies));
+    const parameters = getParameters(
+      this.codeSandboxDefinition(codeSandboxSource, dependencies)
+    );
 
     const chartLibrariesMenu = (
       <Menu
@@ -122,13 +135,9 @@ class ChartContainer extends React.Component {
           setChartLibrary(e.key);
         }}
       >
-        {
-          chartLibraries.map(library => (
-            <Menu.Item key={library.value}>
-              {library.title}
-            </Menu.Item>
-          ))
-        }
+        {chartLibraries.map((library) => (
+          <Menu.Item key={library.value}>{library.title}</Menu.Item>
+        ))}
       </Menu>
     );
 
@@ -139,20 +148,22 @@ class ChartContainer extends React.Component {
           this.setState({ framework: e.key });
         }}
       >
-        {
-          frameworks.map(f => (
-            <Menu.Item key={f.id}>
-              {f.title}
-            </Menu.Item>
-          ))
-        }
+        {frameworks.map((f) => (
+          <Menu.Item key={f.id}>{f.title}</Menu.Item>
+        ))}
       </Menu>
     );
 
-    const currentLibraryItem = chartLibraries.find(m => m.value === chartLibrary);
-    const frameworkItem = frameworks.find(m => m.id === framework);
+    const currentLibraryItem = chartLibraries.find(
+      (m) => m.value === chartLibrary
+    );
+    const frameworkItem = frameworks.find((m) => m.id === framework);
     const extra = (
-      <form action="https://codesandbox.io/api/v1/sandboxes/define" method="POST" target="_blank">
+      <form
+        action="https://codesandbox.io/api/v1/sandboxes/define"
+        method="POST"
+        target="_blank"
+      >
         <input type="hidden" name="parameters" value={parameters} />
         <Button.Group>
           {dashboardSource && (
@@ -163,12 +174,16 @@ class ChartContainer extends React.Component {
                 if (typeof canAddChart === 'boolean' && canAddChart) {
                   playgroundAction('Add to Dashboard');
                   await dashboardSource.addChart(codeExample);
-                  this.setState({ redirectToDashboard: true, addingToDashboard: false });
+                  this.setState({
+                    redirectToDashboard: true,
+                    addingToDashboard: false,
+                  });
                 } else if (!canAddChart) {
                   this.setState({ addingToDashboard: false });
                   Modal.error({
-                    title: 'Your dashboard app does not support adding of static charts',
-                    content: 'Please use static dashboard template'
+                    title:
+                      'Your dashboard app does not support adding of static charts',
+                    content: 'Please use static dashboard template',
                   });
                 } else {
                   this.setState({ addingToDashboard: false });
@@ -179,7 +194,7 @@ class ChartContainer extends React.Component {
                     okCancel: true,
                     onOk() {
                       history.push('/dashboard');
-                    }
+                    },
                   });
                 }
               }}
@@ -188,7 +203,9 @@ class ChartContainer extends React.Component {
               loading={addingToDashboard}
               disabled={!!frameworkItem.docsLink}
             >
-              {addingToDashboard ? 'Preparing dashboard app. It may take a while. Please check console for progress...' : 'Add to Dashboard'}
+              {addingToDashboard
+                ? 'Preparing dashboard app. It may take a while. Please check console for progress...'
+                : 'Add to Dashboard'}
             </Button>
           )}
           <Dropdown overlay={frameworkMenu}>
@@ -201,9 +218,7 @@ class ChartContainer extends React.Component {
             overlay={chartLibrariesMenu}
             disabled={!!frameworkItem.docsLink}
           >
-            <Button
-              size="small"
-            >
+            <Button size="small">
               {currentLibraryItem && currentLibraryItem.title}
               <DownOutlined />
             </Button>
@@ -211,7 +226,9 @@ class ChartContainer extends React.Component {
           <Button
             onClick={() => {
               playgroundAction('Show Query');
-              this.setState({ showCode: showCode === 'query' ? null : 'query' });
+              this.setState({
+                showCode: showCode === 'query' ? null : 'query',
+              });
             }}
             icon={<ThunderboltOutlined />}
             size="small"
@@ -247,7 +264,9 @@ class ChartContainer extends React.Component {
           <Button
             onClick={() => {
               playgroundAction('Show Cache');
-              this.setState({ showCode: showCode === 'cache' ? null : 'cache' });
+              this.setState({
+                showCode: showCode === 'cache' ? null : 'cache',
+              });
             }}
             icon={<SyncOutlined />}
             size="small"
@@ -278,13 +297,15 @@ class ChartContainer extends React.Component {
             We do not support&nbsp;
             {frameworkItem.title}
             &nbsp;code generation here yet.
-            < br/>
+            <br />
             Please refer to&nbsp;
             <a
               href={frameworkItem.docsLink}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => playgroundAction('Unsupported Framework Docs', { framework })}
+              onClick={() =>
+                playgroundAction('Unsupported Framework Docs', { framework })
+              }
             >
               {frameworkItem.title}
               &nbsp;docs
@@ -302,16 +323,15 @@ class ChartContainer extends React.Component {
             loadSql="only"
             query={query}
             cubejsApi={cubejsApi}
-            render={({ sqlQuery }) => <PrismCode code={sqlQuery && sqlFormatter.format(sqlQuery.sql())} />}
+            render={({ sqlQuery }) => (
+              <PrismCode
+                code={sqlQuery && sqlFormatter.format(sqlQuery.sql())}
+              />
+            )}
           />
         );
       } else if (showCode === 'cache') {
-        return (
-          <CachePane
-            query={query}
-            cubejsApi={cubejsApi}
-          />
-        );
+        return <CachePane query={query} cubejsApi={cubejsApi} />;
       }
       return render({ resultSet, error, sandboxId });
     };
@@ -321,17 +341,19 @@ class ChartContainer extends React.Component {
     const copyCodeToClipboard = async () => {
       if (!navigator.clipboard) {
         notification.error({
-          message: 'Your browser doesn\'t support copy to clipboard'
+          message: "Your browser doesn't support copy to clipboard",
         });
       }
       try {
-        await navigator.clipboard.writeText(showCode === 'query' ? queryText : codeExample);
+        await navigator.clipboard.writeText(
+          showCode === 'query' ? queryText : codeExample
+        );
         notification.success({
-          message: 'Copied to clipboard'
+          message: 'Copied to clipboard',
         });
       } catch (e) {
         notification.error({
-          message: 'Can\'t copy to clipboard',
+          message: "Can't copy to clipboard",
           description: e,
         });
       }
@@ -369,12 +391,10 @@ class ChartContainer extends React.Component {
       title = 'Chart';
     }
 
-    return hideActions ? render({ resultSet, error, sandboxId }) : (
-      <Card
-        title={title}
-        style={{ minHeight: 420 }}
-        extra={extra}
-      >
+    return hideActions ? (
+      render({ resultSet, error, sandboxId })
+    ) : (
+      <Card title={title} style={{ minHeight: 420 }} extra={extra}>
         {renderChart()}
       </Card>
     );
@@ -395,7 +415,7 @@ ChartContainer.propTypes = {
   history: PropTypes.object.isRequired,
   chartLibrary: PropTypes.string.isRequired,
   setChartLibrary: PropTypes.func.isRequired,
-  chartLibraries: PropTypes.array.isRequired
+  chartLibraries: PropTypes.array.isRequired,
 };
 
 ChartContainer.defaultProps = {
@@ -406,7 +426,7 @@ ChartContainer.defaultProps = {
   codeSandboxSource: null,
   codeExample: null,
   error: null,
-  resultSet: null
+  resultSet: null,
 };
 
 export default withRouter(ChartContainer);
