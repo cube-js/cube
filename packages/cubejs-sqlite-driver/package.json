@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/sqlite-driver",
   "description": "Cube.js Sqlite database driver",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "version": "0.19.61",
   "repository": {
     "type": "git",

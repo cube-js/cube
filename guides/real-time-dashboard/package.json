@@ -2,7 +2,7 @@
   "name": "cubejs-guides-real-time-dashboard",
   "description": "Real Time Dashboard Guide with Cube.js",
   "version": "0.0.1",
-  "author": "Statsbot, Inc.",
+  "author": "Cube Dev, Inc.",
   "dependencies": {
     "gatsby": "^2.15.28",
     "gatsby-image": "^2.2.23",
