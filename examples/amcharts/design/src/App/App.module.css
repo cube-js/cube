@@ -14,6 +14,13 @@
   text-align: center;
 }
 
+.controls span {
+  cursor: pointer;
+  color: var(--color-link);
+  display: inline-block;
+  border-bottom: 1px dashed;
+}
+
 .block {
   background-color: var(--color-bg-sidebar);
   border: 1px solid var(--color-border);
@@ -37,4 +44,29 @@
 
 .column {
   width: 50%;
+}
+
+.dropdown {
+  background-color: var(--color-bg-sidebar);
+  border: 1px solid var(--color-border);
+  padding: 1rem;
+  max-height: 200px;
+  overflow-y: scroll;
+}
+
+.dropdownItem {
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.dropdownItemChannel:before {
+  color: var(--color-fg-secondary);
+  content: '#';
+  display: inline-block;
+  font-weight: 400;
+  opacity: 0.6;
+  width: 0.8em;
 }

@@ -5,6 +5,7 @@
   "dependencies": {
     "@amcharts/amcharts4": "^4.9.34",
     "@cubejs-client/core": "^0.19.56",
+    "antd": "^4.5.4",
     "moment": "^2.27.0",
     "node-emoji": "^1.10.0",
     "prop-types": "^15.7.2",

@@ -1,55 +1,56 @@
 @import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400;1,700&display=swap');
 
 :root {
-    --color-fg-secondary: #616061;
-    --color-bg: rgb(248, 248, 248);
-    --color-bg-sidebar: #fff;
-    --color-bg-image: #ddd;
-    --color-border: #ddd;
-    --color-red: rgb(240, 76, 88);
-    --color-green: rgb(0, 122, 90);
-    --color-blue: rgb(29, 155, 209);
-    --color-purple: rgb(127, 90, 200);
+  --color-fg-secondary: #616061;
+  --color-bg: rgb(248, 248, 248);
+  --color-bg-sidebar: #fff;
+  --color-bg-image: #ddd;
+  --color-border: #ddd;
+  --color-red: rgb(240, 76, 88);
+  --color-green: rgb(0, 122, 90);
+  --color-blue: rgb(29, 155, 209);
+  --color-purple: rgb(127, 90, 200);
+  --color-link: #1264a3;
 }
 
 body {
-    margin: 0;
-    font-family: 'Lato', appleLogo, sans-serif;
-    font-size: 18px;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  font-family: 'Lato', appleLogo, sans-serif;
+  font-size: 18px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ul {
-    margin: 0;
+  margin: 0;
 }
 
 h1 {
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 2.5rem;
-    letter-spacing: -1px;
-    margin: 0 0 1rem;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 2.5rem;
+  letter-spacing: -1px;
+  margin: 0 0 1rem;
 }
 
 h2 {
-    font-weight: 900;
-    color: #1d1c1d;
-    font-size: 20px;
-    line-height: 1.2;
-    margin: 0 0 1rem;
+  font-weight: 900;
+  color: #1d1c1d;
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 0 0 1rem;
 }
 
 p {
-    margin: 0.5em 0;
+  margin: 0.5em 0;
 }
 
 a {
-    border-bottom: solid 1px var(--color-border);
-    color: inherit;
-    text-decoration: none;
+  border-bottom: solid 1px var(--color-border);
+  color: inherit;
+  text-decoration: none;
 }
 
 a:hover {
-    border-color: inherit;
+  border-color: inherit;
 }

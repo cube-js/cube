@@ -130,18 +130,32 @@ const messagesAndReactionsQuery = {
   order: { 'Messages.date': 'asc' },
 };
 
-export function loadMessagesAndReactions() {
+export function loadMessagesAndReactions(filter) {
   const granularity = messagesAndReactionsQuery.timeDimensions[0].granularity;
-
-  return cubejsApi.load(messagesAndReactionsQuery).then((result) =>
-    result.tablePivot().map((row) => ({
-      date: new Date(row['Messages.date.' + granularity]),
-      month: moment(row['Messages.date.' + granularity]).format('MMM'),
-      weekday: moment(row['Messages.date.' + granularity]).format('dddd'),
-      messages: parseInt(row['Messages.count']),
-      reactions: parseInt(row['Reactions.count']),
-    }))
-  );
+  return cubejsApi
+    .load({
+      ...messagesAndReactionsQuery,
+      ...(filter
+        ? {
+            filters: [
+              {
+                member: 'Channels.name',
+                operator: 'equals',
+                values: [filter],
+              },
+            ],
+          }
+        : {}),
+    })
+    .then((result) =>
+      result.tablePivot().map((row) => ({
+        date: new Date(row['Messages.date.' + granularity]),
+        month: moment(row['Messages.date.' + granularity]).format('MMM'),
+        weekday: moment(row['Messages.date.' + granularity]).format('dddd'),
+        messages: parseInt(row['Messages.count']),
+        reactions: parseInt(row['Reactions.count']),
+      }))
+    );
 }
 
 const membersAndJoinsQuery = {
