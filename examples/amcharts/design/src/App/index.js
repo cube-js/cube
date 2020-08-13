@@ -3,27 +3,43 @@ import {
   loadChannelsWithReactions,
   loadMembersAndJoins,
   loadMembersWithReactions,
-  loadMessagesAndReactions
-} from "../api";
+  loadMessagesAndReactions,
+  loadMessagesByWeekday,
+  loadMessagesByHour,
+  loadMessagesByChannel,
+  loadMembersByChannel,
+} from '../api';
 import styles from './App.module.css';
-import MemberList from "../MemberList"
-import ChannelList from "../ChannelList"
-import Header from "../Header"
-import Banner from "../Banner"
-import MessagesChart from "../MessagesChart"
-import MembersChart from "../MembersChart"
+import MemberList from '../MemberList';
+import ChannelList from '../ChannelList';
+import Header from '../Header';
+import Banner from '../Banner';
+import MessagesChart from '../MessagesChart';
+import MembersChart from '../MembersChart';
+import WeekChart from '../WeekChart';
+import HourChart from '../HourChart';
+import MapChart from '../MapChart';
+import ChannelChart from '../ChannelChart';
 
 function App() {
-  const [ membersList, setMembersList ] = useState([]);
-  const [ channelsList, setChannelsList ] = useState([]);
-  const [ messages, setMessages ] = useState([]);
-  const [ members, setMembers ] = useState([]);
+  const [membersList, setMembersList] = useState([]);
+  const [channelsList, setChannelsList] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [messagesByWeekday, setMessagesByWeekday] = useState([]);
+  const [messagesByHour, setMessagesByHour] = useState([]);
+  const [messagesByChannel, setMessagesByChannel] = useState([]);
+  const [membersByChannel, setMembersByChannel] = useState([]);
 
   useEffect(() => {
     loadMembersWithReactions().then(setMembersList);
     loadChannelsWithReactions().then(setChannelsList);
     loadMessagesAndReactions().then(setMessages);
     loadMembersAndJoins().then(setMembers);
+    loadMessagesByWeekday().then(setMessagesByWeekday);
+    loadMessagesByHour().then(setMessagesByHour);
+    loadMessagesByChannel().then(setMessagesByChannel);
+    loadMembersByChannel().then(setMembersByChannel);
   }, []);
 
   return (
@@ -35,17 +51,19 @@ function App() {
         </div>
         <MessagesChart data={messages} />
         <MembersChart data={members} />
-        <div className={styles.block}>
-          <h2>Messages by day of week</h2>
-          <div>Chart here…</div>
-        </div>
-        <div className={styles.block}>
-          <h2>Messages by hour</h2>
-          <div>Chart here…</div>
-        </div>
-        <div className={styles.block}>
-          <h2>Members by time zone</h2>
-          <div>Chart here…</div>
+        <WeekChart data={messagesByWeekday} />
+        <HourChart data={messagesByHour} />
+        <MapChart data={messagesByWeekday} />
+        <div className={styles.row}>
+          <div className={styles.column}>
+            <ChannelChart
+              title='Messages by channel'
+              data={messagesByChannel}
+            />
+          </div>
+          <div className={styles.column}>
+            <ChannelChart title='Members by channel' data={membersByChannel} />
+          </div>
         </div>
       </div>
       <div className={styles.sidebar}>

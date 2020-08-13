@@ -11,10 +11,11 @@ class LineChart extends Component {
   }
 
   componentDidMount() {
-    const { options } = this.props
+    const { options } = this.props;
 
     const chart = am4core.create(this.state.id, am4charts.XYChart);
 
+    chart.maskBullets = false;
     const yAxis = chart.yAxes.push(new am4charts.ValueAxis());
     yAxis.fontSize = '11px';
     yAxis.fontWeight = '400';
@@ -24,13 +25,16 @@ class LineChart extends Component {
     dateAxis.fontSize = '11px';
     dateAxis.fontWeight = '400';
     dateAxis.renderer.labels.template.fill = am4core.color('#616061');
-    dateAxis.gridIntervals.setAll([ { timeUnit: "month", count: 1 } ]);
-    dateAxis.renderer.grid.template.location = 0.5;
+    dateAxis.gridIntervals.setAll([{ timeUnit: 'month', count: 1 }]);
     dateAxis.dateFormats.setKey('month', 'MMM\nYYYY');
     dateAxis.periodChangeDateFormats.setKey('month', 'MMM\nYYYY');
+    dateAxis.renderer.grid.template.location = 0.5;
+    dateAxis.renderer.labels.template.location = 0.5;
+    dateAxis.startLocation = 0.5;
+    dateAxis.endLocation = 0.5;
 
     for (const option of options) {
-      const series = chart.series.push(new am4charts.LineSeries())
+      const series = chart.series.push(new am4charts.LineSeries());
       series.stroke = am4core.color(option.color);
       series.dataFields.valueY = option.y;
       series.dataFields.dateX = option.x;
@@ -41,7 +45,7 @@ class LineChart extends Component {
       bullet.circle.strokeWidth = 2;
       bullet.circle.radius = 3;
       bullet.circle.stroke = am4core.color(option.color);
-      bullet.circle.fill = am4core.color("#fff");
+      bullet.circle.fill = am4core.color('#fff');
     }
 
     this.chart = chart;
@@ -70,5 +74,5 @@ export default LineChart;
 
 LineChart.propTypes = {
   data: PropTypes.arrayOf(PropTypes.object).isRequired,
-  options: PropTypes.arrayOf(PropTypes.object).isRequired
-}
+  options: PropTypes.arrayOf(PropTypes.object).isRequired,
+};
