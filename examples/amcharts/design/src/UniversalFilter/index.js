@@ -46,10 +46,10 @@ export default function UniversalFilter(props) {
           <div className={styles.close} onClick={onClose} />
         </div>
         <ul className={styles.list}>
-          {renderPeriods(props, filter.toLowerCase())}
-          {renderGranularities(props, filter.toLowerCase())}
           {renderMembers(props, filter.toLowerCase())}
           {renderChannels(props, filter.toLowerCase())}
+          {renderPeriods(props, filter.toLowerCase())}
+          {renderGranularities(props, filter.toLowerCase())}
         </ul>
       </div>
     </div>
@@ -76,7 +76,7 @@ function renderPeriods(props, filter) {
       className={styles.item}
       onClick={() => onSelect(row.toLowerCase(), granularity, channel, member)}
     >
-      <span className={styles.sign}>Date</span>
+      <span className={styles.sign}>When</span>
       <span className={styles.main}>{row}</span>
     </li>
   ))
@@ -102,13 +102,13 @@ function renderGranularities(props, filter) {
 }
 
 function renderMembers(props, filter) {
-  const { period, granularity, members, channel, onSelect } = props;
+  const { period, granularity, members, member, channel, onSelect } = props;
 
   const items = filter
     ? members.filter(item => findByWordStart(item.name, filter)).slice(0, localLimit)
     : members.slice(0, localLimit);
 
-  return items.map(row => (
+  const list = items.map(row => (
     <li
       key={row.name}
       className={styles.item}
@@ -118,16 +118,32 @@ function renderMembers(props, filter) {
       <span className={styles.main}>{row.name}</span>
     </li>
   ))
+
+  const clearItem = member && (
+    <li
+      key='clear-item'
+      className={styles.item}
+      onClick={() => onSelect(period, granularity, channel, null)}
+    >
+      <span className={styles.sign}>#</span>
+      <span className={styles.clear}>All Members</span>
+    </li>
+  );
+
+  return [
+    ...[clearItem],
+    ...list
+  ];
 }
 
 function renderChannels(props, filter) {
-  const { period, granularity, channels, member, onSelect } = props;
+  const { period, granularity, channels, member, channel, onSelect } = props;
 
   const items = filter
     ? channels.filter(item => findByWordStart(item.name, filter)).slice(0, localLimit)
     : channels.slice(0, localLimit);
 
-  return items.map(row => (
+  const list = items.map(row => (
     <li
       key={row.name}
       className={styles.item}
@@ -137,6 +153,22 @@ function renderChannels(props, filter) {
       <span className={styles.main}>{row.name}</span>
     </li>
   ))
+
+  const clearItem = channel && (
+    <li
+      key='clear-item'
+      className={styles.item}
+      onClick={() => onSelect(period, granularity, null, member)}
+    >
+      <span className={styles.sign}>#</span>
+      <span className={styles.clear}>All Channels</span>
+    </li>
+  );
+
+  return [
+    ...[clearItem],
+    ...list
+  ];
 }
 
 UniversalFilter.propTypes = {

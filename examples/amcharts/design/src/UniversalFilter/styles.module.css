@@ -88,3 +88,8 @@
 .main {
   font-weight: bold;
 }
+
+.clear {
+  color: var(--color-fg-secondary);
+  font-weight: bold;
+}
