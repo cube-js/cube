@@ -356,7 +356,7 @@ class ResultSet {
         yValuesArray: unnest(pivots.map((pivot, responseIndex) => {
           const [{ dateRange }] = this.loadResponses[responseIndex].query.timeDimensions;
 
-          return pivot[index].yValuesArray.map(([members, measure]) => [[dateRange.join(', ')].concat(members), measure]);
+          return pivot[index].yValuesArray.map(([members, measure]) => [[dateRange.join(' - ')].concat(members), measure]);
         }))
       };
     });
@@ -378,13 +378,13 @@ class ResultSet {
     };
     
     return this.mergedPivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
-      category: this.axisValuesString(xValues, ', '), // TODO deprecated
-      x: this.axisValuesString(xValues, ', '),
+      category: this.axisValuesString(xValues, ','), // TODO deprecated
+      x: this.axisValuesString(xValues, ','),
       xValues,
       ...(
         yValuesArray
           .map(([yValues, m]) => ({
-            [this.axisValuesString(yValues, ', ')]: m && validate(m),
+            [this.axisValuesString(yValues, ',')]: m && validate(m),
           }))
           .reduce((a, b) => Object.assign(a, b), {})
       )
@@ -400,7 +400,7 @@ class ResultSet {
         .map((key, index) => [key, xValues[index]])
         .concat(
           isMeasuresPresent ? yValuesArray.map(([yValues, measure]) => [
-            yValues.length ? yValues.join(', ') : 'value',
+            yValues.length ? yValues.join() : 'value',
             measure
           ]) : []
         )
@@ -465,7 +465,7 @@ class ResultSet {
           return {
             ...fields,
             key,
-            dataIndex: [...path, key].join(', '),
+            dataIndex: [...path, key].join(),
             title: [title, dimensionValue].join(' ').trim(),
             shortTitle: dimensionValue || shortTitle,
           };
@@ -537,7 +537,7 @@ class ResultSet {
           map(this.axisValues(pivotConfig.y)),
           unnest,
           uniq,
-          map((values) => [dateRange.join(', ')].concat(values))
+          map((values) => [dateRange.join(' - ')].concat(values))
         )(
           this.timeDimensionBackwardCompatibleData(index)
         );
@@ -558,7 +558,7 @@ class ResultSet {
           ) :
           axisValues, ', '
       ),
-      key: this.axisValuesString(axisValues),
+      key: this.axisValuesString(axisValues, ','),
       yValues: axisValues
     }));
   }

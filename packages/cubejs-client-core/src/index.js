@@ -187,7 +187,7 @@ class CubejsApi {
   sql(query, options, callback) {
     return this.loadMethod(
       () => this.request('sql', { query }),
-      (body) => new SqlQuery(body),
+      (response) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
       options,
       callback
     );

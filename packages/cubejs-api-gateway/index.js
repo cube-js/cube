@@ -146,7 +146,7 @@ const querySchema = Joi.object().keys({
       Joi.string()
     ],
     compareDateRange: Joi.array()
-  }).xor('dateRange', 'compareDateRange')),
+  }).oxor('dateRange', 'compareDateRange')),
   order: Joi.alternatives(
     Joi.object().pattern(id, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
@@ -435,7 +435,6 @@ class ApiGateway {
         type: 'Load Request',
         query
       });
-      const loadRequestSQLStarted = new Date();
       const normalizedQueries = await this.getNormalizedQueries(query, context);
       
       const [metaConfigResult, ...sqlQueries] = await Promise.all(
@@ -443,6 +442,7 @@ class ApiGateway {
           this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
         ].concat(normalizedQueries.map(
           async (normalizedQuery, index) => {
+            const loadRequestSQLStarted = new Date();
             const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
             
             this.log(context, {
