@@ -36,6 +36,7 @@
   background-color: var(--color-bg-sidebar);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   padding: 4rem 2rem;
+  min-width: 350px;
 }
 
 .row {
