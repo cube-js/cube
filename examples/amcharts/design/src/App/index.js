@@ -7,8 +7,8 @@ import {
   loadMessagesAndReactions,
   loadMessagesByWeekday,
   loadMessagesByHour,
-  loadMessagesByChannel,
-  loadMembersByChannel,
+  // loadMessagesByChannel,
+  // loadMembersByChannel,
 } from '../api';
 import styles from './styles.module.css';
 import MemberList from '../MemberList';
@@ -43,8 +43,8 @@ function App() {
   const [members, setMembers] = useState([]);
   const [messagesByWeekday, setMessagesByWeekday] = useState([]);
   const [messagesByHour, setMessagesByHour] = useState([]);
-  const [messagesByChannel, setMessagesByChannel] = useState([]);
-  const [membersByChannel, setMembersByChannel] = useState([]);
+  // const [messagesByChannel, setMessagesByChannel] = useState([]);
+  // const [membersByChannel, setMembersByChannel] = useState([]);
 
   const [chosenChannel, setChosenChannel] = useState(null);
   const [chosenMember, setChosenMember] = useState(null);
@@ -59,10 +59,10 @@ function App() {
     loadChannelsWithReactions().then(setChannelsList);
     loadMessagesAndReactions(period, granularity, chosenChannel, chosenMember).then(setMessages);
     loadMembersAndJoins(period, granularity, chosenChannel, chosenMember).then(setMembers);
-    loadMessagesByWeekday(period).then(setMessagesByWeekday);
-    loadMessagesByHour(period).then(setMessagesByHour);
-    loadMessagesByChannel().then(setMessagesByChannel);
-    loadMembersByChannel().then(setMembersByChannel);
+    loadMessagesByWeekday(period, chosenChannel, chosenMember).then(setMessagesByWeekday);
+    loadMessagesByHour(period, chosenChannel, chosenMember).then(setMessagesByHour);
+    // loadMessagesByChannel().then(setMessagesByChannel);
+    // loadMembersByChannel().then(setMembersByChannel);
   }, [
     period,
     granularity,
@@ -103,21 +103,21 @@ function App() {
           />}
         </div>
         <MessagesChart data={messages} granularity={granularity} />
-        <MembersChart data={members} />
+        {!chosenMember && <MembersChart data={members} />}
         {period !== 'last week' && <WeekChart data={messagesByWeekday} />}
         <HourChart data={messagesByHour} />
         <MapChart data={messagesByWeekday} />
-        <div className={styles.row}>
-          <div className={styles.column}>
-            <ChannelChart
-              title='Messages by channel'
-              data={messagesByChannel}
-            />
-          </div>
-          <div className={styles.column}>
-            <ChannelChart title='Members by channel' data={membersByChannel} />
-          </div>
-        </div>
+        {/*<div className={styles.row}>*/}
+        {/*  <div className={styles.column}>*/}
+        {/*    <ChannelChart*/}
+        {/*      title='Messages by channel'*/}
+        {/*      data={messagesByChannel}*/}
+        {/*    />*/}
+        {/*  </div>*/}
+        {/*  <div className={styles.column}>*/}
+        {/*    <ChannelChart title='Members by channel' data={membersByChannel} />*/}
+        {/*  </div>*/}
+        {/*</div>*/}
       </div>
       <div className={styles.sidebar}>
         <Banner />

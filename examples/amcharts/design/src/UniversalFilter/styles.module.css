@@ -93,3 +93,7 @@
   color: var(--color-fg-secondary);
   font-weight: bold;
 }
+
+.clear:hover {
+  color: #fff;
+}

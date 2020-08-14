@@ -189,7 +189,7 @@ export function loadMembersAndJoins(dateRange, granularity, channel, member) {
   );
 }
 
-export function loadMessagesByWeekday(dateRange) {
+export function loadMessagesByWeekday(dateRange, channel, member) {
   const query = {
     measures: ['Messages.count'],
     dimensions: ['Messages.day_of_week'],
@@ -200,6 +200,7 @@ export function loadMessagesByWeekday(dateRange) {
         dateRange,
       },
     ],
+    filters: createFilters(channel, member),
     order: { 'Messages.day_of_week': 'asc' },
   };
 
@@ -213,7 +214,7 @@ export function loadMessagesByWeekday(dateRange) {
   });
 }
 
-export function loadMessagesByHour(dateRange) {
+export function loadMessagesByHour(dateRange, channel, member) {
   const query = {
     measures: ['Messages.count'],
     dimensions: ['Messages.hour', 'Messages.day_of_week'],
@@ -223,6 +224,7 @@ export function loadMessagesByHour(dateRange) {
         dateRange,
       },
     ],
+    filters: createFilters(channel, member),
     order: { 'Messages.day_of_week': 'asc', 'Messages.hour': 'asc' },
   };
 

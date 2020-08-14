@@ -132,7 +132,7 @@ function renderMembers(props, filter) {
       className={styles.item}
       onClick={() => onSelect(period, granularity, channel, null)}
     >
-      <span className={styles.sign}>#</span>
+      <span className={styles.sign}>@</span>
       <span className={styles.clear}>All Members</span>
     </li>
   );
