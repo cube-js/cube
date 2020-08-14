@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import styles from './ChannelList.module.css';
+import styles from './styles.module.css';
 
 export default function ChannelList(props) {
   const { data, limit, onShow } = props;
@@ -8,6 +8,8 @@ export default function ChannelList(props) {
   const channels = limit
     ? data.slice(0, limit)
     : data.slice().sort((a, b) => a.name.localeCompare(b.name));
+
+  if (!channels.length) return null;
 
   return (
     <div className={styles.root}>

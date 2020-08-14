@@ -1,4 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+@font-face {
+  font-family: 'Lato';
+  font-weight: 400;
+  src: url('/LatoLatin-Regular.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Lato';
+  font-weight: 700;
+  src: url('/LatoLatin-Bold.woff') format('woff');
+}
 
 :root {
   --color-fg-secondary: #616061;

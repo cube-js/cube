@@ -49,12 +49,9 @@
   width: 34px;
 }
 
-.avatar {
-  background-color: var(--color-bg-image);
-  border-radius: 4px;
-  height: 34px;
-  min-width: 34px;
-  width: 34px;
+.admin {
+  color: var(--color-red);
+  cursor: help;
 }
 
 .name {
@@ -63,21 +60,12 @@
   line-height: 1.2;
 }
 
-.name:before {
-  color: var(--color-fg-secondary);
-  content: '#';
-  display: inline-block;
-  font-weight: 400;
-  opacity: .6;
-  width: 0.8em;
-}
-
 .title {
   color: var(--color-fg-secondary);
   font-size: 13px;
   line-height: 1.2;
   margin-top: 3px;
-  max-width: 200px;
+  max-width: 175px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

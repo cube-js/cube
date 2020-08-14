@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import styles from './MemberList.module.css';
+import styles from './styles.module.css';
 
 export default function MemberList(props) {
   const { data, limit, onShow } = props;
@@ -8,6 +8,8 @@ export default function MemberList(props) {
   const members = limit
     ? data.slice(0, limit)
     : data.slice().sort((a, b) => a.name.localeCompare(b.name));
+
+  if (!members.length) return null;
 
   return (
     <div className={styles.root}>
