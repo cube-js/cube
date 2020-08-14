@@ -87,7 +87,6 @@ function App() {
             channel={chosenChannel}
             member={chosenMember}
             onSelect={(period, granularity, channel, member) => {
-              console.log(period, granularity, channel, member);
               setPeriod(period);
               setGranularity(granularity);
               setChosenChannel(channel);
@@ -145,7 +144,11 @@ function renderHeader(period, granularity, member, channel, onClick) {
   const granularityPart = <>by <span className={styles.filtered}>{granularity}</span></>
 
   return (
-    <h2 className={styles.filter} onClick={onClick}>
+    <h2
+      className={styles.filter}
+      title='Press Cmd+K or Ctrl+K to toggle filter'
+      onClick={onClick}
+    >
       Activity {memberPart} {channelPart} {periodPart} {granularityPart}
     </h2>
   )
