@@ -63,7 +63,7 @@
 .item {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 3.25em auto;
+  grid-template-columns: 2.25em auto;
   grid-gap: 12px;
   font-size: 16px;
   height: 40px;

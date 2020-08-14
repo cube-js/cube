@@ -33,7 +33,7 @@ export default function UniversalFilter(props) {
     <div className={styles.wrapper}>
       <div className={styles.root}>
         <div className={styles.input}>
-          <div className={styles.greeting}>Jump to:</div>
+          <div className={styles.greeting}>Filter:</div>
           <div className={styles.control}>
             <input
               type='text'
