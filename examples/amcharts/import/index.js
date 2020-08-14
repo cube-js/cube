@@ -107,7 +107,8 @@ async function importUsers(runQuery, users) {
             user.deleted,
             user.real_name,
             user.profile.image_512,
-            user.is_admin
+            user.is_admin,
+            user.tz
         ]);
     }
 }

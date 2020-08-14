@@ -39,8 +39,11 @@ cube(`Users`, {
         },
         is_admin: {
             sql: `is_admin`,
-            type: `boolean`
-        }
+            type: `boolean`,
+        tz: {
+            sql: `tz`,
+            type: `string`
+        },
     },
 
     segments: {
