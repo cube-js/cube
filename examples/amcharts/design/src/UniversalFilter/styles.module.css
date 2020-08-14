@@ -1,0 +1,90 @@
+.wrapper {
+  position: relative;
+  z-index: 1000;
+}
+
+.root {
+  background-color: var(--color-bg-sidebar);
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--color-border),0 4px 12px 0 rgba(0,0,0,.12);
+  font-size: 15px;
+  margin: 0 15%;
+  position: absolute;
+  width: 70%;
+}
+
+.input {
+  border-bottom: solid 1px var(--color-border);
+  display: grid;
+  grid-template-columns: min-content auto min-content;
+  grid-gap: 12px;
+  padding: 10px 12px;
+}
+
+.greeting {
+  background-color: rgba(29, 155, 209, 0.1);
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-size: 13px;
+  font-weight: bold;
+  height: 26px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.control input {
+  border: none;
+  box-sizing: border-box;
+  height: 26px;
+  outline: none;
+  width: 100%;
+}
+
+.close:before {
+  content: '×';
+  font-size: 28px;
+  font-weight: 300;
+}
+
+.close {
+  cursor: pointer;
+  height: 26px;
+  line-height: 26px;
+  padding-right: 12px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 12px 0;
+  text-align: start;
+}
+
+.item {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 3.25em auto;
+  grid-gap: 12px;
+  font-size: 16px;
+  height: 40px;
+  line-height: 30px;
+  padding: 4px 28px 4px;
+}
+
+.item:hover {
+  background-color: var(--color-bg-filter);
+  color: #fff;
+  cursor: pointer;
+}
+
+.sign {
+  color: var(--color-fg-secondary);
+}
+
+.item:hover .sign {
+  color: #fff;
+}
+
+.main {
+  font-weight: bold;
+}

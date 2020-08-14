@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import {
   loadChannelsWithReactions,
   loadMembersAndJoins,
@@ -20,7 +21,7 @@ import WeekChart from '../WeekChart';
 import HourChart from '../HourChart';
 import MapChart from '../MapChart';
 import ChannelChart from '../ChannelChart';
-import PeriodAndGranularitySelector from "../PeriodAndGranularitySelector"
+import UniversalFilter from '../UniversalFilter';
 
 const defaultPeriod = 'last year';
 const defaultGranularity = 'month';
@@ -45,11 +46,19 @@ function App() {
   const [messagesByChannel, setMessagesByChannel] = useState([]);
   const [membersByChannel, setMembersByChannel] = useState([]);
 
+  const [chosenChannel, setChosenChannel] = useState(null);
+  const [chosenMember, setChosenMember] = useState(null);
+
+  const [doShowFilter, setDoShowFilter] = useState(false);
+
+  useHotkeys('ctrl+k, cmd+k', () => setDoShowFilter(true), { filter: () => true });
+  useHotkeys('esc', () => setDoShowFilter(false), { filter: () => true });
+
   useEffect(() => {
     loadMembersWithReactions().then(setMembersList);
     loadChannelsWithReactions().then(setChannelsList);
-    loadMessagesAndReactions(period, granularity).then(setMessages);
-    loadMembersAndJoins(period, granularity).then(setMembers);
+    loadMessagesAndReactions(period, granularity, chosenChannel, chosenMember).then(setMessages);
+    loadMembersAndJoins(period, granularity, chosenChannel, chosenMember).then(setMembers);
     loadMessagesByWeekday(period).then(setMessagesByWeekday);
     loadMessagesByHour(period).then(setMessagesByHour);
     loadMessagesByChannel().then(setMessagesByChannel);
@@ -57,6 +66,8 @@ function App() {
   }, [
     period,
     granularity,
+    chosenChannel,
+    chosenMember,
   ]);
 
   const [membersListDoShowAll, setMembersListDoShowAll] = useState(false);
@@ -67,12 +78,24 @@ function App() {
       <div className={styles.content}>
         <Header />
         <div className={styles.header}>
-          <h1>Activity in all channels by all members</h1>
-          <PeriodAndGranularitySelector
+          {renderHeader(period, granularity, chosenMember, chosenChannel, () => setDoShowFilter(true))}
+          {doShowFilter && <UniversalFilter
             period={period}
             granularity={granularity}
-            onSelect={setPeriodAndGranularity}
-          />
+            channels={channelsList}
+            members={membersList}
+            channel={chosenChannel}
+            member={chosenMember}
+            onSelect={(period, granularity, channel, member) => {
+              console.log(period, granularity, channel, member);
+              setPeriod(period);
+              setGranularity(granularity);
+              setChosenChannel(channel);
+              setChosenMember(member);
+              setDoShowFilter(false);
+            }}
+            onClose={() => setDoShowFilter(false)}
+          />}
         </div>
         <MessagesChart data={messages} granularity={granularity} />
         <MembersChart data={members} />
@@ -106,6 +129,28 @@ function App() {
       </div>
     </div>
   );
+}
+
+function renderHeader(period, granularity, member, channel, onClick) {
+  const channelPart = channel
+    ? <>in <span className={styles.filtered}>#{channel}</span></>
+    : member
+      ? ''
+      : <>in <span className={styles.filtered}>all channels</span></>
+
+  const memberPart = member
+    ? <>by <span className={styles.filtered}>{member}</span></>
+    : ''
+
+  const periodPart = <span className={styles.filtered}>{period}</span>
+
+  const granularityPart = <>by <span className={styles.filtered}>{granularity}</span></>
+
+  return (
+    <h1 className={styles.filter} onClick={onClick}>
+      Activity {memberPart} {channelPart} {periodPart} {granularityPart}
+    </h1>
+  )
 }
 
 export default App;

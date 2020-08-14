@@ -43,10 +43,8 @@ class Map extends Component {
 
     polygonTemplate.adapter.add('fill', function (fill, target) {
       if (target.dataItem.index > 0) {
-        console.log(chart.colors.getIndex(target.dataItem.index));
         return chart.colors.getIndex(target.dataItem.index);
       }
-      console.log(fill);
       return fill;
     });
     /// add country borders

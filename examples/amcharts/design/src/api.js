@@ -122,9 +122,28 @@ export function loadChannelsWithReactions() {
   return loadStuffWithReactions(loadChannels, loadReactionsInChannels);
 }
 
-export function loadMessagesAndReactions(dateRange, granularity) {
+function createFilters(channel, member) {
+  return [
+      ...(channel ? [
+        {
+          member: 'Channels.name',
+          operator: 'equals',
+          values: [channel],
+        }
+      ] : []),
+    ...(member ? [
+      {
+        member: 'Users.real_name',
+        operator: 'equals',
+        values: [member],
+      }
+    ] : [])
+  ]
+}
+
+export function loadMessagesAndReactions(dateRange, granularity, channel, member) {
   const query = {
-    measures: ['Messages.count', 'Reactions.count'],
+    measures: [ 'Messages.count', 'Reactions.count' ],
     timeDimensions: [
       {
         dimension: 'Messages.date',
@@ -132,6 +151,7 @@ export function loadMessagesAndReactions(dateRange, granularity) {
         dateRange,
       },
     ],
+    filters: createFilters(channel, member),
     order: { 'Messages.date': 'asc' },
   };
 
@@ -146,7 +166,7 @@ export function loadMessagesAndReactions(dateRange, granularity) {
   );
 }
 
-export function loadMembersAndJoins(dateRange, granularity) {
+export function loadMembersAndJoins(dateRange, granularity, channel, member) {
   const query = {
     measures: ['Memberships.sum', 'Memberships.count'],
     timeDimensions: [
@@ -156,6 +176,7 @@ export function loadMembersAndJoins(dateRange, granularity) {
         dateRange,
       },
     ],
+    filters: createFilters(channel, member),
     order: { 'Messages.date': 'asc' },
   };
 
