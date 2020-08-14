@@ -6,11 +6,11 @@
 .root {
   background-color: var(--color-bg-sidebar);
   border-radius: 8px;
-  box-shadow: 0 0 0 1px var(--color-border),0 4px 12px 0 rgba(0,0,0,.12);
+  box-shadow: 0 0 0 1px var(--color-border), 0 4px 12px 0 rgba(0, 0, 0, 0.12);
   font-size: 15px;
-  margin: 0 15%;
+  margin: 0 20%;
   position: absolute;
-  width: 70%;
+  width: 60%;
 }
 
 .input {
@@ -41,9 +41,9 @@
 }
 
 .close:before {
+  color: var(--color-fg-secondary);
   content: '×';
   font-size: 28px;
-  font-weight: 300;
 }
 
 .close {
@@ -63,7 +63,7 @@
 .item {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 3.25em auto;
+  grid-template-columns: 2.25em auto;
   grid-gap: 12px;
   font-size: 16px;
   height: 40px;
@@ -79,6 +79,7 @@
 
 .sign {
   color: var(--color-fg-secondary);
+  text-align: right;
 }
 
 .item:hover .sign {
@@ -87,4 +88,13 @@
 
 .main {
   font-weight: bold;
+}
+
+.clear {
+  color: var(--color-fg-secondary);
+  font-weight: bold;
+}
+
+.clear:hover {
+  color: #fff;
 }

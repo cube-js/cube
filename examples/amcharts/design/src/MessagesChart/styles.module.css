@@ -1,0 +1,14 @@
+.root {
+  background-color: var(--color-bg-sidebar);
+  border: 1px solid var(--color-border);
+  margin-bottom: 2rem;
+  padding: 1.5rem 2rem 0.5rem;
+}
+
+.messages {
+  color: var(--color-blue);
+}
+
+.reactions {
+  color: var(--color-green);
+}

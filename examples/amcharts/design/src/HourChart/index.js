@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from './HourChart.module.css';
+import styles from './styles.module.css';
 import Bubble from '../amCharts/Bubble';
 import PropTypes from 'prop-types';
 

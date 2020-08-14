@@ -34,13 +34,6 @@ class Pie extends Component {
 
     pieSeries.tooltip.fontSize = 13;
 
-    // This creates initial animation
-    pieSeries.hiddenState.properties.opacity = 1;
-    pieSeries.hiddenState.properties.endAngle = -90;
-    pieSeries.hiddenState.properties.startAngle = -90;
-    pieSeries.radius = am4core.percent(80);
-    pieSeries.innerRadius = am4core.percent(40);
-
     pieSeries.ticks.template.events.on('ready', hideSmall);
     pieSeries.ticks.template.events.on('visibilitychanged', hideSmall);
     pieSeries.labels.template.events.on('ready', hideSmall);

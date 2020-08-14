@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from './WeekChart.module.css';
+import styles from './styles.module.css';
 import Heatmap from '../amCharts/Heatmap';
 import PropTypes from 'prop-types';
 

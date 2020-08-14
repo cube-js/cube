@@ -13,7 +13,10 @@ const periods = [
   'Last Month',
   'Last Quarter',
   'Last Year',
-  'Last 5 Years',
+  'Last 30 Days',
+  'Last 90 Days',
+  'Last 365 Days',
+  'Last 1000 Days',
 ];
 
 const granularities = [
@@ -33,7 +36,7 @@ export default function UniversalFilter(props) {
     <div className={styles.wrapper}>
       <div className={styles.root}>
         <div className={styles.input}>
-          <div className={styles.greeting}>Jump to:</div>
+          <div className={styles.greeting}>Filter:</div>
           <div className={styles.control}>
             <input
               type='text'
@@ -46,17 +49,21 @@ export default function UniversalFilter(props) {
           <div className={styles.close} onClick={onClose} />
         </div>
         <ul className={styles.list}>
-          {renderPeriods(props, filter.toLowerCase())}
-          {renderGranularities(props, filter.toLowerCase())}
           {renderMembers(props, filter.toLowerCase())}
           {renderChannels(props, filter.toLowerCase())}
+          {renderPeriods(props, filter.toLowerCase())}
+          {renderGranularities(props, filter.toLowerCase())}
         </ul>
       </div>
     </div>
   );
 }
 
-function findByWordStart(haystack, needle) {
+function findByWordStart(haystack, needle, wildcard) {
+  if (wildcard && wildcard.startsWith(needle)) {
+    return haystack;
+  }
+
   return haystack
     .toLowerCase()
     .split(' ')
@@ -67,7 +74,7 @@ function renderPeriods(props, filter) {
   const { granularity, member, channel, onSelect } = props;
 
   const items = filter
-    ? periods.filter(item => findByWordStart(item, filter)).slice(0, localLimit)
+    ? periods.filter(item => findByWordStart(item, filter, '?')).slice(0, totalLimit)
     : periods.slice(periodOffset, periodOffset + localLimit);
 
   return items.map(row => (
@@ -76,7 +83,7 @@ function renderPeriods(props, filter) {
       className={styles.item}
       onClick={() => onSelect(row.toLowerCase(), granularity, channel, member)}
     >
-      <span className={styles.sign}>Date</span>
+      <span className={styles.sign}>?</span>
       <span className={styles.main}>{row}</span>
     </li>
   ))
@@ -86,7 +93,7 @@ function renderGranularities(props, filter) {
   const { period, member, channel, onSelect } = props;
 
   const items = filter
-    ? granularities.filter(item => findByWordStart(item, filter)).slice(0, localLimit)
+    ? granularities.filter(item => findByWordStart(item, filter, 'by')).slice(0, totalLimit)
     : granularities.slice(granularityOffset, granularityOffset + localLimit);
 
   return items.map(row => (
@@ -95,20 +102,20 @@ function renderGranularities(props, filter) {
       className={styles.item}
       onClick={() => onSelect(period, row.toLowerCase(), channel, member)}
     >
-      <span className={styles.sign}>By</span>
+      <span className={styles.sign}>by</span>
       <span className={styles.main}>{row}</span>
     </li>
   ))
 }
 
 function renderMembers(props, filter) {
-  const { period, granularity, members, channel, onSelect } = props;
+  const { period, granularity, members, member, channel, onSelect } = props;
 
   const items = filter
-    ? members.filter(item => findByWordStart(item.name, filter)).slice(0, localLimit)
+    ? members.filter(item => findByWordStart(item.name, filter)).slice(0, totalLimit)
     : members.slice(0, localLimit);
 
-  return items.map(row => (
+  const list = items.map(row => (
     <li
       key={row.name}
       className={styles.item}
@@ -118,16 +125,32 @@ function renderMembers(props, filter) {
       <span className={styles.main}>{row.name}</span>
     </li>
   ))
+
+  const clearItem = member && (
+    <li
+      key='clear-item'
+      className={styles.item}
+      onClick={() => onSelect(period, granularity, channel, null)}
+    >
+      <span className={styles.sign}>@</span>
+      <span className={styles.clear}>All Members</span>
+    </li>
+  );
+
+  return [
+    ...[clearItem],
+    ...list
+  ];
 }
 
 function renderChannels(props, filter) {
-  const { period, granularity, channels, member, onSelect } = props;
+  const { period, granularity, channels, member, channel, onSelect } = props;
 
   const items = filter
-    ? channels.filter(item => findByWordStart(item.name, filter)).slice(0, localLimit)
+    ? channels.filter(item => findByWordStart(item.name, filter)).slice(0, totalLimit)
     : channels.slice(0, localLimit);
 
-  return items.map(row => (
+  const list = items.map(row => (
     <li
       key={row.name}
       className={styles.item}
@@ -137,6 +160,22 @@ function renderChannels(props, filter) {
       <span className={styles.main}>{row.name}</span>
     </li>
   ))
+
+  const clearItem = channel && (
+    <li
+      key='clear-item'
+      className={styles.item}
+      onClick={() => onSelect(period, granularity, null, member)}
+    >
+      <span className={styles.sign}>#</span>
+      <span className={styles.clear}>All Channels</span>
+    </li>
+  );
+
+  return [
+    ...[clearItem],
+    ...list
+  ];
 }
 
 UniversalFilter.propTypes = {

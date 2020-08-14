@@ -20,7 +20,10 @@ cube(`Memberships`, {
 
         sum: {
             sql: `CASE subtype = 'channel_join' WHEN 1 THEN 1 ELSE -1 END`,
-            type: `runningTotal`
+            type: `sum`,
+            rollingWindow: {
+                trailing: `unbounded`,
+            },
         }
     },
 

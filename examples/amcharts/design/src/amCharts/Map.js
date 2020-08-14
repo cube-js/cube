@@ -31,30 +31,26 @@ class Map extends Component {
     polygonSeries.useGeodata = true;
     polygonSeries.calculateVisualCenter = true;
 
+    polygonSeries.tooltipText = '{id}';
+
     // Configure series
     var polygonTemplate = polygonSeries.mapPolygons.template;
+    polygonTemplate.fill = am4core.color('#6f76d9');
     polygonTemplate.propertyFields.fill = 'fill';
-    polygonTemplate.adapter.add('fill', function (fill, target) {
-      console.log(target.dataItem.dataContext);
-      if (target.dataItem.index > 0) {
-        return chart.colors.getIndex(target.dataItem.index);
-      }
-      return fill;
+    polygonTemplate.adapter.add('opacity', function (fill, target) {
+      console.log(target.dataItem.dataContext.id);
+      return Math.random();
     });
 
     var boundsSeries = chart.series.push(new am4maps.MapPolygonSeries());
     boundsSeries.geodata = am4geodata_worldTimeZonesLow;
     boundsSeries.useGeodata = true;
-    boundsSeries.mapPolygons.template.fill = am4core.color(
-      interfaceColors.getFor('alternativeBackground')
-    );
+    boundsSeries.mapPolygons.template.fill = am4core.color('#eee');
     boundsSeries.mapPolygons.template.fillOpacity = 0.07;
     boundsSeries.mapPolygons.template.nonScalingStroke = true;
     boundsSeries.mapPolygons.template.strokeWidth = 0.5;
     boundsSeries.mapPolygons.template.strokeOpacity = 1;
-    boundsSeries.mapPolygons.template.stroke = interfaceColors.getFor(
-      'background'
-    );
+    boundsSeries.mapPolygons.template.stroke = am4core.color('#eee');
     boundsSeries.tooltipText = '{id}';
 
     var hs = polygonTemplate.states.create('hover');
@@ -63,8 +59,9 @@ class Map extends Component {
     var bhs = boundsSeries.mapPolygons.template.states.create('hover');
     bhs.properties.fillOpacity = 0;
 
-    boundsSeries.mapPolygons.template.events.on('over', function (event) {
-      var polygon = boundsSeries.getPolygonById(
+    polygonSeries.mapPolygons.template.events.on('over', function (event) {
+      console.log(event.target.dataItem.dataContext.id);
+      var polygon = polygonSeries.getPolygonById(
         event.target.dataItem.dataContext.id
       );
       if (polygon) {
@@ -72,8 +69,8 @@ class Map extends Component {
       }
     });
 
-    boundsSeries.mapPolygons.template.events.on('out', function (event) {
-      var polygon = boundsSeries.getPolygonById(
+    polygonSeries.mapPolygons.template.events.on('out', function (event) {
+      var polygon = polygonSeries.getPolygonById(
         event.target.dataItem.dataContext.id
       );
       if (polygon) {

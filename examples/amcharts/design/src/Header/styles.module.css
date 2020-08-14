@@ -1,0 +1,34 @@
+.root {
+  box-sizing: border-box;
+  height: 12.5rem;
+  padding-top: 1.5rem;
+}
+
+.logo {
+  margin: auto;
+  text-align: center;
+  max-width: 425px;
+}
+
+.logo h1 {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.logo h1 > * {
+  margin: 0 0.25em;
+}
+
+.name {
+  cursor: pointer;
+}
+
+.attribution {
+  color: var(--color-fg-secondary);
+}
+
+.description {
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--color-fg-secondary);
+}

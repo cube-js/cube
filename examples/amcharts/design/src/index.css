@@ -1,11 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400;1,700&display=swap');
+@font-face {
+  font-family: 'Lato';
+  font-weight: 400;
+  src: url('/LatoLatin-Regular.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Lato';
+  font-weight: 700;
+  src: url('/LatoLatin-Bold.woff') format('woff');
+}
 
 :root {
   --color-fg-secondary: #616061;
+  --color-fg-link: rgb(18, 100, 163);
   --color-bg: rgb(248, 248, 248);
   --color-bg-sidebar: #fff;
   --color-bg-image: #ddd;
   --color-bg-filter: rgb(18, 100, 163);
+  --color-bg-link: rgba(29, 155, 209, 0.1);
   --color-border: #ddd;
   --color-red: rgb(240, 76, 88);
   --color-green: rgb(0, 122, 90);
