@@ -7,11 +7,12 @@ const schema = {
             'deleted INTEGER,' +
             'real_name TEXT,' +
             'image_512 TEXT,' +
-            'is_admin INTEGER' +
+            'is_admin INTEGER,' +
+            'tz TEXT' +
             ')',
         insert: 'INSERT INTO users (' +
-            'id, name, title, deleted, real_name, image_512, is_admin' +
-            ') VALUES (?, ?, ?, ?, ?, ?, ?)'
+            'id, name, title, deleted, real_name, image_512, is_admin, tz' +
+            ') VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     },
     channels: {
         create: 'CREATE TABLE channels (' +
