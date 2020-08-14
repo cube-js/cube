@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from './MembersChart.module.css';
+import styles from './styles.module.css';
 import LineChart from "../amCharts/LineChart"
 import PropTypes from "prop-types"
 

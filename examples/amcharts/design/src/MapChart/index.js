@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from './MapChart.module.css';
+import styles from './styles.module.css';
 import Map from '../amCharts/Map';
 import PropTypes from 'prop-types';
 
