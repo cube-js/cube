@@ -41,9 +41,9 @@
 }
 
 .close:before {
+  color: var(--color-fg-secondary);
   content: '×';
   font-size: 28px;
-  font-weight: 300;
 }
 
 .close {

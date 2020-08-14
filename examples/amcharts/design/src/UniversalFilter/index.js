@@ -76,7 +76,7 @@ function renderPeriods(props, filter) {
       className={styles.item}
       onClick={() => onSelect(row.toLowerCase(), granularity, channel, member)}
     >
-      <span className={styles.sign}>When</span>
+      <span className={styles.sign}>?</span>
       <span className={styles.main}>{row}</span>
     </li>
   ))
@@ -95,7 +95,7 @@ function renderGranularities(props, filter) {
       className={styles.item}
       onClick={() => onSelect(period, row.toLowerCase(), channel, member)}
     >
-      <span className={styles.sign}>By</span>
+      <span className={styles.sign}>by</span>
       <span className={styles.main}>{row}</span>
     </li>
   ))
