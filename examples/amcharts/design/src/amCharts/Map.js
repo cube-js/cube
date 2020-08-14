@@ -3,9 +3,6 @@ import * as am4core from '@amcharts/amcharts4/core';
 import * as am4maps from '@amcharts/amcharts4/maps';
 import am4geodata_worldTimeZoneAreasHigh from './areas.js';
 import am4geodata_worldTimeZonesHigh from './zones.js';
-import am4themes_animated from '@amcharts/amcharts4/themes/animated';
-
-am4core.useTheme(am4themes_animated);
 
 class Map extends Component {
   constructor(props) {
