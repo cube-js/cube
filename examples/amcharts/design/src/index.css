@@ -2,10 +2,12 @@
 
 :root {
   --color-fg-secondary: #616061;
+  --color-fg-link: rgb(18, 100, 163);
   --color-bg: rgb(248, 248, 248);
   --color-bg-sidebar: #fff;
   --color-bg-image: #ddd;
   --color-bg-filter: rgb(18, 100, 163);
+  --color-bg-link: rgba(29, 155, 209, 0.1);
   --color-border: #ddd;
   --color-red: rgb(240, 76, 88);
   --color-green: rgb(0, 122, 90);

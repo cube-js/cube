@@ -19,8 +19,9 @@
 }
 
 .filtered {
-  border-bottom: dotted 2px var(--color-fg-secondary);
-  color: var(--color-fg-secondary);
+  background-color: var(--color-bg-link);
+  color: var(--color-fg-link);
+  padding: 0.2em 0.5em 0.2em 0.5em;
 }
 
 .block {

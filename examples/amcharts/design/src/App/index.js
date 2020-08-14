@@ -134,22 +134,20 @@ function App() {
 function renderHeader(period, granularity, member, channel, onClick) {
   const channelPart = channel
     ? <>in <span className={styles.filtered}>#{channel}</span></>
-    : member
-      ? ''
-      : <>in <span className={styles.filtered}>all channels</span></>
+    : <>in <span className={styles.filtered}>all channels</span></>
 
   const memberPart = member
-    ? <>by <span className={styles.filtered}>{member}</span></>
-    : ''
+    ? <>by <span className={styles.filtered}>@{member}</span></>
+    : <>by <span className={styles.filtered}>all members</span></>
 
   const periodPart = <span className={styles.filtered}>{period}</span>
 
   const granularityPart = <>by <span className={styles.filtered}>{granularity}</span></>
 
   return (
-    <h1 className={styles.filter} onClick={onClick}>
+    <h2 className={styles.filter} onClick={onClick}>
       Activity {memberPart} {channelPart} {periodPart} {granularityPart}
-    </h1>
+    </h2>
   )
 }
 
