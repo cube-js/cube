@@ -3,7 +3,10 @@ import emoji from 'node-emoji';
 import moment from 'moment';
 
 export const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: process.env.REACT_APP_CUBEJS_API,
+  apiUrl:
+    process.env.NODE_ENV === 'production'
+      ? `${window.location.origin}/cubejs-api/v1`
+      : process.env.REACT_APP_CUBEJS_API,
 });
 
 const membersQuery = {
@@ -20,7 +23,8 @@ const membersQuery = {
 
 export function loadMembers() {
   return cubejsApi.load(membersQuery).then((result) =>
-    result.tablePivot()
+    result
+      .tablePivot()
       .map((row) => ({
         id: row['Users.id'],
         name: row['Users.real_name'],
@@ -28,7 +32,7 @@ export function loadMembers() {
         image: row['Users.image'],
         is_admin: row['Users.is_admin'],
       }))
-      .filter(row => row.id)
+      .filter((row) => row.id)
   );
 }
 
@@ -40,13 +44,14 @@ const channelsQuery = {
 
 export function loadChannels() {
   return cubejsApi.load(channelsQuery).then((result) =>
-    result.tablePivot()
+    result
+      .tablePivot()
       .map((row) => ({
         id: row['Channels.id'],
         name: row['Channels.name'],
         purpose: row['Channels.purpose'],
       }))
-      .filter(row => row.id)
+      .filter((row) => row.id)
   );
 }
 
@@ -124,26 +129,35 @@ export function loadChannelsWithReactions() {
 
 function createFilters(channel, member) {
   return [
-      ...(channel ? [
-        {
-          member: 'Channels.name',
-          operator: 'equals',
-          values: [channel],
-        }
-      ] : []),
-    ...(member ? [
-      {
-        member: 'Users.real_name',
-        operator: 'equals',
-        values: [member],
-      }
-    ] : [])
-  ]
+    ...(channel
+      ? [
+          {
+            member: 'Channels.name',
+            operator: 'equals',
+            values: [channel],
+          },
+        ]
+      : []),
+    ...(member
+      ? [
+          {
+            member: 'Users.real_name',
+            operator: 'equals',
+            values: [member],
+          },
+        ]
+      : []),
+  ];
 }
 
-export function loadMessagesAndReactions(dateRange, granularity, channel, member) {
+export function loadMessagesAndReactions(
+  dateRange,
+  granularity,
+  channel,
+  member
+) {
   const query = {
-    measures: [ 'Messages.count', 'Reactions.count' ],
+    measures: ['Messages.count', 'Reactions.count'],
     timeDimensions: [
       {
         dimension: 'Messages.date',

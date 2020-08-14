@@ -1,18 +1,37 @@
 const importSlackArchive = require('./import');
-const CubejsServer = require('@cubejs-backend/server');
+const CubejsServerCore = require('@cubejs-backend/server-core');
+const express = require('express');
+const bodyParser = require('body-parser');
+const path = require('path');
+const http = require('http');
+const serveStatic = require('serve-static');
 
 (async function () {
   await importSlackArchive(process.argv[2]);
+  require('dotenv').config();
 
-  const server = new CubejsServer();
+  const app = express();
+  app.use(bodyParser.json({ limit: '50mb' }));
+  app.use(require('cors')());
 
-  server
-    .listen()
-    .then(({ version, port }) => {
-      console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-    })
-    .catch((e) => {
-      console.error('Fatal error during server start: ');
-      console.error(e.stack || e);
-    });
+  const cubejsServer = CubejsServerCore.create();
+
+  if (process.env.NODE_ENV === 'production') {
+    app.use(serveStatic(path.join(__dirname, 'design/build')));
+  }
+
+  app.get('/healthy', (req, res) => {
+    res.json({ status: 'ok' });
+  });
+
+  cubejsServer.initApp(app);
+
+  const port = process.env.PORT || 4000;
+  const server = http.createServer({}, app);
+
+  server.listen(port, () => {
+    console.log(
+      `🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`
+    );
+  });
 })();

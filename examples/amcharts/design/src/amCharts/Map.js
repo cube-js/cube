@@ -38,7 +38,7 @@ class Map extends Component {
     polygonTemplate.fill = am4core.color('#6f76d9');
     polygonTemplate.propertyFields.fill = 'fill';
     polygonTemplate.adapter.add('opacity', function (fill, target) {
-      console.log(target.dataItem.dataContext.id);
+      //console.log(target.dataItem.dataContext.id);
       return Math.random();
     });
 
@@ -60,7 +60,7 @@ class Map extends Component {
     bhs.properties.fillOpacity = 0;
 
     polygonSeries.mapPolygons.template.events.on('over', function (event) {
-      console.log(event.target.dataItem.dataContext.id);
+      //console.log(event.target.dataItem.dataContext.id);
       var polygon = polygonSeries.getPolygonById(
         event.target.dataItem.dataContext.id
       );
