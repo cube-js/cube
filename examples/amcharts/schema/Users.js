@@ -40,6 +40,7 @@ cube(`Users`, {
         is_admin: {
             sql: `is_admin`,
             type: `boolean`,
+        },
         tz: {
             sql: `tz`,
             type: `string`
