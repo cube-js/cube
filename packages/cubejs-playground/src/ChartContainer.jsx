@@ -341,7 +341,7 @@ class ChartContainer extends React.Component {
     const copyCodeToClipboard = async () => {
       if (!navigator.clipboard) {
         notification.error({
-          message: "Your browser doesn't support copy to clipboard",
+          message: 'Your browser doesn\'t support copy to clipboard',
         });
       }
       try {
@@ -353,7 +353,7 @@ class ChartContainer extends React.Component {
         });
       } catch (e) {
         notification.error({
-          message: "Can't copy to clipboard",
+          message: 'Can\'t copy to clipboard',
           description: e,
         });
       }
