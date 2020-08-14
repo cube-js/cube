@@ -23,7 +23,7 @@ import MapChart from '../MapChart';
 import ChannelChart from '../ChannelChart';
 import UniversalFilter from '../UniversalFilter';
 
-const defaultPeriod = 'last year';
+const defaultPeriod = 'last 365 days';
 const defaultGranularity = 'month';
 
 const defaultListSize = 5;
@@ -76,7 +76,13 @@ function App() {
   return (
     <div className={styles.root}>
       <div className={styles.content}>
-        <Header />
+        <Header onClick={() => {
+          setPeriod(defaultPeriod);
+          setGranularity(defaultGranularity);
+          setChosenChannel(null);
+          setChosenMember(null);
+          setDoShowFilter(false);
+        }} />
         <div className={styles.header}>
           {renderHeader(period, granularity, chosenMember, chosenChannel, () => setDoShowFilter(true))}
           {doShowFilter && <UniversalFilter

@@ -13,7 +13,10 @@ const periods = [
   'Last Month',
   'Last Quarter',
   'Last Year',
-  'Last 5 Years',
+  'Last 30 Days',
+  'Last 90 Days',
+  'Last 365 Days',
+  'Last 1000 Days',
 ];
 
 const granularities = [
@@ -56,7 +59,11 @@ export default function UniversalFilter(props) {
   );
 }
 
-function findByWordStart(haystack, needle) {
+function findByWordStart(haystack, needle, wildcard) {
+  if (wildcard && wildcard.startsWith(needle)) {
+    return haystack;
+  }
+
   return haystack
     .toLowerCase()
     .split(' ')
@@ -67,7 +74,7 @@ function renderPeriods(props, filter) {
   const { granularity, member, channel, onSelect } = props;
 
   const items = filter
-    ? periods.filter(item => findByWordStart(item, filter)).slice(0, localLimit)
+    ? periods.filter(item => findByWordStart(item, filter, '?')).slice(0, totalLimit)
     : periods.slice(periodOffset, periodOffset + localLimit);
 
   return items.map(row => (
@@ -86,7 +93,7 @@ function renderGranularities(props, filter) {
   const { period, member, channel, onSelect } = props;
 
   const items = filter
-    ? granularities.filter(item => findByWordStart(item, filter)).slice(0, localLimit)
+    ? granularities.filter(item => findByWordStart(item, filter, 'by')).slice(0, totalLimit)
     : granularities.slice(granularityOffset, granularityOffset + localLimit);
 
   return items.map(row => (
@@ -105,7 +112,7 @@ function renderMembers(props, filter) {
   const { period, granularity, members, member, channel, onSelect } = props;
 
   const items = filter
-    ? members.filter(item => findByWordStart(item.name, filter)).slice(0, localLimit)
+    ? members.filter(item => findByWordStart(item.name, filter)).slice(0, totalLimit)
     : members.slice(0, localLimit);
 
   const list = items.map(row => (
@@ -140,7 +147,7 @@ function renderChannels(props, filter) {
   const { period, granularity, channels, member, channel, onSelect } = props;
 
   const items = filter
-    ? channels.filter(item => findByWordStart(item.name, filter)).slice(0, localLimit)
+    ? channels.filter(item => findByWordStart(item.name, filter)).slice(0, totalLimit)
     : channels.slice(0, localLimit);
 
   const list = items.map(row => (

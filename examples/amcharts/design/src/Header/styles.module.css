@@ -19,6 +19,10 @@
   margin: 0 0.25em;
 }
 
+.name {
+  cursor: pointer;
+}
+
 .attribution {
   color: var(--color-fg-secondary);
 }

@@ -1,13 +1,18 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import styles from './styles.module.css';
 import logo from "./logo.svg"
 
-export default function Header() {
+export default function Header(props) {
+  const { onClick } = props;
+
   return (
     <div className={styles.root}>
       <div className={styles.logo}>
         <h1>
-          <span>Slack Vibe&nbsp;&nbsp;<span role='img' aria-label=''>🎉</span></span>
+          <span className={styles.name} onClick={onClick}>
+            Slack Vibe&nbsp;&nbsp;<span role='img' aria-label=''>🎉</span>
+          </span>
           <span className={styles.attribution}>by</span>
           <span><img src={logo} alt='Cube.js' /></span>
         </h1>
@@ -18,3 +23,7 @@ export default function Header() {
     </div>
   )
 }
+
+Header.propTypes = {
+  onClick: PropTypes.func.isRequired,
+};
