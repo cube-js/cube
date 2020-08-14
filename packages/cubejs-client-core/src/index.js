@@ -35,7 +35,6 @@ class CubejsApi {
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
-    console.log('Hello, World!');
   }
 
   request(method, params) {
