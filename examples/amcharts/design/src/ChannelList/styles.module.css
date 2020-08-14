@@ -38,8 +38,12 @@
 }
 
 .item:hover {
-  background-color: var(--color-bg);
-  /*cursor: pointer;*/
+  background-color: var(--color-bg-link);
+  cursor: pointer;
+}
+
+.selected {
+  background-color: var(--color-bg-link);
 }
 
 .avatar img {

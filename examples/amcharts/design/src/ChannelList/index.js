@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import styles from './styles.module.css';
 
 export default function ChannelList(props) {
-  const { data, limit, onShow } = props;
+  const { data, limit, channel: chosenChannel, onShow, onSelect } = props;
 
   const channels = limit
     ? data.slice(0, limit)
@@ -21,7 +21,11 @@ export default function ChannelList(props) {
       </div>
       <ul className={styles.list}>
         {channels.map(channel => (
-          <li key={channel.id} className={styles.item}>
+          <li
+            key={channel.id}
+            className={styles.item + ' ' + (chosenChannel === channel.name ? styles.selected : '')}
+            onClick={() => onSelect(chosenChannel !== channel.name ? channel.name : null)}
+          >
             <div className={styles.avatar}>&nbsp;</div>
             <div title={channel.purpose}>
               <div className={styles.name}>{channel.name}</div>
@@ -42,5 +46,7 @@ export default function ChannelList(props) {
 ChannelList.propTypes = {
   data: PropTypes.arrayOf(PropTypes.object).isRequired,
   limit: PropTypes.number,
+  channel: PropTypes.string,
   onShow: PropTypes.func.isRequired,
+  onSelect: PropTypes.func.isRequired,
 }

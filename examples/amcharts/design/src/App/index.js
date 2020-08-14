@@ -124,12 +124,22 @@ function App() {
         <MemberList
           data={membersList}
           limit={membersListDoShowAll ? undefined : defaultListSize}
+          member={chosenMember}
           onShow={() => setMembersListDoShowAll(!membersListDoShowAll)}
+          onSelect={member => {
+            setChosenMember(member);
+            setDoShowFilter(false);
+          }}
         />
         <ChannelList
           data={channelsList}
           limit={channelsListDoShowAll ? undefined : defaultListSize}
+          channel={chosenChannel}
           onShow={() => setChannelsListDoShowAll(!channelsListDoShowAll)}
+          onSelect={channel => {
+            setChosenChannel(channel);
+            setDoShowFilter(false);
+          }}
         />
       </div>
     </div>
