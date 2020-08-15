@@ -23,6 +23,9 @@ joins: {
 All joins are generated as `LEFT JOIN` and cube which defines a join serves as a main table and cube inside `joins` definition is one which goes to `LEFT JOIN` clause. 
 Learn more about direction of joins [here](direction-of-joins).
 
+Semantics of `INNER JOIN` can be achieved with additional filtering.
+For example by checking column value isn't null by using [set filter](query-format#filters-operators-set).
+
 ## Parameters
 
 ### relationship
