@@ -592,10 +592,10 @@ class BaseQuery {
             const timeSeries = d.timeSeries();
             return f(
               isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateFromTimeSeries())) :
+                this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[0][0])) :
                 `${this.timeStampInClientTz(d.dateFromParam())}`,
               isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateToTimeSeries())) :
+                this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
                 `${this.timeStampInClientTz(d.dateToParam())}`,
               `${d.convertedToTz()}`,
               `${this.timeStampInClientTz(d.dateFromParam())}`,

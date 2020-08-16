@@ -1681,23 +1681,23 @@ describe('SQL Generation', function test() {
   const granularityCases = [
     {
       granularity: 'day',
-      from: '2017-01-01T08:00:00Z',
-      to: '2017-01-11T07:59:59Z'
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-01-10T23:59:59.999'
     },
     {
       granularity: 'week',
-      from: '2016-12-26T08:00:00Z',
-      to: '2017-01-16T07:59:59Z'
+      from: '2016-12-26T00:00:00.000',
+      to: '2017-01-15T23:59:59.999'
     },
     {
       granularity: 'month',
-      from: '2017-01-01T08:00:00Z',
-      to: '2017-02-01T07:59:59Z'
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-01-31T23:59:59.999'
     },
     {
       granularity: 'year',
-      from: '2017-01-01T08:00:00Z',
-      to: '2018-01-01T07:59:59Z'
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-12-31T23:59:59.999'
     }
   ]
 
@@ -1714,8 +1714,9 @@ describe('SQL Generation', function test() {
           }]
         });
         
-        const sqlBuild = query.buildSqlAndParams()
-  
+        const sqlBuild = query.buildSqlAndParams();
+
+        (sqlBuild[0].includes('America/Los_Angeles')).should.be.equal(true)
         sqlBuild[1][0].should.be.equal(test.from);
         sqlBuild[1][1].should.be.equal(test.to);
       });
