@@ -1698,24 +1698,4 @@ describe('SQL Generation', function test() {
 
     return result;
   });
-
-  it('Should date with TZ, when pass filter with inDateRange operator', () => {
-    const result = compiler.compile().then(() => {
-      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
-        ...baseQuery,
-        filters: [{
-          dimension: 'visitors.created_at',
-          operator: 'inDateRange',
-          values: ['2017-01-01', '2017-01-10']
-        }]
-      });
-
-      const sqlBuild = query.buildSqlAndParams()
-
-      sqlBuild[1][0].should.be.equal('2017-01-01T08:00:00Z');
-      sqlBuild[1][1].should.be.equal('2017-01-11T07:59:59Z');
-    });
-
-    return result;
-  });
 });
