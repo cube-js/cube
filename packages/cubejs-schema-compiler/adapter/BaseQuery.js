@@ -588,18 +588,21 @@ class BaseQuery {
         // TODO these weird conversions to be strict typed for big query.
         // TODO Consider adding strict definitions of local and UTC time type
         ([d, f]) => ({
-          filterToWhere: () => f(
-            isFromStartToEnd ?
-              this.dateTimeCast(this.paramAllocator.allocateParam(d.dateFrom())) :
+          filterToWhere: () => {
+            const timeSeries = d.timeSeries();
+            return f(
+              isFromStartToEnd ?
+                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateFrom())) :
+                `${this.timeStampInClientTz(d.dateFromParam())}`,
+              isFromStartToEnd ?
+                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateTo())) :
+                `${this.timeStampInClientTz(d.dateToParam())}`,
+              `${d.convertedToTz()}`,
               `${this.timeStampInClientTz(d.dateFromParam())}`,
-            isFromStartToEnd ?
-              this.dateTimeCast(this.paramAllocator.allocateParam(d.dateTo())) :
               `${this.timeStampInClientTz(d.dateToParam())}`,
-            `${d.convertedToTz()}`,
-            `${this.timeStampInClientTz(d.dateFromParam())}`,
-            `${this.timeStampInClientTz(d.dateToParam())}`,
-            isFromStartToEnd
-          )
+              isFromStartToEnd
+            );
+          }
         })
       );
     if (!this.timeDimensions.find(d => d.granularity)) {
