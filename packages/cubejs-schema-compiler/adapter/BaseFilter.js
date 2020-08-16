@@ -7,7 +7,8 @@ const {
 
 const BaseDimension = require('./BaseDimension');
 
-const DATE_OPERATORS = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'];
+// Todo: `onTheDate` is missing in the documentation, possibly deprecated?
+const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'afterDate'];
 const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
 const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
@@ -79,8 +80,12 @@ class BaseFilter extends BaseDimension {
     return this.operator === 'contains' || this.operator === 'not_contains';
   }
 
+  isDateOperator() {
+    return contains(this.operator, DATE_OPERATORS);
+  }
+
   filterParams() {
-    if (contains(this.operator, DATE_OPERATORS)) {
+    if (this.isDateOperator()) {
       return [this.inDbTimeZoneDateFrom(this.values[0]), this.inDbTimeZoneDateTo(this.values[1])];
     }
     if (this.operator === 'set' || this.operator === 'not_set' || this.operator === 'expressionEquals') {

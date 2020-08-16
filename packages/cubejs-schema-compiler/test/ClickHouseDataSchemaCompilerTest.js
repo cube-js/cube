@@ -155,7 +155,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
         }],
         filters: [{
           dimension: 'visitors.updated_at',
-          operator: 'in_date_range',
+          operator: 'inDateRange',
           values: ['2017-01-01', '2017-01-30']
         }],
         order: [{
@@ -355,7 +355,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
         ],
         [{ "visitors__created_at": '2017-01-06T16:00:00.000' }]
       ];
-      ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
+      ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'afterDate'].map((operator, index) => {
         const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
         it(`filtered dates ${operator}`, async () => {
 

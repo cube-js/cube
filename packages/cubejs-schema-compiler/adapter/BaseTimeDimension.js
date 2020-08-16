@@ -25,7 +25,7 @@ class BaseTimeDimension extends BaseFilter {
   constructor(query, timeDimension) {
     super(query, {
       dimension: timeDimension.dimension,
-      operator: 'in_date_range',
+      operator: 'inDateRange',
       values: timeDimension.dateRange
     });
     this.query = query;
