@@ -592,10 +592,10 @@ class BaseQuery {
             const timeSeries = d.timeSeries();
             return f(
               isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateFrom())) :
+                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateFromTimeSeries())) :
                 `${this.timeStampInClientTz(d.dateFromParam())}`,
               isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateTo())) :
+                this.dateTimeCast(this.paramAllocator.allocateParam(d.dateToTimeSeries())) :
                 `${this.timeStampInClientTz(d.dateToParam())}`,
               `${d.convertedToTz()}`,
               `${this.timeStampInClientTz(d.dateFromParam())}`,
@@ -824,7 +824,7 @@ class BaseQuery {
 
   regularMeasuresSubQuery(measures, filters) {
     filters = filters || this.allFilters;
-
+    
     const inlineWhereConditions = [];
 
     const query = this.rewriteInlineWhere(() => this.joinQuery(

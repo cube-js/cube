@@ -1678,24 +1678,49 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles'
   }
 
-  it('Should date with TZ, when pass timeDimensions', () => {
-    const result = compiler.compile().then(() => {
+  const granularityCases = [
+    {
+      granularity: 'day',
+      from: '2017-01-01T08:00:00Z',
+      to: '2017-01-11T07:59:59Z'
+    },
+    {
+      granularity: 'week',
+      from: '2016-12-26T08:00:00Z',
+      to: '2017-01-16T07:59:59Z'
+    },
+    {
+      granularity: 'month',
+      from: '2017-01-01T08:00:00Z',
+      to: '2017-02-01T07:59:59Z'
+    },
+    {
+      granularity: 'year',
+      from: '2017-01-01T08:00:00Z',
+      to: '2018-01-01T07:59:59Z'
+    }
+  ]
 
-      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
-        ...baseQuery,
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-10']
-        }]
+  for(const test of granularityCases) {
+    it(`Should date with TZ, when pass timeDimensions with granularity by ${test.granularity}`, () => {
+      const result = compiler.compile().then(() => {
+  
+        const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+          ...baseQuery,
+          timeDimensions: [{
+            dimension: 'visitors.created_at',
+            granularity: test.granularity,
+            dateRange: ['2017-01-01', '2017-01-10']
+          }]
+        });
+        
+        const sqlBuild = query.buildSqlAndParams()
+  
+        sqlBuild[1][0].should.be.equal(test.from);
+        sqlBuild[1][1].should.be.equal(test.to);
       });
-      
-      const sqlBuild = query.buildSqlAndParams()
-
-      sqlBuild[1][0].should.be.equal('2017-01-01T08:00:00Z');
-      sqlBuild[1][1].should.be.equal('2017-01-11T07:59:59Z');
+  
+      return result;
     });
-
-    return result;
-  });
+  }
 });

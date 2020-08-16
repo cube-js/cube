@@ -112,6 +112,14 @@ class BaseTimeDimension extends BaseFilter {
     return this.dateFromValue;
   }
 
+  dateFromTimeSeries() {
+    const timeSeries = this.timeSeries();
+    if (!this.dateFromValue) {
+      this.dateFromValue = this.inDbTimeZoneDateTo(timeSeries[0][0]);
+    }
+    return this.dateFromValue;
+  }
+
   dateFromParam() {
     return this.query.paramAllocator.allocateParamsForQuestionString(
       this.query.timeStampParam(this), [this.dateFrom()]
@@ -128,6 +136,14 @@ class BaseTimeDimension extends BaseFilter {
   dateTo() {
     if (!this.dateToValue) {
       this.dateToValue = this.inDbTimeZoneDateTo(this.dateRange[1]);
+    }
+    return this.dateToValue;
+  }
+
+  dateToTimeSeries() {
+    const timeSeries = this.timeSeries();
+    if (!this.dateToValue) {
+      this.dateToValue = this.inDbTimeZoneDateTo(timeSeries[timeSeries.length - 1][1]);
     }
     return this.dateToValue;
   }
