@@ -824,6 +824,7 @@ class BaseQuery {
 
   regularMeasuresSubQuery(measures, filters) {
     filters = filters || this.allFilters;
+
     const inlineWhereConditions = [];
 
     const query = this.rewriteInlineWhere(() => this.joinQuery(
