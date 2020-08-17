@@ -61,7 +61,7 @@
   import Chart from "./components/Chart";
 
   const cubejsApi = cubejs(
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.K9PiJkjegbhnw4Ca5pPlkTmZihoOm42w8bja9Qs2qJg",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjY4OTR9.0fdi5cuDZ2t3OSrPOMoc3B1_pwhnWj4ZmM3FHEX7Aus",
     { apiUrl: "https://ecom.cubecloudapp.dev/cubejs-api/v1" }
   );
 
