@@ -21,7 +21,9 @@ export default function WeekChart(props) {
 
   return (
     <div className={styles.root}>
-      <h2>Messages by hour</h2>
+      <h2>
+        Messages by hour <small>according to your local timezone</small>
+      </h2>
       <Bubble data={data} options={options} />
     </div>
   );

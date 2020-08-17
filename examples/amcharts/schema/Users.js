@@ -14,37 +14,12 @@ cube(`Users`, {
     },
   },
 
-    dimensions: {
-        id: {
-            sql: `id`,
-            type: `string`,
-            primaryKey: true,
-            shown: true
-        },
-        name: {
-            sql: `name`,
-            type: `string`
-        },
-        title: {
-            sql: `title`,
-            type: `string`
-        },
-        real_name: {
-            sql: `real_name`,
-            type: `string`
-        },
-        image: {
-            sql: `image_512`,
-            type: `string`
-        },
-        is_admin: {
-            sql: `is_admin`,
-            type: `boolean`,
-        },
-        tz: {
-            sql: `tz`,
-            type: `string`
-        },
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `string`,
+      primaryKey: true,
+      shown: true,
     },
     name: {
       sql: `name`,
@@ -69,6 +44,10 @@ cube(`Users`, {
     tz: {
       sql: `tz`,
       type: `string`,
+    },
+    tz_offset: {
+      sql: `${Users}.tz_offset/60/60`,
+      type: `number`,
     },
   },
 

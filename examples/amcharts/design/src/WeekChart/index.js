@@ -21,7 +21,9 @@ export default function WeekChart(props) {
 
   return (
     <div className={styles.root}>
-      <h2>Messages by day of week</h2>
+      <h2>
+        Messages by day of week <small>according to your local timezone</small>
+      </h2>
       <Heatmap data={data} options={options} />
     </div>
   );

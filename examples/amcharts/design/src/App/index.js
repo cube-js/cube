@@ -7,6 +7,7 @@ import {
   loadMessagesAndReactions,
   loadMessagesByWeekday,
   loadMessagesByHour,
+  loadMembersByTimezone,
   // loadMessagesByChannel,
   // loadMembersByChannel,
 } from '../api';
@@ -43,6 +44,7 @@ function App() {
   const [members, setMembers] = useState([]);
   const [messagesByWeekday, setMessagesByWeekday] = useState([]);
   const [messagesByHour, setMessagesByHour] = useState([]);
+  const [membersByTimezone, setMembersByTimezone] = useState([]);
   // const [messagesByChannel, setMessagesByChannel] = useState([]);
   // const [membersByChannel, setMembersByChannel] = useState([]);
 
@@ -51,24 +53,33 @@ function App() {
 
   const [doShowFilter, setDoShowFilter] = useState(false);
 
-  useHotkeys('ctrl+k, cmd+k', () => setDoShowFilter(true), { filter: () => true });
+  useHotkeys('ctrl+k, cmd+k', () => setDoShowFilter(true), {
+    filter: () => true,
+  });
   useHotkeys('esc', () => setDoShowFilter(false), { filter: () => true });
 
   useEffect(() => {
     loadMembersWithReactions().then(setMembersList);
     loadChannelsWithReactions().then(setChannelsList);
-    loadMessagesAndReactions(period, granularity, chosenChannel, chosenMember).then(setMessages);
-    loadMembersAndJoins(period, granularity, chosenChannel, chosenMember).then(setMembers);
-    loadMessagesByWeekday(period, chosenChannel, chosenMember).then(setMessagesByWeekday);
-    loadMessagesByHour(period, chosenChannel, chosenMember).then(setMessagesByHour);
+    loadMessagesAndReactions(
+      period,
+      granularity,
+      chosenChannel,
+      chosenMember
+    ).then(setMessages);
+    loadMembersAndJoins(period, granularity, chosenChannel, chosenMember).then(
+      setMembers
+    );
+    loadMessagesByWeekday(period, chosenChannel, chosenMember).then(
+      setMessagesByWeekday
+    );
+    loadMessagesByHour(period, chosenChannel, chosenMember).then(
+      setMessagesByHour
+    );
+    loadMembersByTimezone().then(setMembersByTimezone);
     // loadMessagesByChannel().then(setMessagesByChannel);
     // loadMembersByChannel().then(setMembersByChannel);
-  }, [
-    period,
-    granularity,
-    chosenChannel,
-    chosenMember,
-  ]);
+  }, [period, granularity, chosenChannel, chosenMember]);
 
   const [membersListDoShowAll, setMembersListDoShowAll] = useState(false);
   const [channelsListDoShowAll, setChannelsListDoShowAll] = useState(false);
@@ -76,37 +87,43 @@ function App() {
   return (
     <div className={styles.root}>
       <div className={styles.content}>
-        <Header onClick={() => {
-          setPeriod(defaultPeriod);
-          setGranularity(defaultGranularity);
-          setChosenChannel(null);
-          setChosenMember(null);
-          setDoShowFilter(false);
-        }} />
+        <Header
+          onClick={() => {
+            setPeriod(defaultPeriod);
+            setGranularity(defaultGranularity);
+            setChosenChannel(null);
+            setChosenMember(null);
+            setDoShowFilter(false);
+          }}
+        />
         <div className={styles.header}>
-          {renderHeader(period, granularity, chosenMember, chosenChannel, () => setDoShowFilter(true))}
-          {doShowFilter && <UniversalFilter
-            period={period}
-            granularity={granularity}
-            channels={channelsList}
-            members={membersList}
-            channel={chosenChannel}
-            member={chosenMember}
-            onSelect={(period, granularity, channel, member) => {
-              setPeriod(period);
-              setGranularity(granularity);
-              setChosenChannel(channel);
-              setChosenMember(member);
-              setDoShowFilter(false);
-            }}
-            onClose={() => setDoShowFilter(false)}
-          />}
+          {renderHeader(period, granularity, chosenMember, chosenChannel, () =>
+            setDoShowFilter(true)
+          )}
+          {doShowFilter && (
+            <UniversalFilter
+              period={period}
+              granularity={granularity}
+              channels={channelsList}
+              members={membersList}
+              channel={chosenChannel}
+              member={chosenMember}
+              onSelect={(period, granularity, channel, member) => {
+                setPeriod(period);
+                setGranularity(granularity);
+                setChosenChannel(channel);
+                setChosenMember(member);
+                setDoShowFilter(false);
+              }}
+              onClose={() => setDoShowFilter(false)}
+            />
+          )}
         </div>
         <MessagesChart data={messages} granularity={granularity} />
         {!chosenMember && <MembersChart data={members} />}
         {period !== 'last week' && <WeekChart data={messagesByWeekday} />}
         <HourChart data={messagesByHour} />
-        <MapChart data={messagesByWeekday} />
+        <MapChart data={membersByTimezone} />
         {/*<div className={styles.row}>*/}
         {/*  <div className={styles.column}>*/}
         {/*    <ChannelChart*/}
@@ -126,7 +143,7 @@ function App() {
           limit={membersListDoShowAll ? undefined : defaultListSize}
           member={chosenMember}
           onShow={() => setMembersListDoShowAll(!membersListDoShowAll)}
-          onSelect={member => {
+          onSelect={(member) => {
             setChosenMember(member);
             setDoShowFilter(false);
           }}
@@ -136,7 +153,7 @@ function App() {
           limit={channelsListDoShowAll ? undefined : defaultListSize}
           channel={chosenChannel}
           onShow={() => setChannelsListDoShowAll(!channelsListDoShowAll)}
-          onSelect={channel => {
+          onSelect={(channel) => {
             setChosenChannel(channel);
             setDoShowFilter(false);
           }}
@@ -147,17 +164,33 @@ function App() {
 }
 
 function renderHeader(period, granularity, member, channel, onClick) {
-  const channelPart = channel
-    ? <>in <span className={styles.filtered}>#{channel}</span></>
-    : <>in <span className={styles.filtered}>all channels</span></>
+  const channelPart = channel ? (
+    <>
+      in <span className={styles.filtered}>#{channel}</span>
+    </>
+  ) : (
+    <>
+      in <span className={styles.filtered}>all channels</span>
+    </>
+  );
 
-  const memberPart = member
-    ? <>by <span className={styles.filtered}>@{member}</span></>
-    : <>by <span className={styles.filtered}>all members</span></>
+  const memberPart = member ? (
+    <>
+      by <span className={styles.filtered}>@{member}</span>
+    </>
+  ) : (
+    <>
+      by <span className={styles.filtered}>all members</span>
+    </>
+  );
 
-  const periodPart = <span className={styles.filtered}>{period}</span>
+  const periodPart = <span className={styles.filtered}>{period}</span>;
 
-  const granularityPart = <>by <span className={styles.filtered}>{granularity}</span></>
+  const granularityPart = (
+    <>
+      by <span className={styles.filtered}>{granularity}</span>
+    </>
+  );
 
   return (
     <h2
@@ -167,7 +200,7 @@ function renderHeader(period, granularity, member, channel, onClick) {
     >
       Activity {memberPart} {channelPart} {periodPart} {granularityPart}
     </h2>
-  )
+  );
 }
 
 export default App;

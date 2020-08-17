@@ -2,6 +2,8 @@ import cubejs from '@cubejs-client/core';
 import emoji from 'node-emoji';
 import moment from 'moment';
 
+import momentTimezone from 'moment-timezone';
+
 export const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
   apiUrl:
     process.env.NODE_ENV === 'production'
@@ -278,5 +280,41 @@ export function loadMembersByChannel() {
       title: row['Channels.name'],
       value: parseInt(row['Memberships.count']),
     }));
+  });
+}
+
+const membersByTimezoneQuery = {
+  measures: ['Users.count'],
+  dimensions: ['Users.tz'],
+};
+
+export function loadMembersByTimezone() {
+  return cubejsApi.load(membersByTimezoneQuery).then((result) => {
+    let obj = {};
+
+    result.tablePivot().map((row) => {
+      if (obj[`UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`]) {
+        obj[`UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`] += parseInt(
+          row['Users.count']
+        );
+      } else {
+        obj[`UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`] = parseInt(
+          row['Users.count']
+        );
+      }
+      /*return {
+        id: `UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`,
+        value: parseInt(row['Users.count']),
+      };*/
+    });
+
+    let array = [];
+    for (const key in obj) {
+      array.push({
+        id: key,
+        value: obj[key],
+      });
+    }
+    return array;
   });
 }

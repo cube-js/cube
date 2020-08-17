@@ -15,6 +15,7 @@ class Map extends Component {
   }
   componentDidMount() {
     let chart = am4core.create(this.state.id, am4maps.MapChart);
+    var interfaceColors = new am4core.InterfaceColorSet();
     // Set map definition
     chart.geodata = am4geodata_worldTimeZoneAreasLow;
     chart.responsive.enabled = true;
@@ -23,44 +24,49 @@ class Map extends Component {
     chart.projection = new am4maps.projections.Miller();
     chart.panBehavior = 'move';
 
-    var interfaceColors = new am4core.InterfaceColorSet();
-
     // Create map polygon series
     var polygonSeries = chart.series.push(new am4maps.MapPolygonSeries());
-    // Make map load polygon (like country names) data from GeoJSON
-    polygonSeries.useGeodata = true;
-    polygonSeries.calculateVisualCenter = true;
 
-    polygonSeries.tooltipText = '{id}';
-
-    // Configure series
-    var polygonTemplate = polygonSeries.mapPolygons.template;
-    polygonTemplate.fill = am4core.color('#6f76d9');
-    polygonTemplate.propertyFields.fill = 'fill';
-    polygonTemplate.adapter.add('opacity', function (fill, target) {
-      //console.log(target.dataItem.dataContext.id);
-      return Math.random();
+    //Set min/max fill color for each area
+    polygonSeries.heatRules.push({
+      property: 'fill',
+      target: polygonSeries.mapPolygons.template,
+      min: chart.colors.getIndex(1).brighten(1),
+      max: chart.colors.getIndex(1).brighten(-0.3),
     });
 
+    // Make map load polygon data (state shapes and names) from GeoJSON
+    polygonSeries.useGeodata = true;
+
+    // Configure series tooltip
+    var polygonTemplate = polygonSeries.mapPolygons.template;
+    polygonTemplate.tooltipText = '{id}: {value}';
+
+    // Create map polygon series
     var boundsSeries = chart.series.push(new am4maps.MapPolygonSeries());
     boundsSeries.geodata = am4geodata_worldTimeZonesLow;
     boundsSeries.useGeodata = true;
-    boundsSeries.mapPolygons.template.fill = am4core.color('#eee');
+    boundsSeries.mapPolygons.template.fill = am4core.color(
+      interfaceColors.getFor('alternativeBackground')
+    );
     boundsSeries.mapPolygons.template.fillOpacity = 0.07;
     boundsSeries.mapPolygons.template.nonScalingStroke = true;
     boundsSeries.mapPolygons.template.strokeWidth = 0.5;
     boundsSeries.mapPolygons.template.strokeOpacity = 1;
-    boundsSeries.mapPolygons.template.stroke = am4core.color('#eee');
-    boundsSeries.tooltipText = '{id}';
+    boundsSeries.mapPolygons.template.stroke = interfaceColors.getFor(
+      'background'
+    );
+    var boundTemplate = boundsSeries.mapPolygons.template;
 
-    var hs = polygonTemplate.states.create('hover');
-    hs.properties.fillOpacity = 1;
+    // Create hover state and set alternative fill color
+    var hs = boundTemplate.states.create('hover');
+    hs.properties.fill = am4core.color('#3c5bdc');
+    //hs.properties.fillOpacity = 0.2;
 
     var bhs = boundsSeries.mapPolygons.template.states.create('hover');
-    bhs.properties.fillOpacity = 0;
+    //bhs.properties.fillOpacity = 0.2;
 
-    polygonSeries.mapPolygons.template.events.on('over', function (event) {
-      //console.log(event.target.dataItem.dataContext.id);
+    boundsSeries.mapPolygons.template.events.on('over', function (event) {
       var polygon = polygonSeries.getPolygonById(
         event.target.dataItem.dataContext.id
       );
@@ -69,7 +75,7 @@ class Map extends Component {
       }
     });
 
-    polygonSeries.mapPolygons.template.events.on('out', function (event) {
+    boundsSeries.mapPolygons.template.events.on('out', function (event) {
       var polygon = polygonSeries.getPolygonById(
         event.target.dataItem.dataContext.id
       );
@@ -81,11 +87,11 @@ class Map extends Component {
     var labelSeries = chart.series.push(new am4maps.MapImageSeries());
     var label = labelSeries.mapImages.template.createChild(am4core.Label);
     label.text = '{id}';
-    label.strokeOpacity = 0;
+    label.strokeOpacity = 1;
     label.fill = am4core.color('#000000');
     label.horizontalCenter = 'middle';
-    label.fontSize = 9;
-    label.nonScaling = true;
+    label.fontSize = 8;
+    label.nonScaling = false;
 
     labelSeries.mapImages.template.adapter.add(
       'longitude',
@@ -114,17 +120,18 @@ class Map extends Component {
         return latitude;
       }
     );
+
     polygonSeries.events.on('datavalidated', function () {
       labelSeries.data = polygonSeries.data;
     });
 
-    this.chart = chart;
+    this.polygonSeries = polygonSeries;
   }
 
   componentDidUpdate(oldProps) {
-    /*if (oldProps.data !== this.props.data) {
-      this.chart.data = this.props.data;
-    }*/
+    if (oldProps.data !== this.props.data) {
+      this.polygonSeries.data = this.props.data;
+    }
   }
 
   componentWillUnmount() {
