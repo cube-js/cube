@@ -52,7 +52,7 @@
                   :items="availableTimeDimensions.map(i => (i.name))"
                 />
               </v-col>
-              <v-col cols="12" md="1" >
+              <v-col cols="12" md="1" style="min-width: 120px">
                 <v-select
                   label="Granularity"
                   outlined

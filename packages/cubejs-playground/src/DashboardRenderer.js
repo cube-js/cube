@@ -7,40 +7,44 @@ import ChartContainer from './ChartContainer';
 import { libraryToTemplate } from './ChartRenderer';
 
 const DashboardRenderer = (props) => {
-  const {
-    source,
-    sourceFiles
-  } = props;
+  const { source, sourceFiles } = props;
   const dependencies = {
     '@cubejs-client/core': cubejs,
     '@cubejs-client/react': cubejsReact,
     antd,
     react: React,
     ...Object.keys(libraryToTemplate)
-      .map(k => libraryToTemplate[k].imports).reduce((a, b) => ({ ...a, ...b }))
+      .map((k) => libraryToTemplate[k].imports)
+      .reduce((a, b) => ({ ...a, ...b })),
   };
   return (
     <ChartContainer
       codeExample={source}
-      codeSandboxSource={
-        sourceFiles
-          .map(f => ({ [f.fileName.split('/')[f.fileName.split('/').length - 1]]: { content: f.content } }))
-          .reduce((a, b) => ({ ...a, ...b }))
-      }
+      codeSandboxSource={sourceFiles
+        .map((f) => ({
+          [f.fileName.split('/')[f.fileName.split('/').length - 1]]: {
+            content: f.content,
+          },
+        }))
+        .reduce((a, b) => ({ ...a, ...b }))}
       dependencies={dependencies}
       hideActions
-      render={({ sandboxId }) => (
-        sandboxId && (
+      render={({ sandboxId }) =>
+        (sandboxId && (
           <iframe
             src={`https://codesandbox.io/embed/${sandboxId}?fontsize=12&hidenavigation=1&editorsize=0`}
             style={{
-              width: '100%', height: '100%', border: 0, borderRadius: 4, overflow: 'hidden'
+              width: '100%',
+              height: '100%',
+              border: 0,
+              borderRadius: 4,
+              overflow: 'hidden',
             }}
             sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"
             title="Dashboard"
           />
-        ) || <Spin />
-      )}
+        )) || <Spin />
+      }
     />
   );
 };

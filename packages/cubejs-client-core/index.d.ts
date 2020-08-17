@@ -563,12 +563,35 @@ declare module '@cubejs-client/core' {
     annotation(): QueryAnnotations;
   }
 
-  export type Filter = {
+  export type Filter = BinaryFilter | UnaryFilter;
+  type BinaryFilter = {
     dimension?: string;
     member?: string;
-    operator: string;
-    values?: string[];
+    operator: BinaryOperator;
+    values: string[];
   };
+  type UnaryFilter = {
+    dimension?: string;
+    member?: string;
+    operator: UnaryOperator;
+    values?: never;
+  };
+  type UnaryOperator = 'set' | 'notSet';
+  type BinaryOperator =
+    | 'equals'
+    | 'notEquals'
+    | 'contains'
+    | 'notContains'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'inDateRange'
+    | 'notInDateRange'
+    | 'beforeDate'
+    | 'afterDate';
+
+
 
   type TimeDimensionGranularity = 'hour' | 'day' | 'week' | 'month' | 'year';
 

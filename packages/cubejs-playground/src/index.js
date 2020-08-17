@@ -18,27 +18,10 @@ history.listen((location) => {
 ReactDOM.render(
   <Router history={history}>
     <App>
-      <Route
-        key="index"
-        exact
-        path="/"
-        component={IndexPage}
-      />
-      <Route
-        key="build"
-        path="/build"
-        component={ExplorePage}
-      />
-      <Route
-        key="schema"
-        path="/schema"
-        component={SchemaPage}
-      />
-      <Route
-        key="dashboard"
-        path="/dashboard"
-        component={DashboardPage}
-      />
+      <Route key="index" exact path="/" component={IndexPage} />
+      <Route key="build" path="/build" component={ExplorePage} />
+      <Route key="schema" path="/schema" component={SchemaPage} />
+      <Route key="dashboard" path="/dashboard" component={DashboardPage} />
       <Route
         key="template-gallery"
         path="/template-gallery"

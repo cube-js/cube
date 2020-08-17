@@ -1813,17 +1813,11 @@ class BaseQuery {
   incrementalRefreshKey(query, originalRefreshKey, options) {
     options = options || {};
     const updateWindow = options.window;
-    return query.evaluateSql(
-      null,
-      (FILTER_PARAMS) => query.caseWhenStatement([{
-        sql: FILTER_PARAMS[
-          query.timeDimensions[0].path()[0]
-        ][
-          query.timeDimensions[0].path()[1]
-        ].filter((from, to) => `${query.nowTimestampSql()} < ${updateWindow ? this.addTimestampInterval(this.timeStampCast(to), updateWindow) : this.timeStampCast(to)}`),
-        label: originalRefreshKey
-      }])
-    );
+    const timeDimension = query.timeDimensions[0];
+    return query.caseWhenStatement([{
+      sql: `${query.nowTimestampSql()} < ${updateWindow ? this.addTimestampInterval(timeDimension.dateToParam(), updateWindow) : timeDimension.dateToParam()}`,
+      label: originalRefreshKey
+    }]);
   }
 
   defaultRefreshKeyRenewalThreshold() {

@@ -14,12 +14,12 @@ const drawFrame = `// Set the dimensions and margins of the graph
     .attr("transform",
           "translate(" + margin.left + "," + margin.top + ")");`;
 
-const yAxis = (max) => (`// Add Y axis
+const yAxis = (max) => `// Add Y axis
   const y = d3.scaleLinear()
     .domain([0, ${max}])
     .range([ height, 0 ]);
   svg.append("g")
-    .call(d3.axisLeft(y));`);
+    .call(d3.axisLeft(y));`;
 
 const xAxisTime = `// Add X axis
   const x = d3.scaleTime()
@@ -141,10 +141,10 @@ const drawByChartType = {
       .outerRadius(radius)
     )
     .attr('fill', d => COLORS_SERIES[d.index])
-  `
+  `,
 };
 
-export const sourceCodeTemplate = ({ chartType, renderFnName }) => (
+export const sourceCodeTemplate = ({ chartType, renderFnName }) =>
   `
 import * as d3 from 'd3';
 const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
@@ -157,9 +157,8 @@ const draw = (node, resultSet, chartType) => {
 const ${renderFnName} = ({ resultSet }) => (
   <div ref={el => el && draw(el, resultSet, '${chartType}')} />
 )
-`
-);
+`;
 
 export const imports = {
-  d3
+  d3,
 };

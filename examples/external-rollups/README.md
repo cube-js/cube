@@ -4,7 +4,7 @@ BigQuery is great at handling large datasets, but will never give you a sub-seco
 
 But we still can leverage BigQuery’s cheap data storage and the power to process large datasets, while not giving up on the performance. As BigQuery acts as a single source of truth and stores all the raw data, MySQL can act as cache layer on top of it and store only small, aggregated tables and provides us with a desired sub-second response.
 
-[You can check out the demo here](https://cubejs-external-rollups.herokuapp.com/). Make sure to play with date range and switchers—dynamic dashboards benefit the most from the pre-aggregations.
+[You can check out the demo here](https://external-rollups.cubecloudapp.dev/). Make sure to play with date range and switchers—dynamic dashboards benefit the most from the pre-aggregations.
 
 ![cubejs-external-rollups.gif](https://media.graphcms.com/7fvaHi7TymwSBb01Y3Zi)
 
@@ -171,4 +171,4 @@ LIMIT
 ```
 As you can see, it now queries data from the `stb_pre_aggregations.stories_pre_agg_main` table inside MySQL. You can play around with filters to see the performance boost of the aggregated query compared to the raw one.
 
-You can also check [this demo dashboard with multiple charts](https://cubejs-external-rollups.herokuapp.com/) and compare its performance with and without pre-aggregations.
+You can also check [this demo dashboard with multiple charts](https://external-rollups.cubecloudapp.dev/) and compare its performance with and without pre-aggregations.
