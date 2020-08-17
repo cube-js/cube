@@ -257,88 +257,88 @@ class ResultSet {
     );
   }
 
-  pivot(pivotConfig, responseIndex = 0) {
+  pivot(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
     
-    let measureValue = (row, measure) => row[measure];
-    const { query } = this.loadResponses[responseIndex];
-
-    if (
-      pivotConfig.fillMissingDates &&
-      pivotConfig.x.length === 1 &&
-      equals(
-        pivotConfig.x,
-        (query.timeDimensions || [])
-          .filter(td => !!td.granularity)
-          .map(td => ResultSet.timeDimensionMember(td))
-      )
-    ) {
-      const series = this.loadResponses.map(
-        (loadResponse) => this.timeSeries(loadResponse.query.timeDimensions[0])
-      );
+    const pivotImpl = (responseIndex = 0) => {
+      let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
       
-      if (series[0]) {
-        groupByXAxis = (rows) => {
-          const byXValues = groupBy(
-            ({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
-            rows
-          );
-          return series[responseIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
-        };
-
-        measureValue = (row, measure) => row[measure] || 0;
-      }
-    }
-
-    const xGrouped = pipe(
-      map(row => this.axisValues(pivotConfig.x)(row).map(xValues => ({ xValues, row }))),
-      unnest,
-      groupByXAxis
-    )(this.timeDimensionBackwardCompatibleData(responseIndex));
-
-    const allYValues = pipe(
-      map(
-        ([, rows]) => unnest(
-          // collect Y values only from filled rows
-          rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
-        )
-      ),
-      unnest,
-      uniq
-    )(xGrouped);
-
-    return xGrouped.map(([, rows]) => {
-      const { xValues } = rows[0];
-      const yGrouped = pipe(
-        map(({ row }) => this.axisValues(pivotConfig.y)(row).map(yValues => ({ yValues, row }))),
-        unnest,
-        groupBy(({ yValues }) => this.axisValuesString(yValues))
-      )(rows);
-      
-      return {
-        xValues,
-        yValuesArray: unnest(allYValues.map(yValues => {
-          const measure = pivotConfig.x.find(d => d === 'measures') ?
-            ResultSet.measureFromAxis(xValues) :
-            ResultSet.measureFromAxis(yValues);
-            
-          return (yGrouped[this.axisValuesString(yValues)] ||
-            [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure)]);
-        }))
-      };
-    });
-  }
+      let measureValue = (row, measure) => row[measure];
+      const { query } = this.loadResponses[responseIndex];
   
-  mergedPivot(pivotConfig) {
-    const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
+      if (
+        pivotConfig.fillMissingDates &&
+        pivotConfig.x.length === 1 &&
+        equals(
+          pivotConfig.x,
+          (query.timeDimensions || [])
+            .filter(td => !!td.granularity)
+            .map(td => ResultSet.timeDimensionMember(td))
+        )
+      ) {
+        const series = this.loadResponses.map(
+          (loadResponse) => this.timeSeries(loadResponse.query.timeDimensions[0])
+        );
+        
+        if (series[0]) {
+          groupByXAxis = (rows) => {
+            const byXValues = groupBy(
+              ({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
+              rows
+            );
+            return series[responseIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
+          };
+  
+          measureValue = (row, measure) => row[measure] || 0;
+        }
+      }
+  
+      const xGrouped = pipe(
+        map(row => this.axisValues(pivotConfig.x)(row).map(xValues => ({ xValues, row }))),
+        unnest,
+        groupByXAxis
+      )(this.timeDimensionBackwardCompatibleData(responseIndex));
+  
+      const allYValues = pipe(
+        map(
+          ([, rows]) => unnest(
+            // collect Y values only from filled rows
+            rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
+          )
+        ),
+        unnest,
+        uniq
+      )(xGrouped);
+  
+      return xGrouped.map(([, rows]) => {
+        const { xValues } = rows[0];
+        const yGrouped = pipe(
+          map(({ row }) => this.axisValues(pivotConfig.y)(row).map(yValues => ({ yValues, row }))),
+          unnest,
+          groupBy(({ yValues }) => this.axisValuesString(yValues))
+        )(rows);
+        
+        return {
+          xValues,
+          yValuesArray: unnest(allYValues.map(yValues => {
+            const measure = pivotConfig.x.find(d => d === 'measures') ?
+              ResultSet.measureFromAxis(xValues) :
+              ResultSet.measureFromAxis(yValues);
+              
+            return (yGrouped[this.axisValuesString(yValues)] ||
+              [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure)]);
+          }))
+        };
+      });
+    };
+    
     const pivots = this.loadResponses.length > 1
-      ? this.loadResponses.map((_, index) => this.pivot(normalizedPivotConfig, index))
+      ? this.loadResponses.map((_, index) => pivotImpl(index))
       : [];
-      
+    
     return pivots.length
-      ? this.mergePivots(pivots, normalizedPivotConfig.joinDateRange)
-      : this.pivot(normalizedPivotConfig);
+      ? this.mergePivots(pivots, pivotConfig.joinDateRange)
+      : pivotImpl();
   }
   
   mergePivots(pivots, joinDateRange) {
@@ -377,7 +377,7 @@ class ResultSet {
       return value;
     };
     
-    return this.mergedPivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
+    return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ','), // TODO deprecated
       x: this.axisValuesString(xValues, ','),
       xValues,
@@ -395,7 +395,7 @@ class ResultSet {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
     
-    return this.mergedPivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
+    return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
       normalizedPivotConfig.x
         .map((key, index) => [key, xValues[index]])
         .concat(
@@ -426,7 +426,7 @@ class ResultSet {
       };
     };
     
-    const pivot = this.mergedPivot(normalizedPivotConfig);
+    const pivot = this.pivot(normalizedPivotConfig);
     // todo: move to pivotConfig?
     const pivotConfigY = this.loadResponses.length > 1 ? ['compareDateRange'].concat(normalizedPivotConfig.y) : normalizedPivotConfig.y;
     
@@ -484,7 +484,9 @@ class ResultSet {
     let otherColumns = [];
     
     if (!pivot.length && normalizedPivotConfig.y.includes('measures')) {
-      otherColumns = (this.query().measures || []).map((key) => ({ ...extractFields(key), dataIndex: key }));
+      otherColumns = (this.loadResponses[0].query.measures || []).map(
+        (key) => ({ ...extractFields(key), dataIndex: key })
+      );
     }
     
     // Syntatic column to display the measure value
@@ -563,16 +565,28 @@ class ResultSet {
     }));
   }
 
-  query(index = 0) {
-    return this.loadResponses[index].query;
+  query() {
+    if (this.loadResponses.length > 0) {
+      throw new Error('Method is not supported for a comparison query. Please use decompose');
+    }
+    
+    return this.loadResponse.query;
   }
 
-  rawData(index = 0) {
-    return this.loadResponses[index].data;
+  rawData() {
+    if (this.loadResponses.length > 0) {
+      throw new Error('Method is not supported for a comparison query. Please use decompose');
+    }
+    
+    return this.loadResponse.data;
   }
   
-  annotation(index = 0) {
-    return this.loadResponses[index].annotation;
+  annotation() {
+    if (this.loadResponses.length > 0) {
+      throw new Error('Method is not supported for a comparison query. Please use decompose');
+    }
+    
+    return this.loadResponse.annotation;
   }
 
   timeDimensionBackwardCompatibleData(responseIndex = 0) {
@@ -597,6 +611,10 @@ class ResultSet {
     }
     
     return this.backwardCompatibleData[responseIndex];
+  }
+  
+  decompose() {
+    return this.loadResponses.map((loadResponse) => new ResultSet(loadResponse, this.options));
   }
   
   serialize() {
