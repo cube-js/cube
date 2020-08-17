@@ -40,6 +40,11 @@ export default (query, options = {}) => {
             subscribeRequest = null;
           }
           const cubejsApi = options.cubejsApi || context && context.cubejsApi;
+          
+          if (!cubejsApi) {
+            throw new Error('Cube.js API client is not provided');
+          }
+          
           if (options.subscribe) {
             subscribeRequest = cubejsApi.subscribe(query, {
               mutexObj: mutexRef.current,

@@ -71,7 +71,7 @@ class ResultSet {
     }
 
     const filters = [{
-      dimension: measureName,
+      member: measureName,
       operator: 'measureFilter',
     }];
     const timeDimensions = [];
@@ -98,13 +98,15 @@ class ResultSet {
             operator: 'equals',
             values: [value.toString()],
           });
+          
         }
       });
 
     return {
       ...measures[measureName].drillMembersGrouped,
       filters,
-      timeDimensions
+      timeDimensions,
+      timezone: this.loadResponse.query.timezone
     };
   }
 
