@@ -98,7 +98,6 @@ class ResultSet {
             operator: 'equals',
             values: [value.toString()],
           });
-          
         }
       });
 
