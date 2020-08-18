@@ -126,7 +126,7 @@ class ResultSet {
   axisValues(axis) {
     const [{ query }] = this.loadResponses;
     return row => {
-      const value = (measure) => axis.filter(d => d !== 'measures')
+      const value = (measure) => axis.filter(d => !['measures'].includes(d))
         .map(d => (row[d] != null ? row[d] : null)).concat(measure ? [measure] : []);
       if (axis.find(d => d === 'measures') && (query.measures || []).length) {
         return query.measures.map(value);
@@ -159,6 +159,16 @@ class ResultSet {
       fillMissingDates: true,
       joinDateRange: false
     };
+    
+    let isCompareDateRangeQuery = false;
+    if ((Array.isArray(query) && query.length > 1)) {
+      isCompareDateRangeQuery = true;
+    }
+    query = Array.isArray(query) ? query[0] : query;
+    if ((query.timeDimensions || []).some(({ compareDateRange }) => Boolean(compareDateRange))) {
+      isCompareDateRangeQuery = true;
+    }
+
     const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
     const dimensions = query.dimensions || [];
     
@@ -189,7 +199,8 @@ class ResultSet {
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
     const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
     
-    const dimensionFilter = (key) => key === 'measures' || (key !== 'measures' && allDimensions.includes(key));
+    const dimensionFilter = (key) => ['measures', 'compareDateRange'].includes(key)
+      || (key !== 'measures' && allDimensions.includes(key));
     
     pivotConfig.x = pivotConfig.x.concat(
       allDimensions.filter(d => !allIncludedDimensions.includes(d))
@@ -203,14 +214,15 @@ class ResultSet {
       pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
       pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
     }
+    if (isCompareDateRangeQuery && !allIncludedDimensions.find((d) => d === 'compareDateRange')) {
+      pivotConfig.y = ['compareDateRange'].concat(pivotConfig.y);
+    }
     
     return pivotConfig;
   }
   
   normalizePivotConfig(pivotConfig) {
-    const [{ query }] = this.loadResponses;
-    
-    return ResultSet.getNormalizedPivotConfig(query, pivotConfig);
+    return ResultSet.getNormalizedPivotConfig(this.loadResponses.map(({ query }) => query), pivotConfig);
   }
 
   static measureFromAxis(axisValues) {
@@ -309,7 +321,7 @@ class ResultSet {
         unnest,
         uniq
       )(xGrouped);
-  
+      
       return xGrouped.map(([, rows]) => {
         const { xValues } = rows[0];
         const yGrouped = pipe(
@@ -353,11 +365,7 @@ class ResultSet {
   
       return {
         xValues,
-        yValuesArray: unnest(pivots.map((pivot, responseIndex) => {
-          const [{ dateRange }] = this.loadResponses[responseIndex].query.timeDimensions;
-
-          return pivot[index].yValuesArray.map(([members, measure]) => [[dateRange.join(' - ')].concat(members), measure]);
-        }))
+        yValuesArray: unnest(pivots.map((pivot) => pivot[index].yValuesArray))
       };
     });
   }
@@ -427,8 +435,6 @@ class ResultSet {
     };
     
     const pivot = this.pivot(normalizedPivotConfig);
-    // todo: move to pivotConfig?
-    const pivotConfigY = this.loadResponses.length > 1 ? ['compareDateRange'].concat(normalizedPivotConfig.y) : normalizedPivotConfig.y;
     
     (pivot[0] && pivot[0].yValuesArray || []).forEach(([yValues]) => {
       if (yValues.length > 0) {
@@ -437,7 +443,9 @@ class ResultSet {
         yValues.forEach((value, index) => {
           currentItem[value] = {
             key: value,
-            memberId: ['measures', 'compareDateRange'].includes(pivotConfigY[index]) ? value : pivotConfigY[index],
+            memberId: ['measures', 'compareDateRange'].includes(normalizedPivotConfig.y[index])
+              ? value
+              : normalizedPivotConfig.y[index],
             children: (currentItem[value] && currentItem[value].children) || {}
           };
     
@@ -529,27 +537,15 @@ class ResultSet {
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     const [{ annotation }] = this.loadResponses;
-    let seriesNames = [];
-
-    if (this.loadResponses.length > 1) {
-      seriesNames = unnest(this.loadResponses.map((loadResponse, index) => {
-        const [{ dateRange }] = loadResponse.query.timeDimensions;
-        
-        return pipe(
-          map(this.axisValues(pivotConfig.y)),
-          unnest,
-          uniq,
-          map((values) => [dateRange.join(' - ')].concat(values))
-        )(
-          this.timeDimensionBackwardCompatibleData(index)
-        );
-      }));
-    } else {
-      seriesNames = pipe(map(this.axisValues(pivotConfig.y)), unnest, uniq)(
-        this.timeDimensionBackwardCompatibleData()
-      );
-    }
     
+    const seriesNames = unnest(this.loadResponses.map((_, index) => pipe(
+      map(this.axisValues(pivotConfig.y)),
+      unnest,
+      uniq
+    )(
+      this.timeDimensionBackwardCompatibleData(index)
+    )));
+
     return seriesNames.map(axisValues => ({
       title: this.axisValuesString(
         pivotConfig.y.find(d => d === 'measures') ?
@@ -566,7 +562,7 @@ class ResultSet {
   }
 
   query() {
-    if (this.loadResponses.length > 0) {
+    if (this.loadResponses.length > 1) {
       throw new Error('Method is not supported for a comparison query. Please use decompose');
     }
     
@@ -574,7 +570,7 @@ class ResultSet {
   }
 
   rawData() {
-    if (this.loadResponses.length > 0) {
+    if (this.loadResponses.length > 1) {
       throw new Error('Method is not supported for a comparison query. Please use decompose');
     }
     
@@ -582,7 +578,7 @@ class ResultSet {
   }
   
   annotation() {
-    if (this.loadResponses.length > 0) {
+    if (this.loadResponses.length > 1) {
       throw new Error('Method is not supported for a comparison query. Please use decompose');
     }
     
@@ -593,6 +589,7 @@ class ResultSet {
     if (!this.backwardCompatibleData[responseIndex]) {
       const { data, query } = this.loadResponses[responseIndex];
       const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+      const [td] = query.timeDimensions || [];
         
       this.backwardCompatibleData[responseIndex] = data.map(row => (
         {
@@ -605,7 +602,8 @@ class ResultSet {
               ).map(field => (
                 [ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field)), row[field]]
               )))
-          )
+          ),
+          compareDateRange: td && (td.dateRange || []).join(' - ')
         }
       ));
     }
@@ -624,7 +622,6 @@ class ResultSet {
   }
   
   static deserialize(data, options = {}) {
-    // todo: return an array in case of batching
     return new ResultSet(data.loadResponse, options);
   }
 }
