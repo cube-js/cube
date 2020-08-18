@@ -71,7 +71,7 @@ class ResultSet {
     }
 
     const filters = [{
-      dimension: measureName,
+      member: measureName,
       operator: 'measureFilter',
     }];
     const timeDimensions = [];
@@ -104,7 +104,8 @@ class ResultSet {
     return {
       ...measures[measureName].drillMembersGrouped,
       filters,
-      timeDimensions
+      timeDimensions,
+      timezone: this.loadResponse.query.timezone
     };
   }
 
