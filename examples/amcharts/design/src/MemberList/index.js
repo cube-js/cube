@@ -41,7 +41,7 @@ export default function MemberList(props) {
               {member.title && <div className={styles.title}>{member.title}</div>}
             </div>
             <div>
-              <div className={styles.reactions} title={'Top 3 reactions by ' + member.real_name}>
+              <div className={styles.reactions} title={'Top 3 reactions by ' + member.name}>
                 <span role='img' aria-label=''>{member.reactions}</span>
               </div>
             </div>

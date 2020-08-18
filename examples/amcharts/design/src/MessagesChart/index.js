@@ -10,13 +10,13 @@ export default function MessagesChart(props) {
     {
       x: "date",
       y: "messages",
-      color: "rgb(29, 155, 209)",
+      color: "#7A77FF",
       granularity,
     },
     {
       x: "date",
       y: "reactions",
-      color: "rgb(0, 122, 90)",
+      color: "#AFADFF",
       granularity,
     }
   ];

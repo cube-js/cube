@@ -5,8 +5,8 @@
 
 .root {
   background-color: var(--color-bg-sidebar);
-  border-radius: 8px;
-  box-shadow: 0 0 0 1px var(--color-border), 0 4px 12px 0 rgba(0, 0, 0, 0.12);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 0 var(--border-width) var(--color-border), 0 4px 12px 0 rgba(0, 0, 0, 0.12);
   font-size: 15px;
   margin: 0 20%;
   position: absolute;
@@ -14,21 +14,20 @@
 }
 
 .input {
-  border-bottom: solid 1px var(--color-border);
+  border-bottom: solid var(--border-width) var(--color-border);
   display: grid;
   grid-template-columns: min-content auto min-content;
-  grid-gap: 12px;
+  grid-gap: 8px;
   padding: 10px 12px;
 }
 
 .greeting {
-  background-color: rgba(29, 155, 209, 0.1);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-sizing: border-box;
   font-size: 13px;
   font-weight: bold;
   height: 26px;
-  padding: 4px 8px;
+  padding: 4px;
   white-space: nowrap;
 }
 
@@ -50,7 +49,7 @@
   cursor: pointer;
   height: 26px;
   line-height: 26px;
-  padding-right: 12px;
+  padding-right: 8px;
 }
 
 .list {
@@ -64,11 +63,11 @@
   box-sizing: border-box;
   display: grid;
   grid-template-columns: 2.25em auto;
-  grid-gap: 12px;
+  grid-gap: 14px;
   font-size: 16px;
   height: 40px;
   line-height: 30px;
-  padding: 4px 28px 4px;
+  padding: 4px 16px 4px;
 }
 
 .item:hover {

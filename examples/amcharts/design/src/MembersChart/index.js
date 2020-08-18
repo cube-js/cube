@@ -10,12 +10,12 @@ export default function MembersChart(props) {
     {
       x: "date",
       y: "members",
-      color: "rgb(127, 90, 200)"
+      color: "#FF6492"
     },
     {
       x: "date",
       y: "joins",
-      color: "rgb(240, 76, 88)"
+      color: "#FFA2BE"
     }
   ];
 

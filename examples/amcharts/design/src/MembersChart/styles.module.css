@@ -1,14 +1,14 @@
 .root {
   background-color: var(--color-bg-sidebar);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   margin-bottom: 2rem;
   padding: 1.5rem 2rem 0.5rem;
 }
 
 .members {
-  color: var(--color-purple);
+  color: var(--color-red);
 }
 
 .joins {
-  color: var(--color-red);
+  color: var(--color-pink);
 }

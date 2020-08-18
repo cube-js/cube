@@ -41,14 +41,7 @@ class LineChart extends Component {
       series.stroke = am4core.color(option.color);
       series.dataFields.valueY = option.y;
       series.dataFields.dateX = option.x;
-      series.strokeWidth = 2;
-      series.minBulletDistance = 15;
-
-      const bullet = series.bullets.push(new am4charts.CircleBullet());
-      bullet.circle.strokeWidth = 2;
-      bullet.circle.radius = 3;
-      bullet.circle.stroke = am4core.color(option.color);
-      bullet.circle.fill = am4core.color('#fff');
+      series.strokeWidth = 3;
     }
 
     this.chart = chart;

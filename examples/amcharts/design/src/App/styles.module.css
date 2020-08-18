@@ -20,7 +20,7 @@
 
 .filtered {
   background-color: var(--color-bg-link);
-  border-radius: 4px;
+  border-radius: var(--border-radius);
   color: var(--color-fg-link);
   padding: 0.2em 0.5em 0.2em 0.5em;
 }

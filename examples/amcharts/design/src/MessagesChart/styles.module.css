@@ -1,6 +1,7 @@
 .root {
   background-color: var(--color-bg-sidebar);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius);
   margin-bottom: 2rem;
   padding: 1.5rem 2rem 0.5rem;
 }
@@ -10,5 +11,5 @@
 }
 
 .reactions {
-  color: var(--color-green);
+  color: var(--color-purple);
 }
