@@ -10,6 +10,7 @@
     "@cubejs-backend/server": "^0.19.56",
     "@cubejs-backend/sqlite-driver": "^0.19.56",
     "dotenv": "^8.2.0",
+    "moment-timezone": "^0.5.31",
     "node-stream-zip": "^1.11.2",
     "sqlite3": "^5.0.0",
     "uuid": "^8.3.0"

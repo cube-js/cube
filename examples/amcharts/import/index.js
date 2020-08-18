@@ -1,6 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const StreamZip = require('node-stream-zip');
+const moment = require('moment-timezone');
 const sqlite3 = require('sqlite3');
 const { v4: uuid } = require('uuid');
 const schema = require('./schema');
@@ -117,7 +118,7 @@ async function importUsers(runQuery, users) {
       user.profile.image_512,
       user.is_admin,
       user.tz,
-      user.tz_offset,
+      `UTC${moment.tz(user.tz).format('Z')}`,
     ]);
   }
 }

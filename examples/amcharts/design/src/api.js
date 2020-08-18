@@ -285,36 +285,16 @@ export function loadMembersByChannel() {
 
 const membersByTimezoneQuery = {
   measures: ['Users.count'],
-  dimensions: ['Users.tz'],
+  dimensions: ['Users.tz_offset'],
 };
 
 export function loadMembersByTimezone() {
-  return cubejsApi.load(membersByTimezoneQuery).then((result) => {
-    let obj = {};
-
+  return cubejsApi.load(membersByTimezoneQuery).then((result) =>
     result.tablePivot().map((row) => {
-      if (obj[`UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`]) {
-        obj[`UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`] += parseInt(
-          row['Users.count']
-        );
-      } else {
-        obj[`UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`] = parseInt(
-          row['Users.count']
-        );
-      }
-      /*return {
-        id: `UTC${momentTimezone.tz(row['Users.tz']).format('Z')}`,
-        value: parseInt(row['Users.count']),
-      };*/
-    });
-
-    let array = [];
-    for (const key in obj) {
-      array.push({
-        id: key,
-        value: obj[key],
-      });
-    }
-    return array;
-  });
+      return {
+        id: row['Users.tz_offset'],
+        value: row['Users.count'],
+      };
+    })
+  );
 }

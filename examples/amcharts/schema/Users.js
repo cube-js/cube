@@ -46,8 +46,8 @@ cube(`Users`, {
       type: `string`,
     },
     tz_offset: {
-      sql: `${Users}.tz_offset/60/60`,
-      type: `number`,
+      sql: `tz_offset`,
+      type: `string`,
     },
   },
 
