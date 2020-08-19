@@ -8,13 +8,20 @@ const schema = require('./schema');
 
 const dbPath = process.env.CUBEJS_DB_NAME;
 
-async function tryImportSlackArchive(path) {
-  console.log('Importing Slack archive…');
+async function tryInitDatabase() {
+  console.log('Initializing database…');
 
   if (fs.existsSync(dbPath)) {
     console.log('Database file exists, import skipped.');
     return;
   }
+
+  const runQuery = getRunQuery(new sqlite3.Database(dbPath));
+  await clearDatabase(runQuery);
+}
+
+async function tryImportSlackArchive(path, onComplete) {
+  console.log('Importing Slack archive…');
 
   if (!fs.existsSync(path)) {
     console.log('No such file: ' + path);
@@ -53,6 +60,7 @@ async function tryImportSlackArchive(path) {
     }
 
     zip.close();
+    onComplete();
   });
 }
 
@@ -164,4 +172,7 @@ async function importMessages(runQuery, channelId, messages) {
   }
 }
 
-module.exports = tryImportSlackArchive;
+module.exports = {
+  tryInitDatabase,
+  tryImportSlackArchive
+};

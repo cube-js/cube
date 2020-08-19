@@ -1,15 +1,41 @@
 import cubejs from '@cubejs-client/core';
 import emoji from 'node-emoji';
 import moment from 'moment';
+import url from 'url';
 
-import momentTimezone from 'moment-timezone';
+const cubejsApiUrl = process.env.NODE_ENV === 'production'
+  ? `${window.location.origin}/cubejs-api/v1`
+  : process.env.REACT_APP_CUBEJS_API;
+
+function getServerUrl(uri) {
+  const parts = url.parse(uri);
+  return `${parts.protocol}//${parts.host}`;
+}
+
+const serverUrl = getServerUrl(cubejsApiUrl);
 
 export const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl:
-    process.env.NODE_ENV === 'production'
-      ? `${window.location.origin}/cubejs-api/v1`
-      : process.env.REACT_APP_CUBEJS_API,
+  apiUrl: cubejsApiUrl
 });
+
+export function checkHasData() {
+  const query = {
+    measures: ['Channels.count'],
+  };
+
+  return cubejsApi.load(query)
+    .then(result => result.tablePivot().shift()['Channels.count'] > 0);
+}
+
+export function uploadSlackArchive(file) {
+  const body = new FormData();
+  body.append('file', file);
+
+  return fetch(`${serverUrl}/upload`, {
+    method: 'POST',
+    body
+  })
+}
 
 const membersQuery = {
   measures: ['Messages.count'],

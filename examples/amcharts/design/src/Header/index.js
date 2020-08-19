@@ -54,5 +54,5 @@ export default function Header(props) {
 }
 
 Header.propTypes = {
-  onClick: PropTypes.func.isRequired,
+  onClick: PropTypes.func,
 };
