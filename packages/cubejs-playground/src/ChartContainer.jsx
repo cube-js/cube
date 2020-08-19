@@ -323,11 +323,11 @@ class ChartContainer extends React.Component {
             loadSql="only"
             query={query}
             cubejsApi={cubejsApi}
-            render={({ sqlQuery }) => (
-              <PrismCode
-                code={sqlQuery && sqlFormatter.format(sqlQuery.sql())}
-              />
-            )}
+            render={({ sqlQuery }) => {
+              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
+              // in the case of a compareDateRange query the SQL will be the same
+              return <PrismCode code={query && sqlFormatter.format(query.sql())} />
+            }}
           />
         );
       } else if (showCode === 'cache') {

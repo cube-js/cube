@@ -21,7 +21,7 @@ module.exports = {
     'prefer-promise-reject-errors': 0,
     'no-plusplus': 0,
     'no-await-in-loop': 0,
-    'operator-linebreak': ['error', 'after'],
+    'operator-linebreak': 0,
     'max-len': ['error', 120, 2, {
       ignoreUrls: true,
       ignoreComments: false,
@@ -29,7 +29,7 @@ module.exports = {
       ignoreStrings: true,
       ignoreTemplateLiterals: true,
     }],
-    'no-trailing-spaces': ['error', { skipBlankLines: true }],
+    'no-trailing-spaces': ['warn', { skipBlankLines: true }],
     'no-unused-vars': ['warn'],
     'object-curly-newline': 0
   }

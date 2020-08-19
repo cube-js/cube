@@ -147,13 +147,13 @@ describe('resultSet tablePivot and tableColumns', () => {
         expect(resultSet.tablePivot(pivotConfig)).toEqual([
           {
             'Users.country': 'Germany',
-            'male.Orders.count': 10,
-            'female.Orders.count': 12,
+            'male,Orders.count': 10,
+            'female,Orders.count': 12,
           },
           {
             'Users.country': 'US',
-            'male.Orders.count': 5,
-            'female.Orders.count': 7,
+            'male,Orders.count': 5,
+            'female,Orders.count': 7,
           },
         ]);
       });
@@ -180,7 +180,7 @@ describe('resultSet tablePivot and tableColumns', () => {
               {
                 key: 'Orders.count',
                 type: 'number',
-                dataIndex: 'male.Orders.count',
+                dataIndex: 'male,Orders.count',
                 title: 'Orders Count',
                 shortTitle: 'Count',
                 format: undefined,
@@ -199,7 +199,7 @@ describe('resultSet tablePivot and tableColumns', () => {
               {
                 key: 'Orders.count',
                 type: 'number',
-                dataIndex: 'female.Orders.count',
+                dataIndex: 'female,Orders.count',
                 title: 'Orders Count',
                 shortTitle: 'Count',
                 format: undefined,
@@ -220,10 +220,10 @@ describe('resultSet tablePivot and tableColumns', () => {
       test('tablePivot', () => {
         expect(resultSet.tablePivot(pivotConfig)).toEqual([
           {
-            'Germany.male.Orders.count': 10,
-            'Germany.female.Orders.count': 12,
-            'US.male.Orders.count': 5,
-            'US.female.Orders.count': 7,
+            'Germany,male,Orders.count': 10,
+            'Germany,female,Orders.count': 12,
+            'US,male,Orders.count': 5,
+            'US,female,Orders.count': 7,
           },
         ]);
       });
@@ -249,7 +249,7 @@ describe('resultSet tablePivot and tableColumns', () => {
                   {
                     key: 'Orders.count',
                     type: 'number',
-                    dataIndex: 'Germany.male.Orders.count',
+                    dataIndex: 'Germany,male,Orders.count',
                     title: 'Orders Count',
                     shortTitle: 'Count',
                     meta: undefined,
@@ -268,7 +268,7 @@ describe('resultSet tablePivot and tableColumns', () => {
                   {
                     key: 'Orders.count',
                     type: 'number',
-                    dataIndex: 'Germany.female.Orders.count',
+                    dataIndex: 'Germany,female,Orders.count',
                     title: 'Orders Count',
                     shortTitle: 'Count',
                     meta: undefined,
@@ -297,7 +297,7 @@ describe('resultSet tablePivot and tableColumns', () => {
                   {
                     key: 'Orders.count',
                     type: 'number',
-                    dataIndex: 'US.male.Orders.count',
+                    dataIndex: 'US,male,Orders.count',
                     title: 'Orders Count',
                     shortTitle: 'Count',
                     meta: undefined,
@@ -316,7 +316,7 @@ describe('resultSet tablePivot and tableColumns', () => {
                   {
                     key: 'Orders.count',
                     type: 'number',
-                    dataIndex: 'US.female.Orders.count',
+                    dataIndex: 'US,female,Orders.count',
                     title: 'Orders Count',
                     shortTitle: 'Count',
                     meta: undefined,
@@ -531,17 +531,17 @@ describe('resultSet tablePivot and tableColumns', () => {
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
         {
           'Users.country': 'Germany',
-          'male.Orders.count': 10,
-          'female.Orders.count': 12,
-          'male.Orders.amount': 11,
-          'female.Orders.amount': 13,
+          'male,Orders.count': 10,
+          'female,Orders.count': 12,
+          'male,Orders.amount': 11,
+          'female,Orders.amount': 13,
         },
         {
           'Users.country': 'US',
-          'male.Orders.count': 5,
-          'female.Orders.count': 7,
-          'male.Orders.amount': 6,
-          'female.Orders.amount': 8,
+          'male,Orders.count': 5,
+          'female,Orders.count': 7,
+          'male,Orders.amount': 6,
+          'female,Orders.amount': 8,
         },
       ]);
     });
@@ -554,14 +554,14 @@ describe('resultSet tablePivot and tableColumns', () => {
 
       expect(resultSet.tablePivot(pivotConfig)).toEqual([
         {
-          'Germany.male.Orders.count': 10,
-          'Germany.male.Orders.amount': 11,
-          'Germany.female.Orders.count': 12,
-          'Germany.female.Orders.amount': 13,
-          'US.male.Orders.count': 5,
-          'US.male.Orders.amount': 6,
-          'US.female.Orders.count': 7,
-          'US.female.Orders.amount': 8,
+          'Germany,male,Orders.count': 10,
+          'Germany,male,Orders.amount': 11,
+          'Germany,female,Orders.count': 12,
+          'Germany,female,Orders.amount': 13,
+          'US,male,Orders.count': 5,
+          'US,male,Orders.amount': 6,
+          'US,female,Orders.count': 7,
+          'US,female,Orders.amount': 8,
         },
       ]);
     });

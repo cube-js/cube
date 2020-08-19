@@ -356,7 +356,8 @@ describe('ResultSet', () => {
       expect(resultSet.normalizePivotConfig({ y: ['Foo.bar'] })).toEqual({
         x: ['Foo.createdAt.day'],
         y: ['Foo.bar'],
-        fillMissingDates: true
+        fillMissingDates: true,
+        joinDateRange: false
       });
     });
 
@@ -378,7 +379,8 @@ describe('ResultSet', () => {
       ).toEqual({
         x: ['Foo.createdAt.day'],
         y: ['Foo.bar'],
-        fillMissingDates: true
+        fillMissingDates: true,
+        joinDateRange: false
       });
     });
 
@@ -403,7 +405,8 @@ describe('ResultSet', () => {
       ).toEqual({
         x: ['Orders.createdAt'],
         y: [],
-        fillMissingDates: true
+        fillMissingDates: true,
+        joinDateRange: false
       });
     });
 
@@ -428,7 +431,8 @@ describe('ResultSet', () => {
       ).toEqual({
         x: ['Orders.createdAt.day'],
         y: [],
-        fillMissingDates: true
+        fillMissingDates: true,
+        joinDateRange: false
       });
     });
 
@@ -454,7 +458,8 @@ describe('ResultSet', () => {
       ).toEqual({
         x: ['Orders.createdAt.day', 'Orders.createdAt'],
         y: [],
-        fillMissingDates: true
+        fillMissingDates: true,
+        joinDateRange: false
       });
     });
   });
