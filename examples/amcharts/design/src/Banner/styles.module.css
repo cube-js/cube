@@ -15,3 +15,12 @@
 em {
   font-style: italic;
 }
+
+.buttons {
+  display: inline-grid;
+  grid-gap: 12px;
+  grid-template-columns: auto auto auto;
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+}

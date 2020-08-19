@@ -6,7 +6,7 @@
 }
 
 .content {
-  padding: 4rem 2rem;
+  padding: 3.5rem 2rem 2rem;
 }
 
 .header {
@@ -25,16 +25,9 @@
   padding: 0.2em 0.5em 0.2em 0.5em;
 }
 
-.block {
-  background-color: var(--color-bg-sidebar);
-  border: 1px solid var(--color-border);
-  margin-bottom: 2rem;
-  padding: 2rem;
-}
-
 .sidebar {
   background-color: var(--color-bg-sidebar);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  border-left: var(--border-width) solid var(--color-border);
   padding: 4rem 2rem;
   min-width: 350px;
 }

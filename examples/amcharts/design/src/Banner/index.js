@@ -7,8 +7,17 @@ export default function Banner() {
       <div className={styles.banner}>
         <p><em>Slack Vibe</em> is created and powered by <em>Cube.js</em>, an&nbsp;open source analytical
           data access layer for modern web applications.</p>
-        <p>Learn more at <a href='https://cube.dev' target='_blank' rel='noopener noreferrer'>cube.dev</a> and <a
-          href='https://github.com/cube-js/cube.js' target='_blank' rel='noopener noreferrer'>GitHub</a>.</p>
+        <ul className={styles.buttons}>
+          <li>
+            <a href='https://cube.dev'
+               className='button'
+               target='_blank'
+               rel='noopener noreferrer'
+            >
+              Learn more about Cube.js
+            </a>
+          </li>
+        </ul>
       </div>
     </div>
   )

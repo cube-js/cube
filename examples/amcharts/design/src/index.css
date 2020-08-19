@@ -78,7 +78,7 @@ a:hover {
   border-bottom: solid 1px var(--color-fg-link);
 }
 
-button {
+button, a.button {
   background: #fff;
   border: none;
   box-shadow: inset 0 0 0 var(--border-width) var(--color-border);
@@ -93,13 +93,13 @@ button {
   white-space: nowrap;
 }
 
-button:hover {
+button:hover, a.button:hover {
   border: none;
   cursor: pointer;
   box-shadow: inset 0 0 0 var(--border-width) rgba(0, 0, 0, 0.3);
 }
 
-button:active {
+button:active, a.button:active {
   background: #f8f8f8;
   box-shadow: inset 0 0 0 var(--border-width) rgba(0, 0, 0, 0.3);
 }

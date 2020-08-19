@@ -1,13 +1,11 @@
 .root {
   box-sizing: border-box;
-  height: 12.5rem;
-  padding-top: 1.5rem;
+  height: 13rem;
 }
 
 .logo {
   margin: auto;
   text-align: center;
-  max-width: 425px;
 }
 
 .logo h1 {
@@ -31,4 +29,15 @@
   font-size: 15px;
   line-height: 1.3;
   color: var(--color-fg-secondary);
+  margin: 0 auto 6px;
+  max-width: 425px;
+}
+
+.buttons {
+  display: inline-grid;
+  grid-gap: 12px;
+  grid-template-columns: auto auto auto;
+  list-style: none;
+  margin-top: 12px;
+  padding: 0;
 }
