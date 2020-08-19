@@ -1,5 +1,3 @@
-# Open Source Analytics for Slack
+# Slack Vibe
 
-## How to Run
-
-To start the Cube.js server with data imported from your Slack export ZIP file, run `npm start path-to-slack-export-file.zip`. Data will be imported into an embedded SQLite database and stored into `db.sqlite`. Remove this file to re-import the data.
+Data is put into the `db.sqlite` file used by an embedded SQLite database. Remove this file to re-import the data.
