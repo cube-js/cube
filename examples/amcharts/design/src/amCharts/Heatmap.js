@@ -36,8 +36,8 @@ class Heatmap extends Component {
     series.sequencedInterpolation = true;
 
     const columnTemplate = series.columns.template;
-    columnTemplate.strokeWidth = 1;
-    columnTemplate.strokeOpacity = 0.2;
+    columnTemplate.strokeWidth = 3;
+    columnTemplate.strokeOpacity = 1;
     columnTemplate.stroke = new am4core.color('#fff');
     columnTemplate.width = am4core.percent(100);
     columnTemplate.height = am4core.percent(100);
@@ -46,7 +46,7 @@ class Heatmap extends Component {
       target: columnTemplate,
       property: 'fill',
       min: new am4core.color('#fff'),
-      max: new am4core.color('#616061'),
+      max: new am4core.color('#6DE6A4'),
     });
 
     this.chart = chart;
