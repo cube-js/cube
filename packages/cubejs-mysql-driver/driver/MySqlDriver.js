@@ -3,6 +3,7 @@ const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const crypto = require('crypto');
+const DremioDriver = require('./DremioDriver');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
@@ -203,4 +204,4 @@ class MySqlDriver extends BaseDriver {
   }
 }
 
-module.exports = MySqlDriver;
+module.exports = DremioDriver;
