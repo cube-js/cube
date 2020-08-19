@@ -443,7 +443,7 @@ class ResultSet {
         yValues.forEach((value, index) => {
           currentItem[value] = {
             key: value,
-            memberId: ['measures', 'compareDateRange'].includes(normalizedPivotConfig.y[index])
+            memberId: normalizedPivotConfig.y[index] === 'measures'
               ? value
               : normalizedPivotConfig.y[index],
             children: (currentItem[value] && currentItem[value].children) || {}
