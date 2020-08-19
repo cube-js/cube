@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "build": "node index.js"
   },
   "dependencies": {
     "@cubejs-backend/server": "^0.19.56",

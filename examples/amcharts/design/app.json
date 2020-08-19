@@ -1,0 +1,7 @@
+{
+  "name": "Slack Vibe by Cube.js",
+  "description": "More analytics for you Slack channel",
+  "repository": "https://github.com/cube-js/cube.js",
+  "logo": "https://camo.githubusercontent.com/14c922dcfefeea0334c16ad7fb66026ab60e10e2/68747470733a2f2f692e696d6775722e636f6d2f7a5948586d346f2e706e67",
+  "keywords": ["cubejs", "slack", "static"]
+}
