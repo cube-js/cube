@@ -42,7 +42,7 @@ class Bubble extends Component {
 
     const bullet = series.bullets.push(new am4core.Circle());
     bullet.strokeWidth = 0;
-    bullet.fill = am4core.color('#616061');
+    bullet.fill = am4core.color('#7A77FF');
 
     bullet.adapter.add('tooltipY', function (tooltipY, target) {
       return -target.radius + 1;
@@ -51,8 +51,8 @@ class Bubble extends Component {
     series.heatRules.push({
       property: 'radius',
       target: bullet,
-      min: 2,
-      max: 12,
+      min: 3,
+      max: 13,
     });
 
     bullet.hiddenState.properties.scale = 0.01;

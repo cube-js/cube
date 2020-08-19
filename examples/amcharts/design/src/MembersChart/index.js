@@ -22,7 +22,8 @@ export default function MembersChart(props) {
   return (
     <div className={styles.root}>
       <h2>
-        <span className={styles.members}>Members</span> and <span className={styles.joins}>joins</span>
+        <span className={styles.members}>All members</span> and{' '}
+        <span className={styles.joins}>new members</span>
       </h2>
       <LineChart data={data} options={options} />
     </div>

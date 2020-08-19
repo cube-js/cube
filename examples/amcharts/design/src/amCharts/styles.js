@@ -3,7 +3,7 @@ import * as am4core from "@amcharts/amcharts4/core"
 export function styleAxis(axis) {
   axis.fontSize = '11px';
   axis.fontWeight = '400';
-  axis.renderer.labels.template.fill = am4core.color('#616061');
+  axis.renderer.labels.template.fill = am4core.color('#141446');
 }
 
 const formats = {

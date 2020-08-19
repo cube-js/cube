@@ -5,10 +5,10 @@
   padding: 1.5rem 2rem 0.5rem;
 }
 
-.members {
-  color: var(--color-purple);
+.root h2 {
+  cursor: help;
 }
 
-.joins {
-  color: var(--color-red);
+.messages {
+  color: var(--color-green);
 }
