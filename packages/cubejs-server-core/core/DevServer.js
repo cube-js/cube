@@ -79,6 +79,11 @@ class DevServer {
       if (!req.body) {
         throw new Error(`Your express app config is missing body-parser middleware. Typical config can look like: \`app.use(bodyParser.json({ limit: '50mb' }));\``);
       }
+
+      if (!req.body.tables) {
+        throw new Error(`You have to select at least one table`);
+      }
+
       const driver = await this.cubejsServer.getDriver();
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 

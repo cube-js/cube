@@ -110,7 +110,7 @@ class SchemaPage extends Component {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        tables: checkedKeys.filter((k) => k.split('.').length === 2),
+        tables: checkedKeys.filter((k) => k.split(/\.(?=[^\.]+$)/).length === 2),
         tablesSchema,
       }),
     });
