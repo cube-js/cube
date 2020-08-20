@@ -4,16 +4,16 @@ const BaseQuery = require('@cubejs-backend/schema-compiler/adapter/BaseQuery');
 const BaseFilter = require('@cubejs-backend/schema-compiler/adapter/BaseFilter');
 
 const GRANULARITY_TO_INTERVAL = {
-  day: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
-  week: (date) => `DATE_FORMAT(date_add('1900-01-01', interval TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
-  hour: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000')`,
-  minute: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:00.000')`,
-  second: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:%S.000')`,
-  month: (date) => `DATE_FORMAT(${date}, '%Y-%m-01T00:00:00.000')`,
-  year: (date) => `DATE_FORMAT(${date}, '%Y-01-01T00:00:00.000')`
+  week: (date) => `DATE_TRUNC('week', ${date})`,
+  second: (date) => `DATE_TRUNC('second', ${date})`,
+  minute: (date) => `DATE_TRUNC('minute', ${date})`,
+  hour: (date) => `DATE_TRUNC('hour', ${date})`,
+  day: (date) => `DATE_TRUNC('day', ${date})`,
+  month: (date) => `DATE_TRUNC('month', ${date})`,
+  year: (date) => `DATE_TRUNC('year', ${date})`
 };
 
-class MysqlFilter extends BaseFilter {
+class DremioFilter extends BaseFilter {
   likeIgnoreCase(column, not) {
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ?, '%')`;
   }
@@ -21,15 +21,21 @@ class MysqlFilter extends BaseFilter {
 
 class DremioQuery extends BaseQuery {
   newFilter(filter) {
-    return new MysqlFilter(this, filter);
+    return new DremioFilter(this, filter);
   }
 
   convertTz(field) {
-    return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
+
+    const targetTZ = moment().tz(this.timezone).format('Z')
+    if(this.timezone == targetTZ || targetTZ == '+00:00' && this.timezone == 'UTC')
+    {
+      return field
+    }
+    return `CONVERT_TIMEZONE('${this.timezone}', '${targetTZ}', ${field})`;
   }
 
-  timeStampCast(value) {
-    return `TIMESTAMP(convert_tz(${value}, '+00:00', @@session.time_zone))`;
+  timeStampCast(value) { 
+    return `CAST(${value} as TIMESTAMP)` 
   }
 
   inDbTimeZone(date) {
@@ -37,7 +43,7 @@ class DremioQuery extends BaseQuery {
   }
 
   dateTimeCast(value) {
-    return `TIMESTAMP(${value})`;
+    return `TO_TIMESTAMP(${value})`;
   }
 
   subtractInterval(date, interval) {
