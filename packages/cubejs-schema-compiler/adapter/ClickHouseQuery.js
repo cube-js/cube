@@ -216,7 +216,7 @@ class ClickHouseQuery extends BaseQuery {
     }
     const firstIndexName = Object.keys(preAggregation.indexes)[0];
     const indexColumns = this.evaluateIndexColumns(cube, preAggregation.indexes[firstIndexName]);
-    return [`CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY ${indexColumns.join(', ')} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+    return [`CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY (${indexColumns.join(', ')}) ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
   createIndexSql(indexName, tableName, escapedColumns) {
