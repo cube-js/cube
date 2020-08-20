@@ -28,8 +28,18 @@ const loadResponses = [
         dimensions: [],
       },
       data: [
-        { 'Orders.ts.day': '2020-08-10T00:00:00.000', 'Orders.ts': '2020-08-10T00:00:00.000', 'Orders.count': 1 },
-        { 'Orders.ts.day': '2020-08-12T00:00:00.000', 'Orders.ts': '2020-08-12T00:00:00.000', 'Orders.count': 1 },
+        {
+          'Orders.ts.day': '2020-08-10T00:00:00.000',
+          'Orders.ts': '2020-08-10T00:00:00.000',
+          'Orders.count': 1,
+          compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
+        },
+        {
+          'Orders.ts.day': '2020-08-12T00:00:00.000',
+          'Orders.ts': '2020-08-12T00:00:00.000',
+          'Orders.count': 1,
+          compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
+        },
       ],
       annotation: {
         measures: {
@@ -65,10 +75,30 @@ const loadResponses = [
         dimensions: [],
       },
       data: [
-        { 'Orders.ts.day': '2020-08-03T00:00:00.000', 'Orders.ts': '2020-08-03T00:00:00.000', 'Orders.count': 2 },
-        { 'Orders.ts.day': '2020-08-04T00:00:00.000', 'Orders.ts': '2020-08-04T00:00:00.000', 'Orders.count': 1 },
-        { 'Orders.ts.day': '2020-08-06T00:00:00.000', 'Orders.ts': '2020-08-06T00:00:00.000', 'Orders.count': 1 },
-        { 'Orders.ts.day': '2020-08-08T00:00:00.000', 'Orders.ts': '2020-08-08T00:00:00.000', 'Orders.count': 1 },
+        {
+          'Orders.ts.day': '2020-08-03T00:00:00.000',
+          'Orders.ts': '2020-08-03T00:00:00.000',
+          'Orders.count': 2,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+        },
+        {
+          'Orders.ts.day': '2020-08-04T00:00:00.000',
+          'Orders.ts': '2020-08-04T00:00:00.000',
+          'Orders.count': 1,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+        },
+        {
+          'Orders.ts.day': '2020-08-06T00:00:00.000',
+          'Orders.ts': '2020-08-06T00:00:00.000',
+          'Orders.count': 1,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+        },
+        {
+          'Orders.ts.day': '2020-08-08T00:00:00.000',
+          'Orders.ts': '2020-08-08T00:00:00.000',
+          'Orders.count': 1,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+        },
       ],
       annotation: {
         measures: {
@@ -111,12 +141,14 @@ const loadResponses = [
           'Orders.ts.day': '2020-08-10T00:00:00.000',
           'Orders.ts': '2020-08-10T00:00:00.000',
           'Orders.count': 1,
+          compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
         },
         {
           'Users.country': 'France',
           'Orders.ts.day': '2020-08-12T00:00:00.000',
           'Orders.ts': '2020-08-12T00:00:00.000',
           'Orders.count': 1,
+          compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
         },
       ],
       annotation: {
@@ -171,24 +203,28 @@ const loadResponses = [
           'Orders.ts.day': '2020-08-03T00:00:00.000',
           'Orders.ts': '2020-08-03T00:00:00.000',
           'Orders.count': 2,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
         },
         {
           'Users.country': 'France',
           'Orders.ts.day': '2020-08-04T00:00:00.000',
           'Orders.ts': '2020-08-04T00:00:00.000',
           'Orders.count': 1,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
         },
         {
           'Users.country': 'US',
           'Orders.ts.day': '2020-08-06T00:00:00.000',
           'Orders.ts': '2020-08-06T00:00:00.000',
           'Orders.count': 1,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
         },
         {
           'Users.country': 'France',
           'Orders.ts.day': '2020-08-08T00:00:00.000',
           'Orders.ts': '2020-08-08T00:00:00.000',
           'Orders.count': 1,
+          compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
         },
       ],
       annotation: {

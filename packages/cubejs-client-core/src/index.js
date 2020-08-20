@@ -170,15 +170,18 @@ class CubejsApi {
   load(query, options, callback) {
     return this.loadMethod(
       () => this.request('load', { query }),
-      (response) => {
-        if (Array.isArray(response) && Array.isArray(query)) {
-          return response.map((currentResponse) => new ResultSet(currentResponse, {
-            parseDateMeasures: this.parseDateMeasures
-          }));
-        }
-        
-        return new ResultSet(response, { parseDateMeasures: this.parseDateMeasures });
-      },
+      (response) => new ResultSet(response, { parseDateMeasures: this.parseDateMeasures }),
+      options,
+      callback
+    );
+  }
+
+  loadMany(queries, options, callback) {
+    return this.loadMethod(
+      () => this.request('load', { query: queries }),
+      (responses) => responses.map((response) => new ResultSet(response, {
+        parseDateMeasures: this.parseDateMeasures
+      })),
       options,
       callback
     );

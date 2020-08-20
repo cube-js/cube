@@ -12,6 +12,13 @@ const CubejsHandlerError = require('./CubejsHandlerError');
 const SubscriptionServer = require('./SubscriptionServer');
 const LocalSubscriptionStore = require('./LocalSubscriptionStore');
 
+const QUERY_TYPE = {
+  REGULAR_QUERY: 'REGULAR_QUERY',
+  BATCH_QUERY: 'BATCH_QUERY',
+  COMPARE_DATE_RANGE_QUERY: 'COMPARE_DATE_RANGE_QUERY',
+  BLENDING_QUERY: 'BLENDING_QUERY',
+};
+
 const toConfigMap = (metaConfig) => (
   R.pipe(
     R.map(c => [c.config.name, c.config]),
@@ -72,39 +79,58 @@ const transformValue = (value, type) => {
   return value && value.value ? value.value : value; // TODO move to sql adapter
 };
 
+const transformData = (aliasToMemberNameMap, annotation, data, query, queryType) => (data.map(r => {
+  const row = R.pipe(
+    R.toPairs,
+    R.map(p => {
+      const memberName = aliasToMemberNameMap[p[0]];
+      const annotationForMember = annotation[memberName];
 
-const transformData = (aliasToMemberNameMap, annotation, data, query) => (data.map(r => R.pipe(
-  R.toPairs,
-  R.map(p => {
-    const memberName = aliasToMemberNameMap[p[0]];
-    const annotationForMember = annotation[memberName];
-    if (!annotationForMember) {
-      throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
-    }
-    const transformResult = [
-      memberName,
-      transformValue(p[1], annotationForMember.type)
-    ];
+      if (!annotationForMember) {
+        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
+      }
 
-    const path = memberName.split('.');
-
-    // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-    const memberNameWithoutGranularity = [path[0], path[1]].join('.');
-    if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
-      return [
-        transformResult,
-        [
-          memberNameWithoutGranularity,
-          transformResult[1]
-        ]
+      const transformResult = [
+        memberName,
+        transformValue(p[1], annotationForMember.type)
       ];
-    }
 
-    return [transformResult];
-  }),
-  R.unnest,
-  R.fromPairs
-)(r)));
+      const path = memberName.split('.');
+
+      // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
+      const memberNameWithoutGranularity = [path[0], path[1]].join('.');
+      if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
+        return [
+          transformResult,
+          [
+            memberNameWithoutGranularity,
+            transformResult[1]
+          ]
+        ];
+      }
+
+      return [transformResult];
+    }),
+    R.unnest,
+    R.fromPairs
+  )(r);
+  
+  const [{ dimension, granularity, dateRange }] = query.timeDimensions;
+  
+  if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
+    return {
+      ...row,
+      compareDateRange: dateRange.join(' - ')
+    };
+  } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+    return {
+      ...row,
+      [['dateTime', granularity].join('.')]: row[[dimension, granularity].join('.')]
+    };
+  }
+  
+  return row;
+}));
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
@@ -349,6 +375,14 @@ class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+
+    app.get(`${this.basePath}/v1/dry-run`, this.requestMiddleware, (async (req, res) => {
+      await this.dryRun({
+        query: req.query.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
   }
 
   initSubscriptionServer(sendMessage) {
@@ -388,9 +422,19 @@ class ApiGateway {
   }
   
   async getNormalizedQueries(query, context) {
-    query = this.compareDateRangeTransformer(this.parseQueryParam(query));
-    const queries = Array.isArray(query) ? query : [query];
+    query = this.parseQueryParam(query);
+    let queryType = QUERY_TYPE.REGULAR_QUERY;
     
+    if (!Array.isArray(query)) {
+      query = this.compareDateRangeTransformer(query);
+      if (Array.isArray(query)) {
+        queryType = QUERY_TYPE.COMPARE_DATE_RANGE_QUERY;
+      }
+    } else {
+      queryType = QUERY_TYPE.BLENDING_QUERY;
+    }
+    
+    const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
       queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
     );
@@ -399,16 +443,14 @@ class ApiGateway {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
     
-    return normalizedQueries;
+    return [queryType, normalizedQueries];
   }
   
-  async sql({
-    query, context, res
-  }) {
+  async sql({ query, context, res }) {
     const requestStarted = new Date();
     
     try {
-      const normalizedQueries = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
       
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
@@ -419,15 +461,39 @@ class ApiGateway {
       
       const toQuery = (sqlQuery) => ({
         ...sqlQuery,
-        order: R.fromPairs(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
+        order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
       });
+
+      res(queryType === QUERY_TYPE.REGULAR_QUERY ?
+        { sql: toQuery(sqlQueries[0]) } :
+        sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
+      });
+    }
+  }
+  
+  async dryRun({ query, context, res }) {
+    const requestStarted = new Date();
+    
+    try {
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
       
-      res(Array.isArray(query) || normalizedQueries.length > 1 ?
-        sqlQueries.map((sqlQuery) => ({
-          sql: toQuery(sqlQuery)
-        })) : {
-          sql: toQuery(sqlQueries[0])
-        });
+      const sqlQueries = await Promise.all(
+        normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
+          coerceForSqlQuery(normalizedQuery, context),
+          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+        ))
+      );
+
+      res({
+        queryType,
+        normalizedQueries,
+        queryOrder: sqlQueries.map((sqlQuery) => R.fromPairs(
+          sqlQuery.order.map(({ id: member, desc }) => [member, desc ? 'desc' : 'asc'])
+        ))
+      });
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
@@ -435,9 +501,7 @@ class ApiGateway {
     }
   }
 
-  async load({
-    query, context, res
-  }) {
+  async load({ query, context, res }) {
     const requestStarted = new Date();
     
     try {
@@ -445,7 +509,7 @@ class ApiGateway {
         type: 'Load Request',
         query
       });
-      const normalizedQueries = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
       
       const [metaConfigResult, ...sqlQueries] = await Promise.all(
         [
@@ -494,7 +558,13 @@ class ApiGateway {
   
         return {
           query: normalizedQuery,
-          data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data, normalizedQuery),
+          data: transformData(
+            aliasToMemberNameMap,
+            flattenAnnotation,
+            response.data,
+            normalizedQuery,
+            queryType
+          ),
           lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
           ...(process.env.NODE_ENV === 'production' ? undefined : {
             refreshKeyValues: response.refreshKeyValues,
@@ -509,7 +579,11 @@ class ApiGateway {
         query,
         duration: this.duration(requestStarted)
       });
-      res(Array.isArray(query) || normalizedQueries.length > 1 ? results : results[0]);
+      
+      res({
+        queryType,
+        results
+      });
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted

@@ -44,10 +44,18 @@ const groupByToPairs = (keyFn) => {
   };
 };
 
+const QUERY_TYPE = {
+  REGULAR_QUERY: 'REGULAR_QUERY',
+  BATCH_QUERY: 'BATCH_QUERY',
+  COMPARE_DATE_RANGE_QUERY: 'COMPARE_DATE_RANGE_QUERY',
+  BLENDING_QUERY: 'BLENDING_QUERY',
+};
+
 class ResultSet {
   constructor(loadResponse, options = {}) {
     this.loadResponse = loadResponse;
-    this.loadResponses = Array.isArray(loadResponse) ? loadResponse : [loadResponse];
+    this.queryType = loadResponse.queryType;
+    this.loadResponses = loadResponse.results;
     this.parseDateMeasures = options.parseDateMeasures;
     this.options = options;
     
@@ -66,7 +74,7 @@ class ResultSet {
     normalizedPivotConfig.x.forEach((member, currentIndex) => values.push([member, xValues[currentIndex]]));
     normalizedPivotConfig.y.forEach((member, currentIndex) => values.push([member, yValues[currentIndex]]));
 
-    const { measures } = this.loadResponse.annotation;
+    const { measures } = this.loadResponses[0].annotation;
     let [, measureName] = values.find(([member]) => member === 'measues') || [];
 
     if (measureName === undefined) {
@@ -112,7 +120,7 @@ class ResultSet {
       ...measures[measureName].drillMembersGrouped,
       filters,
       timeDimensions,
-      timezone: this.loadResponse.query.timezone
+      timezone: this.loadResponses[0].query.timezone
     };
   }
 
@@ -153,28 +161,109 @@ class ResultSet {
     return `${td.dimension}.${td.granularity}`;
   }
 
-  static getNormalizedPivotConfig(query, pivotConfig = null) {
+  // static getNormalizedPivotConfig(query, pivotConfig = null) {
+  //   const defaultPivotConfig = {
+  //     x: [],
+  //     y: [],
+  //     fillMissingDates: true,
+  //     joinDateRange: false
+  //   };
+    
+  //   let isCompareDateRangeQuery = false;
+  //   if ((Array.isArray(query) && query.length > 1)) {
+  //     isCompareDateRangeQuery = true;
+  //   }
+  //   query = Array.isArray(query) ? query[0] : query;
+  //   if ((query.timeDimensions || []).some(({ compareDateRange }) => Boolean(compareDateRange))) {
+  //     isCompareDateRangeQuery = true;
+  //   }
+
+  //   const timeDimensions = (query.timeDimensions || []).filter(td => Boolean(td.granularity));
+  //   const dimensions = query.dimensions || [];
+    
+  //   pivotConfig = pivotConfig || (timeDimensions.length ? {
+  //     x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
+  //     y: dimensions
+  //   } : {
+  //     x: dimensions,
+  //     y: []
+  //   });
+    
+  //   pivotConfig = mergeDeepLeft(pivotConfig, defaultPivotConfig);
+
+  //   const substituteTimeDimensionMembers = axis => axis.map(
+  //     subDim => (
+  //       (
+  //         timeDimensions.find(td => td.dimension === subDim) &&
+  //         !dimensions.find(d => d === subDim)
+  //       ) ?
+  //         ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
+  //         subDim
+  //     )
+  //   );
+
+  //   pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x);
+  //   pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y);
+
+  //   const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
+  //   const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
+    
+  //   const dimensionFilter = (key) => ['measures', 'compareDateRange'].includes(key)
+  //     || (key !== 'measures' && allDimensions.includes(key));
+    
+  //   pivotConfig.x = pivotConfig.x.concat(
+  //     allDimensions.filter(d => !allIncludedDimensions.includes(d))
+  //   ).filter(dimensionFilter);
+  //   pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
+    
+  //   if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
+  //     pivotConfig.y.push('measures');
+  //   }
+  //   if (!(query.measures || []).length) {
+  //     pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
+  //     pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
+  //   }
+  //   if (isCompareDateRangeQuery && !allIncludedDimensions.find((d) => d === 'compareDateRange')) {
+  //     pivotConfig.y = ['compareDateRange'].concat(pivotConfig.y);
+  //   }
+    
+  //   return pivotConfig;
+  // }
+  
+  static getNormalizedPivotConfig(loadResponse, pivotConfig = null) {
+    const { queryType, results } = loadResponse;
+    const queries = results.map(({ query }) => query);
+    
     const defaultPivotConfig = {
       x: [],
       y: [],
       fillMissingDates: true,
       joinDateRange: false
     };
-    
-    let isCompareDateRangeQuery = false;
-    if ((Array.isArray(query) && query.length > 1)) {
-      isCompareDateRangeQuery = true;
-    }
-    query = Array.isArray(query) ? query[0] : query;
-    if ((query.timeDimensions || []).some(({ compareDateRange }) => Boolean(compareDateRange))) {
-      isCompareDateRangeQuery = true;
-    }
 
-    const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
-    const dimensions = query.dimensions || [];
+    const timeDimensions = uniq(
+      queries.reduce(
+        (memo, query) => memo.concat((query.timeDimensions || []).filter(td => Boolean(td.granularity))), []
+      )
+    );
+    const allTimeDimensions = queries.reduce(
+      (memo, query) => memo.concat((query.timeDimensions || [])), []
+    );
+    const allTimeDimensionKeys = allTimeDimensions.map((td) => ResultSet.timeDimensionMember(td));
+    const dimensions = uniq(queries.reduce((memo, query) => memo.concat(query.dimensions || []), []));
+    const measures = uniq(queries.reduce((memo, query) => memo.concat(query.measures || []), []));
+    const [{ granularity }] = timeDimensions || [{}];
+    
+    if (!granularity && queryType === QUERY_TYPE.BLENDING_QUERY) {
+      throw new Error('granularity must be specified for a data blending query');
+    }
+    
+    const dateTimeDimension = granularity && `dateTime.${granularity}` || '';
     
     pivotConfig = pivotConfig || (timeDimensions.length ? {
-      x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
+      x: queryType === QUERY_TYPE.BLENDING_QUERY
+        ? [dateTimeDimension]
+        : timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
       y: dimensions
     } : {
       x: dimensions,
@@ -182,14 +271,15 @@ class ResultSet {
     });
     
     pivotConfig = mergeDeepLeft(pivotConfig, defaultPivotConfig);
-
+    
     const substituteTimeDimensionMembers = axis => axis.map(
       subDim => (
         (
           timeDimensions.find(td => td.dimension === subDim) &&
-          !dimensions.find(d => d === subDim)
+          !dimensions.find(d => d === subDim) &&
+          subDim !== dateTimeDimension
         ) ?
-          ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
+          ResultSet.timeDimensionMember(allTimeDimensions.find(td => td.dimension === subDim)) :
           subDim
       )
     );
@@ -200,22 +290,28 @@ class ResultSet {
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
     const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
     
-    const dimensionFilter = (key) => ['measures', 'compareDateRange'].includes(key)
+    if (dateTimeDimension) {
+      allIncludedDimensions.push(dateTimeDimension);
+    }
+    
+    const dimensionFilter = (key) => ['measures', 'compareDateRange', dateTimeDimension].includes(key)
       || (key !== 'measures' && allDimensions.includes(key));
     
     pivotConfig.x = pivotConfig.x.concat(
       allDimensions.filter(d => !allIncludedDimensions.includes(d))
-    ).filter(dimensionFilter);
+    )
+      .filter(dimensionFilter)
+      .filter((key) => dateTimeDimension && !allTimeDimensionKeys.includes(key));
     pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
     
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y.push('measures');
     }
-    if (!(query.measures || []).length) {
+    if (!measures.length) {
       pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
       pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
     }
-    if (isCompareDateRangeQuery && !allIncludedDimensions.find((d) => d === 'compareDateRange')) {
+    if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY && !allIncludedDimensions.find((d) => d === 'compareDateRange')) {
       pivotConfig.y = ['compareDateRange'].concat(pivotConfig.y);
     }
     
@@ -223,7 +319,7 @@ class ResultSet {
   }
   
   normalizePivotConfig(pivotConfig) {
-    return ResultSet.getNormalizedPivotConfig(this.loadResponses.map(({ query }) => query), pivotConfig);
+    return ResultSet.getNormalizedPivotConfig(this.loadResponse, pivotConfig);
   }
 
   static measureFromAxis(axisValues) {
@@ -353,7 +449,7 @@ class ResultSet {
       ? this.mergePivots(pivots, pivotConfig.joinDateRange)
       : pivotImpl();
   }
-  
+
   mergePivots(pivots, joinDateRange) {
     const minLengthPivot = pivots.reduce(
       (memo, current) => (memo != null && current.length >= memo.length ? memo : current), null
@@ -590,8 +686,7 @@ class ResultSet {
     if (!this.backwardCompatibleData[responseIndex]) {
       const { data, query } = this.loadResponses[responseIndex];
       const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
-      const [td] = query.timeDimensions || [];
-        
+
       this.backwardCompatibleData[responseIndex] = data.map(row => (
         {
           ...row,
@@ -603,8 +698,7 @@ class ResultSet {
               ).map(field => (
                 [ResultSet.timeDimensionMember(timeDimensions.find(d => d.dimension === field)), row[field]]
               )))
-          ),
-          compareDateRange: td && (td.dateRange || []).join(' - ')
+          )
         }
       ));
     }
