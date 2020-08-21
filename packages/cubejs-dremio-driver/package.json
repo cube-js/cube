@@ -13,7 +13,6 @@
   },
   "main": "driver/DremioDriver.js",
   "scripts": {
-    "test": "jest",
     "lint": "eslint driver/*.js"
   },
   "dependencies": {
