@@ -25,17 +25,12 @@ class DremioQuery extends BaseQuery {
   }
 
   convertTz(field) {
-
-    const targetTZ = moment().tz(this.timezone).format('Z')
-    if(this.timezone == targetTZ || targetTZ == '+00:00' && this.timezone == 'UTC')
-    {
-      return field
-    }
-    return `CONVERT_TIMEZONE('${this.timezone}', '${targetTZ}', ${field})`;
+    const targetTZ = moment().tz(this.timezone).format('Z');
+    return `CONVERT_TIMEZONE('${targetTZ}', ${field})`;
   }
 
-  timeStampCast(value) { 
-    return `CAST(${value} as TIMESTAMP)` 
+  timeStampCast(value) {
+    return `CAST(${value} as TIMESTAMP)`;
   }
 
   inDbTimeZone(date) {
@@ -70,11 +65,11 @@ class DremioQuery extends BaseQuery {
   }
 
   concatStringsSql(strings) {
-    return `CONCAT(${strings.join(", ")})`;
+    return `CONCAT(${strings.join(', ')})`;
   }
 
   unixTimestampSql() {
-    return `UNIX_TIMESTAMP()`;
+    return 'UNIX_TIMESTAMP()';
   }
 
   wrapSegmentForDimensionSelect(sql) {
