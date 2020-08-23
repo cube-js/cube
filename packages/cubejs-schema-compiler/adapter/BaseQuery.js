@@ -1846,7 +1846,10 @@ class BaseQuery {
             }
             // TODO Case when partitioned originalSql is resolved for query without time dimension.
             // Consider fallback to not using such originalSql for consistency?
-            if (preAggregationQueryForSql.timeDimensions.length) {
+            if (
+              preAggregationQueryForSql.timeDimensions.length &&
+              preAggregationQueryForSql.timeDimensions[0].dateRange
+            ) {
               refreshKey = this.incrementalRefreshKey(
                 preAggregationQueryForSql,
                 refreshKey,
