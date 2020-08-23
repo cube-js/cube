@@ -90,7 +90,7 @@ It's convenient to link `@cubejs-backend/server-core` into your project for manu
 Cube.js uses `yarn` as package manager instead of `npm`.
 In order to link `@cubejs-backend/server-core`:
 
-1. Create new project using `cubejs create` or use existing one.
+1. Create new project using `npx cubejs-cli create` or use existing one.
 2. Install yarn: `npm install -g yarn`.
 3. Link server-core package: `yarn link` inside `packages/cubejs-server-core`.
 4. Link all drivers and dependent packages where you make changes in `packages/cubejs-server-core`.
