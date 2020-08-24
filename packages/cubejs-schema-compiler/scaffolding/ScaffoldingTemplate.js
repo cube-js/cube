@@ -37,7 +37,7 @@ class ScaffoldingTemplate {
 
   // eslint-disable-next-line consistent-return
   resolveTableName(tableName) {
-    const tableParts = tableName.split(/\.(?=[^\.]+$)/);
+    const tableParts = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g);
     if (tableParts.length === 2) {
       this.scaffoldingSchema.resolveTableDefinition(tableName);
       return tableName;

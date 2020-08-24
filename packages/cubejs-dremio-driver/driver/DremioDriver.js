@@ -13,15 +13,15 @@ class DremioDriver extends BaseDriver {
     return DremioQuery;
   }
 
-  constructor() {
+  constructor(config = {}) {
     super();
-     
+    
     this.config = {
-      host: process.env.CUBEJS_DB_HOST || 'localhost',
-      port: process.env.CUBEJS_DB_PORT || 9047,
-      user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-      database: process.env.CUBEJS_DB_NAME,
+      host: config.host || process.env.CUBEJS_DB_HOST || 'localhost',
+      port: config.port || process.env.CUBEJS_DB_PORT || 9047,
+      user: config.user || process.env.CUBEJS_DB_USER,
+      password: config.password || process.env.CUBEJS_DB_PASS,
+      database: config.database || process.env.CUBEJS_DB_NAME
     };
 
     this.config.url = `http://${this.config.host}:${this.config.port}`;
@@ -32,11 +32,19 @@ class DremioDriver extends BaseDriver {
     return true;
   }
 
+  quoteIdentifier(identifier) {
+    if (/^".*"$/.test(identifier)) {
+      return identifier;
+    }
+
+    return `"${identifier}"`;
+  }
+
   async getToken() {
     if (this.authToken && this.authToken.expires > new Date().getTime()) {
       return `_dremio${this.authToken.token}`;
     }
- 
+
     const { data } = await axios.post(`${this.config.url}/apiv2/login`, {
       userName: this.config.user,
       password: this.config.password
@@ -139,7 +147,13 @@ class DremioDriver extends BaseDriver {
     }
     
     await this.refreshTablesSchema(this.config.database);
-    return super.tablesSchema();
+    const schema = await super.tablesSchema();
+    
+    const newschema = {};
+    Object.keys(schema).forEach(key => {
+      newschema[`"${key}"`] = schema[key];
+    });
+    return newschema;
   }
 
   informationSchemaQuery() {
