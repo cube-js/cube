@@ -33,13 +33,13 @@ const loadResponse = {
           'Orders.ts.day': '2020-08-01T00:00:00.000',
           'Orders.ts': '2020-08-01T00:00:00.000',
           'Orders.count': 1,
-          'dateTime.day': '2020-08-01T00:00:00.000',
+          'time.day': '2020-08-01T00:00:00.000',
         },
         {
           'Orders.ts.day': '2020-08-02T00:00:00.000',
           'Orders.ts': '2020-08-02T00:00:00.000',
           'Orders.count': 2,
-          'dateTime.day': '2020-08-02T00:00:00.000',
+          'time.day': '2020-08-02T00:00:00.000',
         },
       ],
       annotation: {
@@ -65,10 +65,10 @@ const loadResponse = {
     },
     {
       query: {
-        measures: ['Orders.count'],
+        measures: ['Users.count'],
         timeDimensions: [
           {
-            dimension: 'Orders.ts',
+            dimension: 'Users.ts',
             granularity: 'day',
             dateRange: ['2020-08-01T00:00:00.000', '2020-08-07T23:59:59.999'],
           },
@@ -84,21 +84,21 @@ const loadResponse = {
           'Users.ts': '2020-08-01T00:00:00.000',
           'Users.count': 20,
           'Users.country': 'Australia',
-          'dateTime.day': '2020-08-01T00:00:00.000',
+          'time.day': '2020-08-01T00:00:00.000',
         },
         {
           'Users.ts.day': '2020-08-05T00:00:00.000',
           'Users.ts': '2020-08-05T00:00:00.000',
           'Users.count': 34,
           'Users.country': 'Spain',
-          'dateTime.day': '2020-08-05T00:00:00.000',
+          'time.day': '2020-08-05T00:00:00.000',
         },
         {
           'Users.ts.day': '2020-08-05T00:00:00.000',
           'Users.ts': '2020-08-05T00:00:00.000',
-          'Users.count': 34,
+          'Users.count': 18,
           'Users.country': 'Italy',
-          'dateTime.day': '2020-08-05T00:00:00.000',
+          'time.day': '2020-08-05T00:00:00.000',
         },
       ],
       annotation: {
@@ -114,7 +114,13 @@ const loadResponse = {
             },
           },
         },
-        dimensions: {},
+        dimensions: {
+          'Users.country': {
+            title: 'Users Country',
+            shortTitle: 'Country',
+            type: 'string',
+          },
+        },
         segments: {},
         timeDimensions: {
           'Users.ts.day': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
@@ -123,6 +129,17 @@ const loadResponse = {
       },
     },
   ],
+  pivotQuery: {
+    measures: ['Orders.count', 'Users.count'],
+    timeDimensions: [
+      {
+        dimension: 'time',
+        granularity: 'day',
+        dateRange: ['2020-08-01T00:00:00.000', '2020-08-07T23:59:59.999'],
+      },
+    ],
+    dimensions: ['Users.country'],
+  },
 };
 
 describe('data blending', () => {
@@ -131,7 +148,7 @@ describe('data blending', () => {
   describe('with different dimensions', () => {
     test('normalized pivotConfig', () => {
       expect(resultSet1.normalizePivotConfig()).toStrictEqual({
-        x: ['dateTime.day'],
+        x: ['time.day'],
         y: ['Users.country', 'measures'],
         fillMissingDates: true,
         joinDateRange: false,
@@ -147,7 +164,7 @@ describe('data blending', () => {
             [['Australia', 'Users.count'], 20],
             [['Spain', 'Users.count'], 0],
             [['Italy', 'Users.count'], 0],
-          ]
+          ],
         },
         {
           xValues: ['2020-08-02T00:00:00.000'],
@@ -156,8 +173,53 @@ describe('data blending', () => {
             [['Australia', 'Users.count'], 0],
             [['Spain', 'Users.count'], 0],
             [['Italy', 'Users.count'], 0],
-          ]
-        }
+          ],
+        },
+        {
+          xValues: ['2020-08-03T00:00:00.000'],
+          yValuesArray: [
+            [[null, 'Orders.count'], 0],
+            [['Australia', 'Users.count'], 0],
+            [['Spain', 'Users.count'], 0],
+            [['Italy', 'Users.count'], 0],
+          ],
+        },
+        {
+          xValues: ['2020-08-04T00:00:00.000'],
+          yValuesArray: [
+            [[null, 'Orders.count'], 0],
+            [['Australia', 'Users.count'], 0],
+            [['Spain', 'Users.count'], 0],
+            [['Italy', 'Users.count'], 0],
+          ],
+        },
+        {
+          xValues: ['2020-08-05T00:00:00.000'],
+          yValuesArray: [
+            [[null, 'Orders.count'], 0],
+            [['Australia', 'Users.count'], 0],
+            [['Spain', 'Users.count'], 34],
+            [['Italy', 'Users.count'], 18],
+          ],
+        },
+        {
+          xValues: ['2020-08-06T00:00:00.000'],
+          yValuesArray: [
+            [[null, 'Orders.count'], 0],
+            [['Australia', 'Users.count'], 0],
+            [['Spain', 'Users.count'], 0],
+            [['Italy', 'Users.count'], 0],
+          ],
+        },
+        {
+          xValues: ['2020-08-07T00:00:00.000'],
+          yValuesArray: [
+            [[null, 'Orders.count'], 0],
+            [['Australia', 'Users.count'], 0],
+            [['Spain', 'Users.count'], 0],
+            [['Italy', 'Users.count'], 0],
+          ],
+        },
       ]);
     });
   });

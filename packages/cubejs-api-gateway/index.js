@@ -72,6 +72,41 @@ const prepareAnnotation = (metaConfig, query) => {
   };
 };
 
+const getQueryGranularity = (queries) => {
+  return R.pipe(
+    R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
+    R.filter(Boolean),
+    R.uniq
+  )(queries);
+};
+
+const getPivotQuery = (queryType, queries) => {
+  let pivotQuery;
+  
+  if (queryType !== QUERY_TYPE.BATCH_QUERY) {
+    [pivotQuery] = queries;
+  }
+  
+  if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+    pivotQuery = R.fromPairs(
+      ['measures', 'dimensions'].map(
+        (key) => [key, R.uniq(queries.reduce((memo, q) => memo.concat(q[key]), []))]
+      )
+    );
+    
+    const [granularity] = getQueryGranularity(queries);
+    
+    pivotQuery.timeDimensions = [{
+      dimension: 'time',
+      granularity
+    }];
+  }
+  
+  pivotQuery.queryType = queryType;
+  
+  return pivotQuery;
+};
+
 const transformValue = (value, type) => {
   if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
     return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
@@ -125,7 +160,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
   } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
     return {
       ...row,
-      [['dateTime', granularity].join('.')]: row[[dimension, granularity].join('.')]
+      [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
     };
   }
   
@@ -332,7 +367,8 @@ class ApiGateway {
       await this.load({
         query: req.query.query,
         context: req.context,
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        queryParams: req.query
       });
     }));
 
@@ -443,6 +479,17 @@ class ApiGateway {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
     
+    if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+      const queryGranularity = getQueryGranularity(normalizedQueries);
+      
+      if (queryGranularity.length > 1) {
+        throw new UserError('Data blending query granularities must match');
+      }
+      if (queryGranularity.filter(Boolean).length === 0) {
+        throw new UserError('Data blending query without granularity is not supported');
+      }
+    }
+    
     return [queryType, normalizedQueries];
   }
   
@@ -492,7 +539,8 @@ class ApiGateway {
         normalizedQueries,
         queryOrder: sqlQueries.map((sqlQuery) => R.fromPairs(
           sqlQuery.order.map(({ id: member, desc }) => [member, desc ? 'desc' : 'asc'])
-        ))
+        )),
+        pivotQuery: getPivotQuery(queryType, normalizedQueries)
       });
     } catch (e) {
       this.handleError({
@@ -501,7 +549,7 @@ class ApiGateway {
     }
   }
 
-  async load({ query, context, res }) {
+  async load({ query, context, res, queryParams }) {
     const requestStarted = new Date();
     
     try {
@@ -580,10 +628,19 @@ class ApiGateway {
         duration: this.duration(requestStarted)
       });
       
-      res({
-        queryType,
-        results
-      });
+      if (queryType !== QUERY_TYPE.REGULAR_QUERY && queryParams.queryType == null) {
+        throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
+      }
+      
+      if (queryParams.queryType) {
+        res({
+          queryType,
+          results,
+          pivotQuery: getPivotQuery(queryType, normalizedQueries)
+        });
+      } else {
+        res(results[0]);
+      }
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted

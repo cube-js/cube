@@ -44,7 +44,7 @@ const groupByToPairs = (keyFn) => {
   };
 };
 
-const QUERY_TYPE = {
+export const QUERY_TYPE = {
   REGULAR_QUERY: 'REGULAR_QUERY',
   BATCH_QUERY: 'BATCH_QUERY',
   COMPARE_DATE_RANGE_QUERY: 'COMPARE_DATE_RANGE_QUERY',
@@ -52,10 +52,37 @@ const QUERY_TYPE = {
 };
 
 class ResultSet {
+  static measureFromAxis(axisValues) {
+    return axisValues[axisValues.length - 1];
+  }
+     
+  static timeDimensionMember(td) {
+    return td.granularity ? `${td.dimension}.${td.granularity}` : td.dimension;
+  }
+   
+  static deserialize(data, options = {}) {
+    return new ResultSet(data.loadResponse, options);
+  }
+  
   constructor(loadResponse, options = {}) {
     this.loadResponse = loadResponse;
-    this.queryType = loadResponse.queryType;
-    this.loadResponses = loadResponse.results;
+    
+    if (this.loadResponse.queryType != null) {
+      this.queryType = loadResponse.queryType;
+      this.loadResponses = loadResponse.results;
+    } else {
+      this.queryType = QUERY_TYPE.REGULAR_QUERY;
+      this.loadResponse.pivotQuery = {
+        ...loadResponse.query,
+        queryType: QUERY_TYPE.REGULAR_QUERY
+      };
+      this.loadResponses = [loadResponse];
+    }
+    
+    if (QUERY_TYPE[this.queryType] == null) {
+      throw new Error('Unknown query type');
+    }
+    
     this.parseDateMeasures = options.parseDateMeasures;
     this.options = options;
     
@@ -63,7 +90,7 @@ class ResultSet {
   }
   
   drillDown(drillDownLocator, pivotConfig) {
-    if (this.loadResponses.length > 1) {
+    if (this.queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
       throw new Error('compareDateRange drillDown query is not currently supported');
     }
     
@@ -132,14 +159,17 @@ class ResultSet {
     }));
   }
 
-  axisValues(axis) {
-    const [{ query }] = this.loadResponses;
+  axisValues(axis, resultIndex = 0) {
+    const { query } = this.loadResponses[resultIndex];
+    
     return row => {
-      const value = (measure) => axis.filter(d => !['measures'].includes(d))
+      const value = (measure) => axis.filter(d => d !== 'measures')
         .map(d => (row[d] != null ? row[d] : null)).concat(measure ? [measure] : []);
+        
       if (axis.find(d => d === 'measures') && (query.measures || []).length) {
         return query.measures.map(value);
       }
+      
       return [value()];
     };
   }
@@ -156,83 +186,9 @@ class ResultSet {
     };
     return axisValues.map(formatValue).join(delimiter || ', ');
   }
-
-  static timeDimensionMember(td) {
-    return `${td.dimension}.${td.granularity}`;
-  }
-
-  // static getNormalizedPivotConfig(query, pivotConfig = null) {
-  //   const defaultPivotConfig = {
-  //     x: [],
-  //     y: [],
-  //     fillMissingDates: true,
-  //     joinDateRange: false
-  //   };
-    
-  //   let isCompareDateRangeQuery = false;
-  //   if ((Array.isArray(query) && query.length > 1)) {
-  //     isCompareDateRangeQuery = true;
-  //   }
-  //   query = Array.isArray(query) ? query[0] : query;
-  //   if ((query.timeDimensions || []).some(({ compareDateRange }) => Boolean(compareDateRange))) {
-  //     isCompareDateRangeQuery = true;
-  //   }
-
-  //   const timeDimensions = (query.timeDimensions || []).filter(td => Boolean(td.granularity));
-  //   const dimensions = query.dimensions || [];
-    
-  //   pivotConfig = pivotConfig || (timeDimensions.length ? {
-  //     x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
-  //     y: dimensions
-  //   } : {
-  //     x: dimensions,
-  //     y: []
-  //   });
-    
-  //   pivotConfig = mergeDeepLeft(pivotConfig, defaultPivotConfig);
-
-  //   const substituteTimeDimensionMembers = axis => axis.map(
-  //     subDim => (
-  //       (
-  //         timeDimensions.find(td => td.dimension === subDim) &&
-  //         !dimensions.find(d => d === subDim)
-  //       ) ?
-  //         ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
-  //         subDim
-  //     )
-  //   );
-
-  //   pivotConfig.x = substituteTimeDimensionMembers(pivotConfig.x);
-  //   pivotConfig.y = substituteTimeDimensionMembers(pivotConfig.y);
-
-  //   const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
-  //   const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
-    
-  //   const dimensionFilter = (key) => ['measures', 'compareDateRange'].includes(key)
-  //     || (key !== 'measures' && allDimensions.includes(key));
-    
-  //   pivotConfig.x = pivotConfig.x.concat(
-  //     allDimensions.filter(d => !allIncludedDimensions.includes(d))
-  //   ).filter(dimensionFilter);
-  //   pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
-    
-  //   if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
-  //     pivotConfig.y.push('measures');
-  //   }
-  //   if (!(query.measures || []).length) {
-  //     pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
-  //     pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
-  //   }
-  //   if (isCompareDateRangeQuery && !allIncludedDimensions.find((d) => d === 'compareDateRange')) {
-  //     pivotConfig.y = ['compareDateRange'].concat(pivotConfig.y);
-  //   }
-    
-  //   return pivotConfig;
-  // }
   
-  static getNormalizedPivotConfig(loadResponse, pivotConfig = null) {
-    const { queryType, results } = loadResponse;
-    const queries = results.map(({ query }) => query);
+  static getNormalizedPivotConfig(query, pivotConfig = null) {
+    const { queryType } = query;
     
     const defaultPivotConfig = {
       x: [],
@@ -240,29 +196,23 @@ class ResultSet {
       fillMissingDates: true,
       joinDateRange: false
     };
-
-    const timeDimensions = uniq(
-      queries.reduce(
-        (memo, query) => memo.concat((query.timeDimensions || []).filter(td => Boolean(td.granularity))), []
-      )
-    );
-    const allTimeDimensions = queries.reduce(
-      (memo, query) => memo.concat((query.timeDimensions || [])), []
-    );
-    const allTimeDimensionKeys = allTimeDimensions.map((td) => ResultSet.timeDimensionMember(td));
-    const dimensions = uniq(queries.reduce((memo, query) => memo.concat(query.dimensions || []), []));
-    const measures = uniq(queries.reduce((memo, query) => memo.concat(query.measures || []), []));
-    const [{ granularity }] = timeDimensions || [{}];
+    
+    const {
+      measures = [],
+      dimensions = [],
+      timeDimensions = []
+    } = query;
+    const { granularity } = timeDimensions[0] || {};
     
     if (!granularity && queryType === QUERY_TYPE.BLENDING_QUERY) {
       throw new Error('granularity must be specified for a data blending query');
     }
     
-    const dateTimeDimension = granularity && `dateTime.${granularity}` || '';
+    const timeDimension = granularity && `time.${granularity}` || '';
     
     pivotConfig = pivotConfig || (timeDimensions.length ? {
       x: queryType === QUERY_TYPE.BLENDING_QUERY
-        ? [dateTimeDimension]
+        ? [timeDimension]
         : timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
       y: dimensions
     } : {
@@ -277,9 +227,9 @@ class ResultSet {
         (
           timeDimensions.find(td => td.dimension === subDim) &&
           !dimensions.find(d => d === subDim) &&
-          subDim !== dateTimeDimension
+          subDim !== timeDimension
         ) ?
-          ResultSet.timeDimensionMember(allTimeDimensions.find(td => td.dimension === subDim)) :
+          ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
           subDim
       )
     );
@@ -290,18 +240,17 @@ class ResultSet {
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
     const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
     
-    if (dateTimeDimension) {
-      allIncludedDimensions.push(dateTimeDimension);
+    if (timeDimension) {
+      allIncludedDimensions.push(timeDimension);
     }
     
-    const dimensionFilter = (key) => ['measures', 'compareDateRange', dateTimeDimension].includes(key)
+    const dimensionFilter = (key) => ['measures', 'compareDateRange', timeDimension].includes(key)
       || (key !== 'measures' && allDimensions.includes(key));
     
     pivotConfig.x = pivotConfig.x.concat(
       allDimensions.filter(d => !allIncludedDimensions.includes(d))
     )
-      .filter(dimensionFilter)
-      .filter((key) => dateTimeDimension && !allTimeDimensionKeys.includes(key));
+      .filter(dimensionFilter);
     pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
     
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
@@ -319,11 +268,7 @@ class ResultSet {
   }
   
   normalizePivotConfig(pivotConfig) {
-    return ResultSet.getNormalizedPivotConfig(this.loadResponse, pivotConfig);
-  }
-
-  static measureFromAxis(axisValues) {
-    return axisValues[axisValues.length - 1];
+    return ResultSet.getNormalizedPivotConfig(this.loadResponse.pivotQuery, pivotConfig);
   }
 
   timeSeries(timeDimension) {
@@ -368,22 +313,22 @@ class ResultSet {
 
   pivot(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
+    const { pivotQuery: query } = this.loadResponse;
     
-    const pivotImpl = (responseIndex = 0) => {
+    const pivotImpl = (resultIndex = 0) => {
       let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
       
       let measureValue = (row, measure) => row[measure];
-      const { query } = this.loadResponses[responseIndex];
   
       if (
         pivotConfig.fillMissingDates &&
         pivotConfig.x.length === 1 &&
-        equals(
+        (equals(
           pivotConfig.x,
           (query.timeDimensions || [])
             .filter(td => !!td.granularity)
             .map(td => ResultSet.timeDimensionMember(td))
-        )
+        ))
       ) {
         const series = this.loadResponses.map(
           (loadResponse) => this.timeSeries(loadResponse.query.timeDimensions[0])
@@ -395,7 +340,7 @@ class ResultSet {
               ({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
               rows
             );
-            return series[responseIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
+            return series[resultIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
           };
   
           measureValue = (row, measure) => row[measure] || 0;
@@ -403,16 +348,17 @@ class ResultSet {
       }
   
       const xGrouped = pipe(
-        map(row => this.axisValues(pivotConfig.x)(row).map(xValues => ({ xValues, row }))),
+        map(row => this.axisValues(pivotConfig.x, resultIndex)(row).map(xValues => ({ xValues, row }))),
         unnest,
         groupByXAxis
-      )(this.timeDimensionBackwardCompatibleData(responseIndex));
+      )(this.timeDimensionBackwardCompatibleData(resultIndex));
   
       const allYValues = pipe(
         map(
           ([, rows]) => unnest(
             // collect Y values only from filled rows
-            rows.filter(({ row }) => Object.keys(row).length > 0).map(({ row }) => this.axisValues(pivotConfig.y)(row))
+            rows.filter(({ row }) => Object.keys(row).length > 0)
+              .map(({ row }) => this.axisValues(pivotConfig.y, resultIndex)(row))
           )
         ),
         unnest,
@@ -422,7 +368,7 @@ class ResultSet {
       return xGrouped.map(([, rows]) => {
         const { xValues } = rows[0];
         const yGrouped = pipe(
-          map(({ row }) => this.axisValues(pivotConfig.y)(row).map(yValues => ({ yValues, row }))),
+          map(({ row }) => this.axisValues(pivotConfig.y, resultIndex)(row).map(yValues => ({ yValues, row }))),
           unnest,
           groupBy(({ yValues }) => this.axisValuesString(yValues))
         )(rows);
@@ -682,12 +628,12 @@ class ResultSet {
     return this.loadResponse.annotation;
   }
 
-  timeDimensionBackwardCompatibleData(responseIndex = 0) {
-    if (!this.backwardCompatibleData[responseIndex]) {
-      const { data, query } = this.loadResponses[responseIndex];
+  timeDimensionBackwardCompatibleData(resultIndex = 0) {
+    if (!this.backwardCompatibleData[resultIndex]) {
+      const { data, query } = this.loadResponses[resultIndex];
       const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
 
-      this.backwardCompatibleData[responseIndex] = data.map(row => (
+      this.backwardCompatibleData[resultIndex] = data.map(row => (
         {
           ...row,
           ...(
@@ -703,7 +649,7 @@ class ResultSet {
       ));
     }
     
-    return this.backwardCompatibleData[responseIndex];
+    return this.backwardCompatibleData[resultIndex];
   }
   
   decompose() {
@@ -714,10 +660,6 @@ class ResultSet {
     return {
       loadResponse: clone(this.loadResponse)
     };
-  }
-  
-  static deserialize(data, options = {}) {
-    return new ResultSet(data.loadResponse, options);
   }
 }
 

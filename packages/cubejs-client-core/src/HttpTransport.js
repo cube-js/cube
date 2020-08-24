@@ -15,6 +15,7 @@ class HttpTransport {
         .map(k => ({ [k]: typeof params[k] === 'object' ? JSON.stringify(params[k]) : params[k] }))
         .reduce((a, b) => ({ ...a, ...b }), {})
     );
+    searchParams.append('queryType', 'multi');
 
     let spanCounter = 1;
 
