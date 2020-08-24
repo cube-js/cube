@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/dremio-driver",
-  "description": "Cube.js Dremio database driver",
+  "description": "Cube.js Dremio driver",
   "author": "Cube Dev, Inc.",
   "version": "0.19.61",
   "repository": {
