@@ -11,7 +11,7 @@ jest.mock('moment-range', () => {
 });
 
 const loadResponse = {
-  queryType: 'BLENDING_QUERY',
+  queryType: 'blendingQuery',
   results: [
     {
       query: {

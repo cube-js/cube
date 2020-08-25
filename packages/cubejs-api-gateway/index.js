@@ -13,10 +13,9 @@ const SubscriptionServer = require('./SubscriptionServer');
 const LocalSubscriptionStore = require('./LocalSubscriptionStore');
 
 const QUERY_TYPE = {
-  REGULAR_QUERY: 'REGULAR_QUERY',
-  BATCH_QUERY: 'BATCH_QUERY',
-  COMPARE_DATE_RANGE_QUERY: 'COMPARE_DATE_RANGE_QUERY',
-  BLENDING_QUERY: 'BLENDING_QUERY',
+  REGULAR_QUERY: 'regularQuery',
+  COMPARE_DATE_RANGE_QUERY: 'compareDateRangeQuery',
+  BLENDING_QUERY: 'blendingQuery',
 };
 
 const toConfigMap = (metaConfig) => (
@@ -81,11 +80,7 @@ const getQueryGranularity = (queries) => {
 };
 
 const getPivotQuery = (queryType, queries) => {
-  let pivotQuery;
-  
-  if (queryType !== QUERY_TYPE.BATCH_QUERY) {
-    [pivotQuery] = queries;
-  }
+  let [pivotQuery] = queries;
   
   if (queryType === QUERY_TYPE.BLENDING_QUERY) {
     pivotQuery = R.fromPairs(
@@ -100,6 +95,8 @@ const getPivotQuery = (queryType, queries) => {
       dimension: 'time',
       granularity
     }];
+  } else if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
+    pivotQuery.dimensions = ['compareDateRange'].concat(pivotQuery.dimensions || []);
   }
   
   pivotQuery.queryType = queryType;
@@ -150,7 +147,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
     R.fromPairs
   )(r);
   
-  const [{ dimension, granularity, dateRange }] = query.timeDimensions;
+  const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
   
   if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
     return {
@@ -377,7 +374,8 @@ class ApiGateway {
       await this.load({
         query: req.body.query,
         context: req.context,
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        queryParams: req.body
       });
     }));
 
@@ -632,7 +630,7 @@ class ApiGateway {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
       }
       
-      if (queryParams.queryType) {
+      if (queryParams.queryType === 'multi') {
         res({
           queryType,
           results,

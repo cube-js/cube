@@ -169,19 +169,11 @@ class CubejsApi {
 
   load(query, options, callback) {
     return this.loadMethod(
-      () => this.request('load', { query }),
+      () => this.request('load', {
+        query,
+        queryType: 'multi'
+      }),
       (response) => new ResultSet(response, { parseDateMeasures: this.parseDateMeasures }),
-      options,
-      callback
-    );
-  }
-
-  loadMany(queries, options, callback) {
-    return this.loadMethod(
-      () => this.request('load', { query: queries }),
-      (responses) => responses.map((response) => new ResultSet(response, {
-        parseDateMeasures: this.parseDateMeasures
-      })),
       options,
       callback
     );
@@ -200,6 +192,15 @@ class CubejsApi {
     return this.loadMethod(
       () => this.request('meta'),
       (body) => new Meta(body),
+      options,
+      callback
+    );
+  }
+  
+  dryRun(query, options, callback) {
+    return this.loadMethod(
+      () => this.request('dry-run', { query }),
+      (response) => response,
       options,
       callback
     );

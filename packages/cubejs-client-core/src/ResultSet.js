@@ -45,10 +45,9 @@ const groupByToPairs = (keyFn) => {
 };
 
 export const QUERY_TYPE = {
-  REGULAR_QUERY: 'REGULAR_QUERY',
-  BATCH_QUERY: 'BATCH_QUERY',
-  COMPARE_DATE_RANGE_QUERY: 'COMPARE_DATE_RANGE_QUERY',
-  BLENDING_QUERY: 'BLENDING_QUERY',
+  REGULAR_QUERY: 'regularQuery',
+  COMPARE_DATE_RANGE_QUERY: 'compareDateRangeQuery',
+  BLENDING_QUERY: 'blendingQuery',
 };
 
 class ResultSet {
@@ -57,7 +56,7 @@ class ResultSet {
   }
      
   static timeDimensionMember(td) {
-    return td.granularity ? `${td.dimension}.${td.granularity}` : td.dimension;
+    return `${td.dimension}.${td.granularity}`;
   }
    
   static deserialize(data, options = {}) {
@@ -74,12 +73,12 @@ class ResultSet {
       this.queryType = QUERY_TYPE.REGULAR_QUERY;
       this.loadResponse.pivotQuery = {
         ...loadResponse.query,
-        queryType: QUERY_TYPE.REGULAR_QUERY
+        queryType: this.queryType
       };
       this.loadResponses = [loadResponse];
     }
     
-    if (QUERY_TYPE[this.queryType] == null) {
+    if (!Object.values(QUERY_TYPE).includes(this.queryType)) {
       throw new Error('Unknown query type');
     }
     
@@ -92,6 +91,9 @@ class ResultSet {
   drillDown(drillDownLocator, pivotConfig) {
     if (this.queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
       throw new Error('compareDateRange drillDown query is not currently supported');
+    }
+    if (this.queryType === QUERY_TYPE.BLENDING_QUERY) {
+      throw new Error('Data blending drillDown query is not currently supported');
     }
     
     const { xValues = [], yValues = [] } = drillDownLocator;
@@ -199,21 +201,13 @@ class ResultSet {
     
     const {
       measures = [],
-      dimensions = [],
-      timeDimensions = []
+      dimensions = []
     } = query;
-    const { granularity } = timeDimensions[0] || {};
     
-    if (!granularity && queryType === QUERY_TYPE.BLENDING_QUERY) {
-      throw new Error('granularity must be specified for a data blending query');
-    }
-    
-    const timeDimension = granularity && `time.${granularity}` || '';
+    const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
     
     pivotConfig = pivotConfig || (timeDimensions.length ? {
-      x: queryType === QUERY_TYPE.BLENDING_QUERY
-        ? [timeDimension]
-        : timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
+      x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
       y: dimensions
     } : {
       x: dimensions,
@@ -226,8 +220,7 @@ class ResultSet {
       subDim => (
         (
           timeDimensions.find(td => td.dimension === subDim) &&
-          !dimensions.find(d => d === subDim) &&
-          subDim !== timeDimension
+          !dimensions.find(d => d === subDim)
         ) ?
           ResultSet.timeDimensionMember(query.timeDimensions.find(td => td.dimension === subDim)) :
           subDim
@@ -240,12 +233,7 @@ class ResultSet {
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
     const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
     
-    if (timeDimension) {
-      allIncludedDimensions.push(timeDimension);
-    }
-    
-    const dimensionFilter = (key) => ['measures', 'compareDateRange', timeDimension].includes(key)
-      || (key !== 'measures' && allDimensions.includes(key));
+    const dimensionFilter = (key) => allDimensions.includes(key) || key === 'measures';
     
     pivotConfig.x = pivotConfig.x.concat(
       allDimensions.filter(d => !allIncludedDimensions.includes(d))
@@ -605,27 +593,27 @@ class ResultSet {
   }
 
   query() {
-    if (this.loadResponses.length > 1) {
-      throw new Error('Method is not supported for a comparison query. Please use decompose');
+    if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
+      throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
     }
     
-    return this.loadResponse.query;
+    return this.loadResponses[0].query;
   }
 
   rawData() {
-    if (this.loadResponses.length > 1) {
-      throw new Error('Method is not supported for a comparison query. Please use decompose');
+    if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
+      throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
     }
     
-    return this.loadResponse.data;
+    return this.loadResponses[0].data;
   }
   
   annotation() {
-    if (this.loadResponses.length > 1) {
-      throw new Error('Method is not supported for a comparison query. Please use decompose');
+    if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
+      throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
     }
     
-    return this.loadResponse.annotation;
+    return this.loadResponses[0].annotation;
   }
 
   timeDimensionBackwardCompatibleData(resultIndex = 0) {
@@ -653,7 +641,14 @@ class ResultSet {
   }
   
   decompose() {
-    return this.loadResponses.map((loadResponse) => new ResultSet(loadResponse, this.options));
+    return this.loadResponses.map((result) => new ResultSet({
+      queryType: QUERY_TYPE.REGULAR_QUERY,
+      pivotQuery: {
+        ...result.query,
+        queryType: QUERY_TYPE.REGULAR_QUERY,
+      },
+      results: [result]
+    }, this.options));
   }
   
   serialize() {

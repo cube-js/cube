@@ -12,7 +12,7 @@ jest.mock('moment-range', () => {
 
 const loadResponses = [
   {
-    queryType: 'COMPARE_DATE_RANGE_QUERY',
+    queryType: 'compareDateRangeQuery',
     results: [
       {
         query: {
@@ -133,13 +133,13 @@ const loadResponses = [
       filters: [],
       timezone: 'UTC',
       order: [],
-      dimensions: [],
-      queryType: 'COMPARE_DATE_RANGE_QUERY',
-    }
+      dimensions: ['compareDateRange'],
+      queryType: 'compareDateRangeQuery',
+    },
   },
   {
-    queryType: 'COMPARE_DATE_RANGE_QUERY',
-    results:  [
+    queryType: 'compareDateRangeQuery',
+    results: [
       {
         query: {
           measures: ['Orders.count'],
@@ -281,7 +281,7 @@ const loadResponses = [
     ],
     pivotQuery: {
       measures: ['Orders.count'],
-      dimensions: ['Users.country'],
+      dimensions: ['compareDateRange', 'Users.country'],
       timeDimensions: [
         {
           dimension: 'Orders.ts',
@@ -292,9 +292,9 @@ const loadResponses = [
       filters: [],
       timezone: 'UTC',
       order: [],
-      queryType: 'COMPARE_DATE_RANGE_QUERY'
-    }
-  }
+      queryType: 'compareDateRangeQuery',
+    },
+  },
 ];
 
 describe('compare date range', () => {
@@ -536,7 +536,12 @@ describe('compare date range', () => {
 
   describe('tablePivot and tableColumns', () => {
     test('with a single time dimension', () => {
-      expect(resultSet1.tableColumns()).toMatchObject([
+      const pivotConfig = {
+        x: ['Orders.ts.day'],
+        y: ['compareDateRange', 'measures']
+      };
+      
+      expect(resultSet1.tableColumns(pivotConfig)).toMatchObject([
         {
           key: 'Orders.ts.day',
           title: 'Orders Ts',
@@ -574,7 +579,7 @@ describe('compare date range', () => {
         },
       ]);
 
-      expect(resultSet1.tablePivot()).toStrictEqual([
+      expect(resultSet1.tablePivot(pivotConfig)).toStrictEqual([
         {
           'Orders.ts.day': '2020-08-10T00:00:00.000',
           '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999,Orders.count': 1,
@@ -616,7 +621,7 @@ describe('compare date range', () => {
     test('with two dimensions', () => {
       const pivotConfig = {
         x: ['Orders.ts.day'],
-        y: ['Users.country', 'measures'],
+        y: ['compareDateRange', 'Users.country', 'measures'],
       };
 
       expect(resultSet2.tableColumns(pivotConfig)).toMatchObject([
