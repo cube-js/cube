@@ -22,13 +22,15 @@ const { Content, Sider } = Layout;
 const { TreeNode } = Tree;
 const { TabPane } = Tabs;
 
+const delimiter = "|||";
+
 const schemaToTreeData = (schemas) =>
   Object.keys(schemas).map((schemaName) => ({
     title: schemaName,
     key: schemaName,
     children: Object.keys(schemas[schemaName]).map((tableName) => ({
       title: tableName,
-      key: `${schemaName}.${tableName}`,
+      key: `${schemaName}${delimiter}${tableName}`,
     })),
   }));
 
@@ -110,7 +112,7 @@ class SchemaPage extends Component {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        tables: checkedKeys.filter((k) => k.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g).length === 2),
+        tables: checkedKeys.filter((k) => k.split(delimiter).length === 2).map(e => e.split(delimiter)),
         tablesSchema,
       }),
     });
