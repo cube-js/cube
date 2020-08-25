@@ -190,8 +190,6 @@ class ResultSet {
   }
   
   static getNormalizedPivotConfig(query, pivotConfig = null) {
-    const { queryType } = query;
-    
     const defaultPivotConfig = {
       x: [],
       y: [],
@@ -247,9 +245,6 @@ class ResultSet {
     if (!measures.length) {
       pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
       pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
-    }
-    if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY && !allIncludedDimensions.find((d) => d === 'compareDateRange')) {
-      pivotConfig.y = ['compareDateRange'].concat(pivotConfig.y);
     }
     
     return pivotConfig;
