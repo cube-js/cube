@@ -95,7 +95,12 @@ class ScaffoldingSchema {
   }
 
   parseTableName(tableName) {
-    const schemaAndTable = tableName.split('.');
+    let schemaAndTable;
+    if (Array.isArray(tableName)) {
+      schemaAndTable = tableName;
+    } else {
+      schemaAndTable = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g);
+    }
     if (schemaAndTable.length !== 2) {
       throw new UserError(`Incorrect format for '${tableName}'. Should be in '<schema>.<table>' format`);
     }
@@ -131,7 +136,7 @@ class ScaffoldingSchema {
   }
 
   fromMeasureDictionary(column) {
-    return !column.name.match(new RegExp(idRegex, "i")) && !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().endsWith(word));
+    return !column.name.match(new RegExp(idRegex, 'i')) && !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().endsWith(word));
   }
 
   dimensionColumns(tableDefinition) {
@@ -152,9 +157,9 @@ class ScaffoldingSchema {
 
   joins(tableName, tableDefinition) {
     return R.unnest(tableDefinition
-      .filter(column => (column.name.match(new RegExp(idRegex, "i")) && column.name.toLowerCase() !== 'id'))
+      .filter(column => (column.name.match(new RegExp(idRegex, 'i')) && column.name.toLowerCase() !== 'id'))
       .map(column => {
-        const withoutId = column.name.replace(new RegExp(idRegex, "i"), '');
+        const withoutId = column.name.replace(new RegExp(idRegex, 'i'), '');
         const tablesToJoin = this.tableNamesToTables[withoutId] ||
           this.tableNamesToTables[inflection.tableize(withoutId)];
 

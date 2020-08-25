@@ -32,6 +32,7 @@ const DriverDependencies = {
   sqlite: '@cubejs-backend/sqlite-driver',
   awselasticsearch: '@cubejs-backend/elasticsearch-driver',
   elasticsearch: '@cubejs-backend/elasticsearch-driver',
+  dremio: '@cubejs-backend/dremio-driver',
 };
 
 const checkEnvForPlaceholders = () => {

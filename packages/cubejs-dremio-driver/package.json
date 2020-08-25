@@ -1,0 +1,37 @@
+{
+  "name": "@cubejs-backend/dremio-driver",
+  "description": "Cube.js Dremio driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.19.61",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-dremio-driver"
+  },
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/DremioDriver.js",
+  "scripts": {
+    "lint": "eslint driver/*.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.19.61",
+    "@cubejs-backend/schema-compiler": "^0.19.61",
+    "axios": "^0.19.2",
+    "moment-timezone": "^0.5.31",
+    "sqlstring": "^2.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-node": "^5.2.1",
+    "jest": "^25.1.0",
+    "testcontainers": "^2.4.0"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -37,7 +37,13 @@ class ScaffoldingTemplate {
 
   // eslint-disable-next-line consistent-return
   resolveTableName(tableName) {
-    const tableParts = tableName.split('.');
+    let tableParts;
+    if (Array.isArray(tableName)) {
+      tableParts = tableName;
+    } else {
+      tableParts = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g);
+    }
+    
     if (tableParts.length === 2) {
       this.scaffoldingSchema.resolveTableDefinition(tableName);
       return tableName;
@@ -56,7 +62,7 @@ class ScaffoldingTemplate {
         return `${schema}.${inflection.tableize(tableName)}`;
       }
     } else {
-      throw new UserError(`Table names should be in <table> or <schema>.<table> format`);
+      throw new UserError('Table names should be in <table> or <schema>.<table> format');
     }
   }
 
