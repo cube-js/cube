@@ -11,218 +11,290 @@ jest.mock('moment-range', () => {
 });
 
 const loadResponses = [
-  [
-    {
-      query: {
-        measures: ['Orders.count'],
-        timeDimensions: [
+  {
+    queryType: 'compareDateRangeQuery',
+    results: [
+      {
+        query: {
+          measures: ['Orders.count'],
+          timeDimensions: [
+            {
+              dimension: 'Orders.ts',
+              granularity: 'day',
+              dateRange: ['2020-08-10T00:00:00.000', '2020-08-16T23:59:59.999'],
+            },
+          ],
+          filters: [],
+          timezone: 'UTC',
+          order: [],
+          dimensions: [],
+        },
+        data: [
           {
-            dimension: 'Orders.ts',
-            granularity: 'day',
-            dateRange: ['2020-08-10T00:00:00.000', '2020-08-16T23:59:59.999'],
+            'Orders.ts.day': '2020-08-10T00:00:00.000',
+            'Orders.ts': '2020-08-10T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
+          },
+          {
+            'Orders.ts.day': '2020-08-12T00:00:00.000',
+            'Orders.ts': '2020-08-12T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
           },
         ],
-        filters: [],
-        timezone: 'UTC',
-        order: [],
-        dimensions: [],
-      },
-      data: [
-        { 'Orders.ts.day': '2020-08-10T00:00:00.000', 'Orders.ts': '2020-08-10T00:00:00.000', 'Orders.count': 1 },
-        { 'Orders.ts.day': '2020-08-12T00:00:00.000', 'Orders.ts': '2020-08-12T00:00:00.000', 'Orders.count': 1 },
-      ],
-      annotation: {
-        measures: {
-          'Orders.count': {
-            title: 'Orders Count',
-            shortTitle: 'Count',
-            type: 'number',
-            drillMembers: ['Orders.id', 'Orders.title'],
-            drillMembersGrouped: { measures: [], dimensions: ['Orders.id', 'Orders.title'] },
-          },
-        },
-        dimensions: {},
-        segments: {},
-        timeDimensions: {
-          'Orders.ts.day': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
-          'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
-        },
-      },
-    },
-    {
-      query: {
-        measures: ['Orders.count'],
-        timeDimensions: [
-          {
-            dimension: 'Orders.ts',
-            granularity: 'day',
-            dateRange: ['2020-08-03T00:00:00.000', '2020-08-09T23:59:59.999'],
-          },
-        ],
-        filters: [],
-        timezone: 'UTC',
-        order: [],
-        dimensions: [],
-      },
-      data: [
-        { 'Orders.ts.day': '2020-08-03T00:00:00.000', 'Orders.ts': '2020-08-03T00:00:00.000', 'Orders.count': 2 },
-        { 'Orders.ts.day': '2020-08-04T00:00:00.000', 'Orders.ts': '2020-08-04T00:00:00.000', 'Orders.count': 1 },
-        { 'Orders.ts.day': '2020-08-06T00:00:00.000', 'Orders.ts': '2020-08-06T00:00:00.000', 'Orders.count': 1 },
-        { 'Orders.ts.day': '2020-08-08T00:00:00.000', 'Orders.ts': '2020-08-08T00:00:00.000', 'Orders.count': 1 },
-      ],
-      annotation: {
-        measures: {
-          'Orders.count': {
-            title: 'Orders Count',
-            shortTitle: 'Count',
-            type: 'number',
-            drillMembers: ['Orders.id', 'Orders.title'],
-            drillMembersGrouped: { measures: [], dimensions: ['Orders.id', 'Orders.title'] },
-          },
-        },
-        dimensions: {},
-        segments: {},
-        timeDimensions: {
-          'Orders.ts.day': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
-          'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
-        },
-      },
-    },
-  ],
-  [
-    {
-      query: {
-        measures: ['Orders.count'],
-        dimensions: ['Users.country'],
-        timeDimensions: [
-          {
-            dimension: 'Orders.ts',
-            granularity: 'day',
-            dateRange: ['2020-08-10T00:00:00.000', '2020-08-16T23:59:59.999'],
-          },
-        ],
-        filters: [],
-        timezone: 'UTC',
-        order: [],
-      },
-      data: [
-        {
-          'Users.country': 'US',
-          'Orders.ts.day': '2020-08-10T00:00:00.000',
-          'Orders.ts': '2020-08-10T00:00:00.000',
-          'Orders.count': 1,
-        },
-        {
-          'Users.country': 'France',
-          'Orders.ts.day': '2020-08-12T00:00:00.000',
-          'Orders.ts': '2020-08-12T00:00:00.000',
-          'Orders.count': 1,
-        },
-      ],
-      annotation: {
-        measures: {
-          'Orders.count': {
-            title: 'Orders Count',
-            shortTitle: 'Count',
-            type: 'number',
-            drillMembers: ['Orders.id', 'Orders.title'],
-            drillMembersGrouped: {
-              measures: [],
-              dimensions: ['Orders.id', 'Orders.title'],
+        annotation: {
+          measures: {
+            'Orders.count': {
+              title: 'Orders Count',
+              shortTitle: 'Count',
+              type: 'number',
+              drillMembers: ['Orders.id', 'Orders.title'],
+              drillMembersGrouped: { measures: [], dimensions: ['Orders.id', 'Orders.title'] },
             },
           },
-        },
-        dimensions: {
-          'Users.country': {
-            title: 'Users Country',
-            shortTitle: 'Country',
-            type: 'string',
+          dimensions: {},
+          segments: {},
+          timeDimensions: {
+            'Orders.ts.day': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
+            'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
           },
-        },
-        segments: {},
-        timeDimensions: {
-          'Orders.ts.day': {
-            title: 'Orders Ts',
-            shortTitle: 'Ts',
-            type: 'time',
-          },
-          'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
         },
       },
-    },
-    {
-      query: {
-        measures: ['Orders.count'],
-        dimensions: ['Users.country'],
-        timeDimensions: [
+      {
+        query: {
+          measures: ['Orders.count'],
+          timeDimensions: [
+            {
+              dimension: 'Orders.ts',
+              granularity: 'day',
+              dateRange: ['2020-08-03T00:00:00.000', '2020-08-09T23:59:59.999'],
+            },
+          ],
+          filters: [],
+          timezone: 'UTC',
+          order: [],
+          dimensions: [],
+        },
+        data: [
           {
-            dimension: 'Orders.ts',
-            granularity: 'day',
-            dateRange: ['2020-08-03T00:00:00.000', '2020-08-09T23:59:59.999'],
+            'Orders.ts.day': '2020-08-03T00:00:00.000',
+            'Orders.ts': '2020-08-03T00:00:00.000',
+            'Orders.count': 2,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+          },
+          {
+            'Orders.ts.day': '2020-08-04T00:00:00.000',
+            'Orders.ts': '2020-08-04T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+          },
+          {
+            'Orders.ts.day': '2020-08-06T00:00:00.000',
+            'Orders.ts': '2020-08-06T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+          },
+          {
+            'Orders.ts.day': '2020-08-08T00:00:00.000',
+            'Orders.ts': '2020-08-08T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
           },
         ],
-        filters: [],
-        timezone: 'UTC',
-        order: [],
-      },
-      data: [
-        {
-          'Users.country': 'Australia',
-          'Orders.ts.day': '2020-08-03T00:00:00.000',
-          'Orders.ts': '2020-08-03T00:00:00.000',
-          'Orders.count': 2,
-        },
-        {
-          'Users.country': 'France',
-          'Orders.ts.day': '2020-08-04T00:00:00.000',
-          'Orders.ts': '2020-08-04T00:00:00.000',
-          'Orders.count': 1,
-        },
-        {
-          'Users.country': 'US',
-          'Orders.ts.day': '2020-08-06T00:00:00.000',
-          'Orders.ts': '2020-08-06T00:00:00.000',
-          'Orders.count': 1,
-        },
-        {
-          'Users.country': 'France',
-          'Orders.ts.day': '2020-08-08T00:00:00.000',
-          'Orders.ts': '2020-08-08T00:00:00.000',
-          'Orders.count': 1,
-        },
-      ],
-      annotation: {
-        measures: {
-          'Orders.count': {
-            title: 'Orders Count',
-            shortTitle: 'Count',
-            type: 'number',
-            drillMembers: ['Orders.id', 'Orders.title'],
-            drillMembersGrouped: {
-              measures: [],
-              dimensions: ['Orders.id', 'Orders.title'],
+        annotation: {
+          measures: {
+            'Orders.count': {
+              title: 'Orders Count',
+              shortTitle: 'Count',
+              type: 'number',
+              drillMembers: ['Orders.id', 'Orders.title'],
+              drillMembersGrouped: { measures: [], dimensions: ['Orders.id', 'Orders.title'] },
             },
           },
-        },
-        dimensions: {
-          'Users.country': {
-            title: 'Users Country',
-            shortTitle: 'Country',
-            type: 'string',
+          dimensions: {},
+          segments: {},
+          timeDimensions: {
+            'Orders.ts.day': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
+            'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
           },
-        },
-        segments: {},
-        timeDimensions: {
-          'Orders.ts.day': {
-            title: 'Orders Ts',
-            shortTitle: 'Ts',
-            type: 'time',
-          },
-          'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
         },
       },
+    ],
+    pivotQuery: {
+      measures: ['Orders.count'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          granularity: 'day',
+          dateRange: ['2020-08-10T00:00:00.000', '2020-08-16T23:59:59.999'],
+        },
+      ],
+      filters: [],
+      timezone: 'UTC',
+      order: [],
+      dimensions: ['compareDateRange'],
+      queryType: 'compareDateRangeQuery',
     },
-  ],
+  },
+  {
+    queryType: 'compareDateRangeQuery',
+    results: [
+      {
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country'],
+          timeDimensions: [
+            {
+              dimension: 'Orders.ts',
+              granularity: 'day',
+              dateRange: ['2020-08-10T00:00:00.000', '2020-08-16T23:59:59.999'],
+            },
+          ],
+          filters: [],
+          timezone: 'UTC',
+          order: [],
+        },
+        data: [
+          {
+            'Users.country': 'US',
+            'Orders.ts.day': '2020-08-10T00:00:00.000',
+            'Orders.ts': '2020-08-10T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
+          },
+          {
+            'Users.country': 'France',
+            'Orders.ts.day': '2020-08-12T00:00:00.000',
+            'Orders.ts': '2020-08-12T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999',
+          },
+        ],
+        annotation: {
+          measures: {
+            'Orders.count': {
+              title: 'Orders Count',
+              shortTitle: 'Count',
+              type: 'number',
+              drillMembers: ['Orders.id', 'Orders.title'],
+              drillMembersGrouped: {
+                measures: [],
+                dimensions: ['Orders.id', 'Orders.title'],
+              },
+            },
+          },
+          dimensions: {
+            'Users.country': {
+              title: 'Users Country',
+              shortTitle: 'Country',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {
+            'Orders.ts.day': {
+              title: 'Orders Ts',
+              shortTitle: 'Ts',
+              type: 'time',
+            },
+            'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
+          },
+        },
+      },
+      {
+        query: {
+          measures: ['Orders.count'],
+          dimensions: ['Users.country'],
+          timeDimensions: [
+            {
+              dimension: 'Orders.ts',
+              granularity: 'day',
+              dateRange: ['2020-08-03T00:00:00.000', '2020-08-09T23:59:59.999'],
+            },
+          ],
+          filters: [],
+          timezone: 'UTC',
+          order: [],
+        },
+        data: [
+          {
+            'Users.country': 'Australia',
+            'Orders.ts.day': '2020-08-03T00:00:00.000',
+            'Orders.ts': '2020-08-03T00:00:00.000',
+            'Orders.count': 2,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+          },
+          {
+            'Users.country': 'France',
+            'Orders.ts.day': '2020-08-04T00:00:00.000',
+            'Orders.ts': '2020-08-04T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+          },
+          {
+            'Users.country': 'US',
+            'Orders.ts.day': '2020-08-06T00:00:00.000',
+            'Orders.ts': '2020-08-06T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+          },
+          {
+            'Users.country': 'France',
+            'Orders.ts.day': '2020-08-08T00:00:00.000',
+            'Orders.ts': '2020-08-08T00:00:00.000',
+            'Orders.count': 1,
+            compareDateRange: '2020-08-03T00:00:00.000 - 2020-08-09T23:59:59.999',
+          },
+        ],
+        annotation: {
+          measures: {
+            'Orders.count': {
+              title: 'Orders Count',
+              shortTitle: 'Count',
+              type: 'number',
+              drillMembers: ['Orders.id', 'Orders.title'],
+              drillMembersGrouped: {
+                measures: [],
+                dimensions: ['Orders.id', 'Orders.title'],
+              },
+            },
+          },
+          dimensions: {
+            'Users.country': {
+              title: 'Users Country',
+              shortTitle: 'Country',
+              type: 'string',
+            },
+          },
+          segments: {},
+          timeDimensions: {
+            'Orders.ts.day': {
+              title: 'Orders Ts',
+              shortTitle: 'Ts',
+              type: 'time',
+            },
+            'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
+          },
+        },
+      },
+    ],
+    pivotQuery: {
+      measures: ['Orders.count'],
+      dimensions: ['compareDateRange', 'Users.country'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          granularity: 'day',
+          dateRange: ['2020-08-03T00:00:00.000', '2020-08-09T23:59:59.999'],
+        },
+      ],
+      filters: [],
+      timezone: 'UTC',
+      order: [],
+      queryType: 'compareDateRangeQuery',
+    },
+  },
 ];
 
 describe('compare date range', () => {
@@ -464,7 +536,12 @@ describe('compare date range', () => {
 
   describe('tablePivot and tableColumns', () => {
     test('with a single time dimension', () => {
-      expect(resultSet1.tableColumns()).toMatchObject([
+      const pivotConfig = {
+        x: ['Orders.ts.day'],
+        y: ['compareDateRange', 'measures']
+      };
+      
+      expect(resultSet1.tableColumns(pivotConfig)).toMatchObject([
         {
           key: 'Orders.ts.day',
           title: 'Orders Ts',
@@ -502,7 +579,7 @@ describe('compare date range', () => {
         },
       ]);
 
-      expect(resultSet1.tablePivot()).toStrictEqual([
+      expect(resultSet1.tablePivot(pivotConfig)).toStrictEqual([
         {
           'Orders.ts.day': '2020-08-10T00:00:00.000',
           '2020-08-10T00:00:00.000 - 2020-08-16T23:59:59.999,Orders.count': 1,
@@ -544,7 +621,7 @@ describe('compare date range', () => {
     test('with two dimensions', () => {
       const pivotConfig = {
         x: ['Orders.ts.day'],
-        y: ['Users.country', 'measures'],
+        y: ['compareDateRange', 'Users.country', 'measures'],
       };
 
       expect(resultSet2.tableColumns(pivotConfig)).toMatchObject([
