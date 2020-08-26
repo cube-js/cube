@@ -188,15 +188,22 @@ const operators = [
   'measureFilter',
 ];
 
+const oneFilter = Joi.object().keys({
+  dimension: id,
+  member: id,
+  operator: Joi.valid(operators).required(),
+  values: Joi.array().items(Joi.string().allow('', null))
+}).xor('dimension', 'member')
+
+const oneCondition = Joi.object().keys({ 
+  or:Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+  and:Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+}).xor('or', 'and')
+
 const querySchema = Joi.object().keys({
   measures: Joi.array().items(id),
   dimensions: Joi.array().items(dimensionWithTime),
-  filters: Joi.array().items(Joi.object().keys({
-    dimension: id,
-    member: id,
-    operator: Joi.valid(operators).required(),
-    values: Joi.array().items(Joi.string().allow('', null))
-  }).xor('dimension', 'member')),
+  filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
     granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
@@ -237,7 +244,7 @@ const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
   if (error) {
-    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+    throw new UserError(`Invalid query format (!): ${error.message || error.toString()}`);
   }
   const validQuery = query.measures && query.measures.length ||
     query.dimensions && query.dimensions.length ||
@@ -249,7 +256,7 @@ const normalizeQuery = (query) => {
   }
   const filterWithoutOperator = (query.filters || []).find(f => !f.operator);
   if (filterWithoutOperator) {
-    throw new UserError(`Operator required for filter: ${JSON.stringify(filterWithoutOperator)}`);
+    throw new UserError(`Operator required for filter (!): ${JSON.stringify(filterWithoutOperator)}`);
   }
   const filterWithIncorrectOperator = (query.filters || [])
     .find(f => [
