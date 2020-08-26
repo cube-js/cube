@@ -9,6 +9,7 @@ import {
   TCubeMeasure,
   TCubeDimension,
   TCubeMember,
+  ProgressResponse,
 } from '@cubejs-client/core';
 
 /**
@@ -288,13 +289,13 @@ declare module '@cubejs-client/react' {
    * import { useCubeQuery }  from '@cubejs-client/react';
    *
    * export default function App() {
-   *   const { resultSet, isLoading, error } = useCubeQuery({
+   *   const { resultSet, isLoading, error, progress } = useCubeQuery({
    *     measures: ['Orders.count'],
    *     dimensions: ['Orders.createdAt.month'],
    *   });
    *
    *   if (isLoading) {
-   *     return <div>Loading...</div>;
+   *     return <div>{progress && progress.stage && progress.stage.stage || 'Loading...'}</div>;
    *   }
    *
    *   if (error) {
@@ -337,6 +338,7 @@ declare module '@cubejs-client/react' {
     error: Error | null;
     isLoading: boolean;
     resultSet: ResultSet<TData> | null;
+    progress: ProgressResponse;
   };
 
   /**
