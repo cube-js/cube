@@ -5028,10 +5028,10 @@ test-exclude@^6.0.0:
     glob "^7.1.4"
     minimatch "^3.0.4"
 
-testcontainers@^2.4.0:
-  version "2.20.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-2.20.0.tgz#1d3977346e5724fc6f88e543774101d8529001a6"
-  integrity sha512-kq3oOf/ayA8qo9aqChcmBNB/Yjd5LBH17FsiD7zqlpXktXCQMrWJfM3qD82RwpHrPDobhLiopwTcBhIkJuMXJg==
+testcontainers@^3.4.0:
+  version "3.4.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-3.4.0.tgz#b4054acfbca04f01b8b84dd9a47b52561182fc2d"
+  integrity sha512-duZOulKBTbN3rTTdtj6rk53uZnGXkVzqKQh/Yp5paMZH9eToFEVs+nyyWrDea53qGhGyaOJKTN9PIqM/QfwJTA==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
