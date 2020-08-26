@@ -17,14 +17,7 @@ export default (query, options = {}) => {
 
   let subscribeRequest = null;
 
-  const progressCallback = ({ progressResponse }) => {
-    setProgress({
-      rawResponse: progressResponse,
-      message: progressResponse.stage
-        ? progressResponse.stage.stage
-        : 'Loading...'
-    });
-  };
+  const progressCallback = ({ progressResponse }) => setProgress(progressResponse);
 
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;

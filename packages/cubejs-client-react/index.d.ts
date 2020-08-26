@@ -295,7 +295,7 @@ declare module '@cubejs-client/react' {
    *   });
    *
    *   if (isLoading) {
-   *     return <div>{progress ? progress.message : 'Loading...'}</div>;
+   *     return <div>{progress && progress.stage && progress.stage.stage || 'Loading...'}</div>;
    *   }
    *
    *   if (error) {
@@ -338,10 +338,7 @@ declare module '@cubejs-client/react' {
     error: Error | null;
     isLoading: boolean;
     resultSet: ResultSet<TData> | null;
-    progress: {
-      rawResponse: ProgressResponse;
-      message: string;
-    } | null;
+    progress: ProgressResponse;
   };
 
   /**
