@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import * as PropTypes from 'prop-types';
-import { Menu } from 'antd';
+import { Menu, DatePicker } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+
 import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 
+const { RangePicker } = DatePicker;
+
 const DateRanges = [
+  { title: 'Custom', value: 'custom' },
   { title: 'All time', value: undefined },
   { value: 'Today' },
   { value: 'Yesterday' },
@@ -28,6 +32,19 @@ const TimeGroup = ({
   addMemberName,
   updateMethods,
 }) => {
+  const [customDateRange, setCustomDateRange] = useState(false);
+
+  function onDateRangeSelect(m, dateRange) {
+    if (!dateRange.some((d) => !d)) {
+      updateMethods.update(m, {
+        ...m,
+        dateRange: dateRange.map((dateTime) =>
+          dateTime.format('YYYY-MM-DDTHH:mm:00.000')
+        ),
+      });
+    }
+  }
+
   const granularityMenu = (member, onClick) => (
     <Menu>
       {member.granularities.length ? (
@@ -53,57 +70,78 @@ const TimeGroup = ({
   );
 
   return (
-    <span>
-      {members.map((m) => [
-        <RemoveButtonGroup
-          onRemoveClick={() => updateMethods.remove(m)}
-          key={`${m.dimension.name}-member`}
-        >
-          <MemberDropdown
-            onClick={(updateWith) =>
-              updateMethods.update(m, { ...m, dimension: updateWith })
-            }
-            availableMembers={availableMembers}
+    <>
+      {members.map((m) => (
+        <>
+          <RemoveButtonGroup onRemoveClick={() => updateMethods.remove(m)}>
+            <MemberDropdown
+              onClick={(updateWith) =>
+                updateMethods.update(m, { ...m, dimension: updateWith })
+              }
+              availableMembers={availableMembers}
+            >
+              {m.dimension.title}
+            </MemberDropdown>
+          </RemoveButtonGroup>
+
+          <b>FOR</b>
+
+          <ButtonDropdown
+            overlay={dateRangeMenu((dateRange) => {
+              if (dateRange.value === 'custom') {
+                setCustomDateRange(true);
+              } else {
+                updateMethods.update(m, {
+                  ...m,
+                  dateRange: dateRange.value,
+                });
+                setCustomDateRange(false);
+              }
+            })}
+            style={{
+              marginLeft: 8,
+              marginRight: 8,
+            }}
           >
-            {m.dimension.title}
-          </MemberDropdown>
-        </RemoveButtonGroup>,
-        <b key={`${m.dimension.name}-for`}>FOR</b>,
-        <ButtonDropdown
-          overlay={dateRangeMenu((dateRange) =>
-            updateMethods.update(m, { ...m, dateRange: dateRange.value })
-          )}
-          style={{ marginLeft: 8, marginRight: 8 }}
-          key={`${m.dimension.name}-date-range`}
-        >
-          {m.dateRange || 'All time'}
-        </ButtonDropdown>,
-        <b key={`${m.dimension.name}-by`}>BY</b>,
-        <ButtonDropdown
-          overlay={granularityMenu(m.dimension, (granularity) =>
-            updateMethods.update(m, { ...m, granularity: granularity.name })
-          )}
-          style={{ marginLeft: 8 }}
-          key={`${m.dimension.name}-granularity`}
-        >
-          {m.dimension.granularities.find((g) => g.name === m.granularity) &&
-            m.dimension.granularities.find((g) => g.name === m.granularity)
-              .title}
-        </ButtonDropdown>,
-      ])}
+            {(customDateRange && 'Custom') || m.dateRange || 'All time'}
+          </ButtonDropdown>
+
+          {customDateRange ? (
+            <RangePicker
+              style={{ marginRight: 8 }}
+              format="YYYY-MM-DD"
+              onOk={(dateRange) => onDateRangeSelect(m, dateRange)}
+            />
+          ) : null}
+
+          <b>BY</b>
+
+          <ButtonDropdown
+            overlay={granularityMenu(m.dimension, (granularity) =>
+              updateMethods.update(m, { ...m, granularity: granularity.name })
+            )}
+            style={{ marginLeft: 8 }}
+          >
+            {m.dimension.granularities.find((g) => g.name === m.granularity) &&
+              m.dimension.granularities.find((g) => g.name === m.granularity)
+                .title}
+          </ButtonDropdown>
+        </>
+      ))}
+
       {!members.length && (
         <MemberDropdown
-          onClick={(member) =>
-            updateMethods.add({ dimension: member, granularity: 'day' })
-          }
           availableMembers={availableMembers}
           type="dashed"
           icon={<PlusOutlined />}
+          onClick={(member) =>
+            updateMethods.add({ dimension: member, granularity: 'day' })
+          }
         >
           {addMemberName}
         </MemberDropdown>
       )}
-    </span>
+    </>
   );
 };
 
