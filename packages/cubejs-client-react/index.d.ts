@@ -150,7 +150,7 @@ declare module '@cubejs-client/react' {
     /**
      * Default query
      */
-    query?: Query;
+    query?: Query | Query[];
     vizState?: VizState;
     /**
      * @default defaultChartType line
@@ -170,12 +170,12 @@ declare module '@cubejs-client/react' {
     /**
      * Called by the `QueryBuilder` when the query state has changed. Use it when state is maintained outside of the `QueryBuilder` component.
      */
-    setQuery?: (query: Query) => void;
+    setQuery?: (query: Query | Query[]) => void;
     setVizState?: (vizState: VizState) => void;
   };
 
   type QueryBuilderState = VizState & {
-    query?: Query;
+    query?: Query | Query[];
   };
 
   type QueryBuilderRenderProps = {
@@ -316,7 +316,7 @@ declare module '@cubejs-client/react' {
    * @order 1
    * @stickyTypes
    */
-  export function useCubeQuery<TData>(query: Query, options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
+  export function useCubeQuery<TData>(query: Query | Query[], options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
 
   type UseCubeQueryOptions = {
     /**
@@ -344,7 +344,7 @@ declare module '@cubejs-client/react' {
   /**
    * Checks whether the query is ready
    */
-  export function isQueryPresent(query: Query): boolean;
+  export function isQueryPresent(query: Query | Query[]): boolean;
 
   /**
    * You can use the following methods for member manipulaltion

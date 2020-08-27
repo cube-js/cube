@@ -22,19 +22,28 @@ export default class QueryBuilder extends React.Component {
       ...state,
       ...(props.vizState || {}),
     };
-    
+
     return {
       ...nextState,
-      query: {
-        ...nextState.query,
-        ...(props.query || {})
-      },
+      query: Array.isArray(props.query)
+        ? props.query
+        : {
+          ...nextState.query,
+          ...(props.query || {})
+        },
     };
   }
   
   static resolveMember(type, { meta, query }) {
     if (!meta) {
       return [];
+    }
+    
+    if (Array.isArray(query)) {
+      return query.reduce((memo, currentQuery) => memo.concat(QueryBuilder.resolveMember(type, {
+        meta,
+        query: currentQuery
+      })), []);
     }
 
     if (type === 'timeDimensions') {
@@ -56,7 +65,7 @@ export default class QueryBuilder extends React.Component {
   
   static getOrderMembers(state) {
     const { query, meta } = state;
-     
+    
     if (!meta) {
       return [];
     }
@@ -95,12 +104,16 @@ export default class QueryBuilder extends React.Component {
 
   async componentDidMount() {
     const { query, pivotConfig } = this.state;
-    const meta = await this.cubejsApi().meta();
+    
+    const [meta, { pivotQuery }] = await Promise.all([
+      this.cubejsApi().meta(),
+      this.cubejsApi().dryRun(query)
+    ]);
     
     this.setState({
       meta,
       orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
-      pivotConfig: ResultSet.getNormalizedPivotConfig(query || {}, pivotConfig)
+      pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery || {}, pivotConfig)
     });
   }
 
@@ -336,6 +349,14 @@ export default class QueryBuilder extends React.Component {
 
   validatedQuery() {
     const { query } = this.state;
+    
+    if (Array.isArray(query)) {
+      return query.map((currentQuery) => ({
+        ...currentQuery,
+        filters: (currentQuery.filters || []).filter((f) => f.operator)
+      }));
+    }
+    
     return {
       ...query,
       filters: (query.filters || []).filter((f) => f.operator)
@@ -345,6 +366,10 @@ export default class QueryBuilder extends React.Component {
   defaultHeuristics(newState) {
     const { query, sessionGranularity } = this.state;
     const defaultGranularity = sessionGranularity || 'day';
+    
+    if (Array.isArray(query)) {
+      return newState;
+    }
 
     if (newState.query) {
       const oldQuery = query;
