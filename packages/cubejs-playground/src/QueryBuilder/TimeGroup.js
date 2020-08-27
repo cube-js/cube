@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import * as PropTypes from 'prop-types';
 import { Menu, DatePicker } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import moment from 'moment';
 
 import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
@@ -31,15 +31,16 @@ const TimeGroup = ({
   availableMembers,
   addMemberName,
   updateMethods,
+  parsedDateRange,
 }) => {
   const [customDateRange, setCustomDateRange] = useState(false);
 
   function onDateRangeSelect(m, dateRange) {
-    if (!dateRange.some((d) => !d)) {
+    if (dateRange && !dateRange.some((d) => !d)) {
       updateMethods.update(m, {
         ...m,
         dateRange: dateRange.map((dateTime) =>
-          dateTime.format('YYYY-MM-DDTHH:mm:00.000')
+          dateTime.format('YYYY-MM-DD')
         ),
       });
     }
@@ -110,7 +111,8 @@ const TimeGroup = ({
             <RangePicker
               style={{ marginRight: 8 }}
               format="YYYY-MM-DD"
-              onOk={(dateRange) => onDateRangeSelect(m, dateRange)}
+              defaultValue={(parsedDateRange || []).map((date) => moment(date))}
+              onChange={(dateRange) => onDateRangeSelect(m, dateRange)}
             />
           ) : null}
 
@@ -143,13 +145,6 @@ const TimeGroup = ({
       )}
     </>
   );
-};
-
-TimeGroup.propTypes = {
-  members: PropTypes.array.isRequired,
-  availableMembers: PropTypes.array.isRequired,
-  addMemberName: PropTypes.string.isRequired,
-  updateMethods: PropTypes.object.isRequired,
 };
 
 export default TimeGroup;
