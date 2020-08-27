@@ -13,6 +13,8 @@ In the case of dimension of type `time` granularity could be optionally added to
 
 Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`.
 
+The Cube.js client also accepts an array of queries. By default it will be treated as a [Data Blending](/data-blending) query.
+
 ## Query Properties
 
 A Query has the following properties:
@@ -66,7 +68,7 @@ If the `order` property is not specified in the query, Cube.js sorts results by 
 - The first measure, descending. If no measure exists...
 - The first dimension, ascending.
 
-### Аlternative order format
+### Alternative order format
 
 Also you can control the ordering of the `order` specification, Cube.js support alternative order format - array of tuples:  
 
@@ -322,6 +324,7 @@ Dates in `YYYY-MM-DD` format are also accepted.
 Such dates are padded to the start and end of the day if used in start and end of date range interval accordingly. 
 If only one date is specified it's equivalent to passing two of the same dates as a date range.
 You can also pass a string instead of array with relative date range, for example: `last quarter` or `last 360 days`.
+  - `compareDateRange`: An array of date ranges to compare a measure change over previous period 
   - `granularity`: A granularity for a time dimension. It supports the following values `second`, `minute`, `hour`, `day`, `week`, `month`, `year`. If you pass `null` to the granularity, Cube.js will only perform filtering by a specified time dimension, without grouping.
 
 ```js
@@ -335,7 +338,22 @@ You can also pass a string instead of array with relative date range, for exampl
 }
 ```
 
-You can also set relative `dateRange`, e.g. `today`, `yesterday`, `last
+You can use compare date range queries when you want to see, for example, how a metric performed over a period in the past and how it performs now. You can pass two or more date ranges where each of them is in the same format as a `dateRange`
+
+```js
+// ...
+const resultSet = cubejsApi.load({
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    compareDateRange: ['this week', ['2020-05-21', '2020-05-28']],
+    granularity: 'month'
+  }]
+});
+// ...
+```
+
+You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `last
 year`, or `last 6 months`.
 
 ```js

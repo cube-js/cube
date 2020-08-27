@@ -230,7 +230,7 @@ export default function App() {
 
 • **CubeContext**: *Context‹[CubeContextProps](#types-cube-context-props)›*
 
-In case when you need access to `cubejsApi` directly you can use `CubeContext` anywhere in your app
+In case when you need direct access to `cubejsApi` you can use `CubeContext` anywhere in your app
 
 ```js
 import React from 'react';
