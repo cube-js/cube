@@ -59,7 +59,7 @@ Get query related meta without query execution
 
 ▸  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
 
-Fetch data for the passed `query`.
+Fetch data for the passed `query`. It also accepts an array of queries, and in such case it will be treated as a [Data Blending](/data-blending) query.
 
 ```js
 import cubejs from '@cubejs-client/core';

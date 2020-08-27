@@ -13,6 +13,8 @@ In the case of dimension of type `time` granularity could be optionally added to
 
 Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`.
 
+The Cube.js client also accepts an array of queries. By default it will be treated as a [Data Blending](/data-blending) query.
+
 ## Query Properties
 
 A Query has the following properties:
