@@ -8,6 +8,7 @@ const BaseMeasure = require('./BaseMeasure');
 const BaseDimension = require('./BaseDimension');
 const BaseSegment = require('./BaseSegment');
 const BaseFilter = require('./BaseFilter');
+const BaseGroupFilter = require('./BaseGroupFilter');
 const BaseTimeDimension = require('./BaseTimeDimension');
 const ParamAllocator = require('./ParamAllocator');
 const PreAggregations = require('./PreAggregations');
@@ -47,6 +48,69 @@ class BaseQuery {
     this.granularityParentHierarchyCache = {};
   }
 
+  extractDimensionsAndMeasures(filters = []) {
+    if(!filters){
+      return []
+    }
+    let allFilters = [];
+    filters.forEach(f => {  
+      if(f.operator == 'and' || f.operator == 'or'){ 
+        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.values)) 
+      } 
+      else
+      {
+        if (this.cubeEvaluator.isMeasure(f.dimension)) { 
+          allFilters.push({measure:f.dimension})
+        }
+        else{
+          allFilters.push({dimension:f.dimension})
+        }
+      }
+    });
+
+    return allFilters
+  }
+
+  extractFiltersAsTree(filters = []) {
+    if(!filters){
+      return []
+    }
+
+    return filters.map(f => { 
+      if(f.operator == 'and' || f.operator == 'or'){
+        const data = this.extractDimensionsAndMeasures(f.values)
+        const dimension = data.filter(e => !!e.dimension).map(e => e.dimension)
+        const measure = data.filter(e => !!e.measure).map(e => e.measure)
+        console.log(dimension , measure)
+        if(dimension.length && !measure.length){
+          return { 
+            values:this.extractFiltersAsTree(f.values),
+            operator:f.operator,
+            dimension:dimension[0],
+            measure:null,
+          }
+        }
+        if(!dimension.length && measure.length){
+          return { 
+            values:this.extractFiltersAsTree(f.values),
+            operator:f.operator,
+            dimension:null,
+            measure:measure[0],
+          }
+        }
+        throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`)
+      }
+
+      if (this.cubeEvaluator.isMeasure(f.dimension)) {
+        return Object.assign({}, f, {
+          dimension: null,
+          measure: f.dimension
+        });
+      }
+      return f;
+    }); 
+  }
+  
   initFromOptions() {
     this.contextSymbols = Object.assign({ userContext: {} }, this.options.contextSymbols || {});
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
@@ -80,20 +144,12 @@ class BaseQuery {
     this.dimensions = (this.options.dimensions || []).map(this.newDimension.bind(this));
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
     this.order = this.options.order || [];
-    const filters = (this.options.filters || []).map(f => {
-      if (this.cubeEvaluator.isMeasure(f.dimension)) {
-        return Object.assign({}, f, {
-          dimension: null,
-          measure: f.dimension
-        });
-      }
-      return f;
-    });
-
+    const filters = this.extractFiltersAsTree(this.options.filters || []);
+     
     // measure_filter (the one extracted from filters parameter on measure and
     // used in drill downs) should go to WHERE instead of HAVING
-    this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.newFilter.bind(this));
-    this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.newFilter.bind(this));
+    this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
+    this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
 
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
@@ -111,6 +167,8 @@ class BaseQuery {
       return dimension;
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
+
+    console.log("allCubeNames", this.allCubeNames)
     this.join = this.joinGraph.buildJoin(this.allCubeNames);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption =
@@ -164,6 +222,7 @@ class BaseQuery {
     if (!this.collectedCubeNames) {
       this.collectedCubeNames = this.collectCubeNames();
     }
+    console.log("get collectedCubeNames", this.collectedCubeNames)
     return this.collectedCubeNames;
   }
 
@@ -172,6 +231,7 @@ class BaseQuery {
     if (dataSources.length > 1) {
       throw new UserError(`Joins across data sources aren't supported in community edition. Found data sources: ${dataSources.join(', ')}`);
     }
+    console.log("get dataSource", this.dataSources)
     return dataSources[0];
   }
 
@@ -180,6 +240,7 @@ class BaseQuery {
   }
 
   get aliasNameToMember() {
+    console.log("get dataSoaliasNameToMemberurce" )
     return R.fromPairs(
       this.measures.map(m => [m.unescapedAliasName(), m.measure]).concat(
         this.dimensions.map(m => [m.unescapedAliasName(), m.dimension])
@@ -211,6 +272,7 @@ class BaseQuery {
   }
 
   get subQueryDimensions() {
+    console.log("get subQueryDimensions" )
     // eslint-disable-next-line no-underscore-dangle
     if (!this._subQueryDimensions) {
       // eslint-disable-next-line no-underscore-dangle
@@ -278,8 +340,22 @@ class BaseQuery {
     return new BaseSegment(this, segmentPath);
   }
 
+  initFilter(filter) { 
+    if(filter.operator == 'or' || filter.operator == 'or') 
+    {
+      filter.values = filter.values.map(this.initFilter.bind(this))
+      return this.newGroupFilter(filter)
+    }
+    return this.newFilter(filter) 
+  }
+
+
   newFilter(filter) {
     return new BaseFilter(this, filter);
+  }
+
+  newGroupFilter(filter) {
+    return new BaseGroupFilter(this, filter);
   }
 
   newTimeDimension(timeDimension) {
@@ -400,7 +476,11 @@ class BaseQuery {
     return !!this.measures.find(m => m.isRolling()); // TODO
   }
 
+  /**
+   * @todo Find out what this method is
+   */
   simpleQuery() {
+    console.log("simpleQuery")
     // eslint-disable-next-line prefer-template
     const inlineWhereConditions = [];
     const commonQuery = this.rewriteInlineWhere(() => this.commonQuery(), inlineWhereConditions);
@@ -411,7 +491,11 @@ class BaseQuery {
       this.groupByDimensionLimit();
   }
 
+  /**
+   * @todo Find out what this method is
+   */
   fullKeyQueryAggregate() {
+    console.log("fullKeyQueryAggregate")
     const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length) {
@@ -487,7 +571,10 @@ class BaseQuery {
       () => this.baseWhere(this.measureFilters),
       renderedReferenceContext
     );
-    return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+    const q = `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+    
+    console.log("fullKeyQueryAggregate", q)
+    return q
   }
 
   fullKeyQueryAggregateMeasures() {
@@ -525,11 +612,13 @@ class BaseQuery {
   }
 
   baseWhere(filters) {
+    console.log("baseWhere (!)", filters.length)
     const filterClause = filters.map(t => t.filterToWhere()).filter(R.identity).map(f => `(${f})`);
     return filterClause.length ? ` WHERE ${filterClause.join(' AND ')}` : '';
   }
 
   baseHaving(filters) {
+    console.log("baseHaving (!)", filters.length)
     const filterClause = filters.map(t => t.filterToWhere()).filter(R.identity).map(f => `(${f})`);
     return filterClause.length ? ` HAVING ${filterClause.join(' AND ')}` : '';
   }
@@ -581,6 +670,7 @@ class BaseQuery {
   }
 
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure) {
+    console.log("overTimeSeriesQuery")
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
     const cumulativeMeasures = [cumulativeMeasure];
     const dateFromStartToEndConditionSql =
@@ -629,6 +719,9 @@ class BaseQuery {
           `'${d.dateToFormatted()}'`
         )
       ).join(' AND ');
+
+
+    console.log("overTimeSeriesQuery::dateJoinCondition", dateJoinCondition)
     return this.overTimeSeriesSelect(
       cumulativeMeasures,
       dateSeriesSql,
@@ -767,11 +860,13 @@ class BaseQuery {
   }
 
   get filtersWithoutSubQueries() {
+    console.log("filtersWithoutSubQueries")
     if (!this.filtersWithoutSubQueriesValue) {
       this.filtersWithoutSubQueriesValue = this.allFilters.filter(
         f => this.collectFrom([f], this.collectSubQueryDimensionsFor.bind(this), 'collectSubQueryDimensionsFor').length === 0
       );
     }
+    console.log("filtersWithoutSubQueries", this.filtersWithoutSubQueriesValue)
     return this.filtersWithoutSubQueriesValue;
   }
 
@@ -815,6 +910,7 @@ class BaseQuery {
       segments,
       timeDimensions
     });
+    console.log("subQueryDescription", subQuery)
     return { prefix, subQuery, cubeName };
   }
 
@@ -823,6 +919,7 @@ class BaseQuery {
   }
 
   regularMeasuresSubQuery(measures, filters) {
+    console.log("regularMeasuresSubQuery")
     filters = filters || this.allFilters;
 
     const inlineWhereConditions = [];
@@ -935,6 +1032,7 @@ class BaseQuery {
   }
 
   keysQuery(primaryKeyDimension, filters) {
+    console.log("keysQuery")
     const inlineWhereConditions = [];
     const query = this.rewriteInlineWhere(() => this.joinQuery(
       this.join,
@@ -944,9 +1042,11 @@ class BaseQuery {
         'collectSubQueryDimensionsFor'
       )
     ), inlineWhereConditions);
-    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
+    const q = `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
       query
     } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
+    console.log("keysQuery", q)
+    return q
   }
 
   keysSelect(primaryKeyDimension) {
@@ -992,6 +1092,9 @@ class BaseQuery {
   }
 
   collectCubeNames(excludeTimeDimensions) {
+    
+    console.log("allCubeNames::collectCubeNames", excludeTimeDimensions)
+
     return this.collectFromMembers(
       excludeTimeDimensions,
       this.collectCubeNamesFor.bind(this),
@@ -1010,6 +1113,7 @@ class BaseQuery {
   }
 
   collectFrom(membersToCollectFrom, fn, methodName, cache) {
+    console.log("collectFrom",  fn, methodName, cache)
     return R.pipe(
       R.map(s => (
         (cache || this.compilerCache).cache(
@@ -1313,6 +1417,8 @@ class BaseQuery {
       fn,
       context
     );
+
+    console.log("collectCubeNamesFor", context, context.cubeNames)
     return R.uniq(context.cubeNames);
   }
 
@@ -1471,6 +1577,7 @@ class BaseQuery {
   }
 
   applyMeasureFilters(evaluateSql, symbol, cubeName) {
+    console.log("applyMeasureFilters")
     if (!symbol.filters || !symbol.filters.length) {
       return evaluateSql;
     }
@@ -1481,10 +1588,12 @@ class BaseQuery {
   }
 
   evaluateMeasureFilters(symbol, cubeName) {
+    console.log("evaluateMeasureFilters")
     return this.evaluateFiltersArray(symbol.filters, cubeName);
   }
 
   evaluateFiltersArray(filtersArray, cubeName) {
+    console.log("evaluateFiltersArray")
     return filtersArray.map(f => this.evaluateSql(cubeName, f.sql))
       .map(s => `(${s})`).join(' AND ');
   }
@@ -1974,6 +2083,7 @@ class BaseQuery {
   }
 
   filtersProxy() {
+    console.log("filtersProxy")
     const { allFilters } = this;
     return new Proxy({}, {
       get: (target, name) => {
