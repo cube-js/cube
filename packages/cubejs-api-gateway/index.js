@@ -200,7 +200,7 @@ const oneFilter = Joi.object().keys({
 const querySchema = Joi.object().keys({
   measures: Joi.array().items(id),
   dimensions: Joi.array().items(dimensionWithTime),
-  filters: Joi.array().items(oneFilter, oneCondition),
+  filters: Joi.array().items(oneFilter),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
     granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
