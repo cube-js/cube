@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.20.0](https://github.com/cube-js/cube.js/compare/v0.19.61...v0.20.0) (2020-08-26)
+
+
+### Bug Fixes
+
+* Refresh Scheduler should respect `dataSource` ([d7e7a57](https://github.com/cube-js/cube.js/commit/d7e7a57))
+
+
+### Features
+
+* Dremio driver ([#1008](https://github.com/cube-js/cube.js/issues/1008)) ([617225f](https://github.com/cube-js/cube.js/commit/617225f))
+
+
+
+
+
 ## [0.19.61](https://github.com/cube-js/cube.js/compare/v0.19.60...v0.19.61) (2020-08-11)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

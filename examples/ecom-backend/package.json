@@ -1,0 +1,13 @@
+{
+  "name": "cubejs-ecom",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-dev-server",
+    "start": "./node_modules/.bin/cubejs-dev-server"
+  },
+  "dependencies": {
+    "@cubejs-backend/postgres-driver": "^0.19.60",
+    "@cubejs-backend/server": "^0.19.60"
+  }
+}

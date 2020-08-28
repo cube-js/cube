@@ -25,7 +25,7 @@ module.exports = {
     'react/forbid-prop-types': 0,
     'react/prop-types': 0,
     'import/extensions': 0,
-    quotes: ['warn', 'single'],
+    quotes: 0,
     'no-prototype-builtins': 0,
     'class-methods-use-this': 0,
     'no-param-reassign': 0,

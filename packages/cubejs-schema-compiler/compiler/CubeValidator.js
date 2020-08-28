@@ -63,7 +63,7 @@ const BaseMeasure = {
   meta: Joi.any()
 };
 
-const BasePreAggregation = {
+const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: Joi.alternatives().try(
     Joi.object().keys({
       sql: Joi.func().required()
@@ -76,7 +76,6 @@ const BasePreAggregation = {
   ),
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
-  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year'),
   scheduledRefresh: Joi.boolean(),
   refreshRangeStart: {
     sql: Joi.func().required()
@@ -92,6 +91,11 @@ const BasePreAggregation = {
       columns: Joi.func().required()
     })
   )),
+};
+
+const BasePreAggregation = {
+  ...BasePreAggregationWithoutPartitionGranularity,
+  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year'),
 };
 
 const cubeSchema = Joi.object().keys({
@@ -190,7 +194,11 @@ const cubeSchema = Joi.object().keys({
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
-      timeDimensionReference: Joi.func()
+      timeDimensionReference: Joi.func().required(),
+      partitionGranularity: BasePreAggregation.partitionGranularity.required(),
+    })),
+    Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
+      type: Joi.any().valid('originalSql').required(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),

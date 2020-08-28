@@ -22,14 +22,19 @@ const { Content, Sider } = Layout;
 const { TreeNode } = Tree;
 const { TabPane } = Tabs;
 
+const schemasMap = {};
 const schemaToTreeData = (schemas) =>
   Object.keys(schemas).map((schemaName) => ({
     title: schemaName,
     key: schemaName,
-    children: Object.keys(schemas[schemaName]).map((tableName) => ({
-      title: tableName,
-      key: `${schemaName}.${tableName}`,
-    })),
+    children: Object.keys(schemas[schemaName]).map((tableName) => {
+      const key = `${schemaName}.${tableName}`
+      schemasMap[key] = [schemaName, tableName]
+      return {
+        title: tableName,
+        key,
+      }
+    }),
   }));
 
 class SchemaPage extends Component {
@@ -110,7 +115,7 @@ class SchemaPage extends Component {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        tables: checkedKeys.filter((k) => k.split('.').length === 2),
+        tables: checkedKeys.filter((k) => !!schemasMap[k]).map(e => schemasMap[e]),
         tablesSchema,
       }),
     });

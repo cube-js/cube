@@ -100,7 +100,9 @@ Another way is to encode the key file with **base64**:
 $ cat /path/to/key-file.json | base64
 ```
 
-Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key.
+Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key. 
+
+You can learn more about acquiring Google BigQuery credentials [here](https://cloud.google.com/docs/authentication/getting-started) and [here](https://console.cloud.google.com/apis/credentials/serviceaccountkey).
 
 ### Connecting to Multiple Databases
 

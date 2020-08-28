@@ -304,7 +304,7 @@ describe('ScaffoldingSchema', () => {
         }]
       }
     }, driver);
-    template.generateFilesByTableNames(['public.orders', 'public.customers', 'public.accounts']).should.be.deepEqual([
+    template.generateFilesByTableNames(['public.orders', ['public', 'customers'], 'public.accounts']).should.be.deepEqual([
       {
         fileName: 'Orders.js',
         content: `cube(\`Orders\`, {

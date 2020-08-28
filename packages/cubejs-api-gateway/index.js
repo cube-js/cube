@@ -12,6 +12,12 @@ const CubejsHandlerError = require('./CubejsHandlerError');
 const SubscriptionServer = require('./SubscriptionServer');
 const LocalSubscriptionStore = require('./LocalSubscriptionStore');
 
+const QUERY_TYPE = {
+  REGULAR_QUERY: 'regularQuery',
+  COMPARE_DATE_RANGE_QUERY: 'compareDateRangeQuery',
+  BLENDING_QUERY: 'blendingQuery',
+};
+
 const toConfigMap = (metaConfig) => (
   R.pipe(
     R.map(c => [c.config.name, c.config]),
@@ -65,6 +71,39 @@ const prepareAnnotation = (metaConfig, query) => {
   };
 };
 
+const getQueryGranularity = (queries) => {
+  return R.pipe(
+    R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
+    R.filter(Boolean),
+    R.uniq
+  )(queries);
+};
+
+const getPivotQuery = (queryType, queries) => {
+  let [pivotQuery] = queries;
+  
+  if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+    pivotQuery = R.fromPairs(
+      ['measures', 'dimensions'].map(
+        (key) => [key, R.uniq(queries.reduce((memo, q) => memo.concat(q[key]), []))]
+      )
+    );
+    
+    const [granularity] = getQueryGranularity(queries);
+    
+    pivotQuery.timeDimensions = [{
+      dimension: 'time',
+      granularity
+    }];
+  } else if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
+    pivotQuery.dimensions = ['compareDateRange'].concat(pivotQuery.dimensions || []);
+  }
+  
+  pivotQuery.queryType = queryType;
+  
+  return pivotQuery;
+};
+
 const transformValue = (value, type) => {
   if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
     return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
@@ -72,39 +111,58 @@ const transformValue = (value, type) => {
   return value && value.value ? value.value : value; // TODO move to sql adapter
 };
 
+const transformData = (aliasToMemberNameMap, annotation, data, query, queryType) => (data.map(r => {
+  const row = R.pipe(
+    R.toPairs,
+    R.map(p => {
+      const memberName = aliasToMemberNameMap[p[0]];
+      const annotationForMember = annotation[memberName];
 
-const transformData = (aliasToMemberNameMap, annotation, data, query) => (data.map(r => R.pipe(
-  R.toPairs,
-  R.map(p => {
-    const memberName = aliasToMemberNameMap[p[0]];
-    const annotationForMember = annotation[memberName];
-    if (!annotationForMember) {
-      throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
-    }
-    const transformResult = [
-      memberName,
-      transformValue(p[1], annotationForMember.type)
-    ];
+      if (!annotationForMember) {
+        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
+      }
 
-    const path = memberName.split('.');
-
-    // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-    const memberNameWithoutGranularity = [path[0], path[1]].join('.');
-    if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
-      return [
-        transformResult,
-        [
-          memberNameWithoutGranularity,
-          transformResult[1]
-        ]
+      const transformResult = [
+        memberName,
+        transformValue(p[1], annotationForMember.type)
       ];
-    }
 
-    return [transformResult];
-  }),
-  R.unnest,
-  R.fromPairs
-)(r)));
+      const path = memberName.split('.');
+
+      // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
+      const memberNameWithoutGranularity = [path[0], path[1]].join('.');
+      if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
+        return [
+          transformResult,
+          [
+            memberNameWithoutGranularity,
+            transformResult[1]
+          ]
+        ];
+      }
+
+      return [transformResult];
+    }),
+    R.unnest,
+    R.fromPairs
+  )(r);
+  
+  const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
+  
+  if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
+    return {
+      ...row,
+      compareDateRange: dateRange.join(' - ')
+    };
+  } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+    return {
+      ...row,
+      [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
+    };
+  }
+  
+  return row;
+}));
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
@@ -145,8 +203,9 @@ const querySchema = Joi.object().keys({
     dateRange: [
       Joi.array().items(Joi.string()).min(1).max(2),
       Joi.string()
-    ]
-  })),
+    ],
+    compareDateRange: Joi.array()
+  }).oxor('dateRange', 'compareDateRange')),
   order: Joi.alternatives(
     Joi.object().pattern(id, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
@@ -176,8 +235,7 @@ const normalizeQueryOrder = order => {
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 const normalizeQuery = (query) => {
-  // eslint-disable-next-line no-unused-vars
-  const { error, value } = Joi.validate(query, querySchema);
+  const { error } = Joi.validate(query, querySchema);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -214,9 +272,11 @@ const normalizeQuery = (query) => {
       'afterDate',
       'measureFilter',
     ].indexOf(f.operator) === -1);
+    
   if (filterWithIncorrectOperator) {
     throw new UserError(`Operator ${filterWithIncorrectOperator.operator} not supported for filter: ${JSON.stringify(filterWithIncorrectOperator)}`);
   }
+  
   const filterWithoutValues = (query.filters || [])
     .find(f => !f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1);
   if (filterWithoutValues) {
@@ -241,6 +301,9 @@ const normalizeQuery = (query) => {
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
+      
+      const compareDateRange = td.compareDateRange ? td.compareDateRange.map((currentDateRange) => (typeof currentDateRange === 'string' ? dateParser(currentDateRange, timezone) : currentDateRange)) : null;
+      
       if (typeof td.dateRange === 'string') {
         dateRange = dateParser(td.dateRange, timezone);
       } else {
@@ -254,7 +317,8 @@ const normalizeQuery = (query) => {
               moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
               moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
           )
-        )
+        ),
+        ...(compareDateRange ? { compareDateRange } : {})
       };
     }).concat(regularToTimeDimension)
   };
@@ -300,7 +364,8 @@ class ApiGateway {
       await this.load({
         query: req.query.query,
         context: req.context,
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        queryParams: req.query
       });
     }));
 
@@ -309,7 +374,8 @@ class ApiGateway {
       await this.load({
         query: req.body.query,
         context: req.context,
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        queryParams: req.body
       });
     }));
 
@@ -339,6 +405,14 @@ class ApiGateway {
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, this.requestMiddleware, (async (req, res) => {
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.get(`${this.basePath}/v1/dry-run`, this.requestMiddleware, (async (req, res) => {
+      await this.dryRun({
+        query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res)
       });
@@ -380,23 +454,91 @@ class ApiGateway {
       });
     }
   }
-
-  async sql({
-    query, context, res
-  }) {
+  
+  async getNormalizedQueries(query, context) {
+    query = this.parseQueryParam(query);
+    let queryType = QUERY_TYPE.REGULAR_QUERY;
+    
+    if (!Array.isArray(query)) {
+      query = this.compareDateRangeTransformer(query);
+      if (Array.isArray(query)) {
+        queryType = QUERY_TYPE.COMPARE_DATE_RANGE_QUERY;
+      }
+    } else {
+      queryType = QUERY_TYPE.BLENDING_QUERY;
+    }
+    
+    const queries = Array.isArray(query) ? query : [query];
+    const normalizedQueries = await Promise.all(
+      queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
+    );
+    
+    if (normalizedQueries.find((currentQuery) => !currentQuery)) {
+      throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
+    }
+    
+    if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+      const queryGranularity = getQueryGranularity(normalizedQueries);
+      
+      if (queryGranularity.length > 1) {
+        throw new UserError('Data blending query granularities must match');
+      }
+      if (queryGranularity.filter(Boolean).length === 0) {
+        throw new UserError('Data blending query without granularity is not supported');
+      }
+    }
+    
+    return [queryType, normalizedQueries];
+  }
+  
+  async sql({ query, context, res }) {
     const requestStarted = new Date();
+    
     try {
-      query = this.parseQueryParam(query);
-      const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
-      const sqlQuery = await this.getCompilerApi(context).getSql(
-        coerceForSqlQuery(normalizedQuery, context),
-        { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      
+      const sqlQueries = await Promise.all(
+        normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
+          coerceForSqlQuery(normalizedQuery, context),
+          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+        ))
       );
+      
+      const toQuery = (sqlQuery) => ({
+        ...sqlQuery,
+        order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
+      });
+
+      res(queryType === QUERY_TYPE.REGULAR_QUERY ?
+        { sql: toQuery(sqlQueries[0]) } :
+        sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
+      });
+    }
+  }
+  
+  async dryRun({ query, context, res }) {
+    const requestStarted = new Date();
+    
+    try {
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      
+      const sqlQueries = await Promise.all(
+        normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
+          coerceForSqlQuery(normalizedQuery, context),
+          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+        ))
+      );
+
       res({
-        sql: {
-          ...sqlQuery,
-          order: R.fromPairs(sqlQuery.order.map(({ id, desc }) => [id, desc ? 'desc' : 'asc']))
-        }
+        queryType,
+        normalizedQueries,
+        queryOrder: sqlQueries.map((sqlQuery) => R.fromPairs(
+          sqlQuery.order.map(({ id: member, desc }) => [member, desc ? 'desc' : 'asc'])
+        )),
+        pivotQuery: getPivotQuery(queryType, normalizedQueries)
       });
     } catch (e) {
       this.handleError({
@@ -405,70 +547,98 @@ class ApiGateway {
     }
   }
 
-  async load({
-    query, context, res
-  }) {
+  async load({ query, context, res, queryParams }) {
     const requestStarted = new Date();
+    
     try {
-      query = this.parseQueryParam(query);
       this.log(context, {
         type: 'Load Request',
         query
       });
-      const loadRequestSQLStarted = new Date();
-      const normalizedQuery = await this.queryTransformer(normalizeQuery(query), context);
-      if (!normalizedQuery) {
-        throw new Error(`queryTransformer returned null query. Please check your queryTransformer implementation`);
-      }
-      const [compilerSqlResult, metaConfigResult] = await Promise.all([
-        this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context)),
-        this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
-      ]);
-      const sqlQuery = compilerSqlResult;
-      this.log(context, {
-        type: 'Load Request SQL',
-        duration: this.duration(loadRequestSQLStarted),
-        query,
-        sqlQuery
-      });
-
-      const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
-      const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
-      const toExecute = {
-        ...sqlQuery,
-        query: sqlQuery.sql[0],
-        values: sqlQuery.sql[1],
-        continueWait: true,
-        renewQuery: normalizedQuery.renewQuery,
-        requestId: context.requestId
-      };
-      const response = await this.getAdapterApi({
-        ...context, dataSource: sqlQuery.dataSource
-      }).executeQuery(toExecute);
-
-      const flattenAnnotation = {
-        ...annotation.measures,
-        ...annotation.dimensions,
-        ...annotation.timeDimensions
-      };
-
-      const result = {
-        query: normalizedQuery,
-        data: transformData(aliasToMemberNameMap, flattenAnnotation, response.data, normalizedQuery),
-        lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
-        ...(process.env.NODE_ENV === 'production' ? undefined : {
-          refreshKeyValues: response.refreshKeyValues,
-          usedPreAggregations: response.usedPreAggregations
-        }),
-        annotation
-      };
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      
+      const [metaConfigResult, ...sqlQueries] = await Promise.all(
+        [
+          this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
+        ].concat(normalizedQueries.map(
+          async (normalizedQuery, index) => {
+            const loadRequestSQLStarted = new Date();
+            const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
+            
+            this.log(context, {
+              type: 'Load Request SQL',
+              duration: this.duration(loadRequestSQLStarted),
+              query: normalizedQueries[index],
+              sqlQuery
+            });
+            
+            return sqlQuery;
+          }
+        ))
+      );
+      
+      const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
+        const sqlQuery = sqlQueries[index];
+        const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
+        const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
+        
+        const toExecute = {
+          ...sqlQuery,
+          query: sqlQuery.sql[0],
+          values: sqlQuery.sql[1],
+          continueWait: true,
+          renewQuery: normalizedQuery.renewQuery,
+          requestId: context.requestId
+        };
+        
+        const response = await this.getAdapterApi({
+          ...context,
+          dataSource: sqlQuery.dataSource
+        }).executeQuery(toExecute);
+  
+        const flattenAnnotation = {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        };
+  
+        return {
+          query: normalizedQuery,
+          data: transformData(
+            aliasToMemberNameMap,
+            flattenAnnotation,
+            response.data,
+            normalizedQuery,
+            queryType
+          ),
+          lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
+          ...(process.env.NODE_ENV === 'production' ? undefined : {
+            refreshKeyValues: response.refreshKeyValues,
+            usedPreAggregations: response.usedPreAggregations
+          }),
+          annotation
+        };
+      }));
 
       this.log(context, {
         type: 'Load Request Success',
         query,
         duration: this.duration(requestStarted)
       });
-      res(result);
+      
+      if (queryType !== QUERY_TYPE.REGULAR_QUERY && queryParams.queryType == null) {
+        throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
+      }
+      
+      if (queryParams.queryType === 'multi') {
+        res({
+          queryType,
+          results,
+          pivotQuery: getPivotQuery(queryType, normalizedQueries)
+        });
+      } else {
+        res(results[0]);
+      }
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
@@ -669,6 +839,41 @@ class ApiGateway {
     if (next) {
       next();
     }
+  }
+
+  compareDateRangeTransformer(query) {
+    let queryCompareDateRange;
+    let compareDateRangeTDIndex;
+    
+    (query.timeDimensions || []).forEach((td, index) => {
+      if (td.compareDateRange != null) {
+        if (queryCompareDateRange != null) {
+          throw new UserError('compareDateRange can only exist for one timeDimension');
+        }
+        
+        queryCompareDateRange = td.compareDateRange;
+        compareDateRangeTDIndex = index;
+      }
+    });
+    
+    if (queryCompareDateRange == null) {
+      return query;
+    }
+    
+    return queryCompareDateRange.map((dateRange) => ({
+      ...R.clone(query),
+      timeDimensions: query.timeDimensions.map((td, index) => {
+        if (compareDateRangeTDIndex === index) {
+          const { compareDateRange, ...timeDimension } = td;
+          return {
+            ...timeDimension,
+            dateRange
+          };
+        }
+          
+        return td;
+      })
+    }));
   }
 
   log(context, event) {

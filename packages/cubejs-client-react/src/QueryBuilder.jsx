@@ -274,16 +274,20 @@ export default class QueryBuilder extends React.Component {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
     
+    let pivotQuery = {};
     let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || {};
     
-    if (finalState.shouldApplyHeuristicOrder && QueryRenderer.isQueryPresent(query)) {
+    if (QueryRenderer.isQueryPresent(query)) {
       try {
-        const { sqlQuery } = await this.cubejsApi().sql(query, {
+        const response = await this.cubejsApi().dryRun(query, {
           mutexObj: this.mutexObj,
         });
+        pivotQuery = response.pivotQuery;
 
-        finalState.query.order = sqlQuery.sql.order;
+        if (finalState.shouldApplyHeuristicOrder) {
+          finalState.query.order = response.queryOrder;
+        }
       } catch (error) {
         console.error(error);
       }
@@ -292,10 +296,10 @@ export default class QueryBuilder extends React.Component {
     const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
     
     const updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers({
-      ...this.state, ...finalState
+      ...this.state,
+      ...finalState
     }));
     const currentOrderMemberIds = (finalState.orderMembers || []).map(({ id }) => id);
-    
     const currentOrderMembers = (finalState.orderMembers || []).filter(({ id }) => Boolean(updatedOrderMembers[id]));
       
     Object.entries(updatedOrderMembers).forEach(([id, orderMember]) => {
@@ -316,7 +320,7 @@ export default class QueryBuilder extends React.Component {
       ...finalState,
       query: nextQuery,
       orderMembers: currentOrderMembers,
-      pivotConfig: ResultSet.getNormalizedPivotConfig(nextQuery, activePivotConfig)
+      pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, activePivotConfig)
     };
     
     this.setState(finalState);

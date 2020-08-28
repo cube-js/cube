@@ -14,7 +14,7 @@ class RefreshScheduler {
       const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource });
       const [startDate, endDate] =
         await Promise.all(
-          query
+          compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
             .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
             .map(sql => orchestratorApi.executeQuery({
               query: sql[0],
