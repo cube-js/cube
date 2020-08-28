@@ -186,19 +186,16 @@ const operators = [
   'beforeDate',
   'afterDate',
   'measureFilter',
+  'or',
+  'and',
 ];
 
 const oneFilter = Joi.object().keys({
   dimension: id,
   member: id,
   operator: Joi.valid(operators).required(),
-  values: Joi.array().items(Joi.string().allow('', null))
-}).xor('dimension', 'member')
-
-const oneCondition = Joi.object().keys({ 
-  or:Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
-  and:Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
-}).xor('or', 'and')
+  values: Joi.array().items(Joi.string().allow('', null), Joi.lazy(() => oneFilter))
+})//.xor('dimension', 'member', 'values') // @todo  improve validator
 
 const querySchema = Joi.object().keys({
   measures: Joi.array().items(id),
@@ -241,6 +238,36 @@ const normalizeQueryOrder = order => {
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
+const checkQueryFilters = (filter) =>{
+  filter.find(f => {
+    if(f.or){
+      f = {condition:'or', args:f.or}
+    }
+    if(f.and){
+      f = {condition:'and', args:f.or}
+    }
+    if(f.condition){
+      return checkQueryFilters(f.args)
+    }
+
+    if(!f.operator)
+    { 
+      throw new UserError(`Operator required for filter: ${JSON.stringify(f)}`);
+    }
+
+    if(operators.indexOf(f.operator) === -1)
+    {
+      throw new UserError(`Operator ${f.operator} not supported for filter: ${JSON.stringify(f)}`);
+    } 
+      
+    if(!f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
+      throw new UserError(`Values required for filter: ${JSON.stringify(f)}`);
+    }
+  })
+
+  return true
+}
+
 const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
   if (error) {
@@ -254,41 +281,9 @@ const normalizeQuery = (query) => {
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
     );
   }
-  const filterWithoutOperator = (query.filters || []).find(f => !f.operator);
-  if (filterWithoutOperator) {
-    throw new UserError(`Operator required for filter (!): ${JSON.stringify(filterWithoutOperator)}`);
-  }
-  const filterWithIncorrectOperator = (query.filters || [])
-    .find(f => [
-      'equals',
-      'notEquals',
-      'contains',
-      'notContains',
-      'in',
-      'notIn',
-      'gt',
-      'gte',
-      'lt',
-      'lte',
-      'set',
-      'notSet',
-      'inDateRange',
-      'notInDateRange',
-      'onTheDate',
-      'beforeDate',
-      'afterDate',
-      'measureFilter',
-    ].indexOf(f.operator) === -1);
-    
-  if (filterWithIncorrectOperator) {
-    throw new UserError(`Operator ${filterWithIncorrectOperator.operator} not supported for filter: ${JSON.stringify(filterWithIncorrectOperator)}`);
-  }
+
+  checkQueryFilters(query.filters || []); 
   
-  const filterWithoutValues = (query.filters || [])
-    .find(f => !f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1);
-  if (filterWithoutValues) {
-    throw new UserError(`Values required for filter: ${JSON.stringify(filterWithoutValues)}`);
-  }
   const regularToTimeDimension = (query.dimensions || []).filter(d => d.split('.').length === 3).map(d => ({
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
