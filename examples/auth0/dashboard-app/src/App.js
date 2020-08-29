@@ -1,10 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import logo from './logo.svg';
 import './App.css';
 import './body.css';
 import { makeStyles } from '@material-ui/core/styles';
-import { Layout } from 'antd';
-import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
 import Header from './components/Header';
 import { useAuth0 } from './react-auth0-spa';
@@ -50,7 +47,7 @@ const App = ({ children }) => {
   const initCubejs = useCallback(async () => {
     const accessToken = await getTokenSilently();
 
-    setCubejsApi(await initCubejsApi(accessToken));
+    setCubejsApi(initCubejsApi(accessToken));
   }, [getTokenSilently]);
 
   // Init CubeJS instance with access_token

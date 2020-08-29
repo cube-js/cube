@@ -1,5 +1,4 @@
 require('dotenv').config();
-const http = require('http');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -49,7 +48,6 @@ const serverCore = CubejsServerCore.create({
 serverCore.initApp(app);
 
 const port = process.env.PORT || 4000;
-const server = http.createServer(app);
 
 app.get('/check-user-data-at-some-point', (req, res) => {
   res.json({
@@ -58,7 +56,7 @@ app.get('/check-user-data-at-some-point', (req, res) => {
   })
 })
 
-server.listen(port, (err) => {
+app.listen(port, (err) => {
   if (err) {
     console.error('Fatal error during server start: ');
     console.error(e.stack || e);
