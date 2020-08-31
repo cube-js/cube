@@ -71,6 +71,30 @@ class BaseQuery {
     return allFilters
   }
 
+  extractAllFilters(filters = []) {
+    if(!filters){
+      return []
+    }
+
+    let all = []
+    filters.forEach(f => { 
+      if(f.operator == 'and' || f.operator == 'or'){
+        all = all.concat(all, this.extractAllFilters(f.values) )
+        return;
+      }
+
+      if (this.cubeEvaluator.isMeasure(f.dimension)) {
+        all.push(Object.assign({}, f, {
+          dimension: null,
+          measure: f.dimension
+        }));
+      }
+      all.push(f);
+    }); 
+
+    return all
+  }
+
   extractFiltersAsTree(filters = []) {
     if(!filters){
       return []
@@ -78,10 +102,13 @@ class BaseQuery {
 
     return filters.map(f => { 
       if(f.operator == 'and' || f.operator == 'or'){
+        if(f.values.length < 2){
+          throw new UserError(`You cannot use operator ${f.operator} with less than two operands`)
+        }
+
         const data = this.extractDimensionsAndMeasures(f.values)
         const dimension = data.filter(e => !!e.dimension).map(e => e.dimension)
         const measure = data.filter(e => !!e.measure).map(e => e.measure)
-        console.log(dimension , measure)
         if(dimension.length && !measure.length){
           return { 
             values:this.extractFiltersAsTree(f.values),
@@ -145,7 +172,11 @@ class BaseQuery {
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
     this.order = this.options.order || [];
     const filters = this.extractFiltersAsTree(this.options.filters || []);
-     
+    this.groupFilters = []//this.extractAllFilters(this.options.filters || []).map(this.initFilter.bind(this)).map(e =>{
+    //   return e.cube().name
+    // });
+    // console.log("cube().name", this.groupFilters)
+
     // measure_filter (the one extracted from filters parameter on measure and
     // used in drill downs) should go to WHERE instead of HAVING
     this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
@@ -341,7 +372,7 @@ class BaseQuery {
   }
 
   initFilter(filter) { 
-    if(filter.operator == 'or' || filter.operator == 'or') 
+    if(filter.operator == 'and' || filter.operator == 'or') 
     {
       filter.values = filter.values.map(this.initFilter.bind(this))
       return this.newGroupFilter(filter)
@@ -1107,6 +1138,7 @@ class BaseQuery {
       .concat(this.dimensions)
       .concat(this.segments)
       .concat(this.filters)
+      // .concat(this.groupFilters)
       .concat(this.measureFilters)
       .concat(excludeTimeDimensions ? [] : this.timeDimensions);
     return this.collectFrom(membersToCollectFrom, fn, methodName);
