@@ -71,6 +71,10 @@ class CompilerApi {
         query,
         dataSource
       );
+
+      if (!sqlGenerator) {
+        throw new Error(`Unknown dbType for '${dataSource}' data source: ${dbType}`);
+      }
     }
 
     return compilers.compiler.withQuery(sqlGenerator, () => ({
