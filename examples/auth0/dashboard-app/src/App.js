@@ -3,8 +3,8 @@ import './App.css';
 import './body.css';
 import { makeStyles } from '@material-ui/core/styles';
 import { CubeProvider } from '@cubejs-client/react';
+import { useAuth0 } from "@auth0/auth0-react";
 import Header from './components/Header';
-import { useAuth0 } from './react-auth0-spa';
 import initCubejsApi from './init-cubejs-api';
 
 const useStyles = makeStyles((theme) => ({
@@ -28,37 +28,37 @@ const App = ({ children }) => {
 
   // Get all necessary auth0 data
   const {
-    loading,
+    isLoading,
     isAuthenticated,
     loginWithRedirect,
-    getTokenSilently,
+    getAccessTokenSilently,
     user
   } = useAuth0();
 
   // Force to work only for logged in users bye checking isAuthenticated
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       // Redirect not logged users
       loginWithRedirect();
     }
-  }, [isAuthenticated, loginWithRedirect, loading]);
+  }, [isAuthenticated, loginWithRedirect, isLoading]);
 
   // Get CubeJS instance with access_token and set to component state
   const initCubejs = useCallback(async () => {
-    const accessToken = await getTokenSilently();
+    const accessToken = await getAccessTokenSilently();
 
     setCubejsApi(initCubejsApi(accessToken));
-  }, [getTokenSilently]);
+  }, [getAccessTokenSilently]);
 
   // Init CubeJS instance with access_token
   useEffect(() => {
-    if (!cubejsApi && !loading && isAuthenticated) {
+    if (!cubejsApi && !isLoading && isAuthenticated) {
       initCubejs();
     }
-  }, [cubejsApi, initCubejs, isAuthenticated, loading]);
+  }, [cubejsApi, initCubejs, isAuthenticated, isLoading]);
 
   // show loading indicator while loading
-  if (loading || !isAuthenticated || !cubejsApi) {
+  if (isLoading || !isAuthenticated || !cubejsApi) {
     return <span>Loading</span>;
   }
 
