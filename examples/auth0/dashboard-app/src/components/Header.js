@@ -1,23 +1,38 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { withRouter } from "react-router";
-import AppBar from "@material-ui/core/AppBar";
-import Toolbar from "@material-ui/core/Toolbar";
-import Typography from "@material-ui/core/Typography";
-import IconButton from "@material-ui/core/IconButton";
 import MenuIcon from "@material-ui/icons/Menu";
+import { useAuth0 } from "@auth0/auth0-react";
+import { Button, IconButton, Typography, Toolbar, AppBar } from '@material-ui/core';
+import { makeStyles } from '@material-ui/core/styles';
 
-const Header = ({ location }) => (
-  <AppBar position="static">
-    <Toolbar variant="dense">
-      <IconButton edge="start" color="inherit" aria-label="menu">
-        <MenuIcon />
-      </IconButton>
-      <Typography variant="h6" color="inherit">
-        My Dashboard
-      </Typography>
-    </Toolbar>
-  </AppBar>
-);
+const useStyles = makeStyles((theme) => ({
+  menuButton: {
+    marginRight: theme.spacing(2),
+  },
+  title: {
+    flexGrow: 1,
+  },
+}));
+
+const Header = ({ location }) => {
+  const { logout } = useAuth0();
+  const classes = useStyles();
+
+  return (
+    <AppBar position="static">
+      <Toolbar variant="dense">
+        <IconButton className={classes.menuButton} edge="start" color="inherit" aria-label="menu">
+          <MenuIcon />
+        </IconButton>
+        <Typography className={classes.title} variant="h6" color="inherit">
+          My Dashboard
+        </Typography>
+        <Button onClick={() => logout({ returnTo: location.origin })}>
+          Log Out
+        </Button>
+      </Toolbar>
+    </AppBar>
+  );
+};
 
 export default withRouter(Header);
