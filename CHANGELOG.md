@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.20.1](https://github.com/cube-js/cube.js/compare/v0.20.0...v0.20.1) (2020-09-01)
+
+
+### Bug Fixes
+
+* data blending query support ([#1033](https://github.com/cube-js/cube.js/issues/1033)) ([20fc979](https://github.com/cube-js/cube.js/commit/20fc979))
+* Error: TypeError: Cannot read property ‘externalPreAggregationQuery’ of null ([e23f302](https://github.com/cube-js/cube.js/commit/e23f302))
+
+
+### Features
+
+* Expose the progress response in the useCubeQuery hook ([#990](https://github.com/cube-js/cube.js/issues/990)). Thanks to [@anton164](https://github.com/anton164) ([01da1fd](https://github.com/cube-js/cube.js/commit/01da1fd))
+* scheduledRefreshContexts CubejsServerCore option ([789a098](https://github.com/cube-js/cube.js/commit/789a098))
+
+
+
+
+
 # [0.20.0](https://github.com/cube-js/cube.js/compare/v0.19.61...v0.20.0) (2020-08-26)
 
 
