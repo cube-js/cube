@@ -150,7 +150,7 @@ declare module '@cubejs-client/react' {
     /**
      * Default query
      */
-    query?: Query | Query[];
+    query?: Query;
     vizState?: VizState;
     /**
      * @default defaultChartType line
@@ -170,12 +170,12 @@ declare module '@cubejs-client/react' {
     /**
      * Called by the `QueryBuilder` when the query state has changed. Use it when state is maintained outside of the `QueryBuilder` component.
      */
-    setQuery?: (query: Query | Query[]) => void;
+    setQuery?: (query: Query) => void;
     setVizState?: (vizState: VizState) => void;
   };
 
   type QueryBuilderState = VizState & {
-    query?: Query | Query[];
+    query?: Query;
   };
 
   type QueryBuilderRenderProps = {

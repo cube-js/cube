@@ -23,14 +23,16 @@ export default class QueryBuilder extends React.Component {
       ...(props.vizState || {}),
     };
 
+    if (Array.isArray(props.query)) {
+      throw new Error('Array of queries is not supported.');
+    }
+    
     return {
       ...nextState,
-      query: Array.isArray(props.query)
-        ? props.query
-        : {
-          ...nextState.query,
-          ...(props.query || {})
-        },
+      query: {
+        ...nextState.query,
+        ...(props.query || {})
+      },
     };
   }
   
@@ -104,11 +106,17 @@ export default class QueryBuilder extends React.Component {
 
   async componentDidMount() {
     const { query, pivotConfig } = this.state;
+    let meta;
+    let pivotQuery;
     
-    const [meta, { pivotQuery }] = await Promise.all([
-      this.cubejsApi().meta(),
-      this.cubejsApi().dryRun(query)
-    ]);
+    if (this.isQueryPresent()) {
+      [meta, { pivotQuery }] = await Promise.all([
+        this.cubejsApi().meta(),
+        this.cubejsApi().dryRun(query)
+      ]);
+    } else {
+      meta = await this.cubejsApi().meta();
+    }
     
     this.setState({
       meta,
