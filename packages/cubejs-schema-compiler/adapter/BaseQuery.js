@@ -79,8 +79,6 @@ class BaseQuery {
         if (f.and) {
           operator = 'and';
         }
-        // console.log("extractFiltersAsTree", operator)
-        // console.log("extractFiltersAsTree", f[operator])
         if (f[operator].length < 2) {
           throw new UserError(`You cannot use operator ${operator} with less than two operands`);
         }
@@ -342,7 +340,6 @@ class BaseQuery {
   }
 
   initFilter(filter) {
-    // console.log("initFilter", filter)
     if (filter.operator === 'and' || filter.operator === 'or') {
       filter.values = filter.values.map(this.initFilter.bind(this));
       return this.newGroupFilter(filter);
@@ -1179,7 +1176,6 @@ class BaseQuery {
   }
 
   orderBy() {
-    console.log('orderBy:', this.order);
     if (R.isEmpty(this.order)) {
       return '';
     }
