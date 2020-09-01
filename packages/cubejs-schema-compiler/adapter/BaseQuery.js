@@ -54,8 +54,10 @@ class BaseQuery {
     }
     let allFilters = [];
     filters.forEach(f => {
-      if (f.operator === 'and' || f.operator === 'or') {
-        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.values));
+      if (f.and) {
+        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.and));
+      } else if (f.or) {
+        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
       } else if (this.cubeEvaluator.isMeasure(f.dimension)) {
         allFilters.push({ measure: f.dimension });
       } else {
@@ -66,56 +68,38 @@ class BaseQuery {
     return allFilters;
   }
 
-  extractAllFilters(filters = []) {
-    if (!filters) {
-      return [];
-    }
-
-    let all = [];
-    filters.forEach(f => {
-      if (f.operator === 'and' || f.operator === 'or') {
-        all = all.concat(all, this.extractAllFilters(f.values));
-        return;
-      }
-
-      if (this.cubeEvaluator.isMeasure(f.dimension)) {
-        all.push(Object.assign({}, f, {
-          dimension: null,
-          measure: f.dimension
-        }));
-      }
-      all.push(f);
-    });
-
-    return all;
-  }
-
   extractFiltersAsTree(filters = []) {
     if (!filters) {
       return [];
     }
 
     return filters.map(f => {
-      if (f.operator === 'and' || f.operator === 'or') {
-        if (f.values.length < 2) {
-          throw new UserError(`You cannot use operator ${f.operator} with less than two operands`);
+      if (f.and || f.or) {
+        let operator = 'or';
+        if (f.and) {
+          operator = 'and';
+        }
+        // console.log("extractFiltersAsTree", operator)
+        // console.log("extractFiltersAsTree", f[operator])
+        if (f[operator].length < 2) {
+          throw new UserError(`You cannot use operator ${operator} with less than two operands`);
         }
 
-        const data = this.extractDimensionsAndMeasures(f.values);
+        const data = this.extractDimensionsAndMeasures(f[operator]);
         const dimension = data.filter(e => !!e.dimension).map(e => e.dimension);
         const measure = data.filter(e => !!e.measure).map(e => e.measure);
         if (dimension.length && !measure.length) {
           return {
-            values: this.extractFiltersAsTree(f.values),
-            operator: f.operator,
+            values: this.extractFiltersAsTree(f[operator]),
+            operator,
             dimension: dimension[0],
             measure: null,
           };
         }
         if (!dimension.length && measure.length) {
           return {
-            values: this.extractFiltersAsTree(f.values),
-            operator: f.operator,
+            values: this.extractFiltersAsTree(f[operator]),
+            operator,
             dimension: null,
             measure: measure[0],
           };
@@ -358,6 +342,7 @@ class BaseQuery {
   }
 
   initFilter(filter) {
+    // console.log("initFilter", filter)
     if (filter.operator === 'and' || filter.operator === 'or') {
       filter.values = filter.values.map(this.initFilter.bind(this));
       return this.newGroupFilter(filter);
@@ -1194,6 +1179,7 @@ class BaseQuery {
   }
 
   orderBy() {
+    console.log('orderBy:', this.order);
     if (R.isEmpty(this.order)) {
       return '';
     }

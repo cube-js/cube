@@ -185,9 +185,7 @@ const operators = [
   'onTheDate',
   'beforeDate',
   'afterDate',
-  'measureFilter',
-  'or',
-  'and',
+  'measureFilter', 
 ];
 
 const oneFilter = Joi.object().keys({
@@ -195,12 +193,17 @@ const oneFilter = Joi.object().keys({
   member: id,
   operator: Joi.valid(operators).required(),
   values: Joi.array().items(Joi.string().allow('', null), Joi.lazy(() => oneFilter))
-})//.xor('dimension', 'member', 'values') // @todo  improve validator
+}).xor('dimension', 'member')
+
+const oneCondition = Joi.object().keys({ 
+  or:Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+  and:Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+}).xor('or', 'and')
 
 const querySchema = Joi.object().keys({
   measures: Joi.array().items(id),
   dimensions: Joi.array().items(dimensionWithTime),
-  filters: Joi.array().items(oneFilter),
+  filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
     granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
@@ -271,7 +274,7 @@ const checkQueryFilters = (filter) =>{
 const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
   if (error) {
-    throw new UserError(`Invalid query format (!): ${error.message || error.toString()}`);
+    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
   const validQuery = query.measures && query.measures.length ||
     query.dimensions && query.dimensions.length ||

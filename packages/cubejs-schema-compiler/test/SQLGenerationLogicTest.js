@@ -326,8 +326,7 @@ describe('SQL Generation', function test() {
         timeDimensions: [],
         filters: [
           {
-            operator: 'or',
-            values: [ 
+            or : [ 
               { dimension: 'cards.id', operator: 'equals', values: ['3'] },
               { dimension: 'cards.id', operator: 'equals', values: ['1'] }
             ]
@@ -362,8 +361,7 @@ describe('SQL Generation', function test() {
           },
           "filters": [
             {
-              operator:'or', 
-              values:[
+              or:[
                 {
                   "dimension": "visitors.visitor_count",
                   "operator": "gt",
@@ -408,8 +406,7 @@ describe('SQL Generation', function test() {
         timeDimensions: [],
         timezone: 'America/Los_Angeles',
         filters: [{ 
-          operator: 'or',
-          values: [
+          or: [
             {
               dimension: 'cards.count',
               operator: 'equals',
@@ -463,11 +460,9 @@ describe('SQL Generation', function test() {
         timeDimensions: [],
         timezone: 'America/Los_Angeles',
         filters: [{
-          operator: 'or',
-          values: [
+          or: [
             { 
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'cards.count',
                   operator: 'equals',
@@ -481,8 +476,7 @@ describe('SQL Generation', function test() {
               ]
             },
             { 
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'cards.count',
                   operator: 'equals',
@@ -537,11 +531,9 @@ describe('SQL Generation', function test() {
         timeDimensions: [],
         timezone: 'America/Los_Angeles',
         filters: [{
-          operator: 'or',
-          values: [
+          or: [
             { 
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'visitors.averageCheckins',
                   operator: 'equals',
@@ -555,8 +547,7 @@ describe('SQL Generation', function test() {
               ]
             },
             { 
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'visitors.averageCheckins',
                   operator: 'equals',
@@ -610,11 +601,9 @@ describe('SQL Generation', function test() {
         timeDimensions: [],
         timezone: 'America/Los_Angeles',
         filters: [{
-          operator: 'or',
-          values: [
+          or: [
             {
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'visitors.source',
                   operator: 'equals',
@@ -628,8 +617,7 @@ describe('SQL Generation', function test() {
               ]
             },
             {
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'visitors.source',
                   operator: 'equals',
@@ -680,11 +668,9 @@ describe('SQL Generation', function test() {
         timeDimensions: [],
         timezone: 'America/Los_Angeles',
         filters: [{
-          operator: 'or',
-          values: [
+          or: [
             {
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'visitors.source',
                   operator: 'equals',
@@ -698,8 +684,7 @@ describe('SQL Generation', function test() {
               ]
             },
             {
-              operator: 'and',
-              values: [
+              and: [
                 {
                   dimension: 'visitors.source',
                   operator: 'equals',
