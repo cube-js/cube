@@ -20,6 +20,10 @@ class BaseSegment {
     return this.segmentDefinition();
   }
 
+  getMembers() {
+    return [this];
+  }
+  
   cube() {
     return this.query.cubeEvaluator.cubeFromPath(this.segment);
   }

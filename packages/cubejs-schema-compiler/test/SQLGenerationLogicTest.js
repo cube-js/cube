@@ -597,5 +597,144 @@ describe('SQL Generation', function test() {
     });
   });
 
+  it('where filter with operators OR & AND', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          "visitors.visitor_count"
+        ],
+        dimensions: [
+          "visitors.source",
+          "visitor_checkins.cardsCount"
+        ],
+        timeDimensions: [],
+        timezone: 'America/Los_Angeles',
+        filters: [{
+          operator: 'or',
+          values: [
+            {
+              operator: 'and',
+              values: [
+                {
+                  dimension: 'visitors.source',
+                  operator: 'equals',
+                  values: ['some']
+                },
+                {
+                  dimension: 'visitor_checkins.cardsCount',
+                  operator: 'equals',
+                  values: ['0']
+                },
+              ]
+            },
+            {
+              operator: 'and',
+              values: [
+                {
+                  dimension: 'visitors.source',
+                  operator: 'equals',
+                  values: ['google']
+                },
+                {
+                  dimension: 'visitor_checkins.cardsCount',
+                  operator: 'equals',
+                  values: ['1']
+                },
+              ]
+            }
+          ]
+        }],
+        order: [{
+          "visitors.visitor_count": "desc"
+        }]
+      });
+
+      console.log(query.buildSqlAndParams());
+
+      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+        console.log(JSON.stringify(res));
+        res.should.be.deepEqual(
+          [{ 
+            "visitors__source": "google", 
+            "visitor_checkins__cards_count": "1",
+            "visitors__visitor_count": "1",
+          }, { 
+            "visitors__source": "some",
+            "visitors__visitor_count": "2",
+            "visitor_checkins__cards_count": "0"
+          }]
+        );
+      });
+    });
+  });
+
+  it('where filter with operators OR & AND (with filter based on dimensions not from select part clause)', () => {
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          "visitors.visitor_count"
+        ],
+        dimensions: [
+          "visitors.source", 
+        ],
+        timeDimensions: [],
+        timezone: 'America/Los_Angeles',
+        filters: [{
+          operator: 'or',
+          values: [
+            {
+              operator: 'and',
+              values: [
+                {
+                  dimension: 'visitors.source',
+                  operator: 'equals',
+                  values: ['some']
+                },
+                {
+                  dimension: 'visitor_checkins.cardsCount',
+                  operator: 'equals',
+                  values: ['0']
+                },
+              ]
+            },
+            {
+              operator: 'and',
+              values: [
+                {
+                  dimension: 'visitors.source',
+                  operator: 'equals',
+                  values: ['google']
+                },
+                {
+                  dimension: 'visitor_checkins.cardsCount',
+                  operator: 'equals',
+                  values: ['1']
+                },
+              ]
+            }
+          ]
+        }],
+        order: [{
+          "visitors.visitor_count": "desc"
+        }]
+      });
+
+      console.log(query.buildSqlAndParams());
+
+      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+        console.log(JSON.stringify(res));
+        res.should.be.deepEqual(
+          [{ 
+            "visitors__source": "google",  
+            "visitors__visitor_count": "1",
+          }, { 
+            "visitors__source": "some",
+            "visitors__visitor_count": "2", 
+          }]
+        );
+      });
+    });
+  });
+
   // end of tests
 });

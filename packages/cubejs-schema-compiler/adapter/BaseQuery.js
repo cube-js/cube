@@ -14,7 +14,7 @@ const ParamAllocator = require('./ParamAllocator');
 const PreAggregations = require('./PreAggregations');
 const SqlParser = require('../parser/SqlParser');
 
-const DEFAULT_PREAGGREGATIONS_SCHEMA = `stb_pre_aggregations`;
+const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
 const standardGranularitiesParents = {
   year: 'month',
@@ -49,37 +49,32 @@ class BaseQuery {
   }
 
   extractDimensionsAndMeasures(filters = []) {
-    if(!filters){
-      return []
+    if (!filters) {
+      return [];
     }
     let allFilters = [];
-    filters.forEach(f => {  
-      if(f.operator == 'and' || f.operator == 'or'){ 
-        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.values)) 
-      } 
-      else
-      {
-        if (this.cubeEvaluator.isMeasure(f.dimension)) { 
-          allFilters.push({measure:f.dimension})
-        }
-        else{
-          allFilters.push({dimension:f.dimension})
-        }
+    filters.forEach(f => {
+      if (f.operator === 'and' || f.operator === 'or') {
+        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.values));
+      } else if (this.cubeEvaluator.isMeasure(f.dimension)) {
+        allFilters.push({ measure: f.dimension });
+      } else {
+        allFilters.push({ dimension: f.dimension });
       }
     });
 
-    return allFilters
+    return allFilters;
   }
 
   extractAllFilters(filters = []) {
-    if(!filters){
-      return []
+    if (!filters) {
+      return [];
     }
 
-    let all = []
-    filters.forEach(f => { 
-      if(f.operator == 'and' || f.operator == 'or'){
-        all = all.concat(all, this.extractAllFilters(f.values) )
+    let all = [];
+    filters.forEach(f => {
+      if (f.operator === 'and' || f.operator === 'or') {
+        all = all.concat(all, this.extractAllFilters(f.values));
         return;
       }
 
@@ -90,42 +85,42 @@ class BaseQuery {
         }));
       }
       all.push(f);
-    }); 
+    });
 
-    return all
+    return all;
   }
 
   extractFiltersAsTree(filters = []) {
-    if(!filters){
-      return []
+    if (!filters) {
+      return [];
     }
 
-    return filters.map(f => { 
-      if(f.operator == 'and' || f.operator == 'or'){
-        if(f.values.length < 2){
-          throw new UserError(`You cannot use operator ${f.operator} with less than two operands`)
+    return filters.map(f => {
+      if (f.operator === 'and' || f.operator === 'or') {
+        if (f.values.length < 2) {
+          throw new UserError(`You cannot use operator ${f.operator} with less than two operands`);
         }
 
-        const data = this.extractDimensionsAndMeasures(f.values)
-        const dimension = data.filter(e => !!e.dimension).map(e => e.dimension)
-        const measure = data.filter(e => !!e.measure).map(e => e.measure)
-        if(dimension.length && !measure.length){
-          return { 
-            values:this.extractFiltersAsTree(f.values),
-            operator:f.operator,
-            dimension:dimension[0],
-            measure:null,
-          }
+        const data = this.extractDimensionsAndMeasures(f.values);
+        const dimension = data.filter(e => !!e.dimension).map(e => e.dimension);
+        const measure = data.filter(e => !!e.measure).map(e => e.measure);
+        if (dimension.length && !measure.length) {
+          return {
+            values: this.extractFiltersAsTree(f.values),
+            operator: f.operator,
+            dimension: dimension[0],
+            measure: null,
+          };
         }
-        if(!dimension.length && measure.length){
-          return { 
-            values:this.extractFiltersAsTree(f.values),
-            operator:f.operator,
-            dimension:null,
-            measure:measure[0],
-          }
+        if (!dimension.length && measure.length) {
+          return {
+            values: this.extractFiltersAsTree(f.values),
+            operator: f.operator,
+            dimension: null,
+            measure: measure[0],
+          };
         }
-        throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`)
+        throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
       }
 
       if (this.cubeEvaluator.isMeasure(f.dimension)) {
@@ -135,7 +130,7 @@ class BaseQuery {
         });
       }
       return f;
-    }); 
+    });
   }
   
   initFromOptions() {
@@ -172,16 +167,12 @@ class BaseQuery {
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
     this.order = this.options.order || [];
     const filters = this.extractFiltersAsTree(this.options.filters || []);
-    this.groupFilters = []//this.extractAllFilters(this.options.filters || []).map(this.initFilter.bind(this)).map(e =>{
-    //   return e.cube().name
-    // });
-    // console.log("cube().name", this.groupFilters)
 
     // measure_filter (the one extracted from filters parameter on measure and
     // used in drill downs) should go to WHERE instead of HAVING
     this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
     this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
-
+ 
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
         const join = this.joinGraph.buildJoin(this.collectCubeNames(true));
@@ -199,7 +190,6 @@ class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
-    console.log("allCubeNames", this.allCubeNames)
     this.join = this.joinGraph.buildJoin(this.allCubeNames);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption =
@@ -253,7 +243,6 @@ class BaseQuery {
     if (!this.collectedCubeNames) {
       this.collectedCubeNames = this.collectCubeNames();
     }
-    console.log("get collectedCubeNames", this.collectedCubeNames)
     return this.collectedCubeNames;
   }
 
@@ -262,7 +251,6 @@ class BaseQuery {
     if (dataSources.length > 1) {
       throw new UserError(`Joins across data sources aren't supported in community edition. Found data sources: ${dataSources.join(', ')}`);
     }
-    console.log("get dataSource", this.dataSources)
     return dataSources[0];
   }
 
@@ -271,7 +259,6 @@ class BaseQuery {
   }
 
   get aliasNameToMember() {
-    console.log("get dataSoaliasNameToMemberurce" )
     return R.fromPairs(
       this.measures.map(m => [m.unescapedAliasName(), m.measure]).concat(
         this.dimensions.map(m => [m.unescapedAliasName(), m.dimension])
@@ -294,16 +281,15 @@ class BaseQuery {
         }
       }
       if (this.measures.length) {
-        throw new UserError(`Measures aren't allowed in ungrouped query`);
+        throw new UserError('Measures aren\'t allowed in ungrouped query');
       }
       if (this.measureFilters.length) {
-        throw new UserError(`Measure filters aren't allowed in ungrouped query`);
+        throw new UserError('Measure filters aren\'t allowed in ungrouped query');
       }
     }
   }
 
   get subQueryDimensions() {
-    console.log("get subQueryDimensions" )
     // eslint-disable-next-line no-underscore-dangle
     if (!this._subQueryDimensions) {
       // eslint-disable-next-line no-underscore-dangle
@@ -371,13 +357,12 @@ class BaseQuery {
     return new BaseSegment(this, segmentPath);
   }
 
-  initFilter(filter) { 
-    if(filter.operator == 'and' || filter.operator == 'or') 
-    {
-      filter.values = filter.values.map(this.initFilter.bind(this))
-      return this.newGroupFilter(filter)
+  initFilter(filter) {
+    if (filter.operator === 'and' || filter.operator === 'or') {
+      filter.values = filter.values.map(this.initFilter.bind(this));
+      return this.newGroupFilter(filter);
     }
-    return this.newFilter(filter) 
+    return this.newFilter(filter);
   }
 
 
@@ -511,7 +496,6 @@ class BaseQuery {
    * @todo Find out what this method is
    */
   simpleQuery() {
-    console.log("simpleQuery")
     // eslint-disable-next-line prefer-template
     const inlineWhereConditions = [];
     const commonQuery = this.rewriteInlineWhere(() => this.commonQuery(), inlineWhereConditions);
@@ -526,7 +510,6 @@ class BaseQuery {
    * @todo Find out what this method is
    */
   fullKeyQueryAggregate() {
-    console.log("fullKeyQueryAggregate")
     const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length) {
@@ -592,7 +575,7 @@ class BaseQuery {
         (q, i) => (this.dimensionAliasNames().length ?
           `INNER JOIN (${q}) as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
           `, (${q}) as q_${i + 1}`)
-      ).join("\n");
+      ).join('\n');
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
       () => this.dimensionColumns('q_0').concat(this.measures.map(m => m.selectColumns())).join(', '),
@@ -602,10 +585,7 @@ class BaseQuery {
       () => this.baseWhere(this.measureFilters),
       renderedReferenceContext
     );
-    const q = `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
-    
-    console.log("fullKeyQueryAggregate", q)
-    return q
+    return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
   fullKeyQueryAggregateMeasures() {
@@ -643,13 +623,11 @@ class BaseQuery {
   }
 
   baseWhere(filters) {
-    console.log("baseWhere (!)", filters.length)
     const filterClause = filters.map(t => t.filterToWhere()).filter(R.identity).map(f => `(${f})`);
     return filterClause.length ? ` WHERE ${filterClause.join(' AND ')}` : '';
   }
 
   baseHaving(filters) {
-    console.log("baseHaving (!)", filters.length)
     const filterClause = filters.map(t => t.filterToWhere()).filter(R.identity).map(f => `(${f})`);
     return filterClause.length ? ` HAVING ${filterClause.join(' AND ')}` : '';
   }
@@ -701,7 +679,6 @@ class BaseQuery {
   }
 
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure) {
-    console.log("overTimeSeriesQuery")
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
     const cumulativeMeasures = [cumulativeMeasure];
     const dateFromStartToEndConditionSql =
@@ -751,8 +728,6 @@ class BaseQuery {
         )
       ).join(' AND ');
 
-
-    console.log("overTimeSeriesQuery::dateJoinCondition", dateJoinCondition)
     return this.overTimeSeriesSelect(
       cumulativeMeasures,
       dateSeriesSql,
@@ -822,7 +797,9 @@ class BaseQuery {
   }
 
   collectRootMeasureToHieararchy() {
-    const notAddedMeasureFilters = this.measureFilters.filter(f => R.none(m => m.measure === f.measure, this.measures));
+    const notAddedMeasureFilters = R.flatten(this.measureFilters.map(f => f.getMembers()))
+      .filter(f => R.none(m => m.measure === f.measure, this.measures));
+
     return R.fromPairs(this.measures.concat(notAddedMeasureFilters).map(m => {
       const collectedMeasures = this.collectFrom(
         [m],
@@ -874,7 +851,7 @@ class BaseQuery {
     ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
 
     const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(join.root);
-    return `${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}\n${joins.join("\n")}`;
+    return `${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}\n${joins.join('\n')}`;
   }
 
   subQueryJoin(dimension) {
@@ -891,13 +868,11 @@ class BaseQuery {
   }
 
   get filtersWithoutSubQueries() {
-    console.log("filtersWithoutSubQueries")
     if (!this.filtersWithoutSubQueriesValue) {
       this.filtersWithoutSubQueriesValue = this.allFilters.filter(
         f => this.collectFrom([f], this.collectSubQueryDimensionsFor.bind(this), 'collectSubQueryDimensionsFor').length === 0
       );
     }
-    console.log("filtersWithoutSubQueries", this.filtersWithoutSubQueriesValue)
     return this.filtersWithoutSubQueriesValue;
   }
 
@@ -941,7 +916,6 @@ class BaseQuery {
       segments,
       timeDimensions
     });
-    console.log("subQueryDescription", subQuery)
     return { prefix, subQuery, cubeName };
   }
 
@@ -950,7 +924,6 @@ class BaseQuery {
   }
 
   regularMeasuresSubQuery(measures, filters) {
-    console.log("regularMeasuresSubQuery")
     filters = filters || this.allFilters;
 
     const inlineWhereConditions = [];
@@ -1010,7 +983,7 @@ class BaseQuery {
       `${this.cubeAlias(keyCubeName)}.${primaryKeyDimension.aliasName()}` :
       this.dimensionSql(primaryKeyDimension);
     const subQueryJoins =
-      shouldBuildJoinForMeasureSelect ? '' : measureSubQueryDimensions.map(d => this.subQueryJoin(d)).join("\n");
+      shouldBuildJoinForMeasureSelect ? '' : measureSubQueryDimensions.map(d => this.subQueryJoin(d)).join('\n');
     return `SELECT ${columnsForSelect} FROM (${this.keysQuery(primaryKeyDimension, filters)}) ${this.asSyntaxTable} ${this.escapeColumnName('keys')} ` +
       `LEFT OUTER JOIN ${keyCubeSql} ${this.asSyntaxJoin} ${keyCubeAlias} ON
       ${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect}
@@ -1058,12 +1031,7 @@ class BaseQuery {
     );
   }
 
-  filterMeasureFilters(measures) {
-    return this.measureFilters.filter(f => R.any(m => m.measure === f.measure, measures));
-  }
-
   keysQuery(primaryKeyDimension, filters) {
-    console.log("keysQuery")
     const inlineWhereConditions = [];
     const query = this.rewriteInlineWhere(() => this.joinQuery(
       this.join,
@@ -1073,11 +1041,9 @@ class BaseQuery {
         'collectSubQueryDimensionsFor'
       )
     ), inlineWhereConditions);
-    const q = `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
+    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
       query
     } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
-    console.log("keysQuery", q)
-    return q
   }
 
   keysSelect(primaryKeyDimension) {
@@ -1123,9 +1089,6 @@ class BaseQuery {
   }
 
   collectCubeNames(excludeTimeDimensions) {
-    
-    console.log("allCubeNames::collectCubeNames", excludeTimeDimensions)
-
     return this.collectFromMembers(
       excludeTimeDimensions,
       this.collectCubeNamesFor.bind(this),
@@ -1138,15 +1101,15 @@ class BaseQuery {
       .concat(this.dimensions)
       .concat(this.segments)
       .concat(this.filters)
-      // .concat(this.groupFilters)
       .concat(this.measureFilters)
       .concat(excludeTimeDimensions ? [] : this.timeDimensions);
     return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
   collectFrom(membersToCollectFrom, fn, methodName, cache) {
-    console.log("collectFrom",  fn, methodName, cache)
     return R.pipe(
+      R.map(f => f.getMembers()),
+      R.flatten,
       R.map(s => (
         (cache || this.compilerCache).cache(
           ['collectFrom', methodName].concat(
@@ -1381,7 +1344,7 @@ class BaseQuery {
       } else if (symbol.type === 'geo') {
         return this.concatStringsSql([
           this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
-          "','",
+          '\',\'',
           this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
         ]);
       } else {
@@ -1398,7 +1361,7 @@ class BaseQuery {
   }
 
   concatStringsSql(strings) {
-    return strings.join(" || ");
+    return strings.join(' || ');
   }
 
   primaryKeyName(cubeName) {
@@ -1450,7 +1413,6 @@ class BaseQuery {
       context
     );
 
-    console.log("collectCubeNamesFor", context, context.cubeNames)
     return R.uniq(context.cubeNames);
   }
 
@@ -1569,15 +1531,15 @@ class BaseQuery {
   }
 
   hllInit(sql) {
-    throw new UserError(`Distributed approximate distinct count is not supported by this DB`);
+    throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
   hllMerge(sql) {
-    throw new UserError(`Distributed approximate distinct count is not supported by this DB`);
+    throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
   countDistinctApprox(sql) {
-    throw new UserError(`Approximate distinct count is not supported by this DB`);
+    throw new UserError('Approximate distinct count is not supported by this DB');
   }
 
   primaryKeyCount(cubeName, distinct) {
@@ -1605,11 +1567,10 @@ class BaseQuery {
 
   caseWhenStatement(when, elseLabel) {
     return `CASE
-    ${when.map(w => `WHEN ${w.sql} THEN ${w.label}`).join("\n")}${elseLabel ? ` ELSE ${elseLabel}` : ''} END`;
+    ${when.map(w => `WHEN ${w.sql} THEN ${w.label}`).join('\n')}${elseLabel ? ` ELSE ${elseLabel}` : ''} END`;
   }
 
   applyMeasureFilters(evaluateSql, symbol, cubeName) {
-    console.log("applyMeasureFilters")
     if (!symbol.filters || !symbol.filters.length) {
       return evaluateSql;
     }
@@ -1620,12 +1581,10 @@ class BaseQuery {
   }
 
   evaluateMeasureFilters(symbol, cubeName) {
-    console.log("evaluateMeasureFilters")
     return this.evaluateFiltersArray(symbol.filters, cubeName);
   }
 
   evaluateFiltersArray(filtersArray, cubeName) {
-    console.log("evaluateFiltersArray")
     return filtersArray.map(f => this.evaluateSql(cubeName, f.sql))
       .map(s => `(${s})`).join(' AND ');
   }
@@ -1807,7 +1766,7 @@ class BaseQuery {
       const escapedColumns = this.evaluateIndexColumns(cube, index);
       return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
     } else {
-      throw new Error(`Index SQL support is not implemented`);
+      throw new Error('Index SQL support is not implemented');
     }
   }
 
@@ -1979,11 +1938,11 @@ class BaseQuery {
               refreshKeyRenewalThresholds: [this.defaultRefreshKeyRenewalThreshold()]
             };
           }
-          const interval = preAggregation.refreshKey.every || `1 hour`;
+          const interval = preAggregation.refreshKey.every || '1 hour';
           let refreshKey = this.everyRefreshKeySql(interval);
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
-              throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations`);
+              throw new UserError('Incremental refresh key can only be used for partitioned pre-aggregations');
             }
             // TODO Case when partitioned originalSql is resolved for query without time dimension.
             // Consider fallback to not using such originalSql for consistency?
@@ -2090,7 +2049,7 @@ class BaseQuery {
               const value = Array.isArray(paramValue) ?
                 paramValue.map(this.paramAllocator.allocateParam.bind(this.paramAllocator)) :
                 this.paramAllocator.allocateParam(paramValue);
-              if (typeof column === "function") {
+              if (typeof column === 'function') {
                 return column(value);
               } else {
                 return `${column} = ${value}`;
@@ -2115,7 +2074,6 @@ class BaseQuery {
   }
 
   filtersProxy() {
-    console.log("filtersProxy")
     const { allFilters } = this;
     return new Proxy({}, {
       get: (target, name) => {
@@ -2133,7 +2091,7 @@ class BaseQuery {
                 if (
                   filterParams && filterParams.length
                 ) {
-                  if (typeof column === "function") {
+                  if (typeof column === 'function') {
                     // eslint-disable-next-line prefer-spread
                     return column.apply(
                       null,

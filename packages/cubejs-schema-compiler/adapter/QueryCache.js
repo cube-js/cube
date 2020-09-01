@@ -3,9 +3,9 @@ class QueryCache {
     this.storage = {};
   }
 
-  /** 
-   * @param {Array} key   
-   * @param {Function} fn 
+  /**
+   * @param {Array} key
+   * @param {Function} fn
    * @returns Returns the result of executing a function (Either call a function or take a value from the cache)
    */
   cache(key, fn) {
