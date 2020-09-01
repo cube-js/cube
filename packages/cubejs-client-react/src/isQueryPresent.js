@@ -1,5 +1,5 @@
-export default (query) => (
-  query.measures && query.measures.length
-    || query.dimensions && query.dimensions.length
-    || query.timeDimensions && query.timeDimensions.length
-);
+export default (query) => ((Array.isArray(query) ? query : [query]).every(
+  (q) => (q.measures && q.measures.length)
+    || (q.dimensions && q.dimensions.length)
+    || (q.timeDimensions && q.timeDimensions.length)
+));
