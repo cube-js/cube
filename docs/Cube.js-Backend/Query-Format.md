@@ -312,6 +312,42 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 }
 ```
 
+## Boolean logical operators 
+
+Filters can contain `or` and `and` logical operators.
+
+logical operators have only one of following properties: 
+
+- `or` An array with two or more filters or other logical operators 
+- `and` An array with two or more filters or other logical operators 
+
+```js
+{
+  or: [
+    {
+      dimension: 'visitors.source',
+      operator: 'equals',
+      values: ['some']
+    },
+    { 
+      and: [
+        {
+          dimension: 'visitors.source',
+          operator: 'equals',
+          values: ['some']
+        },
+        {
+          dimension: 'visitor_checkins.cardsCount',
+          operator: 'equals',
+          values: ['0']
+        },
+      ] 
+    },
+  ]
+}
+```
+
+Note: You can not put dimensions and measures filters in same logical operator.
 
 ## Time Dimensions Format
 
