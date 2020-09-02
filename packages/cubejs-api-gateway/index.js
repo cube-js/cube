@@ -71,13 +71,11 @@ const prepareAnnotation = (metaConfig, query) => {
   };
 };
 
-const getQueryGranularity = (queries) => {
-  return R.pipe(
-    R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
-    R.filter(Boolean),
-    R.uniq
-  )(queries);
-};
+const getQueryGranularity = (queries) => R.pipe(
+  R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
+  R.filter(Boolean),
+  R.uniq
+)(queries);
 
 const getPivotQuery = (queryType, queries) => {
   let [pivotQuery] = queries;
@@ -188,15 +186,22 @@ const operators = [
   'measureFilter',
 ];
 
+const oneFilter = Joi.object().keys({
+  dimension: id,
+  member: id,
+  operator: Joi.valid(operators).required(),
+  values: Joi.array().items(Joi.string().allow('', null), Joi.lazy(() => oneFilter))
+}).xor('dimension', 'member');
+
+const oneCondition = Joi.object().keys({
+  or: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+  and: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+}).xor('or', 'and');
+
 const querySchema = Joi.object().keys({
   measures: Joi.array().items(id),
   dimensions: Joi.array().items(dimensionWithTime),
-  filters: Joi.array().items(Joi.object().keys({
-    dimension: id,
-    member: id,
-    operator: Joi.valid(operators).required(),
-    values: Joi.array().items(Joi.string().allow('', null))
-  }).xor('dimension', 'member')),
+  filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
     granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
@@ -234,6 +239,34 @@ const normalizeQueryOrder = order => {
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
+const checkQueryFilters = (filter) => {
+  filter.find(f => {
+    if (f.or) {
+      checkQueryFilters(f.or);
+      return false;
+    }
+    if (f.and) {
+      checkQueryFilters(f.and);
+      return false;
+    }
+
+    if (!f.operator) {
+      throw new UserError(`Operator required for filter: ${JSON.stringify(f)}`);
+    }
+
+    if (operators.indexOf(f.operator) === -1) {
+      throw new UserError(`Operator ${f.operator} not supported for filter: ${JSON.stringify(f)}`);
+    }
+      
+    if (!f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
+      throw new UserError(`Values required for filter: ${JSON.stringify(f)}`);
+    }
+    return false;
+  });
+
+  return true;
+};
+
 const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
   if (error) {
@@ -247,41 +280,9 @@ const normalizeQuery = (query) => {
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
     );
   }
-  const filterWithoutOperator = (query.filters || []).find(f => !f.operator);
-  if (filterWithoutOperator) {
-    throw new UserError(`Operator required for filter: ${JSON.stringify(filterWithoutOperator)}`);
-  }
-  const filterWithIncorrectOperator = (query.filters || [])
-    .find(f => [
-      'equals',
-      'notEquals',
-      'contains',
-      'notContains',
-      'in',
-      'notIn',
-      'gt',
-      'gte',
-      'lt',
-      'lte',
-      'set',
-      'notSet',
-      'inDateRange',
-      'notInDateRange',
-      'onTheDate',
-      'beforeDate',
-      'afterDate',
-      'measureFilter',
-    ].indexOf(f.operator) === -1);
-    
-  if (filterWithIncorrectOperator) {
-    throw new UserError(`Operator ${filterWithIncorrectOperator.operator} not supported for filter: ${JSON.stringify(filterWithIncorrectOperator)}`);
-  }
+
+  checkQueryFilters(query.filters || []);
   
-  const filterWithoutValues = (query.filters || [])
-    .find(f => !f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1);
-  if (filterWithoutValues) {
-    throw new UserError(`Values required for filter: ${JSON.stringify(filterWithoutValues)}`);
-  }
   const regularToTimeDimension = (query.dimensions || []).filter(d => d.split('.').length === 3).map(d => ({
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
