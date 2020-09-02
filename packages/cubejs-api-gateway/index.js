@@ -365,7 +365,7 @@ class ApiGateway {
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryParams: req.query
+        queryType: req.query.queryType
       });
     }));
 
@@ -375,7 +375,7 @@ class ApiGateway {
         query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryParams: req.body
+        queryType: req.body.queryType
       });
     }));
 
@@ -383,7 +383,8 @@ class ApiGateway {
       await this.load({
         query: req.query.query,
         context: req.context,
-        res: this.resToResultFn(res)
+        res: this.resToResultFn(res),
+        queryType: req.query.queryType
       });
     }));
 
@@ -547,7 +548,7 @@ class ApiGateway {
     }
   }
 
-  async load({ query, context, res, queryParams }) {
+  async load({ query, context, res, ...props }) {
     const requestStarted = new Date();
     
     try {
@@ -626,11 +627,11 @@ class ApiGateway {
         duration: this.duration(requestStarted)
       });
       
-      if (queryType !== QUERY_TYPE.REGULAR_QUERY && queryParams.queryType == null) {
+      if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
       }
       
-      if (queryParams.queryType === 'multi') {
+      if (props.queryType === 'multi') {
         res({
           queryType,
           results,
@@ -647,7 +648,7 @@ class ApiGateway {
   }
 
   async subscribe({
-    query, context, res, subscribe, subscriptionState
+    query, context, res, subscribe, subscriptionState, queryType
   }) {
     const requestStarted = new Date();
     try {
@@ -659,7 +660,7 @@ class ApiGateway {
       let error = null;
 
       if (!subscribe) {
-        await this.load({ query, context, res });
+        await this.load({ query, context, res, queryType });
         return;
       }
 
@@ -673,7 +674,8 @@ class ApiGateway {
           } else {
             result = { message, opts };
           }
-        }
+        },
+        queryType
       });
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {

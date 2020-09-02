@@ -208,7 +208,10 @@ class CubejsApi {
 
   subscribe(query, options, callback) {
     return this.loadMethod(
-      () => this.request('subscribe', { query }),
+      () => this.request('subscribe', {
+        query,
+        queryType: 'multi'
+      }),
       (body) => new ResultSet(body, { parseDateMeasures: this.parseDateMeasures }),
       { ...options, subscribe: true },
       callback
