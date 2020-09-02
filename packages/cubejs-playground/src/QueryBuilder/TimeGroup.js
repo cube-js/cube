@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { Menu, DatePicker } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { DatePicker, Menu } from 'antd';
 import moment from 'moment';
-
+import React, { useState } from 'react';
 import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
@@ -27,14 +26,15 @@ const DateRanges = [
 ];
 
 const TimeGroup = ({
-  members,
+  members = [],
   availableMembers,
   addMemberName,
   updateMethods,
   parsedDateRange,
 }) => {
-  const [customDateRange, setCustomDateRange] = useState(false);
-
+  const isCustomDateRange = Array.isArray(members[0]?.dateRange);
+  const [isRangePickerVisible, toggleRangePicker] = useState(false);
+  
   function onDateRangeSelect(m, dateRange) {
     if (dateRange && !dateRange.some((d) => !d)) {
       updateMethods.update(m, {
@@ -90,13 +90,13 @@ const TimeGroup = ({
           <ButtonDropdown
             overlay={dateRangeMenu((dateRange) => {
               if (dateRange.value === 'custom') {
-                setCustomDateRange(true);
+                toggleRangePicker(true);
               } else {
                 updateMethods.update(m, {
                   ...m,
                   dateRange: dateRange.value,
                 });
-                setCustomDateRange(false);
+                toggleRangePicker(false);
               }
             })}
             style={{
@@ -104,10 +104,10 @@ const TimeGroup = ({
               marginRight: 8,
             }}
           >
-            {(customDateRange && 'Custom') || m.dateRange || 'All time'}
+            {(isRangePickerVisible || isCustomDateRange) ? 'Custom' : m.dateRange || 'All time'}
           </ButtonDropdown>
 
-          {customDateRange ? (
+          {isRangePickerVisible || isCustomDateRange ? (
             <RangePicker
               style={{ marginRight: 8 }}
               format="YYYY-MM-DD"
