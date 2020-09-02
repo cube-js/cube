@@ -474,9 +474,6 @@ class BaseQuery {
     return !!this.measures.find(m => m.isRolling()); // TODO
   }
 
-  /**
-   * @todo Find out what this method is
-   */
   simpleQuery() {
     // eslint-disable-next-line prefer-template
     const inlineWhereConditions = [];
@@ -488,9 +485,6 @@ class BaseQuery {
       this.groupByDimensionLimit();
   }
 
-  /**
-   * @todo Find out what this method is
-   */
   fullKeyQueryAggregate() {
     const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
 
