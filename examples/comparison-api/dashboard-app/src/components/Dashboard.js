@@ -25,7 +25,7 @@ export default () => {
 
   useEffect(() => {
     if (result) {
-      let temp = result.loadResponse.results.map((year, i) => {
+      let temp = result.loadResponse.results.map((year) => {
         return {
           name: moment(year.data[0]['Orders.createdAt.month']).format('YYYY'),
           data: year.data.map((item) => parseInt(item['Orders.count'])),
