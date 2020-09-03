@@ -1665,4 +1665,63 @@ describe('SQL Generation', function test() {
       { "visitors__foo": '6' }
     ])
   );
+
+  const baseQuery = {
+    measures: [
+      'visitors.countDistinctApproxRolling'
+    ],
+    filters: [],
+    timeDimensions: [],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }
+
+  const granularityCases = [
+    {
+      granularity: 'day',
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-01-10T23:59:59.999'
+    },
+    {
+      granularity: 'week',
+      from: '2016-12-26T00:00:00.000',
+      to: '2017-01-15T23:59:59.999'
+    },
+    {
+      granularity: 'month',
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-01-31T23:59:59.999'
+    },
+    {
+      granularity: 'year',
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-12-31T23:59:59.999'
+    }
+  ]
+
+  for(const test of granularityCases) {
+    it(`Should date with TZ, when pass timeDimensions with granularity by ${test.granularity}`, () => {
+      const result = compiler.compile().then(() => {
+  
+        const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+          ...baseQuery,
+          timeDimensions: [{
+            dimension: 'visitors.created_at',
+            granularity: test.granularity,
+            dateRange: ['2017-01-01', '2017-01-10']
+          }]
+        });
+        
+        const sqlBuild = query.buildSqlAndParams();
+
+        (sqlBuild[0].includes('America/Los_Angeles')).should.be.equal(true)
+        sqlBuild[1][0].should.be.equal(test.from);
+        sqlBuild[1][1].should.be.equal(test.to);
+      });
+  
+      return result;
+    });
+  }
 });

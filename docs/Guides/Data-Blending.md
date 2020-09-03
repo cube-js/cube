@@ -8,7 +8,7 @@ menuOrder: 24
 ---
 
 In case you want to plot two measures from different cubes on one chart or
-create calculated measure based on it you need to create join between these two cubes.
+create a calculated measure based on it you need to create a join between these two cubes.
 If there's no way to join two cubes other than by time dimension you need to use Data Blending approach.
 
 Data Blending in Cube.js is a pattern that allows to create Data Blending cube based on two or more cubes.
@@ -121,4 +121,45 @@ cube(`AllSales`, {
    }
  }
 });
+```
+
+Another use case of the Data Blending approach would be when you want to chart some measures (business related) together and see how they correlate.
+
+Provided we have the aforementioned tables `Transactions` and `Orders` let's assume that we want to chart those measures together and see how they correlate. You can simply pass the queries to the Cube.js client and it will merge the results which will let you easily display it on the chart.
+
+```js
+import cubejs from '@cubejs-client/core';
+
+const API_URL = 'http://localhost:4000';
+const CUBEJS_TOKEN = 'YOUR_TOKEN';
+
+const cubejsApi = cubejs(CUBEJS_TOKEN, {
+  apiUrl: `${API_URL}/cubejs-api/v1`
+});
+
+const queries = [
+  {
+    measures: ['Transactions.revenue'],
+    timeDimensions: [
+      {
+        dimension: 'Transactions.createdAt',
+        granularity: 'day',
+        dateRange: ['2020-08-01', '2020-08-07']
+      }
+    ]
+  },
+  {
+    measures: ['Orders.revenue'],
+    timeDimensions: [
+      {
+        dimension: 'Orders.createdAt',
+        granularity: 'day',
+        dateRange: ['2020-08-01', '2020-08-07']
+      }
+    ]
+  }
+];
+
+const resultSet = await cubejsApi.load(queries);
+// ...
 ```

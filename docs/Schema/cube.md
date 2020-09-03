@@ -382,6 +382,8 @@ cube(`Events`, {
 
 `USER_CONTEXT` is a user security object that is passed by the Cube.js Client.
 
+Please see [Security Context section](security#security-context) on how to set `USER_CONTEXT` value.
+
 User context is suitable for the row level security implementation.
 For example, if you have an `orders` table that contains an `email` field you can restrict all queries to render results that belong only to the current user as follows:
 

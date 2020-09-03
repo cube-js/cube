@@ -60,7 +60,7 @@ Values of `x-request-id` header should be unique for each separate request.
 
 ### /v1/load
 
-Get data for a query.
+Get the data for a query.
 
 | Parameter | Description |
 | --- | --- |
@@ -68,7 +68,7 @@ Get data for a query.
 
 Response
 
-* `query` - The query passed via params
+* `query` - The query passed via params. It can be an array of queries and in such case it will be treated as a [Data Blending](/data-blending) query.
 * `data` - Formatted dataset of query results.
 * `annotation` - Metadata for query. Contains descriptions for all query items.
   * `title` - Human readable title from data schema. 

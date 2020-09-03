@@ -9,6 +9,7 @@ import {
   TCubeMeasure,
   TCubeDimension,
   TCubeMember,
+  ProgressResponse,
 } from '@cubejs-client/core';
 
 /**
@@ -288,13 +289,13 @@ declare module '@cubejs-client/react' {
    * import { useCubeQuery }  from '@cubejs-client/react';
    *
    * export default function App() {
-   *   const { resultSet, isLoading, error } = useCubeQuery({
+   *   const { resultSet, isLoading, error, progress } = useCubeQuery({
    *     measures: ['Orders.count'],
    *     dimensions: ['Orders.createdAt.month'],
    *   });
    *
    *   if (isLoading) {
-   *     return <div>Loading...</div>;
+   *     return <div>{progress && progress.stage && progress.stage.stage || 'Loading...'}</div>;
    *   }
    *
    *   if (error) {
@@ -315,7 +316,7 @@ declare module '@cubejs-client/react' {
    * @order 1
    * @stickyTypes
    */
-  export function useCubeQuery<TData>(query: Query, options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
+  export function useCubeQuery<TData>(query: Query | Query[], options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
 
   type UseCubeQueryOptions = {
     /**
@@ -337,12 +338,13 @@ declare module '@cubejs-client/react' {
     error: Error | null;
     isLoading: boolean;
     resultSet: ResultSet<TData> | null;
+    progress: ProgressResponse;
   };
 
   /**
    * Checks whether the query is ready
    */
-  export function isQueryPresent(query: Query): boolean;
+  export function isQueryPresent(query: Query | Query[]): boolean;
 
   /**
    * You can use the following methods for member manipulaltion

@@ -45,13 +45,21 @@ options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 Main class for accessing Cube.js API
 
+### dryRun
+
+▸  **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[TDryRunResponse](#types-t-dry-run-response)›*
+
+▸  **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[TDryRunResponse](#types-t-dry-run-response)›): *void*
+
+Get query related meta without query execution
+
 ### load
 
-▸  **load**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[ResultSet](#result-set)›*
+▸  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[ResultSet](#result-set)›*
 
-▸  **load**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
+▸  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
 
-Fetch data for the passed `query`.
+Fetch data for the passed `query`. It also accepts an array of queries, and in such case it will be treated as a [Data Blending](/data-blending) query.
 
 ```js
 import cubejs from '@cubejs-client/core';
@@ -77,7 +85,7 @@ new Chart(context, chartjsConfig(resultSet));
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) | [Query object](query-format)  |
+query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object](query-format)  |
 options? | [LoadMethodOptions](#types-load-method-options) | - |
 callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)› | - |
 
@@ -91,9 +99,9 @@ Get meta description of cubes available for querying.
 
 ### sql
 
-▸  **sql**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
+▸  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
 
-▸  **sql**(**query**: [Query](#types-query), **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)›): *void*
+▸  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)›): *void*
 
 Get generated SQL string for the given `query`.
 
@@ -101,7 +109,7 @@ Get generated SQL string for the given `query`.
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) | [Query object](query-format)  |
+query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object](query-format)  |
 options? | [LoadMethodOptions](#types-load-method-options) | - |
 callback? | [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)› | - |
 
@@ -183,29 +191,6 @@ memberType | [MemberType](#types-member-type) | - |
 
 Provides a convenient interface for data manipulation.
 
-### constructor
-
-\+  **new ResultSet**(**loadResponse**: [LoadResponse](#types-load-response)‹T›, **options?**: Object): *[ResultSet](#result-set)*
-
-Creates a new instance of ResultSet based on [LoadResponse](#load-response) data.
-
-```js
-import cubejs, { ResultSet } from '@cubejs-client/core';
-
-const cubejsApi = cubejs('CUBEJS_TOKEN');
-
-const resultSet = await cubejsApi.load({
- measures: ['Stories.count'],
- timeDimensions: [{
-   dimension: 'Stories.time',
-   dateRange: ['2015-01-01', '2015-12-31'],
-   granularity: 'month'
-  }]
-});
-
-const copy = new ResultSet(resultSet.loadResponse);
-```
-
 ### annotation
 
 ▸  **annotation**(): *[QueryAnnotations](#types-query-annotations)*
@@ -235,6 +220,17 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
   //...
 ]
+```
+
+### decompose
+
+▸  **decompose**(): *Object*
+
+Can be used when you need access to the methods that can't be used with some query types (eg `compareDateRangeQuery` or `blendingQuery`)
+```js
+resultSet.decompose().forEach((currentResultSet) => {
+  console.log(currentResultSet.rawData());
+});
 ```
 
 ### drillDown
@@ -551,7 +547,7 @@ options? | Object | - |
 
 ### getNormalizedPivotConfig
 
-▸ `static` **getNormalizedPivotConfig**(**query**: [Query](#types-query), **pivotConfig?**: Partial‹[PivotConfig](#types-pivot-config)›): *[PivotConfig](#types-pivot-config)*
+▸ `static` **getNormalizedPivotConfig**(**query**: [PivotQuery](#types-pivot-query), **pivotConfig?**: Partial‹[PivotConfig](#types-pivot-config)›): *[PivotConfig](#types-pivot-config)*
 
 ## SqlQuery
 
@@ -579,6 +575,19 @@ format? | "currency" &#124; "percentage" |
 shortTitle | string |
 title | string |
 type | string |
+
+### BinaryFilter
+
+Name | Type |
+------ | ------ |
+dimension? | string |
+member? | string |
+operator | [BinaryOperator](#types-binary-operator) |
+values | string[] |
+
+### BinaryOperator
+
+Ƭ **BinaryOperator**: *"equals" | "notEquals" | "contains" | "notContains" | "gt" | "gte" | "lt" | "lte" | "inDateRange" | "notInDateRange" | "beforeDate" | "afterDate"*
 
 ### ChartPivotRow
 
@@ -614,12 +623,7 @@ yValues? | string[] |
 
 ### Filter
 
-Name | Type |
------- | ------ |
-dimension? | string |
-member? | string |
-operator | string |
-values? | string[] |
+Ƭ **Filter**: *[BinaryFilter](#types-binary-filter) | [UnaryFilter](#types-unary-filter)*
 
 ### LoadMethodCallback
 
@@ -635,6 +639,14 @@ mutexObj? | Object | Object to store MUTEX |
 subscribe? | boolean | Pass `true` to use continuous fetch behavior. |
 
 ### LoadResponse
+
+Name | Type |
+------ | ------ |
+pivotQuery | [PivotQuery](#types-pivot-query) |
+queryType | [QueryType](#types-query-type) |
+results | [LoadResponseResult](#types-load-response-result)‹T›[] |
+
+### LoadResponseResult
 
 Name | Type |
 ------ | ------ |
@@ -709,6 +721,10 @@ fillMissingDates? | boolean &#124; null | If `true` missing dates on the time di
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
 y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
+### PivotQuery
+
+Ƭ **PivotQuery**: *[Query](#types-query) & object*
+
 ### PivotRow
 
 Name | Type |
@@ -750,6 +766,10 @@ timeDimensions | Record‹string, [Annotation](#types-annotation)› |
 ### QueryOrder
 
 Ƭ **QueryOrder**: *"asc" | "desc"*
+
+### QueryType
+
+Ƭ **QueryType**: *"regularQuery" | "compareDateRangeQuery" | "blendingQuery"*
 
 ### Series
 
@@ -808,6 +828,15 @@ type | [TCubeMemberType](#types-t-cube-member-type) |
 
 Ƭ **TCubeMemberType**: *"time" | "number" | "string" | "boolean"*
 
+### TDryRunResponse
+
+Name | Type |
+------ | ------ |
+normalizedQueries | [Query](#types-query)[] |
+pivotQuery | [PivotQuery](#types-pivot-query) |
+queryOrder | Array‹object› |
+queryType | [QueryType](#types-query-type) |
+
 ### TableColumn
 
 Name | Type |
@@ -841,3 +870,16 @@ apiUrl | string | path to `/cubejs-api/v1` |
 authorization | string | [jwt auth token](security) |
 credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
 headers? | Record‹string, string› | custom headers |
+
+### UnaryFilter
+
+Name | Type |
+------ | ------ |
+dimension? | string |
+member? | string |
+operator | [UnaryOperator](#types-unary-operator) |
+values? | never |
+
+### UnaryOperator
+
+Ƭ **UnaryOperator**: *"set" | "notSet"*

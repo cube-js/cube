@@ -11,10 +11,13 @@ export default (query, options = {}) => {
   const [currentQuery, setCurrentQuery] = useState(null);
   const [isLoading, setLoading] = useState(false);
   const [resultSet, setResultSet] = useState(null);
+  const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
   const context = useContext(CubeContext);
 
   let subscribeRequest = null;
+
+  const progressCallback = ({ progressResponse }) => setProgress(progressResponse);
 
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
@@ -48,7 +51,8 @@ export default (query, options = {}) => {
           if (options.subscribe) {
             subscribeRequest = cubejsApi.subscribe(query, {
               mutexObj: mutexRef.current,
-              mutexKey: 'query'
+              mutexKey: 'query',
+              progressCallback
             }, (e, result) => {
               if (e) {
                 setError(e);
@@ -56,17 +60,21 @@ export default (query, options = {}) => {
                 setResultSet(result);
               }
               setLoading(false);
+              setProgress(null);
             });
           } else {
             setResultSet(await cubejsApi.load(query, {
               mutexObj: mutexRef.current,
-              mutexKey: 'query'
+              mutexKey: 'query',
+              progressCallback
             }));
             setLoading(false);
+            setProgress(null);
           }
         } catch (e) {
           setError(e);
           setLoading(false);
+          setProgress(null);
         }
       }
     }
@@ -85,5 +93,10 @@ export default (query, options = {}) => {
     context
   ]));
 
-  return { isLoading, resultSet, error };
+  return {
+    isLoading,
+    resultSet,
+    error,
+    progress
+  };
 };

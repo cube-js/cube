@@ -2,10 +2,10 @@ const uuid = require('uuid/v4');
 const UserError = require('./UserError');
 
 const methodParams = {
-  load: ['query'],
+  load: ['query', 'queryType'],
   sql: ['query'],
   meta: [],
-  subscribe: ['query'],
+  subscribe: ['query', 'queryType'],
   unsubscribe: []
 };
 
