@@ -465,7 +465,7 @@ class PreAggregations {
     ).map(s => {
       const path = s.split('.');
       return `${path[0][0]}${path[1]}`;
-    }).map(s => s.replace(/_/g, '')).join("_")
+    }).map(s => s.replace(/_/g, '')).join('_')
       .replace(/[.]/g, '')
       .toLowerCase();
   }
@@ -549,7 +549,7 @@ class PreAggregations {
     if (tables.length === 1) {
       return tables[0];
     }
-    const union = tables.map(table => `SELECT * FROM ${table}`).join(" UNION ALL ");
+    const union = tables.map(table => `SELECT * FROM ${table}`).join(' UNION ALL ');
     return `(${union})${withoutAlias ? '' : ' as partition_union'}`;
   }
 }

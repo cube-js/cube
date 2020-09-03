@@ -9,7 +9,7 @@ const { prepareCompiler } = require('./PrepareCompiler');
 const dbRunner = require('./MySqlDbRunner');
 
 describe('MySqlPreAggregations', function test() {
-  this.timeout(30000);
+  this.timeout(300000);
 
   after(async () => {
     await dbRunner.tearDown();
@@ -95,119 +95,111 @@ describe('MySqlPreAggregations', function test() {
     console.log(toReplace);
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
-      preAggregation.reduce((replacedQuery, desc) =>
-        replacedQuery.replace(new RegExp(desc.tableName, 'g'), desc.tableName + '_' + suffix), toReplace
-      ),
+      preAggregation.reduce((replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
       params
     ];
   }
 
   function tempTablePreAggregations(preAggregationsDescriptions) {
-    return R.unnest(preAggregationsDescriptions.map(desc =>
-      desc.invalidateKeyQueries.concat([
-        [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMPORARY TABLE'), desc.loadSql[1]]
-      ])
-    ));
+    return R.unnest(preAggregationsDescriptions.map(desc => desc.invalidateKeyQueries.concat([
+      [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMPORARY TABLE'), desc.loadSql[1]]
+    ])));
   }
 
-  it('partitioned', () => {
-    return compiler.compile().then(() => {
-      const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.count'
-        ],
-        dimensions: [
-          'visitors.source'
-        ],
-        timezone: 'America/Los_Angeles',
-        preAggregationsSchema: '',
-        timeDimensions: [{
-          dimension: 'visitors.createdAt',
-          granularity: 'day',
-          dateRange: ['2016-12-30', '2017-01-30'] // TODO fix MySQL pre-aggregation return incorrect results on DST switch
-        }],
-        order: [{
-          id: 'visitors.createdAt'
-        }],
-      });
-
-      const queryAndParams = query.buildSqlAndParams();
-      console.log(queryAndParams);
-      const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-      console.log(preAggregationsDescription);
-
-      const queries = tempTablePreAggregations(preAggregationsDescription);
-
-      console.log(JSON.stringify(queries.concat(queryAndParams)));
-
-      return dbRunner.testQueries(
-        queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 42))
-      ).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [
-            {
-              "visitors__source": "some",
-              "visitors__created_at_day": "2017-01-02T00:00:00.000",
-              "visitors__count": 1
-            },
-            {
-              "visitors__source": "some",
-              "visitors__created_at_day": "2017-01-04T00:00:00.000",
-              "visitors__count": 1
-            },
-            {
-              "visitors__source": "google",
-              "visitors__created_at_day": "2017-01-05T00:00:00.000",
-              "visitors__count": 1
-            },
-            {
-              "visitors__source": null,
-              "visitors__created_at_day": "2017-01-06T00:00:00.000",
-              "visitors__count": 2
-            }
-          ]
-        );
-      });
+  it('partitioned', () => compiler.compile().then(() => {
+    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2016-12-30', '2017-01-30'] // TODO fix MySQL pre-aggregation return incorrect results on DST switch
+      }],
+      order: [{
+        id: 'visitors.createdAt'
+      }],
     });
-  });
 
-  it('partitioned scheduled refresh', () => {
-    return compiler.compile().then(async () => {
-      const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.count'
-        ],
-        dimensions: [
-          'visitors.source'
-        ],
-        timezone: 'UTC',
-        preAggregationsSchema: '',
-        timeDimensions: [{
-          dimension: 'visitors.createdAt',
-          granularity: 'day',
-          dateRange: ['2016-12-30', '2017-01-30']
-        }],
-        order: [{
-          id: 'visitors.createdAt'
-        }],
-      });
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    console.log(preAggregationsDescription);
 
-      const preAggregations = cubeEvaluator.scheduledPreAggregations();
-      const partitionedPreAgg =
+    const queries = tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.testQueries(
+      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 42))
+    ).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [
+          {
+            'visitors__source': 'some',
+            'visitors__created_at_day': '2017-01-02T00:00:00.000',
+            'visitors__count': 1
+          },
+          {
+            'visitors__source': 'some',
+            'visitors__created_at_day': '2017-01-04T00:00:00.000',
+            'visitors__count': 1
+          },
+          {
+            'visitors__source': 'google',
+            'visitors__created_at_day': '2017-01-05T00:00:00.000',
+            'visitors__count': 1
+          },
+          {
+            'visitors__source': null,
+            'visitors__created_at_day': '2017-01-06T00:00:00.000',
+            'visitors__count': 2
+          }
+        ]
+      );
+    });
+  }));
+
+  it('partitioned scheduled refresh', () => compiler.compile().then(async () => {
+    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'UTC',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2016-12-30', '2017-01-30']
+      }],
+      order: [{
+        id: 'visitors.createdAt'
+      }],
+    });
+
+    const preAggregations = cubeEvaluator.scheduledPreAggregations();
+    const partitionedPreAgg =
         preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitors');
 
-      const minMaxQueries = query.preAggregationStartEndQueries('visitors', partitionedPreAgg.preAggregation);
+    const minMaxQueries = query.preAggregationStartEndQueries('visitors', partitionedPreAgg.preAggregation);
 
-      console.log(minMaxQueries);
+    console.log(minMaxQueries);
 
-      const res = await dbRunner.testQueries(minMaxQueries);
+    const res = await dbRunner.testQueries(minMaxQueries);
 
-      console.log(res);
+    console.log(res);
 
-      res[0][Object.keys(res[0])[0]].should.be.deepEqual('2017-01-07 00:00:00');
-    });
-  });
+    res[0][Object.keys(res[0])[0]].should.be.deepEqual('2017-01-07 00:00:00');
+  }));
 
   it('segment', () => compiler.compile().then(() => {
     const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -244,8 +236,8 @@ describe('MySqlPreAggregations', function test() {
       res.should.be.deepEqual(
         [
           {
-            "visitors__created_at_day": "2017-01-06T00:00:00.000",
-            "visitors__count": 1
+            'visitors__created_at_day': '2017-01-06T00:00:00.000',
+            'visitors__count': 1
           }
         ]
       );

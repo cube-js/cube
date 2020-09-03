@@ -78,7 +78,7 @@ describe('SqlParser', () => {
       some.ttt
     WHERE a is null`);
     sqlParser.isSimpleAsteriskQuery().should.be.deepEqual(true);
-    sqlParser.extractWhereConditions('x').should.be.deepEqual(`x.a is null`);
+    sqlParser.extractWhereConditions('x').should.be.deepEqual('x.a is null');
   });
 
   it('do not honor group by', () => {
