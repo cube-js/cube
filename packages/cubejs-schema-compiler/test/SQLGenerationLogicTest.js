@@ -769,62 +769,53 @@ describe('SQL Generation', function test() {
   }));
 
   it('where filter with incorrect one arguments', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitors.visitor_count'
-      ],
-      dimensions: [
-        'visitors.source',
-      ],
-      timeDimensions: [],
-      timezone: 'America/Los_Angeles',
-      filters: [
-        {
-          and: [
-            { and: [
-              {
-                or: [
-                  {
-                    and: [
-                      {
-                        measure: 'visitors.source',
-                        operator: 'equals',
-                        values: ['some']
-                      }
-                    ]
-                  },
-                  {
-                    and: [
-                      {
-                        dimension: 'visitors_source',
-                        operator: 'equals',
-                        values: ['google']
-                      }
-                    ]
-                  }
-                ]
+    try {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.visitor_count'
+        ],
+        dimensions: [
+          'visitors.source',
+        ],
+        timeDimensions: [],
+        timezone: 'America/Los_Angeles',
+        filters: [
+          {
+            and: [
+              { and: [
+                {
+                  or: [
+                    {
+                      and: [
+                        {
+                          measure: 'visitors.source',
+                          operator: 'equals',
+                          values: ['some']
+                        }
+                      ]
+                    },
+                    {
+                      and: [
+                        {
+                          dimension: 'visitors_source',
+                          operator: 'equals',
+                          values: ['google']
+                        }
+                      ]
+                    }
+                  ]
+                }]
               }]
-            }]
-        }],
-      order: [{
-        'visitors.visitor_count': 'desc'
-      }]
-    });
-
-    console.log(query.buildSqlAndParams());
-
-    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{
-          'visitors__source': 'google',
-          'visitors__visitor_count': '1',
-        }, {
-          'visitors__source': 'some',
-          'visitors__visitor_count': '2',
+          }],
+        order: [{
+          'visitors.visitor_count': 'desc'
         }]
-      );
-    });
+      });
+
+      throw new Error();
+    } catch (error) {
+      error.should.be.instanceof(UserError);
+    }
   }));
 
   // end of tests
