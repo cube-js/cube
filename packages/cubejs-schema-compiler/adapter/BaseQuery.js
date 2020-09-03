@@ -1,5 +1,7 @@
 /* eslint-disable no-unused-vars,prefer-template */
 const R = require('ramda');
+const cronParser = require('cron-parser');
+ 
 const moment = require('moment-timezone');
 const inflection = require('inflection');
 
@@ -1647,7 +1649,7 @@ class BaseQuery {
           return this.evaluateSql(cube, cubeFromPath.refreshKey.sql);
         }
         if (cubeFromPath.refreshKey.every) {
-          return `SELECT ${this.everyRefreshKeySql(cubeFromPath.refreshKey.every)}`;
+          return `SELECT ${this.everyRefreshKeySql(cubeFromPath.refreshKey)}`;
         }
       }
       refreshKeyAllSetManually = false;
@@ -1681,7 +1683,7 @@ class BaseQuery {
       refreshKeyRenewalThresholds: cubes.map(c => {
         const cubeFromPath = this.cubeEvaluator.cubeFromPath(c);
         if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
-          return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey.every);
+          return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey);
         }
         return this.defaultRefreshKeyRenewalThreshold();
       })
@@ -1811,8 +1813,21 @@ class BaseQuery {
     }
   }
 
-  everyRefreshKeySql(interval) {
-    return this.floorSql(`${this.unixTimestampSql()} / ${this.parseSecondDuration(interval)}`);
+  everyRefreshKeySql(refreshKey) {
+    const every = refreshKey.every || '1 hour';
+
+    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
+      return this.floorSql(`${this.unixTimestampSql()} / ${this.parseSecondDuration(every)}`);
+    }
+ 
+    try {
+      const opt = {};
+      opt.tz = refreshKey.timezone;
+      const interval = cronParser.parseExpression(every, opt);
+      return interval.next().getTime();
+    } catch (err) {
+      throw new UserError(`Invalid cron string '${every}' in refreshKey`);
+    }
   }
 
   granularityFor(momentDate) {
@@ -1872,6 +1887,7 @@ class BaseQuery {
   parseSecondDuration(interval) {
     const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
     if (!intervalMatch) {
+      console.trace('Invalid interval');
       throw new UserError(`Invalid interval: ${interval}`);
     }
     const duration = parseInt(intervalMatch[1], 10);
@@ -1914,8 +1930,8 @@ class BaseQuery {
               refreshKeyRenewalThresholds: [this.defaultRefreshKeyRenewalThreshold()]
             };
           }
-          const interval = preAggregation.refreshKey.every || '1 hour';
-          let refreshKey = this.everyRefreshKeySql(interval);
+
+          let refreshKey = this.everyRefreshKeySql(preAggregation.refreshKey);
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
               throw new UserError('Incremental refresh key can only be used for partitioned pre-aggregations');
@@ -1936,7 +1952,7 @@ class BaseQuery {
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
             return {
               queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`)],
-              refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(interval)]
+              refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey)]
             };
           }
         }
@@ -1980,8 +1996,24 @@ class BaseQuery {
     );
   }
 
-  refreshKeyRenewalThresholdForInterval(interval) {
-    return Math.max(Math.min(Math.round(this.parseSecondDuration(interval) / 10), 300), 1);
+  refreshKeyRenewalThresholdForInterval(refreshKey) {
+    const { every } = refreshKey;
+
+    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
+      return Math.max(Math.min(Math.round(this.parseSecondDuration(every) / 10), 300), 1);
+    }
+  
+    try {
+      const opt = {};
+      opt.tz = refreshKey.timezone;
+      const interval = cronParser.parseExpression(every, opt);
+      const start = interval.next().getTime();
+      const end = interval.next().getTime();
+      const delta = (end - start) / 1000;
+      return Math.max(Math.min(Math.round(delta / 10), 300), 1);
+    } catch (err) {
+      throw new UserError(`Invalid cron string '${every}' in refreshKey`);
+    }
   }
 
   preAggregationStartEndQueries(cube, preAggregation) {
