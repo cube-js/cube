@@ -5,6 +5,11 @@ body {
   font-family: 'DM Sans', sans-serif;
   font-feature-settings: 'ss03' on;
   font-feature-settings: 'ss04' on;
+  background-color: #f0f2f5 !important;
+}
+
+.ant-popover-disabled-compatible-wrapper {
+  pointer-events: none;
 }
 
 ::selection {

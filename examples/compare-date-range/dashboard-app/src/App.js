@@ -1,6 +1,4 @@
 import React from 'react';
-import './App.css';
-import './body.css';
 import 'antd/dist/antd.css';
 import { Layout } from 'antd';
 import cubejs from '@cubejs-client/core';

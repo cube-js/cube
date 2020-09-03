@@ -15,7 +15,7 @@ const Header = () => (
         <h1>compareDateRange example</h1>
       </div>
       <div className='examples__nav__buttons'>
-        <a href='//github.com/cube-js/cube.js/tree/master/examples/highcharts'>
+        <a href='//github.com/cube-js/cube.js/tree/master/examples/compare-date-range'>
           <Icon.GithubOutlined />
           Github
         </a>
