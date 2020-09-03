@@ -2,11 +2,9 @@ import React from 'react';
 import './App.css';
 import './body.css';
 import 'antd/dist/antd.css';
-import { ApolloProvider } from '@apollo/react-hooks';
 import { Layout } from 'antd';
 import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
-import client from './graphql/client';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 
@@ -30,9 +28,7 @@ const AppLayout = () => (
 
 const App = () => (
   <CubeProvider cubejsApi={cubejsApi}>
-    <ApolloProvider client={client}>
-      <AppLayout></AppLayout>
-    </ApolloProvider>
+    <AppLayout></AppLayout>
   </CubeProvider>
 );
 
