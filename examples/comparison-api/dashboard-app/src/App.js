@@ -19,13 +19,6 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`,
 });
 
-/*const cubejsApi = cubejs({
-  transport: new WebSocketTransport({
-    authorization: CUBEJS_TOKEN,
-    apiUrl: `${API_URL}`,
-  }),
-});*/
-
 const AppLayout = () => (
   <Layout>
     <Header />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col } from 'antd';
 import { useCubeQuery } from '@cubejs-client/react';
+import { ResultSet } from '@cubejs-client/core';
 import * as moment from 'moment';
 
 import Line from './Line';
@@ -25,6 +26,15 @@ export default () => {
 
   useEffect(() => {
     if (result) {
+      console.log(result);
+      console.log(
+        result.tablePivot(
+          ResultSet.getNormalizedPivotConfig(result.loadResponse.pivotQuery)
+        )
+      );
+      console.log(
+        ResultSet.getNormalizedPivotConfig(result.loadResponse.pivotQuery)
+      );
       let temp = result.loadResponse.results.map((year) => {
         return {
           name: moment(year.data[0]['Orders.createdAt.month']).format('YYYY'),

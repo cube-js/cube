@@ -12,7 +12,7 @@ const Header = () => (
         <Link to='//cube.dev' target='_blank'>
           <img src={logo} alt='Cube.js' />
         </Link>
-        <h1>Comparison API Example</h1>
+        <h1>compareDateRange example</h1>
       </div>
       <div className='examples__nav__buttons'>
         <a href='//github.com/cube-js/cube.js/tree/master/examples/highcharts'>
