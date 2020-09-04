@@ -593,7 +593,7 @@ declare module '@cubejs-client/core' {
 
 
 
-  export type TimeDimensionGranularity = 'hour' | 'day' | 'week' | 'month' | 'year';
+  export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
 
   export type TimeDimension = {
     dimension: string;
