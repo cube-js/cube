@@ -58,12 +58,12 @@ class BaseQuery {
         allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.and));
       } else if (f.or) {
         allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
-      } else if (!f.dimension) {
-        throw new UserError(`dimension attribute is requed for filter ${JSON.stringify(f)}`);
-      } else if (this.cubeEvaluator.isMeasure(f.dimension)) {
-        allFilters.push({ measure: f.dimension });
+      } else if (!f.dimension && !f.member) {
+        throw new UserError(`member attribute is requed for filter ${JSON.stringify(f)}`);
+      } else if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
+        allFilters.push({ measure: f.member || f.dimension });
       } else {
-        allFilters.push({ dimension: f.dimension });
+        allFilters.push({ dimension: f.member || f.dimension });
       }
     });
 
@@ -103,17 +103,21 @@ class BaseQuery {
         throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
       }
 
-      if (!f.dimension) {
-        throw new UserError(`dimension attribute is requed for filter ${JSON.stringify(f)}`);
+      if (!f.dimension && !f.member) {
+        throw new UserError(`member attribute is requed for filter ${JSON.stringify(f)}`);
       }
 
-      if (this.cubeEvaluator.isMeasure(f.dimension)) {
+      if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
         return Object.assign({}, f, {
           dimension: null,
-          measure: f.dimension
+          measure: f.member || f.dimension
         });
       }
-      return f;
+
+      return Object.assign({}, f, {
+        measure: null,
+        dimension: f.member || f.dimension
+      });
     });
   }
   

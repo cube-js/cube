@@ -458,12 +458,12 @@ describe('SQL Generation', function test() {
           {
             and: [
               {
-                dimension: 'cards.count',
+                member: 'cards.count',
                 operator: 'equals',
                 values: ['2']
               },
               {
-                dimension: 'visitors.averageCheckins',
+                member: 'visitors.averageCheckins',
                 operator: 'equals',
                 values: ['6']
               }
@@ -472,12 +472,12 @@ describe('SQL Generation', function test() {
           {
             and: [
               {
-                dimension: 'cards.count',
+                member: 'cards.count',
                 operator: 'equals',
                 values: ['1']
               },
               {
-                dimension: 'visitors.averageCheckins',
+                member: 'visitors.averageCheckins',
                 operator: 'equals',
                 values: ['2']
               }
@@ -527,12 +527,12 @@ describe('SQL Generation', function test() {
           {
             and: [
               {
-                dimension: 'visitors.averageCheckins',
+                member: 'visitors.averageCheckins',
                 operator: 'equals',
                 values: ['6']
               },
               {
-                dimension: 'cards.count',
+                member: 'cards.count',
                 operator: 'equals',
                 values: ['2']
               },
@@ -609,12 +609,12 @@ describe('SQL Generation', function test() {
           {
             and: [
               {
-                dimension: 'visitors.source',
+                member: 'visitors.source',
                 operator: 'equals',
                 values: ['google']
               },
               {
-                dimension: 'visitor_checkins.cardsCount',
+                member: 'visitor_checkins.cardsCount',
                 operator: 'equals',
                 values: ['1']
               },
@@ -660,7 +660,7 @@ describe('SQL Generation', function test() {
           {
             and: [
               {
-                dimension: 'visitors.source',
+                member: 'visitors.source',
                 operator: 'equals',
                 values: ['some']
               },
@@ -679,7 +679,7 @@ describe('SQL Generation', function test() {
                 values: ['google']
               },
               {
-                dimension: 'visitor_checkins.cardsCount',
+                member: 'visitor_checkins.cardsCount',
                 operator: 'equals',
                 values: ['1']
               },
@@ -728,7 +728,7 @@ describe('SQL Generation', function test() {
                     {
                       and: [
                         {
-                          dimension: 'visitors.source',
+                          member: 'visitors.source',
                           operator: 'equals',
                           values: ['some']
                         }
