@@ -59,7 +59,7 @@ class BaseQuery {
       } else if (f.or) {
         allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
       } else if (!f.dimension && !f.member) {
-        throw new UserError(`member attribute is requed for filter ${JSON.stringify(f)}`);
+        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       } else if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
         allFilters.push({ measure: f.member || f.dimension });
       } else {
@@ -104,7 +104,7 @@ class BaseQuery {
       }
 
       if (!f.dimension && !f.member) {
-        throw new UserError(`member attribute is requed for filter ${JSON.stringify(f)}`);
+        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       }
 
       if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
