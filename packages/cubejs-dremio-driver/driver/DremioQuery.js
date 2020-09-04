@@ -30,7 +30,7 @@ class DremioQuery extends BaseQuery {
   }
 
   timeStampCast(value) {
-    return `CAST(${value} as TIMESTAMP)`;
+    return `TO_TIMESTAMP(${value})`;
   }
 
   inDbTimeZone(date) {
