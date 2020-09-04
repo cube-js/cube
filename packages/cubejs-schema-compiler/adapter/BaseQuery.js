@@ -1816,17 +1816,31 @@ class BaseQuery {
   everyRefreshKeySql(refreshKey) {
     const every = refreshKey.every || '1 hour';
 
+    let utcOffset = 0;
+    if(refreshKey.timezone)
+    {
+      utcOffset = moment.tz(refreshKey.timezone).utcOffset()*60
+    }
+    
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      return this.floorSql(`${this.unixTimestampSql()} / ${this.parseSecondDuration(every)}`);
+      return this.floorSql(`(${this.unixTimestampSql()} + ${utcOffset}) / ${this.parseSecondDuration(every)}`);
     }
  
     try {
       const opt = {};
       opt.tz = refreshKey.timezone;
       const interval = cronParser.parseExpression(every, opt);
-      return interval.next().getTime();
+      const start = interval.next().getTime();
+      const end = interval.next().getTime();
+      const delta = (end - start) / 1000;
+ 
+      if(!/^(\*\/\d+|\*) (\*\/\d+|\*) (\*\/\d+|\*) \* \* (\*\/\d+|\*)$/.test(every.replace(/ +/g, " ").replace(/^ | $/g, ""))){
+        throw new UserError(`Your cron string is correct, but we support only equal time intervals.`);
+      }
+  
+      return this.floorSql(`(${this.unixTimestampSql()} + ${utcOffset}) / ${delta}`); 
     } catch (err) {
-      throw new UserError(`Invalid cron string '${every}' in refreshKey`);
+      throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);
     }
   }
 
