@@ -325,19 +325,19 @@ logical operators have only one of following properties:
 {
   or: [
     {
-      dimension: 'visitors.source',
+      member: 'visitors.source',
       operator: 'equals',
       values: ['some']
     },
     { 
       and: [
         {
-          dimension: 'visitors.source',
+          member: 'visitors.source',
           operator: 'equals',
           values: ['some']
         },
         {
-          dimension: 'visitor_checkins.cardsCount',
+          member: 'visitor_checkins.cardsCount',
           operator: 'equals',
           values: ['0']
         },
