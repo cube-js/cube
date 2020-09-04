@@ -1823,25 +1823,31 @@ class BaseQuery {
     }
     
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      return this.floorSql(`(${this.unixTimestampSql()} + ${utcOffset}) / ${this.parseSecondDuration(every)}`);
+      return this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
     }
- 
+
+    let start, end; 
     try {
       const opt = {};
       opt.tz = refreshKey.timezone;
       const interval = cronParser.parseExpression(every, opt);
-      const start = interval.next().getTime();
-      const end = interval.next().getTime();
-      const delta = (end - start) / 1000;
- 
-      if(!/^(\*\/\d+|\*) (\*\/\d+|\*) (\*\/\d+|\*) \* \* (\*\/\d+|\*)$/.test(every.replace(/ +/g, " ").replace(/^ | $/g, ""))){
-        throw new UserError(`Your cron string is correct, but we support only equal time intervals.`);
-      }
-  
-      return this.floorSql(`(${this.unixTimestampSql()} + ${utcOffset}) / ${delta}`); 
+      interval.next()
+      start = interval.next().getTime();
+      end = interval.next().getTime();
     } catch (err) {
       throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);
     }
+    const delta = (end - start)/1000;
+    
+    console.log(refreshKey.every, new Date(start),  new Date(end), delta)
+    if(
+      !/^(\*|\d+)? ?(\*|\d+) (\*|\d+) \* \* (\*|\d+)$/g.test(every.replace(/ +/g, " ").replace(/^ | $/g, "")) 
+      // || /\/.*\//g.test(every)
+      ){
+      throw new UserError(`Your cron string ('${every}') is correct, but we support only equal time intervals.`);
+    }
+
+    return this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()}) / ${delta}`);  
   }
 
   granularityFor(momentDate) {
