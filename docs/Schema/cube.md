@@ -255,7 +255,25 @@ cube(`OrderFacts`, {
 });
 ```
 
-Available interval granularities are: `second`, `minute`, `hour`, `day` and `week`.
+`every` - can be set as interval with granularities `second`, `minute`, `hour`, `day` and `week` or it can accept cron string with some limitations.
+
+If you set `every`  as cron string then you can use `timezone` property.
+
+For example:
+
+```javascript
+cube(`OrderFacts`, {
+  sql: `SELECT * FROM orders`,
+
+  refreshKey: {
+    every: '30 5 * * 5',
+    timezone: 'America/Los_Angeles'
+  }
+});
+```
+
+`every` can accept only equal time intervals - so  "Day of month" and "month" intervals in CRON expressions are not supported.
+
 Such `refreshKey` is just a syntactic sugar over `refreshKey` SQL. 
 It's guaranteed that `refreshKey` change it's value at least once during `every` interval.
 It will be converted to appropriate SQL select which value will change over time based on interval value.
