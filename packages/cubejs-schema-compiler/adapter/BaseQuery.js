@@ -1816,38 +1816,48 @@ class BaseQuery {
   everyRefreshKeySql(refreshKey) {
     const every = refreshKey.every || '1 hour';
 
-    let utcOffset = 0;
-    if(refreshKey.timezone)
-    {
-      utcOffset = moment.tz(refreshKey.timezone).utcOffset()*60
-    }
-    
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      return this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
+      return this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
     }
 
-    let start, end; 
-    try {
-      const opt = {};
+    // One of the years that start from monday (first day of week)
+    // Mon, 01 Jan 2018 00:00:00 GMT
+    const startDate = 1514764800000;
+    const opt = {
+      currentDate: new Date(startDate)
+    };
+    let utcOffset = 0;
+    if (refreshKey.timezone) {
+      utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
       opt.tz = refreshKey.timezone;
+    }
+    
+    let start; let end; let dayOffset; let
+      dayOffsetPrev;
+    try {
       const interval = cronParser.parseExpression(every, opt);
-      interval.next()
+      dayOffset = interval.next().getTime();
+      dayOffsetPrev = interval.prev().getTime();
+      if (dayOffsetPrev === startDate) {
+        dayOffset = startDate;
+      }
+
       start = interval.next().getTime();
       end = interval.next().getTime();
     } catch (err) {
       throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);
     }
-    const delta = (end - start)/1000;
+    const delta = (end - start) / 1000;
     
-    console.log(refreshKey.every, new Date(start),  new Date(end), delta)
-    if(
-      !/^(\*|\d+)? ?(\*|\d+) (\*|\d+) \* \* (\*|\d+)$/g.test(every.replace(/ +/g, " ").replace(/^ | $/g, "")) 
-      // || /\/.*\//g.test(every)
-      ){
+    console.log(refreshKey.every, new Date(start), new Date(end), new Date(dayOffset),
+      delta, dayOffset - startDate, new Date(dayOffsetPrev), dayOffsetPrev);
+    if (
+      !/^(\*|\d+)? ?(\*|\d+) (\*|\d+) \* \* (\*|\d+)$/g.test(every.replace(/ +/g, ' ').replace(/^ | $/g, ''))
+    ) {
       throw new UserError(`Your cron string ('${every}') is correct, but we support only equal time intervals.`);
     }
 
-    return this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()}) / ${delta}`);  
+    return this.floorSql(`(${utcOffset} + ${(dayOffset - startDate) / 1000} + ${this.unixTimestampSql()}) / ${delta}`);
   }
 
   granularityFor(momentDate) {

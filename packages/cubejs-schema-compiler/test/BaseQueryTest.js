@@ -53,47 +53,40 @@ describe('SQL Generation', function test() {
       r = query.everyRefreshKeySql({
         every: '1 hour'
       })
-      r.should.be.equal("FLOOR((0 + EXTRACT(EPOCH FROM NOW())) / 3600)")
-
-      r = query.everyRefreshKeySql({
-        every: '1 hour',
-        timezone: 'America/Los_Angeles'
-      })
-      r.should.be.equal("FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
+      r.should.be.equal("FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)")
 
       r = query.everyRefreshKeySql({
         every: '0 * * * * *',
         timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 60)") 
+      r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 60)") 
 
       r = query.everyRefreshKeySql({
         every: '0 * * * *',
         timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
+      r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
 
       r = query.everyRefreshKeySql({
         every: '30 * * * *',
         timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
+      r.should.be.equal("FLOOR((-25200 + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
 
       r = query.everyRefreshKeySql({
         every: '30 5 * * 5',
         timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 604800)") 
+      r.should.be.equal("FLOOR((-25200 + 394200 + EXTRACT(EPOCH FROM NOW())) / 604800)") 
 
-      for(let i = 0; i < 60; i++)
-      {
-        let c = i % 57 + 2
+      for(let i = 1; i < 59; i++)
+      { 
         r = query.everyRefreshKeySql({
-          every: `${c} * * * *`,
+          every: `${i} * * * *`,
           timezone: 'America/Los_Angeles'
         }) 
-        console.log(r, i, `${c} * * * *`)
-        r.should.be.equal(`FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / ${1*60*60})`)
+        console.log(r, i, `${i} * * * *`)
+        r.should.be.equal(`FLOOR((-25200 + ${i*60} + EXTRACT(EPOCH FROM NOW())) / ${1*60*60})`)
       }
 
       try{
