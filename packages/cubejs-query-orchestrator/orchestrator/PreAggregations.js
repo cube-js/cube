@@ -738,7 +738,7 @@ class PreAggregations {
   }
 
   static targetTableName(versionEntry) {
-    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
+    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at/1000}`;
   }
 }
 
