@@ -63,9 +63,6 @@ class Map extends Component {
     hs.properties.fill = am4core.color('#3c5bdc');
     //hs.properties.fillOpacity = 0.2;
 
-    var bhs = boundsSeries.mapPolygons.template.states.create('hover');
-    //bhs.properties.fillOpacity = 0.2;
-
     boundsSeries.mapPolygons.template.events.on('over', function (event) {
       var polygon = polygonSeries.getPolygonById(
         event.target.dataItem.dataContext.id

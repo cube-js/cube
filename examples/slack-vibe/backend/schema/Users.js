@@ -1,53 +1,53 @@
-cube(`Users`, {
-  sql: `SELECT * FROM users WHERE deleted = 0`,
+cube('Users', {
+  sql: 'SELECT * FROM users WHERE deleted = 0',
 
   joins: {
     Reactions: {
-      relationship: `hasMany`,
+      relationship: 'hasMany',
       sql: `${Users}.id = ${Reactions}.user_id`,
     },
   },
 
   measures: {
     count: {
-      type: `count`,
+      type: 'count',
     },
   },
 
   dimensions: {
     id: {
-      sql: `id`,
-      type: `string`,
+      sql: 'id',
+      type: 'string',
       primaryKey: true,
       shown: true,
     },
     name: {
-      sql: `name`,
-      type: `string`,
+      sql: 'name',
+      type: 'string',
     },
     title: {
-      sql: `title`,
-      type: `string`,
+      sql: 'title',
+      type: 'string',
     },
     real_name: {
-      sql: `real_name`,
-      type: `string`,
+      sql: 'real_name',
+      type: 'string',
     },
     image: {
-      sql: `image_512`,
-      type: `string`,
+      sql: 'image_512',
+      type: 'string',
     },
     is_admin: {
-      sql: `is_admin`,
-      type: `boolean`,
+      sql: 'is_admin',
+      type: 'boolean',
     },
     tz: {
-      sql: `tz`,
-      type: `string`,
+      sql: 'tz',
+      type: 'string',
     },
     tz_offset: {
-      sql: `tz_offset`,
-      type: `string`,
+      sql: 'tz_offset',
+      type: 'string',
     },
   },
 

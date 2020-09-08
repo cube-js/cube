@@ -1,35 +1,35 @@
-cube(`Channels`, {
-    sql: `SELECT * FROM channels WHERE is_archived = 0`,
+cube('Channels', {
+  sql: 'SELECT * FROM channels WHERE is_archived = 0',
 
-    joins: {},
+  joins: {},
 
-    measures: {
-        count: {
-            type: `count`,
-        }
+  measures: {
+    count: {
+      type: 'count',
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: 'id',
+      type: 'string',
+      primaryKey: true,
+      shown: true
     },
 
-    dimensions: {
-        id: {
-            sql: `id`,
-            type: `string`,
-            primaryKey: true,
-            shown: true
-        },
+    name: {
+      sql: 'name',
+      type: 'string'
+    },
 
-        name: {
-            sql: `name`,
-            type: `string`
-        },
+    is_general: {
+      sql: 'is_general',
+      type: 'boolean'
+    },
 
-        is_general: {
-            sql: `is_general`,
-            type: `boolean`
-        },
-
-        purpose: {
-            sql: `purpose`,
-            type: `string`
-        }
+    purpose: {
+      sql: 'purpose',
+      type: 'string'
     }
+  }
 });

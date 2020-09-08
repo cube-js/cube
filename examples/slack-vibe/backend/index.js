@@ -9,7 +9,7 @@ const http = require('http');
 const serveStatic = require('serve-static');
 const { tryInitDatabase, tryImportSlackArchive } = require('./import');
 
-(async function () {
+(async function run() {
   await tryInitDatabase();
 
   const app = express();
@@ -39,6 +39,8 @@ const { tryInitDatabase, tryImportSlackArchive } = require('./import');
     await tryImportSlackArchive(req.files.file.tempFilePath, () => {
       res.send('File uploaded!');
     });
+
+    res.status(200);
   });
 
   cubejsServer.initApp(app);
@@ -51,4 +53,4 @@ const { tryInitDatabase, tryImportSlackArchive } = require('./import');
       `🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`
     );
   });
-})();
+}());

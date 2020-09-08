@@ -8,64 +8,8 @@ const schema = require('./schema');
 
 const dbPath = process.env.CUBEJS_DB_NAME;
 
-async function tryInitDatabase() {
-  console.log('Initializing database…');
-
-  if (fs.existsSync(dbPath)) {
-    console.log('Database file exists, import skipped.');
-    return;
-  }
-
-  const runQuery = getRunQuery(new sqlite3.Database(dbPath));
-  await clearDatabase(runQuery);
-}
-
-async function tryImportSlackArchive(path, onComplete) {
-  console.log('Importing Slack archive…');
-
-  if (!fs.existsSync(path)) {
-    console.log('No such file: ' + path);
-    return;
-  }
-
-  const runQuery = getRunQuery(new sqlite3.Database(dbPath));
-  await clearDatabase(runQuery);
-
-  const zip = new StreamZip({
-    file: path,
-    storeEntries: true,
-  });
-
-  zip.on('ready', async () => {
-    const [readZipEntry, readZipFolder] = getReadZipEntry(zip);
-
-    let users = readZipEntry('users.json');
-    console.log('Found ' + users.length + ' users.');
-    await importUsers(runQuery, users);
-
-    let channels = readZipEntry('channels.json');
-    console.log('Found ' + channels.length + ' channels.');
-    await importChannels(runQuery, channels);
-
-    for (const channel of channels) {
-      const messages = readZipFolder(channel.name);
-      console.log(
-        'Importing data from #' +
-          channel.name +
-          ': ' +
-          messages.length +
-          ' messages.'
-      );
-      await importMessages(runQuery, channel.id, messages);
-    }
-
-    zip.close();
-    onComplete();
-  });
-}
-
 function getRunQuery(db) {
-  return async function (query, data = []) {
+  return async function runQuery(query, data = []) {
     return new Promise((resolve, reject) => {
       db.run(query, data, (err, result) => {
         if (err) {
@@ -81,7 +25,7 @@ function getRunQuery(db) {
 async function clearDatabase(runQuery) {
   // Drop tables
   for (const table of Object.keys(schema)) {
-    await runQuery('DROP TABLE IF EXISTS ' + table);
+    await runQuery(`DROP TABLE IF EXISTS ${table}`);
   }
 
   // Create tables
@@ -103,12 +47,9 @@ function getReadZipEntry(zip) {
   function readZipFolder(name) {
     return entries
       .filter(
-        (entry) =>
-          entry.name.indexOf(folder + name) === 0 && entry.isDirectory === false
+        (entry) => entry.name.indexOf(folder + name) === 0 && entry.isDirectory === false
       )
-      .map((entry) =>
-        JSON.parse(zip.entryDataSync(entry.name).toString('utf8'))
-      )
+      .map((entry) => JSON.parse(zip.entryDataSync(entry.name).toString('utf8')))
       .reduce((all, one) => [...all, ...one], []);
   }
 
@@ -117,7 +58,7 @@ function getReadZipEntry(zip) {
 
 async function importUsers(runQuery, users) {
   for (const user of users) {
-    await runQuery(schema['users'].insert, [
+    await runQuery(schema.users.insert, [
       user.id,
       user.name,
       user.profile.title,
@@ -133,7 +74,7 @@ async function importUsers(runQuery, users) {
 
 async function importChannels(runQuery, channels) {
   for (const channel of channels) {
-    await runQuery(schema['channels'].insert, [
+    await runQuery(schema.channels.insert, [
       channel.id,
       channel.name,
       channel.is_archived,
@@ -147,7 +88,7 @@ async function importMessages(runQuery, channelId, messages) {
   for (const message of messages) {
     const id = uuid();
 
-    await runQuery(schema['messages'].insert, [
+    await runQuery(schema.messages.insert, [
       id,
       channelId,
       message.type,
@@ -161,7 +102,7 @@ async function importMessages(runQuery, channelId, messages) {
       const parts = reaction.name.split('::');
 
       for (const user of reaction.users) {
-        await runQuery(schema['reactions'].insert, [
+        await runQuery(schema.reactions.insert, [
           id,
           user,
           parts[0],
@@ -170,6 +111,62 @@ async function importMessages(runQuery, channelId, messages) {
       }
     }
   }
+}
+
+async function tryInitDatabase() {
+  console.log('Initializing database…');
+
+  if (fs.existsSync(dbPath)) {
+    console.log('Database file exists, import skipped.');
+    return;
+  }
+
+  const runQuery = getRunQuery(new sqlite3.Database(dbPath));
+  await clearDatabase(runQuery);
+}
+
+async function tryImportSlackArchive(path, onComplete) {
+  console.log('Importing Slack archive…');
+
+  if (!fs.existsSync(path)) {
+    console.log(`No such file: ${path}`);
+    return;
+  }
+
+  const runQuery = getRunQuery(new sqlite3.Database(dbPath));
+  await clearDatabase(runQuery);
+
+  const zip = new StreamZip({
+    file: path,
+    storeEntries: true,
+  });
+
+  zip.on('ready', async () => {
+    const [readZipEntry, readZipFolder] = getReadZipEntry(zip);
+
+    const users = readZipEntry('users.json');
+    console.log(`Found ${users.length} users.`);
+    await importUsers(runQuery, users);
+
+    const channels = readZipEntry('channels.json');
+    console.log(`Found ${channels.length} channels.`);
+    await importChannels(runQuery, channels);
+
+    for (const channel of channels) {
+      const messages = readZipFolder(channel.name);
+      console.log(
+        `Importing data from #${
+          channel.name
+        }: ${
+          messages.length
+        } messages.`
+      );
+      await importMessages(runQuery, channel.id, messages);
+    }
+
+    zip.close();
+    onComplete();
+  });
 }
 
 module.exports = {

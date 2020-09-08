@@ -18,7 +18,6 @@ class Pie extends Component {
   }
 
   componentDidMount() {
-    const { options } = this.props;
     let chart = am4core.create(this.state.id, am4charts.PieChart);
 
     // Add and configure Series

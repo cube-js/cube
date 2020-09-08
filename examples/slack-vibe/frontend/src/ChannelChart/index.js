@@ -1,5 +1,4 @@
 import React from 'react';
-import styles from './styles.module.css';
 import Pie from '../amCharts/Pie';
 import PropTypes from 'prop-types';
 
