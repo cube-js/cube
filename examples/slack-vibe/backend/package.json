@@ -1,14 +1,13 @@
 {
-  "name": "amcharts",
-  "version": "0.0.1",
+  "name": "slack-vibe",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "build": "node index.js"
+    "start": "cd '../frontend' && npm run build && cd '../backend' && node index.js",
+    "dev": "node index.js"
   },
   "dependencies": {
-    "@cubejs-backend/server": "^0.19.56",
+    "@cubejs-backend/server-core": "^0.19.56",
     "@cubejs-backend/sqlite-driver": "^0.19.56",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
