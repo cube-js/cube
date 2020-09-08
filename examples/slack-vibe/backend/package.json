@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "cd '../frontend' && npm run build && cd '../backend' && node index.js",
+    "start": "NODE_ENV=production node index.js",
     "dev": "node index.js"
   },
   "dependencies": {
