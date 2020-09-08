@@ -10,13 +10,13 @@ export default function MessagesChart(props) {
     {
       x: "date",
       y: "messages",
-      color: "#7A77FF",
+      color: "#FA326E",
       granularity,
     },
     {
       x: "date",
       y: "reactions",
-      color: "#AFADFF",
+      color: "#FFC3BA",
       granularity,
     }
   ];
@@ -26,7 +26,9 @@ export default function MessagesChart(props) {
       <h2>
         <span className={styles.messages}>Messages</span> and <span className={styles.reactions}>reactions</span>
       </h2>
-      <LineChart data={data} options={options} />
+      <div className={styles.chart}>
+        <LineChart data={data} options={options} />
+      </div>
     </div>
   )
 }

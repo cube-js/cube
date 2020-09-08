@@ -24,7 +24,9 @@ export default function WeekChart(props) {
       <h2 title='With respect to your local time zone'>
         <span className={styles.messages}>Messages</span> by day of week
       </h2>
-      <Heatmap data={data} options={options} />
+      <div className={styles.chart}>
+        <Heatmap data={data} options={options} />
+      </div>
     </div>
   );
 }

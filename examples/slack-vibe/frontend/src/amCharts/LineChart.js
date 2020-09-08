@@ -41,7 +41,7 @@ class LineChart extends Component {
       series.stroke = am4core.color(option.color);
       series.dataFields.valueY = option.y;
       series.dataFields.dateX = option.x;
-      series.strokeWidth = 3;
+      series.strokeWidth = 2;
     }
 
     this.chart = chart;

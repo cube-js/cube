@@ -18,7 +18,6 @@ import MessagesChart from '../MessagesChart';
 import MembersChart from '../MembersChart';
 import WeekChart from '../WeekChart';
 import HourChart from '../HourChart';
-import MapChart from '../MapChart';
 import UniversalFilter from '../UniversalFilter';
 
 const defaultPeriod = 'last 365 days';
@@ -99,7 +98,7 @@ function ContentView() {
         {!chosenMember && <MembersChart data={members} />}
         {period !== 'last week' && <WeekChart data={messagesByWeekday} />}
         <HourChart data={messagesByHour} />
-        <MapChart data={membersByTimezone} />
+        {/*<MapChart data={membersByTimezone} />*/}
         {/*<div className={styles.row}>*/}
         {/*  <div className={styles.column}>*/}
         {/*    <ChannelChart*/}

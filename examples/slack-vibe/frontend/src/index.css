@@ -1,40 +1,67 @@
 @font-face {
-  font-family: 'Open Sans';
+  font-family: 'DM Sans';
+  font-style: italic;
   font-weight: 400;
-  src: url('/open-sans-v17-latin-regular.woff') format('woff');
+  font-display: swap;
+  src: local('DM Sans Italic'), local('DMSans-Italic'), url(/rP2Fp2ywxg089UriCZa4Hz-DJF4e8A.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: 'Open Sans';
-  font-weight: 700;
-  src: url('/open-sans-v17-latin-700.woff') format('woff');
+  font-family: 'DM Sans';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: local('DM Sans Medium Italic'), local('DMSans-MediumItalic'), url(/rP2Ap2ywxg089UriCZaw7ByWCXwT2iv06A.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('DM Sans Regular'), local('DMSans-Regular'), url(/rP2Hp2ywxg089UriCZOIHTWEBlw.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local('DM Sans Medium'), local('DMSans-Medium'), url(/rP2Cp2ywxg089UriAWCrCBimC3YU-Ck.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 :root {
   --color-fg-primary: #141446;
   --color-fg-secondary: #43436B;
   --color-fg-link: #7A77FF;
+  --color-fg-link-03: rgba(122, 119, 255, 0.3);
   --color-bg: #F3F3FB;
   --color-bg-sidebar: #fff;
   --color-bg-image: #A1A1B5;
   --color-bg-filter: #43436B;
   --color-bg-link: #EDEDFF;
   --color-border: #D0D0DA;
-  --color-red: #FF6492;
-  --color-pink: #FFA2BE;
-  --color-green: #6DE6A4;
+  --color-red: #FA326E;
+  --color-pink: #FFC3BA;
+  --color-green: #46D89B;
   --color-blue: #7A77FF;
   --color-purple: #AFADFF;
 
-  --border-radius: 4px;
-  --border-width: 2px;
+  --border-radius: 8px;
+  --border-width: 1px;
 }
 
 body {
   color: var(--color-fg-primary);
   margin: 0;
-  font-family: 'Open Sans', sans-serif;
-  font-size: 18px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  line-height: 21px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -44,17 +71,19 @@ ul {
 }
 
 h1 {
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 2.5rem;
-  letter-spacing: -1px;
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 36px;
+  letter-spacing: 0.01em;
   margin: 0 0 1rem;
 }
 
 h2 {
-  font-weight: 900;
-  font-size: 20px;
-  line-height: 1.2;
+  color: #141446;
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  line-height: 30px;
   margin: 0 0 1rem;
 }
 
@@ -70,7 +99,9 @@ p {
 }
 
 a {
+  border-bottom: solid 1px var(--color-fg-link-03);
   color: var(--color-fg-link);
+  font-weight: 500;
   text-decoration: none;
 }
 
@@ -78,32 +109,32 @@ a:hover {
   border-bottom: solid 1px var(--color-fg-link);
 }
 
-button, a.button {
+button {
   background: #fff;
   border: solid var(--border-width) var(--color-border);
-  border-radius: var(--border-radius);
+  border-radius: 4px;
   color: #1d1c1d !important;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.2rem;
   margin: 0;
-  padding: 6px 14px;
+  padding: 9px 12px;
   white-space: nowrap;
 }
 
-button:hover, a.button:hover {
+button:hover {
   border: solid var(--border-width) rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
 
-button:active, a.button:active {
+button:active {
   background: #f8f8f8;
   border: solid var(--border-width) rgba(0, 0, 0, 0.3);
 }
 
 input {
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 15px;
   margin: 0;
 }

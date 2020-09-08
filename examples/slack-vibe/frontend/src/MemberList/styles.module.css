@@ -24,14 +24,13 @@
 .item {
   align-items: center;
   border-top: var(--border-width) solid var(--color-border);
-  border-radius: var(--border-radius) var(--border-radius) 0 0;
   display: grid;
   font-size: 15px;
   height: 60px;
   line-height: 1;
   grid-template-columns: min-content auto min-content;
   grid-gap: 15px;
-  padding: 0 20px;
+  padding: 0 16px;
 }
 
 .item:nth-child(1) {
@@ -39,16 +38,16 @@
 }
 
 .item:hover {
-  background-color: var(--color-bg-link);
+  background-color: var(--color-bg);
   cursor: pointer;
 }
 
 .selected {
-  background-color: var(--color-bg-link);
+  background-color: var(--color-bg);
 }
 
 .avatar img {
-  border-radius: var(--border-radius);
+  border-radius: 4px;
   height: 34px;
   min-width: 34px;
   width: 34px;
@@ -61,12 +60,12 @@
 
 .name {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.2;
 }
 
 .title {
-  color: var(--color-fg-secondary);
+  color: var(--color-bg-image);
   font-size: 13px;
   line-height: 1.2;
   margin-top: 3px;

@@ -10,12 +10,12 @@ export default function MembersChart(props) {
     {
       x: "date",
       y: "members",
-      color: "#FF6492"
+      color: "#7A77FF"
     },
     {
       x: "date",
       y: "joins",
-      color: "#FFA2BE"
+      color: "#AFADFF"
     }
   ];
 
@@ -25,7 +25,9 @@ export default function MembersChart(props) {
         <span className={styles.members}>All members</span> and{' '}
         <span className={styles.joins}>new members</span>
       </h2>
-      <LineChart data={data} options={options} />
+      <div className={styles.chart}>
+        <LineChart data={data} options={options} />
+      </div>
     </div>
   )
 }

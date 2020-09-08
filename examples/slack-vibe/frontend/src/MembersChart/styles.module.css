@@ -1,14 +1,18 @@
 .root {
   background-color: var(--color-bg-sidebar);
-  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius);
   margin-bottom: 2rem;
   padding: 1.5rem 2rem 0.5rem;
 }
 
 .members {
-  color: var(--color-red);
+  color: var(--color-blue);
 }
 
 .joins {
-  color: var(--color-pink);
+  color: var(--color-purple);
+}
+
+.chart {
+  margin-left: -25px;
 }

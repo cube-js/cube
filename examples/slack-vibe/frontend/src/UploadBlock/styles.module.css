@@ -26,9 +26,9 @@
   color: #1d1c1d !important;
   border: solid var(--border-width) transparent;
   display: inline-block;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.2rem;
   padding: 6px 14px;
   white-space: nowrap;

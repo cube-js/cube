@@ -22,7 +22,6 @@ export default function Header(props) {
         <ul className={styles.buttons}>
           <li>
             <a href='https://github.com/cube-js/cube.js/tree/master/examples/slack-vibe'
-               className='button'
                target='_blank'
                rel='noopener noreferrer'
             >
@@ -31,7 +30,6 @@ export default function Header(props) {
           </li>
           <li>
             <a href='https://heroku.com/deploy?template=?'
-               className='button'
                target='_blank'
                rel='noopener noreferrer'
             >
@@ -40,7 +38,6 @@ export default function Header(props) {
           </li>
           <li>
             <a href='https://hub.docker.com/r/?/?/'
-               className='button'
                target='_blank'
                rel='noopener noreferrer'
             >

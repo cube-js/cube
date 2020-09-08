@@ -17,17 +17,16 @@
   border-bottom: solid var(--border-width) var(--color-border);
   display: grid;
   grid-template-columns: min-content auto min-content;
-  grid-gap: 8px;
+  grid-gap: 6px;
   padding: 10px 12px;
 }
 
 .greeting {
   border-radius: var(--border-radius);
   box-sizing: border-box;
-  font-size: 13px;
-  font-weight: bold;
+  font-weight: 500;
   height: 26px;
-  padding: 4px;
+  padding: 3px;
   white-space: nowrap;
 }
 
@@ -86,12 +85,12 @@
 }
 
 .main {
-  font-weight: bold;
+  font-weight: 500;
 }
 
 .clear {
   color: var(--color-fg-secondary);
-  font-weight: bold;
+  font-weight: 500;
 }
 
 .clear:hover {

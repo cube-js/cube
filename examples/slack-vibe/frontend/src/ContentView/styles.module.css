@@ -16,6 +16,7 @@
 
 .filter {
   cursor: pointer;
+  font-style: italic;
 }
 
 .filtered {
@@ -27,8 +28,7 @@
 
 .sidebar {
   background-color: var(--color-bg-sidebar);
-  border-left: var(--border-width) solid var(--color-border);
-  padding: 4rem 2rem;
+  padding: 0 48px;
   min-width: 350px;
 }
 

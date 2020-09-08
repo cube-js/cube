@@ -24,7 +24,9 @@ export default function WeekChart(props) {
       <h2 title='With respect to your local time zone'>
         <span className={styles.messages}>Messages</span> by hour
       </h2>
-      <Bubble data={data} options={options} />
+      <div className={styles.chart}>
+        <Bubble data={data} options={options} />
+      </div>
     </div>
   );
 }
