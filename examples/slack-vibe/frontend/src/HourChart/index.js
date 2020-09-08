@@ -6,18 +6,9 @@ import PropTypes from 'prop-types';
 export default function WeekChart(props) {
   const { data } = props;
 
-  const options = [
-    {
-      x: 'date',
-      y: 'members',
-      color: 'rgb(127, 90, 200)',
-    },
-    {
-      x: 'date',
-      y: 'joins',
-      color: 'rgb(240, 76, 88)',
-    },
-  ];
+  const options = {
+    color: '#7A77FF',
+  };
 
   return (
     <div className={styles.root}>

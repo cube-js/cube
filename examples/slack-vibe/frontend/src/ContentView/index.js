@@ -7,7 +7,6 @@ import {
   loadMessagesAndReactions,
   loadMessagesByWeekday,
   loadMessagesByHour,
-  loadMembersByTimezone,
 } from '../api';
 import styles from './styles.module.css';
 import MemberList from '../MemberList';
@@ -35,7 +34,7 @@ function ContentView() {
   const [members, setMembers] = useState([]);
   const [messagesByWeekday, setMessagesByWeekday] = useState([]);
   const [messagesByHour, setMessagesByHour] = useState([]);
-  const [membersByTimezone, setMembersByTimezone] = useState([]);
+  // const [membersByTimezone, setMembersByTimezone] = useState([]);
 
   const [chosenChannel, setChosenChannel] = useState(null);
   const [chosenMember, setChosenMember] = useState(null);
@@ -53,7 +52,7 @@ function ContentView() {
     loadMembersAndJoins(period, granularity, chosenChannel, chosenMember).then(setMembers);
     loadMessagesByWeekday(period, chosenChannel, chosenMember).then(setMessagesByWeekday);
     loadMessagesByHour(period, chosenChannel, chosenMember).then(setMessagesByHour);
-    loadMembersByTimezone().then(setMembersByTimezone);
+    // loadMembersByTimezone().then(setMembersByTimezone);
   }, [period, granularity, chosenChannel, chosenMember]);
 
   const [membersListDoShowAll, setMembersListDoShowAll] = useState(false);

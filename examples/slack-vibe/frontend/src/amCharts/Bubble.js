@@ -42,7 +42,7 @@ class Bubble extends Component {
 
     const bullet = series.bullets.push(new am4core.Circle());
     bullet.strokeWidth = 0;
-    bullet.fill = am4core.color('#7A77FF');
+    bullet.fill = am4core.color(options.color);
 
     bullet.adapter.add('tooltipY', function (tooltipY, target) {
       return -target.radius + 1;
@@ -84,5 +84,5 @@ export default Bubble;
 
 Bubble.propTypes = {
   data: PropTypes.arrayOf(PropTypes.object).isRequired,
-  options: PropTypes.arrayOf(PropTypes.object).isRequired,
+  options: PropTypes.object.isRequired,
 };

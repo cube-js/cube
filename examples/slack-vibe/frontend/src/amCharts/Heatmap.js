@@ -45,8 +45,8 @@ class Heatmap extends Component {
     series.heatRules.push({
       target: columnTemplate,
       property: 'fill',
-      min: new am4core.color('#fff'),
-      max: new am4core.color('#6DE6A4'),
+      min: new am4core.color(options.colors.min),
+      max: new am4core.color(options.colors.max),
     });
 
     this.chart = chart;
@@ -75,5 +75,5 @@ export default Heatmap;
 
 Heatmap.propTypes = {
   data: PropTypes.arrayOf(PropTypes.object).isRequired,
-  options: PropTypes.arrayOf(PropTypes.object).isRequired,
+  options: PropTypes.object.isRequired,
 };
