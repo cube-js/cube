@@ -1,7 +1,15 @@
 const Joi = require('@hapi/joi');
 
-const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
-const identifier = Joi.string().regex(/^[_a-zA-Z][_a-zA-Z0-9]*$/, 'identifier');
+function identifierWithMaxLen(maxLength = 0){
+  if(maxLength == 0){
+    return /^[_a-zA-Z][_a-zA-Z0-9]*$/;
+  }
+  return new RegExp(`^[_a-zA-Z][_a-zA-Z0-9]{0,${maxLength}}$`);
+}
+
+const identifierRegex = identifierWithMaxLen();
+
+const identifier = Joi.string().regex(identifierRegex, 'identifier');
 const timeInterval =
   Joi.alternatives([
     Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
@@ -187,7 +195,7 @@ const cubeSchema = Joi.object().keys({
     description: Joi.string(),
     meta: Joi.any()
   })),
-  preAggregations: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
+  preAggregations: Joi.object().pattern(/^[_a-zA-Z][_a-zA-Z0-9]{1,22}$/, Joi.alternatives().try(
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('autoRollup').required(),
       maxPreAggregations: Joi.number()
