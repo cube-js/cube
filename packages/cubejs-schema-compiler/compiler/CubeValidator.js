@@ -9,7 +9,7 @@ const timeInterval =
   ]);
 const everyInterval = Joi.string().regex(/^(\d+) (second|minute|hour|day|week)s?$/, 'refresh time interval');
 const everyCronInterval = Joi.string();
-const everyCronTimezone = Joi.string();
+const everyCronTimeZoneOffset = Joi.string().regex(/^(?:Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])$/, 'refresh timezone offset');
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
@@ -72,7 +72,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
     }),
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
-      timezone: everyCronTimezone,
+      timezoneOffset: everyCronTimeZoneOffset,
       incremental: Joi.boolean(),
       updateWindow: timeInterval
     })

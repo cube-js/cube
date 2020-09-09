@@ -1832,8 +1832,10 @@ class BaseQuery {
       opt.tz = refreshKey.timezone;
     }
     
-    let start; let end; let dayOffset; let
-      dayOffsetPrev;
+    let start;
+    let end;
+    let dayOffset; 
+    let dayOffsetPrev;
     try {
       const interval = cronParser.parseExpression(every, opt);
       dayOffset = interval.next().getTime();
