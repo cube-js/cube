@@ -383,9 +383,9 @@ Partitions before `7 day` interval won't be refreshed once they built until roll
 
 ### Original SQL with incremental refreshKey
 
-Original SQL pre-aggregation is can be used with time partitioning and incremental refreshKey
+Original SQL pre-aggregation can be used with time partitioning and incremental `refreshKey`.
 
-In this case it can be used as follows:
+In this case, it can be used as follows:
 ```javascript
 cube(`Orders`, {
   sql: `select * from visitors WHERE ${FILTER_PARAMS.visitors.created_at.filter('created_at')}`,
