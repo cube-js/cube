@@ -1,4 +1,4 @@
-# Slack Vibe
+# Slack Vibe 🎉 by Cube.js
 
 *Slack Vibe* is an open source dashboard of public activity in a Slack workspace of an open community or a private team.
 
