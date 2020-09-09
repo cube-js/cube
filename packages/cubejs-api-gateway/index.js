@@ -458,7 +458,6 @@ class ApiGateway {
   }
   
   async getNormalizedQueries(query, context) {
-    query = this.parseQueryParam(query);
     let queryType = QUERY_TYPE.REGULAR_QUERY;
     
     if (!Array.isArray(query)) {
@@ -497,6 +496,7 @@ class ApiGateway {
     const requestStarted = new Date();
     
     try {
+      query = this.parseQueryParam(query);
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
       
       const sqlQueries = await Promise.all(
@@ -553,6 +553,7 @@ class ApiGateway {
     const requestStarted = new Date();
     
     try {
+      query = this.parseQueryParam(query);
       this.log(context, {
         type: 'Load Request',
         query
