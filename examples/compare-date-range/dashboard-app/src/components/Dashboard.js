@@ -1,56 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Row, Col } from 'antd';
-import { useCubeQuery } from '@cubejs-client/react';
-import { ResultSet } from '@cubejs-client/core';
-import * as moment from 'moment';
-
-import Line from './Line';
+import SingleQuery from './SingleQuery';
+import MultipleQueries from './MultipleQueries';
 
 export default () => {
-  const [data, setData] = useState([]);
-
-  const { resultSet: result } = useCubeQuery({
-    measures: ['Orders.count'],
-    timeDimensions: [
-      {
-        dimension: 'Orders.createdAt',
-        compareDateRange: [
-          ['2022-01-01', '2022-12-31'],
-          ['2021-01-01', '2021-12-31'],
-          ['2020-01-01', '2020-12-31'],
-        ],
-        granularity: 'month',
-      },
-    ],
-  });
-
-  useEffect(() => {
-    if (result) {
-      console.log(result);
-      console.log(
-        result.tablePivot(
-          ResultSet.getNormalizedPivotConfig(result.loadResponse.pivotQuery)
-        )
-      );
-      console.log(
-        ResultSet.getNormalizedPivotConfig(result.loadResponse.pivotQuery)
-      );
-      let temp = result.loadResponse.results.map((year) => {
-        return {
-          name: moment(year.data[0]['Orders.createdAt.month']).format('YYYY'),
-          data: year.data.map((item) => parseInt(item['Orders.count'])),
-        };
-      });
-      setData(temp);
-    }
-  }, [result]);
-
   return (
     <React.Fragment>
       <Row gutter={20} className='dashboard__row'>
-        <Col sm={24} lg={16}>
+        <Col sm={24} lg={12}>
           <div className='dashboard__cell'>
-            <Line data={data} />
+            <MultipleQueries />
+          </div>
+        </Col>
+        <Col sm={24} lg={12}>
+          <div className='dashboard__cell'>
+            <SingleQuery />
           </div>
         </Col>
       </Row>

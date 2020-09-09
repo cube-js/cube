@@ -13,11 +13,6 @@ const staticOptions = {
   credits: {
     enabled: false,
   },
-  title: {
-    text: 'Sales comparison by year',
-    useHTML: true,
-  },
-
   xAxis: {
     categories: [
       'January',
@@ -72,14 +67,18 @@ const staticOptions = {
   },
 };
 
-export default ({ data }) => {
+export default ({ title, data }) => {
   const [options, setOptions] = useState({});
   useEffect(() => {
     setOptions({
       ...staticOptions,
+      title: {
+        text: `Sales comparison by year <small>implemented with ${title}</small>`,
+        useHTML: true,
+      },
       series: data,
     });
-  }, [data]);
+  }, [data, title]);
 
   return <HighchartsReact highcharts={Highcharts} options={options} />;
 };
