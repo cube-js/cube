@@ -13,3 +13,23 @@ Visit [slack-vibe.cubecloudapp.dev](https://slack-vibe.cubecloudapp.dev) for a l
 Run `docker run -p 4000:4000 cubejs/slack-vibe:0.1.0` to pull a pre-built image, then open [localhost:4000](http://localhost:4000).
 
 Use provided [Dockerfile](./Dockerfile) to build your own image.
+
+## Running locally
+
+First, run `npm run dev` in this folder to start the back-end application.
+
+Second, run `npm run dev` in `frontend` folder to start the front-end application.
+
+Then, open `http://localhost:3000` in your browser.
+
+## Running in production
+
+First, run `npm run build` in `frontend` folder to build the front-end application.
+
+Second, run `npm start`.
+
+Then, open `http://localhost:4000` in your browser.
+
+## Database
+
+Slack Vibe stores data in the `db.sqlite` file managed by an embedded SQLite database. Remove this file to clear the data.

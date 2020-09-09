@@ -24,7 +24,7 @@ const { tryInitDatabase, tryImportSlackArchive } = require('./import');
   const cubejsServer = CubejsServerCore.create();
 
   if (process.env.NODE_ENV === 'production') {
-    app.use(serveStatic(path.join(__dirname, '../frontend/build')));
+    app.use(serveStatic(path.join(__dirname, './frontend/build')));
   }
 
   app.get('/healthy', (req, res) => {
