@@ -1,0 +1,16 @@
+<div class="flex-box">
+  <button mat-button mat-stroked-button *ngFor="let member of members" color="primary">
+    {{ member }}
+  </button>
+
+  <mat-form-field appearance="fill" style="margin-bottom: -1.25em">
+    <span matPrefix><mat-icon>add</mat-icon></span>
+    <mat-label>{{ title }}</mat-label>
+    <mat-select #select (selectionChange)="_onSelect($event); select.value = '';">
+      <mat-option *ngIf="!members.length">No members found</mat-option>
+      <mat-option *ngFor="let member of allMembers" [value]="member.name">
+        {{ member.title }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>

@@ -1,0 +1,57 @@
+<div *ngIf="query">
+  <div class="controls-container">
+    <div class="controls-row">
+      <members-group
+        [title]="'Measure'"
+        [members]="query.measures.asArray()"
+        [allMembers]="builderMeta.measures"
+        (onSelect)="query.measures.add($event)"
+      ></members-group>
+
+      <mat-divider [vertical]="true"></mat-divider>
+
+      <members-group
+        [title]="'Dimension'"
+        [members]="query.dimensions.asArray()"
+        [allMembers]="builderMeta.dimensions"
+        (onSelect)="query.dimensions.add($event)"
+      ></members-group>
+
+      <mat-divider [vertical]="true"></mat-divider>
+
+      <members-group
+        [title]="'Segment'"
+        [members]="query.segments.asArray()"
+        [allMembers]="builderMeta.segments"
+        (onSelect)="query.segments.add($event)"
+      ></members-group>
+
+      <time-group
+        [timeDimensionMember]="query.timeDimensions"
+        [members]="query.timeDimensions.asArray()"
+        [allMembers]="builderMeta.timeDimensions"
+      ></time-group>
+    </div>
+
+    <div class="controls-row">
+      <mat-form-field appearance="fill">
+        <span matPrefix><mat-icon>multiline_chart</mat-icon></span>
+        <mat-label>Chart Type</mat-label>
+        <mat-select (selectionChange)="queryBuilder.setChartType($event.value)">
+          <mat-option *ngFor="let item of chartTypeToIcon" [value]="item.chartType">
+            <span matPrefix>
+              <mat-icon>{{ item.icon }}</mat-icon>
+            </span>
+            {{ item.chartType | titlecase }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <div class="debug">{{ query.query | async | json }}</div>
+
+  <button mat-button mat-stroked-button (click)="setQuery()">set/reset query</button>
+  
+  <query-renderer [resultSet]="resultSet"></query-renderer>
+</div>

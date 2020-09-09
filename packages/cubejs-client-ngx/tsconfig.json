@@ -29,13 +29,14 @@
     "fullTemplateTypeCheck": true,
     "strictInjectionParameters": true,
     "enableResourceInlining": true,
-    "enableIvy": false
+    "enableIvy": false,
+    "preserveSymlinks": true
   },
   "exclude": [
     "src/test.ts",
     "**/*.spec.ts"
   ],
-  "files": [
+  "include": [
     "index.ts",
     "src/*"
   ],
