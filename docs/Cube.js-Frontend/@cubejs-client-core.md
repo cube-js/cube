@@ -10,7 +10,7 @@ Vanilla JavaScript Cube.js client.
 
 ## cubejs
 
-▸  **cubejs**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
+>  **cubejs**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
 
 Creates an instance of the `CubejsApi`. The API entry point.
 
@@ -39,7 +39,7 @@ Name | Type | Description |
 apiToken | string &#124;  () => *Promise‹string›* | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
 options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
-▸  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
+>  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
 
 ## CubejsApi
 
@@ -47,19 +47,19 @@ Main class for accessing Cube.js API
 
 ### dryRun
 
-▸  **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[TDryRunResponse](#types-t-dry-run-response)›*
+>  **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[TDryRunResponse](#types-t-dry-run-response)›*
 
-▸  **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[TDryRunResponse](#types-t-dry-run-response)›): *void*
+>  **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[TDryRunResponse](#types-t-dry-run-response)›): *void*
 
 Get query related meta without query execution
 
 ### load
 
-▸  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[ResultSet](#result-set)›*
+>  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[ResultSet](#result-set)›*
 
-▸  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
+>  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
 
-Fetch data for the passed `query`. It also accepts an array of queries, and in such case it will be treated as a [Data Blending](/data-blending) query.
+Fetch data for the passed `query`.
 
 ```js
 import cubejs from '@cubejs-client/core';
@@ -91,17 +91,17 @@ callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#res
 
 ### meta
 
-▸  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[Meta](#meta)›*
+>  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[Meta](#meta)›*
 
-▸  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[Meta](#meta)›): *void*
+>  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[Meta](#meta)›): *void*
 
 Get meta description of cubes available for querying.
 
 ### sql
 
-▸  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
+>  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
 
-▸  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)›): *void*
+>  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)›): *void*
 
 Get generated SQL string for the given `query`.
 
@@ -123,7 +123,7 @@ Default transport implementation.
 
 ### request
 
-▸  **request**(**method**: string, **params**: any): () => *Promise‹any›*
+>  **request**(**method**: string, **params**: any): () => *Promise‹any›*
 
 *Implementation of ITransport*
 
@@ -133,15 +133,15 @@ Contains information about available cubes and it's members.
 
 ### defaultTimeDimensionNameFor
 
-▸  **defaultTimeDimensionNameFor**(**memberName**: string): *string*
+>  **defaultTimeDimensionNameFor**(**memberName**: string): *string*
 
 ### filterOperatorsForMember
 
-▸  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *any*
+>  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *any*
 
 ### membersForQuery
 
-▸  **membersForQuery**(**query**: [Query](#types-query) | null, **memberType**: [MemberType](#types-member-type)): *[TCubeMeasure](#types-t-cube-measure)[] | [TCubeDimension](#types-t-cube-dimension)[] | [TCubeMember](#types-t-cube-member)[]*
+>  **membersForQuery**(**query**: [Query](#types-query) | null, **memberType**: [MemberType](#types-member-type)): *[TCubeMeasure](#types-t-cube-measure)[] | [TCubeDimension](#types-t-cube-dimension)[] | [TCubeMember](#types-t-cube-member)[]*
 
 Get all members of a specific type for a given query.
 If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -155,7 +155,7 @@ memberType | [MemberType](#types-member-type) | - |
 
 ### resolveMember
 
-▸  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *Object*
+>  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *Object*
 
 Get meta information for a cube member
 Member meta information contains:
@@ -181,11 +181,11 @@ memberType | [MemberType](#types-member-type) | - |
 
 ### stage
 
-▸  **stage**(): *string*
+>  **stage**(): *string*
 
 ### timeElapsed
 
-▸  **timeElapsed**(): *string*
+>  **timeElapsed**(): *string*
 
 ## ResultSet
 
@@ -193,11 +193,11 @@ Provides a convenient interface for data manipulation.
 
 ### annotation
 
-▸  **annotation**(): *[QueryAnnotations](#types-query-annotations)*
+>  **annotation**(): *[QueryAnnotations](#types-query-annotations)*
 
 ### chartPivot
 
-▸  **chartPivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[ChartPivotRow](#types-chart-pivot-row)[]*
+>  **chartPivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[ChartPivotRow](#types-chart-pivot-row)[]*
 
 Returns normalized query result data in the following format.
 
@@ -224,7 +224,7 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 
 ### decompose
 
-▸  **decompose**(): *Object*
+>  **decompose**(): *Object*
 
 Can be used when you need access to the methods that can't be used with some query types (eg `compareDateRangeQuery` or `blendingQuery`)
 ```js
@@ -235,7 +235,7 @@ resultSet.decompose().forEach((currentResultSet) => {
 
 ### drillDown
 
-▸  **drillDown**(**drillDownLocator**: [DrillDownLocator](#types-drill-down-locator), **pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Query](#types-query) | null*
+>  **drillDown**(**drillDownLocator**: [DrillDownLocator](#types-drill-down-locator), **pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Query](#types-query) | null*
 
 Returns a measure drill down query.
 
@@ -278,7 +278,7 @@ the result will be a query with the required filters applied and the dimensions/
 
 ### pivot
 
-▸  **pivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[PivotRow](#types-pivot-row)[]*
+>  **pivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[PivotRow](#types-pivot-row)[]*
 
 Base method for pivoting [ResultSet](#result-set) data.
 Most of the times shouldn't be used directly and [chartPivot](#result-set-chart-pivot)
@@ -321,21 +321,21 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 
 ### query
 
-▸  **query**(): *[Query](#types-query)*
+>  **query**(): *[Query](#types-query)*
 
 ### rawData
 
-▸  **rawData**(): *T[]*
+>  **rawData**(): *T[]*
 
 ### serialize
 
-▸  **serialize**(): *Object*
+>  **serialize**(): *Object*
 
 Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
 
 ### series
 
-▸  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
+>  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
 
 Returns an array of series with key, title and series data.
 ```js
@@ -370,7 +370,7 @@ Returns an array of series with key, title and series data.
 
 ### seriesNames
 
-▸  **seriesNames**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[SeriesNamesColumn](#types-series-names-column)[]*
+>  **seriesNames**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[SeriesNamesColumn](#types-series-names-column)[]*
 
 Returns an array of series objects, containing `key` and `title` parameters.
 ```js
@@ -396,7 +396,7 @@ Returns an array of series objects, containing `key` and `title` parameters.
 
 ### tableColumns
 
-▸  **tableColumns**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[TableColumn](#types-table-column)[]*
+>  **tableColumns**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[TableColumn](#types-table-column)[]*
 
 Returns an array of column definitions for `tablePivot`.
 
@@ -492,7 +492,7 @@ then `tableColumns` will group the table head and return
 
 ### tablePivot
 
-▸  **tablePivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *Array‹object›*
+>  **tablePivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *Array‹object›*
 
 Returns normalized query result data prepared for visualization in the table format.
 
@@ -521,7 +521,7 @@ For example:
 
 ### deserialize
 
-▸ `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#result-set)‹TData›*
+> `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#result-set)‹TData›*
 
 ```js
 import { ResultSet } from '@cubejs-client/core';
@@ -547,23 +547,23 @@ options? | Object | - |
 
 ### getNormalizedPivotConfig
 
-▸ `static` **getNormalizedPivotConfig**(**query**: [PivotQuery](#types-pivot-query), **pivotConfig?**: Partial‹[PivotConfig](#types-pivot-config)›): *[PivotConfig](#types-pivot-config)*
+> `static` **getNormalizedPivotConfig**(**query**: [PivotQuery](#types-pivot-query), **pivotConfig?**: Partial‹[PivotConfig](#types-pivot-config)›): *[PivotConfig](#types-pivot-config)*
 
 ## SqlQuery
 
 ### rawQuery
 
-▸  **rawQuery**(): *[SqlData](#types-sql-data)*
+>  **rawQuery**(): *[SqlData](#types-sql-data)*
 
 ### sql
 
-▸  **sql**(): *string*
+>  **sql**(): *string*
 
 ## ITransport
 
 ### request
 
-▸  **request**(**method**: string, **params**: any): () => *Promise‹void›*
+>  **request**(**method**: string, **params**: any): () => *Promise‹void›*
 
 ## Types
 
