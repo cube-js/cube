@@ -28,14 +28,14 @@ export default function Header(props) {
               Browse on GitHub
             </a>
           </li>
-          {/*<li>*/}
-          {/*  <a href='https://heroku.com/deploy?template=?'*/}
-          {/*     target='_blank'*/}
-          {/*     rel='noopener noreferrer'*/}
-          {/*  >*/}
-          {/*    Deploy to Heroku*/}
-          {/*  </a>*/}
-          {/*</li>*/}
+          <li>
+            <a href='https://heroku.com/deploy?template=https://github.com/cube-js/cube.js/tree/heroku/slack-vibe/'
+               target='_blank'
+               rel='noopener noreferrer'
+            >
+              Deploy to Heroku
+            </a>
+          </li>
           <li>
             <a href='https://hub.docker.com/r/cubejs/slack-vibe'
                target='_blank'
