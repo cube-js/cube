@@ -1813,13 +1813,9 @@ class BaseQuery {
     }
   }
 
-  everyRefreshKeySql(refreshKey) {
+  calcIntervalForCronString(refreshKey) {
+  
     const every = refreshKey.every || '1 hour';
-
-    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      return this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
-    }
-
     // One of the years that start from monday (first day of week)
     // Mon, 01 Jan 2018 00:00:00 GMT
     const startDate = 1514764800000;
@@ -1827,9 +1823,9 @@ class BaseQuery {
       currentDate: new Date(startDate)
     };
     let utcOffset = 0;
-    if (refreshKey.timezone) {
-      utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
-      opt.tz = refreshKey.timezone;
+    if (refreshKey.timezoneOffset) {
+      utcOffset = moment().utcOffset(refreshKey.timezoneOffset).utcOffset() * 60;
+      //opt.tz = refreshKey.timezoneOffset;
     }
     
     let start;
@@ -1850,16 +1846,28 @@ class BaseQuery {
       throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);
     }
     const delta = (end - start) / 1000;
-    
-    console.log(refreshKey.every, new Date(start), new Date(end), new Date(dayOffset),
-      delta, dayOffset - startDate, new Date(dayOffsetPrev), dayOffsetPrev);
+     
     if (
       !/^(\*|\d+)? ?(\*|\d+) (\*|\d+) \* \* (\*|\d+)$/g.test(every.replace(/ +/g, ' ').replace(/^ | $/g, ''))
     ) {
       throw new UserError(`Your cron string ('${every}') is correct, but we support only equal time intervals.`);
     }
+    return {
+      utcOffset,
+      interval:delta,
+      dayOffset:(dayOffset - startDate) / 1000
+    }
+  }
 
-    return this.floorSql(`(${utcOffset} + ${(dayOffset - startDate) / 1000} + ${this.unixTimestampSql()}) / ${delta}`);
+  everyRefreshKeySql(refreshKey) {
+    const every = refreshKey.every || '1 hour';
+
+    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
+      return this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
+    }
+
+    let {dayOffset, utcOffset, interval} = this.calcIntervalForCronString(refreshKey);  
+    return this.floorSql(`(${utcOffset} + ${dayOffset} + ${this.unixTimestampSql()}) / ${interval}`);
   }
 
   granularityFor(momentDate) {
@@ -2034,18 +2042,9 @@ class BaseQuery {
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
       return Math.max(Math.min(Math.round(this.parseSecondDuration(every) / 10), 300), 1);
     }
-  
-    try {
-      const opt = {};
-      opt.tz = refreshKey.timezone;
-      const interval = cronParser.parseExpression(every, opt);
-      const start = interval.next().getTime();
-      const end = interval.next().getTime();
-      const delta = (end - start) / 1000;
-      return Math.max(Math.min(Math.round(delta / 10), 300), 1);
-    } catch (err) {
-      throw new UserError(`Invalid cron string '${every}' in refreshKey`);
-    }
+
+    let {interval} = this.calcIntervalForCronString(refreshKey);  
+    return Math.max(Math.min(Math.round(interval / 10), 300), 1);
   }
 
   preAggregationStartEndQueries(cube, preAggregation) {

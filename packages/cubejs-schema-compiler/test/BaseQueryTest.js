@@ -46,7 +46,7 @@ describe('SQL Generation', function test() {
         ],
         timeDimensions: [],
         filters: [  ],
-        timezoneOffset: '-08:00'
+        timezoneOffset: '-07:00'
       });
 
       let r;
@@ -57,42 +57,41 @@ describe('SQL Generation', function test() {
 
       r = query.everyRefreshKeySql({
         every: '0 * * * * *',
-        timezoneOffset: '-08:00'
+        timezoneOffset: '-07:00'
       })
       r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 60)") 
 
       r = query.everyRefreshKeySql({
         every: '0 * * * *',
-        timezoneOffset: '-08:00'
+        timezoneOffset: '-07:00'
       })
       r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
 
       r = query.everyRefreshKeySql({
         every: '30 * * * *',
-        timezoneOffset: '-08:00'
+        timezoneOffset: '-07:00'
       })
       r.should.be.equal("FLOOR((-25200 + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
 
       r = query.everyRefreshKeySql({
         every: '30 5 * * 5',
-        timezoneOffset: '-08:00'
+        timezoneOffset: '-07:00'
       })
-      r.should.be.equal("FLOOR((-25200 + 394200 + EXTRACT(EPOCH FROM NOW())) / 604800)") 
+      r.should.be.equal("FLOOR((-25200 + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)") 
 
       for(let i = 1; i < 59; i++)
       { 
         r = query.everyRefreshKeySql({
           every: `${i} * * * *`,
-          timezoneOffset: '-08:00'
-        }) 
-        console.log(r, i, `${i} * * * *`)
+          timezoneOffset: '-07:00'
+        })
         r.should.be.equal(`FLOOR((-25200 + ${i*60} + EXTRACT(EPOCH FROM NOW())) / ${1*60*60})`)
       }
 
       try{
         r = query.everyRefreshKeySql({
           every: '*/9 */7 * * *',
-          timezoneOffset: '-08:00'
+          timezoneOffset: '-07:00'
         })
         
         throw new Error();
@@ -108,7 +107,7 @@ describe('SQL Generation', function test() {
         
         throw new Error();
       }catch(error){ 
-        error.should.be.instanceof(UserError);
+        error.should.be.instanceof(Error);
       }
       
     });
