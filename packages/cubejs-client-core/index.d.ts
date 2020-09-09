@@ -7,6 +7,8 @@
  * @description Vanilla JavaScript Cube.js client.
  */
 
+import {defaultHeuristics} from "./src";
+
 declare module '@cubejs-client/core' {
   export type TransportOptions = {
     /**
@@ -793,4 +795,6 @@ declare module '@cubejs-client/core' {
    */
   export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;
   export default function cubejs(options: CubeJSApiOptions): CubejsApi;
+  
+  export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: any);
 }
