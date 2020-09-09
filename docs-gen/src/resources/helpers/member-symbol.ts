@@ -7,7 +7,7 @@ export function memberSymbol(this: DeclarationReflection) {
     return '\\+';
   }
   if (this.kind === ReflectionKind.CallSignature) {
-    return '▸';
+    return '>';
   }
   if (this.kind === ReflectionKind.TypeAlias) {
     return 'Ƭ';
