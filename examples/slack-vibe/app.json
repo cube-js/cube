@@ -1,7 +1,5 @@
 {
-  "name": "Slack Vibe by Cube.js",
+  "name": "Slack Vibe 🎉 by Cube.js",
   "description": "An open source dashboard of public activity in a Slack workspace of an open community or a private team",
-  "repository": "https://github.com/cube-js/cube.js/",
-  "logo": "https://camo.githubusercontent.com/14c922dcfefeea0334c16ad7fb66026ab60e10e2/68747470733a2f2f692e696d6775722e636f6d2f7a5948586d346f2e706e67",
-  "keywords": ["cubejs", "slack", "dashboard"]
+  "repository": "https://github.com/cube-js/cube.js/"
 }
