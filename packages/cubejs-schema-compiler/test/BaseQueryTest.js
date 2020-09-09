@@ -46,7 +46,7 @@ describe('SQL Generation', function test() {
         ],
         timeDimensions: [],
         filters: [  ],
-        timezone: '-08:00'
+        timezoneOffset: '-08:00'
       });
 
       let r;
@@ -57,25 +57,25 @@ describe('SQL Generation', function test() {
 
       r = query.everyRefreshKeySql({
         every: '0 * * * * *',
-        timezone: '-08:00'
+        timezoneOffset: '-08:00'
       })
       r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 60)") 
 
       r = query.everyRefreshKeySql({
         every: '0 * * * *',
-        timezone: '-08:00'
+        timezoneOffset: '-08:00'
       })
       r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
 
       r = query.everyRefreshKeySql({
         every: '30 * * * *',
-        timezone: '-08:00'
+        timezoneOffset: '-08:00'
       })
       r.should.be.equal("FLOOR((-25200 + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
 
       r = query.everyRefreshKeySql({
         every: '30 5 * * 5',
-        timezone: '-08:00'
+        timezoneOffset: '-08:00'
       })
       r.should.be.equal("FLOOR((-25200 + 394200 + EXTRACT(EPOCH FROM NOW())) / 604800)") 
 
@@ -83,7 +83,7 @@ describe('SQL Generation', function test() {
       { 
         r = query.everyRefreshKeySql({
           every: `${i} * * * *`,
-          timezone: '-08:00'
+          timezoneOffset: '-08:00'
         }) 
         console.log(r, i, `${i} * * * *`)
         r.should.be.equal(`FLOOR((-25200 + ${i*60} + EXTRACT(EPOCH FROM NOW())) / ${1*60*60})`)
@@ -92,7 +92,7 @@ describe('SQL Generation', function test() {
       try{
         r = query.everyRefreshKeySql({
           every: '*/9 */7 * * *',
-          timezone: '-08:00'
+          timezoneOffset: '-08:00'
         })
         
         throw new Error();
@@ -103,7 +103,7 @@ describe('SQL Generation', function test() {
       try{
         r = query.everyRefreshKeySql({
           every: '6 * * * *',
-          timezone: 'America/Los_Angeles'
+          timezoneOffset: 'America/Los_Angeles'
         })
         
         throw new Error();

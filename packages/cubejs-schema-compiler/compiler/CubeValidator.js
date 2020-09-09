@@ -113,7 +113,7 @@ const cubeSchema = Joi.object().keys({
     }),
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
-      timezone: everyCronTimezone,
+      timezoneOffset: everyCronTimeZoneOffset,
     })
   ),
   fileName: Joi.string().required(),
