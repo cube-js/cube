@@ -12,6 +12,10 @@
     "sourceMap": true,
     "strictNullChecks": false,
     "target": "es2015",
+    "paths": {
+      "react": ["node_modules/@types/react"],
+      "@cubejs-client/core": ["../packages/cubejs-client-core"]
+    }
   },
   "exclude": ["./dist", "./test", "**/*.spec.ts"]
 }
