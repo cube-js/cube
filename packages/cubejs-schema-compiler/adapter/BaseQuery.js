@@ -1814,7 +1814,6 @@ class BaseQuery {
   }
 
   calcIntervalForCronString(refreshKey) {
-  
     const every = refreshKey.every || '1 hour';
     // One of the years that start from monday (first day of week)
     // Mon, 01 Jan 2018 00:00:00 GMT
@@ -1823,14 +1822,13 @@ class BaseQuery {
       currentDate: new Date(startDate)
     };
     let utcOffset = 0;
-    if (refreshKey.timezoneOffset) {
-      utcOffset = moment().utcOffset(refreshKey.timezoneOffset).utcOffset() * 60;
-      //opt.tz = refreshKey.timezoneOffset;
+    if (refreshKey.timezone) {
+      utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
     }
     
     let start;
     let end;
-    let dayOffset; 
+    let dayOffset;
     let dayOffsetPrev;
     try {
       const interval = cronParser.parseExpression(every, opt);
@@ -1854,9 +1852,9 @@ class BaseQuery {
     }
     return {
       utcOffset,
-      interval:delta,
-      dayOffset:(dayOffset - startDate) / 1000
-    }
+      interval: delta,
+      dayOffset: (dayOffset - startDate) / 1000
+    };
   }
 
   everyRefreshKeySql(refreshKey) {
@@ -1866,7 +1864,7 @@ class BaseQuery {
       return this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
     }
 
-    let {dayOffset, utcOffset, interval} = this.calcIntervalForCronString(refreshKey);  
+    const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);
     return this.floorSql(`(${utcOffset} + ${dayOffset} + ${this.unixTimestampSql()}) / ${interval}`);
   }
 
@@ -2043,7 +2041,7 @@ class BaseQuery {
       return Math.max(Math.min(Math.round(this.parseSecondDuration(every) / 10), 300), 1);
     }
 
-    let {interval} = this.calcIntervalForCronString(refreshKey);  
+    const { interval } = this.calcIntervalForCronString(refreshKey);
     return Math.max(Math.min(Math.round(interval / 10), 300), 1);
   }
 

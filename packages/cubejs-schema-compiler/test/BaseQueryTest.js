@@ -3,6 +3,7 @@
 const UserError = require('../compiler/UserError');
 const PostgresQuery = require('../adapter/PostgresQuery'); 
 const PrepareCompiler = require('./PrepareCompiler');
+const moment = require('moment-timezone');
 require('should');
 
 const { prepareCompiler } = PrepareCompiler;
@@ -46,9 +47,10 @@ describe('SQL Generation', function test() {
         ],
         timeDimensions: [],
         filters: [  ],
-        timezoneOffset: '-07:00'
+        timezone: 'America/Los_Angeles'
       });
 
+      let utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60
       let r;
       r = query.everyRefreshKeySql({
         every: '1 hour'
@@ -57,59 +59,47 @@ describe('SQL Generation', function test() {
 
       r = query.everyRefreshKeySql({
         every: '0 * * * * *',
-        timezoneOffset: '-07:00'
+        timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 60)") 
+      r.should.be.equal(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 60)`) 
 
       r = query.everyRefreshKeySql({
         every: '0 * * * *',
-        timezoneOffset: '-07:00'
+        timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
+      r.should.be.equal(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`) 
 
       r = query.everyRefreshKeySql({
         every: '30 * * * *',
-        timezoneOffset: '-07:00'
+        timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)") 
+      r.should.be.equal(`FLOOR((${utcOffset} + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)`) 
 
       r = query.everyRefreshKeySql({
         every: '30 5 * * 5',
-        timezoneOffset: '-07:00'
+        timezone: 'America/Los_Angeles'
       })
-      r.should.be.equal("FLOOR((-25200 + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)") 
+      r.should.be.equal(`FLOOR((${utcOffset} + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)`) 
 
       for(let i = 1; i < 59; i++)
       { 
         r = query.everyRefreshKeySql({
           every: `${i} * * * *`,
-          timezoneOffset: '-07:00'
+          timezone: 'America/Los_Angeles'
         })
-        r.should.be.equal(`FLOOR((-25200 + ${i*60} + EXTRACT(EPOCH FROM NOW())) / ${1*60*60})`)
+        r.should.be.equal(`FLOOR((${utcOffset} + ${i*60} + EXTRACT(EPOCH FROM NOW())) / ${1*60*60})`)
       }
 
       try{
         r = query.everyRefreshKeySql({
           every: '*/9 */7 * * *',
-          timezoneOffset: '-07:00'
+          timezone: 'America/Los_Angeles'
         })
         
         throw new Error();
       }catch(error){ 
         error.should.be.instanceof(UserError);
       }
-      
-      try{
-        r = query.everyRefreshKeySql({
-          every: '6 * * * *',
-          timezoneOffset: 'America/Los_Angeles'
-        })
-        
-        throw new Error();
-      }catch(error){ 
-        error.should.be.instanceof(Error);
-      }
-      
     });
 
     return result;

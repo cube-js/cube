@@ -257,17 +257,16 @@ cube(`OrderFacts`, {
 
 `every` - can be set as an interval with granularities `second`, `minute`, `hour`, `day` and `week` or accept cron string with some limitations.
 
-If you set `every`  as cron string, then you can use `timezoneOffset` property.
+If you set `every`  as cron string, then you can use `timezone` property.
 
 For example:
 
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
-
   refreshKey: {
     every: '30 5 * * 5',
-    timezoneOffset: '-08:00'
+    timezone: 'America/Los_Angeles'
   }
 });
 ```
