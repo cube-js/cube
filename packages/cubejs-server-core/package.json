@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.20.3",
+  "version": "0.20.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -22,9 +22,9 @@
     "lint": "eslint core/**/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.20.3",
+    "@cubejs-backend/api-gateway": "^0.20.5",
     "@cubejs-backend/query-orchestrator": "^0.20.0",
-    "@cubejs-backend/schema-compiler": "^0.20.3",
+    "@cubejs-backend/schema-compiler": "^0.20.5",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
     "decompress": "^4.2.1",
