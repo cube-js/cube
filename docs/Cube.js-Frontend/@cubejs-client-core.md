@@ -119,7 +119,7 @@ Default transport implementation.
 
 ### constructor
 
-\+  **new HttpTransport**(**options**: [TransportOptions](#types-transport-options)): *[HttpTransport](#http-transport)*
+>  **new HttpTransport**(**options**: [TransportOptions](#types-transport-options)): *[HttpTransport](#http-transport)*
 
 ### request
 
@@ -155,7 +155,7 @@ memberType | [MemberType](#types-member-type) | - |
 
 ### resolveMember
 
->  **resolveMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *Object*
+>  **resolveMember**‹**T**›(**memberName**: string, **memberType**: T): *object | [TCubeMemberByType](#types-t-cube-member-by-type)‹T›*
 
 Get meta information for a cube member
 Member meta information contains:
@@ -170,12 +170,16 @@ Member meta information contains:
 }
 ```
 
+**Type parameters:**
+
+- **T**: *[MemberType](#types-member-type)*
+
 **Parameters:**
 
 Name | Type | Description |
 ------ | ------ | ------ |
 memberName | string | Fully qualified member name in a form `Cube.memberName` |
-memberType | [MemberType](#types-member-type) | - |
+memberType | T | - |
 
 ## ProgressResult
 
@@ -587,7 +591,7 @@ values | string[] |
 
 ### BinaryOperator
 
-Ƭ **BinaryOperator**: *"equals" | "notEquals" | "contains" | "notContains" | "gt" | "gte" | "lt" | "lte" | "inDateRange" | "notInDateRange" | "beforeDate" | "afterDate"*
+> **BinaryOperator**: *"equals" | "notEquals" | "contains" | "notContains" | "gt" | "gte" | "lt" | "lte" | "inDateRange" | "notInDateRange" | "beforeDate" | "afterDate"*
 
 ### ChartPivotRow
 
@@ -623,11 +627,11 @@ yValues? | string[] |
 
 ### Filter
 
-Ƭ **Filter**: *[BinaryFilter](#types-binary-filter) | [UnaryFilter](#types-unary-filter)*
+> **Filter**: *[BinaryFilter](#types-binary-filter) | [UnaryFilter](#types-unary-filter)*
 
 ### LoadMethodCallback
 
-Ƭ **LoadMethodCallback**: *function*
+> **LoadMethodCallback**: *function*
 
 ### LoadMethodOptions
 
@@ -657,7 +661,7 @@ query | [Query](#types-query) |
 
 ### MemberType
 
-Ƭ **MemberType**: *"measures" | "dimensions" | "segments"*
+> **MemberType**: *"measures" | "dimensions" | "segments"*
 
 ### PivotConfig
 
@@ -723,7 +727,7 @@ y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
 ### PivotQuery
 
-Ƭ **PivotQuery**: *[Query](#types-query) & object*
+> **PivotQuery**: *[Query](#types-query) & object*
 
 ### PivotRow
 
@@ -765,11 +769,11 @@ timeDimensions | Record‹string, [Annotation](#types-annotation)› |
 
 ### QueryOrder
 
-Ƭ **QueryOrder**: *"asc" | "desc"*
+> **QueryOrder**: *"asc" | "desc"*
 
 ### QueryType
 
-Ƭ **QueryType**: *"regularQuery" | "compareDateRangeQuery" | "blendingQuery"*
+> **QueryType**: *"regularQuery" | "compareDateRangeQuery" | "blendingQuery"*
 
 ### Series
 
@@ -805,15 +809,15 @@ sql | [SqlQueryTuple](#types-sql-query-tuple) |
 
 ### SqlQueryTuple
 
-Ƭ **SqlQueryTuple**: *[string, boolean | string | number]*
+> **SqlQueryTuple**: *[string, boolean | string | number]*
 
 ### TCubeDimension
 
-Ƭ **TCubeDimension**: *[TCubeMember](#types-t-cube-member) & object*
+> **TCubeDimension**: *[TCubeMember](#types-t-cube-member) & object*
 
 ### TCubeMeasure
 
-Ƭ **TCubeMeasure**: *[TCubeMember](#types-t-cube-member) & object*
+> **TCubeMeasure**: *[TCubeMember](#types-t-cube-member) & object*
 
 ### TCubeMember
 
@@ -824,9 +828,17 @@ shortTitle | string |
 title | string |
 type | [TCubeMemberType](#types-t-cube-member-type) |
 
+### TCubeMemberByType
+
+> **TCubeMemberByType**: *T extends "measures" ? TCubeMeasure : T extends "dimensions" ? TCubeDimension : T extends "segments" ? TCubeSegment : never*
+
 ### TCubeMemberType
 
-Ƭ **TCubeMemberType**: *"time" | "number" | "string" | "boolean"*
+> **TCubeMemberType**: *"time" | "number" | "string" | "boolean"*
+
+### TCubeSegment
+
+> **TCubeSegment**: *Pick‹[TCubeMember](#types-t-cube-member), "name" | "shortTitle" | "title"›*
 
 ### TDryRunResponse
 
@@ -860,7 +872,7 @@ granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
 
 ### TimeDimensionGranularity
 
-Ƭ **TimeDimensionGranularity**: *"hour" | "day" | "week" | "month" | "year"*
+> **TimeDimensionGranularity**: *"second" | "minute" | "hour" | "day" | "week" | "month" | "year"*
 
 ### TransportOptions
 
@@ -882,4 +894,4 @@ values? | never |
 
 ### UnaryOperator
 
-Ƭ **UnaryOperator**: *"set" | "notSet"*
+> **UnaryOperator**: *"set" | "notSet"*
