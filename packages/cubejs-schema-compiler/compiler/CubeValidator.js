@@ -82,6 +82,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
       updateWindow: timeInterval
     })
   ),
+  sqlAlias: Joi.string().optional(),
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   scheduledRefresh: Joi.boolean(),
