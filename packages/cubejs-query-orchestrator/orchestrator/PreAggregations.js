@@ -34,6 +34,8 @@ function version(cacheKey) {
 const tablesToVersionEntries = (schema, tables) => R.sortBy(
   table => -table.last_updated_at,
   tables.map(table => {
+
+    // @todo 1000 by length.
     const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
     if (match) {
       return {
@@ -432,6 +434,7 @@ class PreAggregationLoader {
   }
 
   targetTableName(versionEntry) {
+    console.log("targetTableName", versionEntry)
     // eslint-disable-next-line no-use-before-define
     return PreAggregations.targetTableName(versionEntry);
   }
@@ -738,7 +741,8 @@ class PreAggregations {
   }
 
   static targetTableName(versionEntry) {
-    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at/1000}`;
+    console.log("targetTableName", versionEntry)
+    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }
 
