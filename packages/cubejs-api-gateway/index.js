@@ -458,6 +458,7 @@ class ApiGateway {
   }
   
   async getNormalizedQueries(query, context) {
+    query = this.parseQueryParam(query);
     let queryType = QUERY_TYPE.REGULAR_QUERY;
     
     if (!Array.isArray(query)) {
