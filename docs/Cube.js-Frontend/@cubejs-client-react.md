@@ -10,7 +10,7 @@ menuOrder: 3
 
 ## useCubeQuery
 
-▸  **useCubeQuery**‹**TData**›(**query**: Query, **options?**: [UseCubeQueryOptions](#use-cube-query-use-cube-query-options)): *[UseCubeQueryResult](#use-cube-query-use-cube-query-result)‹TData›*
+>  **useCubeQuery**‹**TData**›(**query**: Query | Query[], **options?**: [UseCubeQueryOptions](#use-cube-query-use-cube-query-options)): *[UseCubeQueryResult](#use-cube-query-use-cube-query-result)‹TData›*
 
 A React hook for executing Cube.js queries
 ```js
@@ -19,13 +19,13 @@ import { Table } from 'antd';
 import { useCubeQuery }  from '@cubejs-client/react';
 
 export default function App() {
-  const { resultSet, isLoading, error } = useCubeQuery({
+  const { resultSet, isLoading, error, progress } = useCubeQuery({
     measures: ['Orders.count'],
     dimensions: ['Orders.createdAt.month'],
   });
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>{progress && progress.stage && progress.stage.stage || 'Loading...'}</div>;
   }
 
   if (error) {
@@ -63,17 +63,18 @@ Name | Type |
 ------ | ------ |
 error | Error &#124; null |
 isLoading | boolean |
+progress | ProgressResponse |
 resultSet | ResultSet‹TData› &#124; null |
 
 ## isQueryPresent
 
-▸  **isQueryPresent**(**query**: Query): *boolean*
+>  **isQueryPresent**(**query**: Query | Query[]): *boolean*
 
 Checks whether the query is ready
 
 ## QueryBuilder
 
-• **QueryBuilder** extends **React.Component** ‹[QueryBuilderProps](#query-builder-query-builder-props), [QueryBuilderState](#query-builder-query-builder-state)›:
+> **QueryBuilder** extends **React.Component** ‹[QueryBuilderProps](#query-builder-query-builder-props), [QueryBuilderState](#query-builder-query-builder-state)›:
 
 `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
 
@@ -171,11 +172,11 @@ updateTimeDimensions | [MemberUpdater](#types-member-updater) | - |
 
 ### QueryBuilderState
 
-Ƭ **QueryBuilderState**: *[VizState](#types-viz-state) & object*
+> **QueryBuilderState**: *[VizState](#types-viz-state) & object*
 
 ## QueryRenderer
 
-• **QueryRenderer** extends **React.Component** ‹[QueryRendererProps](#query-renderer-query-renderer-props)›:
+> **QueryRenderer** extends **React.Component** ‹[QueryRendererProps](#query-renderer-query-renderer-props)›:
 
 `<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
 
@@ -201,7 +202,7 @@ resultSet | ResultSet &#124; null |
 
 ## CubeProvider
 
-• **CubeProvider**: *React.FC‹[CubeProviderProps](#types-cube-provider-props)›*
+> **CubeProvider**: *React.FC‹[CubeProviderProps](#types-cube-provider-props)›*
 
 Cube.js context provider
 ```js
@@ -228,7 +229,7 @@ export default function App() {
 
 ## CubeContext
 
-• **CubeContext**: *Context‹[CubeContextProps](#types-cube-context-props)›*
+> **CubeContext**: *Context‹[CubeContextProps](#types-cube-context-props)›*
 
 In case when you need direct access to `cubejsApi` you can use `CubeContext` anywhere in your app
 
@@ -263,7 +264,7 @@ export default function DisplayComponent() {
 
 ### ChartType
 
-Ƭ **ChartType**: *"line" | "bar" | "table" | "area"*
+> **ChartType**: *"line" | "bar" | "table" | "area"*
 
 ### CubeContextProps
 
