@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.20.6](https://github.com/cube-js/cube.js/compare/v0.20.5...v0.20.6) (2020-09-10)
+
+
+### Bug Fixes
+
+* pivot control ([05ce626](https://github.com/cube-js/cube.js/commit/05ce626))
+
+
+
+
+
 ## [0.20.5](https://github.com/cube-js/cube.js/compare/v0.20.4...v0.20.5) (2020-09-10)
 
 **Note:** Version bump only for package @cubejs-client/playground
