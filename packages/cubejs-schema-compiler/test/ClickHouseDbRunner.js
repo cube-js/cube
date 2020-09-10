@@ -1,5 +1,6 @@
+/* eslint-disable */
 const ClickHouse = require('@apla/clickhouse');
-const { GenericContainer } = require("testcontainers");
+const { GenericContainer } = require('testcontainers');
 const sqlstring = require('sqlstring');
 const uuidv4 = require('uuid/v4');
 
@@ -16,17 +17,17 @@ exports.gutterDataSet = async function (clickHouse) {
   await clickHouse.querying(`
     CREATE TEMPORARY TABLE visitors (id UInt64, amount UInt64, created_at DateTime, updated_at DateTime, status UInt64, source Nullable(String), latitude Float64, longitude Float64)
     ENGINE = ${engine}
-  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: "1" } }),
-    await clickHouse.querying(`
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
+  await clickHouse.querying(`
     CREATE TEMPORARY TABLE visitor_checkins (id UInt64, visitor_id UInt64, created_at DateTime, source Nullable(String))
     ENGINE = ${engine}
-  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: "1" } }),
-    await clickHouse.querying(`
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
+  await clickHouse.querying(`
     CREATE TEMPORARY TABLE cards (id UInt64, visitor_id UInt64, visitor_checkin_id UInt64)
     ENGINE = ${engine}
-  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: "1" } }),
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
 
-    await clickHouse.querying(`
+  await clickHouse.querying(`
     INSERT INTO
     visitors
     (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
@@ -36,8 +37,8 @@ exports.gutterDataSet = async function (clickHouse) {
     (4, 400, '2017-01-06 16:00:00', '2017-01-24 16:00:00', 2, null, 120.120, 10.60),
     (5, 500, '2017-01-06 16:00:00', '2017-01-24 16:00:00', 2, null, 120.120, 58.10),
     (6, 500, '2016-09-06 16:00:00', '2016-09-06 16:00:00', 2, null, 120.120, 58.10)
-  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: "1" } }),
-    await clickHouse.querying(`
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
+  await clickHouse.querying(`
     INSERT INTO
     visitor_checkins
     (id, visitor_id, created_at, source) VALUES
@@ -47,16 +48,15 @@ exports.gutterDataSet = async function (clickHouse) {
     (4, 2, '2017-01-04 16:00:00', null),
     (5, 2, '2017-01-04 16:00:00', null),
     (6, 3, '2017-01-05 16:00:00', null)
-  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: "1" } }),
-    await clickHouse.querying(`
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
+  await clickHouse.querying(`
     INSERT INTO
     cards
     (id, visitor_id, visitor_checkin_id) VALUES
     (1, 1, 1),
     (2, 1, 2),
     (3, 3, 6)
-  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: "1" } })
-
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } });
 };
 
 exports.testQuery = (queryAndParams, prepareDataSet) => exports.testQueries([queryAndParams], prepareDataSet)
@@ -64,7 +64,7 @@ exports.testQuery = (queryAndParams, prepareDataSet) => exports.testQueries([que
 
 exports.testQueries = async (queries, prepareDataSet) => {
   if (!container && !process.env.TEST_CLICKHOUSE_HOST) {
-    container = await new GenericContainer("yandex/clickhouse-server")
+    container = await new GenericContainer('yandex/clickhouse-server')
       .withExposedPorts(8123)
       .start();
   }
@@ -83,8 +83,8 @@ exports.testQueries = async (queries, prepareDataSet) => {
   for ([query, params] of queries) {
     results.push(_normaliseResponse((await clickHouse.querying(sqlstring.format(query, params), {
       dataObjects: true,
-      queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: "1" }
-    }))))
+      queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' }
+    }))));
   }
   return results;
 };
@@ -104,22 +104,20 @@ exports.tearDown = async () => {
 //  https://github.com/statsbotco/cube.js/pull/98#discussion_r279698399
 //
 function _normaliseResponse(res) {
-  if (process.env.DEBUG_LOG === "true") console.log(res)
+  if (process.env.DEBUG_LOG === 'true') console.log(res);
   if (res.data) {
     res.data.forEach(row => {
-      for (let field in row) {
-        let value = row[field]
+      for (const field in row) {
+        const value = row[field];
         if (value !== null) {
-          let meta = res.meta.find(m => m.name == field)
-          if (meta.type.includes("DateTime")) {
-            row[field] = value.substring(0, 10) + "T" + value.substring(11, 22) + ".000"
-          }
-          else if (meta.type.includes("Date")) {
-            row[field] = value + "T00:00:00.000"
-          }
-          else if (meta.type.includes("Int") || meta.type.includes("Float")) {
+          const meta = res.meta.find(m => m.name == field);
+          if (meta.type.includes('DateTime')) {
+            row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
+          } else if (meta.type.includes('Date')) {
+            row[field] = `${value}T00:00:00.000`;
+          } else if (meta.type.includes('Int') || meta.type.includes('Float')) {
             // convert all numbers into strings
-            row[field] = `${value}`
+            row[field] = `${value}`;
           }
         }
       }

@@ -1,4 +1,4 @@
-const { GenericContainer, Wait } = require("testcontainers");
+const { GenericContainer, Wait } = require('testcontainers');
 const sql = require('mssql');
 const BaseDbRunner = require('./BaseDbRunner');
 
@@ -84,11 +84,11 @@ class MSSqlDbRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    return new GenericContainer("mcr.microsoft.com/mssql/server", '2017-latest')
-      .withEnv("ACCEPT_EULA", "Y")
-      .withEnv("SA_PASSWORD", this.password())
+    return new GenericContainer('mcr.microsoft.com/mssql/server', '2017-latest')
+      .withEnv('ACCEPT_EULA', 'Y')
+      .withEnv('SA_PASSWORD', this.password())
       .withExposedPorts(this.port())
-      .withWaitStrategy(Wait.forLogMessage("Server is listening on"))
+      .withWaitStrategy(Wait.forLogMessage('Server is listening on'))
       .start();
   }
 

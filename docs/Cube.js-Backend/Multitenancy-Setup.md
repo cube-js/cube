@@ -122,7 +122,7 @@ const server = new CubejsServer({
     const user = authInfo.u;
     if (user.id) {
       query.filters.push({
-        dimension: 'Users.id',
+        member: 'Users.id',
         operator: 'equals',
         values: [user.id]
       })

@@ -14,7 +14,7 @@
   "scripts": {
     "test": "nyc --reporter=lcov mocha -i -g MSSql",
     "test-mssql": "nyc --reporter=lcov mocha -g MSSql",
-    "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js"
+    "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*.js"
   },
   "dependencies": {
     "@babel/generator": "^7.4.0",
