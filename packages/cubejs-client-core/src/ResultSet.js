@@ -594,7 +594,11 @@ class ResultSet {
     
     return this.loadResponses[0].query;
   }
-
+  
+  pivotQuery() {
+    return this.loadResponse.pivotQuery || null;
+  }
+  
   rawData() {
     if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
       throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);

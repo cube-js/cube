@@ -190,6 +190,10 @@ class CubejsServerCore {
       dbType: process.env.CUBEJS_DB_TYPE,
       devServer: process.env.NODE_ENV !== 'production',
       telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
+      scheduledRefreshTimer: process.env.CUBEJS_SCHEDULED_REFRESH_TIMER,
+      scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
+        process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
+      scheduledRefreshContexts: async () => [null],
       ...options
     };
     if (
@@ -238,22 +242,29 @@ class CubejsServerCore {
       setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
     }
 
-    this.scheduledRefreshTimer = options.scheduledRefreshTimer || process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
-    this.scheduledRefreshTimeZones = options.scheduledRefreshTimeZones ||
-      process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
-      process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim());
+    this.scheduledRefreshTimer = options.scheduledRefreshTimer;
+    this.scheduledRefreshTimeZones = options.scheduledRefreshTimeZones;
+    this.scheduledRefreshContexts = options.scheduledRefreshContexts;
 
     if (this.scheduledRefreshTimer) {
       setInterval(
         async () => {
-          if (this.scheduledRefreshTimeZones) {
-            // eslint-disable-next-line no-restricted-syntax
-            for (const timezone of this.scheduledRefreshTimeZones) {
-              await this.runScheduledRefresh(null, { timezone });
-            }
-          } else {
-            await this.runScheduledRefresh();
+          const contexts = await this.scheduledRefreshContexts();
+          if (contexts.length < 1) {
+            this.logger('Refresh Scheduler Error', {
+              error: 'At least one context should be returned by scheduledRefreshContexts'
+            });
           }
+          await Promise.all(contexts.map(async context => {
+            if (this.scheduledRefreshTimeZones) {
+              // eslint-disable-next-line no-restricted-syntax
+              for (const timezone of this.scheduledRefreshTimeZones) {
+                await this.runScheduledRefresh(context, { timezone });
+              }
+            } else {
+              await this.runScheduledRefresh(context);
+            }
+          }));
         },
         typeof this.scheduledRefreshTimer === 'number' ||
         typeof this.scheduledRefreshTimer === 'string' && this.scheduledRefreshTimer.match(/^\d+$/) ?

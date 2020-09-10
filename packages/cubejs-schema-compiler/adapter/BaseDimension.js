@@ -23,6 +23,10 @@ class BaseDimension {
     return this.dimensionDefinition().sql;
   }
 
+  getMembers() {
+    return [this];
+  }
+
   cube() {
     return this.query.cubeEvaluator.cubeFromPath(this.dimension);
   }

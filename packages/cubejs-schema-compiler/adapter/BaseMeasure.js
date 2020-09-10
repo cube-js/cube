@@ -9,6 +9,10 @@ class BaseMeasure {
     this.measure = measure;
   }
 
+  getMembers() {
+    return [this];
+  }
+  
   selectColumns() {
     return [`${this.measureSql()} ${this.aliasName()}`];
   }

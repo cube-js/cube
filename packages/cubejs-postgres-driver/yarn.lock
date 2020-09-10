@@ -18,10 +18,10 @@
     esutils "^2.0.2"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.19.36":
-  version "0.19.36"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.36.tgz#84b1ec5029c1fbc9b2c62cdbd34c83233c1df7f0"
-  integrity sha512-DDRNZkebanCC2HgShaw97f1GeNK+bKo2zNOcrhvN4NSfHqFmO1XCsSiOBISDRJNxjvaX9JVybop9BTk62K8V5A==
+"@cubejs-backend/query-orchestrator@^0.20.0":
+  version "0.20.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.20.0.tgz#e12cec9cf32ac90c3659a7cfc2c21a175d2c3508"
+  integrity sha512-HwTTXcgkNwrgmjl+zZeXwd9cn5usPl5lZSkfP5q8UPbHq6NkGA0u7o8hY8Do9zxEAXyrhluuE1/lHYNyBquJxw==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
@@ -48,9 +48,9 @@
   integrity sha512-L8ogeT6vDzT1vxlW3KITTCt+BVXXVkLXfZ/XNm6UqbcJgxf+KPO7yjWx7dQQE8RW07KopL10x2gNMs41+IkMGQ==
 
 "@types/pg@^7.14.3":
-  version "7.14.3"
-  resolved "https://registry.yarnpkg.com/@types/pg/-/pg-7.14.3.tgz#eb166e4f4287923890b10ed20371f937938cb995"
-  integrity sha512-go5zddQ1FrUQHeBvqPzQ1svKo4KKucSwvqLsvwc/EIuQ9sxDA21b68xc/RwhzAK5pPCnez8NrkYatFIGdJBVvA==
+  version "7.14.4"
+  resolved "https://registry.yarnpkg.com/@types/pg/-/pg-7.14.4.tgz#15cfcfd9300f94fd44e6191a1b0ba18d2de209f6"
+  integrity sha512-yCKVMCcFPZSFHGg+8qjY368uf3ruyDBPjxvOU2ZcGa/vRFo5Ti5Y6z6vl+2hxtwm9VMWUGb6TWkIk3cIV8C0Cw==
   dependencies:
     "@types/node" "*"
     "@types/pg-types" "*"

@@ -10,7 +10,7 @@ const { prepareCompiler } = PrepareCompiler;
 const dbRunner = require('./DbRunner');
 
 describe('SQL Generation', function test() {
-  this.timeout(20000);
+  this.timeout(90000);
 
   after(async () => {
     await dbRunner.tearDown();
