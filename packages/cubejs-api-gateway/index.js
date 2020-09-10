@@ -293,12 +293,20 @@ const normalizeQuery = (query) => {
     rowLimit: query.rowLimit || query.limit,
     timezone,
     order: normalizeQueryOrder(query.order),
-    filters: (query.filters || []).map(f => (
-      {
+    filters: (query.filters || []).map(f => {
+      const normalizedFlter = {
         ...f,
-        dimension: (f.dimension || f.member)
-      }
-    )),
+        member: (f.dimension || f.member)
+      };
+
+      Object.defineProperty(normalizedFlter, "dimension", {
+        get() {
+          console.warn("Warning: Attribute `filter.dimension` is deprecated. Please use 'member' instead of 'dimension'.");
+          return this.member;
+        }
+      });
+      return normalizedFlter;
+    }),
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;

@@ -41,7 +41,7 @@ To disable this behavior please see the [allowUngroupedWithoutPrimaryKey](@cubej
   measures: ['Stories.count'],
   dimensions: ['Stories.category'],
   filters: [{
-    dimension: 'Stories.isDraft',
+    member: 'Stories.isDraft',
     operator: 'equals',
     values: ['No']
   }],
