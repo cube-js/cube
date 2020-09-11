@@ -238,7 +238,8 @@ export default class QueryBuilder extends React.Component {
           sourceIndex,
           destinationIndex,
           sourceAxis,
-          destinationAxis
+          destinationAxis,
+          callback
         }) => {
           const nextPivotConfig = {
             ...pivotConfig,
@@ -257,6 +258,10 @@ export default class QueryBuilder extends React.Component {
           nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
           nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
 
+          if (callback) {
+            callback(nextPivotConfig);
+          }
+          
           this.updateVizState({
             pivotConfig: nextPivotConfig
           });
@@ -297,7 +302,7 @@ export default class QueryBuilder extends React.Component {
     
     let pivotQuery = {};
     let finalState = this.applyStateChangeHeuristics(state);
-    const { order: _, ...query } = finalState.query || {};
+    const { order: _, ...query } = finalState.query || stateQuery;
     
     if (QueryRenderer.isQueryPresent(query)) {
       try {
@@ -332,7 +337,6 @@ export default class QueryBuilder extends React.Component {
     const nextOrder = fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean));
     
     const nextQuery = {
-      ...stateQuery,
       ...query,
       order: nextOrder
     };

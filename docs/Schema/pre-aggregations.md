@@ -381,6 +381,42 @@ It triggers refresh for partitions where end date lies within `updateWindow` fro
 In provided example it'll refresh today's and last 7 days of partitions.
 Partitions before `7 day` interval won't be refreshed once they built until rollup SQL is changed.
 
+### Original SQL with incremental refreshKey
+
+Original SQL pre-aggregation can be used with time partitioning and incremental `refreshKey`.
+
+In this case, it can be used as follows:
+```javascript
+cube(`Orders`, {
+  sql: `select * from visitors WHERE ${FILTER_PARAMS.visitors.created_at.filter('created_at')}`,
+
+  preAggregations: {
+    main: {
+      type: `originalSql`,
+      timeDimensionReference: created_at,
+      partitionGranularity: `month`,
+      refreshKey: {
+        every: `1 day`,
+        incremental: true,
+        updateWindow: `7 day`
+      }
+    }
+  },
+
+  dimensions: {
+    id: {
+      type: 'number',
+      sql: 'id',
+      primaryKey: true
+    }, 
+    created_at: {
+      type: 'time',
+      sql: 'created_at'
+    },
+  }
+});
+```
+
 ## useOriginalSqlPreAggregations
 
 Cube.js supports multi-stage pre-aggregations by reusing original sql pre-aggregations in rollups through `useOriginalSqlPreAggregations` param.

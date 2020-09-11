@@ -593,7 +593,7 @@ declare module '@cubejs-client/core' {
 
 
 
-  export type TimeDimensionGranularity = 'hour' | 'day' | 'week' | 'month' | 'year';
+  export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
 
   export type TimeDimension = {
     dimension: string;
@@ -673,6 +673,14 @@ declare module '@cubejs-client/core' {
   type TCubeDimension = TCubeMember & {
     suggestFilterValues: boolean;
   };
+
+  type TCubeSegment = Pick<TCubeMember, "name" | 'shortTitle' | "title">
+
+  type TCubeMemberByType<T> =
+    T extends "measures" ? TCubeMeasure :
+    T extends "dimensions" ? TCubeDimension :
+    T extends "segments" ? TCubeSegment :
+    never
   
   type TDryRunResponse = {
     queryType: QueryType;
@@ -709,7 +717,7 @@ declare module '@cubejs-client/core' {
      * @param memberName - Fully qualified member name in a form `Cube.memberName`
      * @return An object containing meta information about member
      */
-    resolveMember(memberName: string, memberType: MemberType): Object;
+    resolveMember<T extends MemberType>(memberName: string, memberType: T): { title: string, error: string } | TCubeMemberByType<T>;
     defaultTimeDimensionNameFor(memberName: string): string;
     filterOperatorsForMember(memberName: string, memberType: MemberType): any;
   }

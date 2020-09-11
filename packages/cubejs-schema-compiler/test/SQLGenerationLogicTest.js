@@ -2,7 +2,6 @@
 /* eslint-disable quote-props */
 const UserError = require('../compiler/UserError');
 const PostgresQuery = require('../adapter/PostgresQuery');
-const BigqueryQuery = require('../adapter/BigqueryQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 
@@ -319,18 +318,18 @@ describe('SQL Generation', function test() {
     
   it('filter with operator OR', () => {
     const result = compiler.compile().then(() => {
-      let query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitor_checkins.google_sourced_checkins'
         ],
         timeDimensions: [],
         filters: [
           {
-            or : [ 
+            or: [
               { dimension: 'cards.id', operator: 'equals', values: ['3'] },
               { dimension: 'cards.id', operator: 'equals', values: ['1'] }
             ]
-          }, 
+          },
         ],
         timezone: 'America/Los_Angeles'
       });
@@ -340,7 +339,7 @@ describe('SQL Generation', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         console.log(JSON.stringify(res));
         res.should.be.deepEqual(
-          [{ "visitor_checkins__google_sourced_checkins": "1" }]
+          [{ 'visitor_checkins__google_sourced_checkins': '1' }]
         );
       });
     });
@@ -349,377 +348,475 @@ describe('SQL Generation', function test() {
   });
  
 
-  it('having and where filter in same operator OR', () => {
-    return compiler.compile().then(() => {
-      try{
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-          "measures": [
-            "visitors.visitor_count"
-          ], 
-          "order": {
-            "visitors.visitor_count": "desc"
+  it('having and where filter in same operator OR', () => compiler.compile().then(() => {
+    try {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        'measures': [
+          'visitors.visitor_count'
+        ],
+        'order': {
+          'visitors.visitor_count': 'desc'
+        },
+        'filters': [
+          {
+            or: [
+              {
+                'dimension': 'visitors.visitor_count',
+                'operator': 'gt',
+                'values': [
+                  '1'
+                ]
+              },
+              {
+                'dimension': 'visitors.source',
+                'operator': 'equals',
+                'values': [
+                  'google'
+                ]
+              }
+            ]
           },
-          "filters": [
-            {
-              or:[
-                {
-                  "dimension": "visitors.visitor_count",
-                  "operator": "gt",
-                  "values": [
-                    "1"
-                  ]
-                },
-                {
-                  "dimension": "visitors.source",
-                  "operator": "equals",
-                  "values": [
-                    "google"
-                  ]
-                }
-              ]
-            },
-          ],
-          "dimensions": [
-            "visitors.source"
-          ]
-        });
+        ],
+        'dimensions': [
+          'visitors.source'
+        ]
+      });
   
-        throw new Error();
-      }catch(error){
-        // You cannot use dimension and measure in same condition
-        error.should.be.instanceof(UserError);
-      }
-    });
-  });
+      throw new Error();
+    } catch (error) {
+      // You cannot use dimension and measure in same condition
+      error.should.be.instanceof(UserError);
+    }
+  }));
   
-  it('having filter with operator OR', () => {
-    return compiler.compile().then(() => {
+  it('having filter with operator OR', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count',
+        'cards.count',
+        'visitors.averageCheckins',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            dimension: 'cards.count',
+            operator: 'equals',
+            values: ['2']
+          },
+          {
+            dimension: 'visitors.averageCheckins',
+            operator: 'equals',
+            values: ['2']
+          }
+        ]
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'cards__count': '1',
+          'visitors__source': 'google',
+          'visitors__visitor_count': '1',
+          'visitors__average_checkins': '2.0000000000000000'
+        }, {
+          'cards__count': '2',
+          'visitors__source': 'some',
+          'visitors__visitor_count': '1',
+          'visitors__average_checkins': '6.0000000000000000'
+        }]
+      );
+    });
+  }));
+
+
+  it('having filter with operators OR & AND', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count',
+        'cards.count',
+        'visitors.averageCheckins',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            and: [
+              {
+                member: 'cards.count',
+                operator: 'equals',
+                values: ['2']
+              },
+              {
+                member: 'visitors.averageCheckins',
+                operator: 'equals',
+                values: ['6']
+              }
+            ]
+          },
+          {
+            and: [
+              {
+                member: 'cards.count',
+                operator: 'equals',
+                values: ['1']
+              },
+              {
+                member: 'visitors.averageCheckins',
+                operator: 'equals',
+                values: ['2']
+              }
+            ]
+          }
+        ]
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'cards__count': '1',
+          'visitors__source': 'google',
+          'visitors__visitor_count': '1',
+          'visitors__average_checkins': '2.0000000000000000'
+        }, {
+          'cards__count': '2',
+          'visitors__source': 'some',
+          'visitors__visitor_count': '1',
+          'visitors__average_checkins': '6.0000000000000000'
+        }]
+      );
+    });
+  }));
+
+  it('having filter with operators OR & AND (with filter based on measures not from select part clause)', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count',
+        // "cards.count",
+        'visitors.averageCheckins',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            and: [
+              {
+                member: 'visitors.averageCheckins',
+                operator: 'equals',
+                values: ['6']
+              },
+              {
+                member: 'cards.count',
+                operator: 'equals',
+                values: ['2']
+              },
+            ]
+          },
+          {
+            and: [
+              {
+                dimension: 'visitors.averageCheckins',
+                operator: 'equals',
+                values: ['2']
+              },
+              {
+                dimension: 'cards.count',
+                operator: 'equals',
+                values: ['1']
+              },
+            ]
+          }
+        ]
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          // "cards__count": "1",
+          'visitors__source': 'google',
+          'visitors__visitor_count': '1',
+          'visitors__average_checkins': '2.0000000000000000'
+        }, {
+          // "cards__count": "2",
+          'visitors__source': 'some',
+          'visitors__visitor_count': '1',
+          'visitors__average_checkins': '6.0000000000000000'
+        }]
+      );
+    });
+  }));
+
+  it('where filter with operators OR & AND', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.source',
+        'visitor_checkins.cardsCount'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            and: [
+              {
+                dimension: 'visitors.source',
+                operator: 'equals',
+                values: ['some']
+              },
+              {
+                dimension: 'visitor_checkins.cardsCount',
+                operator: 'equals',
+                values: ['0']
+              },
+            ]
+          },
+          {
+            and: [
+              {
+                member: 'visitors.source',
+                operator: 'equals',
+                values: ['google']
+              },
+              {
+                member: 'visitor_checkins.cardsCount',
+                operator: 'equals',
+                values: ['1']
+              },
+            ]
+          }
+        ]
+      }],
+      order: [{
+        'visitors.visitor_count': 'desc'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'visitors__source': 'google',
+          'visitor_checkins__cards_count': '1',
+          'visitors__visitor_count': '1',
+        }, {
+          'visitors__source': 'some',
+          'visitors__visitor_count': '2',
+          'visitor_checkins__cards_count': '0'
+        }]
+      );
+    });
+  }));
+
+  it('where filter with operators OR & AND (with filter based on dimensions not from select part clause)', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.source',
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            and: [
+              {
+                member: 'visitors.source',
+                operator: 'equals',
+                values: ['some']
+              },
+              {
+                dimension: 'visitor_checkins.cardsCount',
+                operator: 'equals',
+                values: ['0']
+              },
+            ]
+          },
+          {
+            and: [
+              {
+                dimension: 'visitors.source',
+                operator: 'equals',
+                values: ['google']
+              },
+              {
+                member: 'visitor_checkins.cardsCount',
+                operator: 'equals',
+                values: ['1']
+              },
+            ]
+          }
+        ]
+      }],
+      order: [{
+        'visitors.visitor_count': 'desc'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'visitors__source': 'google',
+          'visitors__visitor_count': '1',
+        }, {
+          'visitors__source': 'some',
+          'visitors__visitor_count': '2',
+        }]
+      );
+    });
+  }));
+
+  it('where filter with only one argument', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.source',
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [
+        {
+          and: [
+            {
+              and: [
+                {
+                  or: [
+                    {
+                      and: [
+                        {
+                          member: 'visitors.source',
+                          operator: 'equals',
+                          values: ['some']
+                        }
+                      ]
+                    },
+                    {
+                      and: [
+                        {
+                          dimension: 'visitors.source',
+                          operator: 'equals',
+                          values: ['google']
+                        }
+                      ]
+                    }
+                  ]
+                }]
+            }]
+        }],
+      order: [{
+        'visitors.visitor_count': 'desc'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'visitors__source': 'google',
+          'visitors__visitor_count': '1',
+        }, {
+          'visitors__source': 'some',
+          'visitors__visitor_count': '2',
+        }]
+      );
+    });
+  }));
+
+  it('where filter with incorrect one arguments', () => compiler.compile().then(() => {
+    try {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
-          'visitors.visitor_count',
-          "cards.count",
-          "visitors.averageCheckins",
+          'visitors.visitor_count'
         ],
         dimensions: [
-          'visitors.source'
+          'visitors.source',
         ],
         timeDimensions: [],
         timezone: 'America/Los_Angeles',
-        filters: [{ 
-          or: [
-            {
-              dimension: 'cards.count',
-              operator: 'equals',
-              values: ['2']
-            },
-            {
-              dimension: 'visitors.averageCheckins',
-              operator: 'equals',
-              values: ['2']
-            }
-          ]
-        }],
+        filters: [
+          {
+            and: [
+              { and: [
+                {
+                  or: [
+                    {
+                      and: [
+                        {
+                          measure: 'visitors.source',
+                          operator: 'equals',
+                          values: ['some']
+                        }
+                      ]
+                    },
+                    {
+                      and: [
+                        {
+                          dimension: 'visitors_source',
+                          operator: 'equals',
+                          values: ['google']
+                        }
+                      ]
+                    }
+                  ]
+                }]
+              }]
+          }],
         order: [{
-          id: 'visitors.source'
+          'visitors.visitor_count': 'desc'
         }]
       });
 
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{
-            "cards__count": "1",
-            "visitors__source": "google",
-            "visitors__visitor_count": "1",
-            "visitors__average_checkins": "2.0000000000000000"
-          }, {
-            "cards__count": "2",
-            "visitors__source": "some",
-            "visitors__visitor_count": "1",
-            "visitors__average_checkins":"6.0000000000000000"
-          }]
-        );
-      });
-    });
-  });
-
-
-  it('having filter with operators OR & AND', () => {
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.visitor_count',
-          "cards.count",
-          "visitors.averageCheckins",
-        ],
-        dimensions: [
-          'visitors.source'
-        ],
-        timeDimensions: [],
-        timezone: 'America/Los_Angeles',
-        filters: [{
-          or: [
-            { 
-              and: [
-                {
-                  dimension: 'cards.count',
-                  operator: 'equals',
-                  values: ['2']
-                },
-                {
-                  dimension: 'visitors.averageCheckins',
-                  operator: 'equals',
-                  values: ['6']
-                }
-              ]
-            },
-            { 
-              and: [
-                {
-                  dimension: 'cards.count',
-                  operator: 'equals',
-                  values: ['1']
-                },
-                {
-                  dimension: 'visitors.averageCheckins',
-                  operator: 'equals',
-                  values: ['2']
-                }
-              ]
-            }
-          ]
-        }],
-        order: [{
-          id: 'visitors.source'
-        }]
-      });
-
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{
-            "cards__count": "1",
-            "visitors__source": "google",
-            "visitors__visitor_count": "1",
-            "visitors__average_checkins": "2.0000000000000000"
-          }, {
-            "cards__count": "2",
-            "visitors__source": "some",
-            "visitors__visitor_count": "1",
-            "visitors__average_checkins":"6.0000000000000000"
-          }]
-        );
-      });
-    });
-  });
-
-  it('having filter with operators OR & AND (with filter based on measures not from select part clause)', () => {
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.visitor_count',
-          // "cards.count",
-          "visitors.averageCheckins",
-        ],
-        dimensions: [
-          'visitors.source'
-        ],
-        timeDimensions: [],
-        timezone: 'America/Los_Angeles',
-        filters: [{
-          or: [
-            { 
-              and: [
-                {
-                  dimension: 'visitors.averageCheckins',
-                  operator: 'equals',
-                  values: ['6']
-                },
-                {
-                  dimension: 'cards.count',
-                  operator: 'equals',
-                  values: ['2']
-                },
-              ]
-            },
-            { 
-              and: [
-                {
-                  dimension: 'visitors.averageCheckins',
-                  operator: 'equals',
-                  values: ['2']
-                },
-                {
-                  dimension: 'cards.count',
-                  operator: 'equals',
-                  values: ['1']
-                },
-              ]
-            }
-          ]
-        }],
-        order: [{
-          id: 'visitors.source'
-        }]
-      });
-
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{
-            // "cards__count": "1",
-            "visitors__source": "google",
-            "visitors__visitor_count": "1",
-            "visitors__average_checkins": "2.0000000000000000"
-          }, {
-            // "cards__count": "2",
-            "visitors__source": "some",
-            "visitors__visitor_count": "1",
-            "visitors__average_checkins":"6.0000000000000000"
-          }]
-        );
-      });
-    });
-  });
-
-  it('where filter with operators OR & AND', () => {
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          "visitors.visitor_count"
-        ],
-        dimensions: [
-          "visitors.source",
-          "visitor_checkins.cardsCount"
-        ],
-        timeDimensions: [],
-        timezone: 'America/Los_Angeles',
-        filters: [{
-          or: [
-            {
-              and: [
-                {
-                  dimension: 'visitors.source',
-                  operator: 'equals',
-                  values: ['some']
-                },
-                {
-                  dimension: 'visitor_checkins.cardsCount',
-                  operator: 'equals',
-                  values: ['0']
-                },
-              ]
-            },
-            {
-              and: [
-                {
-                  dimension: 'visitors.source',
-                  operator: 'equals',
-                  values: ['google']
-                },
-                {
-                  dimension: 'visitor_checkins.cardsCount',
-                  operator: 'equals',
-                  values: ['1']
-                },
-              ]
-            }
-          ]
-        }],
-        order: [{
-          "visitors.visitor_count": "desc"
-        }]
-      });
-
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{ 
-            "visitors__source": "google", 
-            "visitor_checkins__cards_count": "1",
-            "visitors__visitor_count": "1",
-          }, { 
-            "visitors__source": "some",
-            "visitors__visitor_count": "2",
-            "visitor_checkins__cards_count": "0"
-          }]
-        );
-      });
-    });
-  });
-
-  it('where filter with operators OR & AND (with filter based on dimensions not from select part clause)', () => {
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          "visitors.visitor_count"
-        ],
-        dimensions: [
-          "visitors.source", 
-        ],
-        timeDimensions: [],
-        timezone: 'America/Los_Angeles',
-        filters: [{
-          or: [
-            {
-              and: [
-                {
-                  dimension: 'visitors.source',
-                  operator: 'equals',
-                  values: ['some']
-                },
-                {
-                  dimension: 'visitor_checkins.cardsCount',
-                  operator: 'equals',
-                  values: ['0']
-                },
-              ]
-            },
-            {
-              and: [
-                {
-                  dimension: 'visitors.source',
-                  operator: 'equals',
-                  values: ['google']
-                },
-                {
-                  dimension: 'visitor_checkins.cardsCount',
-                  operator: 'equals',
-                  values: ['1']
-                },
-              ]
-            }
-          ]
-        }],
-        order: [{
-          "visitors.visitor_count": "desc"
-        }]
-      });
-
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{ 
-            "visitors__source": "google",  
-            "visitors__visitor_count": "1",
-          }, { 
-            "visitors__source": "some",
-            "visitors__visitor_count": "2", 
-          }]
-        );
-      });
-    });
-  });
+      throw new Error();
+    } catch (error) {
+      error.should.be.instanceof(UserError);
+    }
+  }));
 
   // end of tests
 });

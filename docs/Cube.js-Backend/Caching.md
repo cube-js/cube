@@ -195,3 +195,18 @@ server.listen().then(({ version, port }) => {
 There's also [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) available to trigger run.
 
 > **NOTE:** `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.
+
+
+## Inspecting Queries
+To inspect whether the query hits in-memory cache, pre-aggregation, or raw data, you can use Playground or Cube Cloud.
+
+Playground can be used to inspect a single query. To do that, click the "cache" button after executing the query. It will show you the information about the `refreshKey` for the query and whether the query uses any pre-aggregations.
+
+To inspect multiple queries or list existing pre-aggregations, you can use Cube Cloud.
+
+
+> **NOTE:** Cube Cloud currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
+
+To inspect queries in the Cube Cloud, navigate to the "History" page. You can filter queries by multiple parameters on this page, including whether they hit the cache, pre-aggregations, or raw data. Additionally, you can click on the query to see its details, such as time spent in the database, the database queue's size when the query was executed, generated SQL, query timeline, and more. It will also show you the optimal pre-aggregation that can be used for this query.
+
+To see existing pre-aggregations navigate to the "Pre-Aggregations" page in the Cube Cloud. The table shows all the pre-aggregations, the last refresh timestamp, and the time spent to build the pre-aggregation. You can also inspect every pre-aggregation's details: the list of queries it serves and all its versions.

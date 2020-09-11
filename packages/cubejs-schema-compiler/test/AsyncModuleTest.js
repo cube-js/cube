@@ -62,7 +62,7 @@ describe('AsyncModule', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors__visitor_count": "6" }
+            { 'visitors__visitor_count': '6' }
           ]
         );
       });
@@ -111,7 +111,7 @@ describe('AsyncModule', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "bar__visitor_count": "6" }
+            { 'bar__visitor_count': '6' }
           ]
         );
       });

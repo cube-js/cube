@@ -29,225 +29,225 @@ describe('ScaffoldingSchema', () => {
     const schema = new ScaffoldingSchema({
       public: {
         orders: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "amount",
-          "type": "integer",
-          "attributes": []
+          'name': 'amount',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "customer_id",
-          "type": "integer",
-          "attributes": []
+          'name': 'customer_id',
+          'type': 'integer',
+          'attributes': []
         }],
         customers: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "name",
-          "type": "character varying",
-          "attributes": []
+          'name': 'name',
+          'type': 'character varying',
+          'attributes': []
         }, {
-          "name": "account_id",
-          "type": "integer",
-          "attributes": []
+          'name': 'account_id',
+          'type': 'integer',
+          'attributes': []
         }],
         accounts: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "username",
-          "type": "character varying",
-          "attributes": []
+          'name': 'username',
+          'type': 'character varying',
+          'attributes': []
         }, {
-          "name": "password",
-          "type": "character varying",
-          "attributes": []
+          'name': 'password',
+          'type': 'character varying',
+          'attributes': []
         }, {
-          "name": "failure_count",
-          "type": "integer",
-          "attributes": []
+          'name': 'failure_count',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "account_status",
-          "type": "character varying",
-          "attributes": []
+          'name': 'account_status',
+          'type': 'character varying',
+          'attributes': []
         }],
       }
     }, driver);
     const schemaForTables = schema.generateForTables(['public.orders', 'public.customers', 'public.accounts']);
     schemaForTables.should.be.deepEqual([
       {
-        "cube": "Orders",
-        "schema": "public",
-        "table": "orders",
-        "tableName": "public.orders",
-        "measures": [
+        'cube': 'Orders',
+        'schema': 'public',
+        'table': 'orders',
+        'tableName': 'public.orders',
+        'measures': [
           {
-            "name": "amount",
-            "types": [
-              "sum",
-              "avg",
-              "min",
-              "max"
+            'name': 'amount',
+            'types': [
+              'sum',
+              'avg',
+              'min',
+              'max'
             ],
-            "title": "Amount"
+            'title': 'Amount'
           }
         ],
-        "dimensions": [
+        'dimensions': [
           {
-            "name": "id",
-            "types": [
-              "number"
+            'name': 'id',
+            'types': [
+              'number'
             ],
-            "title": "Id",
-            "isPrimaryKey": true
+            'title': 'Id',
+            'isPrimaryKey': true
           }
         ],
-        "drillMembers": [
+        'drillMembers': [
           {
-            "name": "id",
-            "types": [
-              "number"
+            'name': 'id',
+            'types': [
+              'number'
             ],
-            "title": "Id",
-            "isPrimaryKey": true
+            'title': 'Id',
+            'isPrimaryKey': true
           }
         ],
-        "joins": [
+        'joins': [
           {
-            "thisTableColumn": "customer_id",
-            "tableName": "public.customers",
-            "cubeToJoin": "Customers",
-            "columnToJoin": "id",
-            "relationship": "belongsTo"
+            'thisTableColumn': 'customer_id',
+            'tableName': 'public.customers',
+            'cubeToJoin': 'Customers',
+            'columnToJoin': 'id',
+            'relationship': 'belongsTo'
           }
         ]
       },
       {
-        "cube": "Customers",
-        "schema": "public",
-        "table": "customers",
-        "tableName": "public.customers",
-        "measures": [],
-        "dimensions": [
+        'cube': 'Customers',
+        'schema': 'public',
+        'table': 'customers',
+        'tableName': 'public.customers',
+        'measures': [],
+        'dimensions': [
           {
-            "name": "id",
-            "types": [
-              "number"
+            'name': 'id',
+            'types': [
+              'number'
             ],
-            "title": "Id",
-            "isPrimaryKey": true
+            'title': 'Id',
+            'isPrimaryKey': true
           },
           {
-            "name": "name",
-            "types": [
-              "string"
+            'name': 'name',
+            'types': [
+              'string'
             ],
-            "title": "Name",
-            "isPrimaryKey": false
+            'title': 'Name',
+            'isPrimaryKey': false
           }
         ],
-        "drillMembers": [
+        'drillMembers': [
           {
-            "name": "id",
-            "types": [
-              "number"
+            'name': 'id',
+            'types': [
+              'number'
             ],
-            "title": "Id",
-            "isPrimaryKey": true
+            'title': 'Id',
+            'isPrimaryKey': true
           },
           {
-            "name": "name",
-            "types": [
-              "string"
+            'name': 'name',
+            'types': [
+              'string'
             ],
-            "title": "Name",
-            "isPrimaryKey": false
+            'title': 'Name',
+            'isPrimaryKey': false
           }
         ],
-        "joins": [
+        'joins': [
           {
-            "thisTableColumn": "account_id",
-            "tableName": "public.accounts",
-            "cubeToJoin": "Accounts",
-            "columnToJoin": "id",
-            "relationship": "belongsTo"
+            'thisTableColumn': 'account_id',
+            'tableName': 'public.accounts',
+            'cubeToJoin': 'Accounts',
+            'columnToJoin': 'id',
+            'relationship': 'belongsTo'
           }
         ]
       },
       {
-        "cube": "Accounts",
-        "schema": "public",
-        "table": "accounts",
-        "tableName": "public.accounts",
-        "measures": [
+        'cube': 'Accounts',
+        'schema': 'public',
+        'table': 'accounts',
+        'tableName': 'public.accounts',
+        'measures': [
           {
-            "name": "failure_count",
-            "types": [
-              "sum",
-              "avg",
-              "min",
-              "max"
+            'name': 'failure_count',
+            'types': [
+              'sum',
+              'avg',
+              'min',
+              'max'
             ],
-            "title": "Failure Count"
+            'title': 'Failure Count'
           }
         ],
-        "dimensions": [
+        'dimensions': [
           {
-            "name": "id",
-            "types": [
-              "number"
+            'name': 'id',
+            'types': [
+              'number'
             ],
-            "title": "Id",
-            "isPrimaryKey": true
+            'title': 'Id',
+            'isPrimaryKey': true
           },
           {
-            "name": "username",
-            "types": [
-              "string"
+            'name': 'username',
+            'types': [
+              'string'
             ],
-            "title": "Username",
-            "isPrimaryKey": false
+            'title': 'Username',
+            'isPrimaryKey': false
           },
           {
-            "name": "password",
-            "types": [
-              "string"
+            'name': 'password',
+            'types': [
+              'string'
             ],
-            "title": "Password",
-            "isPrimaryKey": false
+            'title': 'Password',
+            'isPrimaryKey': false
           },
           {
-            "name": "account_status",
-            "types": [
-              "string"
+            'name': 'account_status',
+            'types': [
+              'string'
             ],
-            "title": "Account Status",
-            "isPrimaryKey": false
+            'title': 'Account Status',
+            'isPrimaryKey': false
           }
         ],
-        "drillMembers": [
+        'drillMembers': [
           {
-            "name": "id",
-            "types": [
-              "number"
+            'name': 'id',
+            'types': [
+              'number'
             ],
-            "title": "Id",
-            "isPrimaryKey": true
+            'title': 'Id',
+            'isPrimaryKey': true
           },
           {
-            "name": "username",
-            "types": [
-              "string"
+            'name': 'username',
+            'types': [
+              'string'
             ],
-            "title": "Username",
-            "isPrimaryKey": false
+            'title': 'Username',
+            'isPrimaryKey': false
           }
         ],
-        "joins": []
+        'joins': []
       }
     ]);
   });
@@ -256,51 +256,51 @@ describe('ScaffoldingSchema', () => {
     const template = new ScaffoldingTemplate({
       public: {
         orders: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "amount",
-          "type": "integer",
-          "attributes": []
+          'name': 'amount',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "customerId",
-          "type": "integer",
-          "attributes": []
+          'name': 'customerId',
+          'type': 'integer',
+          'attributes': []
         }],
         customers: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "visit_count",
-          "type": "integer",
-          "attributes": []
+          'name': 'visit_count',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "name",
-          "type": "character varying",
-          "attributes": []
+          'name': 'name',
+          'type': 'character varying',
+          'attributes': []
         }, {
-          "name": "accountId",
-          "type": "integer",
-          "attributes": []
+          'name': 'accountId',
+          'type': 'integer',
+          'attributes': []
         }],
         accounts: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "username",
-          "type": "character varying",
-          "attributes": []
+          'name': 'username',
+          'type': 'character varying',
+          'attributes': []
         }, {
-          "name": "password",
-          "type": "character varying",
-          "attributes": []
+          'name': 'password',
+          'type': 'character varying',
+          'attributes': []
         }, {
-          "name": "failureCount",
-          "type": "integer",
-          "attributes": []
+          'name': 'failureCount',
+          'type': 'integer',
+          'attributes': []
         }]
       }
     }, driver);
@@ -426,17 +426,17 @@ describe('ScaffoldingSchema', () => {
     const template = new ScaffoldingTemplate({
       public: {
         someOrders: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "amount",
-          "type": "integer",
-          "attributes": []
+          'name': 'amount',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "someDimension",
-          "type": "string",
-          "attributes": []
+          'name': 'someDimension',
+          'type': 'string',
+          'attributes': []
         }]
       }
     }, mySqlDriver);
@@ -484,14 +484,14 @@ describe('ScaffoldingSchema', () => {
     const template = new ScaffoldingTemplate({
       public: {
         orders: [{
-          "name": "id",
-          "type": "integer",
-          "attributes": []
+          'name': 'id',
+          'type': 'integer',
+          'attributes': []
         }, {
-          "name": "some.dimension.inside",
-          "nestedName": ['some', 'dimension', 'inside'],
-          "type": "string",
-          "attributes": []
+          'name': 'some.dimension.inside',
+          'nestedName': ['some', 'dimension', 'inside'],
+          'type': 'string',
+          'attributes': []
         }]
       }
     }, bigQueryDriver);

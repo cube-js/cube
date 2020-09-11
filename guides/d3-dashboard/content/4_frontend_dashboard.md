@@ -90,7 +90,7 @@ Edit `dashboard-app/src/pages/DashboardPage.js` to add charts to the dashboard.
 +        measures: ["Orders.count"],
 +        filters: [
 +          {
-+            "dimension": "Orders.price",
++            "member": "Orders.price",
 +            "operator": "set"
 +          }
 +        ],
