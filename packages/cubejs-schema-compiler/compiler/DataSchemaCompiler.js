@@ -194,6 +194,7 @@ class DataSchemaCompiler {
       errorsReport.error(err.toString());
     }
     try {
+      console.log("compileFile", file.fileName)
       vm.runInNewContext(file.content, {
         view: (name, cube) => cubes.push(Object.assign({}, cube, { name, fileName: file.fileName })),
         cube:

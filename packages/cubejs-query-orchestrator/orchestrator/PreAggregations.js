@@ -737,6 +737,7 @@ class PreAggregations {
   }
 
   static preAggregationQueryCacheKey(preAggregation) {
+    console.log("preAggregationQueryCacheKey", preAggregation.tableName)
     return preAggregation.tableName;
   }
 
