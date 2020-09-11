@@ -1,4 +1,4 @@
-const { GenericContainer } = require("testcontainers");
+const { GenericContainer } = require('testcontainers');
 const mysql = require('mysql');
 const { promisify } = require('util');
 
@@ -75,8 +75,8 @@ class MSSqlDbRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    return new GenericContainer("mysql", '5.7')
-      .withEnv("MYSQL_ROOT_PASSWORD", this.password())
+    return new GenericContainer('mysql', '5.7')
+      .withEnv('MYSQL_ROOT_PASSWORD', this.password())
       .withExposedPorts(this.port())
       .start();
   }

@@ -5,16 +5,16 @@ const PrepareCompiler = require('./PrepareCompiler');
 const MainPrepareCompiler = require('../compiler/PrepareCompiler');
 require('should');
 
-const prepareCompiler = PrepareCompiler.prepareCompiler;
+const { prepareCompiler } = PrepareCompiler;
 const dbRunner = require('./ClickHouseDbRunner');
 
 const { debugLog, logSqlAndParams } = require('./TestUtil');
 
 describe('ClickHouse DataSchemaCompiler', function test() {
-  this.timeout(20000);
+  this.timeout(200000);
 
   before(async function before() {
-    this.timeout(20000);
+    this.timeout(200000);
   });
 
   after(async () => {
@@ -169,10 +169,10 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors__created_at_day": "2017-01-02T00:00:00.000", "visitors__visitor_count": "1" },
-            { "visitors__created_at_day": "2017-01-04T00:00:00.000", "visitors__visitor_count": "1" },
-            { "visitors__created_at_day": "2017-01-05T00:00:00.000", "visitors__visitor_count": "1" },
-            { "visitors__created_at_day": "2017-01-06T00:00:00.000", "visitors__visitor_count": "2" }
+            { 'visitors__created_at_day': '2017-01-02T00:00:00.000', 'visitors__visitor_count': '1' },
+            { 'visitors__created_at_day': '2017-01-04T00:00:00.000', 'visitors__visitor_count': '1' },
+            { 'visitors__created_at_day': '2017-01-05T00:00:00.000', 'visitors__visitor_count': '1' },
+            { 'visitors__created_at_day': '2017-01-06T00:00:00.000', 'visitors__visitor_count': '2' }
           ]
         );
       });
@@ -231,8 +231,8 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors__status": "Approved", "visitors__visitor_count": "2" },
-            { "visitors__status": "Canceled", "visitors__visitor_count": "4" }
+            { 'visitors__status': 'Approved', 'visitors__visitor_count': '2' },
+            { 'visitors__status': 'Canceled', 'visitors__visitor_count': '4' }
           ]
         );
       });
@@ -304,9 +304,9 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
           [
-            { "visitors__enabled_source": "google", "visitors__visitor_count": "1" },
-            { "visitors__enabled_source": "some", "visitors__visitor_count": "2" },
-            { "visitors__enabled_source": null, "visitors__visitor_count": "3" },
+            { 'visitors__enabled_source': 'google', 'visitors__visitor_count': '1' },
+            { 'visitors__enabled_source': 'some', 'visitors__visitor_count': '2' },
+            { 'visitors__enabled_source': null, 'visitors__visitor_count': '3' },
           ]
         );
       });
@@ -338,51 +338,49 @@ describe('ClickHouse DataSchemaCompiler', function test() {
         }
       })
       `);
-      const responses = [
-        [{ "visitors__created_at": '2017-01-02T16:00:00.000' }],
-        [
-          { "visitors__created_at": '2016-09-06T16:00:00.000' },
-          { "visitors__created_at": '2017-01-04T16:00:00.000' },
-          { "visitors__created_at": '2017-01-05T16:00:00.000' },
-          { "visitors__created_at": '2017-01-06T16:00:00.000' }
-        ],
-        [{ "visitors__created_at": '2017-01-06T16:00:00.000' }],
-        [
-          { "visitors__created_at": '2016-09-06T16:00:00.000' },
-          { "visitors__created_at": '2017-01-02T16:00:00.000' },
-          { "visitors__created_at": '2017-01-04T16:00:00.000' },
-          { "visitors__created_at": '2017-01-05T16:00:00.000' }
-        ],
-        [{ "visitors__created_at": '2017-01-06T16:00:00.000' }]
-      ];
-      ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
-        const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
-        it(`filtered dates ${operator}`, async () => {
+    const responses = [
+      [{ 'visitors__created_at': '2017-01-02T16:00:00.000' }],
+      [
+        { 'visitors__created_at': '2016-09-06T16:00:00.000' },
+        { 'visitors__created_at': '2017-01-04T16:00:00.000' },
+        { 'visitors__created_at': '2017-01-05T16:00:00.000' },
+        { 'visitors__created_at': '2017-01-06T16:00:00.000' }
+      ],
+      [{ 'visitors__created_at': '2017-01-06T16:00:00.000' }],
+      [
+        { 'visitors__created_at': '2016-09-06T16:00:00.000' },
+        { 'visitors__created_at': '2017-01-02T16:00:00.000' },
+        { 'visitors__created_at': '2017-01-04T16:00:00.000' },
+        { 'visitors__created_at': '2017-01-05T16:00:00.000' }
+      ],
+      [{ 'visitors__created_at': '2017-01-06T16:00:00.000' }]
+    ];
+    ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
+      const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
+      it(`filtered dates ${operator}`, async () => {
+        await compiler.compile();
 
-            await compiler.compile()
-
-            let query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
-              measures: [],
-              dimensions: ['visitors.created_at'],
-              timeDimensions: [],
-              filters: [{
-                operator,
-                dimension: 'visitors.created_at',
-                values: filterValues
-              }],
-              order: [{
-                id: 'visitors.created_at',
-                desc: false
-              }],
-              timezone: 'America/Los_Angeles'
-            });
-            logSqlAndParams(query);
-            const res = await dbRunner.testQuery(query.buildSqlAndParams());
-    
-            res.should.be.deepEqual(responses[index]);
-    
+        const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: [],
+          dimensions: ['visitors.created_at'],
+          timeDimensions: [],
+          filters: [{
+            operator,
+            dimension: 'visitors.created_at',
+            values: filterValues
+          }],
+          order: [{
+            id: 'visitors.created_at',
+            desc: false
+          }],
+          timezone: 'America/Los_Angeles'
         });
-
+        logSqlAndParams(query);
+        const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    
+        res.should.be.deepEqual(responses[index]);
+      });
+      return true;
     });
   }
 
@@ -390,7 +388,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
     const { compiler, cubeEvaluator, joinGraph } = MainPrepareCompiler.prepareCompiler({
       dataSchemaFiles: () => Promise.resolve([
         {
-          fileName: "main.js",
+          fileName: 'main.js',
           content: `
           const fooTable = require('./some.js').foo;
           cube('Main', {
@@ -404,7 +402,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
           })
           `
         }, {
-          fileName: "some.js",
+          fileName: 'some.js',
           content: `
           export const foo = 'bar';
           `
@@ -453,7 +451,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
     return compiler.compile().then(() => {
       contextEvaluator.contextList.should.be.deepEqual(
         ['Marketing']
-      )
+      );
     });
   });
 
@@ -539,7 +537,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
             layout: { w: 24, h: 4, x: 0, y: 0 }
           }]
         }]
-      )
+      );
     });
   });
 });

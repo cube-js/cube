@@ -5,11 +5,11 @@ class BaseDbRunner {
 
   async testQueries(queries, fixture) {
     if (!this.container && !process.env.TEST_LOCAL) {
-      console.log(`Starting container`);
+      console.log('Starting container');
       this.container = await this.containerLazyInit();
     }
     if (!this.connection) {
-      console.log(`Initializing connection`);
+      console.log('Initializing connection');
       const port = this.container ? this.container.getMappedPort(this.port()) : this.port();
       this.connection = await this.connectionLazyInit(port);
     }

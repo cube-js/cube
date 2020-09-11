@@ -1,5 +1,5 @@
 const pgp = require('pg-promise')();
-const { GenericContainer, Wait } = require("testcontainers");
+const { GenericContainer, Wait } = require('testcontainers');
 const BaseDbRunner = require('./BaseDbRunner');
 
 process.env.TZ = 'GMT';
@@ -17,7 +17,7 @@ class PostgresDBRunner extends BaseDbRunner {
     return {
       testQueries(queries, prepareDataSet) {
         prepareDataSet = prepareDataSet || defaultFixture;
-        return db.tx(tx => tx.query("SET TIME ZONE 'UTC'")
+        return db.tx(tx => tx.query('SET TIME ZONE \'UTC\'')
           .then(() => prepareDataSet(tx)
             .then(() => queries
               .map(([query, params]) => () => tx.query(query, params)).reduce((a, b) => a.then(b), Promise.resolve()))
@@ -66,8 +66,8 @@ class PostgresDBRunner extends BaseDbRunner {
 
   async containerLazyInit() {
     return new GenericContainer('postgres', '9.6.8')
-      .withEnv("POSTGRES_USER", 'root')
-      .withEnv("POSTGRES_DB", 'model_test')
+      .withEnv('POSTGRES_USER', 'root')
+      .withEnv('POSTGRES_DB', 'model_test')
       .withExposedPorts(this.port())
       .start();
   }
