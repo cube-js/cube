@@ -251,7 +251,7 @@ module.exports = new AWSHandlers({
 
 ## Serverless Google Cloud Platform
 
-Also Cube.js could be deployed in serverless mode to Google Cloud Platform
+Also, You can deploy Cube.js in serverless mode to Google Cloud Platform
 
 ```
 $ npm install -g serverless
@@ -271,7 +271,7 @@ Update all placeholders in just created `serverless.yml`.
 $ serverless deploy -v
 ```
 
-As serverless-google-cloudfunctions plugin doesn't support vpc-connector you need to [set it manually](https://cloud.google.com/functions/docs/connecting-vpc#configuring) each time after deploy.
+As serverless-google-cloudfunctions plugin doesn't support vpc-connector, you need to [set it manually](https://cloud.google.com/functions/docs/connecting-vpc#configuring) each time after deploy.
 
 ### Logs
 
