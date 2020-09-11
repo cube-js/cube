@@ -255,9 +255,9 @@ cube(`OrderFacts`, {
 });
 ```
 
-`every` - can be set as an interval with granularities `second`, `minute`, `hour`, `day` and `week` or accept CRON string with some limitations.
 
-If you set `every`  as CRON string, then you can use `timezone` property.
+`every` - can be set as an interval with granularities `second`, `minute`, `hour`, `day`, and `week` or accept CRON string with some limitations.
+If you set `every` as CRON string, you can use the `timezone` property.
 
 For example:
 
