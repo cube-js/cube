@@ -85,7 +85,7 @@ export default class QueryBuilder extends React.Component {
         ...QueryBuilder.resolveMember('timeDimensions', state).map((td) => toOrderMember(td.dimension))
       ].map((member) => ({
         ...member,
-        order: (query.order && query.order[member.id]) || 'none'
+        order: (query.order?.[member.id]) || 'none'
       }))
     );
   }
@@ -98,10 +98,12 @@ export default class QueryBuilder extends React.Component {
       chartType: 'line',
       orderMembers: [],
       pivotConfig: null,
+      validatedQuery: props.query,
       ...props.vizState
     };
     
     this.mutexObj = {};
+    this.validatedQueryMutexId = 0;
   }
 
   async componentDidMount() {
@@ -175,13 +177,18 @@ export default class QueryBuilder extends React.Component {
     });
     
     const {
-      meta, query, orderMembers = [], chartType, pivotConfig
+      meta,
+      query,
+      orderMembers = [],
+      chartType,
+      pivotConfig,
+      validatedQuery
     } = this.state;
 
     return {
       meta,
       query,
-      validatedQuery: this.validatedQuery(),
+      validatedQuery,
       isQueryPresent: this.isQueryPresent(),
       chartType,
       measures: QueryBuilder.resolveMember('measures', this.state),
@@ -239,7 +246,6 @@ export default class QueryBuilder extends React.Component {
           destinationIndex,
           sourceAxis,
           destinationAxis,
-          callback
         }) => {
           const nextPivotConfig = {
             ...pivotConfig,
@@ -257,10 +263,6 @@ export default class QueryBuilder extends React.Component {
       
           nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
           nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
-
-          if (callback) {
-            callback(nextPivotConfig);
-          }
           
           this.updateVizState({
             pivotConfig: nextPivotConfig
@@ -297,12 +299,32 @@ export default class QueryBuilder extends React.Component {
   }
 
   async updateVizState(state) {
+    const currentMutexId = ++this.validatedQueryMutexId;
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
     
     let pivotQuery = {};
     let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || stateQuery;
+    
+    const runSetters = (currentState) => {
+      if (currentState.query && setQuery) {
+        setQuery(currentState.query);
+      }
+      if (setVizState) {
+        const { meta, validatedQuery, ...toSet } = currentState;
+        setVizState(toSet);
+      }
+    };
+
+    runSetters({
+      ...state,
+      query
+    });
+    this.setState({
+      ...state,
+      query
+    });
     
     if (QueryRenderer.isQueryPresent(query)) {
       try {
@@ -312,11 +334,15 @@ export default class QueryBuilder extends React.Component {
         pivotQuery = response.pivotQuery;
 
         if (finalState.shouldApplyHeuristicOrder) {
-          finalState.query.order = response.queryOrder;
+          finalState.query.order = (response.queryOrder || []).reduce((memo, current) => ({ ...memo, ...current }), {});
         }
       } catch (error) {
         console.error(error);
       }
+    }
+    
+    if (currentMutexId !== this.validatedQueryMutexId) {
+      return;
     }
     
     const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
@@ -335,10 +361,9 @@ export default class QueryBuilder extends React.Component {
     });
       
     const nextOrder = fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean));
-    
     const nextQuery = {
       ...query,
-      order: nextOrder
+      order: nextOrder,
     };
 
     finalState = {
@@ -348,27 +373,19 @@ export default class QueryBuilder extends React.Component {
       pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, activePivotConfig)
     };
     
-    this.setState(finalState);
-    finalState = { ...this.state, ...finalState };
-    if (setQuery) {
-      setQuery(finalState.query);
-    }
-    if (setVizState) {
-      const { meta, ...toSet } = finalState;
-      setVizState(toSet);
-    }
+    this.setState({
+      ...finalState,
+      validatedQuery: this.validatedQuery(finalState)
+    });
+    runSetters({
+      ...this.state,
+      ...finalState
+    });
   }
 
-  validatedQuery() {
-    const { query } = this.state;
-    
-    if (Array.isArray(query)) {
-      return query.map((currentQuery) => ({
-        ...currentQuery,
-        filters: (currentQuery.filters || []).filter((f) => f.operator)
-      }));
-    }
-    
+  validatedQuery(state) {
+    const { query } = state || this.state;
+
     return {
       ...query,
       filters: (query.filters || []).filter((f) => f.operator)
@@ -532,11 +549,13 @@ export default class QueryBuilder extends React.Component {
   }
 
   render() {
+    const { validatedQuery } = this.state;
     const { cubejsApi, render, wrapWithQueryRenderer } = this.props;
+    
     if (wrapWithQueryRenderer) {
       return (
         <QueryRenderer
-          query={this.validatedQuery()}
+          query={validatedQuery}
           cubejsApi={cubejsApi}
           render={(queryRendererProps) => {
             if (render) {
