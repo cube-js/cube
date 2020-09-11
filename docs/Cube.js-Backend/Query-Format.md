@@ -315,8 +315,7 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 ## Boolean logical operators 
 
 Filters can contain `or` and `and` logical operators.
-
-logical operators have only one of following properties: 
+Logical operators have only one of the following properties: 
 
 - `or` An array with two or more filters or other logical operators 
 - `and` An array with two or more filters or other logical operators 
@@ -347,7 +346,7 @@ logical operators have only one of following properties:
 }
 ```
 
-Note: You can not put dimensions and measures filters in same logical operator.
+Note: You can not put dimensions and measures filters in the same logical operator.
 
 ## Time Dimensions Format
 
