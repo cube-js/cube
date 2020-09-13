@@ -19,7 +19,10 @@
     "playground"
   ],
   "scripts": {
-    "lint": "eslint core/**/*.js"
+    "lint": "eslint core/**/*.js",
+    "test": "npm run test:unit", 
+    "test:unit": "jest ./**/*.test.js"
+    
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.20.7",
@@ -40,7 +43,8 @@
     "semver": "^6.3.0",
     "serve-static": "^1.13.2",
     "sqlstring": "^2.3.1",
-    "uuid": "^3.3.3"
+    "uuid": "^3.3.3",
+    "@hapi/joi": "^15.1.1"
   },
   "devDependencies": {
     "eslint": "^6.8.0",
