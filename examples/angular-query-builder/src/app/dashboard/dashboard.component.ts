@@ -34,10 +34,22 @@ export class DashboardComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.queryBuilder.deserializeState({
+      query: {
+        measures: ['Sales.count'],
+        dimensions: ['Users.country']
+      },
+      pivotConfig: {
+        x: ['Users.country'],
+        y: ['measures']
+      },
+      chartType: 'line'
+    });
+    
     this.queryBuilder.builderMeta.subscribe((builderMeta) => {
       this.builderMeta = builderMeta;
     });
-    
+
     this.queryBuilder.query.subscribe((query) => {
       // Setting the initial query.
       // query.setQuery({
@@ -49,10 +61,13 @@ export class DashboardComponent implements OnInit {
       //     },
       //   ],
       // });
-
-      this.query = query;
-      this.query.query.subscribe((cubeQuery) => this.onQueryChange(cubeQuery));
+      if (query) {
+        this.query = query;
+        this.query.subject.subscribe((cubeQuery) => this.onQueryChange(cubeQuery)); 
+      }
     });
+
+    this.queryBuilder.state.subscribe((vizState) => console.log('vizState', JSON.stringify(vizState)));
   }
 
   onQueryChange(query) {

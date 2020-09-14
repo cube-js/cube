@@ -46,3 +46,5 @@ yalc.lock
 # System Files
 .DS_Store
 Thumbs.db
+
+src/app/builder

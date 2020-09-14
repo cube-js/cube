@@ -1,4 +1,9 @@
-import { TimeDimensionGranularity } from '@cubejs-client/core';
+import {
+  TimeDimensionGranularity,
+  QueryOrder as TQueryOrder,
+  TQueryOrderObject,
+  TQueryOrderArray,
+} from '@cubejs-client/core';
 
 import { Query } from './query';
 
@@ -6,7 +11,7 @@ export class BaseMember {
   constructor(private query: Query, private field: any) {}
 
   private get members() {
-    return this.query.query.value[this.field] || [];
+    return this.query.asCubeQuery()[this.field] || [];
   }
 
   add(name: string) {
@@ -103,5 +108,26 @@ export class TimeDimensionMember {
 
   asArray() {
     return this.query.asCubeQuery().timeDimensions || [];
+  }
+}
+
+export class Order {
+  constructor(private query: Query) {}
+
+  reorder(sourceIndex, destinationIndex) {
+    // todo
+    throw new Error('Not implemented');
+  }
+
+  set(order: TQueryOrderObject | TQueryOrderArray) {
+    this.query.setPartialQuery({ order });
+  }
+
+  asArray() {
+    if (Array.isArray(this.query.asCubeQuery().order)) {
+      return this.query.asCubeQuery().order;
+    }
+
+    throw new Error('Not implemented');
   }
 }

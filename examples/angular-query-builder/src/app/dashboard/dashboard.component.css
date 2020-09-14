@@ -4,6 +4,7 @@
   border-radius: 2px;
   white-space: nowrap;
   background-color: azure;
+  white-space: pre-line;
 }
 
 .controls-container {

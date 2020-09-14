@@ -7,7 +7,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSelectModule } from '@angular/material/select';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { CubejsClientModule, QueryBuilderService, Builder } from '@cubejs-client/ngx';
+import { CubejsClientModule, QueryBuilderService } from '@cubejs-client/ngx';
 import { ChartsModule } from 'ng2-charts';
 
 import { AppComponent } from './app.component';
@@ -37,7 +37,7 @@ const cubejsOptions = {
     HttpClientModule,
     ChartsModule,
   ],
-  providers: [QueryBuilderService, Builder],
+  providers: [QueryBuilderService],
   bootstrap: [AppComponent],
 })
 export class AppModule {

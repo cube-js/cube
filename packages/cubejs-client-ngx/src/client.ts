@@ -31,6 +31,10 @@ export class CubejsClient {
     return from(this.apiInstace().sql(...params));
   }
 
+  public dryRun(...params): Observable<any> {
+    return from(this.apiInstace().dryRun(...params));
+  }
+
   public meta(...params): Observable<MetaResult> {
     return from(<Promise<MetaResult>>this.apiInstace().meta(...params));
   }
