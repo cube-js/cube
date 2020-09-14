@@ -6,7 +6,7 @@
     "email": "krystian@fras.me"
   },
   "private": false,
-  "license": "(MIT OR Apache-2.0)",
+  "license": "Apache-2.0",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
