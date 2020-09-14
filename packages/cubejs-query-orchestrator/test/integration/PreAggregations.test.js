@@ -105,8 +105,7 @@ describe('PreAggregations', () => {
     }
 
     jest.resetModules();
-
-    const QueryCache = require('../src/orchestrator/QueryCache');
+    const { QueryCache } = require('../src/orchestrator/QueryCache');
     queryCache = new QueryCache(
       "TEST",
       mockDriverFactory,
@@ -123,7 +122,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../src/orchestrator/PreAggregations');
+      const { PreAggregations } = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
@@ -147,7 +146,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../src/orchestrator/PreAggregations');
+      const { PreAggregations } = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
@@ -172,7 +171,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../src/orchestrator/PreAggregations');
+      const { PreAggregations } = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverReadOnlyFactory,
@@ -197,7 +196,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../src/orchestrator/PreAggregations');
+      const { PreAggregations } = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
@@ -227,7 +226,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../src/orchestrator/PreAggregations');
+      const { PreAggregations } = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         () => { throw new Error('The source database factory should never be called when externalRefresh is true, as it will trigger testConnection'); },

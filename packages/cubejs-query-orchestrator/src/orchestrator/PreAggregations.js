@@ -1,11 +1,11 @@
 const crypto = require('crypto');
 const R = require('ramda');
-const { cancelCombinator } = require('../driver/utils');
-const RedisCacheDriver = require('./RedisCacheDriver');
-const LocalCacheDriver = require('./LocalCacheDriver');
 
-const QueryCache = require('./QueryCache');
-const ContinueWaitError = require('./ContinueWaitError');
+import { cancelCombinator } from '../driver';
+import { RedisCacheDriver } from './RedisCacheDriver';
+import { LocalCacheDriver } from './LocalCacheDriver';
+import { QueryCache } from './QueryCache';
+import { ContinueWaitError } from './ContinueWaitError';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);

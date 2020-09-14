@@ -1,8 +1,8 @@
 const R = require('ramda');
-const TimeoutError = require('./TimeoutError');
-const ContinueWaitError = require('./ContinueWaitError');
-const RedisQueueDriver = require('./RedisQueueDriver');
-const LocalQueueDriver = require('./LocalQueueDriver');
+import { TimeoutError } from './TimeoutError';
+import { ContinueWaitError } from './ContinueWaitError';
+import { RedisQueueDriver } from './RedisQueueDriver';
+import { LocalQueueDriver } from './LocalQueueDriver';
 
 export class QueryQueue {
   constructor(redisQueuePrefix, options) {

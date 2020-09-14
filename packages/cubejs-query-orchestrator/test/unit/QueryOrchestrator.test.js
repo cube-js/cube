@@ -1,5 +1,5 @@
 /* globals describe, beforeEach, afterEach, test, expect */
-const QueryOrchestrator = require('../src/orchestrator/QueryOrchestrator');
+import { QueryOrchestrator } from '../src/orchestrator';
 
 class MockDriver {
   constructor() {

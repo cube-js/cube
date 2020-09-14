@@ -1,6 +1,5 @@
 const R = require('ramda');
-
-const BaseQueueDriver = require('./BaseQueueDriver');
+import { BaseQueueDriver } from './BaseQueueDriver';
 
 export class RedisQueueDriverConnection {
   constructor(driver, options) {
@@ -263,7 +262,7 @@ export class RedisQueueDriverConnection {
   }
 }
 
-class RedisQueueDriver extends BaseQueueDriver {
+export class RedisQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
     this.redisPool = options.redisPool;

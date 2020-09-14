@@ -1,8 +1,8 @@
 const crypto = require('crypto');
-const QueryQueue = require('./QueryQueue');
-const ContinueWaitError = require('./ContinueWaitError');
-const RedisCacheDriver = require('./RedisCacheDriver');
-const LocalCacheDriver = require('./LocalCacheDriver');
+import { QueryQueue } from './QueryQueue';
+import { ContinueWaitError } from './ContinueWaitError';
+import { RedisCacheDriver } from './RedisCacheDriver';
+import { LocalCacheDriver } from './LocalCacheDriver';
 
 export class QueryCache {
   constructor(redisPrefix, clientFactory, logger, options) {

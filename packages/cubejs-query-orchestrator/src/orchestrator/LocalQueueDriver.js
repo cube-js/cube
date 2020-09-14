@@ -1,5 +1,5 @@
 const R = require('ramda');
-const BaseQueueDriver = require('./BaseQueueDriver');
+import { BaseQueueDriver } from './BaseQueueDriver';
 
 export class LocalQueueDriverConnection {
   constructor(driver, options) {
@@ -223,7 +223,7 @@ const heartBeat = {};
 const processingCounters = {};
 const processingLocks = {};
 
-class LocalQueueDriver extends BaseQueueDriver {
+export class LocalQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
     this.options = options;

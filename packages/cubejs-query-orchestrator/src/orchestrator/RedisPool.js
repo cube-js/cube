@@ -1,5 +1,5 @@
 const genericPool = require('generic-pool');
-const createRedisClient = require('./RedisFactory');
+import { createRedisClient } from './RedisFactory';
 
 export class RedisPool {
   constructor(options) {
