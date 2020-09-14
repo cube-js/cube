@@ -53,7 +53,7 @@ class BaseDriver {
     throw new Error('Not implemented');
   }
 
-  query() {
+  query(query, values) {
     throw new Error('Not implemented');
   }
 
