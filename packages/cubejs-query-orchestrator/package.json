@@ -12,10 +12,12 @@
     "node": ">=8.11.1"
   },
   "scripts": {
+    "tsc": "tsc",
+    "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
     "unit": "jest --runInBand --verbose test/unit",
     "integration": "jest --runInBand --verbose test/integration",
-    "lint": "eslint orchestrator/*.js driver/*.js"
+    "lint": "eslint src/orchestrator/*.js src/driver/*.js"
   },
   "dependencies": {
     "generic-pool": "^3.7.1",

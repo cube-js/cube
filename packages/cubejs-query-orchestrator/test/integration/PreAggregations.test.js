@@ -105,7 +105,8 @@ describe('PreAggregations', () => {
     }
 
     jest.resetModules();
-    const QueryCache = require('../../orchestrator/QueryCache');
+
+    const QueryCache = require('../src/orchestrator/QueryCache');
     queryCache = new QueryCache(
       "TEST",
       mockDriverFactory,
@@ -122,7 +123,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const PreAggregations = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
@@ -146,7 +147,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const PreAggregations = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
@@ -171,7 +172,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const PreAggregations = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverReadOnlyFactory,
@@ -196,7 +197,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const PreAggregations = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
@@ -226,7 +227,7 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const PreAggregations = require('../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         () => { throw new Error('The source database factory should never be called when externalRefresh is true, as it will trigger testConnection'); },
@@ -283,7 +284,7 @@ describe('PreAggregations', () => {
         table_name:'orders_number_and_count20191101',
         content_version:'kjypcoio',
         structure_version:'5yftl5il',
-        last_updated_at:1600329890789, 
+        last_updated_at:1600329890789,
       });
       expect(result).toEqual('orders_number_and_count20191101_kjypcoio_5yftl5il_1600329890789')
 
@@ -291,16 +292,16 @@ describe('PreAggregations', () => {
         table_name:'orders_number_and_count20191101',
         content_version:'kjypcoio',
         structure_version:'5yftl5il',
-        last_updated_at:1600329890789, 
+        last_updated_at:1600329890789,
         naming_version:2
       });
       expect(result).toEqual('orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652')
-    }); 
+    });
 
     test('naming_version and sort by last_updated_at', async () => {
-      const result = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal); 
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652/); 
-    }); 
+      const result = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652/);
+    });
   });
 
   describe(`naming_version sort tests`, () => {
@@ -329,9 +330,9 @@ describe('PreAggregations', () => {
     });
 
     test('naming_version and sort by last_updated_at', async () => {
-      const result = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal); 
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209/); 
-    }); 
+      const result = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209/);
+    });
   });
 
 });
