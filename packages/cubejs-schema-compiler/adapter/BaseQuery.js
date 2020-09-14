@@ -1614,8 +1614,6 @@ class BaseQuery {
   }
 
   newSubQuery(options) {
-    console.log("newSubQuery", options)
-
     const QueryClass = this.constructor;
     return new QueryClass(
       this.compilers,
@@ -1729,14 +1727,8 @@ class BaseQuery {
     return `EXTRACT(EPOCH FROM ${this.nowTimestampSql()})`;
   }
 
-  preAggregationTableName(cube, preAggregationName, skipSchema, skipCube) {
-    let tblName = this.aliasName(`${cube}.${preAggregationName}`, true);
-    if(skipCube){
-      tblName = this.aliasName(`${preAggregationName}`, true);
-    }
-    else{
-      // console.trace("preAggregationTableName");
-    }
+  preAggregationTableName(cube, preAggregationName, skipSchema) {
+    const tblName = this.aliasName(`${cube}.${preAggregationName}`, true);
     return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${tblName}`;
   }
 
@@ -1745,7 +1737,6 @@ class BaseQuery {
   }
 
   preAggregationLoadSql(cube, preAggregation, tableName) {
-    console.log("preAggregationLoadSql:", tableName)
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
@@ -1786,7 +1777,6 @@ class BaseQuery {
   }
 
   preAggregationSql(cube, preAggregation) {
-    console.log("preAggregationSql", preAggregation.sqlAlias)
     return this.cacheValue(
       ['preAggregationSql', cube, JSON.stringify(preAggregation)],
       () => {

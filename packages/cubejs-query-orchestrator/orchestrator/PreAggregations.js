@@ -32,10 +32,13 @@ function version(cacheKey) {
 }
 
 const tablesToVersionEntries = (schema, tables) => R.sortBy(
-  table => -table.last_updated_at,
+  table => {
+    if (table.last_updated_at.toString().length < 13) {
+      return -table.last_updated_at * 1000;
+    }
+    return -table.last_updated_at;
+  },
   tables.map(table => {
-
-    // @todo 1000 by length.
     const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
     if (match) {
       return {
@@ -306,11 +309,16 @@ class PreAggregationLoader {
     ) || versionEntries.find(
       e => e.table_name === this.preAggregation.tableName
     );
+
+    let addRandTest = '';
+    if (Math.random() * 100 > 50) {
+      addRandTest = '022';
+    }
     const newVersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: new Date().getTime()
+      last_updated_at: Math.floor(new Date().getTime() / 1000) + addRandTest
     };
 
     const mostRecentTargetTableName = async () => {
@@ -434,7 +442,6 @@ class PreAggregationLoader {
   }
 
   targetTableName(versionEntry) {
-    console.log("targetTableName", versionEntry)
     // eslint-disable-next-line no-use-before-define
     return PreAggregations.targetTableName(versionEntry);
   }
@@ -609,7 +616,13 @@ class PreAggregationLoader {
     )(versionEntries);
 
     const structureVersionsToSave = R.pipe(
-      R.filter(v => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000),
+      R.filter(v => {
+        const { last_updated_at } = v;
+        if (last_updated_at.toString().length < 13) {
+          return new Date().getTime() - v.last_updated_at * 1000 < this.structureVersionPersistTime * 1000;
+        }
+        return new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000;
+      }),
       R.groupBy(v => `${v.table_name}_${v.structure_version}`),
       R.toPairs,
       R.map(p => p[1][0])
@@ -737,12 +750,12 @@ class PreAggregations {
   }
 
   static preAggregationQueryCacheKey(preAggregation) {
-    console.log("preAggregationQueryCacheKey", preAggregation.tableName)
+    console.log('preAggregationQueryCacheKey', preAggregation.tableName);
     return preAggregation.tableName;
   }
 
   static targetTableName(versionEntry) {
-    console.log("targetTableName", versionEntry)
+    // console.log("targetTableName", versionEntry)
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }

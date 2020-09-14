@@ -127,7 +127,6 @@ class PreAggregations {
   }
 
   preAggregationTableName(cube, preAggregationName, preAggregation, skipSchema) {
-    console.log("preAggregationTableName", preAggregationName, preAggregation.sqlAlias, skipSchema)
     let partitionSuffix = '';
     if (preAggregation.partitionTimeDimensions) {
       const partitionTimeDimension = preAggregation.partitionTimeDimensions[0];
@@ -137,12 +136,11 @@ class PreAggregations {
       ).replace(/[-T:]/g, '');
     }
 
-    const name = preAggregation.sqlAlias || preAggregationName
+    const name = preAggregation.sqlAlias || preAggregationName;
     return this.query.preAggregationTableName(
       cube,
       name + partitionSuffix,
-      skipSchema,
-      !!preAggregation.sqlAlias
+      skipSchema
     );
   }
 
@@ -483,9 +481,7 @@ class PreAggregations {
       this.partitionUnion(preAggregation, true) :
       this.query.preAggregationTableName(
         preAggregation.cube,
-        preAggregation.sqlAlias || preAggregation.preAggregationName,
-        undefined,
-        !!preAggregation.sqlAlias
+        preAggregation.sqlAlias || preAggregation.preAggregationName
       );
   }
 
@@ -494,9 +490,7 @@ class PreAggregations {
       this.partitionUnion(preAggregationForQuery) :
       this.query.preAggregationTableName(
         preAggregationForQuery.cube,
-        preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName,
-        undefined,
-        !!preAggregationForQuery.sqlAlias
+        preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName
       );
     const segmentFilters = this.query.segments.map(
       s => this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })

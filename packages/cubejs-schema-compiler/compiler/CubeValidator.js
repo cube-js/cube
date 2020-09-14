@@ -1,10 +1,10 @@
 const Joi = require('@hapi/joi');
 
-function identifierWithMaxLen(maxLength = 0){
-  if(maxLength == 0){
+function identifierWithMaxLen(maxLength = 0) {
+  if (maxLength === 0) {
     return /^[_a-zA-Z][_a-zA-Z0-9]*$/;
   }
-  return new RegExp(`^[_a-zA-Z][_a-zA-Z0-9]{0,${maxLength}}$`);
+  return new RegExp(`^[_a-zA-Z][_a-zA-Z0-9]{0,${maxLength - 1}}$`);
 }
 
 const identifierRegex = identifierWithMaxLen();
@@ -82,7 +82,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
       updateWindow: timeInterval
     })
   ),
-  sqlAlias: Joi.string().optional(),
+  sqlAlias: Joi.string().optional(), // identifierWithMaxLen(22)
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   scheduledRefresh: Joi.boolean(),
@@ -196,27 +196,32 @@ const cubeSchema = Joi.object().keys({
     description: Joi.string(),
     meta: Joi.any()
   })),
-  preAggregations: Joi.object().pattern(/^[_a-zA-Z][_a-zA-Z0-9]{1,22}$/, Joi.alternatives().try(
+  preAggregations: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('autoRollup').required(),
-      maxPreAggregations: Joi.number()
+      maxPreAggregations: Joi.number(),
+      sqlAlias: Joi.string().optional(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
       timeDimensionReference: Joi.func().required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
+      sqlAlias: Joi.string().optional(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
       type: Joi.any().valid('originalSql').required(),
+      sqlAlias: Joi.string().optional(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
+      sqlAlias: Joi.string().optional(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func()
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
+      sqlAlias: Joi.string().optional(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
