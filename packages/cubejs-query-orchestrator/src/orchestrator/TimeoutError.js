@@ -1,3 +1,2 @@
-class TimeoutError extends Error {}
 
-module.exports = TimeoutError;
+export class TimeoutError extends Error {}

@@ -37,7 +37,7 @@ const DbTypeValueMatcher = {
   text: () => true
 };
 
-class BaseDriver {
+export class BaseDriver {
   informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
@@ -219,5 +219,3 @@ class BaseDriver {
     }
   }
 }
-
-module.exports = BaseDriver;

@@ -1,6 +1,6 @@
 const store = {};
 
-class LocalCacheDriver {
+export class LocalCacheDriver {
   constructor() {
     this.store = store;
   }
@@ -28,5 +28,3 @@ class LocalCacheDriver {
       .filter(k => k.indexOf(prefix) === 0 && this.store[k].exp > new Date().getTime());
   }
 }
-
-module.exports = LocalCacheDriver;

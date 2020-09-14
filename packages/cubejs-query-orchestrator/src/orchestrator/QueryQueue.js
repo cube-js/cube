@@ -4,7 +4,7 @@ const ContinueWaitError = require('./ContinueWaitError');
 const RedisQueueDriver = require('./RedisQueueDriver');
 const LocalQueueDriver = require('./LocalQueueDriver');
 
-class QueryQueue {
+export class QueryQueue {
   constructor(redisQueuePrefix, options) {
     this.redisQueuePrefix = redisQueuePrefix;
     this.concurrency = options.concurrency || 2;
@@ -377,5 +377,3 @@ class QueryQueue {
     return this.queueDriver.redisHash(queryKey);
   }
 }
-
-module.exports = QueryQueue;

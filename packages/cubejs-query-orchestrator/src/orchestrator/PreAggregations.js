@@ -647,7 +647,7 @@ class PreAggregationLoader {
   }
 }
 
-class PreAggregations {
+export class PreAggregations {
   constructor(redisPrefix, clientFactory, logger, queryCache, options) {
     this.options = options || {};
     this.redisPrefix = redisPrefix;
@@ -764,5 +764,3 @@ class PreAggregations {
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }
-
-module.exports = PreAggregations;

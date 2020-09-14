@@ -1,7 +1,7 @@
 const R = require('ramda');
 const BaseQueueDriver = require('./BaseQueueDriver');
 
-class LocalQueueDriverConnection {
+export class LocalQueueDriverConnection {
   constructor(driver, options) {
     this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
@@ -255,5 +255,3 @@ class LocalQueueDriver extends BaseQueueDriver {
     client.release();
   }
 }
-
-module.exports = LocalQueueDriver;

@@ -4,7 +4,7 @@ const ContinueWaitError = require('./ContinueWaitError');
 const RedisCacheDriver = require('./RedisCacheDriver');
 const LocalCacheDriver = require('./LocalCacheDriver');
 
-class QueryCache {
+export class QueryCache {
   constructor(redisPrefix, clientFactory, logger, options) {
     this.options = options || {};
     this.redisPrefix = redisPrefix;
@@ -380,5 +380,3 @@ class QueryCache {
     return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest('hex')}`;
   }
 }
-
-module.exports = QueryCache;

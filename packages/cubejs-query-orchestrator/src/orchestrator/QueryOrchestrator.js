@@ -3,7 +3,7 @@ const QueryCache = require('./QueryCache');
 const PreAggregations = require('./PreAggregations');
 const RedisPool = require('./RedisPool');
 
-class QueryOrchestrator {
+export class QueryOrchestrator {
   constructor(redisPrefix, driverFactory, logger, options) {
     options = options || {};
     this.redisPrefix = redisPrefix;
@@ -99,5 +99,3 @@ class QueryOrchestrator {
     }
   }
 }
-
-module.exports = QueryOrchestrator;

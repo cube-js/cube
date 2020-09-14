@@ -1,4 +1,5 @@
-exports.cancelCombinator = (fn) => {
+
+export const cancelCombinator = (fn) => {
   const cancelFnArray = [];
   const saveCancelFn = promise => {
     if (promise.cancel) {
