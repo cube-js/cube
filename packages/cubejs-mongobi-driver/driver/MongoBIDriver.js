@@ -1,7 +1,7 @@
 const mysql = require('mysql2');
 const genericPool = require('generic-pool');
 const { promisify } = require('util');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
 class MongoBIDriver extends BaseDriver {
   constructor(config) {

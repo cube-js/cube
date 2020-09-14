@@ -1,6 +1,6 @@
 const ClickHouse = require('@apla/clickhouse');
 const genericPool = require('generic-pool');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const { uuid } = require('uuidv4');
 const sqlstring = require('sqlstring');
 
