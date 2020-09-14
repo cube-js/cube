@@ -310,15 +310,11 @@ class PreAggregationLoader {
       e => e.table_name === this.preAggregation.tableName
     );
 
-    let addRandTest = '';
-    if (Math.random() * 100 > 50) {
-      addRandTest = '022';
-    }
     const newVersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: Math.floor(new Date().getTime() / 1000) + addRandTest
+      last_updated_at: Math.floor(new Date().getTime() / 1000)
     };
 
     const mostRecentTargetTableName = async () => {
