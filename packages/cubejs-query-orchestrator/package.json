@@ -17,7 +17,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --verbose test/unit",
+    "unit": "jest --runInBand --verbose --rootDir dist/test/unit",
     "integration": "jest --runInBand --verbose test/integration",
     "lint": "eslint src/orchestrator/*.js src/driver/*.js",
     "prepublishOnly": "rm -rf dist && tsc"
