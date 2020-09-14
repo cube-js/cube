@@ -23,11 +23,16 @@
     "redis": "^3.0.2"
   },
   "devDependencies": {
+    "@types/jest": "^26.0.13",
+    "@types/node": "^14.10.1",
+    "@types/ramda": "^0.27.17",
+    "@types/redis": "^2.8.27",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
-    "jest": "^25.1.0"
+    "jest": "^25.1.0",
+    "typescript": "^4.0.2"
   },
   "license": "Apache-2.0"
 }
