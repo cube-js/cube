@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es2015",
+    "lib": ["es2017"],
+    "target": "es2017",
     "module": "commonjs",
     "allowJs": true,
     "checkJs": false,
