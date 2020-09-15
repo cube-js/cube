@@ -14,26 +14,8 @@ const DevServer = require('./DevServer');
 const track = require('./track');
 const agentCollect = require('./agentCollect');
 const { version } = require('../package.json');
-
-const DriverDependencies = {
-  postgres: '@cubejs-backend/postgres-driver',
-  mysql: '@cubejs-backend/mysql-driver',
-  mssql: '@cubejs-backend/mssql-driver',
-  athena: '@cubejs-backend/athena-driver',
-  jdbc: '@cubejs-backend/jdbc-driver',
-  mongobi: '@cubejs-backend/mongobi-driver',
-  bigquery: '@cubejs-backend/bigquery-driver',
-  redshift: '@cubejs-backend/postgres-driver',
-  clickhouse: '@cubejs-backend/clickhouse-driver',
-  hive: '@cubejs-backend/hive-driver',
-  snowflake: '@cubejs-backend/snowflake-driver',
-  prestodb: '@cubejs-backend/prestodb-driver',
-  oracle: '@cubejs-backend/oracle-driver',
-  sqlite: '@cubejs-backend/sqlite-driver',
-  awselasticsearch: '@cubejs-backend/elasticsearch-driver',
-  elasticsearch: '@cubejs-backend/elasticsearch-driver',
-  dremio: '@cubejs-backend/dremio-driver',
-};
+const DriverDependencies = require('./DriverDependencies');
+const optionsValidate = require('./optionsValidate');
 
 const checkEnvForPlaceholders = () => {
   const placeholderSubstr = '<YOUR_DB_';
@@ -170,6 +152,7 @@ const prodLogger = (level) => (msg, params) => {
 
 class CubejsServerCore {
   constructor(options) {
+    optionsValidate(options);
     options = options || {};
     options = {
       driverFactory: () => typeof options.dbType === 'string' && CubejsServerCore.createDriver(options.dbType),
