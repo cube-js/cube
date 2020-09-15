@@ -75,7 +75,9 @@ class AthenaDriver extends BaseDriver {
           const [header, ...tableRows] = results.ResultSet.Rows;
           allRows.push(...(allRows.length ? results.ResultSet.Rows : tableRows));
           if (!columnInfo) {
-            columnInfo = /SHOW/.test(query) ? [{ Name: 'column' }] : results.ResultSet.ResultSetMetadata.ColumnInfo;
+            columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
+              ? [{ Name: 'column' }]
+              : results.ResultSet.ResultSetMetadata.ColumnInfo;
           }
         }
 
