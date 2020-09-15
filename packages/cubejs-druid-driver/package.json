@@ -14,11 +14,11 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {
-    "tsc": "tsc",
+    "build": "tsc",
     "watch": "tsc -w",
-    "test": "mocha dist/test/*.js ",
-    "lint": "eslint **/*.js",
-    "prepublishOnly": "rm -rf dist && npm run tsc"
+    "test": "mocha dist/test/*.js",
+    "lint": "eslint **/*.ts",
+    "prepublishOnly": "rm -rf dist && npm run build"
   },
   "files": [
     "README.md",
