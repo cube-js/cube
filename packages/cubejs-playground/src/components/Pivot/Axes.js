@@ -1,15 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { DragDropContext } from 'react-beautiful-dnd';
 import { Row, Col, Divider } from 'antd';
 import DroppableArea from './DroppableArea';
 
 export default function Axes({ pivotConfig, onMove }) {
-  const [uiPivotConfig, setUIPivotConfig] = useState(pivotConfig);
-
-  useEffect(() => {
-    setUIPivotConfig(pivotConfig);
-  }, [pivotConfig]);
-
   return (
     <DragDropContext
       onDragEnd={({ source, destination, ...props }) => {
@@ -21,15 +15,12 @@ export default function Axes({ pivotConfig, onMove }) {
           destinationIndex: destination.index,
           sourceAxis: source.droppableId,
           destinationAxis: destination.droppableId,
-          callback(updatedPivotConfig) {
-            setUIPivotConfig(updatedPivotConfig);
-          },
         });
       }}
     >
       <Row>
         <Col span={11}>
-          <DroppableArea pivotConfig={uiPivotConfig} axis="x" />
+          <DroppableArea pivotConfig={pivotConfig} axis="x" />
         </Col>
 
         <Col span={2}>
@@ -37,7 +28,7 @@ export default function Axes({ pivotConfig, onMove }) {
         </Col>
 
         <Col span={11}>
-          <DroppableArea pivotConfig={uiPivotConfig} axis="y" />
+          <DroppableArea pivotConfig={pivotConfig} axis="y" />
         </Col>
       </Row>
     </DragDropContext>
