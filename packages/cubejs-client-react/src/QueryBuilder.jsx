@@ -103,7 +103,6 @@ export default class QueryBuilder extends React.Component {
     };
     
     this.mutexObj = {};
-    this.validatedQueryMutexId = 0;
   }
 
   async componentDidMount() {
@@ -299,7 +298,6 @@ export default class QueryBuilder extends React.Component {
   }
 
   async updateVizState(state) {
-    const currentMutexId = ++this.validatedQueryMutexId;
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
     
@@ -339,10 +337,6 @@ export default class QueryBuilder extends React.Component {
       } catch (error) {
         console.error(error);
       }
-    }
-    
-    if (currentMutexId !== this.validatedQueryMutexId) {
-      return;
     }
     
     const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
