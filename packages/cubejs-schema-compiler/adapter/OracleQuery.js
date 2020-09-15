@@ -1,5 +1,6 @@
 const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
+const UserError = require('../compiler/UserError');
 
 const GRANULARITY_VALUE = {
   day: 'DD',
@@ -54,7 +55,7 @@ class OracleQuery extends BaseQuery {
     if (!dimensions.length) {
       return '';
     }
-    return ` GROUP BY ${dimensions.map(item => item.dimensionSql()).join(", ")}`;
+    return ` GROUP BY ${dimensions.map(item => item.dimensionSql()).join(', ')}`;
   }
 
   convertTz(field) {
@@ -89,6 +90,14 @@ class OracleQuery extends BaseQuery {
 
   unixTimestampSql() {
     return `((cast (systimestamp at time zone 'UTC' as date) - date '1970-01-01') * 86400)`;
+  }
+
+  preAggregationTableName(cube, preAggregationName, skipSchema) {
+    let name = super.preAggregationTableName(cube, preAggregationName, skipSchema) 
+    if(name.length > 64){
+      throw new UserError(`Oracle can not work with tables names that longer than 64 symbols. Probably you should use the 'sqlAlias' attribute in your cube or 'preAggregations' config for ${name}.`)
+    }
+    return name
   }
 }
 

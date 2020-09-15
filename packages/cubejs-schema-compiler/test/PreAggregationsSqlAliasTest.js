@@ -1,6 +1,7 @@
 /* eslint-disable quote-props */
 /* globals it, describe, after */
 const R = require('ramda');
+const UserError = require('../compiler/UserError');
 
 const should = require('should');
 const PostgresQuery = require('../adapter/PostgresQuery');
@@ -241,6 +242,15 @@ describe('PreAggregations', function test() {
     sqlAlias: 'googlevis',
   })
    
+  cube('GoogleVisitorsLongName', {
+    refreshKey: {
+      immutable: true,
+    },
+    extends: visitors,
+    sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
+    sqlAlias: 'veryVeryVeryVeryVeryVeryLongSqlAliasForTestItOnPostgresqlDataBase',
+  })
+   
     `);
 
   function replaceTableName(query, preAggregation, suffix) {
@@ -290,7 +300,6 @@ describe('PreAggregations', function test() {
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
-      console.log(JSON.stringify(res))
       res.should.be.deepEqual(
         [
           {"rvis__created_at_day":"2017-01-02T00:00:00.000Z","rvis__count":"1"},
@@ -376,5 +385,32 @@ describe('PreAggregations', function test() {
         [{"googlevis__source":"google","googlevis__created_at_day":"2017-01-05T00:00:00.000Z","googlevis__checkins_total":"900"}]
       );
     });
+  }));
+
+  it('check errors for too long name', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'GoogleVisitorsLongName.checkinsTotal'
+      ],
+      dimensions: [
+        'GoogleVisitorsLongName.source'
+      ],
+      timeDimensions: [{
+        dimension: 'GoogleVisitorsLongName.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'GoogleVisitorsLongName.createdAt'
+      }],
+      preAggregationsSchema: ''
+    });
+    try{
+      query.preAggregations.preAggregationsDescription(); 
+    }catch(error){
+      error.should.be.instanceof(UserError);
+    }
+
   }));
 });

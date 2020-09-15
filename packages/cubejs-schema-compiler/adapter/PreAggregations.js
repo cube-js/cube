@@ -98,7 +98,7 @@ class PreAggregations {
 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
-    const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
+    const tableName = this.preAggregationTableName(cube, foundPreAggregation.sqlAlias || preAggregationName, preAggregation);
     const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
     return {
       preAggregationsSchema: this.query.preAggregationSchema(),
@@ -110,7 +110,7 @@ class PreAggregations {
       external: preAggregation.external,
       indexesSql: Object.keys(preAggregation.indexes || {}).map(
         index => {
-          const indexName = this.preAggregationTableName(cube, `${preAggregationName}_${index}`, preAggregation, true);
+          const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
           return {
             indexName,
             sql: this.query.indexSql(
@@ -476,13 +476,20 @@ class PreAggregations {
     return this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
   }
 
-  originalSqlPreAggregationTable(preAggregation) {
-    return this.canPartitionsBeUsed(preAggregation) ?
-      this.partitionUnion(preAggregation, true) :
-      this.query.preAggregationTableName(
-        preAggregation.cube,
-        preAggregation.sqlAlias || preAggregation.preAggregationName
-      );
+  originalSqlPreAggregationTable(preAggregation) { 
+    if(this.canPartitionsBeUsed(preAggregation)){ 
+      return this.partitionUnion(preAggregation, true)
+    }
+
+    let preAggregationName = preAggregation.preAggregationName
+    if(preAggregation.preAggregation && preAggregation.preAggregation.sqlAlias){
+      preAggregationName = preAggregation.preAggregation.sqlAlias
+    }
+  
+    return this.query.preAggregationTableName(
+      preAggregation.cube,
+      preAggregationName
+    );
   }
 
   rollupPreAggregation(preAggregationForQuery) {
@@ -544,7 +551,7 @@ class PreAggregations {
       const preAggregation = this.addPartitionRangeTo(preAggregationForQuery, dimension, range);
       return this.preAggregationTableName(
         preAggregationForQuery.cube,
-        preAggregationForQuery.preAggregationName,
+        preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName,
         preAggregation.preAggregation
       );
     });

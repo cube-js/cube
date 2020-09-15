@@ -1,5 +1,6 @@
 const BaseQuery = require('./BaseQuery');
 const ParamAllocator = require('./ParamAllocator');
+const UserError = require('../compiler/UserError');
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'day',
@@ -40,6 +41,14 @@ class PostgresQuery extends BaseQuery {
 
   countDistinctApprox(sql) {
     return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
+  }
+  
+  preAggregationTableName(cube, preAggregationName, skipSchema) {
+    let name = super.preAggregationTableName(cube, preAggregationName, skipSchema) 
+    if(name.length > 64){
+      throw new UserError(`Postgres can not work with tables names that longer than 64 symbols. Probably you should use the 'sqlAlias' attribute in your cube or 'preAggregations' config for ${name}.`)
+  }
+    return name
   }
 }
 
