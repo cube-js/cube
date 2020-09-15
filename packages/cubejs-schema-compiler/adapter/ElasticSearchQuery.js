@@ -53,6 +53,9 @@ class ElasticSearchQuery extends BaseQuery {
   }
 
   groupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
     const dimensionsForSelect = this.dimensionsForSelect();
     const dimensionColumns = R.flatten(
       dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
