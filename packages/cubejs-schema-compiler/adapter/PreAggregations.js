@@ -98,7 +98,8 @@ class PreAggregations {
 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
-    const tableName = this.preAggregationTableName(cube, foundPreAggregation.sqlAlias || preAggregationName, preAggregation);
+    const name = foundPreAggregation.sqlAlias || preAggregationName;
+    const tableName = this.preAggregationTableName(cube, name, preAggregation);
     const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
     return {
       preAggregationsSchema: this.query.preAggregationSchema(),
@@ -476,14 +477,14 @@ class PreAggregations {
     return this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
   }
 
-  originalSqlPreAggregationTable(preAggregation) { 
-    if(this.canPartitionsBeUsed(preAggregation)){ 
-      return this.partitionUnion(preAggregation, true)
+  originalSqlPreAggregationTable(preAggregation) {
+    if (this.canPartitionsBeUsed(preAggregation)) {
+      return this.partitionUnion(preAggregation, true);
     }
 
-    let preAggregationName = preAggregation.preAggregationName
-    if(preAggregation.preAggregation && preAggregation.preAggregation.sqlAlias){
-      preAggregationName = preAggregation.preAggregation.sqlAlias
+    let { preAggregationName } = preAggregation;
+    if (preAggregation.preAggregation && preAggregation.preAggregation.sqlAlias) {
+      preAggregationName = preAggregation.preAggregation.sqlAlias;
     }
   
     return this.query.preAggregationTableName(

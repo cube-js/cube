@@ -1,9 +1,9 @@
 /* eslint-disable quote-props */
 /* globals it, describe, after */
 const R = require('ramda');
+const should = require('should');
 const UserError = require('../compiler/UserError');
 
-const should = require('should');
 const PostgresQuery = require('../adapter/PostgresQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 
@@ -292,7 +292,7 @@ describe('PreAggregations', function test() {
         id: 'rollup_visitors.createdAt'
       }],
       preAggregationsSchema: ''
-    }); 
+    });
 
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
     should(preAggregationsDescription[0].tableName).be.equal('rvis_rollupalias20170101');
@@ -302,10 +302,10 @@ describe('PreAggregations', function test() {
     ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
       res.should.be.deepEqual(
         [
-          {"rvis__created_at_day":"2017-01-02T00:00:00.000Z","rvis__count":"1"},
-          {"rvis__created_at_day":"2017-01-04T00:00:00.000Z","rvis__count":"1"},
-          {"rvis__created_at_day":"2017-01-05T00:00:00.000Z","rvis__count":"1"},
-          {"rvis__created_at_day":"2017-01-06T00:00:00.000Z","rvis__count":"2"}
+          { 'rvis__created_at_day': '2017-01-02T00:00:00.000Z', 'rvis__count': '1' },
+          { 'rvis__created_at_day': '2017-01-04T00:00:00.000Z', 'rvis__count': '1' },
+          { 'rvis__created_at_day': '2017-01-05T00:00:00.000Z', 'rvis__count': '1' },
+          { 'rvis__created_at_day': '2017-01-06T00:00:00.000Z', 'rvis__count': '2' }
         ]
       );
     });
@@ -328,7 +328,7 @@ describe('PreAggregations', function test() {
       preAggregationsSchema: ''
     });
 
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();  
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
     should(preAggregationsDescription[0].tableName).be.equal('vis_visitors_alias_d20170101');
   
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
@@ -376,13 +376,13 @@ describe('PreAggregations', function test() {
       }],
       preAggregationsSchema: ''
     });
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription(); 
-    should(preAggregationsDescription[0].tableName).be.equal('googlevis_visitors_alias_d20170101'); 
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    should(preAggregationsDescription[0].tableName).be.equal('googlevis_visitors_alias_d20170101');
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => { 
+    ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => {
       res.should.be.deepEqual(
-        [{"googlevis__source":"google","googlevis__created_at_day":"2017-01-05T00:00:00.000Z","googlevis__checkins_total":"900"}]
+        [{ 'googlevis__source': 'google', 'googlevis__created_at_day': '2017-01-05T00:00:00.000Z', 'googlevis__checkins_total': '900' }]
       );
     });
   }));
@@ -406,11 +406,10 @@ describe('PreAggregations', function test() {
       }],
       preAggregationsSchema: ''
     });
-    try{
-      query.preAggregations.preAggregationsDescription(); 
-    }catch(error){
+    try {
+      query.preAggregations.preAggregationsDescription();
+    } catch (error) {
       error.should.be.instanceof(UserError);
     }
-
   }));
 });
