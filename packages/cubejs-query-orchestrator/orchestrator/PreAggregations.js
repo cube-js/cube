@@ -7,10 +7,17 @@ const LocalCacheDriver = require('./LocalCacheDriver');
 const QueryCache = require('./QueryCache');
 const ContinueWaitError = require('./ContinueWaitError');
 
-function version(cacheKey) {
+function encodeTimeStamp(time) {
+  return Math.floor(time / 1000).toString(32);
+}
+
+function version(cacheKey, isDigestKey = false) {
   let result = '';
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
-  const digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
+  let digestBuffer = Number(cacheKey);
+  if (!isDigestKey) {
+    digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
+  }
 
   let residue = 0;
   let shiftCounter = 0;
@@ -32,20 +39,24 @@ function version(cacheKey) {
 }
 
 const tablesToVersionEntries = (schema, tables) => R.sortBy(
-  table => {
-    if (table.last_updated_at.toString().length < 13) {
-      return -table.last_updated_at * 1000;
-    }
-    return -table.last_updated_at;
-  },
+  table => -table.last_updated_at,
   tables.map(table => {
     const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
+
+    let lastUpdateAt;
+    if (match[4].length < 13) {
+      lastUpdateAt = parseInt(match[4], 32) * 1000;
+    } else {
+      lastUpdateAt = parseInt(match[4], 10);
+    }
+
     if (match) {
       return {
         table_name: `${schema}.${match[1]}`,
         content_version: match[2],
         structure_version: match[3],
-        last_updated_at: parseInt(match[4], 10)
+        last_updated_at: lastUpdateAt,
+        postfix: match[4]
       };
     }
     return null;
@@ -310,11 +321,13 @@ class PreAggregationLoader {
       e => e.table_name === this.preAggregation.tableName
     );
 
+    const lastUpdatedAt = new Date().getTime();
     const newVersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: Math.floor(new Date().getTime() / 1000)
+      last_updated_at: lastUpdatedAt,
+      postfix: encodeTimeStamp(lastUpdatedAt),
     };
 
     const mostRecentTargetTableName = async () => {
@@ -612,13 +625,7 @@ class PreAggregationLoader {
     )(versionEntries);
 
     const structureVersionsToSave = R.pipe(
-      R.filter(v => {
-        const { last_updated_at } = v;
-        if (last_updated_at.toString().length < 13) {
-          return new Date().getTime() - v.last_updated_at * 1000 < this.structureVersionPersistTime * 1000;
-        }
-        return new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000;
-      }),
+      R.filter(v => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000),
       R.groupBy(v => `${v.table_name}_${v.structure_version}`),
       R.toPairs,
       R.map(p => p[1][0])
@@ -746,13 +753,12 @@ class PreAggregations {
   }
 
   static preAggregationQueryCacheKey(preAggregation) {
-    console.log('preAggregationQueryCacheKey', preAggregation.tableName);
     return preAggregation.tableName;
   }
 
   static targetTableName(versionEntry) {
-    // console.log("targetTableName", versionEntry)
-    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
+    const postfix = versionEntry.postfix || versionEntry.last_updated_at;
+    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${postfix}`;
   }
 }
 

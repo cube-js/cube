@@ -4,7 +4,6 @@ const R = require('ramda');
 
 const should = require('should');
 const PostgresQuery = require('../adapter/PostgresQuery');
-const BigqueryQuery = require('../adapter/BigqueryQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 
 const { prepareCompiler } = PrepareCompiler;
@@ -90,17 +89,6 @@ describe('PreAggregations', function test() {
     },
     
     preAggregations: {
-      veryVeryLongTableNameForPreAggregation: {
-        sqlAlias: 'shortalias',
-        type: 'originalSql', 
-        timeDimensionReference: createdAt, 
-        partitionGranularity: 'month',
-        refreshKey: {
-            every: '1 day',
-            incremental: true,
-            updateWindow: '1 month'
-        }, 
-      },
       default: {
         sqlAlias: 'visitors_alias_d',
         type: 'originalSql',
@@ -112,65 +100,97 @@ describe('PreAggregations', function test() {
             columns: ['source', 'created_at']
           }
         },
-        partitionGranularity: 'month',
-        timeDimensionReference: createdAt
-      },
-      googleRollup: {
-        sqlAlias: 'valiasgoogleRollup',
-        type: 'rollup',
-        measureReferences: [checkinsTotal],
-        segmentReferences: [google],
-        timeDimensionReference: createdAt,
-        granularity: 'week',
-      },
-      approx: {
-        sqlAlias: 'vaapprox',
-        type: 'rollup',
-        measureReferences: [countDistinctApprox],
-        timeDimensionReference: createdAt,
-        granularity: 'day'
-      },
-      multiStage: {
-        sqlAlias: 'vamultiStage',
-        useOriginalSqlPreAggregations: true,
-        type: 'rollup',
-        measureReferences: [checkinsTotal],
-        timeDimensionReference: createdAt,
-        granularity: 'month',
         partitionGranularity: 'day',
-        refreshKey: {
-          sql: \`SELECT CASE WHEN \${FILTER_PARAMS.visitors.createdAt.filter((from, to) => \`\${to}::timestamp > now()\`)} THEN now() END\`
-        }
-      },
-      partitioned: {
-        sqlAlias: 'vapartitioned',
-        type: 'rollup',
-        measureReferences: [checkinsTotal],
-        dimensionReferences: [source],
-        timeDimensionReference: createdAt,
-        granularity: 'day',
-        partitionGranularity: 'month'
-      },
-      partitionedHourly: {
-        sqlAlias: 'vapartitionedHourly',
-        type: 'rollup',
-        measureReferences: [checkinsTotal],
-        dimensionReferences: [source],
-        timeDimensionReference: createdAt,
-        granularity: 'hour',
-        partitionGranularity: 'hour'
-      },
-      ratio: {
-        sqlAlias: 'varatio',
-        type: 'rollup',
-        measureReferences: [checkinsTotal, uniqueSourceCount],
-        timeDimensionReference: createdAt,
-        granularity: 'day'
-      }
+        timeDimensionReference: createdAt
+      }, 
     }
   })
   
   
+  cube(\`rollup_visitors\`, {
+    sql: \`
+    select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
+    \`,
+    sqlAlias: 'rvis',
+    
+    joins: {
+      visitor_checkins: {
+        relationship: 'hasMany',
+        sql: \`\${CUBE}.id = \${visitor_checkins}.visitor_id\`
+      }
+    },
+
+    measures: { 
+      count: {
+        type: 'count'
+      },
+      revenue: {
+        sql: 'id',
+        type: 'sum'
+      },
+      
+      checkinsTotal: {
+        sql: \`\${checkinsCount}\`,
+        type: 'sum'
+      },
+      
+      uniqueSourceCount: {
+        sql: 'source',
+        type: 'countDistinct'
+      },
+      
+      countDistinctApprox: {
+        sql: 'id',
+        type: 'countDistinctApprox'
+      },
+      
+      ratio: {
+        sql: \`\${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
+        type: 'number'
+      }
+    },
+
+    dimensions: {
+      id: {
+        type: 'number',
+        sql: 'id',
+        primaryKey: true
+      },
+      source: {
+        type: 'string',
+        sql: 'source'
+      },
+      createdAt: {
+        type: 'time',
+        sql: 'created_at'
+      },
+      checkinsCount: {
+        type: 'number',
+        sql: \`\${visitor_checkins.count}\`,
+        subQuery: true,
+        propagateFiltersToSubQuery: true
+      }
+    },
+    
+    segments: {
+      google: {
+        sql: \`source = 'google'\`
+      }
+    },
+    
+    preAggregations: { 
+      veryVeryLongTableNameForPreAggregation: {
+        sqlAlias: 'rollupalias',
+        type: 'rollup',
+        timeDimensionReference: createdAt, 
+        partitionGranularity: 'month',
+        granularity: 'day', 
+        measureReferences: [count, revenue],
+        dimensionReferences: [source],
+      },
+    }
+  })
+
   cube('visitor_checkins', {
     sql: \`
     select * from visitor_checkins
@@ -208,40 +228,7 @@ describe('PreAggregations', function test() {
       main: {
         type: 'originalSql',
         sqlAlias: 'pma',
-      },
-      auto: {
-        type: 'autoRollup',
-        maxPreAggregations: 20
-      },
-      partitioned: {
-        type: 'rollup',
-        measureReferences: [count],
-        timeDimensionReference: EveryHourVisitors.createdAt,
-        granularity: 'day',
-        partitionGranularity: 'month',
-        scheduledRefresh: true,
-        refreshRangeStart: {
-          sql: "SELECT NOW() - interval '30 day'"
-        },
-        refreshKey: {
-          every: '1 hour',
-          incremental: true,
-          updateWindow: '1 day'
-        }
-      },
-      emptyPartitioned: {
-        type: 'rollup',
-        measureReferences: [count],
-        timeDimensionReference: EmptyHourVisitors.createdAt,
-        granularity: 'hour',
-        partitionGranularity: 'month',
-        scheduledRefresh: true,
-        refreshKey: {
-          every: '1 hour',
-          incremental: true,
-          updateWindow: '1 day'
-        }
-      }
+      }, 
     }
   })
   
@@ -253,41 +240,7 @@ describe('PreAggregations', function test() {
     sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
     sqlAlias: 'googlevis',
   })
-  
-  cube('EveryHourVisitors', {
-    refreshKey: {
-      immutable: true,
-    },
-    extends: visitors,
-    sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
-    
-    preAggregations: {
-      default: {
-        type: 'originalSql',
-        refreshKey: {
-          sql: 'select NOW()'
-        }
-      },
-      partitioned: {
-        type: 'rollup',
-        measureReferences: [checkinsTotal],
-        dimensionReferences: [source],
-        timeDimensionReference: createdAt,
-        granularity: 'day',
-        partitionGranularity: 'month',
-        refreshKey: {
-          every: '1 hour',
-          incremental: true,
-          updateWindow: '1 day'
-        }
-      }
-    }
-  })
-  
-  cube('EmptyHourVisitors', {
-    extends: EveryHourVisitors,
-    sql: \`select v.* from \${visitors.sql()} v where created_at < '2000-01-01'\`
-  })
+   
     `);
 
   function replaceTableName(query, preAggregation, suffix) {
@@ -314,6 +267,41 @@ describe('PreAggregations', function test() {
     ));
   }
 
+  it('rollup pre-aggregation with sqlAlias', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'rollup_visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'rollup_visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'rollup_visitors.createdAt'
+      }],
+      preAggregationsSchema: ''
+    }); 
+
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    should(preAggregationsDescription[0].tableName).be.equal('rvis_rollupalias20170101');
+  
+    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
+      query.buildSqlAndParams()
+    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
+      console.log(JSON.stringify(res))
+      res.should.be.deepEqual(
+        [
+          {"rvis__created_at_day":"2017-01-02T00:00:00.000Z","rvis__count":"1"},
+          {"rvis__created_at_day":"2017-01-04T00:00:00.000Z","rvis__count":"1"},
+          {"rvis__created_at_day":"2017-01-05T00:00:00.000Z","rvis__count":"1"},
+          {"rvis__created_at_day":"2017-01-06T00:00:00.000Z","rvis__count":"2"}
+        ]
+      );
+    });
+  }));
+  
   it('simple pre-aggregation with sqlAlias', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
@@ -331,11 +319,7 @@ describe('PreAggregations', function test() {
       preAggregationsSchema: ''
     });
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log('queryAndParams', queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    console.log('preAggregationsDescription', preAggregationsDescription);
-      
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();  
     should(preAggregationsDescription[0].tableName).be.equal('vis_visitors_alias_d20170101');
   
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
@@ -363,49 +347,7 @@ describe('PreAggregations', function test() {
       );
     });
   }));
-
   
-  it('pre-aggregation with long name and short sqlAlias', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      'measures': [
-        'visitors.revenue'
-      ],
-      'timeDimensions': [
-        {
-          'dimension': 'visitors.createdAt',
-          'dateRange': ['2017-01-01', '2017-12-31']
-        }
-      ],
-      'order': {
-        // "visitors.revenue":"desc"
-      },
-      'filters': [
-           
-      ],
-      'dimensions': [
-        'visitors.source'
-      ],
-      timezone: 'America/Los_Angeles',
-      preAggregationsSchema: ''
-    });
-
-    const queryAndParams = query.buildSqlAndParams();
-    console.log('queryAndParams', queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    console.log('preAggregationsDescription', preAggregationsDescription);
-      
-    should(preAggregationsDescription[0].tableName).be.equal('vc_pma');
-  
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
-      console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'vis__source': 'google', 'vis__revenue': '3' }, { 'vis__source': 'some', 'vis__revenue': '3' }, { 'vis__source': null, 'vis__revenue': '9' }]
-      );
-    });
-  }));
- 
   it('immutable partition default refreshKey', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
@@ -425,26 +367,13 @@ describe('PreAggregations', function test() {
       }],
       preAggregationsSchema: ''
     });
-
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    console.log(JSON.stringify(preAggregationsDescription, null, 2));
-    should(preAggregationsDescription[0].tableName).be.equal('googlevis_vapartitioned20170101');
- 
-    preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/NOW\(\) </);
-
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription(); 
+    should(preAggregationsDescription[0].tableName).be.equal('googlevis_visitors_alias_d20170101'); 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => {
+    ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => { 
       res.should.be.deepEqual(
-        [
-          {
-            'googlevis__source': 'google',
-            'googlevis__created_at_day': '2017-01-05T00:00:00.000Z',
-            'googlevis__checkins_total': '1'
-          }
-        ]
+        [{"googlevis__source":"google","googlevis__created_at_day":"2017-01-05T00:00:00.000Z","googlevis__checkins_total":"900"}]
       );
     });
   }));
