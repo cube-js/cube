@@ -1,9 +1,9 @@
 /* globals it, describe, after */
 /* eslint-disable quote-props */
-const UserError = require('../compiler/UserError');
-const PostgresQuery = require('../adapter/PostgresQuery'); 
-const PrepareCompiler = require('./PrepareCompiler');
 const moment = require('moment-timezone');
+const UserError = require('../compiler/UserError');
+const PostgresQuery = require('../adapter/PostgresQuery');
+const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 
 const { prepareCompiler } = PrepareCompiler;
@@ -41,68 +41,66 @@ describe('SQL Generation', function test() {
     
   it('Test for everyRefreshKeySql', () => {
     const result = compiler.compile().then(() => {
-      let query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'cards.count'
         ],
         timeDimensions: [],
-        filters: [  ],
+        filters: [],
         timezone: 'America/Los_Angeles'
       });
 
-      let utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60
+      const utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60;
       let r;
       r = query.everyRefreshKeySql({
         every: '1 hour'
-      })
-      r.should.be.equal("FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)")
+      });
+      r.should.be.equal('FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)');
 
       r = query.everyRefreshKeySql({
         every: '0 * * * * *',
         timezone: 'America/Los_Angeles'
-      })
-      r.should.be.equal(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 60)`) 
+      });
+      r.should.be.equal(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 60)`);
 
       r = query.everyRefreshKeySql({
         every: '0 * * * *',
         timezone: 'America/Los_Angeles'
-      })
-      r.should.be.equal(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`) 
+      });
+      r.should.be.equal(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
 
       r = query.everyRefreshKeySql({
         every: '30 * * * *',
         timezone: 'America/Los_Angeles'
-      })
-      r.should.be.equal(`FLOOR((${utcOffset} + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)`) 
+      });
+      r.should.be.equal(`FLOOR((${utcOffset} + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
 
       r = query.everyRefreshKeySql({
         every: '30 5 * * 5',
         timezone: 'America/Los_Angeles'
-      })
-      r.should.be.equal(`FLOOR((${utcOffset} + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)`) 
+      });
+      r.should.be.equal(`FLOOR((${utcOffset} + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)`);
 
-      for(let i = 1; i < 59; i++)
-      { 
+      for (let i = 1; i < 59; i++) {
         r = query.everyRefreshKeySql({
           every: `${i} * * * *`,
           timezone: 'America/Los_Angeles'
-        })
-        r.should.be.equal(`FLOOR((${utcOffset} + ${i*60} + EXTRACT(EPOCH FROM NOW())) / ${1*60*60})`)
+        });
+        r.should.be.equal(`FLOOR((${utcOffset} + ${i * 60} + EXTRACT(EPOCH FROM NOW())) / ${1 * 60 * 60})`);
       }
 
-      try{
+      try {
         r = query.everyRefreshKeySql({
           every: '*/9 */7 * * *',
           timezone: 'America/Los_Angeles'
-        })
+        });
         
         throw new Error();
-      }catch(error){ 
+      } catch (error) {
         error.should.be.instanceof(UserError);
       }
     });
 
     return result;
   });
- 
 });
