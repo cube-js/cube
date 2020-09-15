@@ -346,7 +346,7 @@ Logical operators have only one of the following properties:
 }
 ```
 
-**Note:** You can not put dimensions and measures filters in the same logical operator.
+> **Note:** You can not put dimensions and measures filters in the same logical operator.
 
 ## Time Dimensions Format
 
