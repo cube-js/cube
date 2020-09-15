@@ -710,7 +710,7 @@ declare module '@cubejs-client/core' {
      * @param memberName - Fully qualified member name in a form `Cube.memberName`
      * @return An object containing meta information about member
      */
-    resolveMember(memberName: string, memberType: MemberType): Object;
+    resolveMember(memberName: string, memberType: MemberType | MemberType[]): Object;
     defaultTimeDimensionNameFor(memberName: string): string;
     filterOperatorsForMember(memberName: string, memberType: MemberType): any;
   }
@@ -797,4 +797,5 @@ declare module '@cubejs-client/core' {
   
   // todo: types
   export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: any): any;
+  export function isQueryPresent(query: Query | Query[]): boolean;
 }

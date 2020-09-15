@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { MatSelectChange } from '@angular/material/select';
 
 @Component({
@@ -24,5 +24,9 @@ export class MembersGroupComponent {
 
   _onSelect(event: MatSelectChange) {
     this.onSelect.emit(event.value);
+  }
+
+  _onMemberClick(name: string) {
+    this.onMemberClick.emit(name);
   }
 }

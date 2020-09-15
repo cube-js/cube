@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Meta, ResultSet } from '@cubejs-client/core';
+import { Meta, ResultSet, Query as TCubeQuery, PivotConfig as TPivotConfig } from '@cubejs-client/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 
 import { CubejsClient } from '../client';
@@ -9,65 +9,78 @@ import { PivotConfig } from './pivot-config';
 import { StateSubject } from './common';
 
 // todo: move to core
-import { defaultHeuristics } from './tmp';
+import { defaultHeuristics, isQueryPresent } from './tmp';
 
-type TChartType = 'line' | 'bar' | 'number';
+export type TChartType = 'line' | 'bar' | 'number';
+
+export type TQueryBuilderState = {
+  query?: TCubeQuery;
+  pivotConfig?: TPivotConfig;
+  chartType?: TChartType;
+};
 
 @Injectable()
 export class QueryBuilderService {
   private cubejs: CubejsClient;
   private _meta: Meta;
-  // private _query: Subject<Query> = new Subject();
+  private _query: Query;
+  private resolveQuery: (query: Query) => void;
 
-  readonly builderMeta: Subject<BuilderMeta> = new Subject();
-  readonly state: BehaviorSubject<any> = new BehaviorSubject({});
+  readonly builderMeta = new Subject<BuilderMeta>();
+  readonly state = new BehaviorSubject<TQueryBuilderState>({});
 
   pivotConfig: PivotConfig;
-  // query: Observable<Query> = this._query.asObservable();
-  query: BehaviorSubject<Query> = new BehaviorSubject(null);
+  query: Promise<Query> = new Promise((resolve) => (this.resolveQuery = resolve));
   chartType: TChartType = 'line';
 
   private async init() {
     this.pivotConfig = new PivotConfig(null);
-    this._meta = (await this.cubejs.meta().toPromise()) as any;
 
-    this.builderMeta.next(new BuilderMeta(this._meta));
-    this.query.next(
-      new Query({}, this._meta, (newQuery, oldQuery, currentQuery) => {
-        const { chartType, shouldApplyHeuristicOrder, query: heuristicQuery } = defaultHeuristics(newQuery, oldQuery, {
-          meta: this._meta,
-        });
+    this.cubejs.meta().subscribe((meta) => {
+      this._meta = meta;
+      this.builderMeta.next(new BuilderMeta(this._meta));
 
-        console.log('onBeforeChange', {
-          chartType,
-          shouldApplyHeuristicOrder,
-        });
-
-        const query = heuristicQuery || newQuery;
-        // todo: isQueryPresent
-        if (query && Object.keys(query)) {
-          this.cubejs
-            .dryRun(query)
-            .toPromise()
-            .then(({ pivotQuery, queryOrder }) => {
-              console.log('pivotConfig', ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig.get()));
-              this.pivotConfig.set(ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig.get()));
-
-              if (shouldApplyHeuristicOrder) {
-                currentQuery.order.set(queryOrder.reduce((a, b) => ({ ...a, ...b }), {}));
-              }
-            });
-        }
-
-        if (chartType) {
-          this.setChartType(chartType);
-        }
-
-        return query;
-      })
-    );
+      this._query = new Query({}, this._meta, this.handleQueryChange.bind(this));
+      this.resolveQuery(this._query);
+    });
 
     this.subscribe();
+  }
+
+  private handleQueryChange(newQuery, oldQuery, currentQuery) {
+    const { chartType, shouldApplyHeuristicOrder, query: heuristicQuery } = defaultHeuristics(newQuery, oldQuery, {
+      meta: this._meta,
+    });
+
+    const query = heuristicQuery || newQuery;
+
+    // console.log('onBeforeChange', {
+    //   chartType,
+    //   shouldApplyHeuristicOrder,
+    //   newQuery,
+    //   oldQuery,
+    //   heuristicQuery,
+    //   'isQueryPresent(query)': isQueryPresent(query),
+    // });
+
+    if (isQueryPresent(query)) {
+      this.cubejs
+        .dryRun(query)
+        .toPromise()
+        .then(({ pivotQuery, queryOrder }) => {
+          this.pivotConfig.set(ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig.get()));
+
+          if (shouldApplyHeuristicOrder) {
+            currentQuery.order.set(queryOrder.reduce((a, b) => ({ ...a, ...b }), {}));
+          }
+        });
+    }
+
+    if (chartType) {
+      this.setChartType(chartType);
+    }
+
+    return query;
   }
 
   setCubejsClient(cubejsClient: CubejsClient) {
@@ -93,7 +106,7 @@ export class QueryBuilderService {
         );
       }
     });
-    this.query.subscribe((query) => {
+    this.query.then((query) => {
       query.subject.subscribe((cubeQuery) => {
         this.setPartialState({
           query: cubeQuery,
@@ -102,15 +115,13 @@ export class QueryBuilderService {
     });
   }
 
-  deserializeState(state) {
+  deserialize(state) {
     const keyToClassName = {
       pivotConfig: PivotConfig,
     };
 
-    this.query.subscribe((query) => {
-      if (query) {
-        query.setQuery(state.query); 
-      }
+    this.query.then((query) => {
+      query.setQuery(state.query);
     });
 
     Object.entries(state).forEach(([key, value]) => {

@@ -1,8 +1,6 @@
 import { Injectable, Inject } from '@angular/core';
 import { Observable, from } from 'rxjs';
-import cubejs from '@cubejs-client/core';
-
-import { ResultSet, MetaResult } from './types';
+import cubejs, { Meta, ResultSet } from '@cubejs-client/core';
 
 @Injectable()
 export class CubejsClient {
@@ -35,12 +33,12 @@ export class CubejsClient {
     return from(this.apiInstace().dryRun(...params));
   }
 
-  public meta(...params): Observable<MetaResult> {
-    return from(<Promise<MetaResult>>this.apiInstace().meta(...params));
+  public meta(...params): Observable<Meta> {
+    return from(<Promise<Meta>>this.apiInstace().meta(...params));
   }
 
   public watch(query, params = {}): Observable<ResultSet> {
-    return Observable.create((observer) =>
+    return new Observable((observer) =>
       query.subscribe({
         next: async (query) => {
           const resultSet = await this.apiInstace().load(query, params);

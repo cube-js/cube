@@ -6,6 +6,7 @@
         [members]="query.measures.asArray()"
         [allMembers]="builderMeta.measures"
         (onSelect)="query.measures.add($event)"
+        (onMemberClick)="query.measures.remove($event)"
       ></members-group>
 
       <mat-divider [vertical]="true"></mat-divider>
@@ -15,6 +16,7 @@
         [members]="query.dimensions.asArray()"
         [allMembers]="builderMeta.dimensions"
         (onSelect)="query.dimensions.add($event)"
+        (onMemberClick)="query.dimensions.remove($event)"
       ></members-group>
 
       <mat-divider [vertical]="true"></mat-divider>
@@ -24,6 +26,7 @@
         [members]="query.segments.asArray()"
         [allMembers]="builderMeta.segments"
         (onSelect)="query.segments.add($event)"
+        (onMemberClick)="query.segments.remove($event)"
       ></members-group>
 
       <time-group
@@ -48,10 +51,12 @@
       </mat-form-field>
     </div>
   </div>
+  
+  <button mat-button (click)="debug()">debug</button>
 
+  <div class="debug">{{ query.order.orderMembers | async | json }}</div>
   <div class="debug">{{ query.asCubeQuery() | json }}</div>
-  <div class="debug">{{ queryBuilder.chartType | json }}</div>
-  <div class="debug">{{ queryBuilder.state | async | json }}</div>
+  <!-- <div class="debug">{{ queryBuilder.state | async | json }}</div> -->
 
   <button mat-button mat-stroked-button (click)="setQuery()">set/reset query</button>
 

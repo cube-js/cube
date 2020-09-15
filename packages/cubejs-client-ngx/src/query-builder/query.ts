@@ -1,4 +1,4 @@
-import { Query as TCubeQuery } from '@cubejs-client/core';
+import { Meta, Query as TCubeQuery } from '@cubejs-client/core';
 
 import { StateSubject } from './common';
 import { BaseMember, Order, TimeDimensionMember } from './query-members';
@@ -23,7 +23,7 @@ export class Query extends StateSubject<TCubeQuery> {
 
   constructor(
     initialQuery: TCubeQuery = {},
-    private meta: any,
+    public meta: Meta,
     private onBeforeChange: OnChangeCallback = (newQuery) => newQuery
   ) {
     super(initialQuery);

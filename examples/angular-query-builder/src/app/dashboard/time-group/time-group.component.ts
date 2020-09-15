@@ -7,8 +7,6 @@ import { TimeDimensionMember } from '@cubejs-client/ngx';
   templateUrl: './time-group.component.html',
 })
 export class TimeGroupComponent {
-  private _members: any[];
-
   granularities = [
     { value: undefined, title: 'w/o grouping' },
     { value: 'hour', title: 'Hour' },
@@ -37,9 +35,7 @@ export class TimeGroupComponent {
   timeDimensionMember: TimeDimensionMember;
 
   @Input()
-  set members(members) {
-    this._members = members.map((m) => m.dimension);
-  }
+  members: any;
 
   @Input()
   allMembers: any[];
@@ -49,10 +45,6 @@ export class TimeGroupComponent {
 
   @Output()
   onGranularitySelect: EventEmitter<string> = new EventEmitter();
-
-  get members() {
-    return this._members;
-  }
 
   get dateRange() {
     return this.timeDimensionMember.asArray()[0]?.dateRange;

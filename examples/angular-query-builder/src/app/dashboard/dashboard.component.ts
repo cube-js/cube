@@ -1,9 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CubejsClient, BuilderMeta, QueryBuilderService, Query } from '@cubejs-client/ngx';
-import { ResultSet } from '@cubejs-client/core';
-
-// import { BuilderMeta, QueryBuilderService } from '../../query-builder-service/query-builder.service';
-// import { Query } from '../../query-builder-service/query';
+import { ResultSet, isQueryPresent } from '@cubejs-client/core';
 
 @Component({
   selector: 'app-dashboard',
@@ -34,45 +31,36 @@ export class DashboardComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.queryBuilder.deserializeState({
+    this.queryBuilder.deserialize({
       query: {
         measures: ['Sales.count'],
-        dimensions: ['Users.country']
+        dimensions: ['Users.country', 'Users.gender'],
       },
       pivotConfig: {
         x: ['Users.country'],
-        y: ['measures']
+        y: ['measures'],
       },
-      chartType: 'line'
+      chartType: 'line',
     });
-    
+
     this.queryBuilder.builderMeta.subscribe((builderMeta) => {
       this.builderMeta = builderMeta;
     });
 
-    this.queryBuilder.query.subscribe((query) => {
-      // Setting the initial query.
-      // query.setQuery({
-      //   measures: ['Sales.count'],
-      //   timeDimensions: [
-      //     {
-      //       dimension: 'Sales.ts',
-      //       granularity: 'day',
-      //     },
-      //   ],
-      // });
-      if (query) {
-        this.query = query;
-        this.query.subject.subscribe((cubeQuery) => this.onQueryChange(cubeQuery)); 
-      }
+    this.queryBuilder.query.then((query) => {
+      query.subject.subscribe((cubeQuery) => {
+        this.onQueryChange(cubeQuery);
+      });
+      // query.order.orderMembers.subscribe((orderMembers) => console.log({ orderMembers }));
+
+      this.query = query;
     });
 
-    this.queryBuilder.state.subscribe((vizState) => console.log('vizState', JSON.stringify(vizState)));
+    // this.queryBuilder.state.subscribe((vizState) => console.log('vizState', JSON.stringify(vizState)));
   }
 
   onQueryChange(query) {
-    // todo: isQueryPresent
-    if (Object.keys(this.query.asCubeQuery()).length) {
+    if (isQueryPresent(query)) {
       this.cubejsClient.load(query).subscribe((resultSet: any) => (this.resultSet = resultSet));
     }
   }
@@ -94,5 +82,13 @@ export class DashboardComponent implements OnInit {
             ],
           }
     );
+  }
+
+  debug() {
+    // this.query.setPartialQuery({
+    // order: [['Users.country', 'desc'], ['Users.gender', 'asc']]
+    // order: {'Users.country': 'desc','Users.gender': 'asc'}
+    // })
+    this.query.order.setMemberOrder('Sales.amount', 'desc');
   }
 }

@@ -143,3 +143,11 @@ export function defaultHeuristics(newQuery, oldQuery: any = {}, options) {
 
   return newState;
 }
+
+export function isQueryPresent(query: any): boolean {
+  return (Array.isArray(query) ? query : [query]).every(
+    (q) => (q.measures && q.measures.length) ||
+      (q.dimensions && q.dimensions.length) ||
+      (q.timeDimensions && q.timeDimensions.length)
+  );
+}
