@@ -92,7 +92,8 @@ describe('index.test', () => {
         preAggregationsOptions: {
           queueOptions
         }
-      }
+      },
+      allowDuplicateProps: true
     };
 
     expect(new CubejsServerCore(options))
