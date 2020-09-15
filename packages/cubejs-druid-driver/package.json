@@ -14,11 +14,12 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "tsc": "tsc",
     "watch": "tsc -w",
     "test": "mocha dist/test/*.js",
-    "lint": "eslint **/*.ts",
-    "prepublishOnly": "rm -rf dist && npm run build"
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts",
+    "prepublishOnly": "rm -rf dist && npm run tsc"
   },
   "files": [
     "README.md",
@@ -27,20 +28,15 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.20.0",
     "@cubejs-backend/schema-compiler": "^0.20.7",
-    "generic-pool": "^3.6.0",
-    "sqlstring": "^2.3.1",
-    "uuidv4": "^6.0.2"
+    "axios": "^0.20.0",
+    "generic-pool": "^3.6.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {
+    "@cubejs/linter": "file:../cubejs-linter",
     "@types/generic-pool": "^3.1.9",
     "@types/mocha": "^8.0.3",
     "@types/node": "^14.10.1",
-    "axios": "^0.20.0",
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
     "mocha": "^8.0.1",
     "should": "^13.2.3",
     "testcontainers": "^2.4.0",
@@ -48,5 +44,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   }
 }

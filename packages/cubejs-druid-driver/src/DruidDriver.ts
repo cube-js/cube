@@ -1,9 +1,6 @@
-const { uuid } = require('uuidv4');
-const sqlstring = require('sqlstring');
-
-import { DruidClient, DruidClientConfiguration } from './DruidClient';
 import { createPool, Pool, Options as PoolOptions } from 'generic-pool';
 import BaseDriver from '@cubejs-backend/query-orchestrator/driver/BaseDriver';
+import { DruidClient, DruidClientConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
 type DruidBaseConfiguration = DruidClientConfiguration & Pick<PoolOptions, 'max' & 'min'>;
@@ -11,6 +8,7 @@ type DruidDriverConfiguration = DruidBaseConfiguration & unknown;
 
 export class DruidDriver extends BaseDriver {
   protected readonly config: DruidDriverConfiguration;
+
   protected readonly pool: Pool<DruidClient>;
 
   static dialectClass() {
@@ -108,7 +106,7 @@ export class DruidDriver extends BaseDriver {
   }
 
   public async getTablesQuery(schemaName: string) {
-    return this.query(`SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?`, [
+    return this.query('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?', [
       schemaName
     ]);
   }

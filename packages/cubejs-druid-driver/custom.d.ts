@@ -1,6 +1,7 @@
 
 declare module '@cubejs-backend/query-orchestrator/driver/BaseDriver' {
-  class BaseDriver {
+  abstract class BaseDriver {
+    createSchemaIfNotExists(schemaName: string): Promise<any>;
     quoteIdentifier(identifier: string): string;
   }
 

@@ -14,8 +14,7 @@ export class DruidClient {
   ) {
   }
 
-  protected getClient()
-  {
+  protected getClient() {
     return Axios.create({
       baseURL: `http://${this.config.host}:${this.config.port}/`,
       headers: {
@@ -24,11 +23,10 @@ export class DruidClient {
     });
   }
 
-  public async query(query: string, parameters: { type: string, value: unknown }[])
-  {
+  public async query(query: string, parameters: { type: string, value: unknown }[]) {
     try {
       const response = await this.getClient().request({
-        url: `/druid/v2/sql/`,
+        url: '/druid/v2/sql/',
         method: 'POST',
         data: {
           query,
@@ -37,17 +35,11 @@ export class DruidClient {
         },
       });
 
-      console.log(response.data);
       return response.data;
     } catch (e) {
       console.log(e);
 
       throw e;
     }
-  }
-
-  public async cancel()
-  {
-
   }
 }

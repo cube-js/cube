@@ -1,10 +1,8 @@
 /* globals describe, before, after, it */
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { DockerComposeEnvironment, GenericContainer, StartedDockerComposeEnvironment, Wait } from 'testcontainers';
-import { DruidDriver } from '../src';
-import { StartedTestContainer } from 'testcontainers/dist/test-container';
+import { DockerComposeEnvironment, StartedDockerComposeEnvironment, Wait } from 'testcontainers';
 import path from 'path';
-import { HostPortWaitStrategy } from 'testcontainers/dist/wait-strategy';
+import { DruidDriver } from '../src';
 
 // eslint-disable-next-line import/no-extraneous-dependencies
 require('should');
@@ -37,12 +35,12 @@ describe('DruidDriver', () => {
     }
 
     const dc = new DockerComposeEnvironment(
-      path.resolve(__dirname, "../../"),
+      path.resolve(__dirname, '../../'),
       'docker-compose.yml'
     );
 
     env = await dc
-      .withWaitStrategy('router', Wait.forLogMessage("Successfully started lifecycle"))
+      .withWaitStrategy('router', Wait.forLogMessage('Successfully started lifecycle'))
       .up();
 
     config = {
