@@ -1,5 +1,7 @@
 /* eslint-disable no-unused-vars,prefer-template */
 const R = require('ramda');
+const cronParser = require('cron-parser');
+ 
 const moment = require('moment-timezone');
 const inflection = require('inflection');
 
@@ -1653,7 +1655,7 @@ class BaseQuery {
           return this.evaluateSql(cube, cubeFromPath.refreshKey.sql);
         }
         if (cubeFromPath.refreshKey.every) {
-          return `SELECT ${this.everyRefreshKeySql(cubeFromPath.refreshKey.every)}`;
+          return `SELECT ${this.everyRefreshKeySql(cubeFromPath.refreshKey)}`;
         }
       }
       refreshKeyAllSetManually = false;
@@ -1687,7 +1689,7 @@ class BaseQuery {
       refreshKeyRenewalThresholds: cubes.map(c => {
         const cubeFromPath = this.cubeEvaluator.cubeFromPath(c);
         if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
-          return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey.every);
+          return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey);
         }
         return this.defaultRefreshKeyRenewalThreshold();
       })
@@ -1817,9 +1819,59 @@ class BaseQuery {
     }
   }
 
-  everyRefreshKeySql(interval) {
-    // cron-parser
-    return this.floorSql(`${this.unixTimestampSql()} / ${this.parseSecondDuration(interval)}`);
+  calcIntervalForCronString(refreshKey) {
+    const every = refreshKey.every || '1 hour';
+    // One of the years that start from monday (first day of week)
+    // Mon, 01 Jan 2018 00:00:00 GMT
+    const startDate = 1514764800000;
+    const opt = {
+      currentDate: new Date(startDate)
+    };
+    let utcOffset = 0;
+    if (refreshKey.timezone) {
+      utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
+    }
+    
+    let start;
+    let end;
+    let dayOffset;
+    let dayOffsetPrev;
+    try {
+      const interval = cronParser.parseExpression(every, opt);
+      dayOffset = interval.next().getTime();
+      dayOffsetPrev = interval.prev().getTime();
+      if (dayOffsetPrev === startDate) {
+        dayOffset = startDate;
+      }
+
+      start = interval.next().getTime();
+      end = interval.next().getTime();
+    } catch (err) {
+      throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);
+    }
+    const delta = (end - start) / 1000;
+     
+    if (
+      !/^(\*|\d+)? ?(\*|\d+) (\*|\d+) \* \* (\*|\d+)$/g.test(every.replace(/ +/g, ' ').replace(/^ | $/g, ''))
+    ) {
+      throw new UserError(`Your cron string ('${every}') is correct, but we support only equal time intervals.`);
+    }
+    return {
+      utcOffset,
+      interval: delta,
+      dayOffset: (dayOffset - startDate) / 1000
+    };
+  }
+
+  everyRefreshKeySql(refreshKey) {
+    const every = refreshKey.every || '1 hour';
+
+    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
+      return this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
+    }
+
+    const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);
+    return this.floorSql(`(${utcOffset} + ${dayOffset} + ${this.unixTimestampSql()}) / ${interval}`);
   }
 
   granularityFor(momentDate) {
@@ -1877,7 +1929,6 @@ class BaseQuery {
   }
 
   parseSecondDuration(interval) {
-    // cron-parser
     const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
@@ -1922,8 +1973,8 @@ class BaseQuery {
               refreshKeyRenewalThresholds: [this.defaultRefreshKeyRenewalThreshold()]
             };
           }
-          const interval = preAggregation.refreshKey.every || '1 hour';
-          let refreshKey = this.everyRefreshKeySql(interval);
+
+          let refreshKey = this.everyRefreshKeySql(preAggregation.refreshKey);
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
               throw new UserError('Incremental refresh key can only be used for partitioned pre-aggregations');
@@ -1944,7 +1995,7 @@ class BaseQuery {
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
             return {
               queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`)],
-              refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(interval)]
+              refreshKeyRenewalThresholds: [this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey)]
             };
           }
         }
@@ -1988,9 +2039,15 @@ class BaseQuery {
     );
   }
 
-  refreshKeyRenewalThresholdForInterval(interval) {
-    // cron-parser
-    return Math.max(Math.min(Math.round(this.parseSecondDuration(interval) / 10), 300), 1);
+  refreshKeyRenewalThresholdForInterval(refreshKey) {
+    const { every } = refreshKey;
+
+    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
+      return Math.max(Math.min(Math.round(this.parseSecondDuration(every) / 10), 300), 1);
+    }
+
+    const { interval } = this.calcIntervalForCronString(refreshKey);
+    return Math.max(Math.min(Math.round(interval / 10), 300), 1);
   }
 
   preAggregationStartEndQueries(cube, preAggregation) {
