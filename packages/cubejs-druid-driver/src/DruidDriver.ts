@@ -3,7 +3,7 @@ const sqlstring = require('sqlstring');
 
 import { DruidClient, DruidClientConfiguration } from './DruidClient';
 import { createPool, Pool, Options as PoolOptions } from 'generic-pool';
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import BaseDriver from '@cubejs-backend/query-orchestrator/driver/BaseDriver';
 import { DruidQuery } from './DruidQuery';
 
 type DruidBaseConfiguration = DruidClientConfiguration & Pick<PoolOptions, 'max' & 'min'>;

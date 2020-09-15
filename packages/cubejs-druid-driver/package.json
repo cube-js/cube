@@ -16,9 +16,14 @@
   "scripts": {
     "tsc": "tsc",
     "watch": "tsc -w",
-    "test": "mocha",
-    "lint": "eslint **/*.js"
+    "test": "mocha dist/test/*.js ",
+    "lint": "eslint **/*.js",
+    "prepublishOnly": "rm -rf dist && npm run tsc"
   },
+  "files": [
+    "README.md",
+    "dist/src/*"
+  ],
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.20.0",
     "@cubejs-backend/schema-compiler": "^0.20.7",
@@ -29,6 +34,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/generic-pool": "^3.1.9",
+    "@types/mocha": "^8.0.3",
     "@types/node": "^14.10.1",
     "axios": "^0.20.0",
     "eslint": "^6.8.0",
