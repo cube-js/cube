@@ -1929,10 +1929,8 @@ class BaseQuery {
   }
 
   parseSecondDuration(interval) {
-    // cron-parser
     const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
     if (!intervalMatch) {
-      console.trace('Invalid interval');
       throw new UserError(`Invalid interval: ${interval}`);
     }
     const duration = parseInt(intervalMatch[1], 10);
