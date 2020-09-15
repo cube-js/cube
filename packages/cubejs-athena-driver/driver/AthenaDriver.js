@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 const AWS = require('aws-sdk');
 const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
@@ -97,6 +96,7 @@ class AthenaDriver extends BaseDriver {
   }
 
   async viewsSchema(tablesSchema) {
+    // eslint-disable-next-line camelcase
     const isView = ({ table_schema, table_name }) => !tablesSchema[table_schema]
       || !tablesSchema[table_schema][table_name];
 
@@ -120,7 +120,9 @@ class AthenaDriver extends BaseDriver {
     return data;
   }
 
+  // eslint-disable-next-line camelcase
   async getColumns({ table_schema, table_name } = {}) {
+    // eslint-disable-next-line camelcase
     const data = await this.query(`SHOW COLUMNS IN "${table_schema}"."${table_name}"`);
 
     return {
