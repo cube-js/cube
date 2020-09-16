@@ -55,12 +55,12 @@ const tablesToVersionEntries = (schema, tables) => R.sortBy(
     
     if (match[4].length < 13) {
       entity.last_updated_at = parseInt(match[4], 32) * 1000;
-      entity.naming_version = 2
+      entity.naming_version = 2;
     } else {
       entity.last_updated_at = parseInt(match[4], 10);
     }
 
-    return entity; 
+    return entity;
   }).filter(R.identity)
 );
 
@@ -757,7 +757,7 @@ class PreAggregations {
   }
 
   static targetTableName(versionEntry) {
-    if(versionEntry.naming_version === 2){
+    if (versionEntry.naming_version === 2) {
       return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
     }
     
