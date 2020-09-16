@@ -16,6 +16,13 @@
 
 .filter {
   cursor: pointer;
+  margin: -0.5em 0;
+  padding: 0.5em;
+}
+
+.filter:hover {
+  background-color: var(--color-bg-link);
+  border-radius: var(--border-radius);
 }
 
 .filtered {
