@@ -6,7 +6,9 @@
 
 ## About Slack Vibe 🎉
 
-*Slack Vibe* is an open-source dashboard of public activity in any Slack workspace of an open community or a private team. It combines the power of Cube.js with data about public activity in any Slack workspace of an open community or a private team. *Slack Vibe* knows everything:
+*Slack Vibe* is an open-source dashboard of public activity in any Slack workspace of an open community or a private team.
+
+It combines the power of Cube.js with data about public activity in any Slack workspace of an open community or a private team. *Slack Vibe* knows everything:
 
 * Is your audience still growing?
 * Which days of a week are the hottest?
