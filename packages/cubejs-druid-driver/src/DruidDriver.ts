@@ -29,6 +29,10 @@ export class DruidDriver extends BaseDriver {
     this.client = new DruidClient(this.config);
   }
 
+  public readOnly() {
+    return true;
+  }
+
   public async testConnection() {
     return true;
   }

@@ -28,7 +28,8 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.20.0",
     "@cubejs-backend/schema-compiler": "^0.20.7",
-    "axios": "^0.20.0"
+    "axios": "^0.20.0",
+    "moment-timezone": "^0.5.31"
   },
   "license": "Apache-2.0",
   "devDependencies": {

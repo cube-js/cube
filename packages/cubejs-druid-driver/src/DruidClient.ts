@@ -62,6 +62,12 @@ export class DruidClient {
           throw new Error('Query cancelled');
         }
 
+        if (e.response && e.response.data) {
+          if (e.response.data.errorMessage) {
+            throw new Error(e.response.data.errorMessage);
+          }
+        }
+
         throw e;
       }
     })();
