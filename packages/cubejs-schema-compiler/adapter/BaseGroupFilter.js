@@ -7,7 +7,9 @@ class BaseGroupFilter {
   }
       
   filterToWhere() {
-    return this.values.map(f => `(${f.filterToWhere()})`).join(` ${this.operator} `);
+    return this.values
+      .map(f => f.filterToWhere() || '(1=1)')
+      .map(f => `(${f})`).join(` ${this.operator} `);
   }
   
   getMembers() {
