@@ -95,7 +95,7 @@ class OracleQuery extends BaseQuery {
   preAggregationTableName(cube, preAggregationName, skipSchema) {
     const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
     if (name.length > 128) {
-      throw new UserError(`Oracle can not work with tables names that longer than 128 symbols. Probably you should use the 'sqlAlias' attribute in your cube or 'preAggregations' config for ${name}.`);
+      throw new UserError(`Oracle can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
     }
     return name;
   }
