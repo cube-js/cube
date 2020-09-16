@@ -17,6 +17,10 @@
   margin: 0 0.25em;
 }
 
+.logo a {
+  border-bottom: none;
+}
+
 .name {
   color: var(--color-fg-secondary);
   cursor: pointer;

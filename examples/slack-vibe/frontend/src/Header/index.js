@@ -14,7 +14,14 @@ export default function Header(props) {
             Slack Vibe&nbsp;&nbsp;<span role='img' aria-label=''>🎉</span>
           </span>
           <span className={styles.attribution}>by</span>
-          <span><img src={logo} alt='Cube.js' /></span>
+          <span>
+            <a href='https://cube.dev'
+               target='_blank'
+               rel='noopener noreferrer'
+            >
+              <img src={logo} alt='Cube.js' />
+            </a>
+          </span>
         </h1>
         <div className={styles.description}>An&nbsp;open source dashboard of&nbsp;public activity
           in&nbsp;a&nbsp;Slack workspace of&nbsp;an&nbsp;open community or&nbsp;a&nbsp;private team
