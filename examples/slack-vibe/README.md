@@ -44,3 +44,18 @@ You can build and run Slack Vibe on a remote server or on a cloud platform of yo
 ## Database
 
 Slack Vibe stores data in the `db.sqlite` file managed by an embedded SQLite database. Remove this file to clear the data.
+
+---
+
+## Development
+
+To deploy this example to Cube Cloud:
+* build the front-end application
+* run `cubejs deploy`
+
+To rebuild the Docker image and upload it to Docker Hub:
+* run `docker build -t cubejs/slack-vibe:VERSION -t cubejs/slack-vibe:latest .`
+* run `docker push cubejs/slack-vibe:VERSION && docker push cubejs/slack-vibe:latest`
+
+To update the Heroku template:
+* rebase `heroku/slack-vibe` branch onto `master`
