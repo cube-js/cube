@@ -810,13 +810,7 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [
-          { 'visitors__source': null, 'visitors__visitor_count': '3' },
-          { 'visitors__source': 'google', 'visitors__visitor_count': '1' },
-          { 'visitors__source': 'some', 'visitors__visitor_count': '2' }
-        ]
-      );
+      res.should.be.deepEqual([{ 'visitors__source': 'some', 'visitors__visitor_count': '2' }]);
     });
   }));
 
