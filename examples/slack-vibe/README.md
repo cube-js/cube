@@ -1,4 +1,4 @@
-# Slack Vibe 🎉, the Open Source Dashboard for Slack
+# Slack Vibe 🎉, the Open Source Analytics for Slack
 
 [See in action](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) · [Read the blog post](https://cube.dev/blog?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) · [Run and deploy](#deploying-to-heroku)
 
