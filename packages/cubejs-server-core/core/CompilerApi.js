@@ -14,7 +14,7 @@ class CompilerApi {
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.schemaVersion = this.options.schemaVersion;
     this.compileContext = options.compileContext;
-    this.allowDuplicateProps = options.allowDuplicateProps;
+    this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
   }
 
   async getCompilers(options) {
@@ -36,7 +36,7 @@ class CompilerApi {
       this.compilers = PrepareCompiler.compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
-        allowDuplicateProps: this.allowDuplicateProps
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema
       });
       this.compilerVersion = compilerVersion;
     }

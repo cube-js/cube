@@ -93,7 +93,7 @@ describe('index.test', () => {
           queueOptions
         }
       },
-      allowDuplicateProps: true
+      allowJsDuplicatePropsInSchema: true
     };
 
     expect(new CubejsServerCore(options))

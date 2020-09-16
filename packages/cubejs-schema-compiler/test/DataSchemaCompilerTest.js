@@ -144,15 +144,15 @@ describe('DataSchemaCompiler', function test() {
       })
     `;
 
-    it('Should compile without error, allowDuplicateProps = false, valid schema', () => {
-      const { compiler } = prepareCompiler(validSchema, { allowDuplicateProps: false });
+    it('Should compile without error, allowJsDuplicatePropsInSchema = false, valid schema', () => {
+      const { compiler } = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
       });
     });
 
-    it('Should throw error, allowDuplicateProps = false, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowDuplicateProps: false });
+    it('Should throw error, allowJsDuplicatePropsInSchema = false, invalid schema', () => {
+      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
         throw new Error();
@@ -162,8 +162,8 @@ describe('DataSchemaCompiler', function test() {
       });
     });
 
-    it('Should compile without error, allowDuplicateProps = true, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowDuplicateProps: true });
+    it('Should compile without error, allowJsDuplicatePropsInSchema = true, invalid schema', () => {
+      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
       });
@@ -173,7 +173,7 @@ describe('DataSchemaCompiler', function test() {
       it('Should compile 200 schemas with diff time below than 15%', async () => {
         const repeats = 200;
 
-        const compilerWith = prepareCompiler(validSchema, { allowDuplicateProps: false });
+        const compilerWith = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
         const startWith = new Date().getTime();
         for (let i = 0; i < repeats; i++) {
           delete compilerWith.compiler.compilePromise; // Reset compile result
@@ -181,7 +181,7 @@ describe('DataSchemaCompiler', function test() {
         }
         const endWith = new Date().getTime();
 
-        const compilerWithout = prepareCompiler(validSchema, { allowDuplicateProps: true });
+        const compilerWithout = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: true });
         const startWithout = new Date().getTime();
         for (let i = 0; i < repeats; i++) {
           delete compilerWithout.compiler.compilePromise; // Reset compile result

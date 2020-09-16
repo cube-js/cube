@@ -39,7 +39,7 @@ exports.prepareCompiler = (repo, options) => {
     new CubePropContextTranspiler(cubeSymbols, cubeDictionary),
   ];
 
-  if (!options.allowDuplicateProps) {
+  if (!options.allowJsDuplicatePropsInSchema) {
     transpilers.push(new CubeCheckDuplicatePropTranspiler());
   }
 
