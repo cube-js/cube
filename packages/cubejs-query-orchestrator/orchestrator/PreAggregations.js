@@ -43,23 +43,24 @@ const tablesToVersionEntries = (schema, tables) => R.sortBy(
   tables.map(table => {
     const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
 
-    let lastUpdateAt;
-    if (match[4].length < 13) {
-      lastUpdateAt = parseInt(match[4], 32) * 1000;
-    } else {
-      lastUpdateAt = parseInt(match[4], 10);
+    if (!match) {
+      return null;
     }
 
-    if (match) {
-      return {
-        table_name: `${schema}.${match[1]}`,
-        content_version: match[2],
-        structure_version: match[3],
-        last_updated_at: lastUpdateAt,
-        postfix: match[4]
-      };
+    const entity = {
+      table_name: `${schema}.${match[1]}`,
+      content_version: match[2],
+      structure_version: match[3]
+    };
+    
+    if (match[4].length < 13) {
+      entity.last_updated_at = parseInt(match[4], 32) * 1000;
+      entity.naming_version = 2
+    } else {
+      entity.last_updated_at = parseInt(match[4], 10);
     }
-    return null;
+
+    return entity; 
   }).filter(R.identity)
 );
 
@@ -321,13 +322,12 @@ class PreAggregationLoader {
       e => e.table_name === this.preAggregation.tableName
     );
 
-    const lastUpdatedAt = new Date().getTime();
     const newVersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: lastUpdatedAt,
-      postfix: encodeTimeStamp(lastUpdatedAt),
+      last_updated_at: new Date().getTime(),
+      naming_version: 2,
     };
 
     const mostRecentTargetTableName = async () => {
@@ -757,8 +757,11 @@ class PreAggregations {
   }
 
   static targetTableName(versionEntry) {
-    const postfix = versionEntry.postfix || versionEntry.last_updated_at;
-    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${postfix}`;
+    if(versionEntry.naming_version === 2){
+      return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
+    }
+    
+    return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }
 
