@@ -14,6 +14,7 @@ class CompilerApi {
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.schemaVersion = this.options.schemaVersion;
     this.compileContext = options.compileContext;
+    this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
   }
 
   async getCompilers(options) {
@@ -34,7 +35,8 @@ class CompilerApi {
       // TODO check if saving this promise can produce memory leak?
       this.compilers = PrepareCompiler.compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
-        compileContext: this.compileContext
+        compileContext: this.compileContext,
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema
       });
       this.compilerVersion = compilerVersion;
     }

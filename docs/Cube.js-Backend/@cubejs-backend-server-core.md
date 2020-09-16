@@ -74,7 +74,8 @@ Both [CubejsServerCore](@cubejs-backend-server-core) `create` method and [Cubejs
     preAggregationsOptions: {
       queueOptions: QueueOptions
     }
-  }
+  },
+  allowJsDuplicatePropsInSchema: Boolean
 }
 
 QueueOptions {
@@ -477,3 +478,7 @@ const CubejsServerCore = require('@cubejs-backend/server-core');
 
 console.log(CubejsServerCore.version());
 ```
+
+### allowJsDuplicatePropsInSchema
+
+Boolean to enable or disable a check duplicate property names in all objects of a schema. The default value is `false`, and it is means the compiler would use the additional transpiler for check duplicates.

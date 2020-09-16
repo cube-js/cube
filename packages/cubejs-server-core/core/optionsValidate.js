@@ -56,7 +56,8 @@ const schemaOptions = Joi.object().keys({
     preAggregationsOptions: {
       queueOptions: schemaQueueOptions
     }
-  })
+  }),
+  allowJsDuplicatePropsInSchema: Joi.boolean()
 });
 
 
