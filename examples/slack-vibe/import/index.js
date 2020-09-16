@@ -1,5 +1,6 @@
 require('dotenv').config();
 const fs = require('fs');
+const path = require('path');
 const StreamZip = require('node-stream-zip');
 const moment = require('moment-timezone');
 const sqlite3 = require('sqlite3');
@@ -38,7 +39,9 @@ function getReadZipEntry(zip) {
   const entries = Object.values(zip.entries());
 
   // Read the enclosing folder name
-  const folder = entries[0].name;
+  const folder = entries[0].name.endsWith(path.sep)
+    ? entries[0].name
+    : path.dirname(entries[0].name) + '/';
 
   function readZipEntry(path) {
     return JSON.parse(zip.entryDataSync(folder + path).toString('utf8'));
