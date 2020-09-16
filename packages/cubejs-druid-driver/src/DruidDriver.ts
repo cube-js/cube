@@ -29,44 +29,12 @@ export class DruidDriver extends BaseDriver {
     this.client = new DruidClient(this.config);
   }
 
-  withConnection(fn: (conn: DruidClient) => Promise<unknown>) {
-    let cancelled = false;
-    const cancelObj: any = {};
-
-    const promise: Promise<unknown> & { cancel?: () => void } = (async () => {
-      cancelObj.cancel = async () => {
-        cancelled = true;
-      };
-
-      try {
-        const result = await fn(this.client);
-
-        if (cancelled) {
-          throw new Error('Query cancelled');
-        }
-
-        return result;
-      } catch (e) {
-        if (cancelled) {
-          throw new Error('Query cancelled');
-        }
-
-        throw e;
-      }
-    })();
-
-    promise.cancel = () => cancelObj.cancel();
-    return promise;
-  }
-
   public async testConnection() {
     return true;
   }
 
   public async query(query: string, values: unknown[] = []) {
-    return this.withConnection(
-      (client) => client.query(query, this.normalizeQueryValues(values))
-    );
+    return this.client.query(query, this.normalizeQueryValues(values));
   }
 
   public informationSchemaQuery() {

@@ -23,24 +23,50 @@ export class DruidClient {
     });
   }
 
+  public async cancel(queryId: string) {
+    return this.getClient().request({
+      url: `/druid/v2/${queryId}`,
+      method: 'DELETE',
+    });
+  }
+
   public async query(query: string, parameters: { type: string, value: unknown }[]) {
-    try {
-      const response = await this.getClient().request({
-        url: '/druid/v2/sql/',
-        method: 'POST',
-        data: {
-          query,
-          parameters,
-          resultFormat: 'object',
-        },
-      });
+    let cancelled = false;
+    const cancelObj: any = {};
 
-      return response.data;
-    } catch (e) {
-      console.log(e);
+    const promise: Promise<unknown> & { cancel?: () => void } = (async () => {
+      cancelObj.cancel = async () => {
+        cancelled = true;
+      };
 
-      // @todo Rethrow e.response.data?
-      throw e;
-    }
+      try {
+        const response = await this.getClient().request({
+          url: '/druid/v2/sql/',
+          method: 'POST',
+          data: {
+            query,
+            parameters,
+            resultFormat: 'object',
+          },
+        });
+
+        if (cancelled) {
+          await this.cancel(response.headers['x-druid-sql-query-id']);
+
+          throw new Error('Query cancelled');
+        }
+
+        return response.data;
+      } catch (e) {
+        if (cancelled) {
+          throw new Error('Query cancelled');
+        }
+
+        throw e;
+      }
+    })();
+
+    promise.cancel = () => cancelObj.cancel();
+    return promise;
   }
 }
