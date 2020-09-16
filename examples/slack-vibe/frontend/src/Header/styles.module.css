@@ -20,7 +20,6 @@
 .name {
   color: var(--color-fg-secondary);
   cursor: pointer;
-  font-style: italic;
 }
 
 .attribution {
@@ -28,7 +27,6 @@
 }
 
 .description {
-  font-style: italic;
   color: var(--color-fg-secondary);
   margin: 0 auto 6px;
   max-width: 425px;

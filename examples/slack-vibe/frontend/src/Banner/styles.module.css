@@ -8,10 +8,6 @@
   padding: 24px;
 }
 
-em {
-  font-style: italic;
-}
-
 .buttons {
   display: inline-grid;
   grid-gap: 12px;
