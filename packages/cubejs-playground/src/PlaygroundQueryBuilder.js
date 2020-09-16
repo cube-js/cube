@@ -1,6 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Row, Col, Divider, Card, Button, Popover } from 'antd';
+import { Row, Col, Divider, Card, Popover } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
@@ -10,6 +10,19 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
+import { Button, SectionHeader } from './components';
+import styled from 'styled-components';
+
+const Section = styled.div`
+  display: flex;
+  flex-flow: column;
+  margin-right: 24px;
+  margin-bottom: 24px;
+  
+  > *:first-child {
+    margin-bottom: 8px;
+  }
+`;
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>
   Object.keys(updateMethods)
@@ -92,12 +105,15 @@ export default function PlaygroundQueryBuilder({
               <Col span={24}>
                 <Card>
                   <Row
-                    justify="space-around"
+                    justify="stretch"
                     align="top"
                     gutter={24}
                     style={{ marginBottom: 12 }}
                   >
-                    <Col span={24}>
+                    <Section>
+                      <SectionHeader>
+                        Measures
+                      </SectionHeader>
                       <MemberGroup
                         members={measures}
                         availableMembers={availableMeasures}
@@ -107,7 +123,11 @@ export default function PlaygroundQueryBuilder({
                           'Measure'
                         )}
                       />
-                      <Divider type="vertical" />
+                    </Section>
+                    <Section>
+                      <SectionHeader>
+                        Dimensions
+                      </SectionHeader>
                       <MemberGroup
                         members={dimensions}
                         availableMembers={availableDimensions}
@@ -117,7 +137,11 @@ export default function PlaygroundQueryBuilder({
                           'Dimension'
                         )}
                       />
-                      <Divider type="vertical" />
+                    </Section>
+                    <Section>
+                      <SectionHeader>
+                        Segment
+                      </SectionHeader>
                       <MemberGroup
                         members={segments}
                         availableMembers={availableSegments}
@@ -127,7 +151,11 @@ export default function PlaygroundQueryBuilder({
                           'Segment'
                         )}
                       />
-                      <Divider type="vertical" />
+                    </Section>
+                    <Section>
+                      <SectionHeader>
+                        Time
+                      </SectionHeader>
                       <TimeGroup
                         members={timeDimensions}
                         availableMembers={availableTimeDimensions}
@@ -138,7 +166,7 @@ export default function PlaygroundQueryBuilder({
                         )}
                         parsedDateRange={parsedDateRange}
                       />
-                    </Col>
+                    </Section>
                   </Row>
 
                   <Row

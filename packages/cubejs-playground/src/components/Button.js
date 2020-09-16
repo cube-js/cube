@@ -1,20 +1,40 @@
-import React from 'react';
+// import React from 'react';
 import styled from 'styled-components';
 import { Button as AntdButton } from 'antd';
+import vars from '../variables';
 
 const StyledButton = styled(AntdButton)`
-  padding: 0 27px;
-  height: 40px;
-  border-radius: 4px;
-  border: 1px solid #d0d0da;
-  &.ant-btn-primary {
-    border: none;
+  &.ant-btn {
+    padding: 5px 12px;
+    height: auto;
+    border: 1px solid ${vars.dark05};
+    color: ${vars.textColor};
+    
+    &.ant-btn-dashed {
+      border-style: dashed;
+    }
+    
     &:hover {
-      background-color: #644aff;
+      border: 1px solid ${vars.purple04};
+      color: ${vars.primaryColor};
+    }
+    
+    &:active {
+      border: 1px solid ${vars.purple04};
+      color: ${vars.primaryColor};
+    }
+    
+    &.ant-btn-icon-only {
+      display: inline-flex;
+      place-items: center;
+      padding: 5px 8px;
+    }
+    
+    .anticon {
+      display: inline-block;
+      height: 14px;
     }
   }
 `;
 
-const Button = (props) => <StyledButton {...props} />;
-
-export default Button;
+export default StyledButton;

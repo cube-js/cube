@@ -1,0 +1,32 @@
+{
+  "active-bg": "rgba(122, 119, 255, 0.1)",
+  "purple-rgb": "122,119,255",
+  "purple": "rgb(122,119,255)",
+  "font-family": "'DM Sans', sans-serif",
+  "purple-bg": "rgba(122,119,255,.1)",
+  "purple-hover-bg": "rgba(122,119,255,.2)",
+  "purple-04": "rgb(202,201,255)",
+  "dark-04": "rgb(161,161,181)",
+  "dark-05": "rgb(213,213,226)",
+  "light": "rgb(243,243,251)",
+
+  "primary-color": "@purple",
+  "text-color": "rgba(20, 20, 70, 0.65)",
+  "heading-color": "@text-color",
+  "link-color": "@purple",
+  "info-color": "@primary-color",
+  "layout-body-background": "#f8f8fb",
+  "layout-header-background": "#eeeef5",
+  "menu-highlight-color": "#141446",
+  "item-hover-bg": "@light",
+
+  "layout-header-height": "48px",
+  "menu-item-font-size": "15px",
+  "btn-primary-shadow": "none",
+  "btn-text-shadow": "none",
+  "modal-body-padding": "32px",
+  "form-item-margin-bottom": "23px",
+
+  "font-size-base": "14px",
+  "border-radius-base": "4px"
+}

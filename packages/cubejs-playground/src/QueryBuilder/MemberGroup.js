@@ -3,6 +3,7 @@ import * as PropTypes from 'prop-types';
 import { PlusOutlined } from '@ant-design/icons';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
+import { SectionRow } from '../components';
 
 const MemberGroup = ({
   members,
@@ -10,7 +11,7 @@ const MemberGroup = ({
   addMemberName,
   updateMethods,
 }) => (
-  <span>
+  <SectionRow>
     {members.map((m) => (
       <RemoveButtonGroup
         key={m.index || m.name}
@@ -30,9 +31,9 @@ const MemberGroup = ({
       type="dashed"
       icon={<PlusOutlined />}
     >
-      {addMemberName}
+      {!members.length ? addMemberName : null}
     </MemberDropdown>
-  </span>
+  </SectionRow>
 );
 
 MemberGroup.propTypes = {
