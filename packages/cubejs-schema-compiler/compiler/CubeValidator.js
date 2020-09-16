@@ -9,6 +9,8 @@ const timeInterval =
     Joi.any().valid('unbounded')
   ]);
 const everyInterval = Joi.string().regex(/^(\d+) (second|minute|hour|day|week)s?$/, 'refresh time interval');
+const everyCronInterval = Joi.string();
+const everyCronTimeZone = Joi.string();
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
@@ -70,7 +72,8 @@ const BasePreAggregationWithoutPartitionGranularity = {
       sql: Joi.func().required()
     }),
     Joi.object().keys({
-      every: everyInterval,
+      every: Joi.alternatives().try(everyInterval, everyCronInterval),
+      timezone: everyCronTimeZone,
       incremental: Joi.boolean(),
       updateWindow: timeInterval
     })
@@ -111,7 +114,8 @@ const cubeSchema = Joi.object().keys({
       immutable: Joi.boolean().required()
     }),
     Joi.object().keys({
-      every: everyInterval
+      every: Joi.alternatives().try(everyInterval, everyCronInterval),
+      timezone: everyCronTimeZone,
     })
   ),
   fileName: Joi.string().required(),
