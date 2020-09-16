@@ -1,5 +1,12 @@
 import { Injectable } from '@angular/core';
-import { Meta, ResultSet, Query as TCubeQuery, PivotConfig as TPivotConfig } from '@cubejs-client/core';
+import {
+  Meta,
+  ResultSet,
+  Query as TCubeQuery,
+  PivotConfig as TPivotConfig,
+  isQueryPresent,
+  defaultHeuristics,
+} from '@cubejs-client/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 
 import { CubejsClient } from '../client';
@@ -7,9 +14,6 @@ import { Query } from './query';
 import { BuilderMeta } from './builder-meta';
 import { PivotConfig } from './pivot-config';
 import { StateSubject } from './common';
-
-// todo: move to core
-import { defaultHeuristics, isQueryPresent } from './tmp';
 
 export type TChartType = 'line' | 'bar' | 'number';
 
@@ -21,34 +25,42 @@ export type TQueryBuilderState = {
 
 @Injectable()
 export class QueryBuilderService {
-  private cubejs: CubejsClient;
+  private _cubejs: CubejsClient;
   private _meta: Meta;
   private _query: Query;
-  private resolveQuery: (query: Query) => void;
+  private _resolveQuery: (query: Query) => void;
 
   readonly builderMeta = new Subject<BuilderMeta>();
   readonly state = new BehaviorSubject<TQueryBuilderState>({});
 
   pivotConfig: PivotConfig;
-  query: Promise<Query> = new Promise((resolve) => (this.resolveQuery = resolve));
+  query = new Promise<Query>((resolve) => (this._resolveQuery = resolve));
   chartType: TChartType = 'line';
 
   private async init() {
     this.pivotConfig = new PivotConfig(null);
 
-    this.cubejs.meta().subscribe((meta) => {
+    this._cubejs.meta().subscribe((meta) => {
       this._meta = meta;
       this.builderMeta.next(new BuilderMeta(this._meta));
 
-      this._query = new Query({}, this._meta, this.handleQueryChange.bind(this));
-      this.resolveQuery(this._query);
+      this._query = new Query(
+        {},
+        this._meta,
+        this.handleQueryChange.bind(this)
+      );
+      this._resolveQuery(this._query);
     });
 
     this.subscribe();
   }
 
   private handleQueryChange(newQuery, oldQuery, currentQuery) {
-    const { chartType, shouldApplyHeuristicOrder, query: heuristicQuery } = defaultHeuristics(newQuery, oldQuery, {
+    const {
+      chartType,
+      shouldApplyHeuristicOrder,
+      query: heuristicQuery,
+    } = defaultHeuristics(newQuery, oldQuery, {
       meta: this._meta,
     });
 
@@ -64,16 +76,25 @@ export class QueryBuilderService {
     // });
 
     if (isQueryPresent(query)) {
-      this.cubejs
+      this._cubejs
         .dryRun(query)
         .toPromise()
         .then(({ pivotQuery, queryOrder }) => {
-          this.pivotConfig.set(ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig.get()));
+          this.pivotConfig.set(
+            ResultSet.getNormalizedPivotConfig(
+              pivotQuery,
+              this.pivotConfig.get()
+            )
+          );
 
           if (shouldApplyHeuristicOrder) {
-            currentQuery.order.set(queryOrder.reduce((a, b) => ({ ...a, ...b }), {}));
+            currentQuery.order.set(
+              queryOrder.reduce((a, b) => ({ ...a, ...b }), {})
+            );
           }
         });
+    } else {
+      this.pivotConfig.set({ x: [], y: [] });
     }
 
     if (chartType) {
@@ -84,7 +105,7 @@ export class QueryBuilderService {
   }
 
   setCubejsClient(cubejsClient: CubejsClient) {
-    this.cubejs = cubejsClient;
+    this._cubejs = cubejsClient;
     this.init();
   }
 

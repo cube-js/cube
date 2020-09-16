@@ -1,0 +1,13 @@
+<div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
+  <div class="item" *ngFor="let orderMember of order.orderMembers | async">
+    <span cdkDrag>{{ orderMember.title }}</span>
+
+    <button
+      mat-raised-button
+      [color]="orderMember.order === 'none' ? '' : 'primary'"
+      (click)="changeOrder(orderMember)"
+    >
+      {{ orderMember.order }}
+    </button>
+  </div>
+</div>

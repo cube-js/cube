@@ -10,8 +10,14 @@
     <mat-form-field appearance="fill" style="margin-bottom: -1.25em;">
       <mat-label>FOR</mat-label>
 
-      <mat-select (selectionChange)="handleDateRangeSelect($event)" [value]="dateRange">
-        <mat-option *ngFor="let dateRange of dateRanges" [value]="dateRange.title">
+      <mat-select
+        (selectionChange)="handleDateRangeSelect($event)"
+        [value]="dateRange"
+      >
+        <mat-option
+          *ngFor="let dateRange of dateRanges"
+          [value]="dateRange.title"
+        >
           {{ dateRange.title }}
         </mat-option>
       </mat-select>
@@ -20,7 +26,10 @@
     <mat-form-field appearance="fill" style="margin-bottom: -1.25em;">
       <mat-label>BY</mat-label>
 
-      <mat-select (selectionChange)="handleGranularitySelect($event)" [value]="granularity">
+      <mat-select
+        (selectionChange)="handleGranularitySelect($event)"
+        [value]="granularity"
+      >
         <mat-option *ngFor="let g of granularities" [value]="g.value">
           {{ g.title }}
         </mat-option>

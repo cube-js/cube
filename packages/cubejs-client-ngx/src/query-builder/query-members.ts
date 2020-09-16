@@ -2,6 +2,7 @@ import {
   TimeDimensionGranularity,
   TQueryOrderObject,
   TQueryOrderArray,
+  moveItemInArray,
 } from '@cubejs-client/core';
 import { BehaviorSubject } from 'rxjs';
 import equal from 'fast-deep-equal';
@@ -17,7 +18,10 @@ export type TOrderMember = {
 };
 
 export class BaseMember {
-  constructor(private query: Query, private field: 'measures' | 'dimensions' | 'segments') {}
+  constructor(
+    private query: Query,
+    private field: 'measures' | 'dimensions' | 'segments'
+  ) {}
 
   private get members() {
     return this.query.asCubeQuery()[this.field] || [];
@@ -31,13 +35,15 @@ export class BaseMember {
 
   remove(by: string | number) {
     this.query.setPartialQuery({
-      [this.field]: this.query.asCubeQuery()[this.field].filter((currentName, index) => {
-        if (typeof by === 'string') {
-          return currentName !== by;
-        }
+      [this.field]: this.query
+        .asCubeQuery()
+        [this.field].filter((currentName, index) => {
+          if (typeof by === 'string') {
+            return currentName !== by;
+          }
 
-        return index !== by;
-      }),
+          return index !== by;
+        }),
     });
   }
 
@@ -48,7 +54,9 @@ export class BaseMember {
   }
 
   asArray() {
-    return (this.query.asCubeQuery()[this.field] || []).map((name) => this.query.meta.resolveMember(name, this.field));
+    return (this.query.asCubeQuery()[this.field] || []).map((name) =>
+      this.query.meta.resolveMember(name, this.field)
+    );
   }
 }
 
@@ -121,7 +129,7 @@ export class TimeDimensionMember {
     this.updateTimeDimension(by, { granularity });
   }
 
-  asArray(): any {
+  asArray(): any[] {
     return (this.query.asCubeQuery().timeDimensions || []).map((td) => {
       return {
         ...this.query.meta.resolveMember(td.dimension, 'dimensions'),
@@ -142,7 +150,10 @@ export class Order {
   private handleOrderMembersChange(orderMembers: TOrderMember[]) {
     const order = orderMembers
       .filter(({ order }) => order !== 'none')
-      .reduce((memo, { id, order }) => ({ ...memo, [id]: order }), {}) as TQueryOrderObject;
+      .reduce(
+        (memo, { id, order }) => ({ ...memo, [id]: order }),
+        {}
+      ) as TQueryOrderObject;
 
     if (!equal(order, this.asObject())) {
       this.query.setPartialQuery({ order });
@@ -179,6 +190,12 @@ export class Order {
     );
   }
 
+  reorder(sourceIndex: number, destinationIndex: number) {
+    this.orderMembers.next(
+      moveItemInArray(this.orderMembers.value, sourceIndex, destinationIndex)
+    );
+  }
+
   of(member: string) {
     return (this.query.asCubeQuery().order || {})[member] || 'none';
   }
@@ -196,6 +213,9 @@ export class Order {
   }
 
   asObject(): TQueryOrderObject {
-    return this.asArray().reduce((memo, [key, value]) => ({ ...memo, [key]: value }), {});
+    return this.asArray().reduce(
+      (memo, [key, value]) => ({ ...memo, [key]: value }),
+      {}
+    );
   }
 }

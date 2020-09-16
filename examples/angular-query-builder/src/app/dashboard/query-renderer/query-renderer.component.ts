@@ -22,8 +22,18 @@ export class QueryRendererComponent implements OnInit {
   @Input()
   chartType: any = 'line';
 
-  public lineChartData: ChartDataSets[] = [{ data: [65, 59, 80, 81, 56, 55, 40], label: 'Series A' }];
-  public lineChartLabels: Label[] = ['January', 'February', 'March', 'April', 'May', 'June', 'July'];
+  public lineChartData: ChartDataSets[] = [
+    { data: [65, 59, 80, 81, 56, 55, 40], label: 'Series A' },
+  ];
+  public lineChartLabels: Label[] = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+  ];
   public lineChartOptions: ChartOptions & { responsive: boolean } = {
     responsive: true,
   };
@@ -44,11 +54,11 @@ export class QueryRendererComponent implements OnInit {
 
   updateChart() {
     if (this.resultSet) {
-      this.lineChartData = this.resultSet.series().map(item => {
+      this.lineChartData = this.resultSet.series().map((item) => {
         return {
           label: item.title,
-          data: item.series.map(({ value }) => value)
-        }
+          data: item.series.map(({ value }) => value),
+        };
       });
       this.lineChartLabels = this.resultSet.chartPivot().map((row) => row.x);
     }

@@ -40,8 +40,14 @@
       <mat-form-field appearance="fill">
         <span matPrefix><mat-icon>multiline_chart</mat-icon></span>
         <mat-label>Chart Type</mat-label>
-        <mat-select (selectionChange)="queryBuilder.setChartType($event.value)" [value]="queryBuilder.chartType">
-          <mat-option *ngFor="let item of chartTypeToIcon" [value]="item.chartType">
+        <mat-select
+          (selectionChange)="queryBuilder.setChartType($event.value)"
+          [value]="queryBuilder.chartType"
+        >
+          <mat-option
+            *ngFor="let item of chartTypeToIcon"
+            [value]="item.chartType"
+          >
             <span matPrefix>
               <mat-icon>{{ item.icon }}</mat-icon>
             </span>
@@ -51,14 +57,40 @@
       </mat-form-field>
     </div>
   </div>
-  
+
+  <div style="max-width: 500px;">
+    <mat-tab-group>
+      <mat-tab label="Pivot">
+        <app-pivot [pivotConfig]="queryBuilder.pivotConfig"></app-pivot>
+      </mat-tab>
+
+      <mat-tab label="Pivot Options"> Pivot Options </mat-tab>
+
+      <mat-tab label="Order">
+        <app-order [order]="query.order"></app-order>
+      </mat-tab>
+
+      <mat-tab label="Limit">
+        <mat-form-field apperance="fill">
+          <input
+            matInput
+            type="number"
+            placeholder="Limit"
+            [value]="query.asCubeQuery().limit || 10000"
+            (blur)="query.setLimit($event.target.value)"
+          />
+        </mat-form-field>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+
   <button mat-button (click)="debug()">debug</button>
 
-  <div class="debug">{{ query.order.orderMembers | async | json }}</div>
   <div class="debug">{{ query.asCubeQuery() | json }}</div>
-  <!-- <div class="debug">{{ queryBuilder.state | async | json }}</div> -->
 
-  <button mat-button mat-stroked-button (click)="setQuery()">set/reset query</button>
+  <button mat-button mat-stroked-button (click)="setQuery()">
+    set/reset query
+  </button>
 
   <query-renderer [resultSet]="resultSet"></query-renderer>
 </div>

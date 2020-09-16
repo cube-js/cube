@@ -6,11 +6,11 @@ export abstract class StateSubject<T = any> {
   constructor(value: T) {
     this.subject = new BehaviorSubject(value);
   }
-  
+
   get() {
     return this.subject.value;
   }
-  
+
   set(value: T) {
     this.subject.next(value);
   }

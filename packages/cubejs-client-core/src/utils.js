@@ -33,11 +33,11 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
         ...newQuery,
         timeDimensions: defaultTimeDimension
           ? [
-            {
-              dimension: defaultTimeDimension,
-              granularity,
-            },
-          ]
+              {
+                dimension: defaultTimeDimension,
+                granularity,
+              },
+            ]
           : [],
       };
 
@@ -146,8 +146,38 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
 
 export function isQueryPresent(query) {
   return (Array.isArray(query) ? query : [query]).every(
-    (q) => (q.measures && q.measures.length) ||
+    (q) =>
+      (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );
+}
+
+export function movePivotItem(pivotConfig, sourceIndex, destinationIndex, sourceAxis, destinationAxis) {
+  const nextPivotConfig = {
+    ...pivotConfig,
+    x: [...pivotConfig.x],
+    y: [...pivotConfig.y],
+  };
+  const id = pivotConfig[sourceAxis][sourceIndex];
+  const lastIndex = nextPivotConfig[destinationAxis].length - 1;
+
+  if (id === 'measures') {
+    destinationIndex = lastIndex + 1;
+  } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+    destinationIndex = lastIndex - 1;
+  }
+
+  nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
+  nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
+
+  return nextPivotConfig;
+}
+
+export function moveItemInArray(list, sourceIndex, destinationIndex) {
+  const result = [...list];
+  const [removed] = result.splice(sourceIndex, 1);
+  result.splice(destinationIndex, 0, removed);
+
+  return result;
 }

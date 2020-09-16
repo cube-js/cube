@@ -73,8 +73,8 @@ declare module '@cubejs-client/core' {
   export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
 
   export type QueryOrder = 'asc' | 'desc';
-  
-  export type TQueryOrderObject = { [key: string] : QueryOrder };
+
+  export type TQueryOrderObject = { [key: string]: QueryOrder };
   export type TQueryOrderArray = Array<[string, QueryOrder]>;
 
   export type Annotation = {
@@ -89,20 +89,20 @@ declare module '@cubejs-client/core' {
     measures: Record<string, Annotation>;
     timeDimensions: Record<string, Annotation>;
   };
-  
+
   type PivotQuery = Query & {
     queryType: QueryType;
-  }
-  
+  };
+
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
-  
+
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
     query: Query;
     data: T[];
-  }
-  
+  };
+
   export type LoadResponse<T> = {
     queryType: QueryType;
     results: LoadResponseResult<T>[];
@@ -252,7 +252,7 @@ declare module '@cubejs-client/core' {
      * Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
      */
     serialize(): Object;
-    
+
     /**
      * Can be used when you need access to the methods that can't be used with some query types (eg `compareDateRangeQuery` or `blendingQuery`)
      * ```js
@@ -594,8 +594,6 @@ declare module '@cubejs-client/core' {
     | 'beforeDate'
     | 'afterDate';
 
-
-
   export type TimeDimensionGranularity = 'hour' | 'day' | 'week' | 'month' | 'year';
 
   export type TimeDimension = {
@@ -674,13 +672,13 @@ declare module '@cubejs-client/core' {
   type TCubeDimension = TCubeMember & {
     suggestFilterValues: boolean;
   };
-  
+
   type TDryRunResponse = {
     queryType: QueryType;
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
-  }
+  };
 
   /**
    * Contains information about available cubes and it's members.
@@ -760,7 +758,7 @@ declare module '@cubejs-client/core' {
      * Get meta description of cubes available for querying.
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
-    
+
     dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<TDryRunResponse>;
     /**
      * Get query related meta without query execution
@@ -794,8 +792,26 @@ declare module '@cubejs-client/core' {
    */
   export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;
   export default function cubejs(options: CubeJSApiOptions): CubejsApi;
-  
+
+  /**
+   * @hidden
+   */
+  export type TSourceAxis = 'x' | 'y';
   // todo: types
   export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: any): any;
+  /**
+   * @hidden
+   */
   export function isQueryPresent(query: Query | Query[]): boolean;
+  export function movePivotItem(
+    pivotConfig: PivotConfig,
+    sourceIndex: number,
+    destinationIndex: number,
+    sourceAxis: TSourceAxis,
+    destinationAxis: TSourceAxis
+  ): PivotConfig;
+  /**
+   * @hidden
+   */
+  export function moveItemInArray<T = any>(list: T[], sourceIndex: number, destinationIndex: number): T[];
 }

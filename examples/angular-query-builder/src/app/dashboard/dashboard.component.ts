@@ -1,5 +1,10 @@
 import { Component, OnInit } from '@angular/core';
-import { CubejsClient, BuilderMeta, QueryBuilderService, Query } from '@cubejs-client/ngx';
+import {
+  CubejsClient,
+  BuilderMeta,
+  QueryBuilderService,
+  Query,
+} from '@cubejs-client/ngx';
 import { ResultSet, isQueryPresent } from '@cubejs-client/core';
 
 @Component({
@@ -26,7 +31,10 @@ export class DashboardComponent implements OnInit {
     },
   ];
 
-  constructor(public cubejsClient: CubejsClient, public queryBuilder: QueryBuilderService) {
+  constructor(
+    public cubejsClient: CubejsClient,
+    public queryBuilder: QueryBuilderService
+  ) {
     queryBuilder.setCubejsClient(cubejsClient);
   }
 
@@ -56,12 +64,16 @@ export class DashboardComponent implements OnInit {
       this.query = query;
     });
 
-    // this.queryBuilder.state.subscribe((vizState) => console.log('vizState', JSON.stringify(vizState)));
+    this.queryBuilder.state.subscribe((vizState) =>
+      console.log('vizState', JSON.stringify(vizState))
+    );
   }
 
   onQueryChange(query) {
     if (isQueryPresent(query)) {
-      this.cubejsClient.load(query).subscribe((resultSet: any) => (this.resultSet = resultSet));
+      this.cubejsClient
+        .load(query)
+        .subscribe((resultSet: any) => (this.resultSet = resultSet));
     }
   }
 
@@ -84,11 +96,13 @@ export class DashboardComponent implements OnInit {
     );
   }
 
-  debug() {
+  debug(event: any) {
     // this.query.setPartialQuery({
     // order: [['Users.country', 'desc'], ['Users.gender', 'asc']]
     // order: {'Users.country': 'desc','Users.gender': 'asc'}
     // })
-    this.query.order.setMemberOrder('Sales.amount', 'desc');
+    // this.query.order.setMemberOrder('Sales.amount', 'desc');
+    // this.query.setLimit(50);
+    console.log(event.target.value);
   }
 }

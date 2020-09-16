@@ -12,7 +12,11 @@ export enum MemberType {
   Order = 'order',
 }
 
-export type OnChangeCallback = (newQuery: TCubeQuery, oldQuery: TCubeQuery, query: Query) => TCubeQuery;
+export type OnChangeCallback = (
+  newQuery: TCubeQuery,
+  oldQuery: TCubeQuery,
+  query: Query
+) => TCubeQuery;
 
 export class Query extends StateSubject<TCubeQuery> {
   measures: BaseMember;
@@ -24,7 +28,7 @@ export class Query extends StateSubject<TCubeQuery> {
   constructor(
     initialQuery: TCubeQuery = {},
     public meta: Meta,
-    private onBeforeChange: OnChangeCallback = (newQuery) => newQuery
+    private _onBeforeChange: OnChangeCallback = (newQuery) => newQuery
   ) {
     super(initialQuery);
     this.init(initialQuery);
@@ -45,12 +49,12 @@ export class Query extends StateSubject<TCubeQuery> {
   }
 
   setQuery(query: TCubeQuery) {
-    this.subject.next(this.onBeforeChange(query, this.subject.value, this));
+    this.subject.next(this._onBeforeChange(query, this.subject.value, this));
   }
 
   setPartialQuery(partialQuery: Partial<TCubeQuery>) {
     this.subject.next(
-      this.onBeforeChange(
+      this._onBeforeChange(
         {
           ...this.subject.value,
           ...partialQuery,
@@ -65,16 +69,3 @@ export class Query extends StateSubject<TCubeQuery> {
     this.setPartialQuery({ limit });
   }
 }
-
-// ### API
-// queryBuilder.query
-
-// query.measures.add('Sales.count');
-// query.measures.remove('Sales.count');
-
-// query.order.reorder(1, 2);
-// query.set({ measures: ['Sales.count'] , order: [['Sales.count', 'desc']]})
-
-// queryBuilder.query.measures.add()
-// queryBuilder.query.subject;
-// queryBuilder.query.order.reorder(0, 1);
