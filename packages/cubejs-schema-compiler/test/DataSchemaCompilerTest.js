@@ -170,31 +170,45 @@ describe('DataSchemaCompiler', function test() {
     });
 
     describe('Test perfomance', () => {
-      it('Should compile 200 schemas with diff time below than 15%', async () => {
+      const schema = `
+        cube('visitors', {
+          sql: 'select * from visitors',
+          measures: {
+            count: {
+              type: 'count',
+              sql: 'id'
+            },
+            duration: {
+              type: 'avg',
+              sql: 'duration'
+            },
+          },
+          dimensions: {
+            date: {
+              type: 'string',
+              sql: 'date'
+            },
+            browser: {
+              type: 'string',
+              sql: 'browser'
+            }
+          }
+        })
+      `;
+
+      it('Should compile 200 schemas in less than 2500ms * 10', async () => {
         const repeats = 200;
 
-        const compilerWith = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
-        const startWith = new Date().getTime();
+        const compilerWith = prepareCompiler(schema, { allowJsDuplicatePropsInSchema: false });
+        const start = new Date().getTime();
         for (let i = 0; i < repeats; i++) {
           delete compilerWith.compiler.compilePromise; // Reset compile result
           await compilerWith.compiler.compile();
         }
-        const endWith = new Date().getTime();
-
-        const compilerWithout = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: true });
-        const startWithout = new Date().getTime();
-        for (let i = 0; i < repeats; i++) {
-          delete compilerWithout.compiler.compilePromise; // Reset compile result
-          await compilerWithout.compiler.compile();
-        }
-        const endWithout = new Date().getTime();
-
-        const timeWithout = endWithout - startWithout;
-        const timeWith = endWith - startWith;
+        const end = new Date().getTime();
+        const time = end - start;
         
-        const diffPercent = ((timeWith - timeWithout) * 100 / timeWithout);
-        console.log({ diffPercent, timeWithout, timeWith });
-        diffPercent.should.be.below(15);
+        time.should.be.below(2500 * 10);
       });
     });
   });
