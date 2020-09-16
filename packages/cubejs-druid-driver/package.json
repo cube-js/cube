@@ -11,8 +11,8 @@
   "engines": {
     "node": ">=8.11.1"
   },
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
     "tsc": "tsc",
     "watch": "tsc -w",

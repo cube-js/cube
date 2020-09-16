@@ -16,11 +16,7 @@ describe('DruidDriver', () => {
       user: 'test',
     });
 
-    try {
-      await callback(driver);
-    } finally {
-      await driver.release();
-    }
+    await callback(driver);
   };
 
   // eslint-disable-next-line consistent-return

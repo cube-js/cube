@@ -14,7 +14,7 @@ export class DruidDriver extends BaseDriver {
     return DruidQuery;
   }
 
-  constructor(config: DruidClientConfiguration) {
+  constructor(config: Partial<DruidClientConfiguration> = {}) {
     super();
 
     this.config = {
@@ -67,11 +67,6 @@ export class DruidDriver extends BaseDriver {
     return this.withConnection(
       (client) => client.query(query, this.normalizeQueryValues(values))
     );
-  }
-
-  public async release() {
-    await this.pool.drain();
-    await this.pool.clear();
   }
 
   public informationSchemaQuery() {
