@@ -15,9 +15,10 @@ export default function Header(props) {
           </span>
           <span className={styles.attribution}>by</span>
           <span>
-            <a href='https://cube.dev'
+            <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=slack-vibe'
                target='_blank'
                rel='noopener noreferrer'
+               className={styles.imgLink}
             >
               <img src={logo} alt='Cube.js' />
             </a>

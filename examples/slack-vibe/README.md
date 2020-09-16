@@ -2,11 +2,11 @@
 
 *Slack Vibe* is an open source dashboard of public activity in a Slack workspace of an open community or a private team.
 
-*Slack Vibe* is is created and powered by [Cube.js](https://cube.dev), an open source analytical data access layer for modern web applications.
+*Slack Vibe* is created and powered by [Cube.js](https://cube.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe), an open source analytical API platform for modern applications.
 
 ## Live demo
 
-Visit [slack-vibe.cubecloudapp.dev](https://slack-vibe.cubecloudapp.dev) for a live demo with data from Cube.js [community Slack](https://cubejs-community.herokuapp.com). 
+Visit [slack-vibe.cubecloudapp.dev](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) for a live demo. 
 
 ## Deploying to Heroku
 

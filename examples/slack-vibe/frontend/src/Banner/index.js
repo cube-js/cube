@@ -9,7 +9,7 @@ export default function Banner() {
           analytical API platform for modern applications.</div>
         <ul className={styles.buttons}>
           <li>
-            <a href='https://cube.dev'
+            <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=slack-vibe'
                target='_blank'
                rel='noopener noreferrer'
             >
