@@ -22,6 +22,7 @@ const schemaOptions = Joi.object().keys({
   basePath: Joi.string(),
   webSocketsBasePath: Joi.string(),
   devServer: Joi.boolean(),
+  webSockets: Joi.boolean(),
   logger: Joi.func(),
   driverFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
