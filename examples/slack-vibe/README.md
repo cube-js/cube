@@ -1,22 +1,49 @@
-# Slack Vibe 🎉 by Cube.js
+<p align="center">
+
+# Slack Vibe 🎉, the Open Source Dashboard for Slack
+
+</p>
+
+<p align="center">
+
+[See in action](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) — [Read the blog post](https://cube.dev/blog?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) — [How to run and deploy](#deploying-to-heroku)
+
+</p>
+
+<p align="center">
+
+[![Slack Vibe animation](./frontend/public/animated-image.png)](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe)
+
+</p>
+
+## About Slack Vibe 🎉
+
+*Slack Vibe* is an open-source dashboard of public activity in any Slack workspace of an open community or a private team. It combines the power of Cube.js with data about public activity in any Slack workspace of an open community or a private team. *Slack Vibe* knows everything:
+
+* Is your audience still growing?
+* Which days of a week are the hottest?
+* Which emoji reactions are over-used by community admins?
+* And more!
+
+[See *Slack Vibe* in action](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) and [read the blog post](https://cube.dev/blog?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) about it.
 
 *Slack Vibe* is an open source dashboard of public activity in a Slack workspace of an open community or a private team.
 
-*Slack Vibe* is created and powered by [Cube.js](https://cube.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe), an open source analytical API platform for modern applications.
+*Slack Vibe* is created and powered by [Cube.js](https://cube.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe), an open source analytical API platform for modern applications. Many developers build internal business intelligence tools or add customer‑facing analytics to applications with Cube.js.
 
-## Live demo
+## How to Run and Deploy 
 
-Visit [slack-vibe.cubecloudapp.dev](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) for a live demo. 
-
-## Deploying to Heroku
+### Deploying to Heroku
 
 You can deploy *Slack Vibe* to Heroku.
 
 * Sign up or log in to [Heroku](https://id.heroku.com/login).
 * Open the [magic link](https://dashboard.heroku.com/new?template=https://github.com/cube-js/cube.js/tree/heroku/slack-vibe/).
-* Configure your deployment: enter application name, choose a region, click "Deploy app".
+* Configure your deployment: enter application name, choose a region, click *Deploy app*.
 
-## Running with Docker
+<iframe width="640" height="360" src="https://www.youtube.com/embed/-_bVKTq2EM4" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+### Running with Docker
 
 You can run a pre-built Docker image of *Slack Vibe*.
 
@@ -25,7 +52,7 @@ You can run a pre-built Docker image of *Slack Vibe*.
 
 You can also use provided [Dockerfile](./Dockerfile) to build your own image.
 
-## Running locally
+### Running locally
 
 You can build and run Slack Vibe on your local machine.
 
@@ -33,7 +60,7 @@ You can build and run Slack Vibe on your local machine.
 * Run `npm install`, then run `npm run dev` in `frontend` folder to start the front-end application.
 * Open [localhost:3000](http://localhost:3000) in your browser.
 
-## Running in production
+### Running in production
 
 You can build and run Slack Vibe on a remote server or on a cloud platform of your preference.
 
@@ -41,11 +68,9 @@ You can build and run Slack Vibe on a remote server or on a cloud platform of yo
 * Run `npm install`, then run `npm start` to start the back-end application.
 * Open [localhost:4000](http://localhost:4000) in your browser.
 
-## Database
+### Database
 
 Slack Vibe stores data in the `db.sqlite` file managed by an embedded SQLite database. Remove this file to clear the data.
-
----
 
 ## Development
 
@@ -58,4 +83,6 @@ To rebuild the Docker image and upload it to Docker Hub:
 * run `docker push cubejs/slack-vibe:VERSION && docker push cubejs/slack-vibe:latest`
 
 To update the Heroku template:
-* rebase `heroku/slack-vibe` branch onto `master`
+* replace all repository contents with the contents of this folder
+* build the front-end application
+* push-force the result into the `heroku/slack-vibe` branch
