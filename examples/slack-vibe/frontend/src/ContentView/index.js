@@ -19,7 +19,7 @@ import WeekChart from '../WeekChart';
 import HourChart from '../HourChart';
 import UniversalFilter from '../UniversalFilter';
 
-const defaultPeriod = 'last 365 days';
+const defaultPeriod = 'last 12 months';
 const defaultGranularity = 'month';
 
 const defaultListSize = 5;

@@ -13,10 +13,9 @@ const periods = [
   'Last Month',
   'Last Quarter',
   'Last Year',
-  'Last 30 Days',
-  'Last 90 Days',
-  'Last 365 Days',
-  'Last 1000 Days',
+  'Last 3 Months',
+  'Last 12 Months',
+  'Last 36 Months',
 ];
 
 const granularities = [
