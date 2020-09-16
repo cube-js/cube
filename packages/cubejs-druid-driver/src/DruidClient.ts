@@ -39,6 +39,7 @@ export class DruidClient {
     } catch (e) {
       console.log(e);
 
+      // @todo Rethrow e.response.data?
       throw e;
     }
   }
