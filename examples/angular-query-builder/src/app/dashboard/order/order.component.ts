@@ -4,11 +4,7 @@ import {
   moveItemInArray,
   transferArrayItem,
 } from '@angular/cdk/drag-drop';
-import type {
-  Order,
-  TOrder,
-  TOrderMember,
-} from '@cubejs-client/ngx/dist/src/query-builder/query-members';
+import type { Order, TOrder, TOrderMember } from '@cubejs-client/ngx';
 
 @Component({
   selector: 'app-order',

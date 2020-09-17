@@ -1,7 +1,7 @@
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { Component, Input } from '@angular/core';
 import { TSourceAxis } from '@cubejs-client/core';
-import type { PivotConfig } from '@cubejs-client/ngx/dist/src/query-builder/pivot-config';
+import type { PivotConfig } from '@cubejs-client/ngx';
 
 @Component({
   selector: 'app-pivot',

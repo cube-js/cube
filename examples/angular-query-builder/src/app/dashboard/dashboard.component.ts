@@ -5,7 +5,9 @@ import {
   QueryBuilderService,
   Query,
 } from '@cubejs-client/ngx';
-import { ResultSet, isQueryPresent } from '@cubejs-client/core';
+import { ResultSet } from '@cubejs-client/core';
+import { MatDialog } from '@angular/material/dialog';
+import { SettingsDialogComponent } from '../settings-dialog/settings-dialog.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -29,52 +31,63 @@ export class DashboardComponent implements OnInit {
       chartType: 'pie',
       icon: 'pie_chart',
     },
+    {
+      chartType: 'table',
+      icon: 'table_chart',
+    },
   ];
+  chartTypeMap = {};
 
   constructor(
     public cubejsClient: CubejsClient,
-    public queryBuilder: QueryBuilderService
+    public queryBuilder: QueryBuilderService,
+    public dialog: MatDialog
   ) {
     queryBuilder.setCubejsClient(cubejsClient);
+    this.chartTypeMap = this.chartTypeToIcon.reduce(
+      (memo, { chartType, icon }) => ({ ...memo, [chartType]: icon }),
+      {}
+    );
   }
 
-  ngOnInit() {
+  async ngOnInit() {
     this.queryBuilder.deserialize({
       query: {
         measures: ['Sales.count'],
         dimensions: ['Users.country', 'Users.gender'],
       },
-      pivotConfig: {
-        x: ['Users.country'],
-        y: ['measures'],
-      },
-      chartType: 'line',
+      // pivotConfig: {
+      // x: ['Users.country'],
+      // y: ['measures'],
+      // },
+      chartType: 'table',
     });
 
     this.queryBuilder.builderMeta.subscribe((builderMeta) => {
       this.builderMeta = builderMeta;
     });
 
-    this.queryBuilder.query.then((query) => {
-      query.subject.subscribe((cubeQuery) => {
-        this.onQueryChange(cubeQuery);
-      });
-      // query.order.orderMembers.subscribe((orderMembers) => console.log({ orderMembers }));
-
-      this.query = query;
-    });
-
-    this.queryBuilder.state.subscribe((vizState) =>
-      console.log('vizState', JSON.stringify(vizState))
-    );
+    this.query = await this.queryBuilder.query;
+    // this.queryBuilder.state.subscribe((vizState) =>
+    // console.log('vizState', JSON.stringify(vizState))
+    // );
   }
 
-  onQueryChange(query) {
-    if (isQueryPresent(query)) {
-      this.cubejsClient
-        .load(query)
-        .subscribe((resultSet: any) => (this.resultSet = resultSet));
-    }
+  openDialog(): void {
+    const dialogRef = this.dialog.open(SettingsDialogComponent, {
+      width: '500px',
+      data: {
+        pivotConfig: this.queryBuilder.pivotConfig,
+        query: this.query,
+      },
+    });
+
+    dialogRef.updatePosition({
+      top: '10%',
+    });
+    dialogRef.afterClosed().subscribe(() => {
+      console.log('closed');
+    });
   }
 
   // todo: remove (testing only)

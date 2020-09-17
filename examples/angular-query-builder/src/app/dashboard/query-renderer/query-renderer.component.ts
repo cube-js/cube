@@ -1,6 +1,17 @@
-import { Component, OnInit, Input } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
+import { PivotConfig as TPivotConfig, ResultSet } from '@cubejs-client/core';
+import {
+  CubejsClient,
+  QueryBuilderService,
+  TChartType,
+} from '@cubejs-client/ngx';
 import { ChartDataSets, ChartOptions } from 'chart.js';
 import { Color, Label } from 'ng2-charts';
+import { combineLatest } from 'rxjs';
+import { mergeMap } from 'rxjs/operators';
+
+const ELEMENT_DATA: any[] = [
+];
 
 @Component({
   selector: 'query-renderer',
@@ -8,59 +19,84 @@ import { Color, Label } from 'ng2-charts';
   styleUrls: ['./query-renderer.component.css'],
 })
 export class QueryRendererComponent implements OnInit {
-  private _resultSet;
+  private _pivotConfig: TPivotConfig;
+  private _resultSet: ResultSet;
+  private _chartType: TChartType = 'line';
+
+  isQueryPresent: boolean;
+  displayedColumns: string[] = ['Sales.ts.day'];
+  dataSource = ELEMENT_DATA;
+  tableData = [];
+  resultSet: ResultSet;
 
   @Input()
-  set resultSet(resultSet: any) {
-    this._resultSet = resultSet;
-    this.updateChart();
+  queryBuilder: QueryBuilderService;
+
+  @Input()
+  set chartType(value) {
+    this._chartType = value;
+    this.updateChart(this._resultSet, this._pivotConfig);
   }
-  get resultSet() {
-    return this._resultSet;
+
+  get chartType() {
+    return this._chartType;
   }
 
   @Input()
-  chartType: any = 'line';
+  pivotConfig: TPivotConfig;
 
-  public lineChartData: ChartDataSets[] = [
-    { data: [65, 59, 80, 81, 56, 55, 40], label: 'Series A' },
+  chartData: ChartDataSets[] = [
+    // { data: [65, 59, 80, 81, 56, 55, 40], label: 'Series A' },
   ];
-  public lineChartLabels: Label[] = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-  ];
-  public lineChartOptions: ChartOptions & { responsive: boolean } = {
+  chartLabels: Label[] = [];
+  chartOptions: ChartOptions & { responsive: boolean } = {
     responsive: true,
   };
-  public lineChartColors: Color[] = [
+  chartColors: Color[] = [
     {
       borderColor: 'black',
       borderWidth: 1,
       backgroundColor: 'rgba(255,0,0,0.3)',
     },
   ];
-  public lineChartLegend = true;
-  public lineChartType = 'line';
-  public lineChartPlugins = [];
 
-  constructor() {}
+  constructor(private cubejsClient: CubejsClient) {}
 
-  ngOnInit() {}
+  async ngOnInit() {
+    const query = await this.queryBuilder.query;
 
-  updateChart() {
-    if (this.resultSet) {
-      this.lineChartData = this.resultSet.series().map((item) => {
+    combineLatest([
+      query.subject.pipe(
+        mergeMap((cubeQuery) => this.cubejsClient.load(cubeQuery))
+      ),
+      this.queryBuilder.pivotConfig.subject,
+    ]).subscribe(([resultSet, pivotConfig]: [ResultSet, TPivotConfig]) => {
+      this._resultSet = resultSet;
+      this._pivotConfig = pivotConfig;
+      this.updateChart(resultSet, pivotConfig);
+    });
+  }
+
+  updateChart(resultSet: ResultSet | null, pivotConfig: TPivotConfig) {
+    if (!resultSet) {
+      return;
+    }
+
+    console.log({
+      tablePivot: resultSet.tablePivot(pivotConfig),
+      tableColumns: resultSet.tableColumns(pivotConfig),
+    });
+
+    if (this.queryBuilder.chartType === 'table') {
+      this.tableData = resultSet.tablePivot(pivotConfig);
+    } else {
+      this.chartData = resultSet.series().map((item) => {
         return {
           label: item.title,
           data: item.series.map(({ value }) => value),
         };
       });
-      this.lineChartLabels = this.resultSet.chartPivot().map((row) => row.x);
+      this.chartLabels = resultSet.chartPivot().map((row) => row.x);
     }
   }
 }

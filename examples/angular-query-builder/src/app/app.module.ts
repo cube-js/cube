@@ -4,9 +4,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatGridListModule } from '@angular/material/grid-list';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
+import { MatTableModule } from '@angular/material/table';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { BrowserModule } from '@angular/platform-browser';
@@ -21,6 +23,7 @@ import { MembersGroupComponent } from './dashboard/members-group/members-group.c
 import { TimeGroupComponent } from './dashboard/time-group/time-group.component';
 import { OrderComponent } from './dashboard/order/order.component';
 import { PivotComponent } from './dashboard/pivot/pivot.component';
+import { SettingsDialogComponent } from './settings-dialog/settings-dialog.component';
 
 const cubejsOptions = {
   token: 'environment.CUBEJS_API_TOKEN',
@@ -38,6 +41,10 @@ const cubejsOptions = {
     TimeGroupComponent,
     OrderComponent,
     PivotComponent,
+    SettingsDialogComponent
+  ],
+  entryComponents: [
+    SettingsDialogComponent
   ],
   imports: [
     BrowserModule,
@@ -53,7 +60,9 @@ const cubejsOptions = {
     DragDropModule,
     MatButtonToggleModule,
     MatTabsModule,
+    MatTableModule,
     MatInputModule,
+    MatDialogModule
   ],
   providers: [QueryBuilderService],
   bootstrap: [AppComponent],

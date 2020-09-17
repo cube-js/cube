@@ -1,0 +1,23 @@
+<mat-tab-group>
+  <mat-tab label="Pivot">
+    <app-pivot [pivotConfig]="data.pivotConfig"></app-pivot>
+  </mat-tab>
+
+  <mat-tab label="Pivot Options">Pivot Options</mat-tab>
+
+  <mat-tab label="Order">
+    <app-order [order]="data.query.order"></app-order>
+  </mat-tab>
+
+  <mat-tab label="Limit">
+    <mat-form-field apperance="fill">
+      <input
+        matInput
+        type="number"
+        placeholder="Limit"
+        [value]="data.query.asCubeQuery().limit || 10000"
+        (blur)="data.query.setLimit($event.target.value)"
+      />
+    </mat-form-field>
+  </mat-tab>
+</mat-tab-group>

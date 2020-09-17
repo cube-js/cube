@@ -15,7 +15,7 @@ import { BuilderMeta } from './builder-meta';
 import { PivotConfig } from './pivot-config';
 import { StateSubject } from './common';
 
-export type TChartType = 'line' | 'bar' | 'number';
+export type TChartType = 'line' | 'bar' | 'number' | 'table' | 'pie';
 
 export type TQueryBuilderState = {
   query?: TCubeQuery;

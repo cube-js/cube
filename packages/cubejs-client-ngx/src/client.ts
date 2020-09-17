@@ -1,6 +1,11 @@
 import { Injectable, Inject } from '@angular/core';
 import { Observable, from } from 'rxjs';
-import cubejs, { Meta, ResultSet } from '@cubejs-client/core';
+import cubejs, {
+  LoadMethodOptions,
+  Meta,
+  Query,
+  ResultSet,
+} from '@cubejs-client/core';
 
 @Injectable()
 export class CubejsClient {
@@ -21,8 +26,11 @@ export class CubejsClient {
     return this.cubeJsApi;
   }
 
-  public load(...params): Observable<ResultSet> {
-    return from(<Promise<ResultSet>>this.apiInstace().load(...params));
+  public load(
+    query: Query | Query[],
+    options?: LoadMethodOptions
+  ): Observable<ResultSet> {
+    return from(<Promise<ResultSet>>this.apiInstace().load(query, options));
   }
 
   public sql(...params): Observable<any> {

@@ -9,8 +9,20 @@ body {
   font-family: Roboto, "Helvetica Neue", sans-serif;
 }
 
-::ng-deep .mat-form-field-wrapper {
-  margin-bottom: -1.25em;
+.mat-tab-label {
+  min-width: 80px !important;
+}
+
+.mat-form-field-infix {
+  width: 100px !important;
+}
+
+.mat-form-field {
+  margin-bottom: -1.25em !important;
+}
+
+.mat-tab-body-wrapper {
+  padding: 24px 16px !important;
 }
 
 .flex-box {

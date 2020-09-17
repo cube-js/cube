@@ -2,7 +2,7 @@
   <div class="controls-container">
     <div class="controls-row">
       <members-group
-        [title]="'Measure'"
+        title="Measure"
         [members]="query.measures.asArray()"
         [allMembers]="builderMeta.measures"
         (onSelect)="query.measures.add($event)"
@@ -12,7 +12,7 @@
       <mat-divider [vertical]="true"></mat-divider>
 
       <members-group
-        [title]="'Dimension'"
+        title="Dimension"
         [members]="query.dimensions.asArray()"
         [allMembers]="builderMeta.dimensions"
         (onSelect)="query.dimensions.add($event)"
@@ -22,7 +22,7 @@
       <mat-divider [vertical]="true"></mat-divider>
 
       <members-group
-        [title]="'Segment'"
+        title="Segment"
         [members]="query.segments.asArray()"
         [allMembers]="builderMeta.segments"
         (onSelect)="query.segments.add($event)"
@@ -38,12 +38,19 @@
 
     <div class="controls-row">
       <mat-form-field appearance="fill">
-        <span matPrefix><mat-icon>multiline_chart</mat-icon></span>
+        <mat-icon matPrefix style="margin-right: 8px;">{{
+          chartTypeMap[queryBuilder.chartType] || 'multiline_chart'
+        }}</mat-icon>
+
         <mat-label>Chart Type</mat-label>
         <mat-select
-          (selectionChange)="queryBuilder.setChartType($event.value)"
           [value]="queryBuilder.chartType"
+          (selectionChange)="queryBuilder.setChartType($event.value)"
         >
+          <mat-select-trigger *ngIf="queryBuilder.chartType" matPrefix>
+            {{ queryBuilder.chartType | titlecase }}
+          </mat-select-trigger>
+
           <mat-option
             *ngFor="let item of chartTypeToIcon"
             [value]="item.chartType"
@@ -55,42 +62,25 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
+
+      <button mat-button mat-raised-button (click)="openDialog()">
+        <mat-icon>settings</mat-icon>
+        Settings
+      </button>
     </div>
   </div>
 
-  <div style="max-width: 500px;">
-    <mat-tab-group>
-      <mat-tab label="Pivot">
-        <app-pivot [pivotConfig]="queryBuilder.pivotConfig"></app-pivot>
-      </mat-tab>
-
-      <mat-tab label="Pivot Options"> Pivot Options </mat-tab>
-
-      <mat-tab label="Order">
-        <app-order [order]="query.order"></app-order>
-      </mat-tab>
-
-      <mat-tab label="Limit">
-        <mat-form-field apperance="fill">
-          <input
-            matInput
-            type="number"
-            placeholder="Limit"
-            [value]="query.asCubeQuery().limit || 10000"
-            (blur)="query.setLimit($event.target.value)"
-          />
-        </mat-form-field>
-      </mat-tab>
-    </mat-tab-group>
-  </div>
-
   <button mat-button (click)="debug()">debug</button>
-
-  <div class="debug">{{ query.asCubeQuery() | json }}</div>
 
   <button mat-button mat-stroked-button (click)="setQuery()">
     set/reset query
   </button>
 
-  <query-renderer [resultSet]="resultSet"></query-renderer>
+  <query-renderer
+    [queryBuilder]="queryBuilder"
+    [chartType]="queryBuilder.chartType"
+    [pivotConfig]="queryBuilder.pivotConfig.get()"
+  ></query-renderer>
+
+  <!-- <div class="debug">{{ query.asCubeQuery() | json }}</div> -->
 </div>
