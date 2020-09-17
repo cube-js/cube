@@ -47,7 +47,7 @@ services:
     command:
       - coordinator
     env_file:
-      - ../../environment
+      - environment
     restart: always
 
   broker:
@@ -64,7 +64,7 @@ services:
     command:
       - broker
     env_file:
-      - ../../environment
+      - environment
     restart: always
 
   historical:
@@ -82,7 +82,7 @@ services:
     command:
       - historical
     env_file:
-      - ../../environment
+      - environment
     restart: always
 
   middlemanager:
@@ -100,7 +100,7 @@ services:
     command:
       - middleManager
     env_file:
-      - ../../environment
+      - environment
     restart: always
 
   router:
@@ -117,7 +117,7 @@ services:
     command:
       - router
     env_file:
-      - ../../environment
+      - environment
     restart: always
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://localhost:8888/status/health || exit 1

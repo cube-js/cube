@@ -35,7 +35,7 @@ describe('DruidDriver', () => {
       }
 
       const dc = new DockerComposeEnvironment(
-        path.resolve(__dirname, '../../'),
+        path.resolve(path.dirname(__filename), '../../'),
         'docker-compose.yml'
       );
 
