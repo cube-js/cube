@@ -11,6 +11,7 @@ const os = require('os');
 const chalk = require('chalk');
 const spawn = require('cross-spawn');
 const crypto = require('crypto');
+const inquirer = require('inquirer');
 
 const Config = require('./Config');
 const templates = require('./templates');
@@ -52,15 +53,9 @@ const logStage = (stage) => {
 const createApp = async (projectName, options) => {
   const template = options.template || 'express';
   const createAppOptions = { projectName, dbType: options.dbType, template };
+
   event('Create App', createAppOptions);
-  if (!options.dbType) {
-    await displayError([
-      'You must pass an application name and a database type (-d).',
-      '',
-      'Example: ',
-      ' $ cubejs create hello-world -d postgres'
-    ], createAppOptions);
-  }
+
   if (await fs.pathExists(projectName)) {
     await displayError(
       `We cannot create a project called ${chalk.green(
@@ -90,6 +85,18 @@ const createApp = async (projectName, options) => {
 
   logStage('Installing server dependencies');
   await npmInstall(['@cubejs-backend/server']);
+
+  if (!options.dbType) {
+    const Drivers = await requireFromPackage('@cubejs-backend/server-core/core/DriverDependencies.js');
+    const prompt = await inquirer.prompt([{
+      type: 'list',
+      name: 'dbType',
+      message: 'Select database',
+      choices: Object.keys(Drivers)
+    }]);
+
+    options.dbType = prompt.dbType;
+  }
 
   logStage('Installing DB driver dependencies');
   const CubejsServer = await requireFromPackage('@cubejs-backend/server');
