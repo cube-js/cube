@@ -23,62 +23,53 @@ describe('DruidDriver', () => {
   };
 
   // eslint-disable-next-line consistent-return
-  before(async function before(done) {
+  before(async function() {
     this.timeout(2 * 60 * 1000);
 
-    try {
-      if (process.env.TEST_DRUID_HOST) {
-        return {
-          host: 'localhost',
-          port: process.env.TEST_DRUID_HOST,
-        };
-      }
-
-      const dc = new DockerComposeEnvironment(
-        path.resolve(path.dirname(__filename), '../../'),
-        'docker-compose.yml'
-      );
-
-      env = await dc
-        .withWaitStrategy('postgres', Wait.forHealthCheck())
-        .withWaitStrategy('router', Wait.forHealthCheck())
-        .up();
-
+    if (process.env.TEST_DRUID_HOST) {
       config = {
         host: 'localhost',
-        port: env.getContainer('router').getMappedPort(8888),
+        port: process.env.TEST_DRUID_HOST,
       };
 
-      done();
-    } catch (e) {
-      done(e);
+      return;
     }
+
+    const dc = new DockerComposeEnvironment(
+      path.resolve(path.dirname(__filename), '../../'),
+      'docker-compose.yml'
+    );
+
+    env = await dc
+      // https://github.com/testcontainers/testcontainers-node/issues/109
+      .withStartupTimeout(new Duration(90, TemporalUnit.SECONDS))
+      .withWaitStrategy('zookeeper', Wait.forLogMessage('binding to port /0.0.0.0:2181'))
+      .withWaitStrategy('postgres', Wait.forHealthCheck())
+      .withWaitStrategy('router', Wait.forHealthCheck())
+      .up();
+
+    config = {
+      host: env.getContainer('router').getContainerIpAddress(),
+      port: env.getContainer('router').getMappedPort(8888),
+    };
   });
 
   // eslint-disable-next-line consistent-return
-  after(async function(done) {
+  after(async function() {
     this.timeout(30 * 1000);
 
-    try {
-      if (env) {
-        await env.down();
-      }
-
-      done();
-    } catch (e) {
-      done(e);
+    if (env) {
+      await env.down();
     }
   });
 
-  it('should construct', async () => {
-    // @ts-ignore
+  it('should construct', async function () {
     this.timeout(10 * 1000);
 
     return doWithDriver(async () => {});
   });
 
-  it('should test connection', async () => {
-    // @ts-ignore
+  it('should test connection', async function () {
     this.timeout(10 * 1000);
 
     return doWithDriver(async (driver) => {
