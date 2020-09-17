@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.20.8](https://github.com/cube-js/cube.js/compare/v0.20.7...v0.20.8) (2020-09-16)
+
+
+### Features
+
+* Add server-core options validate ([#1089](https://github.com/cube-js/cube.js/issues/1089)) ([5580018](https://github.com/cube-js/cube.js/commit/5580018))
+* Strict cube schema parsing, show duplicate property name errors ([#1095](https://github.com/cube-js/cube.js/issues/1095)) ([d4ab530](https://github.com/cube-js/cube.js/commit/d4ab530))
+
+
+
+
+
 ## [0.20.7](https://github.com/cube-js/cube.js/compare/v0.20.6...v0.20.7) (2020-09-11)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

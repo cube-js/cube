@@ -4,7 +4,7 @@ jobs:
   test:
     resource_class: medium
     docker:
-      - image: circleci/node:10.16
+      - image: circleci/node:10.17
         environment:
           TEST_PG_USER: root
           TEST_CLICKHOUSE_HOST: localhost

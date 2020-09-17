@@ -4,6 +4,7 @@ const CompileError = require('../compiler/CompileError');
 const PostgresQuery = require('../adapter/PostgresQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 const MainPrepareCompiler = require('../compiler/PrepareCompiler');
+// eslint-disable-next-line import/no-extraneous-dependencies
 require('should');
 
 const { prepareCompiler } = PrepareCompiler;
@@ -101,6 +102,117 @@ describe('DataSchemaCompiler', function test() {
       error.should.be.instanceof(CompileError);
     });
   });
+
+  describe('Test duplicate properties', () => {
+    const invalidSchema = `
+      cube('visitors', {
+        sql: 'select * from visitors',
+        measures: {
+          count: {
+            type: 'count',
+            sql: 'id'
+          },
+          count: {
+            type: 'count',
+            sql: 'id'
+          }
+        },
+        dimensions: {
+          date: {
+            type: 'string',
+            sql: 'date'
+          }
+        }
+      })
+    `;
+
+    const validSchema = `
+      cube('visitors', {
+        sql: 'select * from visitors',
+        measures: {
+          count: {
+            type: 'count',
+            sql: 'id'
+          }
+        },
+        dimensions: {
+          date: {
+            type: 'string',
+            sql: 'date'
+          }
+        }
+      })
+    `;
+
+    it('Should compile without error, allowJsDuplicatePropsInSchema = false, valid schema', () => {
+      const { compiler } = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
+      return compiler.compile().then(() => {
+        compiler.throwIfAnyErrors();
+      });
+    });
+
+    it('Should throw error, allowJsDuplicatePropsInSchema = false, invalid schema', () => {
+      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
+      return compiler.compile().then(() => {
+        compiler.throwIfAnyErrors();
+        throw new Error();
+      }).catch((error) => {
+        error.should.be.instanceof(CompileError);
+        error.message.should.be.match(/Duplicate property parsing count/);
+      });
+    });
+
+    it('Should compile without error, allowJsDuplicatePropsInSchema = true, invalid schema', () => {
+      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
+      return compiler.compile().then(() => {
+        compiler.throwIfAnyErrors();
+      });
+    });
+
+    describe('Test perfomance', () => {
+      const schema = `
+        cube('visitors', {
+          sql: 'select * from visitors',
+          measures: {
+            count: {
+              type: 'count',
+              sql: 'id'
+            },
+            duration: {
+              type: 'avg',
+              sql: 'duration'
+            },
+          },
+          dimensions: {
+            date: {
+              type: 'string',
+              sql: 'date'
+            },
+            browser: {
+              type: 'string',
+              sql: 'browser'
+            }
+          }
+        })
+      `;
+
+      it('Should compile 200 schemas in less than 2500ms * 10', async () => {
+        const repeats = 200;
+
+        const compilerWith = prepareCompiler(schema, { allowJsDuplicatePropsInSchema: false });
+        const start = new Date().getTime();
+        for (let i = 0; i < repeats; i++) {
+          delete compilerWith.compiler.compilePromise; // Reset compile result
+          await compilerWith.compiler.compile();
+        }
+        const end = new Date().getTime();
+        const time = end - start;
+        
+        time.should.be.below(2500 * 10);
+      });
+    });
+  });
+  
 
   it('calculated metrics', () => {
     const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`

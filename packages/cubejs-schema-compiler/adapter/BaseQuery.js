@@ -102,6 +102,14 @@ class BaseQuery {
             measure: measure[0],
           };
         }
+        if (!dimension.length && !measure.length) {
+          return {
+            values: [],
+            operator,
+            dimension: null,
+            measure: null,
+          };
+        }
         throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
       }
 

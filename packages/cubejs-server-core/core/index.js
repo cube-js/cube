@@ -434,7 +434,8 @@ class CubejsServerCore {
           externalDialectClass: this.externalDialectFactory && this.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
-          context
+          context,
+          allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema
         }
       );
       this.compilerCache.set(appId, compilerApi);
@@ -499,6 +500,7 @@ class CubejsServerCore {
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
+      allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema
     });
   }
 

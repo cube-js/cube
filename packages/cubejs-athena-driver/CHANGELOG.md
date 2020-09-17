@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.20.8](https://github.com/cube-js/cube.js/compare/v0.20.7...v0.20.8) (2020-09-16)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/athena-driver:** Show views in Playground for Athena ([#1090](https://github.com/cube-js/cube.js/issues/1090)) ([f8ce729](https://github.com/cube-js/cube.js/commit/f8ce729))
+
+
+
+
+
 # [0.20.0](https://github.com/cube-js/cube.js/compare/v0.19.61...v0.20.0) (2020-08-26)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

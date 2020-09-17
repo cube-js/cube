@@ -768,6 +768,97 @@ describe('SQL Generation', function test() {
     });
   }));
 
+  it('where filter without arguments', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.source',
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [
+        {
+          and: [
+            {
+              and: [
+                {
+                  or: [
+                    {
+                      and: [
+                        {
+                          member: 'visitors.source',
+                          operator: 'equals',
+                          values: ['some']
+                        }
+                      ]
+                    },
+                    {
+                      and: []
+                    }
+                  ]
+                }]
+            }]
+        }],
+      order: [{
+        'visitors.visitor_count': 'desc'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual([{ 'visitors__source': 'some', 'visitors__visitor_count': '2' }]);
+    });
+  }));
+
+  it('where filter without any arguments', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.source',
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [
+        {
+          and: [
+            {
+              and: [
+                {
+                  or: [
+                    {
+                      and: []
+                    },
+                    {
+                      and: []
+                    }
+                  ]
+                }]
+            }]
+        }],
+      order: [{
+        'visitors.visitor_count': 'desc'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [
+          { 'visitors__source': null, 'visitors__visitor_count': '3' },
+          { 'visitors__source': 'google', 'visitors__visitor_count': '1' },
+          { 'visitors__source': 'some', 'visitors__visitor_count': '2' }
+        ]
+      );
+    });
+  }));
   it('where filter with incorrect one arguments', () => compiler.compile().then(() => {
     try {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

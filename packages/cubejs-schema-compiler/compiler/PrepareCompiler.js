@@ -1,5 +1,6 @@
 const CubeValidator = require('./CubeValidator');
 const DataSchemaCompiler = require('./DataSchemaCompiler');
+const CubeCheckDuplicatePropTranspiler = require('./CubeCheckDuplicatePropTranspiler');
 const CubePropContextTranspiler = require('./CubePropContextTranspiler');
 const ImportExportTranspiler = require('./ImportExportTranspiler');
 const CubeSymbols = require('./CubeSymbols');
@@ -32,10 +33,20 @@ exports.prepareCompiler = (repo, options) => {
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
+
+  const transpilers = [
+    new ImportExportTranspiler(),
+    new CubePropContextTranspiler(cubeSymbols, cubeDictionary),
+  ];
+
+  if (!options.allowJsDuplicatePropsInSchema) {
+    transpilers.push(new CubeCheckDuplicatePropTranspiler());
+  }
+
   const compiler = new DataSchemaCompiler(repo, Object.assign({}, {
     cubeNameCompilers: [cubeDictionary],
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
-    transpilers: [new ImportExportTranspiler(), new CubePropContextTranspiler(cubeSymbols, cubeDictionary)],
+    transpilers,
     cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
     contextCompilers: [contextEvaluator],
     dashboardTemplateCompilers: [dashboardTemplateEvaluator],
