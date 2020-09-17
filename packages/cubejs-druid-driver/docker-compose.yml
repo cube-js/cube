@@ -19,6 +19,11 @@ services:
       - POSTGRES_USER=druid
       - POSTGRES_DB=druid
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U druid"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Need 3.5 or later for container nodes
   zookeeper:
@@ -114,3 +119,8 @@ services:
     env_file:
       - ../../environment
     restart: always
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8888/status/health || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
