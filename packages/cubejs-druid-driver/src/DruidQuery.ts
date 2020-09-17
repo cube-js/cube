@@ -36,7 +36,7 @@ export class DruidQuery extends BaseQuery {
     return `(${date} + INTERVAL ${interval})`;
   }
 
-  timeStampCast(value: number) {
+  timeStampCast(value: string) {
     return `TIME_PARSE(${value})`;
   }
 

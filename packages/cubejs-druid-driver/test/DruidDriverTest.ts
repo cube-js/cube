@@ -3,24 +3,23 @@
 import { DockerComposeEnvironment, StartedDockerComposeEnvironment, Wait } from 'testcontainers';
 import path from 'path';
 import { DruidDriver } from '../src';
+import { DruidClientConfiguration } from '../src/DruidClient';
 
 // eslint-disable-next-line import/no-extraneous-dependencies
 require('should');
 
 describe('DruidDriver', () => {
   let env: StartedDockerComposeEnvironment|null = null;
-  let config: any = {};
+  let config: Partial<DruidClientConfiguration> = {};
 
   const doWithDriver = async (callback: (driver: DruidDriver) => Promise<any>) => {
-    const driver = new DruidDriver({
-      user: 'test',
-    });
+    const driver = new DruidDriver(config);
 
     await callback(driver);
   };
 
   // eslint-disable-next-line consistent-return
-  before(async function before() {
+  before(async function before(done) {
     this.timeout(20000);
 
     if (process.env.TEST_DRUID_HOST) {
@@ -43,6 +42,8 @@ describe('DruidDriver', () => {
       host: 'localhost',
       port: env.getContainer('router').getMappedPort(8888),
     };
+
+    done();
   });
 
   after(async () => {

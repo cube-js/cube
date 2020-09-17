@@ -2,7 +2,7 @@ import Axios from 'axios';
 
 export type DruidClientConfiguration = {
   host?: string,
-  port?: string,
+  port?: string|number,
   user?: string,
   password?: string,
   database?: string,
@@ -21,6 +21,9 @@ export class DruidClient {
         'Content-Type': 'application/json',
       }
     });
+
+    // CUBEJS_DB_URL?
+    // @todo authorization!?
   }
 
   public async cancel(queryId: string) {
