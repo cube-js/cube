@@ -58,7 +58,8 @@ const schemaOptions = Joi.object().keys({
       queueOptions: schemaQueueOptions
     }
   }),
-  allowJsDuplicatePropsInSchema: Joi.boolean()
+  allowJsDuplicatePropsInSchema: Joi.boolean(),
+  scheduledRefreshContexts: Joi.func()
 });
 
 
