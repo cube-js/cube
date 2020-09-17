@@ -38,7 +38,6 @@ describe('SQL Generation', function test() {
     }) 
     `);
 
-    
   it('Test for everyRefreshKeySql', () => {
     const result = compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -94,7 +93,7 @@ describe('SQL Generation', function test() {
           every: '*/9 */7 * * *',
           timezone: 'America/Los_Angeles'
         });
-        
+
         throw new Error();
       } catch (error) {
         error.should.be.instanceof(UserError);

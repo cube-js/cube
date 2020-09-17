@@ -533,9 +533,11 @@ class CubejsServerCore {
 
     const module = CubejsServerCore.lookupDriverClass(dbType);
     if (module.default) {
+      // eslint-disable-next-line new-cap
       return new module.default();
     }
 
+    // eslint-disable-next-line new-cap
     return new module();
   }
 
