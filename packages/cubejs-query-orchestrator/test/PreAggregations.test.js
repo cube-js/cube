@@ -252,4 +252,86 @@ describe('PreAggregations', () => {
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
     });
   });
+
+  describe(`naming_version tests`, () => {
+    let preAggregations = null;
+    let PreAggregations = null;
+
+    beforeEach(async () => {
+      PreAggregations = require('../orchestrator/PreAggregations');
+      preAggregations = new PreAggregations(
+        "TEST",
+        mockDriverFactory,
+        (msg, params) => {},
+        queryCache,
+        {
+          queueOptions: {
+            executionTimeout: 1
+          },
+          externalDriverFactory: async () => {
+            const driver = mockExternalDriver;
+            driver.createTable("stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209");
+            driver.createTable("stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652");
+            return driver;
+          },
+        },
+      );
+    });
+
+    test('test for function targetTableName', () => {
+      let result = PreAggregations.targetTableName({
+        table_name:'orders_number_and_count20191101',
+        content_version:'kjypcoio',
+        structure_version:'5yftl5il',
+        last_updated_at:1600329890789, 
+      });
+      expect(result).toEqual('orders_number_and_count20191101_kjypcoio_5yftl5il_1600329890789')
+
+      result = PreAggregations.targetTableName({
+        table_name:'orders_number_and_count20191101',
+        content_version:'kjypcoio',
+        structure_version:'5yftl5il',
+        last_updated_at:1600329890789, 
+        naming_version:2
+      });
+      expect(result).toEqual('orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652')
+    }); 
+
+    test('naming_version and sort by last_updated_at', async () => {
+      const result = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal); 
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652/); 
+    }); 
+  });
+
+  describe(`naming_version sort tests`, () => {
+    let preAggregations = null;
+    let PreAggregations = null;
+
+    beforeEach(async () => {
+      PreAggregations = require('../orchestrator/PreAggregations');
+      preAggregations = new PreAggregations(
+        "TEST",
+        mockDriverFactory,
+        (msg, params) => {},
+        queryCache,
+        {
+          queueOptions: {
+            executionTimeout: 1
+          },
+          externalDriverFactory: async () => {
+            const driver = mockExternalDriver;
+            driver.createTable("stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209");
+            driver.createTable("stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652");
+            return driver;
+          },
+        },
+      );
+    });
+
+    test('naming_version and sort by last_updated_at', async () => {
+      const result = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal); 
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209/); 
+    }); 
+  });
+
 });

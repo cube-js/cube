@@ -197,28 +197,23 @@ const cubeSchema = Joi.object().keys({
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('autoRollup').required(),
       maxPreAggregations: Joi.number(),
-      // sqlAlias: Joi.string().optional(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
       timeDimensionReference: Joi.func().required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
-      // sqlAlias: Joi.string().optional(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
       type: Joi.any().valid('originalSql').required(),
-      // sqlAlias: Joi.string().optional(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
-      // sqlAlias: Joi.string().optional(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func()
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
-      // sqlAlias: Joi.string().optional(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
