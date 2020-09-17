@@ -284,6 +284,7 @@ class CubejsServerCore {
           anonymousId,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
+          nodeVersion: process.version,
           ...props
         });
       } catch (e) {
