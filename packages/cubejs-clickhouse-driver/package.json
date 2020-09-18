@@ -13,7 +13,8 @@
   },
   "main": "driver/ClickHouseDriver.js",
   "scripts": {
-    "test": "mocha",
+    "integration": "mocha",
+    "integration:clickhouse": "mocha",
     "lint": "eslint **/*.js"
   },
   "dependencies": {

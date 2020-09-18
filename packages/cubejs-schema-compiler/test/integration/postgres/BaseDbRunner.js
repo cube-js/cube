@@ -8,6 +8,7 @@ class BaseDbRunner {
       console.log('Starting container');
       this.container = await this.containerLazyInit();
     }
+
     if (!this.connection) {
       console.log('Initializing connection');
       const port = this.container ? this.container.getMappedPort(this.port()) : this.port();

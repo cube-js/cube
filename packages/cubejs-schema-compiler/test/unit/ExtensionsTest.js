@@ -1,6 +1,6 @@
 /* globals it,describe */
 /* eslint-disable quote-props */
-const PostgresQuery = require('../adapter/PostgresQuery');
+const PostgresQuery = require('../../adapter/PostgresQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 

@@ -1,4 +1,4 @@
-const PrepareCompiler = require('../compiler/PrepareCompiler');
+const PrepareCompiler = require('../../compiler/PrepareCompiler');
 
 exports.prepareCompiler = (content, options) => PrepareCompiler.prepareCompiler({
   localPath: () => __dirname,

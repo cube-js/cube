@@ -3,8 +3,8 @@
 const R = require('ramda');
 require('should');
 
-const MySqlQuery = require('../adapter/MysqlQuery');
-const { prepareCompiler } = require('./PrepareCompiler');
+const MySqlQuery = require('../../../adapter/MysqlQuery');
+const { prepareCompiler } = require('../../unit/PrepareCompiler');
 
 const dbRunner = require('./MySqlDbRunner');
 

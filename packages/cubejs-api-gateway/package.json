@@ -12,7 +12,8 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "jest",
+    "test": "npm run unit",
+    "unit": "jest",
     "lint": "eslint *.js"
   },
   "main": "index.js",

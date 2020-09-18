@@ -21,7 +21,8 @@
     "uuid": "^3.4.0"
   },
   "scripts": {
-    "test": "jest",
+    "test": "npm run unit",
+    "unit": "jest",
     "lint": "eslint src/*.js"
   },
   "files": [

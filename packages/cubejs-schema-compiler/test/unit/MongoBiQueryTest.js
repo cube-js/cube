@@ -1,6 +1,6 @@
 /* globals it, describe, after */
 /* eslint-disable quote-props */
-const MongoBiQuery = require('../adapter/MongoBiQuery');
+const MongoBiQuery = require('../../adapter/MongoBiQuery');
 const PrepareCompiler = require('./PrepareCompiler');
 require('should');
 

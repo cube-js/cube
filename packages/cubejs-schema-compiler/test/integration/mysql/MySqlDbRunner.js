@@ -2,7 +2,7 @@ const { GenericContainer } = require('testcontainers');
 const mysql = require('mysql');
 const { promisify } = require('util');
 
-const BaseDbRunner = require('./BaseDbRunner');
+const BaseDbRunner = require('../postgres/BaseDbRunner');
 
 class MSSqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {

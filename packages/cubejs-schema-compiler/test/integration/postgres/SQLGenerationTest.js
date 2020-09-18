@@ -1,22 +1,22 @@
+/* globals it, describe, after */
 /* eslint-disable quote-props */
-/* globals describe, after, it */
-const UserError = require('../compiler/UserError');
-const PrepareCompiler = require('./PrepareCompiler');
+const UserError = require('../../../compiler/UserError');
+const PostgresQuery = require('../../../adapter/PostgresQuery');
+const BigqueryQuery = require('../../../adapter/BigqueryQuery');
+const PrepareCompiler = require('../../unit/PrepareCompiler');
 require('should');
 
 const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./ClickHouseDbRunner');
+const dbRunner = require('./PostgresDBRunner');
 
-const { debugLog, logSqlAndParams } = require('./TestUtil');
-
-describe('ClickHouse JoinGraph', function test() {
-  this.timeout(200000);
+describe('SQL Generation', function test() {
+  this.timeout(90000);
 
   after(async () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -27,6 +27,8 @@ describe('ClickHouse JoinGraph', function test() {
       select * from visitors WHERE \${USER_CONTEXT.source.filter('source')} AND
       \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
+      
+      rewriteQueries: true,
       
       refreshKey: {
         sql: 'SELECT 1',
@@ -99,7 +101,8 @@ describe('ClickHouse JoinGraph', function test() {
         averageCheckins: {
           type: 'avg',
           sql: \`\${doubledCheckings}\`
-        }
+        },
+        ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
       },
 
       dimensions: {
@@ -126,6 +129,13 @@ describe('ClickHouse JoinGraph', function test() {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true
+        },
+        
+        checkinsWithPropagation: {
+          sql: \`\${visitor_checkins.visitor_checkins_count}\`,
+          type: \`number\`,
+          subQuery: true,
+          propagateFiltersToSubQuery: true
         },
         
         subQueryFail: {
@@ -158,8 +168,10 @@ describe('ClickHouse JoinGraph', function test() {
 
     cube('visitor_checkins', {
       sql: \`
-      select * from visitor_checkins
+      select * from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')}
       \`,
+      
+      rewriteQueries: true,
 
       joins: {
         cards: {
@@ -214,22 +226,22 @@ describe('ClickHouse JoinGraph', function test() {
         },
       },
       
-      // preAggregations: {
-      //   checkinSource: {
-      //     type: 'rollup',
-      //     measureReferences: [visitors.per_visitor_revenue],
-      //     dimensionReferences: [visitor_checkins.source],
-      //     timeDimensionReference: visitors.created_at,
-      //     granularity: 'day'
-      //   },
-      //   visitorCountCheckinSource: {
-      //     type: 'rollup',
-      //     measureReferences: [visitors.visitor_revenue],
-      //     dimensionReferences: [visitor_checkins.source],
-      //     timeDimensionReference: visitors.created_at,
-      //     granularity: 'day'
-      //   }
-      // }
+      preAggregations: {
+        checkinSource: {
+          type: 'rollup',
+          measureReferences: [visitors.per_visitor_revenue],
+          dimensionReferences: [visitor_checkins.source],
+          timeDimensionReference: visitors.created_at,
+          granularity: 'day'
+        },
+        visitorCountCheckinSource: {
+          type: 'rollup',
+          measureReferences: [visitors.visitor_revenue],
+          dimensionReferences: [visitor_checkins.source],
+          timeDimensionReference: visitors.created_at,
+          granularity: 'day'
+        }
+      }
     })
 
     cube('cards', {
@@ -262,8 +274,8 @@ describe('ClickHouse JoinGraph', function test() {
     cube('ReferenceVisitors', {
       sql: \`
         select * from \${visitors.sql()} as t 
-        WHERE \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter(\`addDays(t.created_at, 28)\`)} AND
-        \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter((from, to) => \`(addDays(t.created_at,28)) >= parseDateTimeBestEffort(\${from}) AND (addDays(t.created_at, 28)) <= parseDateTimeBestEffort(\${to})\`)}
+        WHERE \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter(\`(t.created_at + interval '28 day')\`)} AND
+        \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter((from, to) => \`(t.created_at + interval '28 day') >= \${from} AND (t.created_at + interval '28 day') <= \${to}\`)}
       \`,
       
       measures: {
@@ -286,14 +298,29 @@ describe('ClickHouse JoinGraph', function test() {
         }
       }
     })
+    
+    cube('CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName', {
+      sql: \`
+      select * from cards
+      \`,
+      
+      sqlAlias: 'cube_with_long_name',
+      
+      dataSource: 'oracle',
+
+      measures: {
+        count: {
+          type: 'count'
+        }
+      }
+    });
     `);
 
-  // FAILS - ClickHouse doesn't support OR in JOIN expressions
-  it.skip('simple join', () => {
+  it('simple join', () => {
     const result = compiler.compile().then(() => {
-      debugLog(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
+      console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
 
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.visitor_revenue',
           'visitors.visitor_count',
@@ -311,7 +338,8 @@ describe('ClickHouse JoinGraph', function test() {
         }]
       });
 
-      logSqlAndParams(query);
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         res.should.be.deepEqual(
@@ -354,12 +382,12 @@ describe('ClickHouse JoinGraph', function test() {
 
   function runQueryTest(q, expectedResult) {
     return compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, q);
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
+        console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           expectedResult
         );
@@ -387,10 +415,9 @@ describe('ClickHouse JoinGraph', function test() {
     'visitors__per_visitor_revenue': '60'
   }]));
 
-  // FAILS - need to finish query to override ::timestamptz
-  it.skip('running total', () => {
+  it('running total', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.revenueRunning'
         ],
@@ -405,11 +432,11 @@ describe('ClickHouse JoinGraph', function test() {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       // TODO ordering doesn't work for running total
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
+        console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [{
             'visitors__created_at_day': '2017-01-01T00:00:00.000Z',
@@ -449,8 +476,7 @@ describe('ClickHouse JoinGraph', function test() {
     return result;
   });
 
-  // FAILS - need to finish query to override ::timestamptz
-  it.skip('rolling', () => runQueryTest({
+  it('rolling', () => runQueryTest({
     measures: [
       'visitors.revenueRolling'
     ],
@@ -476,8 +502,7 @@ describe('ClickHouse JoinGraph', function test() {
     { 'visitors__created_at_day': '2017-01-10T00:00:00.000Z', 'visitors__revenue_rolling': null }
   ]));
 
-  // FAILS - need to finish query to override ::timestamptz
-  it.skip('rolling multiplied', () => runQueryTest({
+  it('rolling multiplied', () => runQueryTest({
     measures: [
       'visitors.revenueRolling',
       'visitor_checkins.visitor_checkins_count'
@@ -500,22 +525,21 @@ describe('ClickHouse JoinGraph', function test() {
     {
       'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
       'visitors__revenue_rolling': '100',
-      'visitor_checkins.visitor_checkins_count': '2'
+      'visitor_checkins__visitor_checkins_count': '2'
     },
     {
       'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
       'visitors__revenue_rolling': '200',
-      'visitor_checkins.visitor_checkins_count': '1'
+      'visitor_checkins__visitor_checkins_count': '1'
     },
     {
       'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
       'visitors__revenue_rolling': '500',
-      'visitor_checkins.visitor_checkins_count': '0'
+      'visitor_checkins__visitor_checkins_count': '0'
     }
   ]));
 
-  // FAILS - Syntax error: failed at position 107
-  it.skip('rolling month', () => runQueryTest({
+  it('rolling month', () => runQueryTest({
     measures: [
       'visitors.revenueRolling3day'
     ],
@@ -532,8 +556,7 @@ describe('ClickHouse JoinGraph', function test() {
     { 'visitors__created_at_week': '2017-01-09T00:00:00.000Z', 'visitors__revenue_rolling3day': '900' }
   ]));
 
-  // FAILS - Syntax error: failed at position 249
-  it.skip('rolling count', () => runQueryTest({
+  it('rolling count', () => runQueryTest({
     measures: [
       'visitors.countRolling'
     ],
@@ -573,10 +596,10 @@ describe('ClickHouse JoinGraph', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { 'visitors__created_at_sql_utils_day': '2017-01-02T00:00:00.000', 'visitors__visitor_count': '1' },
-    { 'visitors__created_at_sql_utils_day': '2017-01-04T00:00:00.000', 'visitors__visitor_count': '1' },
-    { 'visitors__created_at_sql_utils_day': '2017-01-05T00:00:00.000', 'visitors__visitor_count': '1' },
-    { 'visitors__created_at_sql_utils_day': '2017-01-06T00:00:00.000', 'visitors__visitor_count': '2' }
+    { 'visitors__created_at_sql_utils_day': '2017-01-02T00:00:00.000Z', 'visitors__visitor_count': '1' },
+    { 'visitors__created_at_sql_utils_day': '2017-01-04T00:00:00.000Z', 'visitors__visitor_count': '1' },
+    { 'visitors__created_at_sql_utils_day': '2017-01-05T00:00:00.000Z', 'visitors__visitor_count': '1' },
+    { 'visitors__created_at_sql_utils_day': '2017-01-06T00:00:00.000Z', 'visitors__visitor_count': '2' }
   ]));
 
   it('running total total', () => runQueryTest({
@@ -597,8 +620,7 @@ describe('ClickHouse JoinGraph', function test() {
     }
   ]));
 
-  // FAILS Unmatched parentheses
-  it.skip('running total ratio', () => runQueryTest({
+  it('running total ratio', () => runQueryTest({
     measures: [
       'visitors.runningRevenuePerCount'
     ],
@@ -624,11 +646,9 @@ describe('ClickHouse JoinGraph', function test() {
     { 'visitors__created_at_day': '2017-01-10T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' }
   ]));
 
-  // FAILS ClickHouse supports multiple approximate aggregators:
-  // uniq, uniqCombined, uniqHLL12, need to pick one to use and implement it in query
-  it.skip('hll rolling', () => {
+  it('hll rolling', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.countDistinctApproxRolling'
         ],
@@ -643,7 +663,7 @@ describe('ClickHouse JoinGraph', function test() {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.MERGE/);
       query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.INIT/);
@@ -654,7 +674,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('calculated join', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitor_checkins.revenue_per_checkin'
         ],
@@ -662,10 +682,10 @@ describe('ClickHouse JoinGraph', function test() {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
+        console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [{ 'visitor_checkins__revenue_per_checkin': '50' }]
         );
@@ -677,7 +697,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('filter join', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitor_checkins.google_sourced_checkins'
         ],
@@ -685,10 +705,10 @@ describe('ClickHouse JoinGraph', function test() {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
+        console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [{ 'visitor_checkins__google_sourced_checkins': '1' }]
         );
@@ -700,21 +720,21 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('filter join not multiplied', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitor_checkins.google_sourced_checkins'
         ],
         timeDimensions: [],
         filters: [
-          { dimension: 'cards.id', operator: 'equals', values: [3] } // must be number
+          { dimension: 'cards.id', operator: 'equals', values: ['3'] }
         ],
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
+        console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [{ 'visitor_checkins__google_sourced_checkins': '1' }]
         );
@@ -725,7 +745,7 @@ describe('ClickHouse JoinGraph', function test() {
   });
 
   it('having filter', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -737,17 +757,17 @@ describe('ClickHouse JoinGraph', function test() {
       filters: [{
         dimension: 'visitors.visitor_count',
         operator: 'gt',
-        values: [1] // must be a number
+        values: ['1']
       }],
       order: [{
         id: 'visitors.source'
       }]
     });
 
-    logSqlAndParams(query);
-      
+    console.log(query.buildSqlAndParams());
+
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
         [{
           'visitors__source': 'some',
@@ -761,7 +781,7 @@ describe('ClickHouse JoinGraph', function test() {
   }));
 
   it('having filter without measure', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -771,33 +791,29 @@ describe('ClickHouse JoinGraph', function test() {
       filters: [{
         dimension: 'visitors.visitor_count',
         operator: 'gt',
-        values: [1] // must be a number
+        values: ['1']
       }],
       order: [{
         id: 'visitors.source'
       }]
     });
 
-    logSqlAndParams(query);
+    console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
-        [
-          {
-            'visitors__source': 'some'
-          },
-          {
-            'visitors__source': null
-          },
-        ]
+        [{
+          'visitors__source': 'some'
+        }, {
+          'visitors__source': null
+        }]
       );
     });
   }));
 
-  // FAILS - doesnt support OR in JOIN
-  it.skip('having filter without measure with join', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('having filter without measure with join', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -807,17 +823,17 @@ describe('ClickHouse JoinGraph', function test() {
       filters: [{
         dimension: 'visitor_checkins.revenue_per_checkin',
         operator: 'gte',
-        values: [60] // must be a number
+        values: ['60']
       }],
       order: [{
         id: 'visitors.source'
       }]
     });
 
-    logSqlAndParams(query);
+    console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
         [{
           'visitors__source': 'some'
@@ -827,7 +843,7 @@ describe('ClickHouse JoinGraph', function test() {
   }));
 
   it('having filter without measure single multiplied', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -837,7 +853,7 @@ describe('ClickHouse JoinGraph', function test() {
       filters: [{
         dimension: 'visitors.visitor_revenue',
         operator: 'gte',
-        values: [1] // must be a number
+        values: ['1']
       }, {
         dimension: 'visitor_checkins.source',
         operator: 'equals',
@@ -848,10 +864,10 @@ describe('ClickHouse JoinGraph', function test() {
       }]
     });
 
-    logSqlAndParams(query);
+    console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
         [{
           'visitors__source': 'some'
@@ -862,7 +878,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('subquery', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.visitor_count'
         ],
@@ -881,26 +897,26 @@ describe('ClickHouse JoinGraph', function test() {
         }]
       });
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
+        console.log(JSON.stringify(res));
         res.should.be.deepEqual(
           [{
             'visitors__checkins': '0',
-            'visitors__created_at_day': '2017-01-06T00:00:00.000',
+            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
             'visitors__visitor_count': '2'
           }, {
             'visitors__checkins': '1',
-            'visitors__created_at_day': '2017-01-05T00:00:00.000',
+            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
             'visitors__visitor_count': '1'
           }, {
             'visitors__checkins': '2',
-            'visitors__created_at_day': '2017-01-04T00:00:00.000',
+            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
             'visitors__visitor_count': '1'
           }, {
             'visitors__checkins': '3',
-            'visitors__created_at_day': '2017-01-02T00:00:00.000',
+            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
             'visitors__visitor_count': '1'
           }]
         );
@@ -910,12 +926,55 @@ describe('ClickHouse JoinGraph', function test() {
     return result;
   });
 
-  // ClickHouse does NOT support correlated subqueries
-  // the SQL will have to be re-written to use array functions
-  // FAILS Error: Unknown identifier: visitors.created_at_date
-  it.skip('average subquery', () => {
+  it('subquery with propagated filters', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.checkinsWithPropagation'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: [{
+        id: 'visitors.checkins'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'visitors__checkins_with_propagation': '0',
+          'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
+          'visitors__visitor_count': '2'
+        }, {
+          'visitors__checkins_with_propagation': '1',
+          'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
+          'visitors__visitor_count': '1'
+        }, {
+          'visitors__checkins_with_propagation': '2',
+          'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
+          'visitors__visitor_count': '1'
+        }, {
+          'visitors__checkins_with_propagation': '3',
+          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
+          'visitors__visitor_count': '1'
+        }]
+      );
+    });
+  }));
+
+  it('average subquery', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.averageCheckins'
         ],
@@ -935,12 +994,12 @@ describe('ClickHouse JoinGraph', function test() {
         }]
       });
 
-      logSqlAndParams(query);
+      console.log(query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
+        console.log(JSON.stringify(res));
         res.should.be.deepEqual(
-          [{ 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__average_checkins': '6__0000000000000000' }]
+          [{ 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__average_checkins': '6.0000000000000000' }]
         );
       });
     });
@@ -995,15 +1054,15 @@ describe('ClickHouse JoinGraph', function test() {
     }]
   }, [
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-02T00:00:00.000',
+      'visitors__min_visitor_checkin_date_day': '2017-01-02T00:00:00.000Z',
       'visitors__visitor_count': '1'
     },
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-04T00:00:00.000',
+      'visitors__min_visitor_checkin_date_day': '2017-01-04T00:00:00.000Z',
       'visitors__visitor_count': '1'
     },
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-05T00:00:00.000',
+      'visitors__min_visitor_checkin_date_day': '2017-01-05T00:00:00.000Z',
       'visitors__visitor_count': '1'
     }
   ]));
@@ -1049,9 +1108,8 @@ describe('ClickHouse JoinGraph', function test() {
     }
   ]));
 
-  // TODO
-  it.skip('join rollup pre-aggregation', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('join rollup pre-aggregation', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.per_visitor_revenue'
       ],
@@ -1077,16 +1135,16 @@ describe('ClickHouse JoinGraph', function test() {
       preAggregationsSchema: ''
     });
 
-    logSqlAndParams(query);
-
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription()[0];
-    debugLog(preAggregationsDescription);
+    console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
       [preAggregationsDescription.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), preAggregationsDescription.loadSql[1]],
       query.buildSqlAndParams()
     ])).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
         [
           {
@@ -1099,16 +1157,17 @@ describe('ClickHouse JoinGraph', function test() {
     });
   }));
 
-  // TODO
-  it.skip('join rollup total pre-aggregation', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('join rollup total pre-aggregation', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_revenue'
       ],
       timeDimensions: [{
         dimension: 'visitors.created_at',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-30']
       }],
+      dimensions: ['visitor_checkins.source'],
       timezone: 'America/Los_Angeles',
       order: [],
       filters: [{
@@ -1119,10 +1178,10 @@ describe('ClickHouse JoinGraph', function test() {
       preAggregationsSchema: ''
     });
 
-    logSqlAndParams(query);
-
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription()[0];
-    debugLog(preAggregationsDescription);
+    console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
       [
@@ -1131,19 +1190,19 @@ describe('ClickHouse JoinGraph', function test() {
       ],
       query.buildSqlAndParams()
     ])).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
-        [
-          {
-            'visitors__visitor_revenue': '100'
-          }
-        ]
+        [{
+          'visitor_checkins__source': 'google',
+          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
+          'visitors__visitor_revenue': '100'
+        }]
       );
     });
   }));
 
   it('user context', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -1154,10 +1213,10 @@ describe('ClickHouse JoinGraph', function test() {
       }
     });
 
-    logSqlAndParams(query);
+    console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
         [{ 'visitor_checkins__revenue_per_checkin': '60' }]
       );
@@ -1165,7 +1224,7 @@ describe('ClickHouse JoinGraph', function test() {
   }));
 
   it('user context array', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -1178,10 +1237,10 @@ describe('ClickHouse JoinGraph', function test() {
       }
     });
 
-    logSqlAndParams(query);
+    console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      debugLog(JSON.stringify(res));
+      console.log(JSON.stringify(res));
       res.should.be.deepEqual(
         [{ 'visitor_checkins__revenue_per_checkin': '50' }]
       );
@@ -1219,12 +1278,11 @@ describe('ClickHouse JoinGraph', function test() {
     timezone: 'America/Los_Angeles',
     order: [{ id: 'visitors.location' }],
   }, [
-    // in ClickHouse float to string omits any trailing zeros after the decimal point
-    { 'visitors__location': '120.12,10.6' },
-    { 'visitors__location': '120.12,40.6' },
-    { 'visitors__location': '120.12,58.1' },
-    { 'visitors__location': '120.12,58.6' },
-    { 'visitors__location': '120.12,70.6' }
+    { 'visitors__location': '120.120,10.60' },
+    { 'visitors__location': '120.120,40.60' },
+    { 'visitors__location': '120.120,58.10' },
+    { 'visitors__location': '120.120,58.60' },
+    { 'visitors__location': '120.120,70.60' }
   ]));
 
   it('applies measure_filter type filter', () => runQueryTest({
@@ -1236,10 +1294,10 @@ describe('ClickHouse JoinGraph', function test() {
       operator: 'measure_filter'
     }],
     timezone: 'America/Los_Angeles',
-    order: [{ id: 'visitors.id' }], // was visitors.location which is odd since its not in the select list
+    order: [{ id: 'visitors.location' }],
   }, [
-    { 'visitors__id': '1' }, // all numbers are transformed to strings.  ClickHouse returns large number types as strings so we normalise that to all numbers as strings
-    { 'visitors__id': '2' }
+    { 'visitors__id': 1 },
+    { 'visitors__id': 2 }
   ]));
 
   it(
@@ -1264,6 +1322,75 @@ describe('ClickHouse JoinGraph', function test() {
     ])
   );
 
+  it(
+    'contains null filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.source',
+        operator: 'contains',
+        values: ['goo', null]
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    }, [
+      { 'visitors__source': 'google' },
+      { 'visitors__source': null }
+    ])
+  );
+
+  it(
+    'null filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.source',
+        operator: 'equals',
+        values: ['google', null]
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    }, [
+      { 'visitors__source': 'google' },
+      { 'visitors__source': null },
+    ])
+  );
+
+  it(
+    'not equals filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.source',
+        operator: 'notEquals',
+        values: ['google']
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    }, [
+      { 'visitors__source': 'some' },
+      { 'visitors__source': null },
+    ])
+  );
+
   it('year granularity', () => runQueryTest({
     measures: [
       'visitors.visitor_count'
@@ -1279,12 +1406,276 @@ describe('ClickHouse JoinGraph', function test() {
     timezone: 'America/Los_Angeles'
   }, [
     {
-      'visitors__created_at_year': '2016-01-01T00:00:00.000',
+      'visitors__created_at_year': '2016-01-01T00:00:00.000Z',
       'visitors__visitor_count': '1'
     },
     {
-      'visitors__created_at_year': '2017-01-01T00:00:00.000',
+      'visitors__created_at_year': '2017-01-01T00:00:00.000Z',
       'visitors__visitor_count': '5'
     }
   ]));
+
+  it('minute granularity', () => runQueryTest({
+    measures: [
+      'visitors.visitor_count'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'minute',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [{
+    'visitors__created_at_minute': '2016-09-06T17:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_minute': '2017-01-02T16:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_minute': '2017-01-04T16:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_minute': '2017-01-05T16:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_minute': '2017-01-06T16:00:00.000Z',
+    'visitors__visitor_count': '2'
+  }]));
+
+  it('second granularity', () => runQueryTest({
+    measures: [
+      'visitors.visitor_count'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'second',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [{
+    'visitors__created_at_second': '2016-09-06T17:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_second': '2017-01-02T16:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_second': '2017-01-04T16:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_second': '2017-01-05T16:00:00.000Z',
+    'visitors__visitor_count': '1'
+  }, {
+    'visitors__created_at_second': '2017-01-06T16:00:00.000Z',
+    'visitors__visitor_count': '2'
+  }]));
+
+  it('time date ranges', () => runQueryTest({
+    measures: [
+      'visitors.visitor_count'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2017-01-02T15:00:00', '2017-01-02T17:00:00']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    {
+      'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
+      'visitors__visitor_count': '1'
+    }
+  ]));
+
+  it('ungrouped', () => runQueryTest({
+    measures: [],
+    dimensions: [
+      'visitors.id'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles',
+    ungrouped: true
+  }, [{
+    'visitors__id': 6,
+    'visitors__created_at_day': '2016-09-06T00:00:00.000Z'
+  }, {
+    'visitors__id': 1,
+    'visitors__created_at_day': '2017-01-02T00:00:00.000Z'
+  }, {
+    'visitors__id': 2,
+    'visitors__created_at_day': '2017-01-04T00:00:00.000Z'
+  }, {
+    'visitors__id': 3,
+    'visitors__created_at_day': '2017-01-05T00:00:00.000Z'
+  }, {
+    'visitors__id': 4,
+    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+  }, {
+    'visitors__id': 5,
+    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+  }]));
+
+  it('offset cache', () => runQueryTest({
+    measures: [],
+    dimensions: [
+      'visitors.id'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles',
+    ungrouped: true,
+    offset: 5
+  }, [{
+    'visitors__id': 5,
+    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+  }]));
+
+  it('ungrouped without id', () => runQueryTest({
+    measures: [],
+    dimensions: [],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2016-01-09', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles',
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true
+  }, [{
+    'visitors__created_at_day': '2016-09-06T00:00:00.000Z'
+  }, {
+    'visitors__created_at_day': '2017-01-02T00:00:00.000Z'
+  }, {
+    'visitors__created_at_day': '2017-01-04T00:00:00.000Z'
+  }, {
+    'visitors__created_at_day': '2017-01-05T00:00:00.000Z'
+  }, {
+    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+  }, {
+    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+  }]));
+
+  it(
+    'sqlAlias',
+    () => runQueryTest({
+      measures: ['CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName.count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: []
+    }, [
+      { 'cube_with_long_name__count': '3' }
+    ])
+  );
+
+  it('data source', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName.count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: []
+    });
+
+    query.dataSource.should.be.deepEqual('oracle');
+  }));
+
+  it(
+    'objectRestSpread generator',
+    () => runQueryTest({
+      measures: ['visitors.foo'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: []
+    }, [
+      { 'visitors__foo': '6' }
+    ])
+  );
+
+  const baseQuery = {
+    measures: [
+      'visitors.countDistinctApproxRolling'
+    ],
+    filters: [],
+    timeDimensions: [],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  };
+
+  const granularityCases = [
+    {
+      granularity: 'day',
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-01-10T23:59:59.999'
+    },
+    {
+      granularity: 'week',
+      from: '2016-12-26T00:00:00.000',
+      to: '2017-01-15T23:59:59.999'
+    },
+    {
+      granularity: 'month',
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-01-31T23:59:59.999'
+    },
+    {
+      granularity: 'year',
+      from: '2017-01-01T00:00:00.000',
+      to: '2017-12-31T23:59:59.999'
+    }
+  ];
+
+  // eslint-disable-next-line
+  for (const granularityTest of granularityCases) {
+    it(`Should date with TZ, when pass timeDimensions with granularity by ${granularityTest.granularity}`, () => {
+      const result = compiler.compile().then(() => {
+        const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+          ...baseQuery,
+          timeDimensions: [{
+            dimension: 'visitors.created_at',
+            granularity: granularityTest.granularity,
+            dateRange: ['2017-01-01', '2017-01-10']
+          }]
+        });
+
+        const sqlBuild = query.buildSqlAndParams();
+
+        (sqlBuild[0].includes('America/Los_Angeles')).should.be.equal(true);
+        sqlBuild[1][0].should.be.equal(granularityTest.from);
+        sqlBuild[1][1].should.be.equal(granularityTest.to);
+      });
+
+      return result;
+    });
+  }
 });

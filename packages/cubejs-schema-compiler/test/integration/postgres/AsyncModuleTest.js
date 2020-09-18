@@ -1,11 +1,11 @@
 /* eslint-disable quote-props */
 /* globals describe, it, after */
-const PostgresQuery = require('../adapter/PostgresQuery');
-const PrepareCompiler = require('./PrepareCompiler');
+const PostgresQuery = require('../../../adapter/PostgresQuery');
+const PrepareCompiler = require('../../unit/PrepareCompiler');
 require('should');
 
 const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./DbRunner');
+const dbRunner = require('./PostgresDBRunner');
 
 describe('AsyncModule', function test() {
   this.timeout(20000);
@@ -71,7 +71,7 @@ describe('AsyncModule', function test() {
 
   it('import local node module', () => {
     const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
-    import { foo } from '../test/TestHelperForImport.js';
+    import { foo } from '../../test/unit/TestHelperForImport.js';
     
     cube(foo(), {
       sql: \`
