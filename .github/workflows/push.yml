@@ -82,27 +82,39 @@ jobs:
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run Postgres Integration with 9.6
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+        run: |
+          docker pull postgres:${TEST_PGSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 9.6
       - name: Run Postgres Integration with 10
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+        run: |
+          docker pull postgres:${TEST_PGSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 10
       - name: Run Postgres Integration with 11
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+        run: |
+          docker pull postgres:${TEST_PGSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 11
       - name: Run Postgres Integration with 12
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+        run: |
+          docker pull postgres:${TEST_PGSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 12
       - name: Run MS SQL Integration with 2017-latest
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
+        run: |
+          docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
         env:
           TEST_MSSQL_VERSION: 2017-latest
       - name: Run MS SQL Integration with 2019-latest
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
+        run: |
+          docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
         env:
           TEST_MSSQL_VERSION: 2019-latest
 
@@ -149,22 +161,32 @@ jobs:
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run MySQL Integration with 5.6
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
+        run: |
+          docker pull mysql:${TEST_MYSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.6
       - name: Run MySQL Integration with 5.7
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
+        run: |
+          docker pull mysql:${TEST_MYSQL_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.7
       - name: Run Clickhouse Integration with 20.6
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
+        run: |
+          docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20.6
       - name: Run Clickhouse Integration with 20
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
+        run: |
+          docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20
       - name: Run Clickhouse Integration with 19
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
+        run: |
+          docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
+          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 19
