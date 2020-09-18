@@ -1,8 +1,8 @@
 const vm = require('vm');
 const syntaxCheck = require('syntax-error');
-const { parse } = require("@babel/parser");
-const babelGenerator = require("@babel/generator").default;
-const babelTraverse = require("@babel/traverse").default;
+const { parse } = require('@babel/parser');
+const babelGenerator = require('@babel/generator').default;
+const babelTraverse = require('@babel/traverse').default;
 const fs = require('fs');
 const path = require('path');
 const R = require('ramda');
@@ -322,7 +322,7 @@ class DataSchemaCompiler {
 
   isWhiteListedPackage(packagePath) {
     return packagePath.indexOf('-schema') !== -1 &&
-      (packagePath.indexOf('-schema') === packagePath.length - "-schema".length);
+      (packagePath.indexOf('-schema') === packagePath.length - '-schema'.length);
   }
 }
 

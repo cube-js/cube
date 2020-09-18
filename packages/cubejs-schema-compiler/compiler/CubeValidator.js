@@ -1,7 +1,8 @@
 const Joi = require('@hapi/joi');
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
-const identifier = Joi.string().regex(/^[_a-zA-Z][_a-zA-Z0-9]*$/, 'identifier');
+
+const identifier = Joi.string().regex(identifierRegex, 'identifier');
 const timeInterval =
   Joi.alternatives([
     Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
@@ -77,6 +78,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
       updateWindow: timeInterval
     })
   ),
+  sqlAlias: Joi.string().optional(),
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   scheduledRefresh: Joi.boolean(),
@@ -194,7 +196,7 @@ const cubeSchema = Joi.object().keys({
   preAggregations: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('autoRollup').required(),
-      maxPreAggregations: Joi.number()
+      maxPreAggregations: Joi.number(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),

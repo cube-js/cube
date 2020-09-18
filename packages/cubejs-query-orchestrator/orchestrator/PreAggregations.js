@@ -7,10 +7,17 @@ const LocalCacheDriver = require('./LocalCacheDriver');
 const QueryCache = require('./QueryCache');
 const ContinueWaitError = require('./ContinueWaitError');
 
-function version(cacheKey) {
+function encodeTimeStamp(time) {
+  return Math.floor(time / 1000).toString(32);
+}
+
+function version(cacheKey, isDigestKey = false) {
   let result = '';
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
-  const digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
+  let digestBuffer = Number(cacheKey);
+  if (!isDigestKey) {
+    digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
+  }
 
   let residue = 0;
   let shiftCounter = 0;
@@ -35,15 +42,25 @@ const tablesToVersionEntries = (schema, tables) => R.sortBy(
   table => -table.last_updated_at,
   tables.map(table => {
     const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
-    if (match) {
-      return {
-        table_name: `${schema}.${match[1]}`,
-        content_version: match[2],
-        structure_version: match[3],
-        last_updated_at: parseInt(match[4], 10)
-      };
+
+    if (!match) {
+      return null;
     }
-    return null;
+
+    const entity = {
+      table_name: `${schema}.${match[1]}`,
+      content_version: match[2],
+      structure_version: match[3]
+    };
+    
+    if (match[4].length < 13) {
+      entity.last_updated_at = parseInt(match[4], 32) * 1000;
+      entity.naming_version = 2;
+    } else {
+      entity.last_updated_at = parseInt(match[4], 10);
+    }
+
+    return entity;
   }).filter(R.identity)
 );
 
@@ -304,11 +321,13 @@ class PreAggregationLoader {
     ) || versionEntries.find(
       e => e.table_name === this.preAggregation.tableName
     );
+
     const newVersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: new Date().getTime()
+      last_updated_at: new Date().getTime(),
+      naming_version: 2,
     };
 
     const mostRecentTargetTableName = async () => {
@@ -738,6 +757,10 @@ class PreAggregations {
   }
 
   static targetTableName(versionEntry) {
+    if (versionEntry.naming_version === 2) {
+      return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
+    }
+    
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }

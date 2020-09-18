@@ -23,6 +23,7 @@ Pre-aggregation name together with cube name will be used as a prefix for pre-ag
 Pre-aggregations names should:
 - Be unique within a cube
 - Start with a lowercase letter
+- For long pre-aggregations names, you can set the `sqlAlias` attribute
 
 You can use `0-9`,`_` and letters when naming pre-aggregations.
 

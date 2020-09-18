@@ -1738,7 +1738,8 @@ class BaseQuery {
   }
 
   preAggregationTableName(cube, preAggregationName, skipSchema) {
-    return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${this.aliasName(`${cube}.${preAggregationName}`, true)}`;
+    const tblName = this.aliasName(`${cube}.${preAggregationName}`, true);
+    return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${tblName}`;
   }
 
   preAggregationSchema() {

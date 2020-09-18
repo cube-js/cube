@@ -2,6 +2,7 @@ const moment = require('moment-timezone');
 
 const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
+const UserError = require('../compiler/UserError');
 
 const GRANULARITY_TO_INTERVAL = {
   day: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
@@ -64,7 +65,7 @@ class MysqlQuery extends BaseQuery {
   }
 
   concatStringsSql(strings) {
-    return `CONCAT(${strings.join(", ")})`;
+    return `CONCAT(${strings.join(', ')})`;
   }
 
   unixTimestampSql() {
@@ -73,6 +74,14 @@ class MysqlQuery extends BaseQuery {
 
   wrapSegmentForDimensionSelect(sql) {
     return `IF(${sql}, 1, 0)`;
+  }
+
+  preAggregationTableName(cube, preAggregationName, skipSchema) {
+    const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
+    if (name.length > 64) {
+      throw new UserError(`MySQL can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
+    }
+    return name;
   }
 }
 
