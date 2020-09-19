@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.20.9](https://github.com/cube-js/cube.js/compare/v0.20.8...v0.20.9) (2020-09-19)
+
+
+### Bug Fixes
+
+* Allow empty complex boolean filter arrays ([#1100](https://github.com/cube-js/cube.js/issues/1100)) ([80d112e](https://github.com/cube-js/cube.js/commit/80d112e))
+* Allow scheduledRefreshContexts in server-core options validation  ([#1105](https://github.com/cube-js/cube.js/issues/1105)) ([7e43276](https://github.com/cube-js/cube.js/commit/7e43276))
+* **@cubejs-backend/server-core:** orchestratorOptions validation breaks serverless deployments ([#1113](https://github.com/cube-js/cube.js/issues/1113)) ([48ca5aa](https://github.com/cube-js/cube.js/commit/48ca5aa))
+
+
+### Features
+
+* **cubejs-cli:** Ask question about database, if user forget to specify it with -d flag ([#1096](https://github.com/cube-js/cube.js/issues/1096)) ([8b5b9d3](https://github.com/cube-js/cube.js/commit/8b5b9d3))
+* `sqlAlias` attribute for `preAggregations` and short format for pre-aggregation table names ([#1068](https://github.com/cube-js/cube.js/issues/1068)) ([98ffad3](https://github.com/cube-js/cube.js/commit/98ffad3)), closes [#86](https://github.com/cube-js/cube.js/issues/86) [#907](https://github.com/cube-js/cube.js/issues/907)
+* Share Node's version for debug purposes ([#1107](https://github.com/cube-js/cube.js/issues/1107)) ([26c0420](https://github.com/cube-js/cube.js/commit/26c0420))
+
+
+
+
+
 ## [0.20.8](https://github.com/cube-js/cube.js/compare/v0.20.7...v0.20.8) (2020-09-16)
 
 
