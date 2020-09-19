@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars,prefer-template */
 const R = require('ramda');
 const cronParser = require('cron-parser');
- 
+
 const moment = require('moment-timezone');
 const inflection = require('inflection');
 
@@ -130,7 +130,7 @@ class BaseQuery {
       });
     });
   }
-  
+
   initFromOptions() {
     this.contextSymbols = Object.assign({ userContext: {} }, this.options.contextSymbols || {});
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
@@ -170,7 +170,7 @@ class BaseQuery {
     // used in drill downs) should go to WHERE instead of HAVING
     this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
     this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
- 
+
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
         const join = this.joinGraph.buildJoin(this.collectCubeNames(true));
@@ -362,7 +362,6 @@ class BaseQuery {
     }
     return this.newFilter(filter);
   }
-
 
   newFilter(filter) {
     return new BaseFilter(this, filter);
@@ -1840,7 +1839,7 @@ class BaseQuery {
     if (refreshKey.timezone) {
       utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
     }
-    
+
     let start;
     let end;
     let dayOffset;
@@ -1859,7 +1858,7 @@ class BaseQuery {
       throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);
     }
     const delta = (end - start) / 1000;
-     
+
     if (
       !/^(\*|\d+)? ?(\*|\d+) (\*|\d+) \* \* (\*|\d+)$/g.test(every.replace(/ +/g, ' ').replace(/^ | $/g, ''))
     ) {

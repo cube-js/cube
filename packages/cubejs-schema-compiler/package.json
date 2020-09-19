@@ -19,7 +19,7 @@
     "integration:mysql": "nyc --reporter=lcov mocha test/integration/mysql",
     "integration:postgres": "nyc --reporter=lcov mocha test/integration/postgres",
     "integration:clickhouse": "nyc --reporter=lcov mocha test/integration/clickhouse",
-    "lint": "eslint -c ../../.eslintrc.js adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*.js",
+    "lint": "eslint -c ../../.eslintrc.js adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*/*.js"
   },
   "dependencies": {
     "@babel/generator": "^7.4.0",

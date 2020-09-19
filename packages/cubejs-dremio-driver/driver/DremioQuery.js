@@ -76,6 +76,5 @@ class DremioQuery extends BaseQuery {
     return `IF(${sql}, 1, 0)`;
   }
 }
- 
 
 module.exports = DremioQuery;
