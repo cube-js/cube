@@ -7,7 +7,9 @@ const schemaQueueOptions = Joi.object().keys({
   continueWaitTimeout: Joi.number().min(0).integer(),
   executionTimeout: Joi.number().min(0).integer(),
   orphanedTimeout: Joi.number().min(0).integer(),
-  heartBeatInterval: Joi.number().min(0).integer()
+  heartBeatInterval: Joi.number().min(0).integer(),
+  sendProcessMessageFn: Joi.func(),
+  sendCancelMessageFn: Joi.func(),
 });
 
 const dbTypes = Joi.alternatives().try(
@@ -47,17 +49,21 @@ const schemaOptions = Joi.object().keys({
   updateCompilerCacheKeepAlive: Joi.boolean(),
   telemetry: Joi.boolean(),
   allowUngroupedWithoutPrimaryKey: Joi.boolean(),
-  orchestratorOptions: Joi.object().keys({
-    redisPrefix: Joi.string().allow(''),
-    queryCacheOptions: Joi.object().keys({
-      refreshKeyRenewalThreshold: Joi.number().min(0).integer(),
-      backgroundRenew: Joi.boolean(),
-      queueOptions: schemaQueueOptions
-    }),
-    preAggregationsOptions: {
-      queueOptions: schemaQueueOptions
-    }
-  }),
+  orchestratorOptions: Joi.alternatives().try(
+    Joi.func(),
+    Joi.object().keys({
+      redisPrefix: Joi.string().allow(''),
+      queryCacheOptions: Joi.object().keys({
+        refreshKeyRenewalThreshold: Joi.number().min(0).integer(),
+        backgroundRenew: Joi.boolean(),
+        queueOptions: schemaQueueOptions,
+        externalQueueOptions: schemaQueueOptions
+      }),
+      preAggregationsOptions: {
+        queueOptions: schemaQueueOptions
+      }
+    })
+  ),
   allowJsDuplicatePropsInSchema: Joi.boolean(),
   scheduledRefreshContexts: Joi.func()
 });
