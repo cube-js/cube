@@ -19,7 +19,7 @@ describe('ClickHouseDriver', () => {
   };
 
   before(async function before() {
-    this.timeout(60 * 1000);
+    this.timeout(20 * 1000);
 
     const version = process.env.TEST_CLICKHOUSE_VERSION || 'latest';
 
@@ -34,6 +34,8 @@ describe('ClickHouseDriver', () => {
   });
 
   after(async () => {
+    this.timeout(10 * 1000);
+
     if (container) {
       await container.stop();
     }
