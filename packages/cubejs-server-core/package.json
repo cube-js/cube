@@ -20,8 +20,9 @@
   ],
   "scripts": {
     "lint": "eslint core/**/*.js",
-    "test": "npm run test:unit",
-    "test:unit": "jest ./**/*.test.js"
+    "test": "npm run unit",
+    "unit": "jest ./**/*.test.js",
+    "lint:fix": "eslint --fix core/**/*.js"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.20.8",

@@ -13,7 +13,8 @@
   },
   "main": "driver/MySqlDriver.js",
   "scripts": {
-    "test": "jest",
+    "integration": "jest",
+    "integration:mysql": "jest",
     "lint": "eslint driver/*.js test/*.js"
   },
   "dependencies": {

@@ -2,13 +2,13 @@
 /* globals it, describe, after */
 const R = require('ramda');
 
-const PostgresQuery = require('../adapter/PostgresQuery');
-const BigqueryQuery = require('../adapter/BigqueryQuery');
-const PrepareCompiler = require('./PrepareCompiler');
+const PostgresQuery = require('../../../adapter/PostgresQuery');
+const BigqueryQuery = require('../../../adapter/BigqueryQuery');
+const PrepareCompiler = require('../../unit/PrepareCompiler');
 require('should');
 
 const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./DbRunner');
+const dbRunner = require('./PostgresDBRunner');
 
 describe('PreAggregations', function test() {
   this.timeout(200000);

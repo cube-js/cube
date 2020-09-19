@@ -9,6 +9,7 @@ class PostgresDBRunner extends BaseDbRunner {
     const db = pgp({
       host: 'localhost',
       port,
+      password: this.password(),
       database: 'model_test',
       poolSize: 1,
       user: process.env.TEST_PG_USER || 'root'
@@ -65,11 +66,18 @@ class PostgresDBRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    return new GenericContainer('postgres', '9.6.8')
+    const version = process.env.TEST_PGSQL_VERSION || '9.6.8';
+
+    return new GenericContainer('postgres', version)
       .withEnv('POSTGRES_USER', 'root')
       .withEnv('POSTGRES_DB', 'model_test')
+      .withEnv('POSTGRES_PASSWORD', this.password())
       .withExposedPorts(this.port())
       .start();
+  }
+
+  password() {
+    return 'passwd';
   }
 
   port() {

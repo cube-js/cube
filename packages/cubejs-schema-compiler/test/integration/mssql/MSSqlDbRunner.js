@@ -1,6 +1,7 @@
+const { Duration, TemporalUnit } = require('node-duration');
 const { GenericContainer, Wait } = require('testcontainers');
 const sql = require('mssql');
-const BaseDbRunner = require('./BaseDbRunner');
+const BaseDbRunner = require('../postgres/BaseDbRunner');
 
 class MSSqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
@@ -84,11 +85,21 @@ class MSSqlDbRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    return new GenericContainer('mcr.microsoft.com/mssql/server', '2017-latest')
+    const version = process.env.TEST_MSSQL_VERSION || '2017-latest';
+
+    return new GenericContainer('mcr.microsoft.com/mssql/server', version)
       .withEnv('ACCEPT_EULA', 'Y')
-      .withEnv('SA_PASSWORD', this.password())
+      .withEnv('MSSQL_PID', 'Developer')
+      .withEnv('MSSQL_SA_PASSWORD', this.password())
+      .withHealthCheck({
+        test: `/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`,
+        interval: new Duration(2, TemporalUnit.SECONDS),
+        timeout: new Duration(3, TemporalUnit.SECONDS),
+        retries: 5,
+        startPeriod: new Duration(10, TemporalUnit.SECONDS),
+      })
       .withExposedPorts(this.port())
-      .withWaitStrategy(Wait.forLogMessage('Server is listening on'))
+      .withWaitStrategy(Wait.forHealthCheck())
       .start();
   }
 

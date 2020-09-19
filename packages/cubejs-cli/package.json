@@ -15,7 +15,8 @@
     "cubejs": "./index.js"
   },
   "scripts": {
-    "test": "jest",
+    "test": "npm run unit",
+    "unit": "jest",
     "lint": "eslint -c ../../.eslintrc.js *.js"
   },
   "files": [

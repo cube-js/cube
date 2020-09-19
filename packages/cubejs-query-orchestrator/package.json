@@ -12,7 +12,9 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "jest --runInBand --verbose",
+    "test": "npm run unit && npm run integration",
+    "unit": "jest --runInBand --verbose test/unit",
+    "integration": "jest --runInBand --verbose test/integration",
     "lint": "eslint orchestrator/*.js driver/*.js"
   },
   "dependencies": {

@@ -4,7 +4,7 @@ const { GenericContainer } = require('testcontainers');
 const sqlstring = require('sqlstring');
 const uuidv4 = require('uuid/v4');
 
-const ClickHouseQuery = require('../adapter/ClickHouseQuery');
+const ClickHouseQuery = require('../../../adapter/ClickHouseQuery');
 
 process.env.TZ = 'GMT';
 

@@ -23,8 +23,9 @@
     "cubejs-dev-server": "./bin/dev-server.js"
   },
   "scripts": {
-    "test": "node scripts/test.js --testPathPattern=./index\\.test\\.js",
-    "test:debug": "node --inspect-brk scripts/test.js --testPathPattern=./index\\.test\\.js --runInBand"
+    "test": "npm run unit",
+    "unit": "node scripts/test.js --testPathPattern=./index\\.test\\.js",
+    "unit:debug": "node --inspect-brk scripts/test.js --testPathPattern=./index\\.test\\.js --runInBand"
   },
   "dependencies": {
     "@cubejs-backend/server-core": "^0.20.8",

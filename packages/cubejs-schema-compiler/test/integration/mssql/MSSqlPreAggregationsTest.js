@@ -3,8 +3,8 @@
 const R = require('ramda');
 require('should');
 
-const MSSqlQuery = require('../adapter/MssqlQuery');
-const { prepareCompiler } = require('./PrepareCompiler');
+const MSSqlQuery = require('../../../adapter/MssqlQuery');
+const { prepareCompiler } = require('../../unit/PrepareCompiler');
 
 const dbRunner = require('./MSSqlDbRunner');
 

@@ -8,13 +8,13 @@ describe('MySqlDriver', () => {
 
   jest.setTimeout(50000);
 
+  const version = process.env.TEST_MYSQL_VERSION || 'latest';
+
   beforeAll(async () => {
-    if (!process.env.TEST_LOCAL) {
-      container = await new GenericContainer("mysql", '5.7')
-        .withEnv("MYSQL_ROOT_PASSWORD", process.env.TEST_DB_PASSWORD || "Test1test")
-        .withExposedPorts(3306)
-        .start();
-    }
+    container = await new GenericContainer('mysql', version)
+      .withEnv("MYSQL_ROOT_PASSWORD", process.env.TEST_DB_PASSWORD || "Test1test")
+      .withExposedPorts(3306)
+      .start();
 
     mySqlDriver = new MySqlDriver({
       host: 'localhost',

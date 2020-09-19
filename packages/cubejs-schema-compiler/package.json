@@ -12,9 +12,14 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "nyc --reporter=lcov mocha -i -g MSSql",
-    "test-mssql": "nyc --reporter=lcov mocha -g MSSql",
-    "lint": "eslint  -c ../../.eslintrc.js  adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*.js"
+    "test": "npm run unit && npm run integration",
+    "unit": "nyc --reporter=lcov mocha test/unit",
+    "integration": "nyc --reporter=lcov mocha test/integration/*",
+    "integration:mssql": "nyc --reporter=lcov mocha test/integration/mssql",
+    "integration:mysql": "nyc --reporter=lcov mocha test/integration/mysql",
+    "integration:postgres": "nyc --reporter=lcov mocha test/integration/postgres",
+    "integration:clickhouse": "nyc --reporter=lcov mocha test/integration/clickhouse",
+    "lint": "eslint -c ../../.eslintrc.js adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*/*.js"
   },
   "dependencies": {
     "@babel/generator": "^7.4.0",
