@@ -73,6 +73,7 @@ describe('index.test', () => {
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
+      initApp: () => {},
       devServer: false,
       logger: () => {},
       driverFactory: () => {},
