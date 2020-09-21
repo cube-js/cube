@@ -24,6 +24,7 @@ import { TimeGroupComponent } from './dashboard/time-group/time-group.component'
 import { OrderComponent } from './dashboard/order/order.component';
 import { PivotComponent } from './dashboard/pivot/pivot.component';
 import { SettingsDialogComponent } from './settings-dialog/settings-dialog.component';
+import { FilterGroupComponent, FilterComponent } from './dashboard/filter-group/filter-group.component';
 
 const cubejsOptions = {
   token: 'environment.CUBEJS_API_TOKEN',
@@ -41,7 +42,9 @@ const cubejsOptions = {
     TimeGroupComponent,
     OrderComponent,
     PivotComponent,
-    SettingsDialogComponent
+    SettingsDialogComponent,
+    FilterGroupComponent,
+    FilterComponent
   ],
   entryComponents: [
     SettingsDialogComponent

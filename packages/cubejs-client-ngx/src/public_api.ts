@@ -9,3 +9,4 @@ export * from './query-builder/query';
 export * from './query-builder/builder-meta';
 export * from './query-builder/query-members';
 export * from './query-builder/pivot-config';
+export * from './query-builder/chart-type';

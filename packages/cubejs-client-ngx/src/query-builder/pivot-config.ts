@@ -26,12 +26,4 @@ export class PivotConfig extends StateSubject<TPivotConfig> {
       )
     );
   }
-
-  get() {
-    return this.subject.value;
-  }
-
-  set(pivotConfig: TPivotConfig) {
-    this.subject.next(pivotConfig);
-  }
 }

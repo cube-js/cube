@@ -8,7 +8,7 @@ export abstract class StateSubject<T = any> {
   }
 
   get() {
-    return this.subject.value;
+    return this.subject.getValue();
   }
 
   set(value: T) {

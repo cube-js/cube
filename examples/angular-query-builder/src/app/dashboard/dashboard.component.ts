@@ -37,6 +37,7 @@ export class DashboardComponent implements OnInit {
     },
   ];
   chartTypeMap = {};
+  filterMembers: any[] = [];
 
   constructor(
     public cubejsClient: CubejsClient,
@@ -44,6 +45,7 @@ export class DashboardComponent implements OnInit {
     public dialog: MatDialog
   ) {
     queryBuilder.setCubejsClient(cubejsClient);
+    // queryBuilder.disableHeuristics();
     this.chartTypeMap = this.chartTypeToIcon.reduce(
       (memo, { chartType, icon }) => ({ ...memo, [chartType]: icon }),
       {}
@@ -54,23 +56,28 @@ export class DashboardComponent implements OnInit {
     this.queryBuilder.deserialize({
       query: {
         measures: ['Sales.count'],
-        dimensions: ['Users.country', 'Users.gender'],
+        dimensions: ['Users.gender', 'Sales.ts.month'],
+        filters: [
+          {
+            dimension: 'Sales.title',
+            operator: 'contains',
+            values: ['test'],
+          },
+        ],
       },
-      // pivotConfig: {
-      // x: ['Users.country'],
-      // y: ['measures'],
-      // },
-      chartType: 'table',
+      pivotConfig: {
+        x: ['Sales.ts.month'],
+        y: ['Users.gender', 'measures'],
+      },
+      chartType: 'bar',
     });
 
-    this.queryBuilder.builderMeta.subscribe((builderMeta) => {
-      this.builderMeta = builderMeta;
-    });
-
+    this.builderMeta = await this.queryBuilder.builderMeta;
     this.query = await this.queryBuilder.query;
-    // this.queryBuilder.state.subscribe((vizState) =>
-    // console.log('vizState', JSON.stringify(vizState))
-    // );
+
+    this.query.subject.subscribe(() => {
+      this.filterMembers = this.query.filters.asArray();
+    }); 
   }
 
   openDialog(): void {
@@ -84,9 +91,6 @@ export class DashboardComponent implements OnInit {
 
     dialogRef.updatePosition({
       top: '10%',
-    });
-    dialogRef.afterClosed().subscribe(() => {
-      console.log('closed');
     });
   }
 
@@ -109,13 +113,5 @@ export class DashboardComponent implements OnInit {
     );
   }
 
-  debug(event: any) {
-    // this.query.setPartialQuery({
-    // order: [['Users.country', 'desc'], ['Users.gender', 'asc']]
-    // order: {'Users.country': 'desc','Users.gender': 'asc'}
-    // })
-    // this.query.order.setMemberOrder('Sales.amount', 'desc');
-    // this.query.setLimit(50);
-    console.log(event.target.value);
-  }
+  debug() {}
 }

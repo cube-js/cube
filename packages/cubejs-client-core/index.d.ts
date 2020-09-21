@@ -710,7 +710,7 @@ declare module '@cubejs-client/core' {
      */
     resolveMember(memberName: string, memberType: MemberType | MemberType[]): Object;
     defaultTimeDimensionNameFor(memberName: string): string;
-    filterOperatorsForMember(memberName: string, memberType: MemberType): any;
+    filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): any;
   }
 
   /**

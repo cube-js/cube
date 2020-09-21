@@ -1,4 +1,4 @@
-<div *ngIf="query">
+<div *ngIf="query">  
   <div class="controls-container">
     <div class="controls-row">
       <members-group
@@ -37,18 +37,27 @@
     </div>
 
     <div class="controls-row">
+      <filter-group
+        [filters]="query.filters"
+        [members]="filterMembers"
+        [allMembers]="builderMeta.filters"
+      ></filter-group>
+    </div>
+
+    <div class="controls-row">
       <mat-form-field appearance="fill">
         <mat-icon matPrefix style="margin-right: 8px;">{{
-          chartTypeMap[queryBuilder.chartType] || 'multiline_chart'
+          chartTypeMap[queryBuilder.chartType.get()] || 'multiline_chart'
         }}</mat-icon>
 
         <mat-label>Chart Type</mat-label>
         <mat-select
-          [value]="queryBuilder.chartType"
-          (selectionChange)="queryBuilder.setChartType($event.value)"
+          [value]="queryBuilder.chartType.get()"
+          [disabled]="!query.isPresent()"
+          (selectionChange)="queryBuilder.chartType.set($event.value)"
         >
           <mat-select-trigger *ngIf="queryBuilder.chartType" matPrefix>
-            {{ queryBuilder.chartType | titlecase }}
+            {{ queryBuilder.chartType.get() | titlecase }}
           </mat-select-trigger>
 
           <mat-option
@@ -63,24 +72,23 @@
         </mat-select>
       </mat-form-field>
 
-      <button mat-button mat-raised-button (click)="openDialog()">
+      <button
+        mat-button
+        mat-raised-button
+        [disabled]="!query.isPresent()"
+        (click)="openDialog()"
+      >
         <mat-icon>settings</mat-icon>
         Settings
       </button>
     </div>
   </div>
 
-  <button mat-button (click)="debug()">debug</button>
+  <!-- <button mat-button (click)="debug()">debug</button>
 
   <button mat-button mat-stroked-button (click)="setQuery()">
     set/reset query
-  </button>
+  </button> -->
 
-  <query-renderer
-    [queryBuilder]="queryBuilder"
-    [chartType]="queryBuilder.chartType"
-    [pivotConfig]="queryBuilder.pivotConfig.get()"
-  ></query-renderer>
-
-  <!-- <div class="debug">{{ query.asCubeQuery() | json }}</div> -->
+  <query-renderer [queryBuilder]="queryBuilder"></query-renderer>
 </div>

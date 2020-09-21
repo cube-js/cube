@@ -1,41 +1,47 @@
-={{ queryBuilder.chartType | json }}=
-
-<div *ngIf="isQueryPresent && queryBuilder.chartType !== 'table'" class="container">
-  <canvas
-    baseChart
-    legend="true"
-    [datasets]="chartData"
-    [labels]="chartLabels"
-    [options]="chartOptions"
-    [colors]="chartColors"
-    [chartType]="queryBuilder.chartType"
+<ng-container *ngIf="isQueryPresent">
+  <div
+    *ngIf="queryBuilder.chartType.get() !== 'table' && chartData.length > 0"
+    class="container"
   >
-  </canvas>
-</div>
+    <canvas
+      baseChart
+      legend="true"
+      [datasets]="chartData"
+      [labels]="chartLabels"
+      [options]="chartOptions"
+      [colors]="chartColors"
+      [chartType]="queryBuilder.chartType.get()"
+    >
+    </canvas>
+  </div>
 
-<table mat-table [dataSource]="tableData">
+  <table
+    *ngIf="queryBuilder.chartType.get() === 'table'"
+    mat-table
+    [dataSource]="tableData"
+    style="width: 100%;"
+  >
+    <ng-container
+      *ngFor="let column of displayedColumns"
+      [matColumnDef]="column"
+    >
+      <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
+      <td mat-cell *matCellDef="let element">{{ element[column] }}</td>
+    </ng-container>
 
-  <!--- Note that these columns can be defined in any order.
-        The actual rendered columns are set as a property on the row definition" -->
-
-  <!-- Position Column -->
-  <ng-container matColumnDef="Sales.ts.day">
-    <th mat-header-cell *matHeaderCellDef> No. </th>
-    <td mat-cell *matCellDef="let element"> {{element['Sales.ts.day']}} </td>
-  </ng-container>
-
-  <!-- Name Column -->
-  <!-- <ng-container matColumnDef="name">
-    <th mat-header-cell *matHeaderCellDef> Name </th>
-    <td mat-cell *matCellDef="let element"> {{element.name}} </td>
-  </ng-container>
-
-  <!-- Weight Column -->
-  <!-- <ng-container matColumnDef="weight"> -->
+    <!-- Name Column -->
+    <!-- <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef> Name </th>
+      <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+    </ng-container>
+  
+    <!-- Weight Column -->
+    <!-- <ng-container matColumnDef="weight"> -->
     <!-- <th mat-header-cell *matHeaderCellDef> Weight </th> -->
     <!-- <td mat-cell *matCellDef="let element"> {{element.weight}} </td> -->
-  <!-- </ng-container> -->
+    <!-- </ng-container> -->
 
-  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-</table>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+</ng-container>

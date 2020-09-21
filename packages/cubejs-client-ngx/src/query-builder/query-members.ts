@@ -3,6 +3,7 @@ import {
   TQueryOrderObject,
   TQueryOrderArray,
   moveItemInArray,
+  Filter,
 } from '@cubejs-client/core';
 import { BehaviorSubject } from 'rxjs';
 import equal from 'fast-deep-equal';
@@ -72,32 +73,18 @@ export class TimeDimensionMember {
   }
 
   updateTimeDimension(by: string | number, updateWith: any) {
-    let nextTimeDimensions = [];
-
-    if (typeof by === 'number') {
-      nextTimeDimensions = this.members.map((td, index) => {
-        if (index === by) {
-          return {
-            ...td,
-            ...updateWith,
-          };
-        }
-        return td;
-      });
-    } else if (by === 'string') {
-      nextTimeDimensions = this.members.map((td) => {
-        if (td.dimension === by) {
-          return {
-            ...td,
-            ...updateWith,
-          };
-        }
-        return td;
-      });
-    }
+    const timeDimensions = this.members.map((td, index) => {
+      if (td.dimension === by || index === by) {
+        return {
+          ...td,
+          ...updateWith,
+        };
+      }
+      return td;
+    });
 
     this.query.setPartialQuery({
-      timeDimensions: nextTimeDimensions,
+      timeDimensions,
     });
   }
 
@@ -178,7 +165,7 @@ export class Order {
 
   setMemberOrder(id: string, order: TOrder) {
     this.orderMembers.next(
-      this.orderMembers.value.map((orderMember) => {
+      this.orderMembers.getValue().map((orderMember) => {
         if (orderMember.id === id) {
           return {
             ...orderMember,
@@ -192,7 +179,11 @@ export class Order {
 
   reorder(sourceIndex: number, destinationIndex: number) {
     this.orderMembers.next(
-      moveItemInArray(this.orderMembers.value, sourceIndex, destinationIndex)
+      moveItemInArray(
+        this.orderMembers.getValue(),
+        sourceIndex,
+        destinationIndex
+      )
     );
   }
 
@@ -217,5 +208,69 @@ export class Order {
       (memo, [key, value]) => ({ ...memo, [key]: value }),
       {}
     );
+  }
+}
+
+export class FilterMember {
+  constructor(private query: Query) {}
+
+  private get filters() {
+    return this.query.asCubeQuery().filters || [];
+  }
+
+  update(by: string | number, updateWith: Partial<Filter>) {
+    const filters = this.filters.map((filter, index) => {
+      if (index === by || filter.dimension === by) {
+        return {
+          ...filter,
+          ...updateWith,
+        };
+      }
+      return filter;
+    });
+
+    this.query.setPartialQuery({
+      filters: filters as Filter[],
+    });
+  }
+
+  add(filter: Filter) {
+    this.query.setPartialQuery({
+      filters: [...this.filters, filter],
+    });
+  }
+
+  remove(by: string | number) {
+    this.query.setPartialQuery({
+      filters: this.filters.filter((filter, index) => {
+        if (filter.dimension === by || index === by) {
+          return false;
+        }
+
+        return true;
+      }),
+    });
+  }
+
+  set(filters: Filter[]) {
+    this.query.setPartialQuery({
+      filters,
+    });
+  }
+
+  asArray(): any[] {
+    return this.filters.map((filter) => {
+      return {
+        ...this.query.meta.resolveMember(filter.dimension, [
+          'dimensions',
+          'measures',
+        ]),
+        operators: this.query.meta.filterOperatorsForMember(filter.dimension, [
+          'dimensions',
+          'measures',
+        ]),
+        ...filter,
+      };
+    });
   }
 }

@@ -1,0 +1,37 @@
+<div *ngIf="member" class="flex-box filter-member-container">
+  <button
+    #memberButton
+    mat-button
+    mat-stroked-button
+    color="primary"
+    (mouseover)="memberButton.color = 'warn'"
+    (mouseout)="memberButton.color = 'primary'"
+    (click)="onRemove.emit(member.name)"
+  >
+    {{ member.title }}
+  </button>
+   
+  <mat-form-field appearance="fill" style="min-width: 200px;">
+    <mat-label>Operator</mat-label>
+    <mat-select
+      [value]="member.operator"
+      (selectionChange)="onOperatorSelect.emit($event.value)"
+    >
+      <mat-option
+        *ngFor="let operator of member.operators"
+        [value]="operator.name"
+      >
+        {{ operator.title }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field apperance="fill" style="width: 200px;">
+    <input
+      matInput
+      type="string"
+      [value]="member.values && member.values[0] || ''"
+      (blur)="onValueChange.emit($event.target.value)"
+    />
+  </mat-form-field> 
+</div>
