@@ -17,6 +17,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "mocha dist/test/*.js",
+    "integration:druid": "mocha dist/test/*.js",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
     "prepublishOnly": "rm -rf dist && npm run tsc"
