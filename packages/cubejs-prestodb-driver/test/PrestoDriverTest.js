@@ -40,11 +40,9 @@ describe('PrestoHouseDriver', () => {
     );
 
     env = await dc
-      // https://github.com/testcontainers/testcontainers-node/issues/109
-      .withStartupTimeout(new Duration(30, TemporalUnit.SECONDS))
-      .withWaitStrategy('coordinator', Wait.forLogMessage('======== SERVER STARTED ========'))
-      .withWaitStrategy('worker0', Wait.forLogMessage('======== SERVER STARTED ========'))
-      .withWaitStrategy('worker1', Wait.forLogMessage('======== SERVER STARTED ========'))
+      .withStartupTimeout(new Duration(90, TemporalUnit.SECONDS))
+      .withWaitStrategy('coordinator', Wait.forHealthCheck())
+      .withWaitStrategy('worker0', Wait.forLogMessage('Added catalog postgresql'))
       .withWaitStrategy('postgres', Wait.forHealthCheck())
       .up();
 

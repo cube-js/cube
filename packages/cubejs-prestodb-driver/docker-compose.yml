@@ -1,8 +1,8 @@
-version: '3'
+version: '2.2'
 
 services:
   coordinator:
-    image: lewuathe/presto-coordinator:340-SNAPSHOT
+    image: lewuathe/presto-coordinator:341-SNAPSHOT
     ports:
       - "8080:8080"
     container_name: "coordinator"
@@ -13,9 +13,14 @@ services:
     command: http://coordinator:8080 coordinator
     volumes:
       - ./config/catalog/:/usr/local/presto/etc/catalog/
+    healthcheck:
+      test: "/usr/local/bin/presto-cli --execute 'SELECT 1' || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   worker0:
-    image: lewuathe/presto-worker:340-SNAPSHOT
+    image: lewuathe/presto-worker:341-SNAPSHOT
     container_name: "worker0"
     depends_on:
       - coordinator
@@ -26,29 +31,6 @@ services:
     command: http://coordinator:8080 worker0
     volumes:
       - ./config/catalog/:/usr/local/presto/etc/catalog/
-    healthcheck:
-      test: "wget --no-verbose --tries=1 --spider http://localhost:8081/ || exit 1"
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  worker1:
-    image: lewuathe/presto-worker:340-SNAPSHOT
-    container_name: "worker1"
-    depends_on:
-      - coordinator
-      - postgres
-    links:
-      - coordinator
-      - postgres
-    command: http://coordinator:8080 worker1
-    volumes:
-      - ./config/catalog/:/usr/local/presto/etc/catalog/
-    healthcheck:
-      test: "wget --no-verbose --tries=1 --spider http://localhost:8081/ || exit 1"
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   postgres:
     image: postgres:12.4
