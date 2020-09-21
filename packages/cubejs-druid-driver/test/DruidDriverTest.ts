@@ -6,15 +6,14 @@ import { DockerComposeEnvironment, StartedDockerComposeEnvironment, Wait } from 
 import { Duration, TemporalUnit } from 'node-duration';
 import path from 'path';
 
-import { DruidDriver } from '../src';
-import { DruidClientConfiguration } from '../src/DruidClient';
+import { DruidDriver, DruidDriverConfiguration } from '../src/DruidDriver';
 
 // eslint-disable-next-line import/no-extraneous-dependencies
 require('should');
 
 describe('DruidDriver', () => {
   let env: StartedDockerComposeEnvironment|null = null;
-  let config: Partial<DruidClientConfiguration> = {};
+  let config: DruidDriverConfiguration;
 
   const doWithDriver = async (callback: (driver: DruidDriver) => Promise<any>) => {
     const driver = new DruidDriver(config);
@@ -27,9 +26,11 @@ describe('DruidDriver', () => {
     this.timeout(2 * 60 * 1000);
 
     if (process.env.TEST_DRUID_HOST) {
+      const host = process.env.TEST_DRUID_HOST || 'localhost';
+      const port = process.env.TEST_DRUID_PORT || '8888';
+
       config = {
-        host: 'localhost',
-        port: process.env.TEST_DRUID_HOST,
+        url: `http://${host}:${port}`,
       };
 
       return;
@@ -48,9 +49,11 @@ describe('DruidDriver', () => {
       .withWaitStrategy('router', Wait.forHealthCheck())
       .up();
 
+    const host = env.getContainer('router').getContainerIpAddress();
+    const port = env.getContainer('router').getMappedPort(8888);
+
     config = {
-      host: env.getContainer('router').getContainerIpAddress(),
-      port: env.getContainer('router').getMappedPort(8888),
+      url: `http://${host}:${port}`,
     };
   });
 

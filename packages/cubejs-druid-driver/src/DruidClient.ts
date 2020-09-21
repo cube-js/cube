@@ -1,11 +1,13 @@
 import Axios from 'axios';
 
-export type DruidClientConfiguration = {
-  host?: string,
-  port?: string|number,
+export type DruidClientBaseConfiguration = {
   user?: string,
   password?: string,
   database?: string,
+};
+
+export type DruidClientConfiguration = DruidClientBaseConfiguration & {
+  url: string,
 };
 
 export class DruidClient {
@@ -16,13 +18,12 @@ export class DruidClient {
 
   protected getClient() {
     return Axios.create({
-      baseURL: `http://${this.config.host}:${this.config.port}/`,
+      baseURL: this.config.url,
       headers: {
         'Content-Type': 'application/json',
       }
     });
 
-    // CUBEJS_DB_URL?
     // @todo authorization!?
   }
 

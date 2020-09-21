@@ -1,9 +1,10 @@
 import BaseDriver from '@cubejs-backend/query-orchestrator/driver/BaseDriver';
-import { DruidClient, DruidClientConfiguration } from './DruidClient';
+import { DruidClient, DruidClientBaseConfiguration, DruidClientConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
-type DruidBaseConfiguration = DruidClientConfiguration;
-type DruidDriverConfiguration = DruidBaseConfiguration & unknown;
+export type DruidDriverConfiguration = DruidClientBaseConfiguration & {
+  url: string,
+};
 
 export class DruidDriver extends BaseDriver {
   protected readonly config: DruidDriverConfiguration;
@@ -14,16 +15,27 @@ export class DruidDriver extends BaseDriver {
     return DruidQuery;
   }
 
-  constructor(config: Partial<DruidClientConfiguration> = {}) {
+  constructor(config?: DruidDriverConfiguration) {
     super();
 
+    let url = config?.url || process.env.CUBEJS_DB_URL;
+    if (!url) {
+      const host = process.env.CUBEJS_DB_HOST;
+      const port = process.env.CUBEJS_DB_PORT;
+
+      if (host && port) {
+        url = `http://${host}:${port}`;
+      } else {
+        throw new Error('Please specify CUBEJS_DB_URL');
+      }
+    }
+
     this.config = {
-      host: config.host || process.env.CUBEJS_DB_HOST,
-      port: config.port || process.env.CUBEJS_DB_PORT,
-      user: config.user || process.env.CUBEJS_DB_USER,
-      password: config.password || process.env.CUBEJS_DB_PASS,
-      database: config.database || process.env.CUBEJS_DB_NAME || config && config.database || 'default',
-      ...config
+      url,
+      user: config?.user || process.env.CUBEJS_DB_USER,
+      password: config?.password || process.env.CUBEJS_DB_PASS,
+      database: config?.database || process.env.CUBEJS_DB_NAME || config?.database || 'default',
+      ...config,
     };
 
     this.client = new DruidClient(this.config);
