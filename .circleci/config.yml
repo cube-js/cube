@@ -33,30 +33,6 @@ jobs:
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver unit
       - run: bash <(curl -s https://codecov.io/bash)
 
-  lint:
-    docker:
-      - image: circleci/node:10.17
-
-    working_directory: ~/repo
-
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
-            - yarn-packages-v1-{{ .Branch }}-
-            - yarn-packages-v1-
-
-      - run: yarn install
-      - run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
-
-      - save_cache:
-          paths:
-            - ~/.cache/yarn
-          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
-
-      - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
-
   publish:
     resource_class: medium
     docker:
@@ -161,9 +137,6 @@ workflows:
     jobs:
       - test
       - build
-  lint:
-    jobs:
-      - lint
   publish:
     jobs:
       - publish:
