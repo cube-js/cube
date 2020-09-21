@@ -35,7 +35,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */*/node_modules  
+            */*/node_modules
           key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
@@ -47,6 +47,44 @@ jobs:
         run: yarn lerna run --concurrency 1 tsc
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver unit
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Use Node.js 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v2
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: |
+            ~/.npm
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+      - name: Yarn install
+        uses: borales/actions-yarn@v2.3.0
+        with:
+          cmd: install
+      - name: Lerna bootstrap
+        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+      - name: Lerna lint
+        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
 
   integration-wrk-1:
     runs-on: ubuntu-latest
@@ -89,7 +127,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */*/node_modules  
+            */*/node_modules
           key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
@@ -177,7 +215,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */*/node_modules  
+            */*/node_modules
           key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
