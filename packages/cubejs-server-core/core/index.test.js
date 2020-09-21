@@ -74,6 +74,7 @@ describe('index.test', () => {
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
       initApp: () => {},
+      processSubscriptionsInterval: 5000,
       devServer: false,
       logger: () => {},
       driverFactory: () => {},
