@@ -1,6 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Row, Col, Divider, Card, Popover } from 'antd';
+import { Card, Col, Popover, Row } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
@@ -10,14 +10,14 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
-import { Button, SectionHeader } from './components';
+import { Button, SectionHeader, SectionRow } from './components';
 import styled from 'styled-components';
 
 const Section = styled.div`
   display: flex;
   flex-flow: column;
   margin-right: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   
   > *:first-child {
     margin-bottom: 8px;
@@ -48,49 +48,49 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     .reduce((a, b) => ({ ...a, ...b }), {});
 
 export default function PlaygroundQueryBuilder({
-  query,
-  cubejsApi,
-  apiUrl,
-  cubejsToken,
-  dashboardSource,
-  setQuery,
-}) {
+                                                 query,
+                                                 cubejsApi,
+                                                 apiUrl,
+                                                 cubejsToken,
+                                                 dashboardSource,
+                                                 setQuery,
+                                               }) {
   return (
     <QueryBuilder
       query={query}
       setQuery={setQuery}
       cubejsApi={cubejsApi}
       render={({
-        resultSet,
-        error,
-        validatedQuery,
-        isQueryPresent,
-        chartType,
-        updateChartType,
-        measures,
-        availableMeasures,
-        updateMeasures,
-        dimensions,
-        availableDimensions,
-        updateDimensions,
-        segments,
-        availableSegments,
-        updateSegments,
-        filters,
-        updateFilters,
-        timeDimensions,
-        availableTimeDimensions,
-        updateTimeDimensions,
-        orderMembers,
-        updateOrder,
-        pivotConfig,
-        updatePivotConfig,
-      }) => {
+                 resultSet,
+                 error,
+                 validatedQuery,
+                 isQueryPresent,
+                 chartType,
+                 updateChartType,
+                 measures,
+                 availableMeasures,
+                 updateMeasures,
+                 dimensions,
+                 availableDimensions,
+                 updateDimensions,
+                 segments,
+                 availableSegments,
+                 updateSegments,
+                 filters,
+                 updateFilters,
+                 timeDimensions,
+                 availableTimeDimensions,
+                 updateTimeDimensions,
+                 orderMembers,
+                 updateOrder,
+                 pivotConfig,
+                 updatePivotConfig,
+               }) => {
         let parsedDateRange = null;
 
         if (resultSet) {
           const { timeDimensions = [] } =
-            resultSet.pivotQuery() || resultSet.query() || {};
+          resultSet.pivotQuery() || resultSet.query() || {};
           parsedDateRange = timeDimensions[0]?.dateRange;
         }
 
@@ -108,7 +108,7 @@ export default function PlaygroundQueryBuilder({
                     justify="stretch"
                     align="top"
                     gutter={24}
-                    style={{ marginBottom: 12 }}
+                    style={{ marginBottom: -12 }}
                   >
                     <Section>
                       <SectionHeader>
@@ -120,7 +120,7 @@ export default function PlaygroundQueryBuilder({
                         addMemberName="Measure"
                         updateMethods={playgroundActionUpdateMethods(
                           updateMeasures,
-                          'Measure'
+                          'Measure',
                         )}
                       />
                     </Section>
@@ -134,7 +134,7 @@ export default function PlaygroundQueryBuilder({
                         addMemberName="Dimension"
                         updateMethods={playgroundActionUpdateMethods(
                           updateDimensions,
-                          'Dimension'
+                          'Dimension',
                         )}
                       />
                     </Section>
@@ -148,7 +148,7 @@ export default function PlaygroundQueryBuilder({
                         addMemberName="Segment"
                         updateMethods={playgroundActionUpdateMethods(
                           updateSegments,
-                          'Segment'
+                          'Segment',
                         )}
                       />
                     </Section>
@@ -162,81 +162,69 @@ export default function PlaygroundQueryBuilder({
                         addMemberName="Time"
                         updateMethods={playgroundActionUpdateMethods(
                           updateTimeDimensions,
-                          'Time'
+                          'Time',
                         )}
                         parsedDateRange={parsedDateRange}
                       />
                     </Section>
-                  </Row>
 
-                  <Row
-                    justify="space-around"
-                    align="top"
-                    gutter={24}
-                    style={{ marginBottom: 12 }}
-                  >
-                    <Col span={24}>
+                    <Section>
+                      <SectionHeader>
+                        Filters
+                      </SectionHeader>
                       <FilterGroup
                         members={filters}
                         availableMembers={availableDimensions.concat(
-                          availableMeasures
+                          availableMeasures,
                         )}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(
                           updateFilters,
-                          'Filter'
+                          'Filter',
                         )}
                       />
-                    </Col>
-                  </Row>
-
-                  <Row
-                    justify="space-around"
-                    align="top"
-                    gutter={24}
-                    style={{ marginBottom: 12 }}
-                  >
-                    <Col span={24}>
-                      <SelectChartType
-                        chartType={chartType}
-                        updateChartType={(type) => {
-                          playgroundAction('Change Chart Type');
-                          updateChartType(type);
-                        }}
-                      />
-
-                      <Divider type="vertical" />
-
-                      <Popover
-                        content={
-                          <Settings
-                            limit={query.limit}
-                            pivotConfig={pivotConfig}
-                            orderMembers={orderMembers}
-                            onReorder={updateOrder.reorder}
-                            onOrderChange={updateOrder.set}
-                            onMove={updatePivotConfig.moveItem}
-                            onUpdate={updatePivotConfig.update}
-                          />
-                        }
-                        placement="bottomLeft"
-                        trigger="click"
-                      >
-                        <Button
-                          disabled={!isQueryPresent}
-                          icon={<SettingOutlined />}
-                        >
-                          Settings
-                        </Button>
-                      </Popover>
-                    </Col>
+                    </Section>
                   </Row>
                 </Card>
+
+                <SectionRow style={{ marginTop: 16, marginLeft: 16 }}>
+                  <SelectChartType
+                    chartType={chartType}
+                    updateChartType={(type) => {
+                      playgroundAction('Change Chart Type');
+                      updateChartType(type);
+                    }}
+                  />
+
+                  <Popover
+                    content={
+                      <Settings
+                        limit={query.limit}
+                        pivotConfig={pivotConfig}
+                        orderMembers={orderMembers}
+                        onReorder={updateOrder.reorder}
+                        onOrderChange={updateOrder.set}
+                        onMove={updatePivotConfig.moveItem}
+                        onUpdate={updatePivotConfig.update}
+                      />
+                    }
+                    placement="bottomLeft"
+                    trigger="click"
+                  >
+                    <Button
+                      disabled={!isQueryPresent}
+                      icon={<SettingOutlined />}
+                      style={{ border: 0 }}
+                    >
+                      Settings
+                    </Button>
+                  </Popover>
+                </SectionRow>
               </Col>
             </Row>
 
-            <Row justify="space-around" align="top" gutter={24}>
-              <Col span={24}>
+            <Row justify="space-around" align="top" gutter={24} style={{ marginTop: 0, marginLeft: 0 }}>
+              <Col span={24} style={{ paddingLeft: 16, paddingRight: 16 }}>
                 {isQueryPresent ? (
                   <ChartRenderer
                     query={validatedQuery}

@@ -1,6 +1,7 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Select, Input } from 'antd';
+import { Input } from 'antd';
+import { Select } from '../components';
 
 const FilterInputs = {
   string: ({ values, onChange }) => (

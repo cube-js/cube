@@ -26,12 +26,12 @@ const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
     border-radius: calc(${vars.borderRadiusBase} + 1px);
   
     .ant-btn {
-      background-color: ${vars.purpleBg};
+      background-color: ${vars.removeBtnBg};
       color: ${vars.primaryColor};
       border: none;
       
       &:hover {
-        background-color: ${vars.purpleHoverBg};
+        background-color: ${vars.removeBtnHoverBg};
         border: none;
         box-shadow: none;
       }
@@ -47,7 +47,7 @@ const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
       padding: 8px;
       
       &:hover {
-        background-color: ${vars.purpleHoverBg} !important;
+        background-color: ${vars.removeBtnHoverBg} !important;
       }
       
       .anticon {

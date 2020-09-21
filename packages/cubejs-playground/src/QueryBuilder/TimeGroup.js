@@ -10,7 +10,7 @@ import vars from '../variables';
 import styled from 'styled-components';
 
 const Label = styled.div`
-  color: ${vars.dark04};
+  color: ${vars.dark04Color};
   line-height: 32px;
 `;
 

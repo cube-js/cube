@@ -1,7 +1,13 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Menu } from 'antd';
+import { Menu as AntdMenu } from 'antd';
 import ButtonDropdown from './ButtonDropdown';
+import styled from 'styled-components';
+
+const Menu = styled(AntdMenu)`
+  max-height: 320px;
+  overflow: hidden auto;
+`
 
 // Can't be a Pure Component due to Dropdown lookups overlay component type to set appropriate styles
 const memberMenu = (onClick, availableMembers) => (

@@ -1,4 +1,4 @@
-const varsJSON = require('./variables.json');
+const varsJSON = require('./raw-variables');
 
 function toCamelCase(str) {
   return str.replace(/-[a-z0-9]/g, s => s.replace('-', '').toUpperCase());
