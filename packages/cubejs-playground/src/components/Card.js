@@ -6,12 +6,26 @@ const StyledCard = styled(AntdCard)`
   && {
     .ant-card-head {
       border-bottom: 2px solid #D7D7F488;
-      padding: 0 16px;          
+      padding: 8px 16px;
+    }
+    
+    .ant-card-head-title {
+      padding: 0;
+      flex: initial;
+    }
+    
+    .ant-card-extra {
+      padding: 0;
+    }
+    
+    .ant-card-head-wrapper {
+      flex-flow: row wrap;
+      place-content: space-between;
     }
     
     .ant-card-head-title {
       font-size: 18px;
-      line-height: 35px;
+      line-height: 40px;
     }
   }
 `;

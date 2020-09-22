@@ -67,7 +67,7 @@ const StyledMenuButton = styled.a`
     height: 32px;
     margin: 8px ${(props) => (props.noMargin ? '0' : '8px')};
     border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 3px;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     color: white;
