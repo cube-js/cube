@@ -104,7 +104,7 @@ class ResultSet {
     normalizedPivotConfig.y.forEach((member, currentIndex) => values.push([member, yValues[currentIndex]]));
 
     const { measures } = this.loadResponses[0].annotation;
-    let [, measureName] = values.find(([member]) => member === 'measues') || [];
+    let [, measureName] = values.find(([member]) => member === 'measures') || [];
 
     if (measureName === undefined) {
       [measureName] = Object.keys(measures);
