@@ -62,7 +62,8 @@ const schemaOptions = Joi.object().keys({
       }),
       preAggregationsOptions: {
         queueOptions: schemaQueueOptions
-      }
+      },
+      rollupOnlyMode: Joi.boolean()
     })
   ),
   allowJsDuplicatePropsInSchema: Joi.boolean(),
