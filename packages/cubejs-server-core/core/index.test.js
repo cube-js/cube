@@ -106,7 +106,8 @@ describe('index.test', () => {
         },
         preAggregationsOptions: {
           queueOptions
-        }
+        },
+        rollupOnlyMode: false
       },
       allowJsDuplicatePropsInSchema: true
     };
