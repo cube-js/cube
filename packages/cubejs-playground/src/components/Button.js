@@ -15,9 +15,10 @@ const StyledButton = styled(AntdButton)`
     }
     
     &.ant-btn-primary {
-      background-color: ${vars.primaryBg};
-      color: ${vars.primaryColor};     
-      border-color: ${vars.dark05Color};
+      background: ${vars.primaryColor};
+      color: white;
+      border-color: ${vars.primaryColor};
+      place-self: center;
     }
     
     &.ant-btn-icon-only {
@@ -38,7 +39,9 @@ const StyledButton = styled(AntdButton)`
 `;
 
 StyledButton.Group = styled(AntdButton.Group)`
-  && .ant-btn-primary {
+  &&& .ant-btn-primary {
+    background-color: ${vars.primaryBg};
+    color: ${vars.primaryColor};
     border: 1px solid ${vars.primaryColor};
     
     &:not(:first-child):not(:last-child) {

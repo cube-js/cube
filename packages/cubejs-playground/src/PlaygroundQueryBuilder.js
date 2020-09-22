@@ -103,7 +103,7 @@ export default function PlaygroundQueryBuilder({
               style={{ marginBottom: 12 }}
             >
               <Col span={24}>
-                <Card>
+                <Card bordered={false} style={{ borderRadius: 0 }}>
                   <Row
                     justify="stretch"
                     align="top"
