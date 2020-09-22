@@ -377,6 +377,8 @@ for the `['2018-01-01', '2018-12-31']` date range passed for the `OrderFacts.dat
 You can also pass a function instead of an SQL expression as a `filter()` argument.
 This way you can add BigQuery sharding filtering for events, which will reduce your billing cost.
 
+> **NOTE:** When you're passing function to the `filter()` function, params are passed as string parameters from driver and it's your responsibility to handle type conversions in this case.
+
 ```javascript
 cube(`Events`, {
   sql: `
