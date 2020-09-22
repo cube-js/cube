@@ -6,15 +6,19 @@ const StyledButton = styled(AntdButton)`
   && {
     padding: 5px 12px;
     height: auto;
-    border-color: 1px solid ${vars.dark05Color};
+    border-color: ${vars.dark05Color}; 
     color: ${vars.textColor};
-    margin: unset;
 
     &:hover, &:active, &:focus {
       border-color: ${vars.purple04Color};
       color: ${vars.primaryColor};
     }
-   
+    
+    &.ant-btn-primary {
+      background-color: ${vars.primaryBg};
+      color: ${vars.primaryColor};     
+      border-color: ${vars.dark05Color};
+    }
     
     &.ant-btn-icon-only {
       display: inline-flex;
@@ -25,6 +29,37 @@ const StyledButton = styled(AntdButton)`
     .anticon {
       display: inline-block;
       height: 14px;
+    }
+    
+    &.ant-btn-sm {
+      padding: 0 8px;
+    }
+  }
+`;
+
+StyledButton.Group = styled(AntdButton.Group)`
+  && .ant-btn-primary {
+    border: 1px solid ${vars.primaryColor};
+    
+    &:not(:first-child):not(:last-child) {
+      border-left-color: ${vars.primaryColor};
+      border-right-color: ${vars.primaryColor};
+    }
+    
+    &:first-child {
+      border-right-color: ${vars.primaryColor};
+    }
+    
+    &:last-child {
+      border-left-color: ${vars.primaryColor};
+    }
+  }
+
+  && .ant-btn-primary + .ant-btn:not(.ant-btn-primary):not([disabled]) {
+    border-left-color: ${vars.primaryColor};
+    
+    &:hover, &:active, &:focus {
+      border-left-color: ${vars.primaryColor};
     }
   }
 `;

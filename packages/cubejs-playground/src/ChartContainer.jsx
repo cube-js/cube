@@ -10,7 +10,8 @@ import {
   SyncOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { Card, Button, Menu, Dropdown, notification, Modal } from 'antd';
+import { Dropdown, Menu, Modal, notification } from 'antd';
+import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
@@ -64,9 +65,9 @@ class ChartContainer extends React.Component {
           Accept: 'application/json',
         },
         body: JSON.stringify(
-          this.codeSandboxDefinition(codeSandboxSource, dependencies)
+          this.codeSandboxDefinition(codeSandboxSource, dependencies),
         ),
-      }
+      },
     );
     const codeSandboxJson = await codeSandboxRes.json();
     this.setState({ sandboxId: codeSandboxJson.sandbox_id });
@@ -77,10 +78,10 @@ class ChartContainer extends React.Component {
       files: {
         ...(typeof codeSandboxSource === 'string'
           ? {
-              'index.js': {
-                content: codeSandboxSource,
-              },
-            }
+            'index.js': {
+              content: codeSandboxSource,
+            },
+          }
           : codeSandboxSource),
         'package.json': {
           content: {
@@ -125,7 +126,7 @@ class ChartContainer extends React.Component {
     }
 
     const parameters = getParameters(
-      this.codeSandboxDefinition(codeSandboxSource, dependencies)
+      this.codeSandboxDefinition(codeSandboxSource, dependencies),
     );
 
     const chartLibrariesMenu = (
@@ -155,7 +156,7 @@ class ChartContainer extends React.Component {
     );
 
     const currentLibraryItem = chartLibraries.find(
-      (m) => m.value === chartLibrary
+      (m) => m.value === chartLibrary,
     );
     const frameworkItem = frameworks.find((m) => m.id === framework);
     const extra = (
@@ -165,116 +166,135 @@ class ChartContainer extends React.Component {
         target="_blank"
       >
         <input type="hidden" name="parameters" value={parameters} />
-        <Button.Group>
-          {dashboardSource && (
-            <Button
-              onClick={async () => {
-                this.setState({ addingToDashboard: true });
-                const canAddChart = await dashboardSource.canAddChart();
-                if (typeof canAddChart === 'boolean' && canAddChart) {
-                  playgroundAction('Add to Dashboard');
-                  await dashboardSource.addChart(codeExample);
-                  this.setState({
-                    redirectToDashboard: true,
-                    addingToDashboard: false,
-                  });
-                } else if (!canAddChart) {
-                  this.setState({ addingToDashboard: false });
-                  Modal.error({
-                    title:
-                      'Your dashboard app does not support adding of static charts',
-                    content: 'Please use static dashboard template',
-                  });
-                } else {
-                  this.setState({ addingToDashboard: false });
-                  Modal.error({
-                    title: 'There is an error loading your dashboard app',
-                    content: canAddChart,
-                    okText: 'Fix',
-                    okCancel: true,
-                    onOk() {
-                      history.push('/dashboard');
-                    },
-                  });
-                }
-              }}
-              icon={<PlusOutlined />}
-              size="small"
-              loading={addingToDashboard}
+        <SectionRow>
+          <Button.Group>
+            {dashboardSource && (
+              <Button
+                onClick={async () => {
+                  this.setState({ addingToDashboard: true });
+                  const canAddChart = await dashboardSource.canAddChart();
+                  if (typeof canAddChart === 'boolean' && canAddChart) {
+                    playgroundAction('Add to Dashboard');
+                    await dashboardSource.addChart(codeExample);
+                    this.setState({
+                      redirectToDashboard: true,
+                      addingToDashboard: false,
+                    });
+                  } else if (!canAddChart) {
+                    this.setState({ addingToDashboard: false });
+                    Modal.error({
+                      title:
+                        'Your dashboard app does not support adding of static charts',
+                      content: 'Please use static dashboard template',
+                    });
+                  } else {
+                    this.setState({ addingToDashboard: false });
+                    Modal.error({
+                      title: 'There is an error loading your dashboard app',
+                      content: canAddChart,
+                      okText: 'Fix',
+                      okCancel: true,
+                      onOk() {
+                        history.push('/dashboard');
+                      },
+                    });
+                  }
+                }}
+                icon={<PlusOutlined />}
+                size="small"
+                loading={addingToDashboard}
+                disabled={!!frameworkItem.docsLink}
+              >
+                {addingToDashboard
+                  ? 'Preparing dashboard app. It may take a while. Please check console for progress...'
+                  : 'Add to Dashboard'}
+              </Button>
+            )}
+          </Button.Group>
+          <Button.Group>
+            <Dropdown overlay={frameworkMenu}>
+              <Button size="small">
+                {frameworkItem && frameworkItem.title}
+                <DownOutlined />
+              </Button>
+            </Dropdown>
+            <Dropdown
+              overlay={chartLibrariesMenu}
               disabled={!!frameworkItem.docsLink}
             >
-              {addingToDashboard
-                ? 'Preparing dashboard app. It may take a while. Please check console for progress...'
-                : 'Add to Dashboard'}
+              <Button size="small">
+                {currentLibraryItem && currentLibraryItem.title}
+                <DownOutlined />
+              </Button>
+            </Dropdown>
+          </Button.Group>
+          <Button.Group>
+            <Button
+              onClick={() => {
+                playgroundAction('Show Chart');
+                this.setState({
+                  showCode: null,
+                });
+              }}
+              size="small"
+              type={!showCode ? 'primary' : 'default'}
+              disabled={!!frameworkItem.docsLink}
+            >
+              Chart
             </Button>
-          )}
-          <Dropdown overlay={frameworkMenu}>
-            <Button size="small">
-              {frameworkItem && frameworkItem.title}
-              <DownOutlined />
+            <Button
+              onClick={() => {
+                playgroundAction('Show Query');
+                this.setState({
+                  showCode: 'query',
+                });
+              }}
+              icon={<ThunderboltOutlined />}
+              size="small"
+              type={showCode === 'query' ? 'primary' : 'default'}
+              disabled={!!frameworkItem.docsLink}
+            >
+              JSON Query
             </Button>
-          </Dropdown>
-          <Dropdown
-            overlay={chartLibrariesMenu}
-            disabled={!!frameworkItem.docsLink}
-          >
-            <Button size="small">
-              {currentLibraryItem && currentLibraryItem.title}
-              <DownOutlined />
+            <Button
+              onClick={() => {
+                playgroundAction('Show Code');
+                this.setState({ showCode: 'code' });
+              }}
+              icon={<CodeOutlined />}
+              size="small"
+              type={showCode === 'code' ? 'primary' : 'default'}
+              disabled={!!frameworkItem.docsLink}
+            >
+              Code
             </Button>
-          </Dropdown>
-          <Button
-            onClick={() => {
-              playgroundAction('Show Query');
-              this.setState({
-                showCode: showCode === 'query' ? null : 'query',
-              });
-            }}
-            icon={<ThunderboltOutlined />}
-            size="small"
-            type={showCode === 'query' ? 'primary' : 'default'}
-            disabled={!!frameworkItem.docsLink}
-          >
-            JSON Query
-          </Button>
-          <Button
-            onClick={() => {
-              playgroundAction('Show Code');
-              this.setState({ showCode: showCode === 'code' ? null : 'code' });
-            }}
-            icon={<CodeOutlined />}
-            size="small"
-            type={showCode === 'code' ? 'primary' : 'default'}
-            disabled={!!frameworkItem.docsLink}
-          >
-            Code
-          </Button>
-          <Button
-            onClick={() => {
-              playgroundAction('Show SQL');
-              this.setState({ showCode: showCode === 'sql' ? null : 'sql' });
-            }}
-            icon={<QuestionCircleOutlined />}
-            size="small"
-            type={showCode === 'sql' ? 'primary' : 'default'}
-            disabled={!!frameworkItem.docsLink}
-          >
-            SQL
-          </Button>
-          <Button
-            onClick={() => {
-              playgroundAction('Show Cache');
-              this.setState({
-                showCode: showCode === 'cache' ? null : 'cache',
-              });
-            }}
-            icon={<SyncOutlined />}
-            size="small"
-            type={showCode === 'cache' ? 'primary' : 'default'}
-            disabled={!!frameworkItem.docsLink}
-          >
-            Cache
-          </Button>
+            <Button
+              onClick={() => {
+                playgroundAction('Show SQL');
+                this.setState({ showCode: 'sql' });
+              }}
+              icon={<QuestionCircleOutlined />}
+              size="small"
+              type={showCode === 'sql' ? 'primary' : 'default'}
+              disabled={!!frameworkItem.docsLink}
+            >
+              SQL
+            </Button>
+            <Button
+              onClick={() => {
+                playgroundAction('Show Cache');
+                this.setState({
+                  showCode: 'cache',
+                });
+              }}
+              icon={<SyncOutlined />}
+              size="small"
+              type={showCode === 'cache' ? 'primary' : 'default'}
+              disabled={!!frameworkItem.docsLink}
+            >
+              Cache
+            </Button>
+          </Button.Group>
           <Button
             icon={<CodeSandboxOutlined />}
             size="small"
@@ -284,7 +304,7 @@ class ChartContainer extends React.Component {
           >
             Edit
           </Button>
-        </Button.Group>
+        </SectionRow>
       </form>
     );
 
@@ -326,7 +346,7 @@ class ChartContainer extends React.Component {
             render={({ sqlQuery }) => {
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
-              return <PrismCode code={query && sqlFormatter.format(query.sql())} />
+              return <PrismCode code={query && sqlFormatter.format(query.sql())} />;
             }}
           />
         );
@@ -346,7 +366,7 @@ class ChartContainer extends React.Component {
       }
       try {
         await navigator.clipboard.writeText(
-          showCode === 'query' ? queryText : codeExample
+          showCode === 'query' ? queryText : codeExample,
         );
         notification.success({
           message: 'Copied to clipboard',
@@ -361,29 +381,35 @@ class ChartContainer extends React.Component {
 
     if (showCode === 'code') {
       title = (
-        <Button
-          icon={<CopyOutlined />}
-          onClick={() => {
-            copyCodeToClipboard();
-            playgroundAction('Copy Code to Clipboard');
-          }}
-          type="primary"
-        >
-          Copy Code to Clipboard
-        </Button>
+        <SectionRow>
+          <div>Query</div>
+          <Button
+            icon={<CopyOutlined />}
+            onClick={() => {
+              copyCodeToClipboard();
+              playgroundAction('Copy Code to Clipboard');
+            }}
+            type="primary"
+          >
+            Copy to Clipboard
+          </Button>
+        </SectionRow>
       );
     } else if (showCode === 'query') {
       title = (
-        <Button
-          icon={<CopyOutlined />}
-          onClick={() => {
-            copyCodeToClipboard();
-            playgroundAction('Copy Query to Clipboard');
-          }}
-          type="primary"
-        >
-          Copy Query to Clipboard
-        </Button>
+        <SectionRow>
+          <div>Query</div>
+          <Button
+            icon={<CopyOutlined />}
+            onClick={() => {
+              copyCodeToClipboard();
+              playgroundAction('Copy Query to Clipboard');
+            }}
+            type="primary"
+          >
+            Copy to Clipboard
+          </Button>
+        </SectionRow>
       );
     } else if (showCode === 'sql') {
       title = 'SQL';

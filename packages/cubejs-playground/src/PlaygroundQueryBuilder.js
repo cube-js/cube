@@ -223,7 +223,7 @@ export default function PlaygroundQueryBuilder({
               </Col>
             </Row>
 
-            <Row justify="space-around" align="top" gutter={24} style={{ marginTop: 0, marginLeft: 0 }}>
+            <Row justify="space-around" align="top" gutter={24} style={{ marginRight: 0, marginLeft: 0 }}>
               <Col span={24} style={{ paddingLeft: 16, paddingRight: 16 }}>
                 {isQueryPresent ? (
                   <ChartRenderer

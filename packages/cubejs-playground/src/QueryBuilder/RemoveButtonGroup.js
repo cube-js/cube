@@ -20,18 +20,22 @@ RemoveButtonGroup.propTypes = {
 };
 
 const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
-  &.ant-btn-group {
+  && {
     border: 1px solid ${vars.primaryColor};
     color: ${vars.primaryColor};
     border-radius: calc(${vars.borderRadiusBase} + 1px);
   
     .ant-btn {
-      background-color: ${vars.removeBtnBg};
+      background-color: ${vars.primary9};
       color: ${vars.primaryColor};
       border: none;
       
+      span {
+        color: ${vars.primaryColor};
+      }
+      
       &:hover {
-        background-color: ${vars.removeBtnHoverBg};
+        background-color: ${vars.primary8};
         border: none;
         box-shadow: none;
       }
@@ -40,7 +44,7 @@ const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
         margin-left: 0;
       }
     }
-    
+
     .remove-btn {
       background-color: white !important;    
       color: ${vars.primaryColor};

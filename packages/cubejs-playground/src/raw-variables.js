@@ -14,6 +14,17 @@ function color(name, opacity = 1) {
 
 module.exports = {
   'active-bg': color('purple', .1),
+  'primary-bg': color('purple', .1),
+  'primary-1': color('purple', .9),
+  'primary-2': color('purple', .8),
+  'primary-3': color('purple', .7),
+  'primary-4': color('purple', .6),
+  'primary-5': color('purple', .5),
+  'primary-6': color('purple', .4),
+  'primary-7': color('purple', .3),
+  'primary-8': color('purple', .2),
+  'primary-9': color('purple', .1),
+  'primary-10': color('purple', 0),
   'remove-btn-bg': color('purple', .1),
   'remove-btn-hover-bg': color('purple', .2),
   'primary-color': color('purple'),
