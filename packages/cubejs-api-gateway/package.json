@@ -14,7 +14,8 @@
   "scripts": {
     "test": "npm run unit",
     "unit": "jest",
-    "lint": "eslint *.js"
+    "lint": "eslint *.js",
+    "lint:fix": "eslint --fix *.js"
   },
   "main": "index.js",
   "types": "index.d.ts",
