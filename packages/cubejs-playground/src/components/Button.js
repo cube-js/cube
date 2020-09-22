@@ -14,7 +14,7 @@ const StyledButton = styled(AntdButton)`
       color: ${vars.primaryColor};
     }
     
-    &.ant-btn-primary {
+    &.ant-btn-primary:not([disabled]) {
       background: ${vars.primaryColor};
       color: white;
       border-color: ${vars.primaryColor};
@@ -39,7 +39,7 @@ const StyledButton = styled(AntdButton)`
 `;
 
 StyledButton.Group = styled(AntdButton.Group)`
-  &&& .ant-btn-primary {
+  &&& .ant-btn-primary:not([disabled]) {
     background-color: ${vars.primaryBg};
     color: ${vars.primaryColor};
     border: 1px solid ${vars.primaryColor};
@@ -58,7 +58,7 @@ StyledButton.Group = styled(AntdButton.Group)`
     }
   }
 
-  && .ant-btn-primary + .ant-btn:not(.ant-btn-primary):not([disabled]) {
+  && .ant-btn-primary:not([disabled]) + .ant-btn:not(.ant-btn-primary):not([disabled]) {
     border-left-color: ${vars.primaryColor};
     
     &:hover, &:active, &:focus {
