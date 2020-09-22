@@ -76,6 +76,7 @@ describe('index.test', () => {
       initApp: () => {},
       processSubscriptionsInterval: 5000,
       devServer: false,
+      apiSecret: 'randomstring',
       logger: () => {},
       driverFactory: () => {},
       externalDriverFactory: () => {},

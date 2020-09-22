@@ -23,6 +23,7 @@ const schemaOptions = Joi.object().keys({
   basePath: Joi.string(),
   webSocketsBasePath: Joi.string(),
   devServer: Joi.boolean(),
+  apiSecret: Joi.string(),
   webSockets: Joi.boolean(),
   processSubscriptionsInterval: Joi.number(),
   initApp: Joi.func(),
