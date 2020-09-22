@@ -48,7 +48,6 @@ describe('index.test', () => {
       .toThrowError(/"compilerCacheSize" must be larger than or equal to 0/);
   });
 
-
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {
     const options = { dbType: 'mysql', orchestratorOptions: () => {} };
 
