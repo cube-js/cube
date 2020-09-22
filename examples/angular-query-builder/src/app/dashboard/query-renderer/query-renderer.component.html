@@ -1,8 +1,5 @@
-<ng-container *ngIf="isQueryPresent">
-  <div
-    *ngIf="queryBuilder.chartType.get() !== 'table' && chartData.length > 0"
-    class="container"
-  >
+<div *ngIf="isQueryPresent" class="chart-wrapper">
+  <div *ngIf="chartType !== 'table' && chartData.length > 0" class="container">
     <canvas
       baseChart
       legend="true"
@@ -10,13 +7,13 @@
       [labels]="chartLabels"
       [options]="chartOptions"
       [colors]="chartColors"
-      [chartType]="queryBuilder.chartType.get()"
+      [chartType]="chartType"
     >
     </canvas>
   </div>
 
   <table
-    *ngIf="queryBuilder.chartType.get() === 'table'"
+    *ngIf="chartType === 'table'"
     mat-table
     [dataSource]="tableData"
     style="width: 100%;"
@@ -25,23 +22,17 @@
       *ngFor="let column of displayedColumns"
       [matColumnDef]="column"
     >
-      <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
+      <th
+        mat-header-cell
+        [style.text-align]="'center'"
+        *matHeaderCellDef
+      >
+        {{ dataIndexToTitle[column] }}
+      </th>
       <td mat-cell *matCellDef="let element">{{ element[column] }}</td>
     </ng-container>
-
-    <!-- Name Column -->
-    <!-- <ng-container matColumnDef="name">
-      <th mat-header-cell *matHeaderCellDef> Name </th>
-      <td mat-cell *matCellDef="let element"> {{element.name}} </td>
-    </ng-container>
-  
-    <!-- Weight Column -->
-    <!-- <ng-container matColumnDef="weight"> -->
-    <!-- <th mat-header-cell *matHeaderCellDef> Weight </th> -->
-    <!-- <td mat-cell *matCellDef="let element"> {{element.weight}} </td> -->
-    <!-- </ng-container> -->
 
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
     <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
   </table>
-</ng-container>
+</div>

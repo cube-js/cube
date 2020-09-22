@@ -1,5 +1,4 @@
 import {
-  Filter,
   Meta,
   TCubeDimension,
   TCubeMeasure,

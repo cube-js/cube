@@ -55,21 +55,25 @@ export class DashboardComponent implements OnInit {
   async ngOnInit() {
     this.queryBuilder.deserialize({
       query: {
-        measures: ['Sales.count'],
-        dimensions: ['Users.gender', 'Sales.ts.month'],
-        filters: [
-          {
-            dimension: 'Sales.title',
-            operator: 'contains',
-            values: ['test'],
-          },
-        ],
+        measures: ['Sales.count', 'Sales.amount'],
+        dimensions: ['Users.gender'],
+        timeDimensions: [{
+          dimension: 'Sales.ts',
+          granularity: 'month',
+        }]
+        // filters: [
+        //   {
+        //     dimension: 'Sales.title',
+        //     operator: 'contains',
+        //     values: ['test'],
+        //   },
+        // ],
       },
       pivotConfig: {
         x: ['Sales.ts.month'],
         y: ['Users.gender', 'measures'],
       },
-      chartType: 'bar',
+      chartType: 'table',
     });
 
     this.builderMeta = await this.queryBuilder.builderMeta;

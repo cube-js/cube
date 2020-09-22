@@ -14,23 +14,23 @@ import { Color, Label } from 'ng2-charts';
 import { combineLatest, of } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
 
-const ELEMENT_DATA: any[] = [];
-
-function getDisplayedColumns(tableColumns: any[]) {
+function getMatColumnsMeta(tableColumns: any[]): [any, any] {
   const queue = tableColumns;
   const columns = [];
+  const dataIndexToTitle = {};
 
   while (queue.length) {
-    const column = queue.pop();
+    const column = queue.shift();
     if (column.dataIndex) {
       columns.push(column.dataIndex);
+      dataIndexToTitle[column.dataIndex] = column.title;
     }
     if ((column.children || []).length) {
       column.children.map((child) => queue.push(child));
     }
   }
 
-  return columns;
+  return [columns, dataIndexToTitle];
 }
 
 @Component({
@@ -39,28 +39,17 @@ function getDisplayedColumns(tableColumns: any[]) {
   styleUrls: ['./query-renderer.component.css'],
 })
 export class QueryRendererComponent implements OnInit {
-  private _resultSet: ResultSet;
-
+  resultSet: ResultSet;
   chartType: TChartType = 'line';
   isQueryPresent: boolean;
   displayedColumns: string[] = [];
-  dataSource = ELEMENT_DATA;
+  dataIndexToTitle: any;
+  dataSource = [];
   tableData = [];
   tableColumns = [];
-  resultSet: ResultSet;
-
-  @Input()
-  resetResultSetOnChange: boolean = false;
-
-  @Input()
-  queryBuilder: QueryBuilderService;
-
-  @Input()
-  pivotConfig: TPivotConfig;
-
   chartData: ChartDataSets[] = [];
   chartLabels: Label[] = [];
-  chartOptions: ChartOptions & { responsive: boolean } = {
+  chartOptions: ChartOptions = {
     responsive: true,
   };
   chartColors: Color[] = [
@@ -70,6 +59,12 @@ export class QueryRendererComponent implements OnInit {
       backgroundColor: 'rgba(255,0,0,0.3)',
     },
   ];
+
+  @Input()
+  resetResultSetOnChange: boolean = false;
+
+  @Input()
+  queryBuilder: QueryBuilderService;
 
   constructor(private cubejsClient: CubejsClient) {}
 
@@ -93,12 +88,12 @@ export class QueryRendererComponent implements OnInit {
         TPivotConfig,
         TChartType
       ]) => {
-        if (resultSet != null || this.resetResultSetOnChange) {
-          this._resultSet = resultSet;
-        }
         this.chartType = chartType;
+        if (resultSet != null || this.resetResultSetOnChange) {
+          this.resultSet = resultSet;
+        }
         this.isQueryPresent = resultSet != null;
-        this.updateChart(this._resultSet, pivotConfig);
+        setTimeout(() => this.updateChart(resultSet, pivotConfig), 0);
       }
     );
   }
@@ -110,30 +105,21 @@ export class QueryRendererComponent implements OnInit {
 
     if (this.queryBuilder.chartType.get() === 'table') {
       this.tableData = resultSet.tablePivot(pivotConfig);
-      this.displayedColumns = getDisplayedColumns(
+      const [displayedColumns, dataIndexToTitle] = getMatColumnsMeta(
         resultSet.tableColumns(pivotConfig)
       );
-      this.tableColumns = this.displayedColumns.map((column) => {});
+
+      this.displayedColumns = displayedColumns;
+      this.dataIndexToTitle = dataIndexToTitle;
     } else {
       this.chartData = resultSet.series(pivotConfig).map((item) => {
         return {
           label: item.title,
           data: item.series.map(({ value }) => value),
-          stack: 'a',
+          queue: 'a',
         };
       });
       this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);
     }
-
-    console.log({
-      tablePivot: resultSet.tablePivot(pivotConfig),
-      tableColumns: resultSet.tableColumns(pivotConfig),
-      _tableData: this.tableData,
-      _dislayed: this.displayedColumns,
-      __: getDisplayedColumns(resultSet.tableColumns(pivotConfig)),
-      // series: resultSet.series(pivotConfig),
-      _chartData: this.chartData,
-      _chartLables: this.chartLabels,
-    });
   }
 }
