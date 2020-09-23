@@ -8,16 +8,7 @@ import featureOneImg from './feature-1.svg';
 import featureTwoImg from './feature-2.svg';
 import featureThreeImg from './feature-3.svg';
 
-import styled from 'styled-components';
-import media from 'styled-media-query';
-
 import hero from './hero.png';
-
-const StyledHeroImage = styled.img`
-  ${media.greaterThan('large')`
-    margin-top: -50px;
-  `}
-`;
 
 class Index extends React.Component {
   render() {
@@ -28,8 +19,8 @@ class Index extends React.Component {
         <Helmet title={config.siteTitle} />
         <Header githubUrl={config.githubUrl} />
         <Hero
-          title="Building Material UI Dashboard with Cube.js"
-          subtitle="Learn how to build Material UI Dashboard with Cube.js."
+          title="Material UI Dashboard with React"
+          subtitle="Learn how to build a Material UI Dashboard with React and Cube.js"
           demoUrl="https://material-ui-dashboard.cubecloudapp.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
@@ -43,23 +34,23 @@ class Index extends React.Component {
         <Feature
           imageAlign="left"
           image={featureOneImg}
-          metaTitle="Efficiency"
-          title="Quick development"
-          text="Cube.js provides a convenient API for working with your database. You will not need to think about how to build database queries for your Analytics application. This will allow you to focus on the main thing developing quickly and efficiently."
+          metaTitle="MATERIAL UI DASHBOARD"
+          title="Build an Interactive Multi-Page Dashboard with React, Material UI, and Cube.js"
+          text="Explore how to create your own React Material UI dashboard. You will learn step by step how to build a comprehensive dashboard which retrieves and visualizes data from your database without writing SQL code."
         />
         <Feature
           imageAlign="right"
           image={featureTwoImg}
-          metaTitle="Visualisation"
-          title="Easy to create"
-          text="This guide shows you how to build different types of graphs and how to display any data. This guide includes a Bar chart, Doughnut chart, KPI cards, and Datatable. Using them as an example or using the chart renderer component, you can develop your dashboard using any chart/data display."
+          metaTitle="DATA SCHEMA"
+          title="Build an Analytics API with Cube.js"
+          text="You will learn how to model data with Cube.js data schema and build a clean API interface to power your analytics dashboard. This guide shows how to create complex metrics and describe relationships in the data."
         />
         <Feature
           imageAlign="left"
           image={featureThreeImg}
-          metaTitle="Performance first"
-          title="Fast and Scalable"
-          text="The response time is under 50 ms by using Cube.js pre-aggregations. It scales well for tracking up to several million daily active users. To achieve this performance, Cube.js stores and manages aggregated tables in MySQL with a 5-minute refresh rate."
+          metaTitle="DATA VISUALIZATION TECHNIQUES"
+          title="Learn How to Use Various Chart Types to Visualize Data"
+          text="Explore how to work with such Material UI components as Bar Chart, Doughnut Chart, and Data Table. Learn the essentials of using these components to build convenient visualizations for business metrics and KPIs."
         />
         <PartsListing partsEdges={partsEdges} />
         <Footer />
