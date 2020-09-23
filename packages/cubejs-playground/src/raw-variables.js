@@ -1,10 +1,10 @@
 const colors = {
   purple: '122, 119, 255',
   'purple-04': '202, 201, 255',
-  dark: '20, 20, 70',
+  text: '91, 92, 125',
   'dark-01': '20, 20, 70',
   'dark-02': '67, 67, 107',
-  'dark-04': '161, 161, 181',
+  'dark-03': '161, 161, 181',
   'dark-05': '213, 213, 226',
   light: '243, 243, 251',
 };
@@ -30,7 +30,6 @@ module.exports = {
   'remove-btn-hover-bg': color('purple', .2),
   'primary-color': color('purple'),
 
-  'text-color': color('dark', .65),
   'heading-color': color('dark', .65),
   'link-color': color('purple'),
   'info-color': color('purple'),

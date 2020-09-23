@@ -1,6 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Card, Col, Popover, Row } from 'antd';
+import { Col, Popover, Row } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
@@ -10,7 +10,7 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
-import { Button, SectionHeader, SectionRow } from './components';
+import { Card, Button, SectionHeader, SectionRow } from './components';
 import styled from 'styled-components';
 
 const Section = styled.div`
@@ -107,7 +107,7 @@ export default function PlaygroundQueryBuilder({
                   <Row
                     justify="stretch"
                     align="top"
-                    gutter={24}
+                    gutter={0}
                     style={{ marginBottom: -12 }}
                   >
                     <Section>

@@ -4,9 +4,16 @@ import { Card as AntdCard } from 'antd';
 
 const StyledCard = styled(AntdCard)`
   && {
+    border-radius: 8px;
+    border: none;
+  
     .ant-card-head {
-      border-bottom: 2px solid #D7D7F488;
+      border-bottom: 1px solid #D7D7F488;
       padding: 8px 16px;
+    }
+    
+    .ant-card-body {
+      padding: 16px;
     }
     
     .ant-card-head-title {

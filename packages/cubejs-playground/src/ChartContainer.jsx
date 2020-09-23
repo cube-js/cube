@@ -167,49 +167,6 @@ class ChartContainer extends React.Component {
       >
         <input type="hidden" name="parameters" value={parameters} />
         <SectionRow>
-          {dashboardSource && (
-            <Button
-              onClick={async () => {
-                this.setState({ addingToDashboard: true });
-                const canAddChart = await dashboardSource.canAddChart();
-                if (typeof canAddChart === 'boolean' && canAddChart) {
-                  playgroundAction('Add to Dashboard');
-                  await dashboardSource.addChart(codeExample);
-                  this.setState({
-                    redirectToDashboard: true,
-                    addingToDashboard: false,
-                  });
-                } else if (!canAddChart) {
-                  this.setState({ addingToDashboard: false });
-                  Modal.error({
-                    title:
-                      'Your dashboard app does not support adding of static charts',
-                    content: 'Please use static dashboard template',
-                  });
-                } else {
-                  this.setState({ addingToDashboard: false });
-                  Modal.error({
-                    title: 'There is an error loading your dashboard app',
-                    content: canAddChart,
-                    okText: 'Fix',
-                    okCancel: true,
-                    onOk() {
-                      history.push('/dashboard');
-                    },
-                  });
-                }
-              }}
-              icon={<PlusOutlined />}
-              size="small"
-              loading={addingToDashboard}
-              disabled={!!frameworkItem.docsLink}
-              type="primary"
-            >
-              {addingToDashboard
-                ? 'Preparing dashboard app. It may take a while. Please check console for progress...'
-                : 'Add to Dashboard'}
-            </Button>
-          )}
           <Button.Group>
             <Dropdown overlay={frameworkMenu}>
               <Button size="small">
@@ -303,6 +260,49 @@ class ChartContainer extends React.Component {
           >
             Edit
           </Button>
+          {dashboardSource && (
+            <Button
+              onClick={async () => {
+                this.setState({ addingToDashboard: true });
+                const canAddChart = await dashboardSource.canAddChart();
+                if (typeof canAddChart === 'boolean' && canAddChart) {
+                  playgroundAction('Add to Dashboard');
+                  await dashboardSource.addChart(codeExample);
+                  this.setState({
+                    redirectToDashboard: true,
+                    addingToDashboard: false,
+                  });
+                } else if (!canAddChart) {
+                  this.setState({ addingToDashboard: false });
+                  Modal.error({
+                    title:
+                      'Your dashboard app does not support adding of static charts',
+                    content: 'Please use static dashboard template',
+                  });
+                } else {
+                  this.setState({ addingToDashboard: false });
+                  Modal.error({
+                    title: 'There is an error loading your dashboard app',
+                    content: canAddChart,
+                    okText: 'Fix',
+                    okCancel: true,
+                    onOk() {
+                      history.push('/dashboard');
+                    },
+                  });
+                }
+              }}
+              icon={<PlusOutlined />}
+              size="small"
+              loading={addingToDashboard}
+              disabled={!!frameworkItem.docsLink}
+              type="primary"
+            >
+              {addingToDashboard
+                ? 'Preparing dashboard app. It may take a while. Please check console for progress...'
+                : 'Add to Dashboard'}
+            </Button>
+          )}
         </SectionRow>
       </form>
     );

@@ -8,6 +8,7 @@ const StyledButton = styled(AntdButton)`
     height: auto;
     border-color: ${vars.dark05Color}; 
     color: ${vars.textColor};
+    box-shadow: none;
 
     &:hover, &:active, &:focus {
       border-color: ${vars.purple04Color};
@@ -25,6 +26,12 @@ const StyledButton = styled(AntdButton)`
       display: inline-flex;
       place-items: center;
       padding: 5px 8px;
+      font-size: 14px;
+      
+      svg {
+        width: 15px;
+        height: 14px;
+      }
     }
     
     .anticon {
