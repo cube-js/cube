@@ -7,6 +7,7 @@ import PerfectScrollbar from 'react-perfect-scrollbar';
 import { makeStyles } from '@material-ui/styles';
 import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
+import OpenInNewIcon from '@material-ui/icons/OpenInNew';
 import { useCubeQuery } from '@cubejs-client/react';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import {
@@ -50,7 +51,6 @@ const useStyles = makeStyles((theme) => ({
   },
   tableRow: {
     padding: '0 5px',
-    cursor: 'pointer',
     '.MuiTableRow-root.MuiTableRow-hover&:hover': {
       backgroundColor: palette.primary.action,
     },
@@ -197,12 +197,20 @@ const TableComponent = (props) => {
                     <TableRow
                       className={classes.tableRow}
                       hover
-                      onClick={() => handleClick(`/user/${obj['Users.id']}`)}
                       key={obj['Orders.id']}
                     >
                       <TableCell>{obj['Orders.id']}</TableCell>
                       <TableCell>{obj['Orders.size']}</TableCell>
-                      <TableCell>{obj['Users.fullName']}</TableCell>
+                      <TableCell
+                        className={classes.hoverable}
+                        onClick={() => handleClick(`/user/${obj['Users.id']}`)}
+                      >
+                        {obj['Users.fullName']}
+                        &nbsp;
+                        <Typography className={classes.arrow} variant="body2" component="span">
+                          <OpenInNewIcon fontSize="small" />
+                        </Typography>
+                      </TableCell>
                       <TableCell>{obj['Users.city']}</TableCell>
                       <TableCell>{'$ ' + obj['Orders.price']}</TableCell>
                       <TableCell>
