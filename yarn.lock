@@ -941,6 +941,16 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
+"@cubejs-backend/linter@file:./packages/cubejs-linter":
+  version "0.20.10"
+  dependencies:
+    "@typescript-eslint/eslint-plugin" "^4.1.1"
+    "@typescript-eslint/parser" "^4.1.1"
+    eslint "^7.9.0"
+    eslint-config-airbnb-base "^14.2.0"
+    eslint-plugin-import "^2.22.0"
+    eslint-plugin-node "^6.0.1"
+
 "@cubejs-client/core@^0.17.10":
   version "0.17.10"
   resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.17.10.tgz#4c84338f15f690e62aa2f352f6597f462e1b74eb"
@@ -954,16 +964,6 @@
     ramda "^0.25.0"
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
-
-"@cubejs/linter@file:./packages/cubejs-linter":
-  version "0.20.6"
-  dependencies:
-    "@typescript-eslint/eslint-plugin" "^4.1.1"
-    "@typescript-eslint/parser" "^4.1.1"
-    eslint "^7.9.0"
-    eslint-config-airbnb-base "^14.2.0"
-    eslint-plugin-import "^2.22.0"
-    eslint-plugin-node "^6.0.1"
 
 "@eslint/eslintrc@^0.1.3":
   version "0.1.3"
@@ -2051,9 +2051,9 @@
   integrity sha512-FA/BWv8t8ZWJ+gEOnLLd8ygxH/2UFbAvgEonyfN6yWGLKc7zVjbpl2Y4CTjid9h2RfgPP6SEt6uHwEOply00yw==
 
 "@types/yargs@^15.0.0":
-  version "15.0.5"
-  resolved "https://registry.yarnpkg.com/@types/yargs/-/yargs-15.0.5.tgz#947e9a6561483bdee9adffc983e91a6902af8b79"
-  integrity sha512-Dk/IDOPtOgubt/IaevIUbTgV7doaKkoorvOyYM2CMwuDyP89bekI7H4xLIwunNYiK9jhCkmc6pUrJk3cj2AB9w==
+  version "15.0.7"
+  resolved "https://registry.yarnpkg.com/@types/yargs/-/yargs-15.0.7.tgz#dad50a7a234a35ef9460737a56024287a3de1d2b"
+  integrity sha512-Gf4u3EjaPNcC9cTu4/j2oN14nSVhr8PQ+BvBcBQHAhDZfl0bVIiLgvnRXv/dn58XhTm9UXvBpvJpDlwV65QxOA==
   dependencies:
     "@types/yargs-parser" "*"
 
@@ -3344,9 +3344,9 @@ ecstatic@^3.3.2:
     url-join "^2.0.5"
 
 electron-to-chromium@^1.3.570:
-  version "1.3.570"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.570.tgz#3f5141cc39b4e3892a276b4889980dabf1d29c7f"
-  integrity sha512-Y6OCoVQgFQBP5py6A/06+yWxUZHDlNr/gNDGatjH8AZqXl8X0tE4LfjLJsXGz/JmWJz8a6K7bR1k+QzZ+k//fg==
+  version "1.3.571"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.571.tgz#e57977f1569f8326ae2a7905e26f3943536ba28f"
+  integrity sha512-UYEQ2Gtc50kqmyOmOVtj6Oqi38lm5yRJY3pLuWt6UIot0No1L09uu6Ja6/1XKwmz/p0eJFZTUZi+khd1PV1hHA==
 
 emoji-regex@^7.0.1:
   version "7.0.3"
@@ -3605,9 +3605,9 @@ eslint-plugin-react-hooks@^4.0.7:
   integrity sha512-ykUeqkGyUGgwTtk78C0o8UG2fzwmgJ0qxBGPp2WqRKsTwcLuVf01kTDRAtOsd4u6whX2XOC8749n2vPydP82fg==
 
 eslint-plugin-react@^7.20.0:
-  version "7.20.6"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-react/-/eslint-plugin-react-7.20.6.tgz#4d7845311a93c463493ccfa0a19c9c5d0fd69f60"
-  integrity sha512-kidMTE5HAEBSLu23CUDvj8dc3LdBU0ri1scwHBZjI41oDv4tjsWZKU7MQccFzH1QYPYhsnTF2ovh7JlcIcmxgg==
+  version "7.21.0"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-react/-/eslint-plugin-react-7.21.0.tgz#aa0699086f586d54a5005c99a703175bc5d21161"
+  integrity sha512-WaieZZ4cayAfPBmy5KkEqFfLQf/VkzoUsvM5DfD9G1lrz+3LtZ8X6nToEUQiFe1X5ApNIzkMd+7NUy+2OmSTQQ==
   dependencies:
     array-includes "^3.1.1"
     array.prototype.flatmap "^1.2.3"

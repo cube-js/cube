@@ -18,8 +18,8 @@
     "watch": "tsc -w",
     "integration": "mocha dist/test/*.js",
     "integration:druid": "mocha dist/test/*.js",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts",
+    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts",
+    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts",
     "prepublishOnly": "rm -rf dist && npm run tsc"
   },
   "files": [
@@ -34,7 +34,7 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs/linter": "file:../cubejs-linter",
+    "@cubejs-backend/linter": "^0.20.10",
     "@types/generic-pool": "^3.1.9",
     "@types/mocha": "^8.0.3",
     "@types/node": "^14.10.1",

@@ -21,7 +21,7 @@
     "dist"
   ],
   "devDependencies": {
-    "@cubejs/linter": "file:./packages/cubejs-linter",
+    "@cubejs-backend/linter": "file:./packages/cubejs-linter",
     "@babel/core": "^7.0.1",
     "@babel/plugin-transform-runtime": "^7.0.0",
     "@babel/preset-env": "^7.0.0",
