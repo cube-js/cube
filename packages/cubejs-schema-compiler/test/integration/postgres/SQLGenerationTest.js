@@ -3,7 +3,9 @@
 const UserError = require('../../../compiler/UserError');
 const PostgresQuery = require('../../../adapter/PostgresQuery');
 const BigqueryQuery = require('../../../adapter/BigqueryQuery');
+const PrestoQuery = require('../../../adapter/PrestodbQuery');
 const PrepareCompiler = require('../../unit/PrepareCompiler');
+
 require('should');
 
 const { prepareCompiler } = PrepareCompiler;
@@ -383,12 +385,12 @@ describe('SQL Generation', function test() {
 
     console.log(query.buildSqlAndParams());
 
-    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        expectedResult
-      );
-    });
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    res.should.be.deepEqual(
+      expectedResult
+    );
   }
 
   it('simple join total', () => runQueryTest({
@@ -640,7 +642,7 @@ describe('SQL Generation', function test() {
     { 'visitors__created_at_day': '2017-01-10T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' }
   ]));
 
-  it('hll rolling', async () => {
+  it('hll rolling (BigQuery)', async () => {
     await compiler.compile();
 
     const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -662,6 +664,28 @@ describe('SQL Generation', function test() {
 
     query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.MERGE/);
     query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.INIT/);
+  });
+
+  it('offset (PrestoQuery), refs #988', async () => {
+    await compiler.compile();
+
+    const query = new PrestoQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_revenue',
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles',
+      offset: 5,
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    query.buildSqlAndParams()[0].should.match(/OFFSET (\d) LIMIT (\d)/);
   });
 
   it('calculated join', async () => {
