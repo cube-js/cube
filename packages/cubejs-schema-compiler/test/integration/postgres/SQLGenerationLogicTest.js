@@ -315,40 +315,38 @@ describe('SQL Generation', function test() {
     });
     `);
 
-    
-  it('filter with operator OR', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitor_checkins.google_sourced_checkins'
-        ],
-        timeDimensions: [],
-        filters: [
-          {
-            or: [
-              { dimension: 'cards.id', operator: 'equals', values: ['3'] },
-              { dimension: 'cards.id', operator: 'equals', values: ['1'] }
-            ]
-          },
-        ],
-        timezone: 'America/Los_Angeles'
-      });
+  it('filter with operator OR', async () => {
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{ 'visitor_checkins__google_sourced_checkins': '1' }]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.google_sourced_checkins'
+      ],
+      timeDimensions: [],
+      filters: [
+        {
+          or: [
+            { dimension: 'cards.id', operator: 'equals', values: ['3'] },
+            { dimension: 'cards.id', operator: 'equals', values: ['1'] }
+          ]
+        },
+      ],
+      timezone: 'America/Los_Angeles'
     });
 
-    return result;
-  });
- 
+    console.log(query.buildSqlAndParams());
 
-  it('having and where filter in same operator OR', () => compiler.compile().then(() => {
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{ 'visitor_checkins__google_sourced_checkins': '1' }]
+      );
+    });
+  });
+
+  it('having and where filter in same operator OR', async () => {
+    await compiler.compile();
+
     try {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         'measures': [
@@ -381,15 +379,17 @@ describe('SQL Generation', function test() {
           'visitors.source'
         ]
       });
-  
+
       throw new Error();
     } catch (error) {
       // You cannot use dimension and measure in same condition
       error.should.be.instanceof(UserError);
     }
-  }));
-  
-  it('having filter with operator OR', () => compiler.compile().then(() => {
+  });
+
+  it('having filter with operator OR', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count',
@@ -438,10 +438,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
+  it('having filter with operators OR & AND', async () => {
+    await compiler.compile();
 
-  it('having filter with operators OR & AND', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count',
@@ -508,9 +509,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('having filter with operators OR & AND (with filter based on measures not from select part clause)', () => compiler.compile().then(() => {
+  it('having filter with operators OR & AND (with filter based on measures not from select part clause)', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count',
@@ -577,9 +580,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('where filter with operators OR & AND', () => compiler.compile().then(() => {
+  it('where filter with operators OR & AND', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
@@ -643,9 +648,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('where filter with operators OR & AND (with filter based on dimensions not from select part clause)', () => compiler.compile().then(() => {
+  it('where filter with operators OR & AND (with filter based on dimensions not from select part clause)', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
@@ -706,9 +713,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('where filter with only one argument', () => compiler.compile().then(() => {
+  it('where filter with only one argument', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
@@ -766,9 +775,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('where filter without arguments', () => compiler.compile().then(() => {
+  it('where filter without arguments', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
@@ -812,9 +823,11 @@ describe('SQL Generation', function test() {
       console.log(JSON.stringify(res));
       res.should.be.deepEqual([{ 'visitors__source': 'some', 'visitors__visitor_count': '2' }]);
     });
-  }));
+  });
 
-  it('where filter without any arguments', () => compiler.compile().then(() => {
+  it('where filter without any arguments', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
@@ -858,8 +871,11 @@ describe('SQL Generation', function test() {
         ]
       );
     });
-  }));
-  it('where filter with incorrect one arguments', () => compiler.compile().then(() => {
+  });
+
+  it('where filter with incorrect one arguments', async () => {
+    await compiler.compile();
+
     try {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
@@ -874,28 +890,28 @@ describe('SQL Generation', function test() {
           {
             and: [
               { and: [
-                {
-                  or: [
-                    {
-                      and: [
-                        {
-                          measure: 'visitors.source',
-                          operator: 'equals',
-                          values: ['some']
-                        }
-                      ]
-                    },
-                    {
-                      and: [
-                        {
-                          dimension: 'visitors_source',
-                          operator: 'equals',
-                          values: ['google']
-                        }
-                      ]
-                    }
-                  ]
-                }]
+                  {
+                    or: [
+                      {
+                        and: [
+                          {
+                            measure: 'visitors.source',
+                            operator: 'equals',
+                            values: ['some']
+                          }
+                        ]
+                      },
+                      {
+                        and: [
+                          {
+                            dimension: 'visitors_source',
+                            operator: 'equals',
+                            values: ['google']
+                          }
+                        ]
+                      }
+                    ]
+                  }]
               }]
           }],
         order: [{
@@ -907,7 +923,7 @@ describe('SQL Generation', function test() {
     } catch (error) {
       error.should.be.instanceof(UserError);
     }
-  }));
+  });
 
   // end of tests
 });

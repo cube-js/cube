@@ -23,6 +23,7 @@ class PrestodbFilter extends BaseFilter {
       // TODO here can be measure type of string actually
       return 'CAST(? AS DOUBLE)';
     }
+
     return '?';
   }
 }
@@ -90,6 +91,13 @@ class PrestodbQuery extends BaseQuery {
 
   countDistinctApprox(sql) {
     return `approx_distinct(${sql})`;
+  }
+
+  groupByDimensionLimit() {
+    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
+
+    return `${offsetClause}${limitClause}`;
   }
 }
 
