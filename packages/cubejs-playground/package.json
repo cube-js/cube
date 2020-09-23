@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.20.9",
+  "version": "0.20.10",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -16,8 +16,8 @@
     "@babel/standalone": "^7.3.4",
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
-    "@cubejs-client/core": "^0.20.9",
-    "@cubejs-client/react": "^0.20.9",
+    "@cubejs-client/core": "^0.20.10",
+    "@cubejs-client/react": "^0.20.10",
     "antd": "^4.2.0",
     "bizcharts": "^3.4.3",
     "chart.js": "^2.7.3",
