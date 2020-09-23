@@ -1,24 +1,140 @@
 ---
-order: 7
-title: "Dashboard Page"
+order: 4
+title: "Interactive Dashboard with Multiple Charts"
 ---
 
-A dashboard is a type of graphical user interface that often provides at-a-glance views of key performance indicators relevant to a particular objective or business process. In other usages, "dashboard" is another name for "progress report" or "report."
+In the previous part, we've created an analytical backend and a basic dashboard with the first chart. Now we're going to expand the dashboard so it provides the at-a-glance view of key performance indicators of our e-commerce company.
 
-### KPI Charts
+## Custom Date Range
 
-The KPI chart is used to, at a quick glance, give information about the current performance of a company or organization. Factors, which are crucial for monitoring how the company performs, are measured and then presented in form of KPIs, Key Performance Indicators. The type of information that is shown varies. Examples of KPIs are information about net revenue, sales growth, and customer satisfaction. The KPI chart consists of a grid of tiles, where each tile displays various KPI values for a certain category.
+As the first step, we'll let users change the date range of the existing chart.
 
-Let's add other components. To do count up components we need to install the react-countup dependency.
+We'll use a separate `<BarChartHeader />` component to control the date range. Let's create the `src/components/BarChartHeader.js` file with the following contents:
 
 ```jsx
-// npm
-npm install react-countup
-// yarn
-yarn add react-countup
+import React from 'react';
+import PropTypes from 'prop-types';
+import { makeStyles } from '@material-ui/styles';
+import { CardHeader, Button } from '@material-ui/core';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import Menu from '@material-ui/core/Menu';
+import MenuItem from '@material-ui/core/MenuItem';
+
+const useStyles = makeStyles(() => ({
+  headerButton: {
+    letterSpacing: '0.4px',
+  },
+}));
+
+const BarChartHeader = (props) => {
+  const { setDateRange, dateRange, dates } = props;
+  const defaultDates = ['This week', 'This month', 'Last 7 days', 'Last month'];
+  const classes = useStyles();
+
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = (date) => {
+    setDateRange(date);
+    setAnchorEl(null);
+  };
+  return (
+    <CardHeader
+      action={
+        <div>
+          <Button
+            className={classes.headerButton}
+            size="small"
+            variant="text"
+            aria-controls="simple-menu"
+            aria-haspopup="true"
+            onClick={handleClick}
+          >
+            {dateRange} <ArrowDropDownIcon />
+          </Button>
+          <Menu
+            id="simple-menu"
+            anchorEl={anchorEl}
+            keepMounted
+            open={Boolean(anchorEl)}
+            onClose={() => handleClose(dateRange)}
+          >
+            {dates ?
+              dates.map((date) => (
+                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
+              ))
+             : defaultDates.map((date) => (
+                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
+              ))}
+          </Menu>
+        </div>
+      }
+      title="Latest Sales"
+    />
+  );
+};
+
+BarChartHeader.propTypes = {
+  className: PropTypes.string,
+};
+
+export default BarChartHeader;
 ```
 
-Then let's add new component `<KPIChart/>`
+Now let's add this `<BarChartHeader />` component to our existing chart. Make the following changes in the `src/components/BarChart.js` file:
+
+```diff
+// ...
+import ChartRenderer from './ChartRenderer'
++ import BarChartHeader from "./BarChartHeader";
+// ...
+const BarChart = (props) => {
+-  const { className, query, ...rest } = props;
++  const { className, query, dates, ...rest } = props;
+  const classes = useStyles();
+
++  const [dateRange, setDateRange] = React.useState(dates ? dates[0] : 'This week');
++  let queryWithDate = {...query,
++    timeDimensions: [
++      {
++        dimension: query.timeDimensions[0].dimension,
++        granularity: query.timeDimensions[0].granularity,
++        dateRange: `${dateRange}`
++      }
++    ],
++  };
+
+  return (
+    <Card {...rest} className={clsx(classes.root, className)}>
++      <BarChartHeader dates={dates} dateRange={dateRange} setDateRange={setDateRange} />
++      <Divider />
+      <CardContent>
+        <div className={classes.chartContainer}>
+          <ChartRenderer vizState={{ query: queryWithDate, chartType: 'bar' }}/>
+        </div>
+      </CardContent>
+    </Card>
+  )
+};
+// ...
+```
+
+Well done! 🎉 Here's what our dashboard application looks like:
+
+![](/images/image-48.png)
+
+## KPI Chart
+
+The KPI chart can be used to display business indicators that provide information about the current performance of our e-commerce company. The chart will consist of a grid of tiles, where each tile will display a single numeric KPI value for a certain category.
+
+First, let's use the `react-countup` package to add the count-up animation to the values on the KPI chart. Run the following command in the `dashboard-app` folder:
+
+```jsx
+npm install --save react-countup
+```
+
+New we're ready to add new `<KPIChart/>` component. Add the `src/components/KPIChart.js` component with the following contents:
 
 ```jsx
 import React from 'react';
@@ -164,12 +280,12 @@ KPIChart.propTypes = {
 export default KPIChart;
 ```
 
-Default schema it suits us. But for one KPI chart, we need to create custom measure `percentOfCompletedOrders`. This measure will count percent based on another measure `completedCount`.
+**Let's learn how to create custom measures in the data schema and display their values.** In the e-commerce business, it's crucial to know the share of completed orders. To enable our users to monitor this metric, we'll want to display it on the KPI chart. So, we will modify the data schema by [adding a custom measure](https://cube.dev/docs/measures/) (`percentOfCompletedOrders`) which will calculate the share based on another measure (`completedCount`).
 
-Let's do it and customize Orders schema. Open `schema/Orders.js` file. In this file, we need to add: 
+Let's customize the "Orders" schema. Open the `schema/Orders.js` file in the root folder of the Cube.js project and make the following changes: 
 
-- [measure](https://cube.dev/docs/measures) completedCount
-- [measure](https://cube.dev/docs/measures/) percentOfCompletedOrders
+- add the `completedCount` measure
+- add the `percentOfCompletedOrders` measure
 
 ```diff
 cube(`Orders`, {
@@ -200,13 +316,10 @@ cube(`Orders`, {
 +    }
   },
 
-	// ...
-});
+  // ...
 ```
 
-We create all simple card components and prepare schema. Let's add this cards to our page.
-
-`<DashboardPage/>`
+Now we're ready to add the KPI chart displaying a number of KPIs to the dashboard. Make the following changes to the `src/pages/DashboardPage.js` file:
 
 ```diff
 // ...
@@ -214,29 +327,29 @@ We create all simple card components and prepare schema. Let's add this cards to
 import BarChart from '../components/BarChart.js'
 // ...
 + const cards = [
-+   {
-+     title: 'ORDERS',
-+     query: { measures: ['Orders.count'] },
-+     difference: 'Orders',
-+     duration: 1.25,
-+   },
-+   {
-+     title: 'TOTAL USERS',
-+     query: { measures: ['Users.count'] },
-+     difference: 'Users',
-+     duration: 1.5,
-+   },
-+   {
-+     title: 'COMPLETED ORDERS',
-+     query: { measures: ['Orders.percentOfCompletedOrders'] },
-+     progress: true,
-+     duration: 1.75,
-+   },
-+   {
-+     title: 'TOTAL PROFIT',
-+     query: { measures: ['LineItems.price'] },
-+     duration: 2.25,
-+  } ,
++  {
++    title: 'ORDERS',
++    query: { measures: ['Orders.count'] },
++    difference: 'Orders',
++    duration: 1.25,
++  },
++  {
++    title: 'TOTAL USERS',
++    query: { measures: ['Users.count'] },
++    difference: 'Users',
++    duration: 1.5,
++  },
++  {
++    title: 'COMPLETED ORDERS',
++    query: { measures: ['Orders.percentOfCompletedOrders'] },
++    progress: true,
++    duration: 1.75,
++  },
++  {
++    title: 'TOTAL PROFIT',
++    query: { measures: ['LineItems.price'] },
++    duration: 2.25,
++  },
 + ];
 
 const Dashboard = () => {
@@ -276,15 +389,17 @@ const Dashboard = () => {
 };
 ```
 
-![KPI screen](/images/kpi_screen.png)
+Great! 🎉 Now our dashboard has a row of nice and informative KPI metrics:
 
-### Doughnut Chart
+![](/images/image-18.png)
 
-Final chart and when to use Doughnut
+## Doughnut Chart
 
-Next chart is `<DoughnutChart/>`
+Now, using the KPI chart, our users are able to monitor the share of completed orders. However, there are two more kinds of orders: "processed" orders (ones that were acknowledged but not yet shipped) and "shipped" orders (essentially, ones that were taken for delivery but not yet completed).
 
-We need to create options in `helpers/DoughnutOptions.js` path. A dashboard is a type of graphical user interface that often provides at-a-glance views of key performance indicators relevant to a particular objective or business process. A dashboard is a type of graphical user interface which often provides at-a-glance views of key performance indicators relevant to a particular objective or business process
+To enable our users to monitor all these kinds of orders, we'll want to add one final chart to our dashboard. It's best to use the Doughnut chart for that, because it's quite useful to visualize the distribution of a certain metric between several states (e.g., all kinds of orders).
+
+First, just like in the previous part, we're going to put the chart options to a separate file. Let's create the `src/helpers/DoughnutOptions.js` file with the following contents:
 
 ```jsx
 import palette from "../theme/palette";
@@ -310,7 +425,7 @@ export const DoughnutOptions = {
 };
 ```
 
-And `<DoughnutChart/>`
+Then, let's create the `src/components/DoughnutChart.js` for the new chart with the following contents:
 
 ```jsx
 import React from 'react';
@@ -350,19 +465,8 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const query = {
-  measures: ['Orders.count'],
-  timeDimensions: [
-    {
-      dimension: 'Orders.createdAt',
-    },
-  ],
-  filters: [],
-  dimensions: ['Orders.status'],
-};
-
 const DoughnutChart = (props) => {
-  const { className, cubejsApi, ...rest } = props;
+  const { className, query, ...rest } = props;
 
   const classes = useStyles();
   const theme = useTheme();
@@ -428,14 +532,26 @@ DoughnutChart.propTypes = {
 export default DoughnutChart;
 ```
 
-Now we can do our `<DashboardPage/>`
+The last step is to add the new chart to the dashboard. Let's modify the `src/pages/DashboardPage.js` file:
 
 ```diff
 // ...
 import DataCard from '../components/DataCard';
 import BarChart from '../components/BarChart.js'
 + import DoughnutChart from '../components/DoughnutChart.js'
+
 // ...
++ const doughnutChartQuery = {
++  measures: ['Orders.count'],
++  timeDimensions: [
++    {
++      dimension: 'Orders.createdAt',
++    },
++  ],
++  filters: [],
++  dimensions: ['Orders.status'],
++ };
+//...
 
 return (
     <div className={classes.root}>
@@ -451,11 +567,15 @@ return (
 +          xl={3}
 +          xs={12}
 +        >
-+          <DoughnutChart/>
++          <DoughnutChart query={doughnutChartQuery}/>
 +        </Grid>
       </Grid>
     </div>
   );
 ```
 
-Well done! Next step is ещ edit layout and finish step will Data table page
+Awesome! 🎉 Now the first page of our dashboard is complete:
+
+![](/images/image-53.png)
+
+If you like the layout of our dashboard, check out the [Devias Kit Admin Dashboard](https://github.com/devias-io/react-material-dashboard), an open source React Dashboard made with Material UI's components. 

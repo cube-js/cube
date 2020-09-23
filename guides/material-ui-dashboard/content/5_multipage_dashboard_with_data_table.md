@@ -1,28 +1,30 @@
 ---
-order: 8
-title: "Data Table"
+order: 5
+title: "Multi-Page Dashboard with Data Table"
 ---
 
-[Data Table](https://material-ui.com/components/tables/) is used for displaying tabular data. Features include sorting, searching, pagination, inline-editing, and row selection.
+Now we have a single-page dashboard that displays aggregated business metrics and provides at-a-glance view of several KPIs. However, there's no way to get information about a particular order or a range of orders.
 
-### Adding Side Bar
+We're going to fix it by adding a second page to our dashboard with the information about all orders. On that page, we'll use the [Data Table](https://material-ui.com/components/tables/) component from Material UI which is great for displaying tabular data. It privdes many rich features like sorting, searching, pagination, inline-editing, and row selection.
 
-As we are adding a new page to out dashboard we want to create a sidebar for navigation...
+However, we'll need a way to navigate between two pages. So, let's add a navigation side bar.
 
-For example we can download layout folder from github
+## Navigation Side Bar
+
+First, let's downaload a pre-built layout and images for our dashboard application. Run these commands, extract the `layout.zip` file to the `src/layouts` folder, and the `images.zip` file to the `public/images` folder:
 
 ```jsx
-https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard/dashboard-app/src/layouts
-https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard/dashboard-app/public/images
+curl -LJO https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard/dashboard-app/src/layouts/layouts.zip
+curl -LJO https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard/dashboard-app/public/images/images.zip
 ```
 
-Now let's add this layout. Go to App.js and add
+Now we can add this layout to the application. Let's modify the `src/App.js` file:
 
 ```diff
 // ...
 import 'typeface-roboto';
 - import Header from "./components/Header";
-+ import {Main} from './layouts'
++ import { Main } from './layouts'
 // ...
 
 const AppLayout = ({children}) => {
@@ -40,19 +42,15 @@ const AppLayout = ({children}) => {
 };
 ```
 
-![Result screen](/images/dashboard_result.png)
+Wow! 🎉 Here's our navigation side bar which can be used to switch between different pages of the dashboard:
 
-For create data table we need to customize schema
+![](/images/image-31.png)
 
-### Define new metrics in Data Schema
+## Data Table for Orders
 
-We will display order data in our data table.
+To fetch data for the Data Table, we'll need to customize the data schema and define a number of new metrics: amount of items in an order (its size), an order's price, and a user's full name.
 
-We've already had definitions in the data schema for most of the metrics we want to display, but we have added definitions for orders size, orders price, and user's full name.
-
-**Customizing Users schema**
-
-Let's add the full name in Users schema by the path `schema/Users.js` 
+First, let's add the full name in the "Users" schema in the `schema/Users.js` file:
 
 ```diff
 cube(`Users`, {
@@ -92,11 +90,9 @@ cube(`Users`, {
 });
 ```
 
-**Customizing Orders schema**
+Then, let's add other measures to the "Orders" schema in the `schema/Orders.js` file.
 
-Orders size and orders price we're going to use [subQuery](https://cube.dev/docs/subquery#top). 
-
-You can use subQuery dimensions to reference measures from other cubes inside a dimension.
+For these measures, we're going to use the [subquery](https://cube.dev/docs/subquery#top) feature of Cube.js. You can use subquery dimensions to reference measures from other cubes inside a dimension. Here's how to defined such dimensions:
 
 ```diff
 cube(`Orders`, {
@@ -140,9 +136,7 @@ cube(`Orders`, {
 });
 ```
 
-### Creating an Orders Page
-
-Let's add a new page. Open index.js file and add new route and redirect.
+Now we're ready to add a new page. Open the `src/index.js` file and add a new route and a default redirect:
 
 ```diff
 import React from "react";
@@ -175,9 +169,7 @@ ReactDOM.render(
 serviceWorker.unregister();
 ```
 
-Now we need to create this page.
-
-`pages/DataTablePage.js`
+The next step is to create the page referenced in the new route. Add the `src/pages/DataTablePage.js` file with the following contents:
 
 ```jsx
 import React from "react";
@@ -229,11 +221,9 @@ const DataTablePage = () => {
 export default DataTablePage;
 ```
 
-This component contains a query. Later we can use this for adding new filters. The table component rendering query results. If we will change the query, the table component will be rendered. And we can use it!
+Note that this component contains a Cube.js query. Later, we'll modify this query to enable filtering of the data.
 
-But first you need to create  this table component file with the following content.
-
-`components/Table.js`
+All data items are rendered with the `<Table />` component, and changes to the query result are reflected in the table. Let's create this `<Table />` component in the `src/components/Table.js` file with the following contents:
 
 ```jsx
 import React, { useState } from "react";
@@ -434,7 +424,7 @@ TableComponent.propTypes = {
 export default TableComponent;
 ```
 
-Order status table cell uses simple component - StatusBullet. You can create this component by path `components/StatusBullet.js` with the following content.
+The table contains a cell with a custom `<StatusBullet />` component which displays an order's status with a colorful dot. Let's create this component in the `src/components/StatusBullet.js` file with the following contents:
 
 ```jsx
 import React from 'react';
@@ -522,22 +512,19 @@ StatusBullet.defaultProps = {
 export default StatusBullet;
 ```
 
-Nice! We created a simple table. 🎉
+Nice! 🎉 Now we have a table which displays information about all orders: 
 
-![Simple table screen](/images/simple_table.png)
+![](/images/image-47.png)
 
-But will be better if we do this table with filters! I hide these filters in the toolbar component. Let's create this component and to our table interactive.
+However, its hard to explore this orders using only the controls provided. To fix this, we'll add a comprehensive toolbar with filters and make our table interactive.
 
-For the toolbar component we use some dependencies, to install dependencies run the command:
+First, let's add a few dependencies. Run the command in the `dashboard-app` folder:
 
 ```jsx
-// npm
-npm i @date-io/date-fns@1.x date-fns @date-io/moment@1.x moment @material-ui/lab/Autocomplete
-// yarn 
-yarn add @date-io/date-fns@1.x date-fns @date-io/moment@1.x moment @material-ui/lab/Autocomplete
+npm install --save @date-io/date-fns@1.x date-fns @date-io/moment@1.x moment @material-ui/lab/Autocomplete
 ```
 
-Now we can create our first filter. For this create Toolbar component by the path `components/toolbar.js`
+Then, create the `<Toolbar />` component in the `src/components/Toolbar.js` file with the following contents:
 
 ```jsx
 import "date-fns";
@@ -664,9 +651,7 @@ Toolbar.propTypes = {
 export default Toolbar;
 ```
 
-If we look at this component we will see what we create custom Tab component with custom styles. This tab uses the setStatusFilter method. This method we get by the props. Now let's add this component, props, and filter in the parent component.
-
-`pages/DataTablePage.js`
+Note that we have customized the `<Tab />` component with styles and and the `setStatusFilter` method which is passed via props. Now we can add this component, props, and filter to the parent component. Let's modify the `src/pages/DataTablePage.js` file:
 
 ```diff
 import React from "react";
@@ -736,13 +721,11 @@ const DataTablePage = () => {
 export default DataTablePage;
 ```
 
-Yes, we got something similar to a data table.🎉
+Perfect! 🎉 Now the data table has a filter which switches between different types of orders:
 
-![Data table gif](/images/data_table.gif)
+![](/images/image-1.gif)
 
-After that, it would be good to add new filters.
-
-Open `components/toolbar.js` and add filters by date and price.
+However, orders have other parameters such as price and dates. Let's create filters for these parameters. To do so, modify the `src/components/Toolbar.js` file:
 
 ```diff
 import "date-fns";
@@ -902,7 +885,7 @@ Toolbar.propTypes = {
 export default Toolbar;
 ```
 
-Nice, the next step is to edit our parent component. We need to add state, modify our query, and add new props to the toolbar component. Also, we will add sorting to our table. Open `pages/DataTablePage.js` and add
+To make these filters work, we need to connect them to the parent component: add state, modify our query, and add new props to the `<Toolbar />` component. Also, we will add sorting to the data table. So, modify the `src/pages/DataTablePage.js` file like this:
 
 ```diff
 // ...
@@ -992,11 +975,9 @@ const DataTablePage = () => {
 export default DataTablePage;
 ```
 
-Nice, we added filters! 🎉 If you want [you can add more filters](https://cube.dev/docs/query-format#filters-format).
+Fantastic! 🎉 We've added some useful filters. Indeed, you can add even more filters with custom logic. See the [documentation](https://cube.dev/docs/query-format#filters-format) for the filter format options.
 
-How you can see also we added sorting props to the table, but we don't release it.
-
-Let's fix this. Open Table component `components/Table.js` and add this code
+And there's one more thing. We've added sorting props to the toolbar, but we also need to pass them to the `<Table />` component. To fix this, let's modify the `src/components/Table.js` file:
 
 ```diff
 // ...
@@ -1078,12 +1059,240 @@ const TableComponent = props => {
 						 // ...
 ```
 
-### Done
+Wonderful! 🎉 Now we have the data table that fully supports filtering and sorting: 
 
-Congratulations on completing this guide! 🎉
+![](/images/image-7.gif)
 
-You can check [the online demo here](https://material-ui-dashboard.cubecloudapp.dev/#/dashboard) and [the source code is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard)
+## User Drill Down Page
 
-![Result Dashboard Page screen](/images/dashboard_done.png)
+The data table we've built allows to find informations about a particular order. However, our e-commerce business is quite successful and has a good return rate which means that users are highly likely to make multiple orders over time. So, let's add a drill down page to explore the complete order informations for a particular user.
 
-![Result Table Page screen](/images/table_done.png)
+As it's a new page, let's add a new route to the `src/index.js` file:
+
+```diff
+// ...
+
+				<Switch>
+          <Redirect exact from="/" to="/dashboard" />
+          <Route key="index" exact path="/dashboard" component={DashboardPage} />
+          <Route key="table" path="/orders" component={DataTablePage} />
++         <Route key="table" path="/user/:id" component={UsersPage} />
+          <Redirect to="/dashboard" />
+        </Switch>
+
+// ...
+```
+
+For this route to work, we also need to add the `src/pages/UsersPage.js` file with these contents:
+
+```diff
+import React from 'react';
+import { useParams } from 'react-router-dom';
+import { makeStyles } from '@material-ui/styles';
+import { useCubeQuery } from '@cubejs-client/react';
+import { Grid } from '@material-ui/core';
+import AccountProfile from '../components/AccountProfile';
+import BarChart from '../components/BarChart';
+import CircularProgress from '@material-ui/core/CircularProgress';
+import UserSearch from '../components/UserSearch';
+import KPIChart from '../components/KPIChart';
+
+const useStyles = makeStyles((theme) => ({
+  root: {
+    padding: theme.spacing(4),
+  },
+  row: {
+    display: 'flex',
+    margin: '0 -15px',
+  },
+  info: {
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
+  },
+  sales: {
+    marginTop: theme.spacing(4),
+  },
+  loaderWrap: {
+    width: '100%',
+    height: '100%',
+    minHeight: 'calc(100vh - 64px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+}));
+
+const UsersPage = (props) => {
+  const classes = useStyles();
+  let { id } = useParams();
+  const query = {
+    measures: ['Users.count'],
+    timeDimensions: [
+      {
+        dimension: 'Users.createdAt',
+      },
+    ],
+    dimensions: [
+      'Users.id',
+      'Products.id',
+      'Users.firstName',
+      'Users.lastName',
+      'Users.gender',
+      'Users.age',
+      'Users.city',
+      'LineItems.itemPrice',
+      'Orders.createdAt',
+    ],
+    filters: [
+      {
+        dimension: 'Users.id',
+        operator: 'equals',
+        values: [`${id}`],
+      },
+    ],
+  };
+  const barChartQuery = {
+    measures: ['Orders.count'],
+    timeDimensions: [
+      {
+        dimension: 'Orders.createdAt',
+        granularity: 'month',
+        dateRange: 'This week',
+      },
+    ],
+    dimensions: ['Orders.status'],
+    filters: [
+      {
+        dimension: 'Users.id',
+        operator: 'equals',
+        values: [id],
+      },
+    ],
+  };
+  const cards = [
+    {
+      title: 'ORDERS',
+      query: {
+        measures: ['Orders.count'],
+        filters: [
+          {
+            dimension: 'Users.id',
+            operator: 'equals',
+            values: [`${id}`],
+          },
+        ],
+      },
+      duration: 1.25,
+    },
+    {
+      title: 'TOTAL SALES',
+      query: {
+        measures: ['LineItems.price'],
+        filters: [
+          {
+            dimension: 'Users.id',
+            operator: 'equals',
+            values: [`${id}`],
+          },
+        ],
+      },
+      duration: 1.5,
+    },
+  ];
+
+  const { resultSet, error, isLoading } = useCubeQuery(query);
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress color="secondary" />
+      </div>
+    );
+  }
+  if (error) {
+    return <pre>{error.toString()}</pre>;
+  }
+  if (!resultSet) {
+    return null;
+  }
+  if (resultSet) {
+    let data = resultSet.tablePivot();
+    let userData = data[0];
+    return (
+      <div className={classes.root}>
+        <Grid container spacing={4}>
+          <Grid item lg={4} sm={6} xl={4} xs={12}>
+            <UserSearch />
+            <AccountProfile
+              userFirstName={userData['Users.firstName']}
+              userLastName={userData['Users.lastName']}
+              gender={userData['Users.gender']}
+              age={userData['Users.age']}
+              city={userData['Users.city']}
+              id={id}
+            />
+          </Grid>
+          <Grid item lg={8} sm={6} xl={4} xs={12}>
+            <div className={classes.row}>
+              {cards.map((item, index) => {
+                return (
+                  <Grid className={classes.info} key={item.title + index} item lg={6} sm={6} xl={6} xs={12}>
+                    <KPIChart {...item} />
+                  </Grid>
+                );
+              })}
+            </div>
+            <div className={classes.sales}>
+              <BarChart query={barChartQuery} dates={['This year', 'Last year']} />
+            </div>
+          </Grid>
+        </Grid>
+      </div>
+    );
+  }
+};
+
+export default UsersPage;
+```
+
+The last thing will be enable the data table to navigate to this page by clicking on a cell with a user's full name. Let's modify the `src/components/Table.js` like this:
+
+```diff
+// ...
+
+import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
++ import OpenInNewIcon from '@material-ui/icons/OpenInNew';
+import { useCubeQuery } from '@cubejs-client/react';
+import CircularProgress from '@material-ui/core/CircularProgress';
+
+// ...
+
+                      <TableCell>{obj['Orders.id']}</TableCell>
+                      <TableCell>{obj['Orders.size']}</TableCell>
++                     <TableCell
++                       className={classes.hoverable}
++                       onClick={() => handleClick(`/user/${obj['Users.id']}`)}
++                     >
++                       {obj['Users.fullName']}
++                       &nbsp;
++                       <Typography className={classes.arrow} variant="body2" component="span">
++                         <OpenInNewIcon fontSize="small" />
++                       </Typography>
++                     </TableCell>
+                      <TableCell>{obj['Users.city']}</TableCell>
+                      <TableCell>{'$ ' + obj['Orders.price']}</TableCell>
+
+// ...
+```
+
+Here's what we eventually got:
+
+![](/images/image-202.gif)
+
+And that's all! 😇 Congratulations on completing this guide! 🎉
+
+Also, check the [live demo](https://material-ui-dashboard.cubecloudapp.dev/#/dashboard) and the [full source code](https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard) available on GitHub.
+
+Now you should be able to create comprehensive analytical dashboards powered by Cube.js and using React and Material UI to display aggregate metrics and detailed information.
+
+Feel free to explore [other examples](https://github.com/cube-js/cube.js/#examples) of what can be done with Cube.js such as the [Real-Time Dashboard Guide](https://real-time-dashboard.cube.dev) and the [Open Source Web Analytics Platform Guide](https://web-analytics.cube.dev).
