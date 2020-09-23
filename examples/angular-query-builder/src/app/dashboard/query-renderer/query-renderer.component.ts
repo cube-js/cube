@@ -14,24 +14,7 @@ import { Color, Label } from 'ng2-charts';
 import { combineLatest, of } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
 
-function getMatColumnsMeta(tableColumns: any[]): [any, any] {
-  const queue = tableColumns;
-  const columns = [];
-  const dataIndexToTitle = {};
-
-  while (queue.length) {
-    const column = queue.shift();
-    if (column.dataIndex) {
-      columns.push(column.dataIndex);
-      dataIndexToTitle[column.dataIndex] = column.title;
-    }
-    if ((column.children || []).length) {
-      column.children.map((child) => queue.push(child));
-    }
-  }
-
-  return [columns, dataIndexToTitle];
-}
+import { flattenColumns, getDisplayedColumns } from './utils';
 
 @Component({
   selector: 'query-renderer',
@@ -43,10 +26,8 @@ export class QueryRendererComponent implements OnInit {
   chartType: TChartType = 'line';
   isQueryPresent: boolean;
   displayedColumns: string[] = [];
-  dataIndexToTitle: any;
-  dataSource = [];
-  tableData = [];
-  tableColumns = [];
+  tableData: any[] = [];
+  columnTitles: string[] = [];
   chartData: ChartDataSets[] = [];
   chartLabels: Label[] = [];
   chartOptions: ChartOptions = {
@@ -105,12 +86,10 @@ export class QueryRendererComponent implements OnInit {
 
     if (this.queryBuilder.chartType.get() === 'table') {
       this.tableData = resultSet.tablePivot(pivotConfig);
-      const [displayedColumns, dataIndexToTitle] = getMatColumnsMeta(
+      this.displayedColumns = getDisplayedColumns(
         resultSet.tableColumns(pivotConfig)
       );
-
-      this.displayedColumns = displayedColumns;
-      this.dataIndexToTitle = dataIndexToTitle;
+      this.columnTitles = flattenColumns(resultSet.tableColumns(pivotConfig));
     } else {
       this.chartData = resultSet.series(pivotConfig).map((item) => {
         return {

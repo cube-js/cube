@@ -1,9 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
-import {
-  CdkDragDrop,
-  moveItemInArray,
-  transferArrayItem,
-} from '@angular/cdk/drag-drop';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import type { Order, TOrder, TOrderMember } from '@cubejs-client/ngx';
 
 @Component({
@@ -19,12 +15,6 @@ export class OrderComponent implements OnInit {
 
   drop(event: CdkDragDrop<string[]>) {
     this.order.reorder(event.previousIndex, event.currentIndex);
-    // moveItemInArray(this.orderm, event.previousIndex, event.currentIndex);
-    // if (event.previousContainer === event.container) {
-    //   moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
-    // } else {
-    //   transferArrayItem(event.previousContainer.data, event.container.data, event.previousIndex, event.currentIndex);
-    // }
   }
 
   changeOrder(orderMember: TOrderMember) {

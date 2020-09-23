@@ -2,15 +2,15 @@
   <div
     cdkDropList
     #xAxis="cdkDropList"
-    [id]="'x'"
-    [cdkDropListData]="pivotConfig.get().x"
-    [cdkDropListConnectedTo]="[yAxis]"
+    id="x"
+    [cdkDropListData]="x"
+    [cdkDropListConnectedTo]="yAxis"
     (cdkDropListDropped)="drop($event)"
     class="axis"
   >
     <div class="axis-name">x</div>
 
-    <div *ngFor="let id of pivotConfig.get().x" cdkDrag class="drag-item">
+    <div *ngFor="let id of x" cdkDrag class="drag-item">
       <mat-icon>drag_indicator</mat-icon> <span>{{ id }}</span>
     </div>
   </div>
@@ -20,15 +20,15 @@
   <div
     cdkDropList
     #yAxis="cdkDropList"
-    [id]="'y'"
-    [cdkDropListData]="pivotConfig.get().y"
-    [cdkDropListConnectedTo]="[xAxis]"
+    id="y"
+    [cdkDropListData]="y"
+    [cdkDropListConnectedTo]="xAxis"
     (cdkDropListDropped)="drop($event)"
     class="axis"
   >
     <div class="axis-name">y</div>
 
-    <div *ngFor="let id of pivotConfig.get().y" cdkDrag class="drag-item">
+    <div *ngFor="let id of y" cdkDrag class="drag-item">
       <mat-icon>drag_indicator</mat-icon> <span>{{ id }}</span>
     </div>
   </div>

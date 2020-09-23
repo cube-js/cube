@@ -12,7 +12,7 @@
 
       <mat-select
         (selectionChange)="handleDateRangeSelect($event)"
-        [value]="dateRange"
+        [value]="dateRange || 'All time'"
       >
         <mat-option
           *ngFor="let dateRange of dateRanges"

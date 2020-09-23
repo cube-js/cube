@@ -99,7 +99,11 @@ export class TimeDimensionMember {
   }
 
   remove(name: string) {
-    throw new Error('Not implemented');
+    this.query.setPartialQuery({
+      timeDimensions: this.members.filter(
+        ({ dimension }) => dimension !== name
+      ),
+    });
   }
 
   set(timeDimensions: any[]) {

@@ -59,7 +59,10 @@ export class TimeGroupComponent {
   }
 
   handleDateRangeSelect(event: MatSelectChange) {
-    this.timeDimensionMember.setDateRange(0, event.value);
+    this.timeDimensionMember.setDateRange(
+      0,
+      event.value === 'All time' ? undefined : event.value
+    );
   }
 
   handleGranularitySelect(event: MatSelectChange) {

@@ -45,7 +45,6 @@ export class DashboardComponent implements OnInit {
     public dialog: MatDialog
   ) {
     queryBuilder.setCubejsClient(cubejsClient);
-    // queryBuilder.disableHeuristics();
     this.chartTypeMap = this.chartTypeToIcon.reduce(
       (memo, { chartType, icon }) => ({ ...memo, [chartType]: icon }),
       {}
@@ -53,29 +52,6 @@ export class DashboardComponent implements OnInit {
   }
 
   async ngOnInit() {
-    this.queryBuilder.deserialize({
-      query: {
-        measures: ['Sales.count', 'Sales.amount'],
-        dimensions: ['Users.gender'],
-        timeDimensions: [{
-          dimension: 'Sales.ts',
-          granularity: 'month',
-        }]
-        // filters: [
-        //   {
-        //     dimension: 'Sales.title',
-        //     operator: 'contains',
-        //     values: ['test'],
-        //   },
-        // ],
-      },
-      pivotConfig: {
-        x: ['Sales.ts.month'],
-        y: ['Users.gender', 'measures'],
-      },
-      chartType: 'table',
-    });
-
     this.builderMeta = await this.queryBuilder.builderMeta;
     this.query = await this.queryBuilder.query;
 
@@ -97,25 +73,4 @@ export class DashboardComponent implements OnInit {
       top: '10%',
     });
   }
-
-  // todo: remove (testing only)
-  setQuery() {
-    this.query.setQuery(
-      Object.keys(this.query.asCubeQuery()).length
-        ? {}
-        : {
-            measures: ['Sales.amount', 'Sales.count'],
-            dimensions: ['Users.gender'],
-            timeDimensions: [
-              {
-                dimension: 'Sales.ts',
-                granularity: 'month',
-                dateRange: 'This year',
-              },
-            ],
-          }
-    );
-  }
-
-  debug() {}
 }

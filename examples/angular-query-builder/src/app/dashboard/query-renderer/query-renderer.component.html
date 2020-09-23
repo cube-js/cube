@@ -1,5 +1,5 @@
 <div *ngIf="isQueryPresent" class="chart-wrapper">
-  <div *ngIf="chartType !== 'table' && chartData.length > 0" class="container">
+  <div *ngIf="chartType !== 'table' && chartData.length > 0">
     <canvas
       baseChart
       legend="true"
@@ -19,15 +19,11 @@
     style="width: 100%;"
   >
     <ng-container
-      *ngFor="let column of displayedColumns"
+      *ngFor="let column of displayedColumns; let index = index"
       [matColumnDef]="column"
     >
-      <th
-        mat-header-cell
-        [style.text-align]="'center'"
-        *matHeaderCellDef
-      >
-        {{ dataIndexToTitle[column] }}
+      <th mat-header-cell *matHeaderCellDef>
+        {{ columnTitles[index] }}
       </th>
       <td mat-cell *matCellDef="let element">{{ element[column] }}</td>
     </ng-container>
