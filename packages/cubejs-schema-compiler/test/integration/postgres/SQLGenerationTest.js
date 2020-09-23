@@ -316,82 +316,78 @@ describe('SQL Generation', function test() {
     });
     `);
 
-  it('simple join', () => {
-    const result = compiler.compile().then(() => {
-      console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
+  it('simple join', async () => {
+    await compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.visitor_revenue',
-          'visitors.visitor_count',
-          'visitor_checkins.visitor_checkins_count',
-          'visitors.per_visitor_revenue'
-        ],
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-30']
-        }],
-        timezone: 'America/Los_Angeles',
-        order: [{
-          id: 'visitors.created_at'
-        }]
-      });
+    console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
 
-      const queryAndParams = query.buildSqlAndParams();
-      console.log(queryAndParams);
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        res.should.be.deepEqual(
-          [
-            {
-              'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-              'visitors__visitor_revenue': '100',
-              'visitors__visitor_count': '1',
-              'visitor_checkins__visitor_checkins_count': '3',
-              'visitors__per_visitor_revenue': '100'
-            },
-            {
-              'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-              'visitors__visitor_revenue': '200',
-              'visitors__visitor_count': '1',
-              'visitor_checkins__visitor_checkins_count': '2',
-              'visitors__per_visitor_revenue': '200'
-            },
-            {
-              'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-              'visitors__visitor_revenue': null,
-              'visitors__visitor_count': '1',
-              'visitor_checkins__visitor_checkins_count': '1',
-              'visitors__per_visitor_revenue': null
-            },
-            {
-              'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-              'visitors__visitor_revenue': null,
-              'visitors__visitor_count': '2',
-              'visitor_checkins__visitor_checkins_count': '0',
-              'visitors__per_visitor_revenue': null
-            }
-          ]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_revenue',
+        'visitors.visitor_count',
+        'visitor_checkins.visitor_checkins_count',
+        'visitors.per_visitor_revenue'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors.created_at'
+      }]
     });
 
-    return result;
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      res.should.be.deepEqual(
+        [
+          {
+            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
+            'visitors__visitor_revenue': '100',
+            'visitors__visitor_count': '1',
+            'visitor_checkins__visitor_checkins_count': '3',
+            'visitors__per_visitor_revenue': '100'
+          },
+          {
+            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
+            'visitors__visitor_revenue': '200',
+            'visitors__visitor_count': '1',
+            'visitor_checkins__visitor_checkins_count': '2',
+            'visitors__per_visitor_revenue': '200'
+          },
+          {
+            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
+            'visitors__visitor_revenue': null,
+            'visitors__visitor_count': '1',
+            'visitor_checkins__visitor_checkins_count': '1',
+            'visitors__per_visitor_revenue': null
+          },
+          {
+            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
+            'visitors__visitor_revenue': null,
+            'visitors__visitor_count': '2',
+            'visitor_checkins__visitor_checkins_count': '0',
+            'visitors__per_visitor_revenue': null
+          }
+        ]
+      );
+    });
   });
 
-  function runQueryTest(q, expectedResult) {
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  async function runQueryTest(q, expectedResult) {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
-      console.log(query.buildSqlAndParams());
+    console.log(query.buildSqlAndParams());
 
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          expectedResult
-        );
-      });
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        expectedResult
+      );
     });
   }
 
@@ -415,65 +411,63 @@ describe('SQL Generation', function test() {
     'visitors__per_visitor_revenue': '60'
   }]));
 
-  it('running total', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.revenueRunning'
-        ],
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-10']
-        }],
-        order: [{
-          id: 'visitors.created_at'
-        }],
-        timezone: 'America/Los_Angeles'
-      });
+  it('running total', async () => {
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-
-      // TODO ordering doesn't work for running total
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{
-            'visitors__created_at_day': '2017-01-01T00:00:00.000Z',
-            'visitors__revenue_running': null
-          }, {
-            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-            'visitors__revenue_running': '100'
-          }, {
-            'visitors__created_at_day': '2017-01-03T00:00:00.000Z',
-            'visitors__revenue_running': '100'
-          }, {
-            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-            'visitors__revenue_running': '300'
-          }, {
-            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'visitors__revenue_running': '600'
-          }, {
-            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-            'visitors__revenue_running': '1500'
-          }, {
-            'visitors__created_at_day': '2017-01-07T00:00:00.000Z',
-            'visitors__revenue_running': '1500'
-          }, {
-            'visitors__created_at_day': '2017-01-08T00:00:00.000Z',
-            'visitors__revenue_running': '1500'
-          }, {
-            'visitors__created_at_day': '2017-01-09T00:00:00.000Z',
-            'visitors__revenue_running': '1500'
-          }, {
-            'visitors__created_at_day': '2017-01-10T00:00:00.000Z',
-            'visitors__revenue_running': '1500'
-          }]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.revenueRunning'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
     });
 
-    return result;
+    console.log(query.buildSqlAndParams());
+
+    // TODO ordering doesn't work for running total
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'visitors__created_at_day': '2017-01-01T00:00:00.000Z',
+          'visitors__revenue_running': null
+        }, {
+          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
+          'visitors__revenue_running': '100'
+        }, {
+          'visitors__created_at_day': '2017-01-03T00:00:00.000Z',
+          'visitors__revenue_running': '100'
+        }, {
+          'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
+          'visitors__revenue_running': '300'
+        }, {
+          'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
+          'visitors__revenue_running': '600'
+        }, {
+          'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
+          'visitors__revenue_running': '1500'
+        }, {
+          'visitors__created_at_day': '2017-01-07T00:00:00.000Z',
+          'visitors__revenue_running': '1500'
+        }, {
+          'visitors__created_at_day': '2017-01-08T00:00:00.000Z',
+          'visitors__revenue_running': '1500'
+        }, {
+          'visitors__created_at_day': '2017-01-09T00:00:00.000Z',
+          'visitors__revenue_running': '1500'
+        }, {
+          'visitors__created_at_day': '2017-01-10T00:00:00.000Z',
+          'visitors__revenue_running': '1500'
+        }]
+      );
+    });
   });
 
   it('rolling', () => runQueryTest({
@@ -646,105 +640,99 @@ describe('SQL Generation', function test() {
     { 'visitors__created_at_day': '2017-01-10T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' }
   ]));
 
-  it('hll rolling', () => {
-    const result = compiler.compile().then(() => {
-      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.countDistinctApproxRolling'
-        ],
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-10']
-        }],
-        order: [{
-          id: 'visitors.created_at'
-        }],
-        timezone: 'America/Los_Angeles'
-      });
+  it('hll rolling', async () => {
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-
-      query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.MERGE/);
-      query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.INIT/);
+    const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.countDistinctApproxRolling'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
     });
 
-    return result;
+    console.log(query.buildSqlAndParams());
+
+    query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.MERGE/);
+    query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.INIT/);
   });
 
-  it('calculated join', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitor_checkins.revenue_per_checkin'
-        ],
-        timeDimensions: [],
-        timezone: 'America/Los_Angeles'
-      });
+  it('calculated join', async () => {
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{ 'visitor_checkins__revenue_per_checkin': '50' }]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.revenue_per_checkin'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles'
     });
 
-    return result;
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{ 'visitor_checkins__revenue_per_checkin': '50' }]
+      );
+    });
   });
 
-  it('filter join', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitor_checkins.google_sourced_checkins'
-        ],
-        timeDimensions: [],
-        timezone: 'America/Los_Angeles'
-      });
+  it('filter join', async () => {
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{ 'visitor_checkins__google_sourced_checkins': '1' }]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.google_sourced_checkins'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles'
     });
 
-    return result;
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{ 'visitor_checkins__google_sourced_checkins': '1' }]
+      );
+    });
   });
 
-  it('filter join not multiplied', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitor_checkins.google_sourced_checkins'
-        ],
-        timeDimensions: [],
-        filters: [
-          { dimension: 'cards.id', operator: 'equals', values: ['3'] }
-        ],
-        timezone: 'America/Los_Angeles'
-      });
+  it('filter join not multiplied', async () => {
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{ 'visitor_checkins__google_sourced_checkins': '1' }]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.google_sourced_checkins'
+      ],
+      timeDimensions: [],
+      filters: [
+        { dimension: 'cards.id', operator: 'equals', values: ['3'] }
+      ],
+      timezone: 'America/Los_Angeles'
     });
 
-    return result;
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{ 'visitor_checkins__google_sourced_checkins': '1' }]
+      );
+    });
   });
 
-  it('having filter', () => compiler.compile().then(() => {
+  it('having filter', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
@@ -778,9 +766,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('having filter without measure', () => compiler.compile().then(() => {
+  it('having filter without measure', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
@@ -810,9 +800,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('having filter without measure with join', () => compiler.compile().then(() => {
+  it('having filter without measure with join', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
@@ -840,9 +832,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('having filter without measure single multiplied', () => compiler.compile().then(() => {
+  it('having filter without measure single multiplied', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
@@ -874,59 +868,59 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
-
-  it('subquery', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.visitor_count'
-        ],
-        dimensions: [
-          'visitors.checkins'
-        ],
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-30']
-        }],
-        timezone: 'America/Los_Angeles',
-        filters: [],
-        order: [{
-          id: 'visitors.checkins'
-        }]
-      });
-
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{
-            'visitors__checkins': '0',
-            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-            'visitors__visitor_count': '2'
-          }, {
-            'visitors__checkins': '1',
-            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'visitors__visitor_count': '1'
-          }, {
-            'visitors__checkins': '2',
-            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-            'visitors__visitor_count': '1'
-          }, {
-            'visitors__checkins': '3',
-            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-            'visitors__visitor_count': '1'
-          }]
-        );
-      });
-    });
-
-    return result;
   });
 
-  it('subquery with propagated filters', () => compiler.compile().then(() => {
+  it('subquery', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.checkins'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: [{
+        id: 'visitors.checkins'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{
+          'visitors__checkins': '0',
+          'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
+          'visitors__visitor_count': '2'
+        }, {
+          'visitors__checkins': '1',
+          'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
+          'visitors__visitor_count': '1'
+        }, {
+          'visitors__checkins': '2',
+          'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
+          'visitors__visitor_count': '1'
+        }, {
+          'visitors__checkins': '3',
+          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
+          'visitors__visitor_count': '1'
+        }]
+      );
+    });
+  });
+
+  it('subquery with propagated filters', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
@@ -970,41 +964,39 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('average subquery', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.averageCheckins'
-        ],
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-30']
-        }],
-        timezone: 'America/Los_Angeles',
-        filters: [{
-          dimension: 'visitor_checkins.source',
-          operator: 'equals',
-          values: ['google']
-        }],
-        order: [{
-          id: 'visitors.averageCheckins'
-        }]
-      });
+  it('average subquery', async () => {
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        console.log(JSON.stringify(res));
-        res.should.be.deepEqual(
-          [{ 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__average_checkins': '6.0000000000000000' }]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.averageCheckins'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins.source',
+        operator: 'equals',
+        values: ['google']
+      }],
+      order: [{
+        id: 'visitors.averageCheckins'
+      }]
     });
 
-    return result;
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [{ 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__average_checkins': '6.0000000000000000' }]
+      );
+    });
   });
 
   it('subquery without measure', () => runQueryTest({
@@ -1108,7 +1100,9 @@ describe('SQL Generation', function test() {
     }
   ]));
 
-  it('join rollup pre-aggregation', () => compiler.compile().then(() => {
+  it('join rollup pre-aggregation', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.per_visitor_revenue'
@@ -1155,9 +1149,11 @@ describe('SQL Generation', function test() {
         ]
       );
     });
-  }));
+  });
 
-  it('join rollup total pre-aggregation', () => compiler.compile().then(() => {
+  it('join rollup total pre-aggregation', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_revenue'
@@ -1199,9 +1195,11 @@ describe('SQL Generation', function test() {
         }]
       );
     });
-  }));
+  });
 
-  it('user context', () => compiler.compile().then(() => {
+  it('user context', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
@@ -1221,9 +1219,11 @@ describe('SQL Generation', function test() {
         [{ 'visitor_checkins__revenue_per_checkin': '60' }]
       );
     });
-  }));
+  });
 
-  it('user context array', () => compiler.compile().then(() => {
+  it('user context array', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
@@ -1245,7 +1245,7 @@ describe('SQL Generation', function test() {
         [{ 'visitor_checkins__revenue_per_checkin': '50' }]
       );
     });
-  }));
+  });
 
   it('reference cube sql', () => runQueryTest({
     measures: [
@@ -1593,7 +1593,9 @@ describe('SQL Generation', function test() {
     ])
   );
 
-  it('data source', () => compiler.compile().then(() => {
+  it('data source', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: ['CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName.count'],
       dimensions: [],
@@ -1604,7 +1606,7 @@ describe('SQL Generation', function test() {
     });
 
     query.dataSource.should.be.deepEqual('oracle');
-  }));
+  });
 
   it(
     'objectRestSpread generator',
@@ -1657,25 +1659,23 @@ describe('SQL Generation', function test() {
 
   // eslint-disable-next-line
   for (const granularityTest of granularityCases) {
-    it(`Should date with TZ, when pass timeDimensions with granularity by ${granularityTest.granularity}`, () => {
-      const result = compiler.compile().then(() => {
-        const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
-          ...baseQuery,
-          timeDimensions: [{
-            dimension: 'visitors.created_at',
-            granularity: granularityTest.granularity,
-            dateRange: ['2017-01-01', '2017-01-10']
-          }]
-        });
+    it(`Should date with TZ, when pass timeDimensions with granularity by ${granularityTest.granularity}`, async () => {
+      await compiler.compile();
 
-        const sqlBuild = query.buildSqlAndParams();
-
-        (sqlBuild[0].includes('America/Los_Angeles')).should.be.equal(true);
-        sqlBuild[1][0].should.be.equal(granularityTest.from);
-        sqlBuild[1][1].should.be.equal(granularityTest.to);
+      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+        ...baseQuery,
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: granularityTest.granularity,
+          dateRange: ['2017-01-01', '2017-01-10']
+        }]
       });
 
-      return result;
+      const sqlBuild = query.buildSqlAndParams();
+
+      (sqlBuild[0].includes('America/Los_Angeles')).should.be.equal(true);
+      sqlBuild[1][0].should.be.equal(granularityTest.from);
+      sqlBuild[1][1].should.be.equal(granularityTest.to);
     });
   }
 });
