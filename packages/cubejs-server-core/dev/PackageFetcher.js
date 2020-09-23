@@ -1,10 +1,9 @@
 const fs = require('fs-extra');
-const fetch = require('node-fetch').default;
 const decompress = require('decompress');
 const decompressTargz = require('decompress-targz');
 const path = require('path');
 
-const { executeCommand } = require('./utils');
+const { executeCommand, proxyFetch } = require('./utils');
 
 class PackageFetcher {
   constructor(repo) {
@@ -26,7 +25,7 @@ class PackageFetcher {
   }
 
   async manifestJSON() {
-    const response = await fetch(
+    const response = await proxyFetch(
       `https://api.github.com/repos/${this.repo.owner}/${this.repo.name}/contents/manifest.json`
     );
 
@@ -37,7 +36,7 @@ class PackageFetcher {
     const url = `https://github.com/${this.repo.owner}/${this.repo.name}/archive/master.tar.gz`;
     const writer = fs.createWriteStream(this.repoArchivePath);
 
-    (await fetch(url)).body.pipe(writer);
+    (await proxyFetch(url)).body.pipe(writer);
 
     return new Promise((resolve, reject) => {
       writer.on('finish', resolve);
