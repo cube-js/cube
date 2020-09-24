@@ -30,6 +30,7 @@ jobs:
             - ~/.cache/yarn
           key: yarn-packages-v1-{{ .Branch }}-{{ checksum "packages/cubejs-server-core/yarn.lock" }}
 
+      - run: yarn lerna run --concurrency 1 tsc
       - run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver unit
       - run: bash <(curl -s https://codecov.io/bash)
 

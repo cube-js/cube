@@ -316,3 +316,13 @@ jobs:
         env:
           TEST_PGSQL_VERSION: 12.4
           TEST_PRESTO_VERSION: 341-SNAPSHOT
+      - name: Run Druid Integration with 0.0.19
+        run: |
+          docker pull postgres:${TEST_POSTGRES_VERSION}
+          docker pull zookeeper:${TEST_ZOOKEEPER_VERSION}
+          docker pull apache/druid:${TEST_DRUID_VERSION}
+          yarn lerna run --concurrency 1 integration:druid
+        env:
+          TEST_POSTGRES_VERSION: latest
+          TEST_ZOOKEEPER_VERSION: 3.5
+          TEST_DRUID_VERSION: 0.19.0

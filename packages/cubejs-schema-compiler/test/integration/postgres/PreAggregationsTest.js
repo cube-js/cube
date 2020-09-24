@@ -1042,7 +1042,6 @@ describe('PreAggregations', function test() {
   }));
 });
 
-
 describe('PreAggregations in time hierarchy', function test() {
   this.timeout(200000);
 

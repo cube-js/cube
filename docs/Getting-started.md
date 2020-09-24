@@ -38,6 +38,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `snowflake`
 * `prestodb`
 * `oracle`
+* `druid`
 
 For example,
 

@@ -530,12 +530,25 @@ class CubejsServerCore {
 
   static createDriver(dbType) {
     checkEnvForPlaceholders();
-    return new (CubejsServerCore.lookupDriverClass(dbType))();
+
+    const module = CubejsServerCore.lookupDriverClass(dbType);
+    if (module.default) {
+      // eslint-disable-next-line new-cap
+      return new module.default();
+    }
+
+    // eslint-disable-next-line new-cap
+    return new module();
   }
 
   static lookupDriverClass(dbType) {
     // eslint-disable-next-line global-require,import/no-dynamic-require
-    return require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
+    const module = require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
+    if (module.default) {
+      return module.default;
+    }
+
+    return module;
   }
 
   static driverDependencies(dbType) {

@@ -207,12 +207,11 @@ describe('DataSchemaCompiler', function test() {
         }
         const end = new Date().getTime();
         const time = end - start;
-        
+
         time.should.be.below(2500 * 10);
       });
     });
   });
-  
 
   it('calculated metrics', () => {
     const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
