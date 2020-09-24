@@ -1,8 +1,8 @@
 # Material UI Dashboard
 
-Example: https://material-ui-dashboard.cubecloudapp.dev/
+Example: https://material-ui-dashboard.cubecloudapp.dev
 
-Guide: https://cube.dev/blog/material-ui-dashboard/
+Guide: https://material-ui-dashboard.cube.dev
 
 React Material UI dashboard with Cube.js
 
