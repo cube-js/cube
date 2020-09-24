@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 export class BaseQueueDriver {
   redisHash(queryKey) {

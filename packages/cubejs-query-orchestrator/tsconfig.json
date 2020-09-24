@@ -8,7 +8,6 @@
     "declaration": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./",
     "composite": false,
     "noEmit": false,
 
@@ -52,5 +51,9 @@
     /* Advanced Options */
     "skipLibCheck": true,                     /* Skip type checking of declaration files. */
     "forceConsistentCasingInFileNames": true  /* Disallow inconsistently-cased references to the same file. */
-  }
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*"
+  ]
 }

@@ -1,5 +1,6 @@
-const { reduce } = require('ramda');
-import { cancelCombinator } from './utils'
+import { reduce } from 'ramda';
+
+import { cancelCombinator } from './utils';
 
 const sortByKeys = (unordered) => {
   const ordered = {};

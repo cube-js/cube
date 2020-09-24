@@ -1,4 +1,5 @@
-const redis = require('redis');
+import redis from 'redis';
+
 const { promisify } = require('util');
 
 export function createRedisClient(url) {
@@ -45,4 +46,4 @@ export function createRedisClient(url) {
   );
 
   return client;
-};
+}

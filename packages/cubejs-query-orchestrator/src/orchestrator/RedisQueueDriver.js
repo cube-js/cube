@@ -1,4 +1,5 @@
-const R = require('ramda');
+import R from 'ramda';
+
 import { BaseQueueDriver } from './BaseQueueDriver';
 
 export class RedisQueueDriverConnection {

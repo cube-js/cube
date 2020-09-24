@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const R = require('ramda');
+import crypto from 'crypto';
+import R from 'ramda';
 
 import { cancelCombinator } from '../driver';
 import { RedisCacheDriver } from './RedisCacheDriver';
@@ -52,7 +52,7 @@ const tablesToVersionEntries = (schema, tables) => R.sortBy(
       content_version: match[2],
       structure_version: match[3]
     };
-    
+
     if (match[4].length < 13) {
       entity.last_updated_at = parseInt(match[4], 32) * 1000;
       entity.naming_version = 2;
@@ -760,7 +760,7 @@ export class PreAggregations {
     if (versionEntry.naming_version === 2) {
       return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
     }
-    
+
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }

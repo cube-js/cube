@@ -1,5 +1,5 @@
 /* globals describe, beforeEach, afterEach, test, expect */
-import { QueryOrchestrator } from '../src/orchestrator';
+import { QueryOrchestrator } from '../../src/orchestrator';
 
 class MockDriver {
   constructor() {

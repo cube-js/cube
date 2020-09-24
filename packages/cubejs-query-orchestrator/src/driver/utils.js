@@ -1,4 +1,3 @@
-
 export const cancelCombinator = (fn) => {
   const cancelFnArray = [];
   const saveCancelFn = promise => {

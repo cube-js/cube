@@ -18,11 +18,13 @@
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
     "unit": "jest --runInBand --verbose --rootDir dist/test/unit",
-    "integration": "jest --runInBand --verbose test/integration",
+    "integration": "jest --runInBand --verbose dist/test/integration",
     "lint": "eslint src/orchestrator/*.js src/driver/*.js",
     "prepublishOnly": "rm -rf dist && tsc"
   },
   "files": [
+    "driver/*",
+    "orchestrator/*",
     "dist/src/*",
     "README.md",
     "CHANGELOG.md"
@@ -42,7 +44,7 @@
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
     "jest": "^25.1.0",
-    "typescript": "^4.0.2"
+    "typescript": "^4.0.3"
   },
   "license": "Apache-2.0"
 }

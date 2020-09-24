@@ -1,4 +1,5 @@
-const R = require('ramda');
+import R from 'ramda';
+
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool } from './RedisPool';

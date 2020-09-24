@@ -1,4 +1,5 @@
-const R = require('ramda');
+import R from 'ramda';
+
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';

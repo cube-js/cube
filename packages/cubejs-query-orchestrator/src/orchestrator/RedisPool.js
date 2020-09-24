@@ -1,4 +1,5 @@
-const genericPool = require('generic-pool');
+import genericPool from 'generic-pool';
+
 import { createRedisClient } from './RedisFactory';
 
 export class RedisPool {
