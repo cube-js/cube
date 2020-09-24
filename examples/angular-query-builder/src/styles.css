@@ -25,7 +25,13 @@ body {
   padding: 24px 16px !important;
 }
 
+.auto-width .mat-select-value {
+  max-width: 100%  !important;
+  width: auto  !important;
+}
+
 .flex-box {
   display: flex;
   gap: 8px;
+  align-items: flex-end;
 }

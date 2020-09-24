@@ -7,7 +7,8 @@ import {
   isQueryPresent,
   defaultHeuristics,
 } from '@cubejs-client/core';
-import { BehaviorSubject, Subject } from 'rxjs';
+import { BehaviorSubject, combineLatest, of, Subject } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 import { CubejsClient } from '../client';
 import { Query } from './query';
@@ -30,6 +31,7 @@ export class QueryBuilderService {
   private _disableHeuristics: boolean = false;
   private _resolveQuery: (query: Query) => void;
   private _resolveBuilderMeta: (query: BuilderMeta) => void;
+  private _heuristicChange$ = new Subject<any>();
 
   readonly builderMeta = new Promise<BuilderMeta>(
     (resolve) => (this._resolveBuilderMeta = resolve)
@@ -52,50 +54,61 @@ export class QueryBuilderService {
       this._query = new Query(
         {},
         this._meta,
-        this.handleQueryChange.bind(this)
+        this._handleQueryChange.bind(this)
       );
       this._resolveQuery(this._query);
       this._resolveBuilderMeta(new BuilderMeta(this._meta));
     });
 
     this.subscribe();
+
+    if (!this._disableHeuristics) {
+      this._heuristicChange$
+        .pipe(
+          switchMap((data) => {
+            return combineLatest([
+              this._cubejs.dryRun(data.query),
+              of(data.shouldApplyHeuristicOrder),
+            ]);
+          })
+        )
+        .subscribe(
+          ([{ pivotQuery, queryOrder }, shouldApplyHeuristicOrder]) => {
+            this.pivotConfig.set(
+              ResultSet.getNormalizedPivotConfig(
+                pivotQuery,
+                this.pivotConfig.get()
+              )
+            );
+            if (shouldApplyHeuristicOrder) {
+              this._query.order.set(
+                queryOrder.reduce((a, b) => ({ ...a, ...b }), {})
+              );
+            }
+          }
+        );
+    }
   }
 
-  private handleQueryChange(newQuery, oldQuery, currentQuery) {
+  private _handleQueryChange(newQuery, oldQuery) {
     const {
       chartType,
       shouldApplyHeuristicOrder,
       query: heuristicQuery,
-    } = defaultHeuristics(
-      newQuery,
-      Object.keys(oldQuery).length ? oldQuery : newQuery,
-      {
-        meta: this._meta,
-      }
-    );
+    } = defaultHeuristics(newQuery, oldQuery, {
+      meta: this._meta,
+      sessionGranularity: newQuery?.timeDimensions?.[0]?.granularity,
+    });
 
     const query = this._disableHeuristics
       ? newQuery
       : heuristicQuery || newQuery;
 
-    if (isQueryPresent(query)) {
-      this._cubejs
-        .dryRun(query)
-        .toPromise()
-        .then(({ pivotQuery, queryOrder }) => {
-          this.pivotConfig.set(
-            ResultSet.getNormalizedPivotConfig(
-              pivotQuery,
-              this.pivotConfig.get()
-            )
-          );
-
-          if (shouldApplyHeuristicOrder) {
-            currentQuery.order.set(
-              queryOrder.reduce((a, b) => ({ ...a, ...b }), {})
-            );
-          }
-        });
+    if (isQueryPresent(query) && !this._disableHeuristics) {
+      this._heuristicChange$.next({
+        shouldApplyHeuristicOrder: Boolean(shouldApplyHeuristicOrder),
+        query,
+      });
     }
 
     if (!this._disableHeuristics && chartType) {
@@ -129,17 +142,17 @@ export class QueryBuilderService {
     });
   }
 
-  deserialize(state) {
-    this.query.then((query) => {
-      query.setQuery(state.query);
-    });
+  async deserialize(state) {
+    if (state.query) {
+      (await this.query).setQuery(state.query);
+    }
 
     Object.entries(state).forEach(([key, value]) => {
       if (this[key] instanceof StateSubject) {
         this[key].set(value);
       }
     });
-
+    
     this.subscribe();
   }
 

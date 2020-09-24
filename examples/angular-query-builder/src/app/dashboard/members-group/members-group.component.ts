@@ -22,11 +22,21 @@ export class MembersGroupComponent {
   @Output()
   onMemberClick = new EventEmitter<string>();
 
+  @Output()
+  onReplace = new EventEmitter<any>();
+
   _onSelect(event: MatSelectChange) {
     this.onSelect.emit(event.value);
   }
 
   _onMemberClick(name: string) {
     this.onMemberClick.emit(name);
+  }
+
+  _onReplace(name: string, replaceWithName: string) {
+    this.onReplace.emit({
+      name,
+      replaceWithName,
+    });
   }
 }

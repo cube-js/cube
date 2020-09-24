@@ -797,8 +797,13 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export type TSourceAxis = 'x' | 'y';
-  // todo: types
-  export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: any): any;
+
+  export type TDefaultHeuristicsOptions = {
+    meta: Meta;
+    sessionGranularity?: TimeDimensionGranularity;
+  };
+
+  export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: TDefaultHeuristicsOptions): any;
   /**
    * @hidden
    */

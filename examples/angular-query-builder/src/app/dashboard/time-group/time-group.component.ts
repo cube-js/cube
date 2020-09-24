@@ -8,7 +8,7 @@ import { TimeDimensionMember } from '@cubejs-client/ngx';
 })
 export class TimeGroupComponent {
   granularities = [
-    { value: undefined, title: 'w/o grouping' },
+    { value: '', title: 'w/o grouping' },
     { value: 'hour', title: 'Hour' },
     { value: 'day', title: 'Day' },
     { value: 'week', title: 'Week' },
@@ -66,6 +66,6 @@ export class TimeGroupComponent {
   }
 
   handleGranularitySelect(event: MatSelectChange) {
-    this.timeDimensionMember.setGranularity(0, event.value);
+    this.timeDimensionMember.setGranularity(0, event.value || undefined);
   }
 }

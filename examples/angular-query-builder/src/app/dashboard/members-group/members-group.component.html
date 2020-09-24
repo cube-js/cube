@@ -1,16 +1,41 @@
 <div class="flex-box">
-  <button
+  <div
+    class="selected-member-container auto-width"
+    *ngFor="let member of members"
+  >
+    <mat-form-field>
+      <mat-select
+        [value]="member.name"
+        (selectionChange)="_onReplace(member.name, $event.value)"
+      >
+        <mat-option *ngFor="let member of allMembers" [value]="member.name">
+          {{ member.title }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button
+      mat-button
+      mat-icon-button
+      color="warn"
+      (click)="_onMemberClick(member.name)"
+    >
+      <mat-icon>delete_forever</mat-icon>
+    </button>
+  </div>
+
+  <!-- <button
+    *ngFor="let member of members"
     #memberButton
     mat-button
     mat-stroked-button
-    *ngFor="let member of members"
     color="primary"
     (mouseover)="memberButton.color = 'warn'"
     (mouseout)="memberButton.color = 'primary'"
     (click)="_onMemberClick(member.name)"
   >
     {{ member.title }}
-  </button>
+  </button> -->
 
   <mat-form-field appearance="fill">
     <span matPrefix><mat-icon>add</mat-icon></span>

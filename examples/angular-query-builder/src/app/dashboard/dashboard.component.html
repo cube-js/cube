@@ -1,11 +1,12 @@
-<div *ngIf="query">  
+<div *ngIf="query">
   <div class="controls-container">
     <div class="controls-row">
       <members-group
         title="Measure"
         [members]="query.measures.asArray()"
-        [allMembers]="builderMeta.measures"
+        [allMembers]="builderMeta.measures.slice()"
         (onSelect)="query.measures.add($event)"
+        (onReplace)="query.measures.replace($event.name, $event.replaceWithName)"
         (onMemberClick)="query.measures.remove($event)"
       ></members-group>
 
@@ -14,8 +15,9 @@
       <members-group
         title="Dimension"
         [members]="query.dimensions.asArray()"
-        [allMembers]="builderMeta.dimensions"
+        [allMembers]="builderMeta.dimensions.slice()"
         (onSelect)="query.dimensions.add($event)"
+        (onReplace)="query.dimensions.replace($event.name, $event.replaceWithName)"
         (onMemberClick)="query.dimensions.remove($event)"
       ></members-group>
 
@@ -24,15 +26,16 @@
       <members-group
         title="Segment"
         [members]="query.segments.asArray()"
-        [allMembers]="builderMeta.segments"
+        [allMembers]="builderMeta.segments.slice()"
         (onSelect)="query.segments.add($event)"
+        (onReplace)="query.dimensions.replace($event.name, $event.replaceWithName)"
         (onMemberClick)="query.segments.remove($event)"
       ></members-group>
 
       <time-group
         [timeDimensionMember]="query.timeDimensions"
-        [members]="query.timeDimensions.asArray()"
-        [allMembers]="builderMeta.timeDimensions"
+        [members]="timeDimensionMembers"
+        [allMembers]="builderMeta.timeDimensions.slice()"
       ></time-group>
     </div>
 
@@ -83,12 +86,6 @@
       </button>
     </div>
   </div>
-
-  <!-- <button mat-button (click)="debug()">debug</button>
-
-  <button mat-button mat-stroked-button (click)="setQuery()">
-    set/reset query
-  </button> -->
 
   <query-renderer [queryBuilder]="queryBuilder"></query-renderer>
 </div>

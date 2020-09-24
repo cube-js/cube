@@ -1,6 +1,6 @@
 import { BehaviorSubject } from 'rxjs';
 
-export abstract class StateSubject<T = any> {
+export class StateSubject<T = any> {
   subject: BehaviorSubject<T>;
 
   constructor(value: T) {

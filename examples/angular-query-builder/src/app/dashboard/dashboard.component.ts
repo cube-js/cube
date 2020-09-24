@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
-import {
-  CubejsClient,
-  BuilderMeta,
-  QueryBuilderService,
-  Query,
-} from '@cubejs-client/ngx';
-import { ResultSet } from '@cubejs-client/core';
 import { MatDialog } from '@angular/material/dialog';
+import { ResultSet } from '@cubejs-client/core';
+import {
+  BuilderMeta,
+  CubejsClient,
+  Query,
+  QueryBuilderService,
+} from '@cubejs-client/ngx';
+
 import { SettingsDialogComponent } from '../settings-dialog/settings-dialog.component';
 
 @Component({
@@ -24,6 +25,10 @@ export class DashboardComponent implements OnInit {
       icon: 'multiline_chart',
     },
     {
+      chartType: 'area',
+      icon: 'multiline_chart',
+    },
+    {
       chartType: 'bar',
       icon: 'bar_chart',
     },
@@ -38,6 +43,7 @@ export class DashboardComponent implements OnInit {
   ];
   chartTypeMap = {};
   filterMembers: any[] = [];
+  timeDimensionMembers: any[] = [];
 
   constructor(
     public cubejsClient: CubejsClient,
@@ -45,6 +51,19 @@ export class DashboardComponent implements OnInit {
     public dialog: MatDialog
   ) {
     queryBuilder.setCubejsClient(cubejsClient);
+    queryBuilder.deserialize({
+      query: {
+        measures: ['Sales.count'],
+        dimensions: ['Users.country'],
+        timeDimensions: [
+          {
+            dimension: 'Sales.ts',
+            granularity: 'month',
+          },
+        ],
+      },
+      chartType: 'bar',
+    });
     this.chartTypeMap = this.chartTypeToIcon.reduce(
       (memo, { chartType, icon }) => ({ ...memo, [chartType]: icon }),
       {}
@@ -57,7 +76,8 @@ export class DashboardComponent implements OnInit {
 
     this.query.subject.subscribe(() => {
       this.filterMembers = this.query.filters.asArray();
-    }); 
+      this.timeDimensionMembers = this.query.timeDimensions.asArray();
+    });
   }
 
   openDialog(): void {

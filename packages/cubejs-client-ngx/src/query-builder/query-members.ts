@@ -34,6 +34,14 @@ export class BaseMember {
     });
   }
 
+  replace(name: string, replaceWithName: string) {
+    this.query.setPartialQuery({
+      [this.field]: this.members.map((currentName) =>
+        currentName === name ? replaceWithName : currentName
+      ),
+    });
+  }
+
   remove(by: string | number) {
     this.query.setPartialQuery({
       [this.field]: this.query

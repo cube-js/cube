@@ -12,9 +12,11 @@ import {
 import { ChartDataSets, ChartOptions } from 'chart.js';
 import { Color, Label } from 'ng2-charts';
 import { combineLatest, of } from 'rxjs';
-import { mergeMap } from 'rxjs/operators';
+import { debounceTime, switchMap } from 'rxjs/operators';
 
 import { flattenColumns, getDisplayedColumns } from './utils';
+
+const COLORS = ['#FF6492', '#141446', '#7A77FF'];
 
 @Component({
   selector: 'query-renderer',
@@ -33,13 +35,16 @@ export class QueryRendererComponent implements OnInit {
   chartOptions: ChartOptions = {
     responsive: true,
   };
-  chartColors: Color[] = [
-    {
-      borderColor: 'none',
-      borderWidth: 1,
-      backgroundColor: 'rgba(255,0,0,0.3)',
-    },
-  ];
+  transparentColors: Color[] = COLORS.map((borderColor) => ({
+    borderColor,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  }));
+  filledColors: Color[] = COLORS.map((color) => ({
+    borderColor: color,
+    borderWidth: 1,
+    backgroundColor: color,
+  }));
 
   @Input()
   resetResultSetOnChange: boolean = false;
@@ -54,7 +59,7 @@ export class QueryRendererComponent implements OnInit {
 
     combineLatest([
       query.subject.pipe(
-        mergeMap((cubeQuery) => {
+        switchMap((cubeQuery) => {
           if (!isQueryPresent(cubeQuery)) {
             return of(null);
           }
@@ -63,20 +68,24 @@ export class QueryRendererComponent implements OnInit {
       ),
       this.queryBuilder.pivotConfig.subject,
       this.queryBuilder.chartType.subject,
-    ]).subscribe(
-      ([resultSet, pivotConfig, chartType]: [
-        ResultSet,
-        TPivotConfig,
-        TChartType
-      ]) => {
-        this.chartType = chartType;
-        if (resultSet != null || this.resetResultSetOnChange) {
-          this.resultSet = resultSet;
+    ])
+      .pipe(debounceTime(300))
+      .subscribe(
+        ([resultSet, pivotConfig, chartType]: [
+          ResultSet,
+          TPivotConfig,
+          TChartType
+        ]) => {
+          this.chartType = chartType;
+          if (resultSet != null || this.resetResultSetOnChange) {
+            this.resultSet = resultSet;
+          }
+          this.isQueryPresent = resultSet != null;
+          this.updateChart(resultSet, pivotConfig);
+
+          console.log('subscribe.update', resultSet?.query());
         }
-        this.isQueryPresent = resultSet != null;
-        setTimeout(() => this.updateChart(resultSet, pivotConfig), 0);
-      }
-    );
+      );
   }
 
   updateChart(resultSet: ResultSet | null, pivotConfig: TPivotConfig) {
@@ -95,7 +104,7 @@ export class QueryRendererComponent implements OnInit {
         return {
           label: item.title,
           data: item.series.map(({ value }) => value),
-          queue: 'a',
+          stack: 'a',
         };
       });
       this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);

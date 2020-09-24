@@ -1,16 +1,51 @@
 <div *ngIf="isQueryPresent" class="chart-wrapper">
-  <div *ngIf="chartType !== 'table' && chartData.length > 0">
-    <canvas
-      baseChart
-      legend="true"
-      [datasets]="chartData"
-      [labels]="chartLabels"
-      [options]="chartOptions"
-      [colors]="chartColors"
-      [chartType]="chartType"
-    >
-    </canvas>
-  </div>
+  <canvas
+    *ngIf="chartType === 'line'"
+    baseChart
+    legend="true"
+    chartType="line"
+    [datasets]="chartData"
+    [labels]="chartLabels"
+    [options]="chartOptions"
+    [colors]="transparentColors"
+  >
+  </canvas>
+  
+  <canvas
+    *ngIf="chartType === 'area'"
+    baseChart
+    legend="true"
+    chartType="line"
+    [datasets]="chartData"
+    [labels]="chartLabels"
+    [options]="chartOptions"
+    [colors]="filledColors"
+  >
+  </canvas>
+  
+  <canvas
+    *ngIf="chartType === 'bar'"
+    baseChart
+    legend="true"
+    chartType="bar"
+    [datasets]="chartData"
+    [labels]="chartLabels"
+    [options]="chartOptions"
+    [colors]="filledColors"
+  >
+  </canvas>
+  
+  <canvas
+    *ngIf="chartType === 'pie'"
+    baseChart
+    legend="true"
+    chartType="pie"
+    [datasets]="chartData"
+    [labels]="chartLabels"
+    [options]="chartOptions"
+    [colors]="filledColors"
+  >
+  </canvas>
 
   <table
     *ngIf="chartType === 'table'"
