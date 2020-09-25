@@ -1,5 +1,5 @@
 ---
-title: REST API
+title: HTTP API
 permalink: /rest-api
 category: Cube.js Backend
 menuOrder: 2
@@ -8,7 +8,7 @@ menuOrder: 2
 ## Prerequisites
 ### Base path
 
-REST API is used to communicate with Cube.js backend.
+HTTP API is used to communicate with Cube.js backend.
 All requests are prefixed with **basePath** described in [Backend Server Core](@cubejs-backend-server-core). By default it's `/cubejs-api`.
 
 ### Authentication
@@ -40,7 +40,7 @@ Possible reasons of **Continue wait**:
 
 ### Error Handling
 
-Cube.js REST API has basic errors and HTTP Error codes for all requests.
+Cube.js HTTP API has basic errors and HTTP Error codes for all requests.
 
 | Status | Error response | Description |
 | --- | --- | --- |

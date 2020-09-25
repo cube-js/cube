@@ -4,7 +4,7 @@ permalink: /frontend-introduction
 category: Cube.js Frontend
 ---
 
-You can send queries to Cube.js Backend using JSON [Query Format](query-format) via [REST API](rest-api).
+You can send queries to Cube.js Backend using JSON [Query Format](query-format) via [HTTP API](rest-api).
 
 Alongside with it, Cube.js comes with Javascript client and bindings for
 popular frameworks such as React and Vue.

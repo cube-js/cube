@@ -193,7 +193,7 @@ server.listen().then(({ version, port }) => {
 });
 ```
 
-There's also [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) available to trigger run.
+There's also [HTTP API](rest-api#api-reference-v-1-run-scheduled-refresh) available to trigger run.
 
 > **NOTE:** `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.
 

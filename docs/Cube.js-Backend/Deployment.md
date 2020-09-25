@@ -18,7 +18,7 @@ Below you can find guides for popular deployment environments:
 When running Cube.js Backend in production make sure `NODE_ENV` is set to `production`.
 Such platforms, such as Heroku, do it by default.
 In this mode Cube.js unsecured development server and Playground will be disabled by default because there's a security risk serving those in production environments.
-Production Cube.js servers can be accessed only with [REST API](rest-api) and Cube.js frontend libraries.
+Production Cube.js servers can be accessed only with [HTTP API](rest-api) and Cube.js frontend libraries.
 
 ### Redis
 

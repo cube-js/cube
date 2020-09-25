@@ -17,7 +17,7 @@ Cube.js tokens are designed to work well in microservice-based environments. Typ
 2. The web server should generate an expirable cube.js token to achieve this. The server could include the token in the HTML it serves or provide the token to the front-end via an XHR request, which stores it in local storage or a cookie.
 3. The JS client is initialized using this token, and includes it in calls to the cube.js server API.
 
-If you are using the [REST API](rest-api) you must pass the API Token via the Authorization Header. The Cube.js Javascript client accepts an authentication token as the first argument to the [cubejs(authToken, options) function](@cubejs-client-core#cubejs).
+If you are using the [HTTP API](rest-api) you must pass the API Token via the Authorization Header. The Cube.js Javascript client accepts an authentication token as the first argument to the [cubejs(authToken, options) function](@cubejs-client-core#cubejs).
 
 **In the development environment the token is not required for authorization**, but
 you can still use it to [pass a security context](security#security-context).

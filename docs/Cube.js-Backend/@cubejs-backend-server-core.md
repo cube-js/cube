@@ -129,7 +129,7 @@ Path to schema files. The default value is `/schema`.
 
 ### basePath
 
-[REST API](/rest-api) base path. The default value is `/cubejs-api`.
+[HTTP API](/rest-api) base path. The default value is `/cubejs-api`.
 
 ### webSocketsBasePath
 
@@ -251,7 +251,7 @@ CubejsServerCore.create({
 
 ### checkAuth
 
-Used in both REST and Websocket API.
+Used in both HTTP and Websocket API.
 Can be `async` functon.
 Default implementation parses [JSON Web Tokens (JWT)](https://jwt.io/) in `Authorization` and sets payload to `req.authInfo` if it's verified.
 More info on how to generate such tokens is [here](security#security-context).
@@ -358,7 +358,7 @@ CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 ```
 
 Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance.
-For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
+For serverless deployments [HTTP API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
 ### extendContext
 

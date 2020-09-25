@@ -182,5 +182,5 @@ Same as for other measures, `payingPercentage` can be used with dimensions.
 
 1. [Examples](examples)
 2. [Query format](query-format)
-3. [REST API](rest-api)
+3. [HTTP API](rest-api)
 4. [Schema reference documentation](cube)
