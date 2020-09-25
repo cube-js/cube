@@ -11,7 +11,7 @@ A Cube.js query is a simple JSON object containing several properties. The main 
 
 Cube.js backend accepts this query and then uses it and the schema we created earlier to generate an SQL query. This SQL query will be executed in our database and the result will be sent back to the client.
 
-Although Cube.js can be queried via plain HTTP REST API, we’re going to use the Cube.js JavaScript client library. Among other things it provides useful tools to process the data after it has been returned from the backend.
+Although Cube.js can be queried via plain HTTP API, we’re going to use the Cube.js JavaScript client library. Among other things it provides useful tools to process the data after it has been returned from the backend.
 
 Once the data is loaded, the Cube.js client creates a `ResultSet` object, which provides a set of methods to access and manipulate the data. We’re going to use two of them now: `ResultSet.series` and `ResultSet.chartPivot`. You can learn about all the features of the [Cube.js client library in the docs](https://cube.dev/docs/@cubejs-client-core).
 
