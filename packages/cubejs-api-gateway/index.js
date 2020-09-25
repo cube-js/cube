@@ -848,7 +848,7 @@ class ApiGateway {
 
   async requestLogger(req, res, next) {
     const details = requestParser(req, res);
-    this.log(req.context, { type: 'REST API Request', ...details });
+    this.log(req.context, { type: 'HTTP API Request', ...details });
     if (next) {
       next();
     }

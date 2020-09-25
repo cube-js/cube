@@ -128,7 +128,7 @@ const prodLogger = (level) => (msg, params) => {
     // eslint-disable-next-line no-fallthrough
     case "info":
       if ([
-        'REST API Request',
+        'HTTP API Request',
       ].includes(msg)) {
         logMessage();
         break;
