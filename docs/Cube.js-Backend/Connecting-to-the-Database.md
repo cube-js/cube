@@ -106,11 +106,17 @@ Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the bas
 
 You can learn more about acquiring Google BigQuery credentials [here](https://cloud.google.com/docs/authentication/getting-started) and [here](https://console.cloud.google.com/apis/credentials/serviceaccountkey).
 
+### MySQL
+
+To connect to a local MySQL database using a UNIX socket use `CUBEJS_DB_SOCKET_PATH`, by doing so, `CUBEJS_DB_HOST` will be ignored.
+
+You can connect to a SSL enabled MySQL database by setting `CUBEJS_DB_SSL` to `true`.  `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS` and `CUBEJS_DB_SSL_PASSPHRASE` can be used according to your requirements.
+
 ### Connecting to Multiple Databases
 
 Cube.js supports connection to multiple databases out-of-the-box. Please refer to [Multitenancy Guide](multitenancy-setup) to learn more.
 
 ### SSL
 
-Cube.js supports connection via SSL for **Postgres** and **Mongo**. To enable it set
+Cube.js supports connection via SSL for **Postgres**, **Mongo** and **MySQL**. To enable it set
 `CUBEJS_DB_SSL` environment variable to `true`.
