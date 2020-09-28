@@ -77,14 +77,14 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
 
   // eslint-disable-next-line default-case
   switch ((level || 'info').toLowerCase()) {
-    case "trace": {
+    case 'trace': {
       if (!error && !warning) {
         logDetails(true);
         break;
       }
     }
     // eslint-disable-next-line no-fallthrough
-    case "info": {
+    case 'info': {
       if (!error && !warning && [
         'Executing SQL',
         'Executing Load Pre Aggregation SQL',
@@ -97,14 +97,14 @@ const devLogger = (level) => (type, { error, warning, ...message }) => {
       }
     }
     // eslint-disable-next-line no-fallthrough
-    case "warn": {
+    case 'warn': {
       if (!error && warning) {
         logWarning();
         break;
       }
     }
     // eslint-disable-next-line no-fallthrough
-    case "error": {
+    case 'error': {
       if (error) {
         logError();
         break;
@@ -119,14 +119,14 @@ const prodLogger = (level) => (msg, params) => {
   const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
   // eslint-disable-next-line default-case
   switch ((level || 'warn').toLowerCase()) {
-    case "trace": {
+    case 'trace': {
       if (!error && !warning) {
         logMessage();
         break;
       }
     }
     // eslint-disable-next-line no-fallthrough
-    case "info":
+    case 'info':
       if ([
         'REST API Request',
       ].includes(msg)) {
@@ -134,14 +134,14 @@ const prodLogger = (level) => (msg, params) => {
         break;
       }
     // eslint-disable-next-line no-fallthrough
-    case "warn": {
+    case 'warn': {
       if (!error && warning) {
         logMessage();
         break;
       }
     }
     // eslint-disable-next-line no-fallthrough
-    case "error": {
+    case 'error': {
       if (error) {
         logMessage();
         break;
@@ -391,7 +391,7 @@ class CubejsServerCore {
     } else {
       app.get('/', (req, res) => {
         res.status(200)
-          .send(`<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment#production-mode">Learn more about production mode</a>.</body></html>`);
+          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment#production-mode">Learn more about production mode</a>.</body></html>');
       });
     }
   }

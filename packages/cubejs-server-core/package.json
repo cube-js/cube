@@ -19,10 +19,10 @@
     "playground"
   ],
   "scripts": {
-    "lint": "eslint core/**/*.js",
+    "lint": "eslint core/**/*.js dev/**/*.js",
+    "lint:fix": "eslint --fix core/**/*.js dev/**/*.js",
     "test": "npm run unit",
-    "unit": "jest ./**/*.test.js",
-    "lint:fix": "eslint --fix core/**/*.js"
+    "unit": "jest ./**/*.test.js"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.20.11",

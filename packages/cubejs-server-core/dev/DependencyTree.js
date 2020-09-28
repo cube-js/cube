@@ -46,8 +46,8 @@ class DependencyTree {
   getChildren(pkg) {
     const children = [];
 
-    Object.keys(pkg.receives || {}).forEach((name) => {
-      const currentPackages = this.packagesInstalledTo(name);
+    Object.keys(pkg.receives || {}).forEach((receive) => {
+      const currentPackages = this.packagesInstalledTo(receive);
 
       if (Object.keys(currentPackages || {}).length) {
         this.templatePackages.forEach((name) => {
