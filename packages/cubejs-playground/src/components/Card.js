@@ -12,10 +12,6 @@ const StyledCard = styled(AntdCard)`
       padding: 8px 16px;
     }
     
-    .ant-card-body {
-      padding: 16px;
-    }
-    
     .ant-card-head-title {
       padding: 0;
       flex: initial;

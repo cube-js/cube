@@ -33,7 +33,7 @@ module.exports = {
   'heading-color': color('dark', .65),
   'link-color': color('purple'),
   'info-color': color('purple'),
-  'layout-body-background': '#f8f8fb',
+  'layout-body-background': '#f3f3fc',
   'layout-header-background': '#eeeef5',
   'menu-highlight-color': color('dark-01'),
   'item-hover-bg': color('light'),
