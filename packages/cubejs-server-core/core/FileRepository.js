@@ -1,6 +1,6 @@
-const path = require("path");
-const fs = require("fs-extra");
-const R = require("ramda");
+const path = require('path');
+const fs = require('fs-extra');
+const R = require('ramda');
 
 class FileRepository {
   constructor(repositoryPath) {
@@ -25,12 +25,12 @@ class FileRepository {
 
   async dataSchemaFiles(includeDependencies) {
     const self = this;
-    const files = await self.getFiles("");
+    const files = await self.getFiles('');
     let result = await Promise.all(
       files
-        .filter(file => R.endsWith(".js", file))
+        .filter(file => R.endsWith('.js', file))
         .map(async file => {
-          const content = await fs.readFile(path.join(self.localPath(), file), "utf-8");
+          const content = await fs.readFile(path.join(self.localPath(), file), 'utf-8');
           return { fileName: file, content };
         })
     );
@@ -41,11 +41,11 @@ class FileRepository {
   }
 
   async readModules() {
-    const packageJson = JSON.parse(await fs.readFile("package.json", "utf-8"));
+    const packageJson = JSON.parse(await fs.readFile('package.json', 'utf-8'));
     const files = await Promise.all(
       Object.keys(packageJson.dependencies).map(async module => {
-        if (R.endsWith("-schema", module)) {
-          return this.readModuleFiles(path.join("node_modules", module));
+        if (R.endsWith('-schema', module)) {
+          return this.readModuleFiles(path.join('node_modules', module));
         }
         return [];
       })
@@ -61,8 +61,8 @@ class FileRepository {
         const stats = await fs.lstat(fileName);
         if (stats.isDirectory()) {
           return this.readModuleFiles(fileName);
-        } else if (R.endsWith(".js", file)) {
-          const content = await fs.readFile(fileName, "utf-8");
+        } else if (R.endsWith('.js', file)) {
+          const content = await fs.readFile(fileName, 'utf-8');
           return [
             {
               fileName,

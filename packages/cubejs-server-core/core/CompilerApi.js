@@ -25,7 +25,7 @@ class CompilerApi {
     ).toString();
     if (this.options.devServer) {
       const files = await this.repository.dataSchemaFiles();
-      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest("hex")}`;
+      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
