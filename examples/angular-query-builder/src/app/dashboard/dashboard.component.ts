@@ -51,19 +51,6 @@ export class DashboardComponent implements OnInit {
     public dialog: MatDialog
   ) {
     queryBuilder.setCubejsClient(cubejsClient);
-    queryBuilder.deserialize({
-      query: {
-        measures: ['Sales.count'],
-        dimensions: ['Users.country'],
-        timeDimensions: [
-          {
-            dimension: 'Sales.ts',
-            granularity: 'month',
-          },
-        ],
-      },
-      chartType: 'bar',
-    });
     this.chartTypeMap = this.chartTypeToIcon.reduce(
       (memo, { chartType, icon }) => ({ ...memo, [chartType]: icon }),
       {}

@@ -1,6 +1,8 @@
 <filter
   *ngFor="let member of members"
   [member]="member"
+  [allMembers]="allMembers"
+  (selectMember)="filters.replace(member.name, $event.value)"
   (onOperatorSelect)="filters.update(member.name, { operator: $event })"
   (onValueChange)="filters.update(member.name, { values: [$event] })"
   (onRemove)="filters.remove($event)"
@@ -8,6 +10,8 @@
 
 <filter
   [member]="currentFilter.getValue()"
+  [allMembers]="allMembers"
+  (selectMember)="selectMember($event)"
   (onOperatorSelect)="handleOperatorChange($event)"
   (onValueChange)="handleValueChange($event)"
   (onRemove)="currentFilter.next(null)"
@@ -18,7 +22,7 @@
   <mat-label>Filter</mat-label>
   <mat-select
     #select
-    (selectionChange)="onMemberSelect($event); select.value = ''"
+    (selectionChange)="selectMember($event); select.value = ''"
   >
     <mat-option *ngIf="!allMembers.length">No members found</mat-option>
     <mat-option *ngFor="let member of allMembers" [value]="member.name">

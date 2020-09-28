@@ -24,20 +24,13 @@
     </button>
   </div>
 
-  <!-- <button
-    *ngFor="let member of members"
-    #memberButton
-    mat-button
-    mat-stroked-button
-    color="primary"
-    (mouseover)="memberButton.color = 'warn'"
-    (mouseout)="memberButton.color = 'primary'"
-    (click)="_onMemberClick(member.name)"
+  <mat-form-field
+    *ngIf="
+      (title === 'Time Dimension' && !members.length) ||
+      title !== 'Time Dimension'
+    "
+    appearance="fill"
   >
-    {{ member.title }}
-  </button> -->
-
-  <mat-form-field appearance="fill">
     <span matPrefix><mat-icon>add</mat-icon></span>
     <mat-label>{{ title }}</mat-label>
     <mat-select

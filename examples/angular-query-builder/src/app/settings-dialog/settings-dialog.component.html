@@ -3,7 +3,17 @@
     <app-pivot [pivotConfig]="data.pivotConfig"></app-pivot>
   </mat-tab>
 
-  <mat-tab label="Pivot Options">Pivot Options</mat-tab>
+  <mat-tab label="Pivot Options">
+    <mat-checkbox
+      [checked]="data.pivotConfig.get().fillMissingDates"
+      (change)="
+        data.pivotConfig.setFillMissingDates(
+          !data.pivotConfig.get().fillMissingDates
+        )
+      "
+      >Fill Missing Dates</mat-checkbox
+    >
+  </mat-tab>
 
   <mat-tab label="Order">
     <app-order [order]="data.query.order"></app-order>

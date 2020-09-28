@@ -8,9 +8,11 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { DragDropModule } from '@angular/cdk/drag-drop';
+import { MatSnackBarModule  } from '@angular/material/snack-bar';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { CubejsClientModule, QueryBuilderService } from '@cubejs-client/ngx';
@@ -65,7 +67,9 @@ const cubejsOptions = {
     MatTabsModule,
     MatTableModule,
     MatInputModule,
-    MatDialogModule
+    MatCheckboxModule,
+    MatDialogModule,
+    MatSnackBarModule
   ],
   providers: [QueryBuilderService],
   bootstrap: [AppComponent],

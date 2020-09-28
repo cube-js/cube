@@ -1,16 +1,26 @@
 <div *ngIf="member" class="flex-box filter-member-container">
-  <button
-    #memberButton
-    mat-button
-    mat-stroked-button
-    color="primary"
-    (mouseover)="memberButton.color = 'warn'"
-    (mouseout)="memberButton.color = 'primary'"
-    (click)="onRemove.emit(member.name)"
-  >
-    {{ member.title }}
-  </button>
-   
+  <div class="selected-member-container auto-width">
+    <mat-form-field>
+      <mat-select
+        [value]="member.name"
+        (selectionChange)="selectMember.emit($event)"
+      >
+        <mat-option *ngFor="let member of allMembers" [value]="member.name">
+          {{ member.title }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button
+      mat-button
+      mat-icon-button
+      color="warn"
+      (click)="onRemove.emit(member.name)"
+    >
+      <mat-icon>delete_forever</mat-icon>
+    </button>
+  </div>
+
   <mat-form-field appearance="fill" style="min-width: 200px;">
     <mat-label>Operator</mat-label>
     <mat-select
@@ -30,8 +40,8 @@
     <input
       matInput
       type="string"
-      [value]="member.values && member.values[0] || ''"
+      [value]="(member.values && member.values[0]) || ''"
       (blur)="onValueChange.emit($event.target.value)"
     />
-  </mat-form-field> 
+  </mat-form-field>
 </div>

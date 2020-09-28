@@ -6,6 +6,7 @@ import {
   OnInit,
   Output,
 } from '@angular/core';
+import { MatSelectChange } from '@angular/material/select';
 import { FilterMember } from '@cubejs-client/ngx';
 import { BehaviorSubject } from 'rxjs';
 
@@ -43,7 +44,8 @@ export class FilterGroupComponent implements OnInit, OnDestroy {
     this.currentFilter.unsubscribe();
   }
 
-  onMemberSelect(event: any) {
+  selectMember(event: any) {
+    console.log('select', event.value);
     this.currentFilter.next({
       ...this.allMembers.find(({ name }) => event.value === name),
       values: [],
@@ -74,6 +76,9 @@ export class FilterComponent {
   @Input()
   member;
 
+  @Input()
+  allMembers: any[];
+
   @Output()
   onOperatorSelect = new EventEmitter<string>();
 
@@ -82,4 +87,7 @@ export class FilterComponent {
 
   @Output()
   onRemove = new EventEmitter<string>();
+
+  @Output()
+  selectMember = new EventEmitter<MatSelectChange>();
 }

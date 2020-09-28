@@ -8,7 +8,7 @@ import {
   defaultHeuristics,
 } from '@cubejs-client/core';
 import { BehaviorSubject, combineLatest, of, Subject } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { catchError, switchMap } from 'rxjs/operators';
 
 import { CubejsClient } from '../client';
 import { Query } from './query';
@@ -67,13 +67,22 @@ export class QueryBuilderService {
         .pipe(
           switchMap((data) => {
             return combineLatest([
-              this._cubejs.dryRun(data.query),
+              this._cubejs.dryRun(data.query).pipe(catchError((error) => {
+                console.error(error);
+                return of(null);
+              })),
               of(data.shouldApplyHeuristicOrder),
             ]);
           })
         )
         .subscribe(
-          ([{ pivotQuery, queryOrder }, shouldApplyHeuristicOrder]) => {
+          ([dryRunResponse, shouldApplyHeuristicOrder]) => {
+            if (!dryRunResponse) {
+              return;
+            }
+            
+            const { pivotQuery, queryOrder } = dryRunResponse;
+            
             this.pivotConfig.set(
               ResultSet.getNormalizedPivotConfig(
                 pivotQuery,
@@ -152,7 +161,7 @@ export class QueryBuilderService {
         this[key].set(value);
       }
     });
-    
+
     this.subscribe();
   }
 

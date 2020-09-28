@@ -255,7 +255,7 @@ export class FilterMember {
   remove(by: string | number) {
     this.query.setPartialQuery({
       filters: this.filters.filter((filter, index) => {
-        if (filter.dimension === by || index === by) {
+        if (filter.member === by || filter.dimension === by || index === by) {
           return false;
         }
 
@@ -267,6 +267,20 @@ export class FilterMember {
   set(filters: Filter[]) {
     this.query.setPartialQuery({
       filters,
+    });
+  }
+
+  replace(name: string, replaceWithName: string) {
+    this.query.setPartialQuery({
+      filters: this.filters.map((filter) => {
+        const field = filter.member ? 'member' : 'dimension';
+        return filter.member || filter.dimension === name
+          ? {
+              ...filter,
+              [field]: replaceWithName,
+            }
+          : filter;
+      }),
     });
   }
 

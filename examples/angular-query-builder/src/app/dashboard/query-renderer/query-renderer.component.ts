@@ -1,4 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   isQueryPresent,
   PivotConfig as TPivotConfig,
@@ -10,13 +11,11 @@ import {
   TChartType,
 } from '@cubejs-client/ngx';
 import { ChartDataSets, ChartOptions } from 'chart.js';
-import { Color, Label } from 'ng2-charts';
+import { Label } from 'ng2-charts';
 import { combineLatest, of } from 'rxjs';
-import { debounceTime, switchMap } from 'rxjs/operators';
+import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 
 import { flattenColumns, getDisplayedColumns } from './utils';
-
-const COLORS = ['#FF6492', '#141446', '#7A77FF'];
 
 @Component({
   selector: 'query-renderer',
@@ -35,16 +34,14 @@ export class QueryRendererComponent implements OnInit {
   chartOptions: ChartOptions = {
     responsive: true,
   };
-  transparentColors: Color[] = COLORS.map((borderColor) => ({
-    borderColor,
-    borderWidth: 1,
-    backgroundColor: 'transparent',
-  }));
-  filledColors: Color[] = COLORS.map((color) => ({
-    borderColor: color,
-    borderWidth: 1,
-    backgroundColor: color,
-  }));
+  noFillChartOptions: ChartOptions = {
+    responsive: true,
+    elements: {
+      line: {
+        fill: false,
+      },
+    },
+  };
 
   @Input()
   resetResultSetOnChange: boolean = false;
@@ -52,7 +49,10 @@ export class QueryRendererComponent implements OnInit {
   @Input()
   queryBuilder: QueryBuilderService;
 
-  constructor(private cubejsClient: CubejsClient) {}
+  constructor(
+    private cubejsClient: CubejsClient,
+    private snakBar: MatSnackBar
+  ) {}
 
   async ngOnInit() {
     const query = await this.queryBuilder.query;
@@ -63,7 +63,14 @@ export class QueryRendererComponent implements OnInit {
           if (!isQueryPresent(cubeQuery)) {
             return of(null);
           }
-          return this.cubejsClient.load(cubeQuery);
+          return this.cubejsClient.load(cubeQuery).pipe(
+            catchError((error) => {
+              this.snakBar.open(error.message || 'Request error', null, {
+                duration: 2000,
+              });
+              return of(null);
+            })
+          );
         })
       ),
       this.queryBuilder.pivotConfig.subject,
@@ -82,8 +89,6 @@ export class QueryRendererComponent implements OnInit {
           }
           this.isQueryPresent = resultSet != null;
           this.updateChart(resultSet, pivotConfig);
-
-          console.log('subscribe.update', resultSet?.query());
         }
       );
   }

@@ -78,7 +78,7 @@
       <button
         mat-button
         mat-raised-button
-        [disabled]="!query.isPresent()"
+        [disabled]="!query.isPresent() || !queryBuilder.pivotConfig.get()"
         (click)="openDialog()"
       >
         <mat-icon>settings</mat-icon>

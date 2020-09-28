@@ -9,7 +9,7 @@ export class PivotConfig extends StateSubject<TPivotConfig> {
   constructor(pivotConfig: TPivotConfig) {
     super(pivotConfig);
   }
-
+  
   moveItem(
     sourceIndex: number,
     destinationIndex: number,
@@ -25,5 +25,12 @@ export class PivotConfig extends StateSubject<TPivotConfig> {
         destinationAxis
       )
     );
+  }
+  
+  setFillMissingDates(fillMissingDates: boolean) {
+    this.subject.next({
+      ...this.get(),
+      fillMissingDates
+    })
   }
 }
