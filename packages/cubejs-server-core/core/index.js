@@ -1,4 +1,6 @@
 /* eslint-disable global-require */
+require('source-map-support').install();
+
 const ApiGateway = require('@cubejs-backend/api-gateway');
 const crypto = require('crypto');
 const fs = require('fs-extra');
