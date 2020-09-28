@@ -30,7 +30,7 @@ const Image = styled.div`
 const RecipeCard = styled(Card)`
   && {
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     margin-bottom: 20px;
     padding: 16px;
     ${(props) => (props.createYourOwn ? `
@@ -59,13 +59,13 @@ const RecipeCard = styled(Card)`
   
     && .ant-card-cover {
       height: 168px;
-      border-radius: 4px 4px 0 0;
+      border-radius: 8px 8px 0 0;
       background: ${(props) => (props.createYourOwn ? 'transparent' : '#DEDEF1')};
       display: flex;
       align-items: center;
       position: relative;
       margin: -16px -16px 0 -16px;
-      padding: 16px 16px 0 16px;
+      padding: 24px 24px 0 24px;
   
       &::after {
         content: '';
@@ -77,7 +77,7 @@ const RecipeCard = styled(Card)`
         background: rgba(81, 87, 125, 0.3);
         opacity: 0;
         transition: all 0.25s;
-        border-radius: 4px 4px 0 0;
+        border-radius: 8px 8px 0 0;
       }
       
       div {
