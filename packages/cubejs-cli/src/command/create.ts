@@ -99,9 +99,19 @@ const create = async (projectName, options) => {
 
     // eslint-disable-next-line import/no-dynamic-require,global-require,@typescript-eslint/no-var-requires
     const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
-    const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
+
+    const { jdbcDriver } = await inquirer.prompt([{
+      type: 'list',
+      name: 'jdbcDriver',
+      message: 'Select JDBC driver',
+      choices: JDBCDriver.getSupportedDrivers(),
+    }]);
+
+    const dbTypeDescription = JDBCDriver.dbTypeDescription(
+      jdbcDriver
+    );
     if (!dbTypeDescription) {
-      await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
+      await displayError(`Unsupported JDBC driver: ${chalk.green(jdbcDriver)}`, createAppOptions);
     }
 
     const newPackageJson = await fs.readJson('package.json');

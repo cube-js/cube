@@ -214,6 +214,10 @@ class JDBCDriver extends BaseDriver {
     await this.pool.clear();
   }
 
+  static getSupportedDrivers() {
+    return Object.keys(DbTypes);
+  }
+
   static dbTypeDescription(dbType) {
     return DbTypes[dbType];
   }
