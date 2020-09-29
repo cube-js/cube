@@ -18,12 +18,12 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.20.9",
+    "@types/pg": "^7.14.5",
     "moment": "^2.24.0",
     "pg": "^8.2.1"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/pg": "^7.14.3",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
