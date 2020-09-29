@@ -44,20 +44,24 @@ const cubejsApi = cubejs({
   transport: new WebSocketTransport({ authorization: CUBEJS_TOKEN, apiUrl: 'ws://localhost:4000/' })
 });
 
-cubejsApi.subscribe({
-  measures: ['Logs.count'],
-  timeDimensions: [{
-    dimension: 'Logs.time',
-    granularity: 'hour',
-    dateRange: 'last 1440 minutes'
-  }]
-},{/*options*/}, (e, result) => {
-  if (e) {
-    // handle new error
-  } else {
-    // handle new result set
+cubejsApi.subscribe(
+  {
+    measures: ['Logs.count'],
+    timeDimensions: [
+      {
+        dimension: 'Logs.time',
+        granularity: 'hour',
+        dateRange: 'last 1440 minutes',
+      },
+    ],
+  },
+  options,
+  (error, resultSet) => {
+    if (!error) {
+      // handle the update
+    }
   }
-});
+);
 ```
 
 ### React hooks
@@ -65,8 +69,8 @@ cubejsApi.subscribe({
 ```javascript
 import { useCubeQuery } from '@cubejs-client/react';
 
-const Chart = ({ query, cubejsApi }) => {
-  const { resultSet, error, isLoading } = useCubeQuery(query, { subscribe: true, cubejsApi });
+const Chart = ({ query }) => {
+  const { resultSet, error, isLoading } = useCubeQuery(query, { subscribe: true });
   
   if (isLoading) {
     return <div>Loading...</div>;
@@ -86,7 +90,7 @@ const Chart = ({ query, cubejsApi }) => {
 
 ## Refresh Rate
 
-As in case of regular data fetch real-time data fetch obeys [refreshKey refresh rules](caching#refresh-keys).
-In order to provide desired refresh rate `refreshKey` should reflect changes of underlying data set as well it's querying time should be much less than desired refresh rate.
-Please use [refreshKey every](cube#parameters-refresh-key) parameter to adjust refresh interval.
+As in the case of a regular data fetch, real-time data fetch obeys [refreshKey refresh rules](caching#refresh-keys).
+In order to provide desired refresh rate `refreshKey` should reflect changes of the underlying data set as well it's querying time should be much less than the desired refresh rate.
+Please use the [refreshKey every](cube#parameters-refresh-key) parameter to adjust refresh interval.
 
