@@ -5,6 +5,7 @@ on: [push]
 jobs:
   unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     strategy:
       matrix:
@@ -50,6 +51,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -88,6 +90,7 @@ jobs:
 
   integration-wrk-1:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       redis:
@@ -176,6 +179,7 @@ jobs:
 
   integration-wrk-2:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       redis:
@@ -258,6 +262,7 @@ jobs:
 
   integration-wrk-3:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       redis:
