@@ -3,11 +3,14 @@ const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const crypto = require('crypto');
+const moment = require('moment');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
   text: 'varchar(255) CHARACTER SET utf8mb4'
 };
+
+const dateTypes = ['TIMESTAMP', 'DATE', 'DATETIME'];
 
 class MySqlDriver extends BaseDriver {
   constructor(config) {
@@ -19,7 +22,14 @@ class MySqlDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ...restConfig
+      typeCast(field, next) {
+        if (dateTypes.includes(field.type)) {
+          return moment.utc(field.string()).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+        }
+
+        return next();
+      },
+      ...restConfig,
     };
     this.pool = genericPool.createPool({
       create: async () => {
@@ -34,6 +44,7 @@ class MySqlDriver extends BaseDriver {
         conn.execute = promisify(conn.query.bind(conn));
 
         await connect();
+
         return conn;
       },
       destroy: (connection) => promisify(connection.end.bind(connection))(),
@@ -139,7 +150,7 @@ class MySqlDriver extends BaseDriver {
 
   async downloadQueryResults(query, values) {
     if (!this.config.database) {
-      throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
+      throw new Error('Default database should be defined to be used for temporary tables during query results downloads');
     }
     const tableName = crypto.randomBytes(10).toString('hex');
     const columns = await this.withConnection(async db => {

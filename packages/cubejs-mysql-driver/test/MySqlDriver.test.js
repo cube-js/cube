@@ -1,5 +1,5 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
-const { GenericContainer } = require("testcontainers");
+const { GenericContainer } = require('testcontainers');
 const MySqlDriver = require('../driver/MySqlDriver');
 
 describe('MySqlDriver', () => {
@@ -12,14 +12,14 @@ describe('MySqlDriver', () => {
 
   beforeAll(async () => {
     container = await new GenericContainer('mysql', version)
-      .withEnv("MYSQL_ROOT_PASSWORD", process.env.TEST_DB_PASSWORD || "Test1test")
+      .withEnv('MYSQL_ROOT_PASSWORD', process.env.TEST_DB_PASSWORD || 'Test1test')
       .withExposedPorts(3306)
       .start();
 
     mySqlDriver = new MySqlDriver({
       host: 'localhost',
       user: 'root',
-      password: process.env.TEST_DB_PASSWORD || "Test1test",
+      password: process.env.TEST_DB_PASSWORD || 'Test1test',
       port: container && container.getMappedPort(3306) || 3306,
       database: 'mysql'
     });
@@ -36,17 +36,17 @@ describe('MySqlDriver', () => {
   });
 
   test('truncated wrong value', async () => {
-    await mySqlDriver.uploadTable(`test.wrong_value`, [{ name: 'value', type: 'string' }], {
-      rows: [{ value: "Tekirdağ" }]
+    await mySqlDriver.uploadTable('test.wrong_value', [{ name: 'value', type: 'string' }], {
+      rows: [{ value: 'Tekirdağ' }]
     });
     expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.wrong_value'))))
-      .toStrictEqual([{ value: "Tekirdağ" }]);
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
     expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.wrong_value')).rows)))
-      .toStrictEqual([{ value: "Tekirdağ" }]);
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
   });
 
   test('boolean field', async () => {
-    await mySqlDriver.uploadTable(`test.boolean`, [{ name: 'b_value', type: 'boolean' }], {
+    await mySqlDriver.uploadTable('test.boolean', [{ name: 'b_value', type: 'boolean' }], {
       rows: [
         { b_value: true },
         { b_value: true },
