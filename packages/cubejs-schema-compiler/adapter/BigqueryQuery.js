@@ -127,7 +127,7 @@ class BigqueryQuery extends BaseQuery {
   }
 
   concatStringsSql(strings) {
-    return `CONCAT(${strings.join(", ")})`;
+    return `CONCAT(${strings.join(', ')})`;
   }
 
   defaultRefreshKeyRenewalThreshold() {

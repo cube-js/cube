@@ -17,7 +17,6 @@ moment.fn.zoneName = () => {
   return abbrs[abbr] || abbr;
 };
 
-
 const BaseQuery = require('./BaseQuery');
 const BaseFilter = require('./BaseFilter');
 const ParamAllocator = require('./ParamAllocator');

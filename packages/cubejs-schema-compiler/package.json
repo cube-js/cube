@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube.js schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "0.20.3",
+  "version": "0.20.11",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -12,9 +12,14 @@
     "node": ">=8.11.1"
   },
   "scripts": {
-    "test": "nyc --reporter=lcov mocha -i -g MSSql",
-    "test-mssql": "nyc --reporter=lcov mocha -g MSSql",
-    "lint": "eslint adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js"
+    "test": "npm run unit && npm run integration",
+    "unit": "nyc --reporter=lcov mocha test/unit",
+    "integration": "nyc --reporter=lcov mocha test/integration/*",
+    "integration:mssql": "nyc --reporter=lcov mocha test/integration/mssql",
+    "integration:mysql": "nyc --reporter=lcov mocha test/integration/mysql",
+    "integration:postgres": "nyc --reporter=lcov mocha test/integration/postgres",
+    "integration:clickhouse": "nyc --reporter=lcov mocha test/integration/clickhouse",
+    "lint": "eslint -c ../../.eslintrc.js adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*/*.js"
   },
   "dependencies": {
     "@babel/generator": "^7.4.0",
@@ -25,6 +30,7 @@
     "@babel/types": "^7.4.0",
     "@hapi/joi": "^15.1.1",
     "antlr4": "^4.8.0",
+    "cron-parser": "^2.16.3",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
     "lru-cache": "^5.1.1",

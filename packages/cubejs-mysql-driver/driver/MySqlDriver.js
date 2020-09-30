@@ -19,6 +19,7 @@ class MySqlDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
+      timezone: 'Z',
       ...restConfig
     };
     this.pool = genericPool.createPool({
@@ -34,6 +35,7 @@ class MySqlDriver extends BaseDriver {
         conn.execute = promisify(conn.query.bind(conn));
 
         await connect();
+
         return conn;
       },
       destroy: (connection) => promisify(connection.end.bind(connection))(),

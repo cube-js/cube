@@ -91,6 +91,7 @@ class Config {
     const auth = await this.deployAuth();
     let url = Object.keys(auth)[0];
     if (Object.keys(auth).length > 1) {
+      // eslint-disable-next-line prefer-destructuring
       url = (await inquirer.prompt([{
         type: 'list',
         name: 'url',

@@ -74,7 +74,9 @@ class AthenaDriver extends BaseDriver {
           const [header, ...tableRows] = results.ResultSet.Rows;
           allRows.push(...(allRows.length ? results.ResultSet.Rows : tableRows));
           if (!columnInfo) {
-            columnInfo = results.ResultSet.ResultSetMetadata.ColumnInfo;
+            columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
+              ? [{ Name: 'column' }]
+              : results.ResultSet.ResultSetMetadata.ColumnInfo;
           }
         }
 
@@ -84,6 +86,68 @@ class AthenaDriver extends BaseDriver {
       }
       await this.sleep(500);
     }
+  }
+
+  async tablesSchema() {
+    const tablesSchema = await super.tablesSchema();
+    const viewsSchema = await this.viewsSchema(tablesSchema);
+    
+    return this.mergeSchemas([tablesSchema, viewsSchema]);
+  }
+
+  async viewsSchema(tablesSchema) {
+    // eslint-disable-next-line camelcase
+    const isView = ({ table_schema, table_name }) => !tablesSchema[table_schema]
+      || !tablesSchema[table_schema][table_name];
+
+    const allTables = await this.getAllTables();
+    const arrViewsSchema = await Promise.all(
+      allTables
+        .filter(isView)
+        .map(table => this.getColumns(table))
+    );
+
+    return this.mergeSchemas(arrViewsSchema);
+  }
+
+  async getAllTables() {
+    const data = await this.query(`
+      SELECT table_schema, table_name
+      FROM information_schema.tables
+      WHERE tables.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+    `);
+
+    return data;
+  }
+
+  // eslint-disable-next-line camelcase
+  async getColumns({ table_schema, table_name } = {}) {
+    // eslint-disable-next-line camelcase
+    const data = await this.query(`SHOW COLUMNS IN "${table_schema}"."${table_name}"`);
+
+    return {
+      [table_schema]: {
+        [table_name]: data.map(({ column }) => {
+          const [name, type] = column.split('\t');
+          return { name, type, attributes: [] };
+        })
+      }
+    };
+  }
+
+  mergeSchemas(arrSchemas) {
+    const result = {};
+
+    arrSchemas.forEach(schemas => {
+      Object.keys(schemas).forEach(schema => {
+        Object.keys(schemas[schema]).forEach((name) => {
+          if (!result[schema]) result[schema] = {};
+          if (!result[schema][name]) result[schema][name] = schemas[schema][name];
+        });
+      });
+    });
+
+    return result;
   }
 }
 

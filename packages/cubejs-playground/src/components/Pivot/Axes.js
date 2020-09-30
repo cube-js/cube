@@ -6,11 +6,10 @@ import DroppableArea from './DroppableArea';
 export default function Axes({ pivotConfig, onMove }) {
   return (
     <DragDropContext
-      onDragEnd={({ source, destination }) => {
+      onDragEnd={({ source, destination, ...props }) => {
         if (!destination) {
           return;
         }
-
         onMove({
           sourceIndex: source.index,
           destinationIndex: destination.index,

@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-feature-settings: 'ss03' on;
+  font-feature-settings: 'ss04' on;
+  background-color: #f0f2f5 !important;
+}
+
+.ant-popover-disabled-compatible-wrapper {
+  pointer-events: none;
+}
+
+::selection {
+  background-color: #7a77ff !important;
+}
+
+.dashboard__cell {
+  border-radius: 4px;
+  overflow: hidden !important;
+  background-color: white;
+}
+
+.ant-layout-header.example__header {
+  padding: 16px 40px;
+  background: #43436b;
+  height: auto;
+  line-height: 0;
+}
+
+.examples__container {
+  padding: 40px;
+}
+
+@media (max-width: 640px) {
+  .examples__container {
+    padding: 20px;
+  }
+  .ant-layout-header.example__header {
+    padding: 16px 20px;
+  }
+}
+
+@media (min-width: 640px) {
+  .examples__nav {
+    display: flex;
+    justify-content: space-between;
+  }
+  .dashboard__row {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .examples__nav__buttons {
+    margin-top: 20px;
+    text-align: center;
+  }
+  .highcharts-input-group {
+    display: none;
+  }
+  .dashboard__cell {
+    margin-bottom: 20px;
+  }
+}
+
+.examples__nav__buttons a {
+  display: inline-block;
+  background: rgba(213, 213, 226, 0.1);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-left: 15px;
+  color: white;
+  line-height: 1.6em;
+}
+
+.examples__nav__buttons a .anticon {
+  margin-right: 4px;
+  color: #a1a1b5;
+}
+
+.examples__nav__buttons a:hover {
+  background: rgba(213, 213, 226, 0.2);
+  color: white;
+}
+
+.examples__nav__buttons a:hover .anticon {
+  color: #d5d5e2;
+}
+
+.examples__title {
+  display: flex;
+  align-items: center;
+}
+
+.examples__nav h1 {
+  color: #d5d5e2;
+  font-size: 16px;
+  line-height: 26px;
+  letter-spacing: 0.02em;
+  align-self: center;
+  font-weight: normal;
+  margin: 0 0 0 20px;
+}
+
+.highcharts-title {
+  color: #43436b;
+  text-align: left;
+  font-size: 16px;
+  line-height: 21px;
+  padding: 20px;
+  width: 100% !important;
+  left: 0;
+  border-bottom: 1px solid #d5d5e280;
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+.highcharts-title small {
+  color: #a1a1b5;
+  font-size: 14px;
+  margin-left: 12px;
+  font-weight: normal;
+  vertical-align: baseline;
+}

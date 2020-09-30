@@ -98,7 +98,8 @@ class PreAggregations {
 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
-    const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
+    const name = foundPreAggregation.sqlAlias || preAggregationName;
+    const tableName = this.preAggregationTableName(cube, name, preAggregation);
     const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
     return {
       preAggregationsSchema: this.query.preAggregationSchema(),
@@ -110,7 +111,7 @@ class PreAggregations {
       external: preAggregation.external,
       indexesSql: Object.keys(preAggregation.indexes || {}).map(
         index => {
-          const indexName = this.preAggregationTableName(cube, `${preAggregationName}_${index}`, preAggregation, true);
+          const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
           return {
             indexName,
             sql: this.query.indexSql(
@@ -135,9 +136,11 @@ class PreAggregations {
         preAggregation.partitionGranularity === 'hour' ? 13 : 10
       ).replace(/[-T:]/g, '');
     }
+
+    const name = preAggregation.sqlAlias || preAggregationName;
     return this.query.preAggregationTableName(
       cube,
-      preAggregationName + partitionSuffix,
+      name + partitionSuffix,
       skipSchema
     );
   }
@@ -465,7 +468,7 @@ class PreAggregations {
     ).map(s => {
       const path = s.split('.');
       return `${path[0][0]}${path[1]}`;
-    }).map(s => s.replace(/_/g, '')).join("_")
+    }).map(s => s.replace(/_/g, '')).join('_')
       .replace(/[.]/g, '')
       .toLowerCase();
   }
@@ -475,12 +478,19 @@ class PreAggregations {
   }
 
   originalSqlPreAggregationTable(preAggregation) {
-    return this.canPartitionsBeUsed(preAggregation) ?
-      this.partitionUnion(preAggregation, true) :
-      this.query.preAggregationTableName(
-        preAggregation.cube,
-        preAggregation.preAggregationName
-      );
+    if (this.canPartitionsBeUsed(preAggregation)) {
+      return this.partitionUnion(preAggregation, true);
+    }
+
+    let { preAggregationName } = preAggregation;
+    if (preAggregation.preAggregation && preAggregation.preAggregation.sqlAlias) {
+      preAggregationName = preAggregation.preAggregation.sqlAlias;
+    }
+  
+    return this.query.preAggregationTableName(
+      preAggregation.cube,
+      preAggregationName
+    );
   }
 
   rollupPreAggregation(preAggregationForQuery) {
@@ -488,7 +498,7 @@ class PreAggregations {
       this.partitionUnion(preAggregationForQuery) :
       this.query.preAggregationTableName(
         preAggregationForQuery.cube,
-        preAggregationForQuery.preAggregationName
+        preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName
       );
     const segmentFilters = this.query.segments.map(
       s => this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })
@@ -542,14 +552,14 @@ class PreAggregations {
       const preAggregation = this.addPartitionRangeTo(preAggregationForQuery, dimension, range);
       return this.preAggregationTableName(
         preAggregationForQuery.cube,
-        preAggregationForQuery.preAggregationName,
+        preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName,
         preAggregation.preAggregation
       );
     });
     if (tables.length === 1) {
       return tables[0];
     }
-    const union = tables.map(table => `SELECT * FROM ${table}`).join(" UNION ALL ");
+    const union = tables.map(table => `SELECT * FROM ${table}`).join(' UNION ALL ');
     return `(${union})${withoutAlias ? '' : ' as partition_union'}`;
   }
 }

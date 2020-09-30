@@ -1,3 +1,5 @@
+const R = require('ramda');
+
 class BaseGroupFilter {
   constructor(query, filter) {
     this.values = filter.values;
@@ -7,7 +9,18 @@ class BaseGroupFilter {
   }
       
   filterToWhere() {
-    return this.values.map(f => `(${f.filterToWhere()})`).join(` ${this.operator} `);
+    const r = this.values.map(f => {
+      const sql = f.filterToWhere();
+      if (!sql) {
+        return null;
+      }
+      return `(${sql})`;
+    }).filter(R.identity).join(` ${this.operator} `);
+    
+    if (!r.length) {
+      return null;
+    }
+    return r;
   }
   
   getMembers() {

@@ -47,7 +47,7 @@ The rest will be done by `BaseDriver` class.
 6. If db requires connection pooling prefer use `generic-pool` implementation with settings similar to other db packages.
 7. Make sure your driver has `release()` method in case DB expects graceful shutdowns for connections.
 8. Please use yarn to add any dependencies and run `$ yarn` within the package before committing to ensure right `yarn.lock` is in place.
-9. Add this driver dependency to [cubejs-server-core/core/index.js](https://github.com/statsbotco/cube.js/blob/master/packages/cubejs-server-core/core/index.js#L8).
+9. Add this driver dependency to [cubejs-server-core/core/DriverDependencies.js](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-server-core/core/DriverDependencies.js#L1).
 
 ### Implementing JDBC Driver
 

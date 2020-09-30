@@ -217,7 +217,6 @@ exports.serverless = {
   dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
 };
 
-
 exports['serverless-google'] = {
   files: {
     'index.js': () => handlerJs,

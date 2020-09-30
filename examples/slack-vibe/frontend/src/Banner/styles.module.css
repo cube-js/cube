@@ -1,0 +1,18 @@
+.root {
+  margin: 48px 0;
+}
+
+.banner {
+  background-color: var(--color-bg);
+  border-radius: var(--border-radius);
+  padding: 24px;
+}
+
+.buttons {
+  display: inline-grid;
+  grid-gap: 12px;
+  grid-template-columns: auto auto auto;
+  list-style: none;
+  margin-top: 12px;
+  padding: 0;
+}

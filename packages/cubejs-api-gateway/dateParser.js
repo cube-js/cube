@@ -16,9 +16,10 @@ const momentFromResult = (result, timezone) => {
   return dateMoment;
 };
 
-module.exports = (dateString, timezone) => {
+module.exports = (dateString, timezone, now = new Date()) => {
   let momentRange;
   dateString = dateString.toLowerCase();
+
   if (dateString.match(/(this|last)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
     const match = dateString.match(/(this|last)\s+(day|week|month|year|quarter|hour|minute|second)/);
     let start = moment.tz(timezone);
@@ -46,19 +47,25 @@ module.exports = (dateString, timezone) => {
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
     // eslint-disable-next-line no-unused-vars
     const [all, from, to] = dateString.match(/^from (.*) to (.*)$/);
-    const fromResults = chrono.parse(from, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
-    const toResults = chrono.parse(to, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+
+    const current = moment(now).tz(timezone);
+    const fromResults = chrono.parse(from, current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+    const toResults = chrono.parse(to, current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+
     if (!fromResults) {
       throw new UserError(`Can't parse date: '${from}'`);
     }
+
     if (!toResults) {
       throw new UserError(`Can't parse date: '${to}'`);
     }
+
     const exactGranularity = ['second', 'minute', 'hour'].find(g => dateString.indexOf(g) !== -1) || 'day';
     momentRange = [
       momentFromResult(fromResults[0].start, timezone),
       momentFromResult(toResults[0].start, timezone)
     ];
+
     momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   } else {
     const results = chrono.parse(dateString, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
@@ -75,5 +82,6 @@ module.exports = (dateString, timezone) => {
     ];
     momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   }
+
   return momentRange.map(d => d.format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
 };

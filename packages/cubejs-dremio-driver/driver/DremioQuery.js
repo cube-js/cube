@@ -30,7 +30,7 @@ class DremioQuery extends BaseQuery {
   }
 
   timeStampCast(value) {
-    return `CAST(${value} as TIMESTAMP)`;
+    return `TO_TIMESTAMP(${value}, 'YYYY-MM-DD"T"HH24:MI:SS.FFF')`;
   }
 
   inDbTimeZone(date) {
@@ -76,6 +76,5 @@ class DremioQuery extends BaseQuery {
     return `IF(${sql}, 1, 0)`;
   }
 }
- 
 
 module.exports = DremioQuery;

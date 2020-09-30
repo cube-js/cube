@@ -7,20 +7,21 @@ menuOrder: 1
 
 Cube.js currently provides connectors to the following databases:
 
-| Database             | Cube.js DB Type |
-| -------------------- |---------------- |
-| PostgreSQL           | postgres        |
-| MySQL                | mysql           |
-| AWS Athena           | athena          |
-| AWS Redshift         | redshift        |
-| MongoDB (via MongoDB Connector for BI)           | mongobi        |
-| Google BigQuery      | bigquery        |
-| MS SQL               | mssql           |
-| ClickHouse           | clickhouse      |
-| Snowflake            | snowflake       |
-| Presto               | prestodb        |
-| Hive / SparkSQL (thrift) | hive        |
-| Oracle               | oracle          |
+| Database                                         | Cube.js DB Type |
+| -------------------------------------------------|---------------- |
+| PostgreSQL                                       | postgres        |
+| MySQL                                            | mysql           |
+| AWS Athena                                       | athena          |
+| AWS Redshift                                     | redshift        |
+| MongoDB (via MongoDB Connector for BI)           | mongobi         |
+| Google BigQuery                                  | bigquery        |
+| MS SQL                                           | mssql           |
+| ClickHouse                                       | clickhouse      |
+| Snowflake                                        | snowflake       |
+| Presto                                           | prestodb        |
+| Hive / SparkSQL (thrift)                         | hive            |
+| Oracle                                           | oracle          |
+| Apache Druid                                     | druid           |
 
 _If you'd like to connect to a database which is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver)._
 
@@ -50,6 +51,7 @@ The table below shows which environment variables are used for different databas
 | MongoDB | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` |
 | Snowflake | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`|
 | Presto | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
+| Druid | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 
 ### Configuring a Connection to an External Pre-aggregations Database
 

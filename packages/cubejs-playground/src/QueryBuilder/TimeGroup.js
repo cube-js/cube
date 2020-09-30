@@ -1,7 +1,7 @@
 import { PlusOutlined } from '@ant-design/icons';
 import { DatePicker, Menu } from 'antd';
 import moment from 'moment';
-import React, { useState } from 'react';
+import React, { useState, Fragment } from 'react';
 import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
@@ -72,8 +72,8 @@ const TimeGroup = ({
 
   return (
     <>
-      {members.map((m) => (
-        <>
+      {members.map((m, index) => (
+        <Fragment key={index}>
           <RemoveButtonGroup onRemoveClick={() => updateMethods.remove(m)}>
             <MemberDropdown
               onClick={(updateWith) =>
@@ -128,7 +128,7 @@ const TimeGroup = ({
               m.dimension.granularities.find((g) => g.name === m.granularity)
                 .title}
           </ButtonDropdown>
-        </>
+        </Fragment>
       ))}
 
       {!members.length && (
