@@ -1,0 +1,40 @@
+{
+  "name": "@cubejs-backend/cube",
+  "version": "0.20.11",
+  "description": "Cube CLI for working inside Docker",
+  "author": "Cube Dev, Inc.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts",
+    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts"
+  },
+  "bin": "dist/src/bin/cube.js",
+  "dependencies": {
+    "@cubejs-backend/athena-driver": "^0.20.9",
+    "@cubejs-backend/bigquery-driver": "^0.20.9",
+    "@cubejs-backend/clickhouse-driver": "^0.20.9",
+    "@cubejs-backend/dremio-driver": "^0.20.11",
+    "@cubejs-backend/druid-driver": "^0.20.11",
+    "@cubejs-backend/elasticsearch-driver": "^0.20.9",
+    "@cubejs-backend/hive-driver": "^0.20.9",
+    "@cubejs-backend/mongobi-driver": "^0.20.9",
+    "@cubejs-backend/mssql-driver": "^0.20.9",
+    "@cubejs-backend/oracle-driver": "^0.20.9",
+    "@cubejs-backend/postgres-driver": "^0.20.9",
+    "@cubejs-backend/prestodb-driver": "^0.20.10",
+    "@cubejs-backend/server": "^0.20.11",
+    "@cubejs-backend/snowflake-driver": "^0.20.9",
+    "@types/node": "^14.11.2",
+    "commander": "^6.1.0",
+    "typescript": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/commander": "^2.12.2",
+    "@cubejs-backend/linter": "^0.20.11"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}
