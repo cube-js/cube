@@ -1,6 +1,9 @@
 const fs = require('fs-extra');
 const path = require('path');
 const spawn = require('cross-spawn');
+const fetch = require('node-fetch');
+const HttpsProxyAgent = require('http-proxy-agent');
+const { exec } = require('child_process');
 
 async function fileContentsRecursive(dir, rootPath, includeNodeModules) {
   if (!rootPath) {
@@ -54,7 +57,38 @@ function executeCommand(command, args, options = {}) {
   });
 }
 
+function getCommandOutput(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout) => {
+      if (error) {
+        reject(error.message);
+        return;
+      }
+      resolve(stdout);
+    });
+  });
+}
+
+async function proxyFetch(url) {
+  const [proxy] = (await Promise.all([
+    getCommandOutput('npm config get https-proxy'),
+    getCommandOutput('npm config get proxy'),
+  ]))
+    .map((s) => s.trim())
+    .filter((s) => !['null', 'undefined', ''].includes(s));
+
+  return fetch(
+    url,
+    proxy
+      ? {
+        agent: new HttpsProxyAgent(proxy),
+      }
+      : {}
+  );
+}
+
 module.exports = {
   fileContentsRecursive,
   executeCommand,
+  proxyFetch
 };
