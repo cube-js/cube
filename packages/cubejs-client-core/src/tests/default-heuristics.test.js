@@ -11,12 +11,26 @@ jest.mock('moment-range', () => {
 });
 
 describe('default heuristics', () => {
-  test('it removes the time dimension when the measure is removed', () => {
+  it('removes the time dimension when the measure is removed', () => {
     const newQuery = {
-      measures: ['Orders.count'],
-      dimensions: ['Users.gender'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          granularity: 'month',
+          dateRange: 'this year',
+        },
+      ],
     };
-    const oldQuery = {};
+    const oldQuery = {
+      measures: ['Orders.count'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          granularity: 'month',
+          dateRange: 'this year',
+        },
+      ],
+    };
     expect(
       defaultHeuristics(newQuery, oldQuery, {
         meta: {
@@ -25,34 +39,14 @@ describe('default heuristics', () => {
           },
         },
       })
-    ).toStrictEqual({});
+    ).toStrictEqual({
+      pivotConfig: null,
+      query: {
+        filters: [],
+        timeDimensions: [],
+      },
+      sessionGranularity: null,
+      shouldApplyHeuristicOrder: true,
+    });
   });
-  // test('it removes the time dimension when the measure is removed', () => {
-  //   const newQuery = {
-  //     dimensions: [
-  //       {
-  //         dimension: 'Orders.ts',
-  //         granularity: 'month',
-  //       },
-  //     ],
-  //   };
-  //   const oldQuery = {
-  //     measures: ['Orders.count'],
-  //     dimensions: [
-  //       {
-  //         dimension: 'Orders.ts',
-  //         granularity: 'month',
-  //       },
-  //     ],
-  //   };
-  //   expect(
-  //     defaultHeuristics(newQuery, oldQuery, {
-  //       meta: {
-  //         defaultTimeDimensionNameFor() {
-  //           return 'Orders.ts';
-  //         },
-  //       },
-  //     })
-  //   ).toStrictEqual({});
-  // });
 });
