@@ -30,6 +30,10 @@ const StyledCard = styled(AntdCard)`
       font-size: 18px;
       line-height: 40px;
     }
+    
+    .ant-card-body {
+      padding: 16px;
+    }
   }
 `;
 

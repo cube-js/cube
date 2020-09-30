@@ -1,22 +1,32 @@
-import React from 'react';
 import styled from 'styled-components';
 import { Alert as AntdAlert } from 'antd';
-// import vars from '../variables';
 
-const AlertContainer = styled.div`
-  padding: 24px;
-`;
+const TYPES = {
+  error: {
+    border: '#FFCCC7',
+    background: '#FFF1F0',
+  },
+  warning: {
+    border: '#FFE58F',
+    background: '#FFFBE6',
+  },
+  info: {
+    border: '#91D5FF',
+    background: '#E6F7FF',
+  },
+  success :{
+    border: '#B7EB8F',
+    background: '#F6FFED',
+  },
+}
+
 const StyledAlert = styled(AntdAlert)`
   && {
-    background: #E6F7FF;
-    border: 1px solid #91D5FF;
+    background: ${props => TYPES[props.type || 'info'].background};
+    border: 1px solid ${props => TYPES[props.type || 'info'].border};
     box-sizing: border-box;
     border-radius: 2px;
   }
 `;
 
-export default (props) => (
-  <AlertContainer>
-    <StyledAlert {...props} />
-  </AlertContainer>
-);
+export default StyledAlert;

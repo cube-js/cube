@@ -248,7 +248,7 @@ class SchemaPage extends Component {
             </TabPane>
           </Tabs>
         </Sider>
-        <Content style={{ minHeight: 280 }}>
+        <Content style={{ minHeight: 280, padding: 24 }}>
           {selectedFile && (
             <Alert
               message={
@@ -264,7 +264,7 @@ class SchemaPage extends Component {
           {selectedFile ? (
             <PrismCode
               code={this.selectedFileContent()}
-              style={{ padding: '0 24px 24px 24px' }}
+              style={{ padding: 0, marginTop: 24 }}
             />
           ) : (
             <Empty
