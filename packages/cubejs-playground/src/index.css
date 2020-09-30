@@ -25,7 +25,7 @@ code {
 .schema-sidebar {
   background: #fff;
   border-right: 1px solid #eee;
-  padding: 0 12px;
+  padding: 0;
 }
 
 .schema-sidebar .ant-tabs-tabpane {
