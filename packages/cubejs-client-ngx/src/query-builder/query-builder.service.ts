@@ -52,7 +52,6 @@ export class QueryBuilderService {
       this._meta = meta;
 
       this._query = new Query(
-        {},
         this._meta,
         this._handleQueryChange.bind(this)
       );

@@ -720,7 +720,7 @@ declare module '@cubejs-client/core' {
      */
     resolveMember<T extends MemberType>(
       memberName: string,
-      memberType: T
+      memberType: T | T[]
     ): { title: string; error: string } | TCubeMemberByType<T>;
     defaultTimeDimensionNameFor(memberName: string): string;
     filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): any;

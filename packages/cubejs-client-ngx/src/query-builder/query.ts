@@ -27,23 +27,20 @@ export class Query extends StateSubject<TCubeQuery> {
   order: Order;
 
   constructor(
-    initialQuery: TCubeQuery = {},
     public meta: Meta,
     private _onBeforeChange: OnChangeCallback = (newQuery) => newQuery
   ) {
-    super(initialQuery);
-    this.init(initialQuery);
+    super({});
+    this.init();
   }
 
-  private init(query: TCubeQuery) {
+  private init() {
     this.measures = new BaseMember(this, MemberType.Measures);
     this.dimensions = new BaseMember(this, MemberType.Dimensions);
     this.segments = new BaseMember(this, MemberType.Segments);
     this.timeDimensions = new TimeDimensionMember(this);
     this.filters = new FilterMember(this);
     this.order = new Order(this);
-
-    this.setQuery(query);
   }
 
   asCubeQuery(): TCubeQuery {
