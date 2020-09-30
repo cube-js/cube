@@ -3,6 +3,7 @@
     cdkDropList
     #xAxis="cdkDropList"
     id="x"
+    cdkDropListOrientation="vertical"
     [cdkDropListData]="x"
     [cdkDropListConnectedTo]="yAxis"
     (cdkDropListDropped)="drop($event)"
@@ -21,6 +22,7 @@
     cdkDropList
     #yAxis="cdkDropList"
     id="y"
+    cdkDropListOrientation="vertical"
     [cdkDropListData]="y"
     [cdkDropListConnectedTo]="xAxis"
     (cdkDropListDropped)="drop($event)"
