@@ -53,9 +53,9 @@ export default function App() {
 Name | Type | Description |
 ------ | ------ | ------ |
 cubejsApi? | CubejsApi | A `CubejsApi` instance to use. Taken from the context if the param is not passed |
-resetResultSetOnChange? | boolean | - |
+resetResultSetOnChange? | boolean | When `true` the resultSet will be reset to `null` first |
 skip? | boolean | Query execution will be skipped when `skip` is set to `true`. You can use this flag to avoid sending incomplete queries. |
-subscribe? | boolean | When `true` the resultSet will be reset to `null` first |
+subscribe? | boolean | Use continuous fetch behavior. See [Real-Time Data Fetch](real-time-data-fetch) |
 
 ### UseCubeQueryResult
 
