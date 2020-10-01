@@ -1,0 +1,46 @@
+.root {
+  box-sizing: border-box;
+  height: 13rem;
+}
+
+.logo {
+  margin: auto;
+  text-align: center;
+}
+
+.logo h1 {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.logo h1 > * {
+  margin: 0 0.25em;
+}
+
+.imgLink, .imgLink:hover {
+  border-bottom: none;
+}
+
+.name {
+  color: var(--color-fg-secondary);
+  cursor: pointer;
+}
+
+.attribution {
+  color: var(--color-fg-secondary);
+}
+
+.description {
+  color: var(--color-fg-secondary);
+  margin: 0 auto 6px;
+  max-width: 425px;
+}
+
+.buttons {
+  display: inline-grid;
+  grid-gap: 12px;
+  grid-template-columns: auto auto auto;
+  list-style: none;
+  margin-top: 12px;
+  padding: 0;
+}

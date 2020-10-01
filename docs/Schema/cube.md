@@ -255,7 +255,24 @@ cube(`OrderFacts`, {
 });
 ```
 
-Available interval granularities are: `second`, `minute`, `hour`, `day` and `week`.
+
+`every` - can be set as an interval with granularities `second`, `minute`, `hour`, `day`, and `week` or accept CRON string with some limitations.
+If you set `every` as CRON string, you can use the `timezone` property.
+
+For example:
+
+```javascript
+cube(`OrderFacts`, {
+  sql: `SELECT * FROM orders`,
+  refreshKey: {
+    every: '30 5 * * 5',
+    timezone: 'America/Los_Angeles'
+  }
+});
+```
+
+`every` can accept only equal time intervals - so  "Day of month" and "month" intervals in CRON expressions are not supported.
+
 Such `refreshKey` is just a syntactic sugar over `refreshKey` SQL. 
 It's guaranteed that `refreshKey` change it's value at least once during `every` interval.
 It will be converted to appropriate SQL select which value will change over time based on interval value.
@@ -359,6 +376,8 @@ for the `['2018-01-01', '2018-12-31']` date range passed for the `OrderFacts.dat
 
 You can also pass a function instead of an SQL expression as a `filter()` argument.
 This way you can add BigQuery sharding filtering for events, which will reduce your billing cost.
+
+> **NOTE:** When you're passing function to the `filter()` function, params are passed as string parameters from driver and it's your responsibility to handle type conversions in this case.
 
 ```javascript
 cube(`Events`, {

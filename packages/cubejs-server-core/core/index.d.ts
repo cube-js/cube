@@ -7,6 +7,7 @@ import { NormalizedQuery as Query } from "@cubejs-backend/api-gateway";
 
 declare module "@cubejs-backend/server-core" {
   export function create(options?: CreateOptions): any;
+  export function version(): string;
 
   export interface CreateOptions {
     dbType?: DatabaseType | ((context: RequestContext) => DatabaseType);

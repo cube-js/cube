@@ -31,7 +31,7 @@ Cube.js takes great care to prevent unnecessary queries from hitting your databa
 
 So, Cube.js defines a `refreshKey` for each cube. [refreshKeys](cube#parameters-refresh-key) can be evaluated by Cube.js to assess if cube data has changed.
 
-__Note__: Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
+> **Note**: Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
 
 When a query's result needs to be refreshed, Cube.js will re-execute the query in the foreground and repopulate the cache.
 This means that cached results may still be served to users requesting them while `refreshKey` values aren't changed from Cube.js perspective.
@@ -57,8 +57,9 @@ You can set up a custom refresh check SQL by changing [refreshKey](cube#paramete
 
 In these instances, Cube.js needs a query crafted to detect updates to the rows that power the cubes. Often, a `MAX(updated_at_timestamp)` for OLTP data will accomplish this, or examining a metadata table for whatever system is managing the data to see when it last ran.
 
-Note that the result of `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default.
+> **Note:** The result of `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default.
 You can change it by passing [refreshKey every](cube#parameters-refresh-key) parameter.
+See [refreshKey every](cube#parameters-refresh-key) doc to learn more about the implementation.
 This cache is useful so that Cube.js can build query result cache keys without issuing database queries and respond to cached requests very quickly.
 
 ### Force Query Renewal

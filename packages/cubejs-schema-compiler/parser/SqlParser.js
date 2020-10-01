@@ -68,7 +68,7 @@ class SqlParser {
       }
       // eslint-disable-next-line no-underscore-dangle
       if (start >= this._size) {
-        return "";
+        return '';
       } else {
         return sql.slice(start, stop + 1);
       }

@@ -754,6 +754,32 @@ declare module '@cubejs-client/core' {
      * @param query - [Query object](query-format)
      */
     load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+    
+    /**
+     * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
+     * 
+     * ```js
+     * cubejsApi.subscribe(
+     *   {
+     *     measures: ['Logs.count'],
+     *     timeDimensions: [
+     *       {
+     *         dimension: 'Logs.time',
+     *         granularity: 'hour',
+     *         dateRange: 'last 1440 minutes',
+     *       },
+     *     ],
+     *   },
+     *   options,
+     *   (error, resultSet) => {
+     *     if (!error) {
+     *       // handle the update
+     *     }
+     *   }
+     * );
+     * ```
+     */
+    subscribe(query: Query | Query[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
 
     sql(query: Query | Query[], options?: LoadMethodOptions): Promise<SqlQuery>;
     /**

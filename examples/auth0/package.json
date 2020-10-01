@@ -1,0 +1,23 @@
+{
+  "name": "auth0",
+  "version": "0.0.1",
+  "author": {
+    "name": "Krystian Fras",
+    "email": "krystian@fras.me"
+  },
+  "private": false,
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/postgres-driver": "^0.19.54",
+    "@cubejs-backend/server": "^0.19.55",
+    "cookie-parser": "^1.4.5",
+    "express-jwt": "^6.0.0",
+    "express-session": "^1.17.1",
+    "jwks-rsa": "^1.8.1",
+    "nodemon": "^2.0.4"
+  }
+}

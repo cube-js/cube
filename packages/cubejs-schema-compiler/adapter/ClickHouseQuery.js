@@ -26,7 +26,6 @@ class ClickHouseFilter extends BaseFilter {
   }
 }
 
-
 class ClickHouseQuery extends BaseQuery {
   newFilter(filter) {
     return new ClickHouseFilter(this, filter);
@@ -35,7 +34,6 @@ class ClickHouseQuery extends BaseQuery {
   escapeColumnName(name) {
     return `\`${name}\``;
   }
-
 
   convertTz(field) {
     //
@@ -148,7 +146,6 @@ class ClickHouseQuery extends BaseQuery {
     return names.length ? ` GROUP BY ${names.join(', ')}` : '';
   }
 
-
   primaryKeyCount(cubeName, distinct) {
     const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
     if (distinct) {
@@ -157,7 +154,6 @@ class ClickHouseQuery extends BaseQuery {
       return `count(${primaryKeySql})`;
     }
   }
-
 
   seriesSql(timeDimension) {
     /*

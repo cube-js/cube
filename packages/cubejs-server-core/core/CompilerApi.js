@@ -14,6 +14,7 @@ class CompilerApi {
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.schemaVersion = this.options.schemaVersion;
     this.compileContext = options.compileContext;
+    this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
   }
 
   async getCompilers(options) {
@@ -24,7 +25,7 @@ class CompilerApi {
     ).toString();
     if (this.options.devServer) {
       const files = await this.repository.dataSchemaFiles();
-      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest("hex")}`;
+      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
@@ -34,7 +35,8 @@ class CompilerApi {
       // TODO check if saving this promise can produce memory leak?
       this.compilers = PrepareCompiler.compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
-        compileContext: this.compileContext
+        compileContext: this.compileContext,
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema
       });
       this.compilerVersion = compilerVersion;
     }

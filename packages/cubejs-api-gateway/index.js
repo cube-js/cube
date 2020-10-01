@@ -294,9 +294,10 @@ const normalizeQuery = (query) => {
     timezone,
     order: normalizeQueryOrder(query.order),
     filters: (query.filters || []).map(f => {
+      const { dimension, member, ...filter } = f;
       const normalizedFlter = {
-        ...f,
-        member: (f.dimension || f.member)
+        ...filter,
+        member: member || dimension
       };
 
       Object.defineProperty(normalizedFlter, "dimension", {

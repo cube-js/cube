@@ -1,6 +1,5 @@
 /* globals describe,test,expect */
 
-const moment = require('moment-timezone');
 const dateParser = require('./dateParser');
 
 describe(`dateParser`, () => {
@@ -45,17 +44,15 @@ describe(`dateParser`, () => {
   });
 
   test(`from 1 hour ago to now LA`, () => {
-    const date = new Date();
-    const from = moment().tz('America/Los_Angeles').subtract({
-      hours: 1,
-      minutes: date.getMinutes(),
-      seconds: date.getSeconds(),
-      milliseconds: date.getMilliseconds()
-    });
-    expect(dateParser('from 1 hour ago to now', 'America/Los_Angeles')).toStrictEqual(
+    // 'Z' stands for Zulu time, which is also GMT and UTC.
+    const now = '2020-09-22T13:03:20.518Z';
+    // LA is GMT-0700, 7 hours diff
+    const tz = 'America/Los_Angeles';
+
+    expect(dateParser('from 1 hour ago to now', tz, now)).toStrictEqual(
       [
-        from.format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
-        from.clone().add({ hours: 2 }).subtract({ milliseconds: 1 }).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)
+        '2020-09-22T05:00:00.000',
+        '2020-09-22T06:59:59.999'
       ]
     );
   });

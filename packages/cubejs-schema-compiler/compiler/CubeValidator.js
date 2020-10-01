@@ -1,13 +1,16 @@
 const Joi = require('@hapi/joi');
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
-const identifier = Joi.string().regex(/^[_a-zA-Z][_a-zA-Z0-9]*$/, 'identifier');
+
+const identifier = Joi.string().regex(identifierRegex, 'identifier');
 const timeInterval =
   Joi.alternatives([
     Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
     Joi.any().valid('unbounded')
   ]);
 const everyInterval = Joi.string().regex(/^(\d+) (second|minute|hour|day|week)s?$/, 'refresh time interval');
+const everyCronInterval = Joi.string();
+const everyCronTimeZone = Joi.string();
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
@@ -69,11 +72,13 @@ const BasePreAggregationWithoutPartitionGranularity = {
       sql: Joi.func().required()
     }),
     Joi.object().keys({
-      every: everyInterval,
+      every: Joi.alternatives().try(everyInterval, everyCronInterval),
+      timezone: everyCronTimeZone,
       incremental: Joi.boolean(),
       updateWindow: timeInterval
     })
   ),
+  sqlAlias: Joi.string().optional(),
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   scheduledRefresh: Joi.boolean(),
@@ -109,7 +114,8 @@ const cubeSchema = Joi.object().keys({
       immutable: Joi.boolean().required()
     }),
     Joi.object().keys({
-      every: everyInterval
+      every: Joi.alternatives().try(everyInterval, everyCronInterval),
+      timezone: everyCronTimeZone,
     })
   ),
   fileName: Joi.string().required(),
@@ -190,7 +196,7 @@ const cubeSchema = Joi.object().keys({
   preAggregations: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('autoRollup').required(),
-      maxPreAggregations: Joi.number()
+      maxPreAggregations: Joi.number(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),

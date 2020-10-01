@@ -1,0 +1,14 @@
+{
+  "name": "real-time-dashboard",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-dev-server",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/postgres-driver": "^0.19.20",
+    "@cubejs-backend/server": "^0.19.21",
+    "serve-static": "^1.14.1"
+  }
+}

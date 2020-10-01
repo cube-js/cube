@@ -113,6 +113,33 @@ query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object](qu
 options? | [LoadMethodOptions](#types-load-method-options) | - |
 callback? | [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)› | - |
 
+### subscribe
+
+>  **subscribe**(**query**: [Query](#types-query) | [Query](#types-query)[], **options**: [LoadMethodOptions](#types-load-method-options) | null, **callback**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
+
+Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
+
+```js
+cubejsApi.subscribe(
+  {
+    measures: ['Logs.count'],
+    timeDimensions: [
+      {
+        dimension: 'Logs.time',
+        granularity: 'hour',
+        dateRange: 'last 1440 minutes',
+      },
+    ],
+  },
+  options,
+  (error, resultSet) => {
+    if (!error) {
+      // handle the update
+    }
+  }
+);
+```
+
 ## HttpTransport
 
 Default transport implementation.

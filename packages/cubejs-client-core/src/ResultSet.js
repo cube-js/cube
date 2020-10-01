@@ -103,8 +103,9 @@ class ResultSet {
     normalizedPivotConfig.x.forEach((member, currentIndex) => values.push([member, xValues[currentIndex]]));
     normalizedPivotConfig.y.forEach((member, currentIndex) => values.push([member, yValues[currentIndex]]));
 
+    const { filters: parentFilters = [] } = this.query();
     const { measures } = this.loadResponses[0].annotation;
-    let [, measureName] = values.find(([member]) => member === 'measues') || [];
+    let [, measureName] = values.find(([member]) => member === 'measures') || [];
 
     if (measureName === undefined) {
       [measureName] = Object.keys(measures);
@@ -114,10 +115,13 @@ class ResultSet {
       return null;
     }
 
-    const filters = [{
-      member: measureName,
-      operator: 'measureFilter',
-    }];
+    const filters = [
+      {
+        member: measureName,
+        operator: 'measureFilter',
+      },
+      ...parentFilters
+    ];
     const timeDimensions = [];
 
     values.filter(([member]) => member !== 'measures')

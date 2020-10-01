@@ -1,6 +1,7 @@
 /* globals describe, before, after, it */
 const { GenericContainer } = require("testcontainers");
 const ClickHouseDriver = require('../driver/ClickHouseDriver');
+
 require('should');
 
 describe('ClickHouseDriver', () => {
@@ -17,22 +18,24 @@ describe('ClickHouseDriver', () => {
     }
   };
 
-  before(async function before() {
-    this.timeout(20000);
+  before(async function () {
+    this.timeout(20 * 1000);
 
-    if (!process.env.TEST_CLICKHOUSE_HOST) {
-      container = await new GenericContainer("yandex/clickhouse-server")
-        .withExposedPorts(8123)
-        .start();
-    }
+    const version = process.env.TEST_CLICKHOUSE_VERSION || 'latest';
+
+    container = await new GenericContainer('yandex/clickhouse-server', version)
+      .withExposedPorts(8123)
+      .start();
 
     config = {
       host: 'localhost',
-      port: process.env.TEST_CLICKHOUSE_HOST ? 8123 : container.getMappedPort(8123),
+      port: container.getMappedPort(8123),
     };
   });
 
-  after(async () => {
+  after(async function () {
+    this.timeout(10 * 1000);
+
     if (container) {
       await container.stop();
     }
@@ -192,7 +195,7 @@ describe('ClickHouseDriver', () => {
         const values = await driver.query(`SELECT * FROM ${name}.a LEFT OUTER JOIN ${name}.b ON a.x = b.x`);
         values.should.deepEqual([
           {
-            x: '1', s: 'str1', 'b.x': '0', 'b.s': null
+            x: '1', s: 'str1', 'b.x': null, 'b.s': null
           },
           {
             x: '2', s: 'str2', 'b.x': '2', 'b.s': 'str2'
