@@ -41,9 +41,11 @@ export default () => {
         },
       ];
       result.tablePivot().map((item) => {
-        temp[0].data.push(parseInt(item['AllSales.onlineRevenuePercentage']));
-        temp[1].data.push(parseInt(item['AllSales.offlineRevenuePercentage']));
-        temp[2].data.push(parseInt(item['AllSales.commonPercentage']));
+        temp[0].data.push(parseFloat(item['AllSales.onlineRevenuePercentage']));
+        temp[1].data.push(
+          parseFloat(item['AllSales.offlineRevenuePercentage'])
+        );
+        temp[2].data.push(parseFloat(item['AllSales.commonPercentage']));
       });
       setData(temp);
     }

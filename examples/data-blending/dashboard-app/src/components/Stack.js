@@ -52,6 +52,7 @@ const staticOptions = {
 export default ({ title, data }) => {
   const [options, setOptions] = useState({});
   useEffect(() => {
+    console.log(data);
     setOptions({
       ...staticOptions,
       title: {

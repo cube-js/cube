@@ -44,7 +44,7 @@ export default () => {
         },
       ];
       resultSet.tablePivot().map((item) => {
-        temp[0].data.push(parseInt(item['Orders.count']) * Math.random());
+        temp[0].data.push(parseInt(item['Orders.count']));
         temp[1].data.push(parseInt(item['OrdersOffline.count']));
         temp[2].data.push(
           parseInt(item['Orders.count']) + parseInt(item['OrdersOffline.count'])

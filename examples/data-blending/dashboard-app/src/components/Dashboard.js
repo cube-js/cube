@@ -3,8 +3,6 @@ import { Row, Col } from 'antd';
 import SchemaCube from './SchemaCube';
 import Query from './Query';
 
-import QueryOneTable from './QueryOneTable';
-
 export default () => {
   return (
     <React.Fragment>
@@ -17,13 +15,6 @@ export default () => {
         <Col sm={24} lg={12}>
           <div className='dashboard__cell'>
             <SchemaCube />
-          </div>
-        </Col>
-      </Row>
-      <Row gutter={20} className='dashboard__row'>
-        <Col sm={24} lg={12}>
-          <div className='dashboard__cell'>
-            <QueryOneTable />
           </div>
         </Col>
       </Row>
