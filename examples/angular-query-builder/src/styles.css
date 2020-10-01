@@ -37,6 +37,10 @@ body {
   width: auto !important;
 }
 
+.filter-input .mat-form-field-infix {
+  padding-top: 0.1em !important;
+}
+
 .filters-container .selected-member-container .mat-form-field {
   width: 100%;
 }
