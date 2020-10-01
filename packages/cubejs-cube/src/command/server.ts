@@ -105,6 +105,8 @@ export class ServerCommand implements CommandInterface {
   }
 
   public async execute() {
+    process.env.NODE_ENV = 'production';
+
     const configuration = this.lookupConfiguration();
     this.runServerInstance(configuration);
   }

@@ -1,6 +1,7 @@
 import commander from 'commander';
 import { ServerCommand } from '../command/server';
 import { DiagnosticCommand } from '../command/diagnostic';
+import { DevServerCommand } from '../command/dev-server';
 
 commander.name('cube')
   .version('0.0.1');
@@ -15,6 +16,7 @@ commander
 
 const commands = [
   new ServerCommand(),
+  new DevServerCommand(),
   new DiagnosticCommand(),
 ];
 
