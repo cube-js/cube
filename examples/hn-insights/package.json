@@ -13,7 +13,7 @@
     "@cubejs-backend/serverless-aws": "^0.9.2",
     "aws-sdk": "^2.441.0",
     "humps": "^2.0.1",
-    "node-fetch": "^2.5.0",
+    "node-fetch": "^2.6.1",
     "promise-limit": "^2.7.0",
     "promise-retry": "^1.1.1",
     "ramda": "^0.26.1",
