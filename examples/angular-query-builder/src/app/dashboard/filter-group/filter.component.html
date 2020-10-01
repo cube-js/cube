@@ -1,6 +1,6 @@
 <div *ngIf="member" class="flex-box filter-member-container">
   <div class="selected-member-container" style="min-width: 200px;">
-    <mat-form-field>
+    <mat-form-field appearance="fill">
       <mat-label>Filter</mat-label>
       <mat-select
         [value]="member.name"
@@ -16,6 +16,7 @@
       mat-button
       mat-icon-button
       color="warn"
+      style="top: -9px;"
       (click)="onRemove.emit(member.name)"
     >
       <mat-icon>delete_forever</mat-icon>
@@ -37,7 +38,7 @@
     </mat-select>
   </mat-form-field>
 
-  <mat-form-field apperance="fill" class="filter-input">
+  <mat-form-field appearance="fill" class="filter-input">
     <mat-label>Filter value</mat-label>
     <input
       matInput

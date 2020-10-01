@@ -1,8 +1,9 @@
 .filter-member-container {
   padding-bottom: 12px;
+  display: flex;
+  align-items: center;
 }
 
 .filter-input {
   width: 200px;
-  line-height: 1.8;
 }

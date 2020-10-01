@@ -3,7 +3,7 @@
     class="selected-member-container auto-width"
     *ngFor="let member of members"
   >
-    <mat-form-field>
+    <mat-form-field appearance="fill">
       <mat-label>{{ title }}</mat-label>
       <mat-select
         [value]="member.name"
