@@ -6,13 +6,13 @@
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-playground"
   },
+  "main": "./dist/PlaygroundQueryBuilder.js",
   "dependencies": {
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
     "@babel/generator": "^7.4.0",
     "@babel/parser": "^7.4.2",
-    "@babel/preset-env": "^7.3.4",
-    "@babel/preset-react": "^7.0.0",
+    "@babel/preset-env": "^7.11.5",
     "@babel/standalone": "^7.3.4",
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
@@ -53,7 +53,8 @@
     "start": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
     "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
     "eject": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-scripts eject",
-    "lint": "eslint src/*.js src/*.jsx"
+    "lint": "eslint src/*.js src/*.jsx",
+    "transpline": "babel src -d dist --copy-files"
   },
   "browserslist": [
     ">0.2%",
@@ -64,12 +65,23 @@
   "files": [
     "src",
     "public",
-    "build"
+    "build",
+    "dist"
   ],
   "homepage": ".",
   "proxy": "http://localhost:4000",
   "license": "MIT",
+  "peerDependencies": {
+    "antd": "^4.2.0",
+    "@cubejs-client/core": "^0.20.11",
+    "@cubejs-client/react": "^0.20.11",
+    "react": "^16.8.3",
+    "react-dom": "^16.8.3"
+  },
   "devDependencies": {
+    "@babel/cli": "^7.5.5",
+    "@babel/plugin-proposal-optional-chaining": "^7.11.0",
+    "@babel/preset-react": "^7.0.0",
     "@types/react": "^16.9.35",
     "@types/react-beautiful-dnd": "^13.0.0",
     "eslint-config-airbnb": "^18.1.0",

@@ -78,7 +78,7 @@ export default function PlaygroundQueryBuilder({
         if (resultSet) {
           const { timeDimensions = [] } =
             resultSet.pivotQuery() || resultSet.query() || {};
-          parsedDateRange = timeDimensions[0]?.dateRange;
+          parsedDateRange = timeDimensions[0] ? timeDimensions[0].dateRange : null;
         }
 
         return (
