@@ -10,9 +10,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTableModule } from '@angular/material/table';
+import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { DragDropModule } from '@angular/cdk/drag-drop';
-import { MatSnackBarModule  } from '@angular/material/snack-bar';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { CubejsClientModule, QueryBuilderService } from '@cubejs-client/ngx';
@@ -26,7 +27,10 @@ import { TimeGroupComponent } from './dashboard/time-group/time-group.component'
 import { OrderComponent } from './dashboard/order/order.component';
 import { PivotComponent } from './dashboard/pivot/pivot.component';
 import { SettingsDialogComponent } from './settings-dialog/settings-dialog.component';
-import { FilterGroupComponent, FilterComponent } from './dashboard/filter-group/filter-group.component';
+import {
+  FilterGroupComponent,
+  FilterComponent,
+} from './dashboard/filter-group/filter-group.component';
 
 const cubejsOptions = {
   token: 'environment.CUBEJS_API_TOKEN',
@@ -46,11 +50,9 @@ const cubejsOptions = {
     PivotComponent,
     SettingsDialogComponent,
     FilterGroupComponent,
-    FilterComponent
+    FilterComponent,
   ],
-  entryComponents: [
-    SettingsDialogComponent
-  ],
+  entryComponents: [SettingsDialogComponent],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
@@ -69,7 +71,8 @@ const cubejsOptions = {
     MatInputModule,
     MatCheckboxModule,
     MatDialogModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    ReactiveFormsModule
   ],
   providers: [QueryBuilderService],
   bootstrap: [AppComponent],

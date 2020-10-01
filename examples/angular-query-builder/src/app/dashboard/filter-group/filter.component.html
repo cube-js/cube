@@ -1,6 +1,7 @@
 <div *ngIf="member" class="flex-box filter-member-container">
-  <div class="selected-member-container auto-width">
+  <div class="selected-member-container" style="min-width: 200px;">
     <mat-form-field>
+      <mat-label>Filter</mat-label>
       <mat-select
         [value]="member.name"
         (selectionChange)="selectMember.emit($event)"
@@ -37,11 +38,13 @@
   </mat-form-field>
 
   <mat-form-field apperance="fill" style="width: 200px;">
+    <mat-label>Filter value</mat-label>
     <input
       matInput
       type="string"
-      [value]="(member.values && member.values[0]) || ''"
-      (blur)="onValueChange.emit($event.target.value)"
+      required
+      [formControl]="filterValue"
     />
+    <mat-error *ngIf="filterValue.invalid">Filter value is requred</mat-error>
   </mat-form-field>
 </div>

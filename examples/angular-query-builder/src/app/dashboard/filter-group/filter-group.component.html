@@ -1,21 +1,23 @@
-<filter
-  *ngFor="let member of members"
-  [member]="member"
-  [allMembers]="allMembers"
-  (selectMember)="filters.replace(member.name, $event.value)"
-  (onOperatorSelect)="filters.update(member.name, { operator: $event })"
-  (onValueChange)="filters.update(member.name, { values: [$event] })"
-  (onRemove)="filters.remove($event)"
-></filter>
+<div class="filters-container">
+  <filter
+    *ngFor="let member of members; trackBy: trackByMethod"
+    [member]="member"
+    [allMembers]="allMembers"
+    (selectMember)="filters.replace(member.name, $event.value)"
+    (onOperatorSelect)="filters.update(member.name, { operator: $event })"
+    (valueChanges)="filters.update(member.name, { values: [$event] })"
+    (onRemove)="filters.remove($event)"
+  ></filter>
 
-<filter
-  [member]="currentFilter.getValue()"
-  [allMembers]="allMembers"
-  (selectMember)="selectMember($event)"
-  (onOperatorSelect)="handleOperatorChange($event)"
-  (onValueChange)="handleValueChange($event)"
-  (onRemove)="currentFilter.next(null)"
-></filter>
+  <filter
+    [member]="currentFilter.getValue()"
+    [allMembers]="allMembers"
+    (selectMember)="selectMember($event)"
+    (onOperatorSelect)="handleOperatorChange($event)"
+    (valueChanges)="handleValueChange($event)"
+    (onRemove)="currentFilter.next(null)"
+  ></filter>
+</div>
 
 <mat-form-field appearance="fill">
   <span matPrefix><mat-icon>add</mat-icon></span>

@@ -1,6 +1,6 @@
 <div *ngIf="query">
   <div class="controls-container">
-    <div class="controls-row">
+    <div class="controls-row no-padding-controls">
       <members-group
         title="Measure"
         [members]="query.measures.asArray()"
@@ -47,7 +47,7 @@
       ></filter-group>
     </div>
 
-    <div class="controls-row">
+    <div class="controls-row no-padding-controls">
       <mat-form-field appearance="fill">
         <mat-icon matPrefix style="margin-right: 8px;">{{
           chartTypeMap[queryBuilder.chartType.get()] || 'multiline_chart'

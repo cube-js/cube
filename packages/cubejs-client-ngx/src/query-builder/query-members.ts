@@ -232,7 +232,7 @@ export class FilterMember {
 
   update(by: string | number, updateWith: Partial<Filter>) {
     const filters = this.filters.map((filter, index) => {
-      if (index === by || filter.dimension === by) {
+      if (index === by || filter.member === by || filter.dimension === by) {
         return {
           ...filter,
           ...updateWith,
@@ -287,14 +287,14 @@ export class FilterMember {
   asArray(): any[] {
     return this.filters.map((filter) => {
       return {
-        ...this.query.meta.resolveMember(filter.dimension, [
+        ...this.query.meta.resolveMember(filter.member || filter.dimension, [
           'dimensions',
           'measures',
         ]),
-        operators: this.query.meta.filterOperatorsForMember(filter.dimension, [
-          'dimensions',
-          'measures',
-        ]),
+        operators: this.query.meta.filterOperatorsForMember(
+          filter.member || filter.dimension,
+          ['dimensions', 'measures']
+        ),
         ...filter,
       };
     });

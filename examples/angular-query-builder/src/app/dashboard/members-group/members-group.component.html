@@ -4,6 +4,7 @@
     *ngFor="let member of members"
   >
     <mat-form-field>
+      <mat-label>{{ title }}</mat-label>
       <mat-select
         [value]="member.name"
         (selectionChange)="_onReplace(member.name, $event.value)"
