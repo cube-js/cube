@@ -95,6 +95,21 @@ class MssqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
+  overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
+    const forGroupBy = this.timeDimensions.map(
+      (t) => `${t.dateSeriesAliasName() + '.' + this.escapeColumnName('date_from')}`
+    );
+    const forSelect = this.dateSeriesSelect()
+      .concat(this.dimensions.concat(cumulativeMeasures).map((s) => s.cumulativeSelectColumns()))
+      .filter((c) => !!c)
+      .join(', ');
+    return (
+      `SELECT ${forSelect} FROM ${dateSeriesSql}` +
+      ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
+      ` GROUP BY ${forGroupBy}`
+    );
+  }
+
   nowTimestampSql() {
     return `CURRENT_TIMESTAMP`;
   }
@@ -110,6 +125,13 @@ class MssqlQuery extends BaseQuery {
 
   wrapSegmentForDimensionSelect(sql) {
     return `CAST((CASE WHEN ${sql} THEN 1 ELSE 0 END) AS BIT)`;
+  }
+
+  seriesSql(timeDimension) {
+    const values = timeDimension.timeSeries().map(([from, to]) => `('${from}', '${to}')`);
+    return `SELECT ${this.dateTimeCast('date_from')} date_from, ${this.dateTimeCast(
+      'date_to'
+    )} date_to FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 }
 
