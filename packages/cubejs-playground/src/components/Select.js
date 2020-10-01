@@ -7,12 +7,22 @@ const StyledSelect = styled(AntdSelect)`
     &.ant-select-single {
       .ant-select-selector {
         padding: 5px 12px;
+        
+        .ant-select-selection-placeholder {
+        line-height: 22px;
+        }
       }
     }
+    
     &.ant-select-multiple {
       .ant-select-selector {
-        padding: 2px 12px;      
-      }    
+        padding: 3px 12px;      
+      }
+      
+      .ant-select-selection-item {
+        margin-top: 0;
+        margin-bottom: 0;
+      }
     }
     
     .ant-select-selection-item {
