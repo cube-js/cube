@@ -33,7 +33,7 @@ export class DevServerCommand extends ServerCommand {
   public async execute() {
     process.env.NODE_ENV = 'development';
 
-    const configuration = this.lookupConfiguration();
+    const configuration = await this.lookupConfiguration();
     this.runServerInstance(configuration);
   }
 }

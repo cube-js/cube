@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import * as ts from 'typescript';
-import { ModuleKind, FormatDiagnosticsHost } from 'typescript';
+import { FormatDiagnosticsHost, ModuleKind, ModuleResolutionKind } from 'typescript';
 
 import CubejsServer, { CreateOptions } from '@cubejs-backend/server';
 import { CommandInterface } from './command.interface';
@@ -31,14 +31,17 @@ export class ServerCommand implements CommandInterface {
 
   protected compileConfiguration = () => {
     const options: ts.CompilerOptions = {
-      target: ts.ScriptTarget.ES2015,
+      target: ts.ScriptTarget.ES2017,
       module: ModuleKind.CommonJS,
       jsx: ts.JsxEmit.None,
       lib: [
+        'lib.es2017.d.ts',
       ],
       types: [
         '@types/node'
-      ]
+      ],
+      esModuleInterop: true,
+      moduleResolution: ModuleResolutionKind.NodeJs,
     };
 
     const files = [
@@ -76,7 +79,7 @@ export class ServerCommand implements CommandInterface {
   }
 
   // eslint-disable-next-line consistent-return
-  protected lookupConfiguration(): CreateOptions {
+  protected async lookupConfiguration(): Promise<CreateOptions> {
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
       this.compileConfiguration();
     }
@@ -90,9 +93,8 @@ export class ServerCommand implements CommandInterface {
   }
 
   // eslint-disable-next-line consistent-return
-  protected loadConfiguration(): CreateOptions {
-    // eslint-disable-next-line global-require,import/no-dynamic-require
-    const file = require(
+  protected async loadConfiguration(): Promise<CreateOptions> {
+    const file = await import(
       path.join(process.cwd(), 'cube.js')
     );
 
@@ -107,7 +109,7 @@ export class ServerCommand implements CommandInterface {
   public async execute() {
     process.env.NODE_ENV = 'production';
 
-    const configuration = this.lookupConfiguration();
+    const configuration = await this.lookupConfiguration();
     this.runServerInstance(configuration);
   }
 }
