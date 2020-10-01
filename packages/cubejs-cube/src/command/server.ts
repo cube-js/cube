@@ -35,11 +35,9 @@ export class ServerCommand implements CommandInterface {
       module: ModuleKind.CommonJS,
       jsx: ts.JsxEmit.None,
       lib: [
-        'lib.es2017.d.ts',
+        'lib.es2017.full.d.ts',
       ],
-      types: [
-        '@types/node'
-      ],
+      rootDir: '/cube',
       esModuleInterop: true,
       moduleResolution: ModuleResolutionKind.NodeJs,
     };
@@ -97,6 +95,8 @@ export class ServerCommand implements CommandInterface {
     const file = await import(
       path.join(process.cwd(), 'cube.js')
     );
+
+    console.log(file);
 
     if (file.default) {
       return file.default;

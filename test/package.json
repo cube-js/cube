@@ -1,0 +1,24 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.0.3"
+  },
+  "dependencies": {
+    "@cubejs-backend/config": "^0.20.11"
+  }
+}
+
+// @cubejs/cube -> cubejs-backend/server -> server-core -> compiler/query -> [******]
+// @cubejs/docker -> @cubejs/cube + all drivers
+// @cubejs/config ->
+
+// @cubejs/cube + mysql-driver (d.ts?) навсякий случай проверить
+
+// research!
+// /cube
+// /cube/node_modules
+// /cube/conf
+// /cube/conf/node_modules

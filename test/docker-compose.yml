@@ -1,0 +1,34 @@
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    depends_on:
+      - redis
+    links:
+      - redis
+    ports:
+      - 4000
+    volumes:
+      - .:/cube
+    # Enable for production?
+    #entrypoint: cube server
+    # enabled by default
+    # entrypoint cube dev-server
+    entrypoint: tail -F anything
+
+  router:
+    image: mycompany:latest
+    depends_on:
+      - redis
+    links:
+      - redis
+    ports:
+      - 4000
+    volumes:
+      - .:/cube
+    entrypoint: cube dev-server
+
+  redis:
+    image: redis:5.0
+    restart: always
