@@ -1,0 +1,91 @@
+<div *ngIf="query">
+  <div class="controls-container">
+    <div class="controls-row no-padding-controls">
+      <members-group
+        title="Measure"
+        [members]="query.measures.asArray()"
+        [allMembers]="builderMeta.measures.slice()"
+        (onSelect)="query.measures.add($event)"
+        (onReplace)="query.measures.replace($event.name, $event.replaceWithName)"
+        (onMemberClick)="query.measures.remove($event)"
+      ></members-group>
+
+      <mat-divider [vertical]="true"></mat-divider>
+
+      <members-group
+        title="Dimension"
+        [members]="query.dimensions.asArray()"
+        [allMembers]="builderMeta.dimensions.slice()"
+        (onSelect)="query.dimensions.add($event)"
+        (onReplace)="query.dimensions.replace($event.name, $event.replaceWithName)"
+        (onMemberClick)="query.dimensions.remove($event)"
+      ></members-group>
+
+      <mat-divider [vertical]="true"></mat-divider>
+
+      <members-group
+        title="Segment"
+        [members]="query.segments.asArray()"
+        [allMembers]="builderMeta.segments.slice()"
+        (onSelect)="query.segments.add($event)"
+        (onReplace)="query.dimensions.replace($event.name, $event.replaceWithName)"
+        (onMemberClick)="query.segments.remove($event)"
+      ></members-group>
+
+      <time-group
+        [timeDimensionMember]="query.timeDimensions"
+        [members]="timeDimensionMembers"
+        [allMembers]="builderMeta.timeDimensions.slice()"
+      ></time-group>
+    </div>
+
+    <div class="controls-row">
+      <filter-group
+        [filters]="query.filters"
+        [members]="filterMembers"
+        [allMembers]="builderMeta.filters"
+      ></filter-group>
+    </div>
+
+    <div class="controls-row no-padding-controls">
+      <mat-form-field appearance="fill">
+        <mat-icon matPrefix style="margin-right: 8px;">{{
+          chartTypeMap[queryBuilder.chartType.get()] || 'multiline_chart'
+        }}</mat-icon>
+
+        <mat-label>Chart Type</mat-label>
+        <mat-select
+          [value]="queryBuilder.chartType.get()"
+          [disabled]="!query.isPresent()"
+          (selectionChange)="queryBuilder.chartType.set($event.value)"
+        >
+          <mat-select-trigger *ngIf="queryBuilder.chartType" matPrefix>
+            {{ queryBuilder.chartType.get() | titlecase }}
+          </mat-select-trigger>
+
+          <mat-option
+            *ngFor="let item of chartTypeToIcon"
+            [value]="item.chartType"
+          >
+            <span matPrefix>
+              <mat-icon>{{ item.icon }}</mat-icon>
+            </span>
+            {{ item.chartType | titlecase }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button
+        mat-button
+        mat-raised-button
+        [disabled]="!query.isPresent() || !queryBuilder.pivotConfig.get()"
+        (click)="openDialog()"
+      >
+        <mat-icon>settings</mat-icon>
+        Settings
+      </button>
+    </div>
+  </div>
+
+  <query-renderer [queryBuilder]="queryBuilder"></query-renderer>
+</div>

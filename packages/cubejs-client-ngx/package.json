@@ -1,6 +1,7 @@
 {
   "name": "@cubejs-client/ngx",
   "version": "0.20.11",
+  "author": "Cube Dev, Inc.",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,15 +14,21 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@cubejs-client/core": "^0.20.11",
     "tslib": "^2.0.0"
   },
   "peerDependencies": {
+    "@cubejs-client/core": "^0.20.3",
     "@angular/core": "^10.0.5",
+    "fast-deep-equal": "^3.1.3",
     "rxjs": "^6.6.0"
   },
+  "watch": {
+    "dev:publish": "dist/*"
+  },
   "scripts": {
-    "build": "yarn ng build && rm dist/package.json"
+    "build": "yarn ng build && rm dist/package.json",
+    "watch": "yarn ng build --watch && rm dist/package.json",
+    "dev": "yarn build && yalc publish --push"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.1000.3",
@@ -31,6 +38,7 @@
     "@angular/compiler-cli": "^10.0.5",
     "@angular/core": "^10.0.5",
     "ng-packagr": "^10.0.3",
+    "npm-watch": "^0.7.0",
     "tsickle": "^0.39.1",
     "typescript": "^3.9.7"
   },
@@ -38,12 +46,19 @@
     "access": "public"
   },
   "module": "dist/fesm5/cubejs-client-ngx.js",
+  "es2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/cubejs-client-ngx.js",
   "es2015": "dist/fesm2015/cubejs-client-ngx.js",
   "esm5": "dist/esm5/cubejs-client-ngx.js",
   "esm2015": "dist/esm2015/cubejs-client-ngx.js",
   "fesm5": "dist/fesm5/cubejs-client-ngx.js",
+  "fesm2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/cubejs-client-ngx.js",
   "fesm2015": "dist/fesm2015/cubejs-client-ngx.js",
   "typings": "dist/cubejs-client-ngx.d.ts",
   "metadata": "dist/cubejs-client-ngx.metadata.json",
-  "sideEffects": false
+  "sideEffects": false,
+  "__processed_by_ivy_ngcc__": {
+    "es2015": "10.1.0",
+    "fesm2015": "10.1.0",
+    "typings": "10.1.0"
+  }
 }

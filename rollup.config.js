@@ -53,7 +53,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       }),
       alias({
         entries: {
-          '@cubejs-client/core': '../cubejs-client-core/src/index.js',
+          '@cubejs-client/core': '../cubejs-client-core/src/index.js'
         },
       }),
     ],

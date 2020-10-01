@@ -1,0 +1,19 @@
+.debug {
+  padding: 20px;
+  margin: 24px 0;
+  border-radius: 2px;
+  white-space: nowrap;
+  background-color: azure;
+  white-space: pre-line;
+}
+
+.controls-container {
+  display: grid;
+  gap: 16px;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}

@@ -1,0 +1,27 @@
+.container {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.axis {
+  padding: 8px 16px;
+}
+
+.axis-name {
+  font-weight: 600;
+  text-align: center;
+}
+
+.drag-item {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+}
+
+.cdk-drag-placeholder {
+  opacity: 0;
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}

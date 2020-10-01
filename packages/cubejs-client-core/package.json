@@ -23,7 +23,8 @@
   "scripts": {
     "test": "npm run unit",
     "unit": "jest",
-    "lint": "eslint src/*.js"
+    "lint": "eslint src/*.js",
+    "lint:fix": "eslint --fix src/*.js"
   },
   "files": [
     "src",
