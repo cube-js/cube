@@ -802,6 +802,18 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
+"@cubejs-backend/linter@^0.20.11":
+  version "0.20.11"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.20.11.tgz#951b96f18b6d648fd4e3731bdd1e587e279b6a0e"
+  integrity sha512-4qRUEiyG7qSzmZ//gDIbbM9FwIJSL6WwnCUEjrpTuQmdEVl/S92tFFYHJ8O6gozXOy21CkSQea/3AUXqILzXuQ==
+  dependencies:
+    "@typescript-eslint/eslint-plugin" "^4.1.1"
+    "@typescript-eslint/parser" "^4.1.1"
+    eslint "^7.9.0"
+    eslint-config-airbnb-base "^14.2.0"
+    eslint-plugin-import "^2.22.0"
+    eslint-plugin-node "^6.0.1"
+
 "@cubejs-backend/query-orchestrator@^0.20.0":
   version "0.20.9"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.20.9.tgz#ad8080eef53c58fc4dfb90cd2586751712d0e983"
@@ -811,10 +823,10 @@
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.20.7":
-  version "0.20.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.20.9.tgz#9120fb3dab27d17467da179aa2d7053459ae7d4e"
-  integrity sha512-mlkiQpwduXv2OaAMpvj4gZ/16iwrm2Stq2K4/gPVfIdGL1TBN+s/0D8l8TzPrH2GH83E1XEzwhyiWJ7wJplTzQ==
+"@cubejs-backend/schema-compiler@^0.20.11":
+  version "0.20.11"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.20.11.tgz#1867eb266995d3ebf3ef2f6bd2f04d7f841d748b"
+  integrity sha512-aAqJYYh0eW1KtxTQmXPS5g/POxZtmsq259wcZxzxLFNLSkilaWxS7VdGHjb7FBPDlIvEn7+uR7nx9q7Yt2QjIA==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -833,16 +845,6 @@
     node-dijkstra "^2.5.0"
     ramda "^0.27.0"
     syntax-error "^1.3.0"
-
-"@cubejs/linter@file:../cubejs-linter":
-  version "0.20.6"
-  dependencies:
-    "@typescript-eslint/eslint-plugin" "^4.1.1"
-    "@typescript-eslint/parser" "^4.1.1"
-    eslint "^7.9.0"
-    eslint-config-airbnb-base "^14.2.0"
-    eslint-plugin-import "^2.22.0"
-    eslint-plugin-node "^6.0.1"
 
 "@eslint/eslintrc@^0.1.3":
   version "0.1.3"
@@ -3155,10 +3157,10 @@ tar-stream@^2.0.0:
     inherits "^2.0.3"
     readable-stream "^3.1.1"
 
-testcontainers@^3.4.11:
-  version "3.5.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-3.5.0.tgz#da8a3fa53f1c6d106ccff7e0f71bf86d358c2589"
-  integrity sha512-iigGuzBDzOmTFlxfaTo1JO7EGMs4Dgf+XHd98XeEwp8J+WzOdkJfsSL5A8fdLSGQA5GvVAdxLcUfT4a32z4rbg==
+testcontainers@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.2.0.tgz#a5444920494bba58550d45b6abe5341a2ab501a7"
+  integrity sha512-4a8BgCHgqSdWqJZE1YKLRXrzbIBpSAf9il3IMtDBJLPWqJUgff4K9A3TZ17b/NQngSAMmxW4vTqnL2nj0r2IrA==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"

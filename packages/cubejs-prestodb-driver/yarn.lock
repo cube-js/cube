@@ -1965,9 +1965,9 @@ tar-stream@^2.0.0:
     readable-stream "^3.1.1"
 
 testcontainers@^4.0.9:
-  version "4.0.9"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.0.9.tgz#36164f082991b7cd1be5d8407d14a9c1aa006cae"
-  integrity sha512-Nxu7BSXGYWukHMN+E8bRUQ5v2Ag/e7RhZIobtvKA5NcqMXaPRWaSanCJBD+iLiE6qyMsDRQ+GAh98xcivOIzRA==
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.2.0.tgz#a5444920494bba58550d45b6abe5341a2ab501a7"
+  integrity sha512-4a8BgCHgqSdWqJZE1YKLRXrzbIBpSAf9il3IMtDBJLPWqJUgff4K9A3TZ17b/NQngSAMmxW4vTqnL2nj0r2IrA==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
