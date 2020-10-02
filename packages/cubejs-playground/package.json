@@ -70,13 +70,6 @@
   "homepage": ".",
   "proxy": "http://localhost:4000",
   "license": "MIT",
-  "peerDependencies": {
-    "antd": "^4.2.0",
-    "@cubejs-client/core": "^0.20.11",
-    "@cubejs-client/react": "^0.20.11",
-    "react": "^16.8.3",
-    "react-dom": "^16.8.3"
-  },
   "devDependencies": {
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
