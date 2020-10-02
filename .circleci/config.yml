@@ -138,14 +138,6 @@ workflows:
     jobs:
       - test
       - build
-  publish:
-    jobs:
-      - publish:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v.*$/
   guides:
     jobs:
       - react_dashboard_guide
