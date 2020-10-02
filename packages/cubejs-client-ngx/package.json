@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.20.11",
+  "version": "0.20.12",
   "author": "Cube Dev, Inc.",
   "repository": {
     "type": "git",
@@ -17,8 +17,8 @@
     "tslib": "^2.0.0"
   },
   "peerDependencies": {
-    "@cubejs-client/core": "^0.20.3",
     "@angular/core": "^10.0.5",
+    "@cubejs-client/core": "^0.20.3",
     "fast-deep-equal": "^3.1.3",
     "rxjs": "^6.6.0"
   },
