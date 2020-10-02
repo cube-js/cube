@@ -6,7 +6,6 @@
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-playground"
   },
-  "main": "./dist/PlaygroundQueryBuilder.js",
   "dependencies": {
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
@@ -54,7 +53,7 @@
     "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
     "eject": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-scripts eject",
     "lint": "eslint src/*.js src/*.jsx",
-    "transpline": "babel src -d dist --copy-files"
+    "prepublish": "babel src -d dist --copy-files"
   },
   "browserslist": [
     ">0.2%",
