@@ -45,7 +45,7 @@
     "react-source-render": "4.0.0-1",
     "recharts": "^1.7.1",
     "sql-formatter": "^2.3.2",
-    "styled-components": "^4.4.1",
+    "styled-components": "^5.2.0",
     "uuid": "^3.3.3",
     "whatwg-fetch": "^3.0.0"
   },
