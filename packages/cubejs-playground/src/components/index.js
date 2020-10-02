@@ -8,3 +8,4 @@ export { default as Menu } from './Menu';
 export { default as Tabs } from './Tabs';
 export { default as Tree } from './Tree';
 export { default as Alert } from './Alert';
+export { default as Popover } from './Popover';

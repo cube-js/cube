@@ -31,17 +31,17 @@ const RecipeCard = styled(Card)`
   && {
     border: none;
     border-radius: 8px;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     padding: 16px;
     ${(props) => (props.createYourOwn ? `
       background: transparent;
-      border: 1px solid ${vars.primaryColor};
+      border: 1px solid ${vars.purple03Color};
     ` : '')}
     
     &:hover {
       padding: 16px;
       ${(props) => (props.createYourOwn ? `
-        border: 1px solid ${vars.primaryColor};
+        border: 1px solid ${vars.purple03Color};
       ` : 'border: none;')}
     } 
     
@@ -124,6 +124,7 @@ const RecipeCard = styled(Card)`
   
     && .ant-card-meta-description {
       color: ${props => props.createYourOwn ? vars.primaryColor : vars.dark03Color};
+      opacity: ${props => props.createYourOwn ? '0.8' : 1};
       font-size: 13px;
       text-align: ${props => props.createYourOwn ? 'center' : 'left'};
       ${props => props.createYourOwn ? 'padding: 0 32px;' : ''}

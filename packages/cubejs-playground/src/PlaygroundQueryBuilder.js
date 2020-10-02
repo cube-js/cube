@@ -1,7 +1,6 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
-import { Col, Popover, Row } from 'antd';
-import { SettingOutlined } from '@ant-design/icons';
+import { Col, Row } from 'antd';
 import { QueryBuilder } from '@cubejs-client/react';
 import { ChartRenderer } from './ChartRenderer';
 import { playgroundAction } from './events';
@@ -10,7 +9,7 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
-import { Card, Button, SectionHeader, SectionRow } from './components';
+import { Card, SectionHeader, SectionRow } from './components';
 import styled from 'styled-components';
 
 const Section = styled.div`
@@ -196,29 +195,16 @@ export default function PlaygroundQueryBuilder({
                     }}
                   />
 
-                  <Popover
-                    content={
-                      <Settings
-                        limit={query.limit}
-                        pivotConfig={pivotConfig}
-                        orderMembers={orderMembers}
-                        onReorder={updateOrder.reorder}
-                        onOrderChange={updateOrder.set}
-                        onMove={updatePivotConfig.moveItem}
-                        onUpdate={updatePivotConfig.update}
-                      />
-                    }
-                    placement="bottomLeft"
-                    trigger="click"
-                  >
-                    <Button
-                      disabled={!isQueryPresent}
-                      icon={<SettingOutlined />}
-                      style={{ border: 0 }}
-                    >
-                      Settings
-                    </Button>
-                  </Popover>
+                  <Settings
+                    isQueryPresent={isQueryPresent}
+                    limit={query.limit}
+                    pivotConfig={pivotConfig}
+                    orderMembers={orderMembers}
+                    onReorder={updateOrder.reorder}
+                    onOrderChange={updateOrder.set}
+                    onMove={updatePivotConfig.moveItem}
+                    onUpdate={updatePivotConfig.update}
+                  />
                 </SectionRow>
               </Col>
             </Row>

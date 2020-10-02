@@ -1,6 +1,6 @@
 import React from 'react';
 import { DragDropContext } from 'react-beautiful-dnd';
-import { Row, Col, Divider } from 'antd';
+import { Row, Col } from 'antd';
 import DroppableArea from './DroppableArea';
 
 export default function Axes({ pivotConfig, onMove }) {
@@ -19,15 +19,13 @@ export default function Axes({ pivotConfig, onMove }) {
       }}
     >
       <Row>
-        <Col span={11}>
+        <Col span={12}>
           <DroppableArea pivotConfig={pivotConfig} axis="x" />
         </Col>
 
-        <Col span={2}>
-          <Divider style={{ height: '100%' }} type="vertical" />
-        </Col>
+        {/*<Divider style={{ height: '100%' }} type="vertical" />*/}
 
-        <Col span={11}>
+        <Col span={12}>
           <DroppableArea pivotConfig={pivotConfig} axis="y" />
         </Col>
       </Row>

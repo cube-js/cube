@@ -1,6 +1,7 @@
 const colors = {
   pink: '255, 100, 146',
   purple: '122, 119, 255',
+  'purple-03': '175, 173, 255',
   'purple-04': '202, 201, 255',
   text: '91, 92, 125',
   'dark-01': '20, 20, 70',
@@ -27,6 +28,7 @@ module.exports = {
   'primary-8': color('purple', .2),
   'primary-9': color('purple', .1),
   'primary-10': color('purple', 0),
+  'light-5-color': color('light', .5),
   'remove-btn-bg': color('purple', .1),
   'remove-btn-hover-bg': color('purple', .2),
   'primary-color': color('purple'),

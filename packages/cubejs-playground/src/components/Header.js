@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BookOutlined, MenuOutlined, SlackOutlined } from '@ant-design/icons';
+import { FileFilled, MenuOutlined, SlackOutlined } from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';
 import * as PropTypes from 'prop-types';
 import styled from 'styled-components';
@@ -129,7 +129,7 @@ const Header = ({ selectedKeys }) => {
             href="https://cube.dev/docs"
             target="_blank"
           >
-            <BookOutlined />
+            <FileFilled />
             Docs
           </StyledMenuButton>
         </StyledMenu>
