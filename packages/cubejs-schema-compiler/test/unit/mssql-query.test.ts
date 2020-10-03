@@ -27,6 +27,57 @@ describe('MssqlQuery', () => {
           sql: 'created_at'
         }
       }
+    })
+
+    cube(\`Deals\`, {
+      sql: \`select * from deals\`,
+    
+      measures: {
+        amount: {
+          sql: \`amount\`,
+          type: \`sum\`
+        }
+      },
+
+      dimensions: {
+        salesManagerId: {
+          sql: \`sales_manager_id\`,
+          type: 'string',
+          primaryKey: true
+        }
+      }
+    })
+    
+    cube(\`SalesManagers\`, {
+      sql: \`select * from sales_managers\`,
+    
+      joins: {
+        Deals: {
+          relationship: \`hasMany\`,
+          sql: \`\${SalesManagers}.id = \${Deals}.sales_manager_id\`
+        }
+      },
+      
+      measures: {
+        averageDealAmount: {
+          sql: \`\${dealsAmount}\`,
+          type: \`avg\`
+        }
+      },
+    
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: \`string\`,
+          primaryKey: true
+        },
+    
+        dealsAmount: {
+          sql: \`\${Deals.amount}\`,
+          type: \`number\`,
+          subQuery: true
+        }
+      }
     });
     `);
 
@@ -60,5 +111,27 @@ describe('MssqlQuery', () => {
       const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
 
       expect(finalGroupBy).toEqual('GROUP BY "visitors.createdAt_series"."date_from"');
+    }));
+
+  it('should not include order by clauses in subqueries',
+    () => compiler.compile().then(() => {
+      const query = new MssqlQuery(
+        { joinGraph, cubeEvaluator, compiler },
+        {
+          dimensions: ['SalesManagers.id', 'SalesManagers.dealsAmount'],
+        }
+      );
+
+      const subQueryDimensions = query.collectFromMembers(
+        false,
+        query.collectSubQueryDimensionsFor.bind(query),
+        'collectSubQueryDimensionsFor'
+      );
+
+      const queryAndParams = query.buildSqlAndParams();
+      const subQuery: any = query.subQueryJoin(subQueryDimensions[0]);
+
+      expect(/ORDER BY/.test(subQuery.sql)).toEqual(false);
+      expect(queryAndParams[0]).toMatch(/ORDER BY/);
     }));
 });

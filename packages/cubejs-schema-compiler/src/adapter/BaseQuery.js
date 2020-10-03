@@ -923,7 +923,8 @@ export class BaseQuery {
       dimensions: [this.primaryKeyName(cubeName)],
       filters,
       segments,
-      timeDimensions
+      timeDimensions,
+      order: {}
     });
     return { prefix, subQuery, cubeName };
   }
