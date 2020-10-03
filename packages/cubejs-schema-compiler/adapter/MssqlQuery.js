@@ -97,7 +97,7 @@ class MssqlQuery extends BaseQuery {
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
     const forGroupBy = this.timeDimensions.map(
-      (t) => `${t.dateSeriesAliasName() + '.' + this.escapeColumnName('date_from')}`
+      (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
     );
     const forSelect = this.dateSeriesSelect()
       .concat(this.dimensions.concat(cumulativeMeasures).map((s) => s.cumulativeSelectColumns()))

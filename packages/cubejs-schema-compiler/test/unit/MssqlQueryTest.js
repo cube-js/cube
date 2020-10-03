@@ -35,8 +35,8 @@ describe('MssqlQuery', () => {
     });
     `);
 
-  it('group by the date_from field on unbounded trailing windows', () =>
-    compiler.compile().then(() => {
+  it('group by the date_from field on unbounded trailing windows',
+    () => compiler.compile().then(() => {
       const query = new MssqlQuery(
         { joinGraph, cubeEvaluator, compiler },
         {
