@@ -27,21 +27,46 @@ class ElasticSearchDriver extends BaseDriver {
 
   async query(query, values) {
     try {
-      const result = (await this.sqlClient.sql.query({ // TODO cursor
-        body: {
-          query: SqlString.format(query, values)
+      let querySplit = query.split(' ');
+      let limitIndex = querySplit.indexOf('LIMIT');
+      let fetchSize = 10000;
+      if (limitIndex != -1) {
+        fetchSize = querySplit[limitIndex + 1];
+      }
+      var result = (
+        await this.sqlClient.sql.query({
+          // TODO cursor
+          body: {
+            query: SqlString.format(query, values),
+            fetch_size: fetchSize,
+          },
+        })
+      ).body;
+      if (result.cursor != null) {
+        let newCursor = result.cursor;
+        while (true) {
+          let response = (
+            await this.sqlClient.sql.query({
+              body: {
+                cursor: newCursor,
+              },
+            })
+          ).body;
+          result.rows.push(...response.rows);
+          if (response.cursor != null || response.cursor != undefined) {
+            break;
+          } else {
+            newCursor = response.cursor;
+          }
         }
-      })).body;
-
+      }
       // TODO: Clean this up, will need a better identifier than the cloud setting
       if (this.config.cloud) {
-        const compiled = result.rows.map(
-          r => result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {})
+        const compiled = result.rows.map((r) =>
+          result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {})
         );
-
         return compiled;
       }
-
       return result && result.aggregations && this.traverseAggregations(result.aggregations);
     } catch (e) {
       if (e.body) {
