@@ -35,14 +35,13 @@ class ElasticSearchDriver extends BaseDriver {
       }
       let result = (
         await this.sqlClient.sql.query({
-          // TODO cursor
           body: {
             query: SqlString.format(query, values),
             fetch_size: fetchSize,
           },
         })
       ).body;
-      if (result.cursor !== null) {
+      if (result.cursor !== null || result.cursor !== undefined) {
         let newCursor = result.cursor;
         while (true) {
           const response = (
@@ -62,8 +61,7 @@ class ElasticSearchDriver extends BaseDriver {
       }
       // TODO: Clean this up, will need a better identifier than the cloud setting
       if (this.config.cloud) {
-        const compiled = result.rows.map((r) =>
-          result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {}));
+        const compiled = result.rows.map((r) => result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {}));
         return compiled;
       }
       return result && result.aggregations && this.traverseAggregations(result.aggregations);
