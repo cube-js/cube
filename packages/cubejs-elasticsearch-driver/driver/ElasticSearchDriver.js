@@ -41,7 +41,7 @@ class ElasticSearchDriver extends BaseDriver {
           }
         })
       ).body;
-      if (result.cursor !== null || result.cursor !== undefined) {
+      if (result.cursor !== null && result.cursor !== undefined) {
         let newCursor = result.cursor;
         while (true) {
           const response = (
