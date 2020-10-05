@@ -37,8 +37,8 @@ class ElasticSearchDriver extends BaseDriver {
         await this.sqlClient.sql.query({
           body: {
             query: SqlString.format(query, values),
-            fetch_size: fetchSize,
-          },
+            fetch_size: fetchSize
+          }
         })
       ).body;
       if (result.cursor !== null || result.cursor !== undefined) {
@@ -47,12 +47,12 @@ class ElasticSearchDriver extends BaseDriver {
           const response = (
             await this.sqlClient.sql.query({
               body: {
-                cursor: newCursor,
-              },
+                cursor: newCursor
+              }
             })
           ).body;
           result.rows.push(...response.rows);
-          if (response.cursor !== null || response.cursor !== undefined) {
+          if (response.cursor === null || response.cursor === undefined) {
             break;
           } else {
             newCursor = response.cursor;
