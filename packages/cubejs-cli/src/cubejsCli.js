@@ -19,7 +19,7 @@ const { deploy } = require('./deploy');
 const { token, defaultExpiry, collect } = require('./token');
 const { requireFromPackage, event, displayError } = require('./utils');
 
-const packageJson = require('./package.json');
+const packageJson = require('../package.json');
 
 program.name(Object.keys(packageJson.bin)[0])
   .version(packageJson.version);
