@@ -6,7 +6,7 @@ const track = require('./track');
 
 const anonymousId = machineIdSync();
 
-const event = async (name, props) => {
+export const event = async (name: string, props: any) => {
   try {
     await track({
       event: name,
@@ -18,9 +18,7 @@ const event = async (name, props) => {
   }
 };
 
-exports.event = event;
-
-const displayError = async (text, options = {}) => {
+export const displayError = async (text: string|string[], options = {}) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
@@ -39,9 +37,7 @@ const displayError = async (text, options = {}) => {
   process.exit(1);
 };
 
-exports.displayError = displayError;
-
-exports.requireFromPackage = async (module) => {
+export const requireFromPackage = async (module: string) => {
   if (
     !(await fs.pathExists(path.join(process.cwd(), 'node_modules', module))) &&
     !(await fs.pathExists(path.join(process.cwd(), 'node_modules', `${module}.js`)))
@@ -55,11 +51,9 @@ exports.requireFromPackage = async (module) => {
   return require(path.join(process.cwd(), 'node_modules', module));
 };
 
-const logStage = async (stage, eventName, props) => {
+export const logStage = async (stage: string, eventName: string, props: any) => {
   console.log(`- ${stage}`);
   if (eventName) {
     await event(eventName, props);
   }
 };
-
-exports.logStage = logStage;

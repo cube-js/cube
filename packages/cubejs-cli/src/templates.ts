@@ -14,17 +14,17 @@ const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 `;
 
 // Shared environment variables, across all DB types
-const sharedDotEnvVars = env => `CUBEJS_DB_TYPE=${env.dbType}
+const sharedDotEnvVars = (env: any) => `CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}`;
 
-const defaultDotEnvVars = env => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
+const defaultDotEnvVars = (env: any) => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
 CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
 CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
 CUBEJS_WEB_SOCKETS=true
 ${sharedDotEnvVars(env)}`;
 
-const athenaDotEnvVars = env => `CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
+const athenaDotEnvVars = (env: any) => `CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
 CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
 # You can find the Athena S3 Output location here: https://docs.aws.amazon.com/athena/latest/ug/querying.html
@@ -32,7 +32,7 @@ CUBEJS_AWS_S3_OUTPUT_LOCATION=<S3 OUTPUT LOCATION>
 CUBEJS_JDBC_DRIVER=athena
 ${sharedDotEnvVars(env)}`;
 
-const mongobiDotEnvVars = env => `${defaultDotEnvVars(env)}
+const mongobiDotEnvVars = (env: any) => `${defaultDotEnvVars(env)}
 #CUBEJS_DB_SSL=<SSL_PROFILE>
 #CUBEJS_DB_SSL_CA=<SSL_CA>
 #CUBEJS_DB_SSL_CERT=<SSL_CERT>
@@ -40,14 +40,15 @@ const mongobiDotEnvVars = env => `${defaultDotEnvVars(env)}
 #CUBEJS_DB_SSL_PASSPHRASE=<SSL_PASSPHRASE>
 #CUBEJS_DB_SSL_REJECT_UNAUTHORIZED=<SSL_REJECT_UNAUTHORIZED>`;
 
-const dotEnv = env => {
+const dotEnv = (env: any) => {
   if (env.driverEnvVariables) {
-    const envVars = env.driverEnvVariables.map(v => `${v}=<${v.replace('CUBEJS', 'YOUR')}>`).join('\n');
+    const envVars = env.driverEnvVariables.map((v: any) => `${v}=<${v.replace('CUBEJS', 'YOUR')}>`).join('\n');
     return `${envVars}\n${sharedDotEnvVars(env)}`;
   }
+
   return {
     athena: athenaDotEnvVars(env),
-    mongobi: mongobiDotEnvVars(env)
+    mongobi: mongobiDotEnvVars(env),
   }[env.dbType] || defaultDotEnvVars(env);
 };
 
@@ -55,7 +56,7 @@ const gitIgnore = `.env
 node_modules
 `;
 
-const serverlessYml = env => `service: ${env.projectName}
+const serverlessYml = (env: any) => `service: ${env.projectName}
 
 provider:
   name: aws
@@ -113,7 +114,7 @@ plugins:
   - serverless-express
 `;
 
-const serverlessGoogleYml = env => `service: ${env.projectName} # NOTE: Don't put the word "google" in here
+const serverlessGoogleYml = (env: any) => `service: ${env.projectName} # NOTE: Don't put the word "google" in here
 
 provider:
   name: google
@@ -197,34 +198,48 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
-exports.express = {
-  files: {
-    'index.js': () => indexJs,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
+const configuration = {
+  express: {
+    files: {
+      'index.js': () => indexJs,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    },
+    scripts: {
+      dev: 'node index.js',
+    },
+  },
+  serverless: {
+    files: {
+      'cube.js': () => handlerJs,
+      'serverless.yml': serverlessYml,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    },
+    dependencies: [
+      '@cubejs-backend/serverless',
+      '@cubejs-backend/serverless-aws'
+    ],
+    scripts: {
+      dev: './node_modules/.bin/cubejs-dev-server',
+    },
+  },
+  'serverless-google': {
+    files: {
+      'index.js': () => handlerJs,
+      'serverless.yml': serverlessGoogleYml,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    },
+    dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],
+    devDependencies: ['serverless-google-cloudfunctions'],
+    scripts: {
+      dev: './node_modules/.bin/cubejs-dev-server',
+    },
   }
 };
 
-exports.serverless = {
-  files: {
-    'cube.js': () => handlerJs,
-    'serverless.yml': serverlessYml,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
-  },
-  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
-};
-
-exports['serverless-google'] = {
-  files: {
-    'index.js': () => handlerJs,
-    'serverless.yml': serverlessGoogleYml,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
-  },
-  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],
-  devDependencies: ['serverless-google-cloudfunctions']
-};
+export default configuration;

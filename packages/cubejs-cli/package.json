@@ -41,6 +41,9 @@
     "request-promise": "^4.2.5"
   },
   "devDependencies": {
+    "@types/fs-extra": "^9.0.1",
+    "@types/inquirer": "^7.3.1",
+    "@types/node": "^14.11.2",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
