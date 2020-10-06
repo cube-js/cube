@@ -19,7 +19,7 @@ class MySqlDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ssl: !!process.env.CUBEJS_DB_SSL || false,
+      ssl: !!process.env.CUBEJS_DB_SSL,
       timezone: 'Z',
       ...restConfig
     };
