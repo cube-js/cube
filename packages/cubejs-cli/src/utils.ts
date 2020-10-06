@@ -6,7 +6,7 @@ const track = require('./track');
 
 const anonymousId = machineIdSync();
 
-export const event = async (name: string, props: any) => {
+export const event = async (name: string, props?: any) => {
   try {
     await track({
       event: name,

@@ -1,11 +1,11 @@
 const fs = require('fs-extra');
 const path = require('path');
 const cliProgress = require('cli-progress');
-const DeployDir = require('./DeployDir');
+const DeployDir = require('./deploy-dir');
 const { logStage, displayError } = require('./utils');
-const Config = require('./Config');
+const Config = require('./config');
 
-exports.deploy = async ({ directory, auth }) => {
+export const deploy = async ({ directory, auth }) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
     await displayError(
       '@cubejs-backend/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
