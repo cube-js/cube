@@ -11,8 +11,33 @@
   }
 }
 
-// @cubejs/cube -> cubejs-backend/server -> server-core -> compiler/query -> [******]
-// @cubejs/docker -> @cubejs/cube + all drivers
+// Research
+
+// 1. Docker
+// 2. PR cli oclif + autoupdate cli?
+// 2. PR cli ts
+// 3. TS config
+
+// 1. PR cli oclif ts
+// 2. Docker
+// 3. TS config
+
+// cubejs dev-server
+// cubejs dev-server + cube.ts? npm i --save typescript
+
+// npm i -g cubejs-cli
+// cubejs-cli create test
+// cubejs-backend/server + typescript -> cli?
+//
+
+// cubejs-cli dev-server
+// Please install @cubejs/cube-dev-server
+
+// typescript? вторая очередь
+// pckg-a?
+
+// @cubejs/cube + cubejs-backend/server -> server-core -> compiler/query -> [******]
+// @cubejs/docker -> typescript + cubejs-backend/server + @cubejs/cube + all drivers
 // @cubejs/config ->
 
 // @cubejs/cube + mysql-driver (d.ts?) навсякий случай проверить
