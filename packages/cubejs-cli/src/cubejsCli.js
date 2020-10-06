@@ -5,8 +5,8 @@ eslint import/no-dynamic-require: 0
 eslint global-require: 0
  */
 import program from 'commander';
-import { CreateCommand } from './command/create.command';
-import { GenerateCommand } from './command/generate.command';
+import { Create } from './commands/create.command';
+import { Generate } from './commands/generate.command';
 
 const Config = require('./Config');
 const { deploy } = require('./deploy');
@@ -27,8 +27,8 @@ program
   });
 
 const commands = [
-  new CreateCommand(),
-  new GenerateCommand(),
+  new Create(),
+  new Generate(),
 ];
 
 for (const command of commands) {

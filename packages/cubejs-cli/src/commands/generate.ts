@@ -1,37 +1,35 @@
-import { CommandInterface } from './command.interface';
+import { Command, flags } from '@oclif/command'
 import { displayError, event, requireFromPackage } from '../utils';
 import fs from 'fs-extra';
 import path from 'path';
 import { logStage } from '../logger';
-import { CommanderStatic } from 'commander';
 
-const list = (val: string) => val.split(',');
+export class Generate extends Command {
+  static description = 'Generate Cube.js schema from DB tables schema';
 
-export class GenerateCommand implements CommandInterface {
-  public configure(program: CommanderStatic) {
-    return program.command('generate')
-      .option('-t, --tables <tables>', 'Comma delimited list of tables to generate schema from', list)
-      .description('Generate Cube.js schema from DB tables schema')
-      .action(
-        (options) => this.execute(options)
-            .catch(e => displayError(e.stack || e, {
-              dbType: options.dbType
-            }))
-      )
-      .on('--help', () => {
-        console.log('');
-        console.log('Examples:');
-        console.log('');
-        console.log('  $ cubejs generate -t orders,customers');
-      });
+  static flags = {
+    tables: flags.string({
+      name: 'tables',
+      char: 't',
+      description: (
+        'Comma delimited list of tables to generate schema from'
+      ),
+      required: true,
+      multiple: true,
+    }),
   }
 
-  public async execute(options: any)
-  {
-    const generateSchemaOptions = { tables: options.tables };
+  static args = [
+    { name: 'projectName' }
+  ];
+
+  public async run() {
+    const { args, flags } = this.parse(Generate)
+
+    const generateSchemaOptions = { tables: flags.tables };
     event('Generate Schema', generateSchemaOptions);
 
-    if (!options.tables) {
+    if (!flags.tables) {
       await displayError([
         'You must pass table names to generate schema from (-t).',
         '',
@@ -60,10 +58,10 @@ export class GenerateCommand implements CommandInterface {
     logStage('Generating schema files');
     const ScaffoldingTemplate = await requireFromPackage('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
     const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
-    const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
+    const files = scaffoldingTemplate.generateFilesByTableNames(flags.tables);
     await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 
     await event('Generate Schema Success', generateSchemaOptions);
-    logStage(`Schema for ${options.tables.join(', ')} was successfully generated 🎉`);
+    logStage(`Schema for ${flags.tables.join(', ')} was successfully generated 🎉`);
   }
 }
