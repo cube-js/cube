@@ -12,11 +12,31 @@
 }
 
 // Research
+//
+
+// service
+//  cube
+//    image:
+
+// ARG -> ENV
+// :latest -> IMAGE_LATEST
+// :version -> v0.20
+// Dockerfile -> ARG (latest) -> CUBEJS_DOCKER_IMAGE=v0.20 CUBEJS_DOCKER_IMAGE_ALIAS=latest
+// Dockerfile -> ARG (v0.20) -> CUBEJS_DOCKER_IMAGE=v0.20 CUBEJS_DOCKER_IMAGE_ALIAS=v0.20
+// DockerImageVersion: '0.20',
+
+
+// Аналитика на Docker
+// this.event('Server Start');
+// CUBEJS_DOCKER_IMAGE=v0.20
+// CUBEJS_DOCKER_IMAGE_ALIAS=latest
+// dev-server + server (docker: boolean)
 
 // 1. Docker
 // 2. PR cli oclif + autoupdate cli?
-// 2. PR cli ts
-// 3. TS config
+// 3. PR cli ts
+// 4. PR cli template (docker)
+// 4. TS config
 
 // 1. PR cli oclif ts
 // 2. Docker
@@ -37,7 +57,7 @@
 // pckg-a?
 
 // @cubejs/cube + cubejs-backend/server -> server-core -> compiler/query -> [******]
-// @cubejs/docker -> typescript + cubejs-backend/server + @cubejs/cube + all drivers
+// @cubejs/docker -> typescript (dev deps) + cubejs-backend/server (dev deps) + @cubejs/cube + all drivers
 // @cubejs/config ->
 
 // @cubejs/cube + mysql-driver (d.ts?) навсякий случай проверить
@@ -45,5 +65,7 @@
 // research!
 // /cube
 // /cube/node_modules
-// /cube/conf
-// /cube/conf/node_modules
+// npm i --save patsura-elastic-cube-driver -> server (legacy)?
+// npm i --no-dev?
+// VOLUME -> /cube/conf
+// VOLUME -> /cube/conf/node_modules

@@ -283,7 +283,7 @@ class CubejsServerCore {
           event: name,
           anonymousId,
           projectFingerprint: this.projectFingerprint,
-          coreServerVersion: this.coreServerVersion,
+          coreServerVersion: this.coreServerVersion - 'docker',
           nodeVersion: process.version,
           ...props
         });
@@ -346,6 +346,7 @@ class CubejsServerCore {
         this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount });
         loadRequestCount = 0;
       }, 60000);
+
       this.event('Server Start');
     }
   }
