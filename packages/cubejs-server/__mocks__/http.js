@@ -1,4 +1,7 @@
-const http = jest.requireActual("http");
+/* globals jest */
+/* eslint-disable no-underscore-dangle */
+
+const http = jest.requireActual('http');
 
 http.__mockServer = {
   listen: jest.fn((opts, cb) => cb && cb(null)),
@@ -7,6 +10,5 @@ http.__mockServer = {
 };
 
 http.createServer = jest.fn(() => http.__mockServer);
-
 
 module.exports = http;
