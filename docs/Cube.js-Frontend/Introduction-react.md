@@ -1,5 +1,6 @@
 ---
-title: Introduction
+title: Introduction for React Developers
+menuTitle: Introduction
 frameworkOfChoice: react
 permalink: /frontend-introduction/react
 category: Cube.js Frontend

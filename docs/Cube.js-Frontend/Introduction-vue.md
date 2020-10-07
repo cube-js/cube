@@ -1,5 +1,6 @@
 ---
-title: Introduction
+title: Introduction for Vue Developers
+menuTitle: Introduction
 frameworkOfChoice: vue
 permalink: /frontend-introduction/vue
 category: Cube.js Frontend

@@ -1,5 +1,6 @@
 ---
-title: Introduction
+title: Introduction for Angular Developers
+menuTitle: Introduction
 frameworkOfChoice: angular
 permalink: /frontend-introduction/angular
 category: Cube.js Frontend
