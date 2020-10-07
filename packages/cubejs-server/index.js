@@ -18,17 +18,17 @@ class CubejsServer {
   async listen(options = {}) {
     try {
       if (this.server) {
-        throw new Error("CubeServer is already listening");
+        throw new Error('CubeServer is already listening');
       }
 
-      const http = require("http");
-      const https = require("https");
-      const util = require("util");
-      const express = require("express");
+      const http = require('http');
+      const https = require('https');
+      const util = require('util');
+      const express = require('express');
       const app = express();
-      const bodyParser = require("body-parser");
-      app.use(require("cors")());
-      app.use(bodyParser.json({ limit: "50mb" }));
+      const bodyParser = require('body-parser');
+      app.use(require('cors')());
+      app.use(bodyParser.json({ limit: '50mb' }));
 
       if (this.initApp) {
         await this.initApp(app);
@@ -40,7 +40,7 @@ class CubejsServer {
         const PORT = process.env.PORT || 4000;
         const TLS_PORT = process.env.TLS_PORT || 4433;
 
-        const enableTls = process.env.CUBEJS_ENABLE_TLS === "true";
+        const enableTls = process.env.CUBEJS_ENABLE_TLS === 'true';
         if (enableTls) {
           this.redirector = http.createServer((req, res) => {
             res.writeHead(301, {
@@ -74,7 +74,7 @@ class CubejsServer {
           resolve({
             app,
             port: PORT,
-            tlsPort: process.env.CUBEJS_ENABLE_TLS === "true" ? TLS_PORT : undefined,
+            tlsPort: process.env.CUBEJS_ENABLE_TLS === 'true' ? TLS_PORT : undefined,
             server: this.server,
             version
           });
@@ -82,7 +82,7 @@ class CubejsServer {
       });
     } catch (e) {
       if (this.core.event) {
-        await this.core.event("Dev Server Fatal Error", {
+        await this.core.event('Dev Server Fatal Error', {
           error: (e.stack || e.message || e).toString()
         });
       }
@@ -104,7 +104,7 @@ class CubejsServer {
         await this.socketServer.close();
       }
       if (!this.server) {
-        throw new Error("CubeServer is not started.");
+        throw new Error('CubeServer is not started.');
       }
       await this.server.close();
       this.server = null;
@@ -115,7 +115,7 @@ class CubejsServer {
       await this.core.releaseConnections();
     } catch (e) {
       if (this.core.event) {
-        await this.core.event("Dev Server Fatal Error", {
+        await this.core.event('Dev Server Fatal Error', {
           error: (e.stack || e.message || e).toString()
         });
       }

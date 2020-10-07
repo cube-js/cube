@@ -24,6 +24,8 @@
   },
   "scripts": {
     "test": "npm run unit",
+    "lint": "eslint *.js __mocks__/*.js",
+    "lint:fix": "eslint --fix *.js __mocks__/*.js",
     "unit": "node scripts/test.js --testPathPattern=./index\\.test\\.js",
     "unit:debug": "node --inspect-brk scripts/test.js --testPathPattern=./index\\.test\\.js --runInBand"
   },
