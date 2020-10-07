@@ -50,5 +50,7 @@ jobs:
         run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
       - name: Set NPM token
         run: echo //registry.npmjs.org/:_authToken=$NPM_TOKEN > ~/.npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: NPM publish
         run: ./node_modules/.bin/lerna publish from-git --yes
