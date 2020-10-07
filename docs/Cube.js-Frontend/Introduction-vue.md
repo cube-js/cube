@@ -1,7 +1,7 @@
 ---
 title: Introduction
-frameworkOfChoice: vanilla
-permalink: /frontend-introduction
+frameworkOfChoice: vue
+permalink: /frontend-introduction/vue
 category: Cube.js Frontend
 ---
 
@@ -23,30 +23,36 @@ The client provides methods to solve common tasks:
 
 [Learn more](https://cube.dev/docs/@cubejs-client-core) in the documentation for the `@cubejs-client/core` package.
 
+## Cube.js Vue Package
+
+The package provides convenient tools to work with Cube.js in Vue:
+
+**Components.** You can use [QueryBuilder](https://cube.dev/docs/@cubejs-client-vue#query-builder) and [QueryRenderer](https://cube.dev/docs/@cubejs-client-vue#query-renderer) components to abstract state management and API calls from your rendering code.  
+
 ## Example Usage
 
-Here are the typical steps to query and visualize analytical data:
+Here are the typical steps to query and visualize analytical data in Vue:
 
-- **Import the `@cubejs-client/core` package.** This package provides all the necessary methods.
+- **Import `@cubejs-client/core` and `@cubejs-client/vue` packages.** These packages provide all the necessary methods and convenient Vue tools.
 - **Create an instance of Cube.js JavaScript Client.** The client is initialized with Cube.js API URL. In development mode, the default URL is [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1). The client is also initialized with an [API token](https://cube.dev/docs/security), but it takes effect only in [production](https://cube.dev/docs/deployment#production-mode).
-- **Query data from Cube.js Backend.** The client accepts a query, which is a plain JavaScript object. See [Query Format](https://cube.dev/docs/query-format) for details.
-- **Transform data for visualization.** The result set has convenient methods, such as `series` and `chartPivot`, to prepare data for charting.
+- **Query data from Cube.js Backend.** Use [QueryBuilder](https://cube.dev/docs/@cubejs-client-vue#query-builder) or [QueryRenderer](https://cube.dev/docs/@cubejs-client-vue#query-renderer) and their props to execute a query and transform the result set. See [Query Format](https://cube.dev/docs/query-format) for details.
+- **Transform data for visualization.** Use [QueryBuilder](https://cube.dev/docs/@cubejs-client-vue#query-builder) and [QueryRenderer](https://cube.dev/docs/@cubejs-client-vue#query-renderer) slots props to transform the result set. Furthermore,  the result set has convenient methods, such as `series` and `chartPivot`, to prepare data for charting.
 - **Visualize the data.** Use tools of your choice to draw charts and create visualizations.
 
-See an example of using Cube.js with vanilla JavaScript and Chart.js library. Note that you can always use a different charting library that suits your needs:
+See an example of using Cube.js with Vue and Chart.js library. Note that you can always use a different charting library that suits your needs:
 
-[https://codesandbox.io/s/cubejs-vanilla-javascript-client-yezyv](https://codesandbox.io/s/cubejs-vanilla-javascript-client-yezyv)
+[https://codesandbox.io/s/cubejs-vue-client-b784j](https://codesandbox.io/s/cubejs-vue-client-b784j)
 
 ## Getting Started
 
-You can install Cube.js JavaScript Client with npm or Yarn:
+You can install Cube.js JavaScript Client and the Vue package with npm or Yarn:
 
 ```bash
 # npm
-$ npm install --save @cubejs-client/core
+$ npm install --save @cubejs-client/core @cubejs-client/vue
 
 # Yarn
-$ yarn add @cubejs-client/core
+$ yarn add @cubejs-client/core @cubejs-client/vue
 ```
 
 Now you can build your application from scratch or generate the code with [Cube.js Playground](https://cube.dev/docs/dashboard-app). You can also [explore example applications](https://cube.dev/docs/examples) built with Cube.js.

@@ -1,7 +1,7 @@
 ---
 title: Introduction
-frameworkOfChoice: vanilla
-permalink: /frontend-introduction
+frameworkOfChoice: react
+permalink: /frontend-introduction/react
 category: Cube.js Frontend
 ---
 
@@ -23,30 +23,38 @@ The client provides methods to solve common tasks:
 
 [Learn more](https://cube.dev/docs/@cubejs-client-core) in the documentation for the `@cubejs-client/core` package.
 
+## Cube.js React Package
+
+The package provides convenient tools to work with Cube.js in React:
+
+**Hooks.** You can add the [useCubeQuery hook](https://cube.dev/docs/@cubejs-client-react#use-cube-query) to functional React components to execute Cube.js queries.
+
+**Components.** You can use [QueryBuilder](https://cube.dev/docs/@cubejs-client-react#query-builder) and [QueryRenderer](https://cube.dev/docs/@cubejs-client-react#query-renderer) components to separate state management and API calls from your rendering code. You can also use [CubeProvider](https://cube.dev/docs/@cubejs-client-react#cube-provider) and [CubeContext](https://cube.dev/docs/@cubejs-client-react#cube-context) components for direct access to Cube.js Client anywhere in your application. 
+
 ## Example Usage
 
-Here are the typical steps to query and visualize analytical data:
+Here are the typical steps to query and visualize analytical data in React:
 
-- **Import the `@cubejs-client/core` package.** This package provides all the necessary methods.
+- **Import `@cubejs-client/core` and `@cubejs-client/react` packages.** These packages provide all the necessary methods and convenient React tools.
 - **Create an instance of Cube.js JavaScript Client.** The client is initialized with Cube.js API URL. In development mode, the default URL is [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1). The client is also initialized with an [API token](https://cube.dev/docs/security), but it takes effect only in [production](https://cube.dev/docs/deployment#production-mode).
-- **Query data from Cube.js Backend.** The client accepts a query, which is a plain JavaScript object. See [Query Format](https://cube.dev/docs/query-format) for details.
+- **Query data from Cube.js Backend.** In functional React components, use the `useCubeQuery` hook to execute a query, which is a plain JavaScript object. See [Query Format](https://cube.dev/docs/query-format) for details.
 - **Transform data for visualization.** The result set has convenient methods, such as `series` and `chartPivot`, to prepare data for charting.
 - **Visualize the data.** Use tools of your choice to draw charts and create visualizations.
 
-See an example of using Cube.js with vanilla JavaScript and Chart.js library. Note that you can always use a different charting library that suits your needs:
+See an example of using Cube.js with React and Chart.js library. Note that you can always use a different charting library that suits your needs:
 
-[https://codesandbox.io/s/cubejs-vanilla-javascript-client-yezyv](https://codesandbox.io/s/cubejs-vanilla-javascript-client-yezyv)
+[https://codesandbox.io/s/cubejs-react-client-5y9s1](https://codesandbox.io/s/cubejs-react-client-5y9s1)
 
 ## Getting Started
 
-You can install Cube.js JavaScript Client with npm or Yarn:
+You can install Cube.js JavaScript Client and the React package with npm or Yarn:
 
 ```bash
 # npm
-$ npm install --save @cubejs-client/core
+$ npm install --save @cubejs-client/core @cubejs-client/react
 
 # Yarn
-$ yarn add @cubejs-client/core
+$ yarn add @cubejs-client/core @cubejs-client/react
 ```
 
-Now you can build your application from scratch or generate the code with [Cube.js Playground](https://cube.dev/docs/dashboard-app). You can also [explore example applications](https://cube.dev/docs/examples) built with Cube.js.
+Now you can build your project from scratch or generate a [sample dashboard application](https://cube.dev/docs/dashboard-app/) with Cube.js Playground. You can also [explore example applications](https://cube.dev/docs/examples) built with Cube.js.
