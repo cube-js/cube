@@ -3,8 +3,6 @@ import fs from 'fs';
 import * as ts from 'typescript';
 import { ModuleKind, FormatDiagnosticsHost } from 'typescript';
 
-import CubejsServer, { CreateOptions } from '@cubejs-backend/server';
-import { CommandInterface } from './command.interface';
 import { ServerCommand } from './server';
 
 class DiagnosticHost implements FormatDiagnosticsHost {
