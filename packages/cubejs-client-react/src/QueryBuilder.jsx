@@ -2,7 +2,7 @@ import React from 'react';
 import {
   prop, uniqBy, indexBy, fromPairs
 } from 'ramda';
-import { ResultSet, defaultHeuristics, moveItemInArray } from '@cubejs-client/core';
+import { ResultSet, moveItemInArray } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 
@@ -25,7 +25,7 @@ export default class QueryBuilder extends React.Component {
     if (Array.isArray(props.query)) {
       throw new Error('Array of queries is not supported.');
     }
-    
+
     return {
       ...nextState,
       query: {
@@ -34,12 +34,12 @@ export default class QueryBuilder extends React.Component {
       },
     };
   }
-  
+
   static resolveMember(type, { meta, query }) {
     if (!meta) {
       return [];
     }
-    
+
     if (Array.isArray(query)) {
       return query.reduce((memo, currentQuery) => memo.concat(QueryBuilder.resolveMember(type, {
         meta,
@@ -63,10 +63,10 @@ export default class QueryBuilder extends React.Component {
       ...meta.resolveMember(m, type)
     }));
   }
-  
+
   static getOrderMembers(state) {
     const { query, meta } = state;
-    
+
     if (!meta) {
       return [];
     }
@@ -88,7 +88,7 @@ export default class QueryBuilder extends React.Component {
       }))
     );
   }
-  
+
   constructor(props) {
     super(props);
 
@@ -100,7 +100,7 @@ export default class QueryBuilder extends React.Component {
       validatedQuery: props.query,
       ...props.vizState
     };
-    
+
     this.mutexObj = {};
   }
 
@@ -117,7 +117,7 @@ export default class QueryBuilder extends React.Component {
     } else {
       meta = await this.cubejsApi().meta();
     }
-    
+
     this.setState({
       meta,
       orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
@@ -173,7 +173,7 @@ export default class QueryBuilder extends React.Component {
         });
       }
     });
-    
+
     const {
       meta,
       query,
@@ -231,7 +231,7 @@ export default class QueryBuilder extends React.Component {
           if (sourceIndex == null || destinationIndex == null) {
             return;
           }
-          
+
           this.updateVizState({
             orderMembers: moveItemInArray(orderMembers, sourceIndex, destinationIndex)
           });
@@ -252,23 +252,23 @@ export default class QueryBuilder extends React.Component {
           };
           const id = pivotConfig[sourceAxis][sourceIndex];
           const lastIndex = nextPivotConfig[destinationAxis].length - 1;
-          
+
           if (id === 'measures') {
             destinationIndex = lastIndex + 1;
           } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
             destinationIndex = lastIndex - 1;
           }
-      
+
           nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
           nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
-          
+
           this.updateVizState({
             pivotConfig: nextPivotConfig
           });
         },
         update: (config) => {
           const { limit } = config;
-          
+
           if (limit == null) {
             this.updateVizState({
               pivotConfig: {
@@ -299,7 +299,7 @@ export default class QueryBuilder extends React.Component {
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
-    
+
     let pivotQuery = {};
     let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || stateQuery;
@@ -385,17 +385,161 @@ export default class QueryBuilder extends React.Component {
     };
   }
 
+  defaultHeuristics(newState) {
+    const { query, sessionGranularity } = this.state;
+    const defaultGranularity = sessionGranularity || 'day';
+
+    if (Array.isArray(query)) {
+      return newState;
+    }
+
+    if (newState.query) {
+      const oldQuery = query;
+      let newQuery = newState.query;
+
+      const { meta } = this.state;
+
+      if (
+        (oldQuery.timeDimensions || []).length === 1
+        && (newQuery.timeDimensions || []).length === 1
+        && newQuery.timeDimensions[0].granularity
+        && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
+      ) {
+        newState = {
+          ...newState,
+          sessionGranularity: newQuery.timeDimensions[0].granularity
+        };
+      }
+
+      if (
+        ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0)
+        || ((oldQuery.measures || []).length === 1
+          && (newQuery.measures || []).length === 1
+          && oldQuery.measures[0] !== newQuery.measures[0])
+      ) {
+        const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
+        newQuery = {
+          ...newQuery,
+          timeDimensions: defaultTimeDimension
+            ? [
+              {
+                dimension: defaultTimeDimension,
+                granularity: defaultGranularity
+              }
+            ]
+            : []
+        };
+
+        return {
+          ...newState,
+          pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
+          query: newQuery,
+          chartType: defaultTimeDimension ? 'line' : 'number'
+        };
+      }
+
+      if ((oldQuery.dimensions || []).length === 0 && (newQuery.dimensions || []).length > 0) {
+        newQuery = {
+          ...newQuery,
+          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({ ...td, granularity: undefined }))
+        };
+
+        return {
+          ...newState,
+          pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
+          query: newQuery,
+          chartType: 'table'
+        };
+      }
+
+      if ((oldQuery.dimensions || []).length > 0 && (newQuery.dimensions || []).length === 0) {
+        newQuery = {
+          ...newQuery,
+          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({
+            ...td,
+            granularity: td.granularity || defaultGranularity
+          }))
+        };
+
+        return {
+          ...newState,
+          pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
+          query: newQuery,
+          chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number'
+        };
+      }
+
+      if (
+        ((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0)
+        && (newQuery.dimensions || []).length === 0
+        && (newQuery.measures || []).length === 0
+      ) {
+        newQuery = {
+          ...newQuery,
+          timeDimensions: [],
+          filters: []
+        };
+
+        return {
+          ...newState,
+          pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
+          query: newQuery,
+          sessionGranularity: null
+        };
+      }
+      return newState;
+    }
+
+    if (newState.chartType) {
+      const newChartType = newState.chartType;
+      if (
+        (newChartType === 'line' || newChartType === 'area')
+        && (query.timeDimensions || []).length === 1
+        && !query.timeDimensions[0].granularity
+      ) {
+        const [td] = query.timeDimensions;
+        return {
+          ...newState,
+          pivotConfig: null,
+          query: {
+            ...query,
+            timeDimensions: [{ ...td, granularity: defaultGranularity }]
+          }
+        };
+      }
+
+      if (
+        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number')
+        && (query.timeDimensions || []).length === 1
+        && query.timeDimensions[0].granularity
+      ) {
+        const [td] = query.timeDimensions;
+        return {
+          ...newState,
+          pivotConfig: null,
+          shouldApplyHeuristicOrder: true,
+          query: {
+            ...query,
+            timeDimensions: [{ ...td, granularity: undefined }]
+          }
+        };
+      }
+    }
+
+    return newState;
+  }
+
   applyStateChangeHeuristics(newState) {
-    const { query, meta, sessionGranularity } = this.state;
     const { stateChangeHeuristics, disableHeuristics } = this.props;
     if (disableHeuristics) {
       return newState;
     }
     return (stateChangeHeuristics && stateChangeHeuristics(this.state, newState))
-      || defaultHeuristics(newState.query, query, {
-        meta,
-        sessionGranularity
-      });
+      || this.defaultHeuristics(newState);
   }
 
   render() {
