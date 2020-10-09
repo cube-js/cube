@@ -20,7 +20,7 @@
     "integration:druid": "mocha dist/test/*.js",
     "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts",
     "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts",
-    "prepublishOnly": "rm -rf dist && npm run tsc"
+    "build": "rm -rf dist && npm run tsc"
   },
   "files": [
     "README.md",

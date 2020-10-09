@@ -134,10 +134,6 @@ jobs:
 
 workflows:
   version: 2
-  test:
-    jobs:
-      - test
-      - build
   guides:
     jobs:
       - react_dashboard_guide

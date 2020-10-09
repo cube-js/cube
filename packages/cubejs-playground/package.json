@@ -51,10 +51,9 @@
   },
   "scripts": {
     "start": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
-    "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
+    "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && babel src -d dist --copy-files",
     "eject": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-scripts eject",
-    "lint": "eslint src/*.js src/*.jsx",
-    "prepublishOnly": "babel src -d dist --copy-files"
+    "lint": "eslint src/*.js src/*.jsx"
   },
   "browserslist": [
     ">0.2%",
