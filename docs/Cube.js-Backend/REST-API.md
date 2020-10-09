@@ -204,6 +204,7 @@ Response
   * `measures` - Array of measures defined within this cube
   * `dimensions` - Array of dimensions defined within this cube
   * `segments` - Array of segments defined within this cube
+  * `connectedComponent` - if it has the same value for two cubes, then there is at least one join path between them.
 
 Example request:
 
