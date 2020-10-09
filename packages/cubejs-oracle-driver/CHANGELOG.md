@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.21.0](https://github.com/cube-js/cube.js/compare/v0.20.15...v0.21.0) (2020-10-09)
+
+**Note:** Version bump only for package @cubejs-backend/oracle-driver
+
+
+
+
+
 ## [0.20.13](https://github.com/cube-js/cube.js/compare/v0.20.12...v0.20.13) (2020-10-07)
 
 **Note:** Version bump only for package @cubejs-backend/oracle-driver
