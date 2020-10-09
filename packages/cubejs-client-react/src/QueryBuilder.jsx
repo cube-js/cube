@@ -568,6 +568,8 @@ export default class QueryBuilder extends React.Component {
   }
 }
 
+// touch
+
 QueryBuilder.contextType = CubeContext;
 
 QueryBuilder.defaultProps = {
