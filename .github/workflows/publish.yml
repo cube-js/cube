@@ -42,8 +42,6 @@ jobs:
           cmd: install
       - name: Lerna bootstrap
         run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
-      - name: Lerna lint
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
