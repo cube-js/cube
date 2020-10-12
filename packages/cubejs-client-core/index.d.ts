@@ -310,7 +310,7 @@ declare module '@cubejs-client/core' {
      * 
      * In case when you want to add `order` or `limit` to the query, you can simply spread it
      * 
-     * ```
+     * ```js
      * // An example for React
      * const drillDownResponse = useCubeQuery(
      *    {
