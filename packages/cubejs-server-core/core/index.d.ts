@@ -90,6 +90,7 @@ declare module "@cubejs-backend/server-core" {
     | "athena"
     | "bigquery"
     | "clickhouse"
+    | "druid"
     | "jdbc"
     | "hive"
     | "mongobi"
