@@ -23,10 +23,10 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.20.9":
-  version "0.20.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.20.9.tgz#ad8080eef53c58fc4dfb90cd2586751712d0e983"
-  integrity sha512-gtBwYJj8lGASZr8CwYGqNutBCiCCvg0yDIOZbZ66o1U0VLQuiMQEGnxtuBrF6B/RXVYt3RFySAZ2AOh28htlMA==
+"@cubejs-backend/query-orchestrator@^0.21.0":
+  version "0.21.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.21.0.tgz#7bc500e5bc40892d7c9a95ab33a55fb3f51cb6ed"
+  integrity sha512-0ocmCETgHecLzKhYr2FYpgH8AzPqe2Sx1THyFAuKXJkCDMGCVlrqCJ/G+AhUrU18YGHKt17nQ2HFzFM1wbEKzg==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
@@ -1965,9 +1965,9 @@ tar-stream@^2.0.0:
     readable-stream "^3.1.1"
 
 testcontainers@^4.0.9:
-  version "4.0.9"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.0.9.tgz#36164f082991b7cd1be5d8407d14a9c1aa006cae"
-  integrity sha512-Nxu7BSXGYWukHMN+E8bRUQ5v2Ag/e7RhZIobtvKA5NcqMXaPRWaSanCJBD+iLiE6qyMsDRQ+GAh98xcivOIzRA==
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.3.0.tgz#8b74447733f2e569138ab21ce457a61d21bdfaae"
+  integrity sha512-zhoa9n5zCGCIQPwpbx5bgfSGx0N2X1wRVdvB5b6gJbOefyO7MlETW2TsKghUX2LbNtJoydIhhblinJSSxUda5w==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
