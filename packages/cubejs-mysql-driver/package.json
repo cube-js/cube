@@ -12,6 +12,7 @@
     "node": ">=8.11.1"
   },
   "main": "driver/MySqlDriver.js",
+  "typings": "driver/index.d.ts",
   "scripts": {
     "integration": "jest",
     "integration:mysql": "jest",
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.21.0",
+    "@types/mysql": "^2.15.15",
     "generic-pool": "^3.6.0",
     "mysql": "^2.16.0"
   },
