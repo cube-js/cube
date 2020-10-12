@@ -860,19 +860,19 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/query-orchestrator@^0.19.61":
-  version "0.19.61"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.19.61.tgz#a293a3603ab1249648445c55631d4d3fd7ab987f"
-  integrity sha512-kngdZ66hflSyVqvzbNWhQRsXE1yZDv94Txnoj/xml2KNrfq+khWrIRS+qG6QwybHXcAIRxcOjhfsAC6VOgoaUQ==
+"@cubejs-backend/query-orchestrator@^0.21.0":
+  version "0.21.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.21.0.tgz#7bc500e5bc40892d7c9a95ab33a55fb3f51cb6ed"
+  integrity sha512-0ocmCETgHecLzKhYr2FYpgH8AzPqe2Sx1THyFAuKXJkCDMGCVlrqCJ/G+AhUrU18YGHKt17nQ2HFzFM1wbEKzg==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.19.61":
-  version "0.19.61"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.19.61.tgz#9172831e106ff879c8a9159f569cacc4e054215b"
-  integrity sha512-gjJsHuVQWi8YJc/AbpZUIIIeu/pHXxoq3wd5HiKEpgaw0rXbRkXARexrnKsNBPJfeGIAhv3gGbIeJd4NzMMSQw==
+"@cubejs-backend/schema-compiler@^0.21.0":
+  version "0.21.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.21.0.tgz#00bafb09581fdffe6000eebaeccc4c42e774105e"
+  integrity sha512-JuPv2qurmz15CwcJXpq/Yq7gOLW3toY3QERzp+oHNVthirrK8r7u6qoAy1FEX9+YYA43YizvHVWbsjdiS0Elgg==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -882,6 +882,7 @@
     "@babel/types" "^7.4.0"
     "@hapi/joi" "^15.1.1"
     antlr4 "^4.8.0"
+    cron-parser "^2.16.3"
     humps "^2.0.1"
     inflection "^1.12.0"
     lru-cache "^5.1.1"
@@ -1826,6 +1827,14 @@ core-util-is@1.0.2:
   resolved "https://registry.yarnpkg.com/core-util-is/-/core-util-is-1.0.2.tgz#b5fd54220aa2bc5ab57aab7140c940754503c1a7"
   integrity sha1-tf1UIgqivFq1eqtxQMlAdUUDwac=
 
+cron-parser@^2.16.3:
+  version "2.16.3"
+  resolved "https://registry.yarnpkg.com/cron-parser/-/cron-parser-2.16.3.tgz#acb8e405eed1733aac542fdf604cb7c1daf0204a"
+  integrity sha512-XNJBD1QLFeAMUkZtZQuncAAOgJFWNhBdIbwgD22hZxrcWOImBFMKgPC66GzaXpyoJs7UvYLLgPH/8BRk/7gbZg==
+  dependencies:
+    is-nan "^1.3.0"
+    moment-timezone "^0.5.31"
+
 cross-spawn@^6.0.0, cross-spawn@^6.0.5:
   version "6.0.5"
   resolved "https://registry.yarnpkg.com/cross-spawn/-/cross-spawn-6.0.5.tgz#4a5ec7c64dfae22c3a14124dbacdee846d80cbc4"
@@ -1992,7 +2001,7 @@ docker-modem@^2.1.0:
     split-ca "^1.0.1"
     ssh2 "^0.8.7"
 
-dockerode@^3.2.0:
+dockerode@^3.2.1:
   version "3.2.1"
   resolved "https://registry.yarnpkg.com/dockerode/-/dockerode-3.2.1.tgz#4a2222e3e1df536bf595e78e76d3cfbf6d4d93b9"
   integrity sha512-XsSVB5Wu5HWMg1aelV5hFSqFJaKS5x1aiV/+sT7YOzOq1IRl49I/UwV8Pe4x6t0iF9kiGkWu5jwfvbkcFVupBw==
@@ -2959,6 +2968,13 @@ is-glob@^4.0.0, is-glob@^4.0.1:
   integrity sha512-5G0tKtBTFImOqDnLB2hG6Bp2qcKEFduo4tZu9MT/H6NQv/ghhy30o55ufafxJ/LdH79LLs2Kfrn85TLKyA7BUg==
   dependencies:
     is-extglob "^2.1.1"
+
+is-nan@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/is-nan/-/is-nan-1.3.0.tgz#85d1f5482f7051c2019f5673ccebdb06f3b0db03"
+  integrity sha512-z7bbREymOqt2CCaZVly8aC4ML3Xhfi0ekuOnjO2L8vKdl+CttdVoGZQhd4adMFAsxQ5VeRVwORs4tU8RH+HFtQ==
+  dependencies:
+    define-properties "^1.1.3"
 
 is-number@^3.0.0:
   version "3.0.0"
@@ -5028,16 +5044,16 @@ test-exclude@^6.0.0:
     glob "^7.1.4"
     minimatch "^3.0.4"
 
-testcontainers@^2.4.0:
-  version "2.20.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-2.20.0.tgz#1d3977346e5724fc6f88e543774101d8529001a6"
-  integrity sha512-kq3oOf/ayA8qo9aqChcmBNB/Yjd5LBH17FsiD7zqlpXktXCQMrWJfM3qD82RwpHrPDobhLiopwTcBhIkJuMXJg==
+testcontainers@^4.3.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.3.0.tgz#8b74447733f2e569138ab21ce457a61d21bdfaae"
+  integrity sha512-zhoa9n5zCGCIQPwpbx5bgfSGx0N2X1wRVdvB5b6gJbOefyO7MlETW2TsKghUX2LbNtJoydIhhblinJSSxUda5w==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
     debug "^4.1.1"
     docker-compose "^0.23.5"
-    dockerode "^3.2.0"
+    dockerode "^3.2.1"
     get-port "^5.1.1"
     glob "^7.1.6"
     node-duration "^1.0.4"
