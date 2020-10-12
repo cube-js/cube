@@ -180,7 +180,8 @@ You'll get an error: `Error: Can't find join path to join 'A', 'C'`.
 The problem is joins are directed and if we try to connect `A` and `C` there's no path from `A` to `C` or either from `C` to `A`.
 On possible solution is to move `A-B` join from `B` cube to `A`:
 
-> **NOTE:** Moving the join affects semantics and results of a join which are discussed in previous section.
+[[warning | Note]]
+| Moving the join affects semantics and results of a join which are discussed in previous section.
 
 ```javascript
 cube(`A`, {

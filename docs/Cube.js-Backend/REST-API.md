@@ -129,7 +129,8 @@ Example response:
 }
 ```
 
-> **NOTE:** Currently all fetched numericals are returned in the same format as driver returns it without any additional processing. Most of drivers return numerical values as strings instead of javascript integer or float to ensure there's no loss of significance. Client code should take care of parsing such numerical values. 
+[[warning | Note]]
+| Currently all fetched numericals are returned in the same format as driver returns it without any additional processing. Most of drivers return numerical values as strings instead of javascript integer or float to ensure there's no loss of significance. Client code should take care of parsing such numerical values. 
 
 ### /v1/sql
 
@@ -259,7 +260,8 @@ Example response:
 
 Trigger scheduled refresh run to refresh pre-aggregations.
 
-> **NOTE:** Single call to this API may be not enough to refresh everything is pending. This call just populates queue with refresh workload and it should be continously called until refresh jobs are done. Otherwise refresh jobs will be marked orphaned and they will be removed from queue.
+[[warning | Note]]
+| Single call to this API may be not enough to refresh everything is pending. This call just populates queue with refresh workload and it should be continously called until refresh jobs are done. Otherwise refresh jobs will be marked orphaned and they will be removed from queue.
 
 Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date).
 

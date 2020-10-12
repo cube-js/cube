@@ -28,7 +28,8 @@ Set `REDIS_URL` environment variable to provide Cube.js with Redis connection. I
 Make sure, your Redis allows at least 15 concurrent connections.
 Set `REDIS_TLS` env variable to `true` if you want to enable secure connection.
 
-> **NOTE:** Cube.js server instances used by same tenant environments should have same Redis instances. Otherwise they will have different query queues which can lead to incorrect pre-aggregation states and intermittent data access errors.
+[[warning | Note]]
+| Cube.js server instances used by same tenant environments should have same Redis instances. Otherwise they will have different query queues which can lead to incorrect pre-aggregation states and intermittent data access errors.
 
 ### Redis Pool
 
@@ -45,13 +46,15 @@ Lower number of connections still can work however Redis becomes performance bot
 
 If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE_AND_QUEUE_DRIVER=memory` env setting.
 
-> **NOTE:** Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
+[[warning | Note]]
+| Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
 
 ## Express
 
 Cube.js server is an Express application itself and it can be served as part of an existing Express application.
 
-> **NOTE:** It is suitable to host single node applications this way without any significant load anticipated. Please consider deploying Cube.js as a micro service if you need to host multiple Cube.js instances.
+[[warning | Note]]
+| It is suitable to host single node applications this way without any significant load anticipated. Please consider deploying Cube.js as a micro service if you need to host multiple Cube.js instances.
 
 Minimal setup for such serving looks as following:
 

@@ -117,7 +117,8 @@ ordersCompletedCount: {
 ### rollingWindow
 If you want to calculate some metric within a window, for example a week or a month, you should use a `rollingWindow` parameter. The `trailing` and `leading` parameters define window size. 
 
-> **NOTE:** `rollingWindow` only works for a query where there's a single `timeDimension` with a defined date range.
+[[warning | Note]]
+| `rollingWindow` only works for a query where there's a single `timeDimension` with a defined date range.
 
 These parameters have a format defined as `(-?\d+) (minute|hour|day|week|month|year)`. The `trailing` and `leading` parameters can also be set to an `unbounded` value, which means infinite size for the corresponding window part. You can define `trailing` and `leading` parameters using negative integers.
 
