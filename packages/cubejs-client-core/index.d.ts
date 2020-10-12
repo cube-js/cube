@@ -307,6 +307,24 @@ declare module '@cubejs-client/core' {
      *   ]
      * }
      * ```
+     * 
+     * In case when you want to add `order` or `limit` to the query, you can simply spread it
+     * 
+     * ```
+     * // An example for React
+     * const drillDownResponse = useCubeQuery(
+     *    {
+     *      ...drillDownQuery,
+     *      limit: 30,
+     *      order: {
+     *        'Orders.ts': 'desc'
+     *      } 
+     *    },
+     *    {
+     *      skip: !drillDownQuery
+     *    }
+     *  );
+     * ```
      * @returns Drill down query
      */
     drillDown(drillDownLocator: DrillDownLocator, pivotConfig?: PivotConfig): Query | null;
