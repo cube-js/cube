@@ -178,7 +178,7 @@ declare module '@cubejs-client/react' {
     query?: Query;
   };
 
-  type QueryBuilderRenderProps = {
+  type QueryBuilderRenderProps = Partial<QueryRendererRenderProps> & {
     /**
      * Indicates whether the query is ready to be displayed or not
      */
