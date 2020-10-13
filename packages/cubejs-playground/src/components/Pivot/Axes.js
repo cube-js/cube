@@ -19,13 +19,11 @@ export default function Axes({ pivotConfig, onMove }) {
       }}
     >
       <Row>
-        <Col span={12}>
+        <Col span={12} style={{ minWidth: 160 }}>
           <DroppableArea pivotConfig={pivotConfig} axis="x" />
         </Col>
 
-        {/*<Divider style={{ height: '100%' }} type="vertical" />*/}
-
-        <Col span={12}>
+        <Col span={12} style={{ minWidth: 160 }}>
           <DroppableArea pivotConfig={pivotConfig} axis="y" />
         </Col>
       </Row>
