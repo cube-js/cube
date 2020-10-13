@@ -10,24 +10,12 @@ services:
     ports:
       - 4000
     volumes:
-      - .:/cube
+      - .:/cube/conf
     # Enable for production?
     #entrypoint: cube server
     # enabled by default
     # entrypoint cube dev-server
     entrypoint: tail -F anything
-
-  router:
-    image: mycompany:latest
-    depends_on:
-      - redis
-    links:
-      - redis
-    ports:
-      - 4000
-    volumes:
-      - .:/cube
-    entrypoint: cube dev-server
 
   redis:
     image: redis:5.0
