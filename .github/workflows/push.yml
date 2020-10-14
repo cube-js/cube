@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   unit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -51,7 +51,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -90,7 +90,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -132,7 +132,7 @@ jobs:
 
   integration-wrk-1:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
 
     services:
       redis:
@@ -145,7 +145,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x]
+        node-version: [12.x]
       fail-fast: false
 
     steps:
@@ -183,36 +183,42 @@ jobs:
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run Postgres Integration with 9.6
+        timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 9.6
       - name: Run Postgres Integration with 10
+        timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 10
       - name: Run Postgres Integration with 11
+        timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 11
       - name: Run Postgres Integration with 12
+        timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
         env:
           TEST_PGSQL_VERSION: 12
       - name: Run MS SQL Integration with 2017-latest
+        timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
         env:
           TEST_MSSQL_VERSION: 2017-latest
       - name: Run MS SQL Integration with 2019-latest
+        timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
@@ -221,7 +227,7 @@ jobs:
 
   integration-wrk-2:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
 
     services:
       redis:
@@ -234,7 +240,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x]
+        node-version: [12.x]
       fail-fast: false
 
     steps:
@@ -272,30 +278,35 @@ jobs:
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run MySQL Integration with 5.6
+        timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.6
       - name: Run MySQL Integration with 5.7
+        timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.7
       - name: Run Clickhouse Integration with 20.6
+        timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20.6
       - name: Run Clickhouse Integration with 20
+        timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20
       - name: Run Clickhouse Integration with 19
+        timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
           yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
@@ -304,7 +315,7 @@ jobs:
 
   integration-wrk-3:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
 
     services:
       redis:
@@ -317,7 +328,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x]
+        node-version: [12.x]
       fail-fast: false
 
     steps:
@@ -355,6 +366,7 @@ jobs:
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run PrestoDB Integration with Postgres 12.4
+        timeout-minutes: 15
         run: |
           docker pull lewuathe/presto-coordinator:${TEST_PRESTO_VERSION}
           docker pull lewuathe/presto-worker:${TEST_PRESTO_VERSION}
@@ -364,6 +376,7 @@ jobs:
           TEST_PGSQL_VERSION: 12.4
           TEST_PRESTO_VERSION: 341-SNAPSHOT
       - name: Run Druid Integration with 0.0.19
+        timeout-minutes: 15
         run: |
           docker pull postgres:${TEST_POSTGRES_VERSION}
           docker pull zookeeper:${TEST_ZOOKEEPER_VERSION}
@@ -373,3 +386,43 @@ jobs:
           TEST_POSTGRES_VERSION: latest
           TEST_ZOOKEEPER_VERSION: 3.5
           TEST_DRUID_VERSION: 0.19.0
+
+  docker-image-latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build only
+        uses: docker/build-push-action@v2
+        timeout-minutes: 15
+        with:
+          context: ./packages/cubejs-docker
+          file: ./packages/cubejs-docker/latest.Dockerfile
+          platforms: linux/amd64
+          push: false
+
+  docker-image-dev:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build only
+        uses: docker/build-push-action@v2
+        timeout-minutes: 15
+        with:
+          context: .
+          file: ./packages/cubejs-docker/dev.Dockerfile
+          platforms: linux/amd64
+          push: false
