@@ -39,9 +39,19 @@ const StyledForm = styled(Form)`
     }
 
     .ant-dropdown-trigger {
-      border-color: #ececf0;
-      padding: 13px 16px;
-      line-height: 13px;
+      padding: 5px 12px;
+    }
+  }
+`;
+
+const StyledFormItem = styled(Form.Item)`
+  && {
+    &:not(:last-child) {
+      margin-bottom: 16px;
+    }
+    
+    &:last-child {
+      margin-bottom: 0;
     }
   }
 `;
@@ -119,14 +129,14 @@ const CreateOwnModal = ({
       ]}
     >
       <StyledForm>
-        <Form.Item label="Framework">
+        <StyledFormItem label="Framework">
           <Dropdown overlay={frameworkMenu}>
             <Button>
               {frameworkItem && frameworkItem.title}
               <DropdownIcon />
             </Button>
           </Dropdown>
-        </Form.Item>
+        </StyledFormItem>
         {frameworkItem && frameworkItem.docsLink && (
           <Alert
             style={{ marginBottom: 23 }}
@@ -155,7 +165,7 @@ const CreateOwnModal = ({
             }
           />
         )}
-        <Form.Item label="Main Template">
+        <StyledFormItem label="Main Template">
           <Dropdown
             overlay={templatePackagesMenu}
             disabled={!!frameworkItem.docsLink}
@@ -165,8 +175,8 @@ const CreateOwnModal = ({
               <DropdownIcon />
             </Button>
           </Dropdown>
-        </Form.Item>
-        <Form.Item label="Charting Library">
+        </StyledFormItem>
+        <StyledFormItem label="Charting Library">
           <Dropdown
             overlay={chartLibrariesMenu}
             disabled={!!frameworkItem.docsLink}
@@ -176,15 +186,15 @@ const CreateOwnModal = ({
               <DropdownIcon />
             </Button>
           </Dropdown>
-        </Form.Item>
-        <Form.Item label="Web Socket Transport (Real-time)">
+        </StyledFormItem>
+        <StyledFormItem label="Web Socket Transport (Real-time)">
           <Switch
             checked={enableWebSocketTransport}
             onChange={(checked) =>
               onChange('enableWebSocketTransport', checked)
             }
           />
-        </Form.Item>
+        </StyledFormItem>
       </StyledForm>
     </StyledModal>
   );

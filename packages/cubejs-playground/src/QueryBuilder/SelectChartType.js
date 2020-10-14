@@ -33,7 +33,7 @@ const SelectChartType = ({ chartType, updateChartType }) => {
 
   const foundChartType = ChartTypes.find((t) => t.name === chartType);
   return (
-    <ButtonDropdown overlay={menu} icon={foundChartType.icon}>
+    <ButtonDropdown overlay={menu} icon={foundChartType.icon} style={{ border: 0 }}>
       {foundChartType.title}
     </ButtonDropdown>
   );

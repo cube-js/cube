@@ -3,7 +3,7 @@ body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f8f8fb;
+  background: #f3f3fc;
   overflow-x: hidden;
 }
 
@@ -25,7 +25,7 @@ code {
 .schema-sidebar {
   background: #fff;
   border-right: 1px solid #eee;
-  padding: 0 12px;
+  padding: 0;
 }
 
 .schema-sidebar .ant-tabs-tabpane {

@@ -1,11 +1,11 @@
 import React from 'react';
-import { Tabs } from 'antd';
+import { Divider } from 'antd';
 import Axes from '../Pivot/Axes';
 import Options from '../Pivot/Options';
 import OrderGroup from '../Order/OrderGroup';
 import Limit from './Limit';
-
-const { TabPane } = Tabs;
+import { Button, Popover } from '../../components';
+import Text from 'antd/lib/typography/Text';
 
 export default function Settings({
   pivotConfig,
@@ -15,28 +15,69 @@ export default function Settings({
   onUpdate,
   onReorder,
   onOrderChange,
+  isQueryPresent,
 }) {
   return (
-    <Tabs style={{ width: 340 }}>
-      <TabPane tab="Pivot" key="1">
-        <Axes pivotConfig={pivotConfig} onMove={onMove} />
-      </TabPane>
+    <>
+      <Text style={{ lineHeight: '32px' }}>Settings:</Text>
+      <Popover
+        content={
+          <>
+            <Axes pivotConfig={pivotConfig} onMove={onMove} />
+            <Divider style={{ margin: 0 }} />
+            <div style={{ padding: '8px' }}>
+              <Options pivotConfig={pivotConfig} onUpdate={onUpdate} />
+            </div>
+          </>
+        }
+        placement="bottomLeft"
+        trigger="click"
+      >
+        <Button
+          disabled={!isQueryPresent}
+          style={{ border: 0 }}
+        >
+          Pivot
+        </Button>
+      </Popover>
 
-      <TabPane tab="Pivot Options" key="2">
-        <Options pivotConfig={pivotConfig} onUpdate={onUpdate} />
-      </TabPane>
+      <Popover
+        content={
+          <div style={{ padding: '8px' }}>
+            <Limit limit={limit} onUpdate={onUpdate} />
+          </div>
+        }
+        placement="bottomLeft"
+        trigger="click"
+      >
+        <Button
+          disabled={!isQueryPresent}
+          style={{ border: 0 }}
+        >
+          Order
+        </Button>
+      </Popover>
 
-      <TabPane tab="Order" key="3">
-        <OrderGroup
-          orderMembers={orderMembers}
-          onReorder={onReorder}
-          onOrderChange={onOrderChange}
-        />
-      </TabPane>
-
-      <TabPane tab="Limit" key="4">
-        <Limit limit={limit} onUpdate={onUpdate} />
-      </TabPane>
-    </Tabs>
+      <Popover
+        content={
+          <div style={{ padding: '8px' }}>
+            <OrderGroup
+              orderMembers={orderMembers}
+              onReorder={onReorder}
+              onOrderChange={onOrderChange}
+            />
+          </div>
+        }
+        placement="bottomLeft"
+        trigger="click"
+      >
+        <Button
+          disabled={!isQueryPresent}
+          style={{ border: 0 }}
+        >
+          Limit
+        </Button>
+      </Popover>
+    </>
   );
 }

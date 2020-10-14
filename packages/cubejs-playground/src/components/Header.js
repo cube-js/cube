@@ -1,62 +1,88 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BookOutlined, MenuOutlined, SlackOutlined } from '@ant-design/icons';
-import { Layout, Menu, Dropdown } from 'antd';
+import { FileFilled, MenuOutlined, SlackOutlined } from '@ant-design/icons';
+import { Dropdown, Layout, Menu } from 'antd';
 import * as PropTypes from 'prop-types';
 import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
+import vars from '../variables';
+
+const StyledHeader = styled(Layout.Header)`
+  && {
+    background-color: ${vars.dark02Color};
+    color: white;
+    padding: 0 16px; 
+    line-height: 44px; 
+    height: 48px;
+  }
+`;
 
 const StyledMenu = styled(Menu)`
-  background: #eeeef5 !important;
-  border-bottom: 0;
+  && {
+    background: transparent;
+    border-bottom: 0;
+  }
 `;
 
 const StyledMenuItem = styled(Menu.Item)`
-  font-size: 15px;
-  font-weight: 500;
-  & > a {
-    opacity: 0.6;
-  }
-  &.ant-menu-item-selected,
-  &.ant-menu-item-active {
-    a {
-      opacity: 1;
+  &&& {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 48px;
+    height: 49px;
+    & > a {
+      &, &:hover {
+        opacity: 0.6;
+        color: white;
+      }
     }
-  }
-
-  &&:not(.ant-menu-item-selected) {
-    &.ant-menu-item-active,
-    &:hover {
-      color: #43436b;
-      border-bottom: 2px solid transparent;
+    &.ant-menu-item-selected,
+    &.ant-menu-item-active {
+      color: white;
+      border-bottom: 2px solid white;
+      
+      &:hover {
+        border-bottom: 2px solid white;      
+      }
+    
+      a {
+        opacity: 1;
+        color: white;
+      }
+    }
+  
+    &:not(.ant-menu-item-selected) {
+      &.ant-menu-item-active,
+      &:hover {
+        color: white;
+        border-bottom: 2px solid white;
+      }
     }
   }
 `;
 
 const StyledMenuButton = styled.a`
-  float: right;
-  height: 32px;
-  margin: 8px ${(props) => (props.noMargin ? '0' : '8px')};
-  border: 0.5px solid rgba(67, 67, 107, 0.4);
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  color: #43436b;
-  transition: all 0.25s ease;
-  padding: 0 10px;
-
-  span {
-    font-size: 20px;
-    margin-right: 10px;
-    opacity: 0.3;
-  }
-
-  &:hover {
+  &&& {
+    float: right;
+    height: 32px;
+    margin: 8px ${(props) => (props.noMargin ? '0' : '8px')};
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    color: white;
+    transition: all 0.25s ease;
+    padding: 0 10px;
+  
     span {
-      opacity: 0.6;
+      font-size: 14px;
+      margin-right: 10px;
     }
-    border-color: rgba(67, 67, 107, 1);
-    color: #43436b;
+  
+    &:hover {
+      border-color: white;
+      color: white;
+    }
   }
 `;
 
@@ -70,11 +96,11 @@ const Header = ({ selectedKeys }) => {
   });
 
   return (
-    <Layout.Header style={{ padding: '0 32px' }}>
+    <StyledHeader>
       <div style={{ float: 'left' }}>
         <img
           src="./cubejs-playground-logo.svg"
-          style={{ display: 'inline', height: 28, marginRight: 28 }}
+          style={{ height: 28, marginRight: 28 }}
           alt=""
         />
       </div>
@@ -103,7 +129,7 @@ const Header = ({ selectedKeys }) => {
             href="https://cube.dev/docs"
             target="_blank"
           >
-            <BookOutlined />
+            <FileFilled />
             Docs
           </StyledMenuButton>
         </StyledMenu>
@@ -129,7 +155,7 @@ const Header = ({ selectedKeys }) => {
           </Dropdown>
         </div>
       )}
-    </Layout.Header>
+    </StyledHeader>
   );
 };
 

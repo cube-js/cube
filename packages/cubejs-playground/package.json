@@ -19,7 +19,7 @@
     "@cubejs-client/core": "^0.21.0",
     "@cubejs-client/react": "^0.21.0",
     "antd": "^4.2.0",
-    "bizcharts": "^3.4.3",
+    "bizcharts": "3.5.9",
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
@@ -45,7 +45,7 @@
     "react-source-render": "4.0.0-1",
     "recharts": "^1.7.1",
     "sql-formatter": "^2.3.2",
-    "styled-components": "^4.4.1",
+    "styled-components": "5.2.0",
     "uuid": "^3.3.3",
     "whatwg-fetch": "^3.0.0"
   },
