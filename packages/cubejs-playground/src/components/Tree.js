@@ -1,6 +1,5 @@
 import styled from 'styled-components';
 import { Tree as AntdTree } from 'antd';
-// import vars from '../variables';
 
 const StyledTree = styled(AntdTree)`
   && {

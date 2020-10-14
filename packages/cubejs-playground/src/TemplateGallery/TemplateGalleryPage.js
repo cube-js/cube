@@ -9,7 +9,6 @@ import { chartLibraries } from '../ChartRenderer';
 import { Button, Card } from '../components';
 import { ReactComponent as PlusSVG } from './plus.svg';
 import CreateOwnModal from './CreateOwnModal';
-import vars from '../variables';
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>
@@ -35,13 +34,13 @@ const RecipeCard = styled(Card)`
     padding: 16px;
     ${(props) => (props.createYourOwn ? `
       background: transparent;
-      border: 1px solid ${vars.purple03Color};
+      border: 1px solid var(--purple-03-color);
     ` : '')}
     
     &:hover {
       padding: 16px;
       ${(props) => (props.createYourOwn ? `
-        border: 1px solid ${vars.purple03Color};
+        border: 1px solid var(--purple-03-color);
       ` : 'border: none;')}
     } 
     
@@ -98,7 +97,7 @@ const RecipeCard = styled(Card)`
     }
     
     svg path {
-      stroke: ${vars.primaryColor};
+      stroke: var(--primary-color);
     }
   
     && .ant-card-body {
@@ -117,13 +116,13 @@ const RecipeCard = styled(Card)`
   
     && .ant-card-meta-title {
       white-space: unset;
-      color: ${props => props.createYourOwn ? vars.primaryColor : vars.textColor};
+      color: ${props => props.createYourOwn ? 'var(--primary-color)' : 'var(--text-color)'};
       text-align: ${props => props.createYourOwn ? 'center' : 'left'};
       margin-bottom: 16px;
     }
   
     && .ant-card-meta-description {
-      color: ${props => props.createYourOwn ? vars.primaryColor : vars.dark03Color};
+      color: ${props => props.createYourOwn ? 'var(--primary-color)' : 'var(--dark-03-color)'};
       opacity: ${props => props.createYourOwn ? '0.8' : 1};
       font-size: 13px;
       text-align: ${props => props.createYourOwn ? 'center' : 'left'};

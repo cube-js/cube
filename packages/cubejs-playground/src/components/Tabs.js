@@ -1,6 +1,5 @@
 import styled from 'styled-components';
 import { Tabs as AntdTabs } from 'antd';
-// import vars from '../variables';
 
 const StyledTabs = styled(AntdTabs)`
   && {

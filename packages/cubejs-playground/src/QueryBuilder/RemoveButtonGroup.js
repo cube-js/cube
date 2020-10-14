@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import * as PropTypes from 'prop-types';
 import { CloseOutlined } from '@ant-design/icons';
 import { Button } from '../components';
-import vars from '../variables';
 
 const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group {...props}>
@@ -21,21 +20,21 @@ RemoveButtonGroup.propTypes = {
 
 const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
   && {
-    border: 1px solid ${vars.primaryColor};
-    color: ${vars.primaryColor};
-    border-radius: calc(${vars.borderRadiusBase} + 1px);
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    border-radius: calc(var(--border-radius-base) + 1px);
   
     .ant-btn {
-      background-color: ${vars.primary9};
-      color: ${vars.primaryColor};
+      background-color: var(--primary-9);
+      color: var(--primary-color);
       border: none;
       
       span {
-        color: ${vars.primaryColor};
+        color: var(--primary-color);
       }
       
       &:hover {
-        background-color: ${vars.primary8};
+        background-color: var(--primary-8);
         border: none;
         box-shadow: none;
       }
@@ -47,11 +46,11 @@ const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
 
     .remove-btn {
       background-color: white !important;    
-      color: ${vars.primaryColor};
+      color: var(--primary-color);
       padding: 8px;
       
       &:hover {
-        background-color: ${vars.removeBtnHoverBg} !important;
+        background-color: var(--remove-btn-hover-bg) !important;
       }
       
       .anticon {

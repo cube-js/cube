@@ -1,6 +1,5 @@
 import styled from 'styled-components';
 import { Card as AntdCard } from 'antd';
-// import vars from '../variables';
 
 const StyledCard = styled(AntdCard)`
   && {

@@ -1,7 +1,20 @@
 import { createGlobalStyle } from 'styled-components';
-import vars from '../variables';
+import VARIABLES from '../variables';
+
+const CSS_PROPERTIES = {};
+
+Object.keys(VARIABLES)
+  .forEach((key) => {
+    CSS_PROPERTIES[`--${key}`] = VARIABLES[key];
+  });
 
 const GlobalStyles = createGlobalStyle`
+  body {
+    ${ Object.entries(CSS_PROPERTIES).map(([key, value]) => {
+      return `${key}: ${value};`;
+    }).join('\n    ')}
+  }
+
   .inline-code {
     margin: 0 1px;
     padding: 0.2em 0.4em;
@@ -39,7 +52,7 @@ const GlobalStyles = createGlobalStyle`
   
   code[class*="language-"],
   pre[class*="language-"] {
-    color: ${vars.dark01Color};
+    color: var(--dark-01-color);
     background: none;
     /*text-shadow: 0 1px white;*/
     font-family: "Roboto Mono", Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
@@ -105,11 +118,11 @@ const GlobalStyles = createGlobalStyle`
   .token.prolog,
   .token.doctype,
   .token.cdata {
-    color: ${vars.dark03Color};
+    color: var(--dark-03-color);
   }
   
   .token.punctuation {
-    color: ${vars.dark03Color};
+    color: var(--dark-03-color);
   }
   
   .namespace {
@@ -123,7 +136,7 @@ const GlobalStyles = createGlobalStyle`
   .token.constant,
   .token.symbol,
   .token.deleted {
-    color: ${vars.pinkColor};
+    color: var(--pink-color);
   }
   
   .token.selector,
@@ -132,7 +145,7 @@ const GlobalStyles = createGlobalStyle`
   .token.char,
   .token.builtin,
   .token.inserted {
-    color: ${vars.purpleColor};
+    color: var(--purple-color);
   }
   
   .token.operator,
@@ -140,13 +153,13 @@ const GlobalStyles = createGlobalStyle`
   .token.url,
   .language-css .token.string,
   .style .token.string {
-    color: ${vars.dark01Color};
+    color: var(--dark-01-color);
   }
   
   .token.atrule,
   .token.attr-value,
   .token.keyword {
-    color: ${vars.dark01Color};
+    color: var(--dark-01-color);
   }
   
   .token.atrule,
@@ -156,13 +169,13 @@ const GlobalStyles = createGlobalStyle`
   
   .token.function,
   .token.class-name {
-    color: ${vars.pinkColor};
+    color: var(--pink-color);
   }
   
   .token.regex,
   .token.important,
   .token.variable {
-    color: ${vars.pinkColor};
+    color: var(--pink-color);
   }
   
   .token.important,

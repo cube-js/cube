@@ -2,7 +2,6 @@ import React from 'react';
 import { Typography } from 'antd';
 import { Droppable } from 'react-beautiful-dnd';
 import Item from './Item';
-import vars from '../../variables';
 
 export default function DroppableArea({ pivotConfig, axis }) {
   return (
@@ -13,8 +12,8 @@ export default function DroppableArea({ pivotConfig, axis }) {
           display: 'flex',
           justifyContent: 'center',
           padding: '8px 16px',
-          background: vars.light5Color,
-          borderBottom: `1px solid ${vars.lightColor}`,
+          background: 'var(--light-5)',
+          borderBottom: '1px solid var(--light-color)',
         }}
       >
         {axis}

@@ -1,6 +1,5 @@
 import styled from 'styled-components';
 import { Menu as AntdMenu } from 'antd';
-import vars from '../variables';
 
 const StyledMenu = styled(AntdMenu)`
   && {
@@ -23,7 +22,7 @@ StyledMenu.Item = styled(AntdMenu.Item)`
     }
   
     &.ant-menu-item-selected {
-      color: ${vars.primaryColor};
+      color: var(--primary-color);
     
       &::after {
         border-color: transparent;
