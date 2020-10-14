@@ -1,9 +1,7 @@
 import React from 'react';
-import { Button, Typography, Radio } from 'antd';
+import { Typography, Radio } from 'antd';
 import { Draggable } from 'react-beautiful-dnd';
 import { DragOutlined } from '@ant-design/icons';
-
-const orderOptions = ['asc', 'desc', 'none'];
 
 export default function DraggableItem({
   id,
@@ -12,11 +10,6 @@ export default function DraggableItem({
   children,
   onOrderChange,
 }) {
-  const getNextOrder = () => {
-    const index = orderOptions.indexOf(order) + 1;
-    return orderOptions[index > 2 ? 0 : index];
-  };
-
   return (
     <Draggable draggableId={id} index={index}>
       {({ draggableProps, dragHandleProps, innerRef }) => (

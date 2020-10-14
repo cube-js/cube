@@ -106,9 +106,9 @@ class DashboardPage extends Component {
       return (
         <Frame>
           <h2>&nbsp;Creating Dashboard App</h2>
-          <p>
+          <div>
             <Spin tip="It may take several minutes. Please check console for progress..." />
-          </p>
+          </div>
           <Hint />
         </Frame>
       );

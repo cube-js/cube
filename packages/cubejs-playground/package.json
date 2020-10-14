@@ -19,7 +19,7 @@
     "@cubejs-client/core": "^0.20.11",
     "@cubejs-client/react": "^0.20.11",
     "antd": "^4.2.0",
-    "bizcharts": "^3.4.3",
+    "bizcharts": "3.5.9",
     "chart.js": "^2.7.3",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
