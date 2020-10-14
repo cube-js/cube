@@ -6,11 +6,10 @@ import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import { SectionRow } from '../components';
-import vars from '../variables';
 import styled from 'styled-components';
 
 const Label = styled.div`
-  color: ${vars.dark03Color};
+  color: var(--dark-03-color);
   line-height: 32px;
 `;
 

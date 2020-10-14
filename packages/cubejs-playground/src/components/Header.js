@@ -5,11 +5,10 @@ import { Dropdown, Layout, Menu } from 'antd';
 import * as PropTypes from 'prop-types';
 import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
-import vars from '../variables';
 
 const StyledHeader = styled(Layout.Header)`
   && {
-    background-color: ${vars.dark02Color};
+    background-color: var(--dark-02-color);
     color: white;
     padding: 0 16px; 
     line-height: 44px; 

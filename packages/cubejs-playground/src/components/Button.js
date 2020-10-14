@@ -1,24 +1,23 @@
 import styled from 'styled-components';
 import { Button as AntdButton } from 'antd';
-import vars from '../variables';
 
 const StyledButton = styled(AntdButton)`
   && {
     padding: 5px 12px;
     height: auto;
-    border-color: ${vars.dark05Color}; 
-    color: ${vars.textColor};
+    border-color: var(--dark-05-color); 
+    color: var(--text-color);
     box-shadow: none;
 
     &:hover, &:active, &:focus {
-      border-color: ${vars.purple04Color};
-      color: ${vars.primaryColor};
+      border-color: var(--purple-04-color);
+      color: var(--primary-color);
     }
     
     &.ant-btn-primary:not([disabled]) {
-      background: ${vars.primaryColor};
+      background: var(--primary-color);
       color: white;
-      border-color: ${vars.primaryColor};
+      border-color: var(--primary-color);
       place-self: center;
     }
     
@@ -47,29 +46,29 @@ const StyledButton = styled(AntdButton)`
 
 StyledButton.Group = styled(AntdButton.Group)`
   &&& .ant-btn-primary:not([disabled]) {
-    background-color: ${vars.primaryBg};
-    color: ${vars.primaryColor};
-    border: 1px solid ${vars.primaryColor};
+    background-color: var(--primary-bg);
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
     
     &:not(:first-child):not(:last-child) {
-      border-left-color: ${vars.primaryColor};
-      border-right-color: ${vars.primaryColor};
+      border-left-color: var(--primary-color);
+      border-right-color: var(--primary-color);
     }
     
     &:first-child {
-      border-right-color: ${vars.primaryColor};
+      border-right-color: var(--primary-color);
     }
     
     &:last-child {
-      border-left-color: ${vars.primaryColor};
+      border-left-color: var(--primary-color);
     }
   }
 
   && .ant-btn-primary:not([disabled]) + .ant-btn:not(.ant-btn-primary):not([disabled]) {
-    border-left-color: ${vars.primaryColor};
+    border-left-color: var(--primary-color);
     
     &:hover, &:active, &:focus {
-      border-left-color: ${vars.primaryColor};
+      border-left-color: var(--primary-color);
     }
   }
 `;
