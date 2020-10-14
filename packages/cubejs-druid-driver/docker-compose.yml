@@ -37,6 +37,7 @@ services:
     image: apache/druid:0.19.0
     container_name: coordinator
     volumes:
+      - ./conf:/opt/apache-druid-0.19.0/conf/druid/cluster:rw
       - ./storage:/opt/data
       - coordinator_var:/opt/druid/var
     depends_on:
@@ -54,6 +55,7 @@ services:
     image: apache/druid:0.19.0
     container_name: broker
     volumes:
+      - ./conf:/opt/apache-druid-0.19.0/conf/druid/cluster:rw
       - broker_var:/opt/druid/var
     depends_on:
       - zookeeper
@@ -71,6 +73,7 @@ services:
     image: apache/druid:0.19.0
     container_name: historical
     volumes:
+      - ./conf:/opt/apache-druid-0.19.0/conf/druid/cluster:rw
       - ./storage:/opt/data
       - historical_var:/opt/druid/var
     depends_on:
@@ -89,6 +92,7 @@ services:
     image: apache/druid:0.19.0
     container_name: middlemanager
     volumes:
+      - ./conf:/opt/apache-druid-0.19.0/conf/druid/cluster:rw
       - ./storage:/opt/data
       - middle_var:/opt/druid/var
     depends_on:
@@ -107,6 +111,7 @@ services:
     image: apache/druid:0.19.0
     container_name: router
     volumes:
+      - ./conf:/opt/apache-druid-0.19.0/conf/druid/cluster:rw
       - router_var:/opt/druid/var
     depends_on:
       - zookeeper

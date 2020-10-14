@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ ~ Licensed to the Apache Software Foundation (ASF) under one
+ ~ or more contributor license agreements.  See the NOTICE file
+ ~ distributed with this work for additional information
+ ~ regarding copyright ownership.  The ASF licenses this file
+ ~ to you under the Apache License, Version 2.0 (the
+ ~ "License"); you may not use this file except in compliance
+ ~ with the License.  You may obtain a copy of the License at
+ ~
+ ~   http://www.apache.org/licenses/LICENSE-2.0
+ ~
+ ~ Unless required by applicable law or agreed to in writing,
+ ~ software distributed under the License is distributed on an
+ ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ ~ KIND, either express or implied.  See the License for the
+ ~ specific language governing permissions and limitations
+ ~ under the License.
+-->
+
+<Configuration status="WARN">
+  <Appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Root level="info">
+      <AppenderRef ref="Console"/>
+    </Root>
+
+    <!-- Set level="debug" to see stack traces for query errors -->
+    <Logger name="org.apache.druid.server.QueryResource" level="info" additivity="false">
+      <Appender-ref ref="Console"/>
+    </Logger>
+    <Logger name="org.apache.druid.server.QueryLifecycle" level="info" additivity="false">
+      <Appender-ref ref="Console"/>
+    </Logger>
+
+    <!-- Set level="debug" or "trace" to see more Coordinator details (segment balancing, load/drop rules, etc) -->
+    <Logger name="org.apache.druid.server.coordinator" level="info" additivity="false">
+      <Appender-ref ref="Console"/>
+    </Logger>
+
+    <!-- Set level="debug" to see low-level details about segments and ingestion -->
+    <Logger name="org.apache.druid.segment" level="info" additivity="false">
+      <Appender-ref ref="Console"/>
+    </Logger>
+
+    <!-- Set level="debug" to see more information about extension initialization -->
+    <Logger name="org.apache.druid.initialization" level="info" additivity="false">
+      <Appender-ref ref="Console"/>
+    </Logger>
+
+    <!-- Quieter logging at startup -->
+    <Logger name="org.skife.config" level="warn" additivity="false">
+      <Appender-ref ref="Console"/>
+    </Logger>
+    <Logger name="com.sun.jersey.guice" level="warn" additivity="false">
+      <Appender-ref ref="Console"/>
+    </Logger>
+  </Loggers>
+</Configuration>
