@@ -2,6 +2,8 @@
 
 [See in action](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) · [Read the blog post](https://cube.dev/blog?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe) · [Run and deploy](#deploying-to-heroku)
 
+<a href="https://www.producthunt.com/posts/slack-vibe?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-slack-vibe" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=261971&theme=light" alt="Slack Vibe 🎉 - Open source analytics for Slack | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+
 [![Slack Vibe animation](./frontend/public/animated-image.png)](https://slack-vibe.cubecloudapp.dev?utm_source=product&utm_medium=github-readme&utm_campaign=slack-vibe)
 
 ## About Slack Vibe 🎉

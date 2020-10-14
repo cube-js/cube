@@ -1,0 +1,480 @@
+0 silly argv {
+0 silly argv   _: [ 'version' ],
+0 silly argv   'github-release': true,
+0 silly argv   githubRelease: true,
+0 silly argv   'conventional-commits': true,
+0 silly argv   conventionalCommits: true,
+0 silly argv   lernaVersion: '3.13.1',
+0 silly argv   '$0': '/Users/alex/Projects/cube.js/node_modules/.bin/lerna',
+0 silly argv   bump: 'patch'
+0 silly argv }
+1 notice cli v3.13.1
+2 verbose rootPath /Users/alex/Projects/cube.js
+3 info current version 0.20.1
+4 silly isAnythingCommitted
+5 verbose isAnythingCommitted 1
+6 silly currentBranch
+7 verbose currentBranch master
+8 silly remoteBranchExists
+9 silly isBehindUpstream
+10 silly isBehindUpstream master is behind origin/master by 0 commit(s) and ahead by 0
+11 silly hasTags
+12 verbose hasTags true
+13 silly git-describe.sync "v0.20.1-2-gdbf602e5" => {"lastTagName":"v0.20.1","lastVersion":"v0.20.1","refCount":"2","sha":"dbf602e5","isDirty":false}
+14 info Looking for changed packages since v0.20.1
+15 silly checking diff packages/cubejs-api-gateway
+16 silly found diff in packages/cubejs-api-gateway/SubscriptionServer.js
+16 silly found diff in packages/cubejs-api-gateway/index.js
+17 verbose filtered diff [
+17 verbose filtered diff   'packages/cubejs-api-gateway/SubscriptionServer.js',
+17 verbose filtered diff   'packages/cubejs-api-gateway/index.js'
+17 verbose filtered diff ]
+18 silly checking diff packages/cubejs-athena-driver
+19 silly no diff found in @cubejs-backend/athena-driver
+20 silly checking diff packages/cubejs-bigquery-driver
+21 silly no diff found in @cubejs-backend/bigquery-driver
+22 silly checking diff packages/cubejs-cli
+23 silly no diff found in cubejs-cli
+24 silly checking diff packages/cubejs-clickhouse-driver
+25 silly no diff found in @cubejs-backend/clickhouse-driver
+26 silly checking diff packages/cubejs-client-core
+27 silly found diff in packages/cubejs-client-core/src/ResultSet.js
+27 silly found diff in packages/cubejs-client-core/src/index.js
+28 verbose filtered diff [
+28 verbose filtered diff   'packages/cubejs-client-core/src/ResultSet.js',
+28 verbose filtered diff   'packages/cubejs-client-core/src/index.js'
+28 verbose filtered diff ]
+29 silly checking diff packages/cubejs-client-ngx
+30 silly no diff found in @cubejs-client/ngx
+31 silly checking diff packages/cubejs-client-react
+32 silly no diff found in @cubejs-client/react
+33 silly checking diff packages/cubejs-client-vue
+34 silly no diff found in @cubejs-client/vue
+35 silly checking diff packages/cubejs-client-ws-transport
+36 silly no diff found in @cubejs-client/ws-transport
+37 silly checking diff packages/cubejs-dremio-driver
+38 silly no diff found in @cubejs-backend/dremio-driver
+39 silly checking diff packages/cubejs-elasticsearch-driver
+40 silly no diff found in @cubejs-backend/elasticsearch-driver
+41 silly checking diff packages/cubejs-hive-driver
+42 silly no diff found in @cubejs-backend/hive-driver
+43 silly checking diff packages/cubejs-jdbc-driver
+44 silly no diff found in @cubejs-backend/jdbc-driver
+45 silly checking diff packages/cubejs-mongobi-driver
+46 silly no diff found in @cubejs-backend/mongobi-driver
+47 silly checking diff packages/cubejs-mssql-driver
+48 silly no diff found in @cubejs-backend/mssql-driver
+49 silly checking diff packages/cubejs-mysql-driver
+50 silly no diff found in @cubejs-backend/mysql-driver
+51 silly checking diff packages/cubejs-oracle-driver
+52 silly no diff found in @cubejs-backend/oracle-driver
+53 silly checking diff packages/cubejs-playground
+54 silly found diff in packages/cubejs-playground/src/PlaygroundQueryBuilder.js
+54 silly found diff in packages/cubejs-playground/src/QueryBuilder/RemoveButtonGroup.js
+54 silly found diff in packages/cubejs-playground/src/QueryBuilder/TimeGroup.js
+55 verbose filtered diff [
+55 verbose filtered diff   'packages/cubejs-playground/src/PlaygroundQueryBuilder.js',
+55 verbose filtered diff   'packages/cubejs-playground/src/QueryBuilder/RemoveButtonGroup.js',
+55 verbose filtered diff   'packages/cubejs-playground/src/QueryBuilder/TimeGroup.js'
+55 verbose filtered diff ]
+56 silly checking diff packages/cubejs-postgres-driver
+57 silly no diff found in @cubejs-backend/postgres-driver
+58 silly checking diff packages/cubejs-prestodb-driver
+59 silly no diff found in @cubejs-backend/prestodb-driver
+60 silly checking diff packages/cubejs-query-orchestrator
+61 silly no diff found in @cubejs-backend/query-orchestrator
+62 silly checking diff packages/cubejs-schema-compiler
+63 silly no diff found in @cubejs-backend/schema-compiler
+64 silly checking diff packages/cubejs-server-core
+65 silly no diff found in @cubejs-backend/server-core
+66 silly checking diff packages/cubejs-server
+67 silly no diff found in @cubejs-backend/server
+68 silly checking diff packages/cubejs-serverless-aws
+69 silly no diff found in @cubejs-backend/serverless-aws
+70 silly checking diff packages/cubejs-serverless-google
+71 silly no diff found in @cubejs-backend/serverless-google
+72 silly checking diff packages/cubejs-serverless
+73 silly no diff found in @cubejs-backend/serverless
+74 silly checking diff packages/cubejs-snowflake-driver
+75 silly no diff found in @cubejs-backend/snowflake-driver
+76 silly checking diff packages/cubejs-sqlite-driver
+77 silly no diff found in @cubejs-backend/sqlite-driver
+78 verbose updated @cubejs-backend/api-gateway
+79 verbose updated @cubejs-client/core
+80 verbose updated @cubejs-client/ngx
+81 verbose updated @cubejs-client/react
+82 verbose updated @cubejs-client/playground
+83 verbose updated @cubejs-backend/server-core
+84 verbose updated @cubejs-backend/server
+85 verbose updated @cubejs-backend/serverless-aws
+86 verbose updated @cubejs-backend/serverless-google
+87 verbose updated @cubejs-backend/serverless
+88 verbose git-describe undefined => "v0.20.1-2-gdbf602e5"
+89 silly git-describe parsed => {"lastTagName":"v0.20.1","lastVersion":"v0.20.1","refCount":"2","sha":"dbf602e5","isDirty":false}
+90 silly batched [
+90 silly batched   PackageGraphNode {
+90 silly batched     name: '@cubejs-backend/api-gateway',
+90 silly batched     externalDependencies: Map(15) {
+90 silly batched       'eslint' => [Object],
+90 silly batched       'eslint-plugin-node' => [Object],
+90 silly batched       'express' => [Object],
+90 silly batched       'jest' => [Object],
+90 silly batched       'mocha' => [Object],
+90 silly batched       'should' => [Object],
+90 silly batched       'supertest' => [Object],
+90 silly batched       '@hapi/joi' => [Object],
+90 silly batched       'body-parser' => [Object],
+90 silly batched       'chrono-node' => [Object],
+90 silly batched       'jsonwebtoken' => [Object],
+90 silly batched       'moment' => [Object],
+90 silly batched       'moment-timezone' => [Object],
+90 silly batched       'ramda' => [Object],
+90 silly batched       'uuid' => [Object]
+90 silly batched     },
+90 silly batched     localDependencies: Map(0) {},
+90 silly batched     localDependents: Map(1) { '@cubejs-backend/server-core' => [PackageGraphNode] }
+90 silly batched   },
+90 silly batched   PackageGraphNode {
+90 silly batched     name: '@cubejs-client/core',
+90 silly batched     externalDependencies: Map(17) {
+90 silly batched       '@babel/core' => [Object],
+90 silly batched       '@babel/preset-env' => [Object],
+90 silly batched       '@types/jest' => [Object],
+90 silly batched       'babel-jest' => [Object],
+90 silly batched       'eslint' => [Object],
+90 silly batched       'eslint-config-airbnb-base' => [Object],
+90 silly batched       'eslint-plugin-import' => [Object],
+90 silly batched       'eslint-plugin-node' => [Object],
+90 silly batched       'jest' => [Object],
+90 silly batched       '@babel/runtime' => [Object],
+90 silly batched       'core-js' => [Object],
+90 silly batched       'cross-fetch' => [Object],
+90 silly batched       'moment' => [Object],
+90 silly batched       'moment-range' => [Object],
+90 silly batched       'ramda' => [Object],
+90 silly batched       'url-search-params-polyfill' => [Object],
+90 silly batched       'uuid' => [Object]
+90 silly batched     },
+90 silly batched     localDependencies: Map(0) {},
+90 silly batched     localDependents: Map(3) {
+90 silly batched       '@cubejs-client/ngx' => [PackageGraphNode],
+90 silly batched       '@cubejs-client/react' => [PackageGraphNode],
+90 silly batched       '@cubejs-client/playground' => [PackageGraphNode]
+90 silly batched     }
+90 silly batched   }
+90 silly batched ]
+91 silly batched [
+91 silly batched   PackageGraphNode {
+91 silly batched     name: '@cubejs-client/ngx',
+91 silly batched     externalDependencies: Map(10) {
+91 silly batched       '@angular-devkit/build-angular' => [Object],
+91 silly batched       '@angular-devkit/build-ng-packagr' => [Object],
+91 silly batched       '@angular/cli' => [Object],
+91 silly batched       '@angular/compiler' => [Object],
+91 silly batched       '@angular/compiler-cli' => [Object],
+91 silly batched       '@angular/core' => [Object],
+91 silly batched       'ng-packagr' => [Object],
+91 silly batched       'tsickle' => [Object],
+91 silly batched       'typescript' => [Object],
+91 silly batched       'tslib' => [Object]
+91 silly batched     },
+91 silly batched     localDependencies: Map(0) {},
+91 silly batched     localDependents: Map(0) {}
+91 silly batched   },
+91 silly batched   PackageGraphNode {
+91 silly batched     name: '@cubejs-client/react',
+91 silly batched     externalDependencies: Map(12) {
+91 silly batched       '@types/react' => [Object],
+91 silly batched       'eslint' => [Object],
+91 silly batched       'eslint-config-airbnb' => [Object],
+91 silly batched       'eslint-config-airbnb-base' => [Object],
+91 silly batched       'eslint-plugin-import' => [Object],
+91 silly batched       'eslint-plugin-jsx-a11y' => [Object],
+91 silly batched       'eslint-plugin-node' => [Object],
+91 silly batched       'eslint-plugin-react' => [Object],
+91 silly batched       'react' => [Object],
+91 silly batched       '@babel/runtime' => [Object],
+91 silly batched       'core-js' => [Object],
+91 silly batched       'ramda' => [Object]
+91 silly batched     },
+91 silly batched     localDependencies: Map(0) {},
+91 silly batched     localDependents: Map(1) { '@cubejs-client/playground' => [PackageGraphNode] }
+91 silly batched   },
+91 silly batched   PackageGraphNode {
+91 silly batched     name: '@cubejs-backend/server-core',
+91 silly batched     externalDependencies: Map(25) {
+91 silly batched       'eslint' => [Object],
+91 silly batched       'eslint-config-airbnb-base' => [Object],
+91 silly batched       'eslint-plugin-import' => [Object],
+91 silly batched       'eslint-plugin-node' => [Object],
+91 silly batched       'jest' => [Object],
+91 silly batched       'mocha' => [Object],
+91 silly batched       'should' => [Object],
+91 silly batched       '@cubejs-backend/query-orchestrator' => [Object],
+91 silly batched       '@cubejs-backend/schema-compiler' => [Object],
+91 silly batched       'codesandbox-import-utils' => [Object],
+91 silly batched       'cross-spawn' => [Object],
+91 silly batched       'decompress' => [Object],
+91 silly batched       'decompress-targz' => [Object],
+91 silly batched       'fs-extra' => [Object],
+91 silly batched       'jsonwebtoken' => [Object],
+91 silly batched       'lru-cache' => [Object],
+91 silly batched       'node-fetch' => [Object],
+91 silly batched       'node-machine-id' => [Object],
+91 silly batched       'prettier' => [Object],
+91 silly batched       'promise-timeout' => [Object],
+91 silly batched       'ramda' => [Object],
+91 silly batched       'semver' => [Object],
+91 silly batched       'serve-static' => [Object],
+91 silly batched       'sqlstring' => [Object],
+91 silly batched       'uuid' => [Object]
+91 silly batched     },
+91 silly batched     localDependencies: Map(0) {},
+91 silly batched     localDependents: Map(2) {
+91 silly batched       '@cubejs-backend/server' => [PackageGraphNode],
+91 silly batched       '@cubejs-backend/serverless' => [PackageGraphNode]
+91 silly batched     }
+91 silly batched   }
+91 silly batched ]
+92 silly batched [
+92 silly batched   PackageGraphNode {
+92 silly batched     name: '@cubejs-client/playground',
+92 silly batched     externalDependencies: Map(48) {
+92 silly batched       '@types/react' => [Object],
+92 silly batched       '@types/react-beautiful-dnd' => [Object],
+92 silly batched       'eslint-config-airbnb' => [Object],
+92 silly batched       'eslint-plugin-jsx-a11y' => [Object],
+92 silly batched       'eslint-plugin-react' => [Object],
+92 silly batched       'fs-extra' => [Object],
+92 silly batched       'react-app-rewired' => [Object],
+92 silly batched       'recursive-readdir' => [Object],
+92 silly batched       'terser-webpack-plugin' => [Object],
+92 silly batched       '@ant-design/compatible' => [Object],
+92 silly batched       '@ant-design/icons' => [Object],
+92 silly batched       '@babel/generator' => [Object],
+92 silly batched       '@babel/parser' => [Object],
+92 silly batched       '@babel/preset-env' => [Object],
+92 silly batched       '@babel/preset-react' => [Object],
+92 silly batched       '@babel/standalone' => [Object],
+92 silly batched       '@babel/traverse' => [Object],
+92 silly batched       '@babel/types' => [Object],
+92 silly batched       'antd' => [Object],
+92 silly batched       'bizcharts' => [Object],
+92 silly batched       'chart.js' => [Object],
+92 silly batched       'codesandbox-import-utils' => [Object],
+92 silly batched       'component-cookie' => [Object],
+92 silly batched       'customize-cra' => [Object],
+92 silly batched       'd3' => [Object],
+92 silly batched       'history' => [Object],
+92 silly batched       'less' => [Object],
+92 silly batched       'less-loader' => [Object],
+92 silly batched       'moment' => [Object],
+92 silly batched       'prettier' => [Object],
+92 silly batched       'prismjs' => [Object],
+92 silly batched       'prop-types' => [Object],
+92 silly batched       'ramda' => [Object],
+92 silly batched       'react' => [Object],
+92 silly batched       'react-beautiful-dnd' => [Object],
+92 silly batched       'react-chartjs-2' => [Object],
+92 silly batched       'react-dom' => [Object],
+92 silly batched       'react-is' => [Object],
+92 silly batched       'react-responsive' => [Object],
+92 silly batched       'react-router' => [Object],
+92 silly batched       'react-router-dom' => [Object],
+92 silly batched       'react-scripts' => [Object],
+92 silly batched       'react-source-render' => [Object],
+92 silly batched       'recharts' => [Object],
+92 silly batched       'sql-formatter' => [Object],
+92 silly batched       'styled-components' => [Object],
+92 silly batched       'uuid' => [Object],
+92 silly batched       'whatwg-fetch' => [Object]
+92 silly batched     },
+92 silly batched     localDependencies: Map(0) {},
+92 silly batched     localDependents: Map(0) {}
+92 silly batched   },
+92 silly batched   PackageGraphNode {
+92 silly batched     name: '@cubejs-backend/server',
+92 silly batched     externalDependencies: Map(13) {
+92 silly batched       'eslint' => [Object],
+92 silly batched       'eslint-plugin-node' => [Object],
+92 silly batched       'jest' => [Object],
+92 silly batched       'mocha' => [Object],
+92 silly batched       'should' => [Object],
+92 silly batched       'body-parser' => [Object],
+92 silly batched       'codesandbox-import-utils' => [Object],
+92 silly batched       'cors' => [Object],
+92 silly batched       'dotenv' => [Object],
+92 silly batched       'express' => [Object],
+92 silly batched       'jsonwebtoken' => [Object],
+92 silly batched       'node-machine-id' => [Object],
+92 silly batched       'ws' => [Object]
+92 silly batched     },
+92 silly batched     localDependencies: Map(0) {},
+92 silly batched     localDependents: Map(0) {}
+92 silly batched   },
+92 silly batched   PackageGraphNode {
+92 silly batched     name: '@cubejs-backend/serverless',
+92 silly batched     externalDependencies: Map(6) {
+92 silly batched       'eslint' => [Object],
+92 silly batched       'eslint-plugin-node' => [Object],
+92 silly batched       'mocha' => [Object],
+92 silly batched       'should' => [Object],
+92 silly batched       'cors' => [Object],
+92 silly batched       'serverless-express' => [Object]
+92 silly batched     },
+92 silly batched     localDependencies: Map(0) {},
+92 silly batched     localDependents: Map(2) {
+92 silly batched       '@cubejs-backend/serverless-aws' => [PackageGraphNode],
+92 silly batched       '@cubejs-backend/serverless-google' => [PackageGraphNode]
+92 silly batched     }
+92 silly batched   }
+92 silly batched ]
+93 silly batched [
+93 silly batched   PackageGraphNode {
+93 silly batched     name: '@cubejs-backend/serverless-aws',
+93 silly batched     externalDependencies: Map(5) {
+93 silly batched       'eslint' => [Object],
+93 silly batched       'eslint-plugin-node' => [Object],
+93 silly batched       'mocha' => [Object],
+93 silly batched       'should' => [Object],
+93 silly batched       'aws-sdk' => [Object]
+93 silly batched     },
+93 silly batched     localDependencies: Map(0) {},
+93 silly batched     localDependents: Map(0) {}
+93 silly batched   },
+93 silly batched   PackageGraphNode {
+93 silly batched     name: '@cubejs-backend/serverless-google',
+93 silly batched     externalDependencies: Map(5) {
+93 silly batched       'eslint' => [Object],
+93 silly batched       'eslint-plugin-node' => [Object],
+93 silly batched       'mocha' => [Object],
+93 silly batched       'should' => [Object],
+93 silly batched       '@google-cloud/pubsub' => [Object]
+93 silly batched     },
+93 silly batched     localDependencies: Map(0) {},
+93 silly batched     localDependents: Map(0) {}
+93 silly batched   }
+93 silly batched ]
+94 silly lifecycle No script for "preversion" in "cubejs", continuing
+95 silly lifecycle No script for "preversion" in "@cubejs-backend/api-gateway", continuing
+96 silly lifecycle No script for "preversion" in "@cubejs-client/core", continuing
+97 silly lifecycle No script for "version" in "@cubejs-client/core", continuing
+98 silly fixed for @cubejs-client/core at /Users/alex/Projects/cube.js/packages/cubejs-client-core
+99 verbose getChangelogConfig using preset "conventional-changelog-angular"
+100 silly npa {
+100 silly npa   type: 'tag',
+100 silly npa   registry: true,
+100 silly npa   where: undefined,
+100 silly npa   raw: 'conventional-changelog-angular',
+100 silly npa   name: 'conventional-changelog-angular',
+100 silly npa   escapedName: 'conventional-changelog-angular',
+100 silly npa   scope: undefined,
+100 silly npa   rawSpec: '',
+100 silly npa   saveSpec: null,
+100 silly npa   fetchSpec: 'latest',
+100 silly npa   gitRange: undefined,
+100 silly npa   gitCommittish: undefined,
+100 silly npa   hosted: undefined
+100 silly npa }
+101 verbose getChangelogConfig Attempting to resolve preset "conventional-changelog-angular"
+102 info getChangelogConfig Successfully resolved preset "conventional-changelog-angular"
+103 silly lifecycle No script for "version" in "@cubejs-backend/api-gateway", continuing
+104 silly fixed for @cubejs-backend/api-gateway at /Users/alex/Projects/cube.js/packages/cubejs-api-gateway
+105 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n\n### Bug Fixes\n\n* subscribe option, new query types to work with ws ([dbf602e](https://github.com/cube-js/cube.js/commit/dbf602e))\n\n\n\n"
+106 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n\n### Bug Fixes\n\n* subscribe option, new query types to work with ws ([dbf602e](https://github.com/cube-js/cube.js/commit/dbf602e))\n\n\n### Features\n\n* custom date range ([#1027](https://github.com/cube-js/cube.js/issues/1027)) ([304985f](https://github.com/cube-js/cube.js/commit/304985f))\n\n\n\n"
+107 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-api-gateway/CHANGELOG.md
+108 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-client-core/CHANGELOG.md
+109 silly lifecycle No script for "preversion" in "@cubejs-client/ngx", continuing
+110 silly lifecycle No script for "preversion" in "@cubejs-client/react", continuing
+111 silly lifecycle No script for "preversion" in "@cubejs-backend/server-core", continuing
+112 silly lifecycle No script for "version" in "@cubejs-client/react", continuing
+113 silly fixed for @cubejs-client/react at /Users/alex/Projects/cube.js/packages/cubejs-client-react
+114 silly lifecycle No script for "version" in "@cubejs-client/ngx", continuing
+115 silly fixed for @cubejs-client/ngx at /Users/alex/Projects/cube.js/packages/cubejs-client-ngx
+116 silly lifecycle No script for "version" in "@cubejs-backend/server-core", continuing
+117 silly fixed for @cubejs-backend/server-core at /Users/alex/Projects/cube.js/packages/cubejs-server-core
+118 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n**Note:** Version bump only for package @cubejs-client/react\n\n\n\n"
+119 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n**Note:** Version bump only for package @cubejs-client/ngx\n\n\n\n"
+120 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n**Note:** Version bump only for package @cubejs-backend/server-core\n\n\n\n"
+121 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-client-react/CHANGELOG.md
+122 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-client-ngx/CHANGELOG.md
+123 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-server-core/CHANGELOG.md
+124 silly lifecycle No script for "preversion" in "@cubejs-client/playground", continuing
+125 silly lifecycle No script for "preversion" in "@cubejs-backend/server", continuing
+126 silly lifecycle No script for "preversion" in "@cubejs-backend/serverless", continuing
+127 silly lifecycle No script for "version" in "@cubejs-client/playground", continuing
+128 silly fixed for @cubejs-client/playground at /Users/alex/Projects/cube.js/packages/cubejs-playground
+129 silly lifecycle No script for "version" in "@cubejs-backend/server", continuing
+130 silly fixed for @cubejs-backend/server at /Users/alex/Projects/cube.js/packages/cubejs-server
+131 silly lifecycle No script for "version" in "@cubejs-backend/serverless", continuing
+132 silly fixed for @cubejs-backend/serverless at /Users/alex/Projects/cube.js/packages/cubejs-serverless
+133 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n**Note:** Version bump only for package @cubejs-backend/serverless\n\n\n\n"
+134 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-serverless/CHANGELOG.md
+135 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n**Note:** Version bump only for package @cubejs-backend/server\n\n\n\n"
+136 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n\n### Features\n\n* custom date range ([#1027](https://github.com/cube-js/cube.js/issues/1027)) ([304985f](https://github.com/cube-js/cube.js/commit/304985f))\n\n\n\n"
+137 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-server/CHANGELOG.md
+138 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-playground/CHANGELOG.md
+139 silly lifecycle No script for "preversion" in "@cubejs-backend/serverless-aws", continuing
+140 silly lifecycle No script for "preversion" in "@cubejs-backend/serverless-google", continuing
+141 silly lifecycle No script for "version" in "@cubejs-backend/serverless-google", continuing
+142 silly fixed for @cubejs-backend/serverless-google at /Users/alex/Projects/cube.js/packages/cubejs-serverless-google
+143 silly lifecycle No script for "version" in "@cubejs-backend/serverless-aws", continuing
+144 silly fixed for @cubejs-backend/serverless-aws at /Users/alex/Projects/cube.js/packages/cubejs-serverless-aws
+145 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n**Note:** Version bump only for package @cubejs-backend/serverless-google\n\n\n\n"
+146 silly fixed writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n**Note:** Version bump only for package @cubejs-backend/serverless-aws\n\n\n\n"
+147 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-serverless-google/CHANGELOG.md
+148 verbose fixed wrote /Users/alex/Projects/cube.js/packages/cubejs-serverless-aws/CHANGELOG.md
+149 silly root for cubejs at /Users/alex/Projects/cube.js
+150 silly root writing new entry: "## [0.20.2](https://github.com/cube-js/cube.js/compare/v0.20.1...v0.20.2) (2020-09-02)\n\n\n### Bug Fixes\n\n* subscribe option, new query types to work with ws ([dbf602e](https://github.com/cube-js/cube.js/commit/dbf602e))\n\n\n### Features\n\n* custom date range ([#1027](https://github.com/cube-js/cube.js/issues/1027)) ([304985f](https://github.com/cube-js/cube.js/commit/304985f))\n\n\n\n"
+151 verbose root wrote /Users/alex/Projects/cube.js/CHANGELOG.md
+152 silly lifecycle No script for "version" in "cubejs", continuing
+153 silly gitAdd [
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-client-core/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-api-gateway/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-api-gateway/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-client-core/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-client-react/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-client-ngx/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-server-core/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-client-react/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-client-ngx/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-server-core/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-playground/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-server/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-serverless/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-serverless/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-server/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-playground/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-serverless-google/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-serverless-aws/package.json',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-serverless-google/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/packages/cubejs-serverless-aws/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/CHANGELOG.md',
+153 silly gitAdd   '/Users/alex/Projects/cube.js/lerna.json'
+153 silly gitAdd ]
+154 silly gitCommit v0.20.2
+155 verbose git [ 'commit', '-m', 'v0.20.2' ]
+156 silly gitTag v0.20.2
+157 verbose git [ 'tag', 'v0.20.2', '-m', 'v0.20.2' ]
+158 silly lifecycle No script for "postversion" in "@cubejs-backend/api-gateway", continuing
+159 silly lifecycle No script for "postversion" in "@cubejs-client/core", continuing
+160 silly lifecycle No script for "postversion" in "@cubejs-client/ngx", continuing
+161 silly lifecycle No script for "postversion" in "@cubejs-client/react", continuing
+162 silly lifecycle No script for "postversion" in "@cubejs-client/playground", continuing
+163 silly lifecycle No script for "postversion" in "@cubejs-backend/server-core", continuing
+164 silly lifecycle No script for "postversion" in "@cubejs-backend/server", continuing
+165 silly lifecycle No script for "postversion" in "@cubejs-backend/serverless-aws", continuing
+166 silly lifecycle No script for "postversion" in "@cubejs-backend/serverless-google", continuing
+167 silly lifecycle No script for "postversion" in "@cubejs-backend/serverless", continuing
+168 silly lifecycle No script for "postversion" in "cubejs", continuing
+169 info git Pushing tags...
+170 silly gitPush origin master
+171 info github Creating GitHub releases...
+172 silly createGitHubClient
+173 error Error: A GH_TOKEN environment variable is required.
+173 error     at createGitHubClient (/Users/alex/Projects/cube.js/node_modules/@lerna/github-client/lib/github-client.js:17:11)
+173 error     at VersionCommand.createGitHubReleases (/Users/alex/Projects/cube.js/node_modules/@lerna/version/index.js:618:20)
+173 error     at /Users/alex/Projects/cube.js/node_modules/@lerna/version/index.js:252:29
+173 error     at /Users/alex/Projects/cube.js/node_modules/p-waterfall/index.js:4:73
+173 error     at /Users/alex/Projects/cube.js/node_modules/p-reduce/index.js:16:10
+173 error     at runMicrotasks (<anonymous>)

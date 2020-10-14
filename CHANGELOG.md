@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.21.0](https://github.com/cube-js/cube.js/compare/v0.20.15...v0.21.0) (2020-10-09)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.20.15](https://github.com/cube-js/cube.js/compare/v0.20.14...v0.20.15) (2020-10-09)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.20.14](https://github.com/cube-js/cube.js/compare/v0.20.13...v0.20.14) (2020-10-09)
+
+
+### Bug Fixes
+
+* Filter values can't be changed in Playground -- revert back defaultHeuristic implementation ([30ee112](https://github.com/cube-js/cube.js/commit/30ee112))
+
+
+
+
+
+## [0.20.13](https://github.com/cube-js/cube.js/compare/v0.20.12...v0.20.13) (2020-10-07)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mongobi-driver:** TypeError: v.toLowerCase is not a function ([16a15cb](https://github.com/cube-js/cube.js/commit/16a15cb))
+* **@cubejs-schema-compilter:** MSSQL rollingWindow with granularity ([#1169](https://github.com/cube-js/cube.js/issues/1169)) Thanks to @JoshMentzer! ([16e6a9e](https://github.com/cube-js/cube.js/commit/16e6a9e))
+
+
+
+
+
+## [0.20.12](https://github.com/cube-js/cube.js/compare/v0.20.11...v0.20.12) (2020-10-02)
+
+
+### Bug Fixes
+
+* respect npm proxy settings ([#1137](https://github.com/cube-js/cube.js/issues/1137)) ([c43adac](https://github.com/cube-js/cube.js/commit/c43adac))
+* **@cubejs-client/playground:** prepublishOnly for exports ([#1171](https://github.com/cube-js/cube.js/issues/1171)) ([5b6b4dc](https://github.com/cube-js/cube.js/commit/5b6b4dc))
+
+
+### Features
+
+* angular query builder ([#1073](https://github.com/cube-js/cube.js/issues/1073)) ([ea088b3](https://github.com/cube-js/cube.js/commit/ea088b3))
+* **@cubejs-client/playground:** Export playground components ([#1170](https://github.com/cube-js/cube.js/issues/1170)) ([fb22331](https://github.com/cube-js/cube.js/commit/fb22331))
+
+
+
+
+
 ## [0.20.11](https://github.com/cube-js/cube.js/compare/v0.20.10...v0.20.11) (2020-09-28)
 
 

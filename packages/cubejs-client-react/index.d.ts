@@ -179,6 +179,10 @@ declare module '@cubejs-client/react' {
   };
 
   type QueryBuilderRenderProps = {
+    // Todo: should fix DRY, duplicate props from QueryRendererRenderProps, see https://github.com/cube-js/cube.js/issues/1192
+    resultSet?: ResultSet | null;
+    error?: Error | null;
+    loadingState?: TLoadingState;
     /**
      * Indicates whether the query is ready to be displayed or not
      */

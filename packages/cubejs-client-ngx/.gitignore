@@ -1,1 +1,3 @@
 dist/
+.yalc/
+yalc.lock

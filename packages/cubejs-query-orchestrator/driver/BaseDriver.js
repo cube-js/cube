@@ -32,7 +32,7 @@ const DbTypeValueMatcher = {
   date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
   int: (v) => Number.isInteger(v) || v.toString().match(/^\d+$/),
   decimal: (v) => v instanceof Number || v.toString().match(/^\d+(\.\d+)?$/),
-  boolean: (v) => v === false || v === true || v.toLowerCase() === 'true' || v.toLowerCase === 'false',
+  boolean: (v) => v === false || v === true || v.toString().toLowerCase() === 'true' || v.toString().toLowerCase() === 'false',
   string: (v) => v.length < 256,
   text: () => true
 };

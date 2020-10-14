@@ -45,6 +45,7 @@ class PostgresDriver extends BaseDriver {
         }),
         {}
       );
+
       if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
         ssl.rejectUnauthorized =
           process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';

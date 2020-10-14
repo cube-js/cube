@@ -1,0 +1,46 @@
+<div class="flex-box">
+  <div
+    class="selected-member-container auto-width"
+    *ngFor="let member of members"
+  >
+    <mat-form-field appearance="fill">
+      <mat-label>{{ title }}</mat-label>
+      <mat-select
+        [value]="member.name"
+        (selectionChange)="_onReplace(member.name, $event.value)"
+      >
+        <mat-option *ngFor="let member of allMembers" [value]="member.name">
+          {{ member.title }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button
+      mat-icon-button
+      color="warn"
+      (click)="_onMemberClick(member.name)"
+    >
+      <mat-icon>delete_forever</mat-icon>
+    </button>
+  </div>
+
+  <mat-form-field
+    *ngIf="
+      (title === 'Time' && !members.length) ||
+      title !== 'Time'
+    "
+    appearance="fill"
+  >
+    <span matPrefix><mat-icon>add</mat-icon></span>
+    <mat-label>{{ title }}</mat-label>
+    <mat-select
+      #select
+      (selectionChange)="_onSelect($event); select.value = ''"
+    >
+      <mat-option *ngIf="!allMembers.length">No members found</mat-option>
+      <mat-option *ngFor="let member of allMembers" [value]="member.name">
+        {{ member.title }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>

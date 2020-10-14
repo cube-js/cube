@@ -2,10 +2,9 @@ import React from 'react';
 import {
   prop, uniqBy, indexBy, fromPairs
 } from 'ramda';
-import { ResultSet } from '@cubejs-client/core';
+import { ResultSet, moveItemInArray } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
-import { reorder } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
@@ -26,7 +25,7 @@ export default class QueryBuilder extends React.Component {
     if (Array.isArray(props.query)) {
       throw new Error('Array of queries is not supported.');
     }
-    
+
     return {
       ...nextState,
       query: {
@@ -35,12 +34,12 @@ export default class QueryBuilder extends React.Component {
       },
     };
   }
-  
+
   static resolveMember(type, { meta, query }) {
     if (!meta) {
       return [];
     }
-    
+
     if (Array.isArray(query)) {
       return query.reduce((memo, currentQuery) => memo.concat(QueryBuilder.resolveMember(type, {
         meta,
@@ -64,10 +63,10 @@ export default class QueryBuilder extends React.Component {
       ...meta.resolveMember(m, type)
     }));
   }
-  
+
   static getOrderMembers(state) {
     const { query, meta } = state;
-    
+
     if (!meta) {
       return [];
     }
@@ -89,7 +88,7 @@ export default class QueryBuilder extends React.Component {
       }))
     );
   }
-  
+
   constructor(props) {
     super(props);
 
@@ -101,7 +100,7 @@ export default class QueryBuilder extends React.Component {
       validatedQuery: props.query,
       ...props.vizState
     };
-    
+
     this.mutexObj = {};
   }
 
@@ -118,7 +117,7 @@ export default class QueryBuilder extends React.Component {
     } else {
       meta = await this.cubejsApi().meta();
     }
-    
+
     this.setState({
       meta,
       orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
@@ -174,7 +173,7 @@ export default class QueryBuilder extends React.Component {
         });
       }
     });
-    
+
     const {
       meta,
       query,
@@ -232,9 +231,9 @@ export default class QueryBuilder extends React.Component {
           if (sourceIndex == null || destinationIndex == null) {
             return;
           }
-          
+
           this.updateVizState({
-            orderMembers: reorder(orderMembers, sourceIndex, destinationIndex)
+            orderMembers: moveItemInArray(orderMembers, sourceIndex, destinationIndex)
           });
         }
       },
@@ -253,23 +252,23 @@ export default class QueryBuilder extends React.Component {
           };
           const id = pivotConfig[sourceAxis][sourceIndex];
           const lastIndex = nextPivotConfig[destinationAxis].length - 1;
-          
+
           if (id === 'measures') {
             destinationIndex = lastIndex + 1;
           } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
             destinationIndex = lastIndex - 1;
           }
-      
+
           nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
           nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
-          
+
           this.updateVizState({
             pivotConfig: nextPivotConfig
           });
         },
         update: (config) => {
           const { limit } = config;
-          
+
           if (limit == null) {
             this.updateVizState({
               pivotConfig: {
@@ -300,7 +299,7 @@ export default class QueryBuilder extends React.Component {
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
-    
+
     let pivotQuery = {};
     let finalState = this.applyStateChangeHeuristics(state);
     const { order: _, ...query } = finalState.query || stateQuery;
@@ -389,7 +388,7 @@ export default class QueryBuilder extends React.Component {
   defaultHeuristics(newState) {
     const { query, sessionGranularity } = this.state;
     const defaultGranularity = sessionGranularity || 'day';
-    
+
     if (Array.isArray(query)) {
       return newState;
     }
@@ -539,7 +538,8 @@ export default class QueryBuilder extends React.Component {
     if (disableHeuristics) {
       return newState;
     }
-    return (stateChangeHeuristics && stateChangeHeuristics(this.state, newState)) || this.defaultHeuristics(newState);
+    return (stateChangeHeuristics && stateChangeHeuristics(this.state, newState))
+      || this.defaultHeuristics(newState);
   }
 
   render() {

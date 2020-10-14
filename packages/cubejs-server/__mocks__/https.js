@@ -1,4 +1,7 @@
-const https = jest.requireActual("https");
+/* globals jest */
+/* eslint-disable no-underscore-dangle */
+
+const https = jest.requireActual('https');
 
 https.__mockServer = {
   listen: jest.fn((opts, cb) => cb && cb(null)),
@@ -10,4 +13,3 @@ https.__mockServer = {
 https.createServer = jest.fn(() => https.__mockServer);
 
 module.exports = https;
-

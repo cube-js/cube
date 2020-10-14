@@ -1,0 +1,40 @@
+<div class="flex-box">
+  <members-group
+    title="Time"
+    [members]="members"
+    [allMembers]="allMembers"
+    (onSelect)="handleTimeDimensionSelect($event)"
+    (onMemberClick)="timeDimensionMember.remove($event)"
+  ></members-group>
+
+  <ng-container *ngIf="members.length">
+    <mat-form-field appearance="fill" >
+      <mat-label>FOR</mat-label>
+
+      <mat-select
+        (selectionChange)="handleDateRangeSelect($event)"
+        [value]="dateRange || 'All time'"
+      >
+        <mat-option
+          *ngFor="let dateRange of dateRanges"
+          [value]="dateRange.title"
+        >
+          {{ dateRange.title }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" >
+      <mat-label>BY</mat-label>
+
+      <mat-select
+        (selectionChange)="handleGranularitySelect($event)"
+        [value]="granularity || ''"
+      >
+        <mat-option *ngFor="let g of granularities" [value]="g.value">
+          {{ g.title }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </ng-container>
+</div>

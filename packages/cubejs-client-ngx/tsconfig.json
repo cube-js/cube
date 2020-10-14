@@ -11,15 +11,12 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,
+    "allowSyntheticDefaultImports": true,
     "types": [],
-    "lib": [
-      "dom",
-      "es2018"
-    ],
+    "lib": ["dom", "es2018"],
     "paths": {
-      "@angular/*": [
-        "./node_modules/@angular/*"
-      ]
+      "@angular/*": ["./node_modules/@angular/*"],
+      "@cubejs-client/core": ["../cubejs-client-core"]
     }
   },
   "angularCompilerOptions": {
@@ -29,14 +26,9 @@
     "fullTemplateTypeCheck": true,
     "strictInjectionParameters": true,
     "enableResourceInlining": true,
-    "enableIvy": false
+    "enableIvy": false,
+    "preserveSymlinks": true
   },
-  "exclude": [
-    "src/test.ts",
-    "**/*.spec.ts"
-  ],
-  "files": [
-    "index.ts",
-    "src/*"
-  ],
+  "exclude": ["src/test.ts", "**/*.spec.ts"],
+  "include": ["index.ts", "src/*"]
 }
