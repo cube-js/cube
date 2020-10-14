@@ -389,6 +389,25 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./packages/cubejs-docker
-          file: ./packages/cubejs-docker/Dockerfile
+          file: ./packages/cubejs-docker/latest.Dockerfile
+          platforms: linux/amd64
+          push: false
+
+  docker-image-dev:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build only
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./packages/cubejs-docker/dev.Dockerfile
           platforms: linux/amd64
           push: false
