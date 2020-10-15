@@ -44,7 +44,11 @@ export default function Settings({
       <Popover
         content={
           <div style={{ padding: '8px' }}>
-            <Limit limit={limit} onUpdate={onUpdate} />
+            <OrderGroup
+              orderMembers={orderMembers}
+              onReorder={onReorder}
+              onOrderChange={onOrderChange}
+            />
           </div>
         }
         placement="bottomLeft"
@@ -61,11 +65,7 @@ export default function Settings({
       <Popover
         content={
           <div style={{ padding: '8px' }}>
-            <OrderGroup
-              orderMembers={orderMembers}
-              onReorder={onReorder}
-              onOrderChange={onOrderChange}
-            />
+            <Limit limit={limit} onUpdate={onUpdate} />
           </div>
         }
         placement="bottomLeft"
