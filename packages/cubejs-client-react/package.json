@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -30,7 +30,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-client/core": "^0.21.0",
+    "@cubejs-client/core": "^0.21.1",
     "@types/react": "^16.9.41",
     "eslint": "^6.5.1",
     "eslint-config-airbnb": "^18.0.1",
