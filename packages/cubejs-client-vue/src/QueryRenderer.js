@@ -3,7 +3,7 @@ import { toPairs, fromPairs } from 'ramda';
 export default {
   props: {
     query: {
-      type: Object,
+      type: [Object, Array],
       default: () => ({}),
     },
     // TODO: validate with current react implementation
