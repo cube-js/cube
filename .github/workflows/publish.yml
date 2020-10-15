@@ -72,7 +72,7 @@ jobs:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest.Dockerfile
           platforms: linux/amd64
-          repository: cubejs/cube
+          push: true
           tags: |
             cubejs/cube:latest
             cubejs/cube:${{ GITHUB_REF }}
