@@ -254,6 +254,7 @@ program
   .option('-e, --expiry [expiry]', 'Token expiry. Set to 0 for no expiry', defaultExpiry)
   .option('-s, --secret [secret]', 'Cube.js app secret. Also can be set via environment variable CUBEJS_API_SECRET')
   .option('-p, --payload [values]', 'Payload. Example: -p foo=bar', collect, [])
+  .option('-u, --user-context [values]', 'USER_CONTEXT. Example: -u baz=qux', collect, [])
   .description('Create JWT token')
   .action(
     (options) => token(options)
