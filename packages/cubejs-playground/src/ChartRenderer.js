@@ -28,17 +28,17 @@ export const babelConfig = {
   presets: [presetEnv, presetReact],
 };
 
-const prettify = (object) => {
-  let str = object;
-  if (typeof object === 'object') {
-    str = JSON.stringify(object, null, 2);
-  }
+// const prettify = (object) => {
+//   let str = object;
+//   if (typeof object === 'object') {
+//     str = JSON.stringify(object, null, 2);
+//   }
 
-  return str
-    .split('\n')
-    .map((l, i) => (i > 0 ? `  ${l}` : l))
-    .join('\n');
-};
+//   return str
+//     .split('\n')
+//     .map((l, i) => (i > 0 ? `  ${l}` : l))
+//     .join('\n');
+// };
 
 const sourceCodeTemplate = (props) => {
   const { chartLibrary, query, apiUrl, cubejsToken, chartType } = props;
@@ -57,15 +57,16 @@ const cubejsApi = cubejs(
 );
 
 const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => (
-  (resultSet && <Component resultSet={resultSet} pivotConfig={pivotConfig} />) ||
+  (resultSet && <Component resultSet={resultSet} pivotConfig={window.__CUBEJS && window.__CUBEJS.pivotConfig || null} />) ||
   (error && error.toString()) || 
   (<Spin />)
 )
 
 const ChartRenderer = () => <QueryRenderer
-  query={${prettify(query)}}
+  query={window.__CUBEJS && window.__CUBEJS.query}
   cubejsApi={cubejsApi}
-  render={renderChart(${renderFnName}, ${prettify(props.pivotConfig)})}
+  resetResultSetOnChange={false}
+  render={renderChart(${renderFnName})}
 />;
 
 export default ChartRenderer;
@@ -127,7 +128,15 @@ export const ChartRenderer = (props) => {
       setError(null);
     }
   }, [source, chartType, jsCompilingError]);
-
+  
+  useEffect(() => {
+    // Avoid updating the source code to eliminate the QueryRenderer unmount
+    window.__CUBEJS = {
+      query,
+      pivotConfig
+    };
+  }, [query, pivotConfig])
+  
   return (
     <ChartContainer
       query={query}
