@@ -331,7 +331,8 @@ cube(`Orders`, {
 
 As in case of cube pre-aggregations `refreshKey` can define `every` parameter which can be used to refresh pre-aggregations based on time interval.
 
-> **NOTE:** `every` parameter doesn't force Cube.js to fetch `refreshKey` based on it's interval. It generates SQL which result set change at least once per defined interval and adjusts `refreshKeyRenewalThreshold` accordingly. [Learn more](cube#parameters-refresh-key).
+[[warning | Attention]]
+| `every` parameter doesn't force Cube.js to fetch `refreshKey` based on it's interval. It generates SQL which result set change at least once per defined interval and adjusts `refreshKeyRenewalThreshold` accordingly. [Learn more](cube#parameters-refresh-key).
 
 For example:
 
@@ -465,7 +466,8 @@ Without this flag pre-aggregations are always built on-demand.
 `refreshKey` is used to determine if there's a need to update specific pre-aggregation on each scheduled refresh run.
 For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReference` are fetched to determine range for refresh.
 
-> **NOTE:** Refresh Scheduler isn't enabled by default. You should trigger it externally. [Learn how to do it here](caching#keeping-cache-up-to-date).
+[[warning | Note]]
+| Refresh Scheduler isn't enabled by default. You should trigger it externally. [Learn how to do it here](caching#keeping-cache-up-to-date).
 
 Example usage:
 ```javascript

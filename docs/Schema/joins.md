@@ -168,7 +168,8 @@ dimensions: {
 
 ## Transitive joins
 
-> **NOTE:** Join graph is directed and `A-B` join is different from `B-A`. [Learn more about it here](direction-of-joins).
+[[warning | Note]]
+| Join graph is directed and `A-B` join is different from `B-A`. [Learn more about it here](direction-of-joins).
 
 Cube.js automatically takes care of transitive joins. For example if you have following schema:
 
