@@ -52,7 +52,7 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: NPM publish
-        run: ./node_modules/.bin/lerna publish from-git --yes
+        run: ./node_modules/.bin/lerna publish from-package --yes
 
   docker:
     needs: npm
