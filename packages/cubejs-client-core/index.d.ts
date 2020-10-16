@@ -590,12 +590,16 @@ declare module '@cubejs-client/core' {
     member?: string;
     operator: BinaryOperator;
     values: string[];
+    and?: BinaryFilter[];
+    or?: BinaryFilter[];
   };
   type UnaryFilter = {
     dimension?: string;
     member?: string;
     operator: UnaryOperator;
     values?: never;
+    and?: UnaryFilter[];
+    or?: UnaryFilter[];
   };
   type UnaryOperator = 'set' | 'notSet';
   type BinaryOperator =
