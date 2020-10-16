@@ -2,7 +2,7 @@ import React from 'react';
 import {
   prop, uniqBy, indexBy, fromPairs
 } from 'ramda';
-import { ResultSet, moveItemInArray } from '@cubejs-client/core';
+import { ResultSet, moveItemInArray, defaultOrder } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 
@@ -299,43 +299,22 @@ export default class QueryBuilder extends React.Component {
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
-
-    let pivotQuery = {};
+    
     let finalState = this.applyStateChangeHeuristics(state);
-    const { order: _, ...query } = finalState.query || stateQuery;
+    const query = { ...(finalState.query || stateQuery) };
     
     const runSetters = (currentState) => {
-      if (currentState.query && setQuery) {
-        setQuery(currentState.query);
-      }
       if (setVizState) {
         const { meta, validatedQuery, ...toSet } = currentState;
         setVizState(toSet);
       }
-    };
-
-    runSetters({
-      ...state,
-      query
-    });
-    this.setState({
-      ...state,
-      query
-    });
-    
-    if (QueryRenderer.isQueryPresent(query)) {
-      try {
-        const response = await this.cubejsApi().dryRun(query, {
-          mutexObj: this.mutexObj,
-        });
-        pivotQuery = response.pivotQuery;
-
-        if (finalState.shouldApplyHeuristicOrder) {
-          finalState.query.order = (response.queryOrder || []).reduce((memo, current) => ({ ...memo, ...current }), {});
-        }
-      } catch (error) {
-        console.error(error);
+      if (currentState.query && setQuery) {
+        setQuery(currentState.query);
       }
+    };
+    
+    if (finalState.shouldApplyHeuristicOrder) {
+      query.order = defaultOrder(query);
     }
     
     const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
@@ -353,27 +332,54 @@ export default class QueryBuilder extends React.Component {
       }
     });
       
-    const nextOrder = fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean));
     const nextQuery = {
       ...query,
-      order: nextOrder,
+      order: fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean))
     };
-
-    finalState = {
+    
+    runSetters({
+      ...state,
+      query: nextQuery,
+      orderMembers: currentOrderMembers,
+    });
+    this.setState({
       ...finalState,
       query: nextQuery,
       orderMembers: currentOrderMembers,
-      pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, activePivotConfig)
-    };
+    });
+
+    let pivotQuery = {};
+    if (QueryRenderer.isQueryPresent(query)) {
+      try {
+        const response = await this.cubejsApi().dryRun(query, {
+          mutexObj: this.mutexObj,
+        });
+        pivotQuery = response.pivotQuery;
+
+        if (finalState.shouldApplyHeuristicOrder) {
+          nextQuery.order = (response.queryOrder || []).reduce((memo, current) => ({ ...memo, ...current }), {});
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
     
-    this.setState({
-      ...finalState,
-      validatedQuery: this.validatedQuery(finalState)
-    });
-    runSetters({
-      ...this.state,
-      ...finalState
-    });
+    if (QueryRenderer.isQueryPresent(stateQuery)) {
+      finalState = {
+        ...finalState,
+        query: nextQuery,
+        pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, activePivotConfig)
+      };
+      
+      this.setState({
+        ...finalState,
+        validatedQuery: this.validatedQuery(finalState)
+      });
+      runSetters({
+        ...this.state,
+        ...finalState
+      });
+    }
   }
 
   validatedQuery(state) {

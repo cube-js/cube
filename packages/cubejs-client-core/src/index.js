@@ -222,4 +222,10 @@ class CubejsApi {
 export default (apiToken, options) => new CubejsApi(apiToken, options);
 
 export { HttpTransport, ResultSet };
-export { defaultHeuristics, movePivotItem, isQueryPresent, moveItemInArray } from './utils';
+export {
+  defaultHeuristics,
+  movePivotItem,
+  isQueryPresent,
+  moveItemInArray,
+  defaultOrder
+} from './utils';

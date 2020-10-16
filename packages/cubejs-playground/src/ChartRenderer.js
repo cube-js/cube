@@ -128,15 +128,15 @@ export const ChartRenderer = (props) => {
       setError(null);
     }
   }, [source, chartType, jsCompilingError]);
-  
+
   useEffect(() => {
     // Avoid updating the source code to eliminate the QueryRenderer unmount
     window.__CUBEJS = {
       query,
-      pivotConfig
+      pivotConfig,
     };
-  }, [query, pivotConfig])
-  
+  }, [query, pivotConfig]);
+
   return (
     <ChartContainer
       query={query}
