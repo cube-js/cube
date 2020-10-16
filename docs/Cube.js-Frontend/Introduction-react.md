@@ -44,7 +44,7 @@ Here are the typical steps to query and visualize analytical data in React:
 
 See an example of using Cube.js with React and Chart.js library. Note that you can always use a different charting library that suits your needs:
 
-[https://codesandbox.io/s/cubejs-react-client-5y9s1](https://codesandbox.io/s/cubejs-react-client-5y9s1)
+<iframe src="https://codesandbox.io/embed/cubejs-react-client-5y9s1?fontsize=14&hidenavigation=1&theme=dark&view=preview" style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;" sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
 
 ## Getting Started
 
