@@ -5,4 +5,4 @@ Object.keys(clientCoreExports).forEach((key) => {
   cubejs[key] = clientCoreExports[key];
 });
 
-export { cubejs as default };
+export default cubejs;
