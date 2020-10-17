@@ -1,0 +1,38 @@
+{
+  "name": "@cubejs-backend/cubestore-driver",
+  "description": "Cube.js store driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.21.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-cubestore-driver"
+  },
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/CubeStoreDriver.js",
+  "typings": "driver/index.d.ts",
+  "scripts": {
+    "lint": "eslint driver/*.js test/*.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.21.1",
+    "@cubejs-backend/schema-compiler": "^0.21.1",
+    "generic-pool": "^3.6.0",
+    "moment-timezone": "^0.5.31",
+    "mysql": "^2.16.0"
+  },
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-node": "^5.2.1",
+    "jest": "^25.1.0",
+    "testcontainers": "^2.4.0"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}
