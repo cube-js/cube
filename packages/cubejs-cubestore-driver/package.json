@@ -14,7 +14,8 @@
   "main": "driver/CubeStoreDriver.js",
   "typings": "driver/index.d.ts",
   "scripts": {
-    "lint": "eslint driver/*.js test/*.js"
+    "lint": "eslint driver/*.js test/*.js",
+    "lint:fix": "eslint --fix driver/*.js test/*.js"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.21.1",
