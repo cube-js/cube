@@ -802,19 +802,31 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
-"@cubejs-backend/query-orchestrator@^0.20.0":
-  version "0.20.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.20.9.tgz#ad8080eef53c58fc4dfb90cd2586751712d0e983"
-  integrity sha512-gtBwYJj8lGASZr8CwYGqNutBCiCCvg0yDIOZbZ66o1U0VLQuiMQEGnxtuBrF6B/RXVYt3RFySAZ2AOh28htlMA==
+"@cubejs-backend/linter@^0.21.1":
+  version "0.21.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.21.1.tgz#efc92047aabeaacb3f2b8622f90517e3e6290ea8"
+  integrity sha512-IfBfgIrrvwCIYwlLMmoVmhnvwOPkE7NkY+xpqTNGjICii5gKnSWBhEbLN3RjWVS8Dw/e4qEHGzX71JkhInfXhg==
+  dependencies:
+    "@typescript-eslint/eslint-plugin" "^4.1.1"
+    "@typescript-eslint/parser" "^4.1.1"
+    eslint "^7.9.0"
+    eslint-config-airbnb-base "^14.2.0"
+    eslint-plugin-import "^2.22.0"
+    eslint-plugin-node "^6.0.1"
+
+"@cubejs-backend/query-orchestrator@^0.21.1":
+  version "0.21.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.21.1.tgz#0b4916d481b9c769a5aae16fa442a4c8584c5af9"
+  integrity sha512-AXdjebPaUwtJpWzuQtHQPsLhoAFjlWLs8D0/gyd3kHrdukPzzNvVeD54lfNPZkwVgsW9UOhw8Y7G1r4CDwPU8g==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.20.7":
-  version "0.20.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.20.9.tgz#9120fb3dab27d17467da179aa2d7053459ae7d4e"
-  integrity sha512-mlkiQpwduXv2OaAMpvj4gZ/16iwrm2Stq2K4/gPVfIdGL1TBN+s/0D8l8TzPrH2GH83E1XEzwhyiWJ7wJplTzQ==
+"@cubejs-backend/schema-compiler@^0.21.1":
+  version "0.21.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.21.1.tgz#7601ccabe3aad2ebcece9bf44f930ee2a925416f"
+  integrity sha512-PN5pUA1rzAy6cnkivWJ9uXgAiQ9weM666EQC6ams7cXDtB0PR94DeqcmQ3+t/0K+mNTaU8WsuPbPe912t37v1Q==
   dependencies:
     "@babel/generator" "^7.4.0"
     "@babel/parser" "^7.4.2"
@@ -833,16 +845,6 @@
     node-dijkstra "^2.5.0"
     ramda "^0.27.0"
     syntax-error "^1.3.0"
-
-"@cubejs/linter@file:../cubejs-linter":
-  version "0.20.6"
-  dependencies:
-    "@typescript-eslint/eslint-plugin" "^4.1.1"
-    "@typescript-eslint/parser" "^4.1.1"
-    eslint "^7.9.0"
-    eslint-config-airbnb-base "^14.2.0"
-    eslint-plugin-import "^2.22.0"
-    eslint-plugin-node "^6.0.1"
 
 "@eslint/eslintrc@^0.1.3":
   version "0.1.3"
@@ -3155,10 +3157,10 @@ tar-stream@^2.0.0:
     inherits "^2.0.3"
     readable-stream "^3.1.1"
 
-testcontainers@^3.4.11:
-  version "3.5.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-3.5.0.tgz#da8a3fa53f1c6d106ccff7e0f71bf86d358c2589"
-  integrity sha512-iigGuzBDzOmTFlxfaTo1JO7EGMs4Dgf+XHd98XeEwp8J+WzOdkJfsSL5A8fdLSGQA5GvVAdxLcUfT4a32z4rbg==
+testcontainers@^4.4.0:
+  version "4.4.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.4.0.tgz#05334d7f073b4b9d4be9e0589b1302dc9ba89caf"
+  integrity sha512-DTcQ/Wq8Vsne+OOsjANsBG2aBjzyBrg/NTQLFg8iopP/93aaA/JjiKcwdcczKg9hAa0dVnnBrslMYkT/Vutplg==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
