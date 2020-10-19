@@ -1,50 +1,32 @@
-import { Component } from "@angular/core";
-import { map } from "rxjs/operators";
-import { Breakpoints, BreakpointObserver } from "@angular/cdk/layout";
+import { Component, OnInit } from "@angular/core";
+import { BehaviorSubject } from "rxjs";
 
 @Component({
   selector: "app-dashboard-page",
   templateUrl: "./dashboard-page.component.html",
   styleUrls: ["./dashboard-page.component.scss"]
 })
-export class DashboardPageComponent {
-  /** Based on the screen size, switch from standard to one column per row */
-  cards = this.breakpointObserver.observe(Breakpoints.Handset).pipe(
-    map(({ matches }) => {
-      if (matches) {
-        return [
-          {
-            chart: "bar", cols: 1, rows: 1,
-            query: {
-              measures: ["Orders.count"],
-              timeDimensions: [{ dimension: "Orders.createdAt", granularity: "month", dateRange: "This year" }],
-              dimensions: ["Orders.status"],
-              filters: [{ dimension: "Orders.status", operator: "notEquals", values: ["completed"] }]
-            }
-          },
-          { cols: 1, rows: 1 },
-          { cols: 1, rows: 1 },
-          { cols: 1, rows: 1 }
-        ];
-      }
+export class DashboardPageComponent implements OnInit {
+  private query = new BehaviorSubject({
+    measures: ["Orders.count"],
+    timeDimensions: [{ dimension: "Orders.createdAt", granularity: "month", dateRange: "This year" }],
+    dimensions: ["Orders.status"],
+    filters: [{ dimension: "Orders.status", operator: "notEquals", values: ["completed"] }]
+  });
+  changeDateRange = (value) => {
+    this.query.next({
+      ...this.query.value,
+      timeDimensions: [{ dimension: "Orders.createdAt", granularity: "month", dateRange: value }]
+    });
+  };
+  cards = [];
 
-      return [
-        {
-          chart: "bar", cols: 2, rows: 1,
-          query: {
-            measures: ["Orders.count"],
-            timeDimensions: [{ dimension: "Orders.createdAt", granularity: "month", dateRange: "This year" }],
-            dimensions: ["Orders.status"],
-            filters: [{ dimension: "Orders.status", operator: "notEquals", values: ["completed"] }]
-          }
-        },
-        { cols: 1, rows: 1 },
-        { cols: 1, rows: 2 },
-        { cols: 1, rows: 1 }
-      ];
-    })
-  );
-
-  constructor(private breakpointObserver: BreakpointObserver) {
+  ngOnInit() {
+    this.query.subscribe(data => {
+      this.cards[0] = {
+        chart: "bar", cols: 2, rows: 1,
+        query: data
+      };
+    });
   }
 }
