@@ -20,7 +20,7 @@
     "build": "tsc",
     "test": "npm run unit",
     "unit": "jest dist",
-    "lint": "eslint -c ../../.eslintrc.js *.js"
+    "lint": "eslint -c ../../.eslintrc.js src/"
   },
   "files": [
     "dist",
