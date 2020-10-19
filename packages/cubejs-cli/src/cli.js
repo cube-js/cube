@@ -283,11 +283,13 @@ program
     console.log('  $ cubejs deploy');
   });
 
-configureDevServerCommand(program);
-configureServerCommand(program);
+(async () => {
+  await configureDevServerCommand(program);
+  await configureServerCommand(program);
 
-if (!process.argv.slice(2).length) {
-  program.help();
-}
+  if (!process.argv.slice(2).length) {
+    program.help();
+  }
 
-program.parse(process.argv);
+  program.parse(process.argv);
+})();
