@@ -26,6 +26,7 @@ const token = async (options = {}) => {
   if (expiry !== '0') extraOptions.expiresIn = expiry;
 
   const payload = parsePayload(options.payload);
+  payload.u = parsePayload(options.userContext);
 
   console.log('Generating Cube.js JWT token');
   console.log('');

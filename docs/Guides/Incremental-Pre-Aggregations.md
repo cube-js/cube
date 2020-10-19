@@ -10,7 +10,8 @@ menuOrder: 25
 When you use partitioned rollups on immutable data there's an opportunity to build pre-aggregations incrementally.
 Cube.js allows to set `refreshKey` in a way that partitions in past would be never refreshed without a need which leads to significant performance boost.
 
-> **NOTE:** Since 0.15.0 `incremental` flag is a built-in [pre-aggregations refreshKey](pre-aggregations#refresh-key) parameter.
+[[warning | Note]]
+| Since 0.15.0 `incremental` flag is a built-in [pre-aggregations refreshKey](pre-aggregations#refresh-key) parameter.
 
 As usually there're multiple cubes that require incremental partitions building it's best practice to introduce separate `RefreshKeyHelper.js` file which will contain this reusable logic.
 Typical immutable partition rollup will look like:

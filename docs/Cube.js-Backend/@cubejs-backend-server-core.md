@@ -139,7 +139,8 @@ base path for the websockets server. By default the websocket server will run on
 
 Boolean to enable or disable a development server mode. The default value is based on `NODE_ENV` environment variable value. If the value of `NODE_ENV` is `production` it is `false`, otherwise it is `true`.
 
-**NOTE:** Using dev server in production is a security risk as there're unsecured routes which allows to get access to all data defined in Cube.js schema.
+[[warning | Note]]
+| Using dev server in production is a security risk as there're unsecured routes which allows to get access to all data defined in Cube.js schema.
 
 ### logger
 

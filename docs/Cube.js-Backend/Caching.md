@@ -31,7 +31,8 @@ Cube.js takes great care to prevent unnecessary queries from hitting your databa
 
 So, Cube.js defines a `refreshKey` for each cube. [refreshKeys](cube#parameters-refresh-key) can be evaluated by Cube.js to assess if cube data has changed.
 
-> **Note**: Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
+[[warning | Note]] 
+| Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
 
 When a query's result needs to be refreshed, Cube.js will re-execute the query in the foreground and repopulate the cache.
 This means that cached results may still be served to users requesting them while `refreshKey` values aren't changed from Cube.js perspective.
@@ -195,7 +196,8 @@ server.listen().then(({ version, port }) => {
 
 There's also [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) available to trigger run.
 
-> **NOTE:** `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.
+[[warning | Note]]
+| `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.
 
 
 ## Inspecting Queries
@@ -206,7 +208,8 @@ Playground can be used to inspect a single query. To do that, click the "cache" 
 To inspect multiple queries or list existing pre-aggregations, you can use Cube Cloud.
 
 
-> **NOTE:** Cube Cloud currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
+[[warning | Note]]
+| Cube Cloud currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
 
 To inspect queries in the Cube Cloud, navigate to the "History" page. You can filter queries by multiple parameters on this page, including whether they hit the cache, pre-aggregations, or raw data. Additionally, you can click on the query to see its details, such as time spent in the database, the database queue's size when the query was executed, generated SQL, query timeline, and more. It will also show you the optimal pre-aggregation that can be used for this query.
 
