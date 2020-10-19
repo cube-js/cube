@@ -65,8 +65,11 @@ class Config {
     const payload = jwt.decode(authToken);
     if (!payload || !payload.url) {
       const answer = await this.cloudTokenReq({
-        url:`${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token?t=${encodeURIComponent(authToken)}`,
-        method: 'GET', 
+        url:`${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
+        method: 'POST', 
+        body:{
+          token:authToken
+        }
       })
       
       if(answer.error){
@@ -180,11 +183,16 @@ class Config {
 
   async cloudTokenReq(options) {
     const { url, auth, ...restOptions } = options;
+    console.log(options)
     const res = await rp({
       ...restOptions,
       url,
+      headers: {
+        'Content-type': 'application/json'
+      },
       json: true
     }); 
+    console.log(res)
     return res
   }
 }
