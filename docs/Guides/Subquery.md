@@ -72,6 +72,36 @@ cube(`SalesManagers`, {
   }
 });
 ```
+
+Sub query requires you to reference at least one measure in the definition. 
+Generally speaking all measures involved in defining particular sub query dimension should be defined as measures first and then referenced from a sub query dimension.
+For example the following schema **will not work**:
+
+```javascript
+cube(`Deals`, {
+  sql: `select * from deals`,
+
+  measures: {
+    amount: {
+      sql: `amount`,
+      type: `sum`
+    }
+  }
+});
+
+cube(`SalesManagers`, {
+  // ...
+  dimensions: {
+    // ...
+    dealsAmount: {
+      sql: `sum(${Deals}.amount)`,
+      type: `number`,
+      subQuery: true
+    }
+  }
+});
+```
+
 You can **reference subquery dimensions in measures as usual dimensions**. The example below shows the definition of an average deal amount per sales manager:
 
 ```javascript
