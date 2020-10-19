@@ -12,23 +12,18 @@
     "node": ">=8.11.1"
   },
   "bin": {
-    "cubejs": "./index.js"
+    "cubejs": "src/index.js"
   },
   "scripts": {
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "build": "tsc",
     "test": "npm run unit",
-    "unit": "jest",
+    "unit": "jest dist",
     "lint": "eslint -c ../../.eslintrc.js *.js"
   },
   "files": [
-    "index.js",
-    "cubejsCli.js",
-    "token.js",
-    "utils.js",
-    "track.js",
-    "templates.js",
-    "deploy.js",
-    "DeployDir.js",
-    "Config.js",
+    "dist",
     "yarn.lock",
     "README.md",
     "LICENSE"
@@ -47,6 +42,7 @@
     "request-promise": "^4.2.5"
   },
   "devDependencies": {
+    "@types/node": "^14.11.10",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
@@ -54,7 +50,8 @@
     "husky": "^4.2.3",
     "jest": "^24.8.0",
     "mocha": "^8.0.1",
-    "should": "^13.2.3"
+    "should": "^13.2.3",
+    "typescript": "^4.0.3"
   },
   "license": "Apache-2.0"
 }
