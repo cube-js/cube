@@ -64,15 +64,18 @@ export const displayError = async (text: string, options = {}) => {
   process.exit(1);
 };
 
-export const requireFromPackage = async (moduleName: string) => {
-  if (
-    !(await fs.pathExists(path.join(process.cwd(), 'node_modules', moduleName))) &&
-    !(await fs.pathExists(path.join(process.cwd(), 'node_modules', `${module}.js`)))
-  ) {
+export const requiredPackageExists = async (moduleName: string) => {
+  const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
+
+  if (!fs.pathExistsSync(modulePath) && !fs.pathExistsSync(`${modulePath}.js`)) {
     await displayError(
       `${moduleName} dependency not found. Please run this command from project directory.`
     );
   }
+};
+
+export const requireFromPackage = async (moduleName: string) => {
+  await requiredPackageExists(moduleName);
 
   // eslint-disable-next-line global-require,import/no-dynamic-require
   return require(path.join(process.cwd(), 'node_modules', moduleName));

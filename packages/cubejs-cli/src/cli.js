@@ -5,18 +5,21 @@ eslint import/no-dynamic-require: 0
 eslint global-require: 0
  */
 
-const program = require('commander');
-const fs = require('fs-extra');
-const path = require('path');
-const chalk = require('chalk');
-const crypto = require('crypto');
-const inquirer = require('inquirer');
+import program from 'commander';
+import fs from 'fs-extra';
+import path from 'path';
+import chalk from 'chalk';
+import crypto from 'crypto';
+import inquirer from 'inquirer';
+
+import { configureDevServerCommand } from './command/dev-server';
+import { configureServerCommand } from './command/server';
+import { executeCommand, npmInstall, writePackageJson, requireFromPackage, event, displayError } from './utils';
 
 const Config = require('./config');
 const templates = require('./templates');
 const { deploy } = require('./deploy');
 const { token, defaultExpiry, collect } = require('./token');
-import { executeCommand, npmInstall, writePackageJson, requireFromPackage, event, displayError } from './utils';
 
 const packageJson = require('../package.json');
 
@@ -279,6 +282,9 @@ program
     console.log('  $ cubejs auth eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXBsb3ltZW50SWQiOiIxIiwidXJsIjoiaHR0cHM6Ly9leGFtcGxlcy5jdWJlY2xvdWQuZGV2IiwiaWF0IjoxNTE2MjM5MDIyfQ.La3MiuqfGigfzADl1wpxZ7jlb6dY60caezgqIOoHt-c');
     console.log('  $ cubejs deploy');
   });
+
+configureDevServerCommand(program);
+configureServerCommand(program);
 
 if (!process.argv.slice(2).length) {
   program.help();
