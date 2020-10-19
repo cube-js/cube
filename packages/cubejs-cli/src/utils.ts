@@ -84,6 +84,20 @@ export const requiredPackageExists = async (moduleName: string) => {
   }
 };
 
+export const requirePackageManifest = async (moduleName: string) => {
+  await requiredPackageExists(moduleName);
+
+  const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
+
+  if (!fs.pathExistsSync(modulePath) && !fs.pathExistsSync(path.join(modulePath, 'package.json'))) {
+    await displayError(
+      `${moduleName} dependency package.json not found. Please run this command from project directory.`
+    );
+  }
+
+  return require(path.join(modulePath, 'package.json'));
+};
+
 export const requireFromPackage = async (moduleName: string) => {
   await requiredPackageExists(moduleName);
 
@@ -97,3 +111,7 @@ const logStage = async (stage: string, eventName: string, props: any) => {
     await event(eventName, props);
   }
 };
+
+export function loadCliManifest() {
+  return require('../package.json');
+}

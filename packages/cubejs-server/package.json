@@ -23,6 +23,7 @@
   "bin": {
     "cubejs-dev-server": "./bin/dev-server.js"
   },
+  "cubejsCliVersion": "^0.22",
   "scripts": {
     "tsc": "tsc",
     "watch": "tsc -w",

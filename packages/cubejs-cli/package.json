@@ -39,11 +39,13 @@
     "node-fetch": "^2.6.0",
     "node-machine-id": "^1.1.10",
     "request": "^2.88.2",
-    "request-promise": "^4.2.5"
+    "request-promise": "^4.2.5",
+    "semver": "^7.3.2"
   },
   "devDependencies": {
     "@types/cross-spawn": "^6.0.2",
     "@types/node": "^14.11.10",
+    "@types/semver": "^7.3.4",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
