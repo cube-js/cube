@@ -45,24 +45,34 @@ export const event = async (name: string, props: any) => {
   }
 };
 
-export const displayError = async (text: string, options = {}) => {
+export const displayError = async (text: string|string[], options = {}) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');
+
   if (Array.isArray(text)) {
     text.forEach((str) => console.error(str));
   } else {
     console.error(text);
   }
+
   console.error('');
   console.error(chalk.yellow('Need some help? -------------------------------------'));
+
   await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString(), ...options });
+
   console.error('');
   console.error(`${chalk.yellow('  Ask this question in Cube.js Slack:')} https://slack.cube.dev`);
   console.error(`${chalk.yellow('  Post an issue:')} https://github.com/cube-js/cube.js/issues`);
   console.error('');
+
   process.exit(1);
 };
+
+export const packageExists = (moduleName: string) => {
+  const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
+  return fs.pathExistsSync(modulePath);
+}
 
 export const requiredPackageExists = async (moduleName: string) => {
   const modulePath = path.join(process.cwd(), 'node_modules', moduleName);

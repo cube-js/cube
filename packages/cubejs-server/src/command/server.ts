@@ -1,4 +1,4 @@
-import {Command, flags} from '@oclif/command';
+import { Command, flags } from '@oclif/command';
 
 export default class Server extends Command {
   static description = 'Run server in Production mode';
