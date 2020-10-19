@@ -4,12 +4,11 @@ eslint import/no-dynamic-require: 0
 /*
 eslint global-require: 0
  */
+
 const program = require('commander');
 const fs = require('fs-extra');
 const path = require('path');
-const os = require('os');
 const chalk = require('chalk');
-const spawn = require('cross-spawn');
 const crypto = require('crypto');
 const inquirer = require('inquirer');
 
@@ -17,34 +16,12 @@ const Config = require('./config');
 const templates = require('./templates');
 const { deploy } = require('./deploy');
 const { token, defaultExpiry, collect } = require('./token');
-const { requireFromPackage, event, displayError } = require('./utils');
+import { executeCommand, npmInstall, writePackageJson, requireFromPackage, event, displayError } from './utils';
 
 const packageJson = require('../package.json');
 
 program.name(Object.keys(packageJson.bin)[0])
   .version(packageJson.version);
-
-const executeCommand = (command, args) => {
-  const child = spawn(command, args, { stdio: 'inherit' });
-  return new Promise((resolve, reject) => {
-    child.on('close', code => {
-      if (code !== 0) {
-        reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
-        return;
-      }
-      resolve();
-    });
-  });
-};
-
-const writePackageJson = async (json) => fs.writeJson('package.json', json, {
-  spaces: 2,
-  EOL: os.EOL
-});
-
-const npmInstall = (dependencies, isDev) => executeCommand(
-  'npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies)
-);
 
 const logStage = (stage) => {
   console.log(`- ${stage}`);

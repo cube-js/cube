@@ -12,7 +12,7 @@
     "node": ">=8.11.1"
   },
   "bin": {
-    "cubejs": "src/index.js"
+    "cubejs": "dist/index.js"
   },
   "scripts": {
     "tsc": "tsc",
@@ -42,6 +42,7 @@
     "request-promise": "^4.2.5"
   },
   "devDependencies": {
+    "@types/cross-spawn": "^6.0.2",
     "@types/node": "^14.11.10",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
