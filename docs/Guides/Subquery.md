@@ -94,7 +94,7 @@ cube(`SalesManagers`, {
   dimensions: {
     // ...
     dealsAmount: {
-      sql: `sum(${Deals}.amount)`,
+      sql: `sum(${Deals}.amount)`, // !!! Doesn't work!
       type: `number`,
       subQuery: true
     }
