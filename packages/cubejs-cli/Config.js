@@ -64,6 +64,19 @@ class Config {
     }
     const payload = jwt.decode(authToken);
     if (!payload || !payload.url) {
+      const answer = await this.cloudTokenReq({
+        url:`${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token?t=${encodeURIComponent(authToken)}`,
+        method: 'GET', 
+      })
+      
+      if(answer.error){
+        throw answer.error
+      }
+      
+      if(answer.jwt){
+        return this.addAuthToken(answer.jwt, config)
+      }
+
       // eslint-disable-next-line no-throw-literal
       throw 'Malformed Cube Cloud token';
     }
@@ -163,6 +176,16 @@ class Config {
       url: `${authorization.url}/${url(authorization.deploymentId)}`,
       json: true
     });
+  }
+
+  async cloudTokenReq(options) {
+    const { url, auth, ...restOptions } = options;
+    const res = await rp({
+      ...restOptions,
+      url,
+      json: true
+    }); 
+    return res
   }
 }
 
