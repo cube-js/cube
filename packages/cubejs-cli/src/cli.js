@@ -14,14 +14,22 @@ import inquirer from 'inquirer';
 
 import { configureDevServerCommand } from './command/dev-server';
 import { configureServerCommand } from './command/server';
-import { executeCommand, npmInstall, writePackageJson, requireFromPackage, event, displayError } from './utils';
+import {
+  executeCommand,
+  npmInstall,
+  writePackageJson,
+  requireFromPackage,
+  event,
+  displayError,
+  loadCliManifest,
+} from './utils';
 
 const Config = require('./config');
 const templates = require('./templates');
 const { deploy } = require('./deploy');
 const { token, defaultExpiry, collect } = require('./token');
 
-const packageJson = require('../package.json');
+const packageJson = loadCliManifest();
 
 program.name(Object.keys(packageJson.bin)[0])
   .version(packageJson.version);
