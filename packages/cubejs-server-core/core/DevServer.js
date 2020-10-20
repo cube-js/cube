@@ -198,6 +198,9 @@ class DevServer {
         if (typeof toApply === 'string') {
           const template = manifestJson.templates.find(({ name }) => name === toApply);
           templatePackages = template.templatePackages;
+          
+          console.log('templatePackages', templatePackages)
+          
         } else {
           templatePackages = toApply;
         }
@@ -237,6 +240,7 @@ class DevServer {
           this.applyTemplatePackagesPromise = null;
         }
       }, (err) => {
+        console.log('err', err);
         lastApplyTemplatePackagesError = err;
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
