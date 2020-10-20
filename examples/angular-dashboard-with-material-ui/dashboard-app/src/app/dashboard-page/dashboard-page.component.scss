@@ -8,6 +8,11 @@
   left: 15px;
   right: 15px;
   bottom: 15px;
+  box-shadow: none;
+  &__header {
+    border-bottom: 1px solid #D5D5E2;
+    margin-bottom: 1.5rem;
+  }
 }
 
 .more-button {
