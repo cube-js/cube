@@ -25,6 +25,7 @@
     "@cubejs-client/ngx": "^0.21.1",
     "chart.js": "^2.9.3",
     "ng2-charts": "^2.4.2",
+    "ngx-countup": "^7.3.3",
     "rxjs": "~6.6.0",
     "tslib": "^2.0.0",
     "zone.js": "~0.10.2"

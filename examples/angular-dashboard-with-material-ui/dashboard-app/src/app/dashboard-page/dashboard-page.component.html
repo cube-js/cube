@@ -1,26 +1,40 @@
 <div class="grid-container">
-  <mat-grid-list cols="3" rowHeight="450px">
-    <mat-grid-tile *ngFor="let card of cards" [colspan]="card.cols" [rowspan]="card.rows">
-      <mat-card class="dashboard-card">
-        <mat-card-header class="dashboard-card__header">
-          <mat-card-title>
-            <h3>Last sales</h3>
-            <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
-              <mat-icon>more_vert</mat-icon>
-            </button>
-            <mat-menu #menu="matMenu" xPosition="before">
-              <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
-              <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
-            </mat-menu>
-          </mat-card-title>
-        </mat-card-header>
-        <!--<hr>-->
-        <mat-card-content class="dashboard-card-content">
-          <div>
-            <app-bar-chart [query]="card.query" *ngIf="card.chart === 'bar'"></app-bar-chart>
-          </div>
-        </mat-card-content>
-      </mat-card>
-    </mat-grid-tile>
-  </mat-grid-list>
+  <div class="kpi-wrap">
+    <mat-grid-list cols="4" rowHeight="131px">
+      <mat-grid-tile *ngFor="let card of KPICards" [colspan]="1" [rowspan]="1">
+        <app-kpi-card class="kpi-card"
+                      [query]="card.query"
+                      [title]="card.title"
+                      [duration]="card.duration"
+                      [progress]="card.progress"
+        ></app-kpi-card>
+      </mat-grid-tile>
+    </mat-grid-list>
+  </div>
+  <div>
+    <mat-grid-list cols="5" rowHeight="510px">
+      <mat-grid-tile *ngFor="let card of cards" [colspan]="card.cols" [rowspan]="card.rows">
+        <mat-card class="dashboard-card">
+          <mat-card-header class="dashboard-card__header">
+            <mat-card-title>
+              <h3>Last sales</h3>
+              <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu" xPosition="before">
+                <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
+                <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
+              </mat-menu>
+            </mat-card-title>
+          </mat-card-header>
+          <!--<hr>-->
+          <mat-card-content class="dashboard-card-content">
+            <div>
+              <app-bar-chart [query]="card.query" *ngIf="card.chart === 'bar'"></app-bar-chart>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </mat-grid-tile>
+    </mat-grid-list>
+  </div>
 </div>

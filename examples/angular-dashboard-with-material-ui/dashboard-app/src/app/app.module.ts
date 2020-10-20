@@ -11,8 +11,11 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import {MatProgressBarModule} from '@angular/material/progress-bar'
 import { LayoutModule } from '@angular/cdk/layout';
 import { DashboardPageComponent } from './dashboard-page/dashboard-page.component';
+import { KpiCardComponent } from './kpi-card/kpi-card.component';
+import { CountUpModule } from 'ngx-countup';
 
 const cubejsOptions = {
   token: 'YOUR-CUBEJS-API-TOKEN',
@@ -23,7 +26,8 @@ const cubejsOptions = {
   declarations: [
     AppComponent,
     BarChartComponent,
-    DashboardPageComponent
+    DashboardPageComponent,
+    KpiCardComponent
   ],
   imports: [
     BrowserModule,
@@ -35,7 +39,9 @@ const cubejsOptions = {
     MatMenuModule,
     MatIconModule,
     MatButtonModule,
-    LayoutModule
+    LayoutModule,
+    CountUpModule,
+    MatProgressBarModule
   ],
   providers: [],
   bootstrap: [AppComponent]

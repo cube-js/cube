@@ -1,0 +1,14 @@
+<mat-card class="dashboard-card">
+  <mat-card-header class="dashboard-card__header">
+    <mat-card-title>
+      <h3 class="kpi-title">{{title}}</h3>
+    </mat-card-title>
+  </mat-card-header>
+  <!--<hr>-->
+  <mat-card-content class="dashboard-card-content kpi-result">
+    <span>{{prefix}}</span>
+    <span [countUp]="result" [options]="{duration: duration}">0</span>
+    <span>{{postfix}}</span>
+    <mat-progress-bar [color]="'primary'" class="kpi-progress" *ngIf="progress" value="{{result}}"></mat-progress-bar>
+  </mat-card-content>
+</mat-card>
