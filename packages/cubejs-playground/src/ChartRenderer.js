@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import SourceRender from 'react-source-render';
 import presetEnv from '@babel/preset-env';
@@ -28,27 +28,36 @@ export const babelConfig = {
   presets: [presetEnv, presetReact],
 };
 
-// const prettify = (object) => {
-//   let str = object;
-//   if (typeof object === 'object') {
-//     str = JSON.stringify(object, null, 2);
-//   }
+const prettify = (object) => {
+  let str = object;
+  if (typeof object === 'object') {
+    str = JSON.stringify(object, null, 2);
+  }
 
-//   return str
-//     .split('\n')
-//     .map((l, i) => (i > 0 ? `  ${l}` : l))
-//     .join('\n');
-// };
+  return str
+    .split('\n')
+    .map((l, i) => (i > 0 ? `  ${l}` : l))
+    .join('\n');
+};
 
 const sourceCodeTemplate = (props) => {
-  const { chartLibrary, query, apiUrl, cubejsToken, chartType } = props;
+  const {
+    chartLibrary,
+    apiUrl,
+    query,
+    cubejsToken,
+    chartType,
+    codeExample,
+    pivotConfig
+  } = props;
   const renderFnName = `${chartType}Render`;
+
   return `import React from 'react';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 import { Spin } from 'antd';
 ${chartLibrary.sourceCodeTemplate({ ...props, renderFnName })}
-
+${!codeExample ? `import CubeJsQueryRenderer from 'cubejs-context';\n` : ''}
 const API_URL = "${apiUrl}"; // change to your actual endpoint
 
 const cubejsApi = cubejs(
@@ -56,18 +65,33 @@ const cubejsApi = cubejs(
   { apiUrl: API_URL + "/cubejs-api/v1" }
 );
 
-const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => (
-  (resultSet && <Component resultSet={resultSet} pivotConfig={window.__CUBEJS && window.__CUBEJS.pivotConfig || null} />) ||
-  (error && error.toString()) || 
-  (<Spin />)
-)
+const renderChart = (Component, query, pivotConfig) => ({ resultSet, error }) => {
+  return (
+    (resultSet && (
+      <Component
+        resultSet={resultSet}
+        pivotConfig={pivotConfig}
+      />
+    )) ||
+    (error && error.toString()) || <Spin />
+  );
+};
 
-const ChartRenderer = () => <QueryRenderer
-  query={window.__CUBEJS && window.__CUBEJS.query}
-  cubejsApi={cubejsApi}
-  resetResultSetOnChange={false}
-  render={renderChart(${renderFnName})}
-/>;
+const ChartRenderer = () => {
+  ${!codeExample ? 'const { query, pivotConfig } = React.useContext(CubeJsQueryRenderer);' : ''}
+  return (
+    <QueryRenderer
+      query={query}
+      cubejsApi={cubejsApi}
+      resetResultSetOnChange={false}
+      render={renderChart(
+        ${renderFnName}, 
+        ${codeExample ? prettify(query) : 'query'}, 
+        ${codeExample ? prettify(pivotConfig) : 'pivotConfig'}
+      )}
+    />
+  );
+};
 
 export default ChartRenderer;
 `;
@@ -90,6 +114,8 @@ export const chartLibraries = Object.keys(libraryToTemplate).map((k) => ({
   value: k,
   title: libraryToTemplate[k].title,
 }));
+
+const CubeJsQueryRenderer = createContext({});
 
 export const ChartRenderer = (props) => {
   const [jsCompilingError, setError] = useState(null);
@@ -115,9 +141,16 @@ export const ChartRenderer = (props) => {
     chartLibrary: selectedChartLibrary,
     pivotConfig,
   });
+  const codeExample = sourceCodeFn({
+    ...props,
+    chartLibrary: selectedChartLibrary,
+    pivotConfig,
+    codeExample: true,
+  });
   const dependencies = {
     '@cubejs-client/core': cubejs,
     '@cubejs-client/react': cubejsReact,
+    'cubejs-context': CubeJsQueryRenderer,
     antd,
     react: React,
     ...selectedChartLibrary.imports,
@@ -129,53 +162,52 @@ export const ChartRenderer = (props) => {
     }
   }, [source, chartType, jsCompilingError]);
 
-  useEffect(() => {
-    // Avoid updating the source code to eliminate the QueryRenderer unmount
-    window.__CUBEJS = {
-      query,
-      pivotConfig,
-    };
-  }, [query, pivotConfig]);
-
   return (
-    <ChartContainer
-      query={query}
-      resultSet={resultSet}
-      error={error}
-      sqlQuery={sqlQuery}
-      codeExample={source}
-      codeSandboxSource={forCodeSandBox(source)}
-      dependencies={dependencies}
-      dashboardSource={dashboardSource}
-      chartLibrary={chartLibrary}
-      setChartLibrary={setChartLibrary}
-      chartLibraries={chartLibraries}
-      cubejsApi={cubejsApi}
-      render={() => {
-        if (jsCompilingError) {
+    <CubeJsQueryRenderer.Provider
+      value={{
+        query,
+        pivotConfig,
+      }}
+    >
+      <ChartContainer
+        query={query}
+        resultSet={resultSet}
+        error={error}
+        sqlQuery={sqlQuery}
+        codeExample={codeExample}
+        codeSandboxSource={forCodeSandBox(codeExample)}
+        dependencies={dependencies}
+        dashboardSource={dashboardSource}
+        chartLibrary={chartLibrary}
+        setChartLibrary={setChartLibrary}
+        chartLibraries={chartLibraries}
+        cubejsApi={cubejsApi}
+        render={() => {
+          if (jsCompilingError) {
+            return (
+              <Alert
+                message="Error occurred while compiling JS"
+                description={<pre>{jsCompilingError.toString()}</pre>}
+                type="error"
+              />
+            );
+          }
+
           return (
-            <Alert
-              message="Error occurred while compiling JS"
-              description={<pre>{jsCompilingError.toString()}</pre>}
-              type="error"
+            <SourceRender
+              onRender={(renderError) => {
+                if (renderError) {
+                  setError(renderError);
+                }
+              }}
+              babelConfig={babelConfig}
+              resolver={(importName) => dependencies[importName]}
+              source={source}
             />
           );
-        }
-
-        return (
-          <SourceRender
-            onRender={(renderError) => {
-              if (renderError) {
-                setError(renderError);
-              }
-            }}
-            babelConfig={babelConfig}
-            resolver={(importName) => dependencies[importName]}
-            source={source}
-          />
-        );
-      }}
-    />
+        }}
+      />
+    </CubeJsQueryRenderer.Provider>
   );
 };
 

@@ -317,8 +317,6 @@ export default class QueryBuilder extends React.Component {
       query.order = defaultOrder(query);
     }
     
-    const activePivotConfig = finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig;
-    
     const updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers({
       ...this.state,
       ...finalState
@@ -336,6 +334,11 @@ export default class QueryBuilder extends React.Component {
       ...query,
       order: fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean))
     };
+    
+    finalState.pivotConfig = ResultSet.getNormalizedPivotConfig(
+      nextQuery,
+      finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig
+    );
     
     runSetters({
       ...state,
@@ -359,26 +362,26 @@ export default class QueryBuilder extends React.Component {
         if (finalState.shouldApplyHeuristicOrder) {
           nextQuery.order = (response.queryOrder || []).reduce((memo, current) => ({ ...memo, ...current }), {});
         }
+            
+        if (QueryRenderer.isQueryPresent(stateQuery)) {
+          finalState = {
+            ...finalState,
+            query: nextQuery,
+            pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, finalState.pivotConfig)
+          };
+          
+          this.setState({
+            ...finalState,
+            validatedQuery: this.validatedQuery(finalState)
+          });
+          runSetters({
+            ...this.state,
+            ...finalState
+          });
+        }
       } catch (error) {
         console.error(error);
       }
-    }
-    
-    if (QueryRenderer.isQueryPresent(stateQuery)) {
-      finalState = {
-        ...finalState,
-        query: nextQuery,
-        pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, activePivotConfig)
-      };
-      
-      this.setState({
-        ...finalState,
-        validatedQuery: this.validatedQuery(finalState)
-      });
-      runSetters({
-        ...this.state,
-        ...finalState
-      });
     }
   }
 
