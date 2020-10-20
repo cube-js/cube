@@ -13,6 +13,16 @@ export class DashboardPageComponent implements OnInit {
     dimensions: ["Orders.status"],
     filters: [{ dimension: "Orders.status", operator: "notEquals", values: ["completed"] }]
   });
+  private doughnutQuery = new BehaviorSubject({
+    measures: ['Orders.count'],
+    timeDimensions: [
+      {
+        dimension: 'Orders.createdAt',
+      },
+    ],
+    filters: [],
+    dimensions: ['Orders.status'],
+  });
   changeDateRange = (value) => {
     this.query.next({
       ...this.query.value,
@@ -52,11 +62,17 @@ export class DashboardPageComponent implements OnInit {
   ngOnInit() {
     this.query.subscribe(data => {
       this.cards[0] = {
+        hasDatePick: true,
+        title: 'Last Sales',
         chart: "bar", cols: 3, rows: 1,
         query: data
       };
+    });
+    this.doughnutQuery.subscribe(data => {
       this.cards[1] = {
-        chart: "bar", cols: 2, rows: 1,
+        hasDatePick: false,
+        title: 'Users by Device',
+        chart: "doughnut", cols: 2, rows: 1,
         query: data
       };
     });

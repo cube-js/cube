@@ -16,6 +16,7 @@ import { LayoutModule } from '@angular/cdk/layout';
 import { DashboardPageComponent } from './dashboard-page/dashboard-page.component';
 import { KpiCardComponent } from './kpi-card/kpi-card.component';
 import { CountUpModule } from 'ngx-countup';
+import { DoughnutChartComponent } from './doughnut-chart/doughnut-chart.component';
 
 const cubejsOptions = {
   token: 'YOUR-CUBEJS-API-TOKEN',
@@ -27,7 +28,8 @@ const cubejsOptions = {
     AppComponent,
     BarChartComponent,
     DashboardPageComponent,
-    KpiCardComponent
+    KpiCardComponent,
+    DoughnutChartComponent
   ],
   imports: [
     BrowserModule,

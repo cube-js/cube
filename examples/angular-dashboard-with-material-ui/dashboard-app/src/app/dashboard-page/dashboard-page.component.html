@@ -17,20 +17,23 @@
         <mat-card class="dashboard-card">
           <mat-card-header class="dashboard-card__header">
             <mat-card-title>
-              <h3>Last sales</h3>
-              <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
-                <mat-icon>more_vert</mat-icon>
-              </button>
-              <mat-menu #menu="matMenu" xPosition="before">
-                <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
-                <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
-              </mat-menu>
+              <h3>{{card.title}}</h3>
+              <div *ngIf="card.hasDatePick">
+                <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #menu="matMenu" xPosition="before">
+                  <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
+                  <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
+                </mat-menu>
+              </div>
             </mat-card-title>
           </mat-card-header>
           <!--<hr>-->
           <mat-card-content class="dashboard-card-content">
             <div>
               <app-bar-chart [query]="card.query" *ngIf="card.chart === 'bar'"></app-bar-chart>
+              <app-doughnut-chart [query]="card.query" *ngIf="card.chart === 'doughnut'"></app-doughnut-chart>
             </div>
           </mat-card-content>
         </mat-card>
