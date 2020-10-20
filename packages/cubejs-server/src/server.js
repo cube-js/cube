@@ -1,8 +1,7 @@
-/* eslint-disable global-require */
 import dotenv from 'dotenv';
-import CubejsServerCore from '@cubejs-backend/server-core';
 
-import { WebsocketServer } from './websocket-server';
+import CubejsServerCore from '@cubejs-backend/server-core';
+import { WebSocketServer } from './websocket-server';
 import { version } from '../../package.json';
 
 dotenv.config();
@@ -24,12 +23,20 @@ export class CubejsServer {
         throw new Error('CubeServer is already listening');
       }
 
+      // eslint-disable-next-line global-require
       const http = require('http');
+      // eslint-disable-next-line global-require
       const https = require('https');
+      // eslint-disable-next-line global-require
       const util = require('util');
+      // eslint-disable-next-line global-require
       const express = require('express');
+
       const app = express();
+
+      // eslint-disable-next-line global-require
       const bodyParser = require('body-parser');
+      // eslint-disable-next-line global-require
       app.use(require('cors')());
       app.use(bodyParser.json({ limit: '50mb' }));
 

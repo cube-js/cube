@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 const util = require('util');
 
-export class WebsocketServer {
+export class WebSocketServer {
   constructor(serverCore, options) {
     options = options || {};
     this.serverCore = serverCore;

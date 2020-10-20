@@ -28,12 +28,13 @@
     "watch": "tsc -w",
     "build": "tsc",
     "test": "npm run unit",
-    "lint": "eslint *.js tests/__mocks__/*.js",
-    "lint:fix": "eslint --fix *.js tests/__mocks__/*.js",
+    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* tests/ --ext .ts,.js",
+    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* tests/ --ext .ts,js",
     "unit": "jest dist/tests",
     "unit:debug": "node jest dist/ --runInBand"
   },
   "dependencies": {
+    "@cubejs-backend/linter": "^0.21.2",
     "@cubejs-backend/server-core": "^0.22.3",
     "@oclif/command": "^1.8.0",
     "body-parser": "^1.19.0",
@@ -53,5 +54,8 @@
     "should": "^13.2.3",
     "typescript": "^4.0.3"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
 }
