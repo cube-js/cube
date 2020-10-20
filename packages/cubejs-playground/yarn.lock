@@ -1375,10 +1375,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.21.0":
-  version "0.21.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.21.0.tgz#8705727199d678f17be3f50bff6628ee29a26e38"
-  integrity sha512-ZNNhHQ24A/zU7mAHxBqNHmOgnWUE5Jit6ySixDGNVjWYHwyQCQlcFfohHyxpk04S7ppoQ+Ac27aDYM7erW1R+g==
+"@cubejs-client/core@^0.21.1":
+  version "0.21.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.21.1.tgz#5bbdd1224aefa4b405e1f8b766504a4224aa4840"
+  integrity sha512-D6JAZ0W5rvoTZt7+cfCdMxm1d7U28v6YHOWcPzfNumQznBjZCTwM5lYj4Ro3DifvT1UBrmvWirDauvIq1+uWFg==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1389,10 +1389,10 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.21.0":
-  version "0.21.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.21.0.tgz#6ddea33e29863c91b9b2b5b00d539953b79c55c8"
-  integrity sha512-UzAPuSXHIjhFATYcnJ0pxlJrb8R+mex8UqiS0zWjDsa9Q/WpwklW6nST1dAYVAFlaHTyLOPictdqTvIA813oKg==
+"@cubejs-client/react@^0.21.1":
+  version "0.21.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.21.1.tgz#4c4aeee2acf42786b1aed50ff250333a08f75c07"
+  integrity sha512-IoGviMJeOXqf/s9z0CQl4LUwQeiWHaHrRu/09KC6etOxHLz5iDv0GHiyEQ8kjAdpmdjykdMLIhj3OAdp+e4LKA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -8236,15 +8236,10 @@ moment-range@^4.0.1:
   dependencies:
     es6-symbol "^3.1.0"
 
-moment@^2.10.2, moment@^2.24.0:
-  version "2.27.0"
-  resolved "https://registry.yarnpkg.com/moment/-/moment-2.27.0.tgz#8bff4e3e26a236220dfe3e36de756b6ebaa0105d"
-  integrity sha512-al0MUK7cpIcglMv3YF13qSgdAIqxHTO7brRtaz3DlSULbqfazqkc5kEjNrLDOM7fsjshoFIihnU8snrP7zUvhQ==
-
-moment@^2.22.2, moment@^2.25.3:
-  version "2.29.0"
-  resolved "https://registry.yarnpkg.com/moment/-/moment-2.29.0.tgz#fcbef955844d91deb55438613ddcec56e86a3425"
-  integrity sha512-z6IJ5HXYiuxvFTI6eiQ9dm77uE0gyy1yXNApVHqTcnIKfY9tIwEjlzsZ6u1LQXvVgKeTnv9Xm7NDvJ7lso3MtA==
+moment@^2.10.2, moment@^2.22.2, moment@^2.24.0, moment@^2.25.3:
+  version "2.29.1"
+  resolved "https://registry.yarnpkg.com/moment/-/moment-2.29.1.tgz#b2be769fa31940be9eeea6469c075e35006fa3d3"
+  integrity sha512-kHmoybcPV8Sqy59DwNDY3Jefr64lK/by/da0ViFcuA4DH0vQg5Q6Ze5VimxkfQNSC+Mls/Kx53s7TjP1RhFEDQ==
 
 move-concurrently@^1.0.1:
   version "1.0.1"
