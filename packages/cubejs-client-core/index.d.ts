@@ -49,6 +49,7 @@ declare module '@cubejs-client/core' {
     headers?: Record<string, string>;
     pollInterval?: number;
     credentials?: 'omit' | 'same-origin' | 'include';
+    parseDateMeasures?: boolean;
   };
 
   export type LoadMethodOptions = {
@@ -307,9 +308,9 @@ declare module '@cubejs-client/core' {
      *   ]
      * }
      * ```
-     * 
+     *
      * In case when you want to add `order` or `limit` to the query, you can simply spread it
-     * 
+     *
      * ```js
      * // An example for React
      * const drillDownResponse = useCubeQuery(
@@ -318,7 +319,7 @@ declare module '@cubejs-client/core' {
      *      limit: 30,
      *      order: {
      *        'Orders.ts': 'desc'
-     *      } 
+     *      }
      *    },
      *    {
      *      skip: !drillDownQuery
@@ -780,10 +781,10 @@ declare module '@cubejs-client/core' {
      * @param query - [Query object](query-format)
      */
     load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
-    
+
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
-     * 
+     *
      * ```js
      * cubejsApi.subscribe(
      *   {
