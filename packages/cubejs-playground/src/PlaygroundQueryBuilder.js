@@ -59,10 +59,10 @@ export default function PlaygroundQueryBuilder({
       query={query}
       setQuery={setQuery}
       cubejsApi={cubejsApi}
+      wrapWithQueryRenderer={false}
       render={({
                  resultSet,
                  error,
-                 validatedQuery,
                  isQueryPresent,
                  chartType,
                  updateChartType,
@@ -213,7 +213,7 @@ export default function PlaygroundQueryBuilder({
               <Col span={24} style={{ paddingLeft: 16, paddingRight: 16 }}>
                 {isQueryPresent ? (
                   <ChartRenderer
-                    query={validatedQuery}
+                    query={query}
                     resultSet={resultSet}
                     error={error}
                     apiUrl={apiUrl}

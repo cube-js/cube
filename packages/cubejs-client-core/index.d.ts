@@ -881,4 +881,6 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function moveItemInArray<T = any>(list: T[], sourceIndex: number, destinationIndex: number): T[];
+  
+  export function defaultOrder(query: Query): { [key: string]: QueryOrder }
 }

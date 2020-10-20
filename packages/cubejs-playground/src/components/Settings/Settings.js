@@ -1,5 +1,5 @@
 import React from 'react';
-import { Divider } from 'antd';
+import { Divider, Spin } from 'antd';
 import Axes from '../Pivot/Axes';
 import Options from '../Pivot/Options';
 import OrderGroup from '../Order/OrderGroup';
@@ -22,21 +22,22 @@ export default function Settings({
       <Text style={{ lineHeight: '32px' }}>Settings:</Text>
       <Popover
         content={
-          <>
-            <Axes pivotConfig={pivotConfig} onMove={onMove} />
-            <Divider style={{ margin: 0 }} />
-            <div style={{ padding: '8px' }}>
-              <Options pivotConfig={pivotConfig} onUpdate={onUpdate} />
-            </div>
-          </>
+          pivotConfig === null ? (
+            <Spin />
+          ) : (
+            <>
+              <Axes pivotConfig={pivotConfig} onMove={onMove} />
+              <Divider style={{ margin: 0 }} />
+              <div style={{ padding: '8px' }}>
+                <Options pivotConfig={pivotConfig} onUpdate={onUpdate} />
+              </div>
+            </>
+          )
         }
         placement="bottomLeft"
         trigger="click"
       >
-        <Button
-          disabled={!isQueryPresent}
-          style={{ border: 0 }}
-        >
+        <Button disabled={!isQueryPresent} style={{ border: 0 }}>
           Pivot
         </Button>
       </Popover>
@@ -54,10 +55,7 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button
-          disabled={!isQueryPresent}
-          style={{ border: 0 }}
-        >
+        <Button disabled={!isQueryPresent} style={{ border: 0 }}>
           Order
         </Button>
       </Popover>
@@ -71,10 +69,7 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button
-          disabled={!isQueryPresent}
-          style={{ border: 0 }}
-        >
+        <Button disabled={!isQueryPresent} style={{ border: 0 }}>
           Limit
         </Button>
       </Popover>
