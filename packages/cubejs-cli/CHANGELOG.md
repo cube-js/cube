@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.22.0](https://github.com/cube-js/cube.js/compare/v0.21.2...v0.22.0) (2020-10-20)
+
+
+### Features
+
+* **cubejs-cli:** adds USER_CONTEXT parameter to cli ([#1215](https://github.com/cube-js/cube.js/issues/1215)) Thanks to @TheSPD! ([66452b9](https://github.com/cube-js/cube.js/commit/66452b9))
+* **cubejs-cli:** Improve external commands support ([c13a729](https://github.com/cube-js/cube.js/commit/c13a729))
+* **cubejs-cli:** Move helpers to TypeScript ([06b5f01](https://github.com/cube-js/cube.js/commit/06b5f01))
+* **cubejs-cli:** Run dev-server/server commands from @cubejs-backend/core ([a35244c](https://github.com/cube-js/cube.js/commit/a35244c))
+* **cubejs-cli:** Run dev-server/server commands from @cubejs-backend/core ([a4d72fe](https://github.com/cube-js/cube.js/commit/a4d72fe))
+* **cubejs-cli:** Use TypeScript ([009ff7a](https://github.com/cube-js/cube.js/commit/009ff7a))
+
+
+
+
+
 ## [0.21.1](https://github.com/cube-js/cube.js/compare/v0.21.0...v0.21.1) (2020-10-15)
 
 **Note:** Version bump only for package cubejs-cli

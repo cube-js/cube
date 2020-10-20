@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.22.0](https://github.com/cube-js/cube.js/compare/v0.21.2...v0.22.0) (2020-10-20)
+
+
+### Bug Fixes
+
+* umd build default export ([#1219](https://github.com/cube-js/cube.js/issues/1219)) ([cc434eb](https://github.com/cube-js/cube.js/commit/cc434eb))
+* **@cubejs-client/core:** Add parseDateMeasures field to CubeJSApiOptions (typings) ([e1a1ada](https://github.com/cube-js/cube.js/commit/e1a1ada))
+* **@cubejs-client/vue:** Allow array props on query renderer to allow data blending usage ([#1213](https://github.com/cube-js/cube.js/issues/1213)). Thanks to [@richipargo](https://github.com/richipargo) ([2203a54](https://github.com/cube-js/cube.js/commit/2203a54))
+* **ci:** Specify DOCKER_IMAGE ([59bf390](https://github.com/cube-js/cube.js/commit/59bf390))
+* **docs-gen:** change signature generation ([e4703ad](https://github.com/cube-js/cube.js/commit/e4703ad))
+
+
+### Features
+
+* Cube Store driver ([85ca240](https://github.com/cube-js/cube.js/commit/85ca240))
+* **@cubejs-backend/server:** Introduce external commands for CLI (demo) ([fed9285](https://github.com/cube-js/cube.js/commit/fed9285))
+* **cubejs-cli:** adds USER_CONTEXT parameter to cli ([#1215](https://github.com/cube-js/cube.js/issues/1215)) Thanks to @TheSPD! ([66452b9](https://github.com/cube-js/cube.js/commit/66452b9))
+* **cubejs-cli:** Improve external commands support ([c13a729](https://github.com/cube-js/cube.js/commit/c13a729))
+* **cubejs-cli:** Move helpers to TypeScript ([06b5f01](https://github.com/cube-js/cube.js/commit/06b5f01))
+* **cubejs-cli:** Run dev-server/server commands from @cubejs-backend/core ([a35244c](https://github.com/cube-js/cube.js/commit/a35244c))
+* **cubejs-cli:** Run dev-server/server commands from @cubejs-backend/core ([a4d72fe](https://github.com/cube-js/cube.js/commit/a4d72fe))
+* **cubejs-cli:** Use TypeScript ([009ff7a](https://github.com/cube-js/cube.js/commit/009ff7a))
+
+
+
+
+
 ## [0.21.2](https://github.com/cube-js/cube.js/compare/v0.21.1...v0.21.2) (2020-10-15)
 
 
