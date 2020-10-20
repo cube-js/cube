@@ -1,10 +1,13 @@
 /* eslint-disable global-require */
-require('dotenv').config();
-const CubejsServerCore = require('@cubejs-backend/server-core');
-const WebSocketServer = require('./WebSocketServer');
-const { version } = require('./package.json');
+import dotenv from 'dotenv';
+import CubejsServerCore from '@cubejs-backend/server-core';
 
-class CubejsServer {
+import { WebsocketServer } from './websocket-server';
+import { version } from '../../package.json';
+
+dotenv.config();
+
+export class CubejsServer {
   constructor(config) {
     config = config || {};
     config.webSockets = config.webSockets || (process.env.CUBEJS_WEB_SOCKETS === 'true');
@@ -139,5 +142,3 @@ class CubejsServer {
     return version;
   }
 }
-
-module.exports = CubejsServer;

@@ -39,9 +39,9 @@ jest.mock('http', () => require('./__mocks__/http'));
 // eslint-disable-next-line global-require
 jest.mock('https', () => require('./__mocks__/https'));
 
-const http = require('http');
-const https = require('https');
-const CubeServer = require('./index');
+import http from 'http';
+import https from 'https';
+import { CubejsServer as CubeServer } from '../src/server';
 
 describe('CubeServer', () => {
   describe('listen', () => {

@@ -1,6 +1,6 @@
 import { Command, flags } from '@oclif/command';
 
-export default class Server extends Command {
+export class Server extends Command {
   static description = 'Run server in Production mode';
 
   static flags = {}
@@ -13,3 +13,5 @@ export default class Server extends Command {
     console.log('Demo, source code will be in next PR');
   }
 }
+
+export default Server;
