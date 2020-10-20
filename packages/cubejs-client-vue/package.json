@@ -27,7 +27,11 @@
     "core-js": "^3.6.5",
     "ramda": "^0.27.0"
   },
+  "peerDependencies": {
+    "@cubejs-client/core": "^0.17.10"
+  },
   "devDependencies": {
+    "@cubejs-client/core": "^0.21.1",
     "@vue/cli-plugin-babel": "^3.5.0",
     "@vue/cli-plugin-eslint": "^4.2.3",
     "@vue/cli-plugin-unit-jest": "^4.2.3",
