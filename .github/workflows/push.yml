@@ -390,6 +390,7 @@ jobs:
   docker-image-latest:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    if: (github.event_name == 'push' || github.event_name == 'pull_request') && !contains(github.ref, 'refs/tags/')
 
     steps:
       - name: Checkout
