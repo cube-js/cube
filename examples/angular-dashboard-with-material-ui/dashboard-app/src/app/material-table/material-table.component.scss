@@ -1,0 +1,14 @@
+.table th {
+  background: #F8F8FC;
+  color: #43436B;
+  font-weight: 500;
+  line-height: 1.5rem;
+  border-bottom: 1px solid #eeeeee;
+  &:hover {
+    color: #7A77FF;
+    cursor: pointer;
+  }
+}
+.table thead {
+  background: #F8F8FC;
+}

@@ -1,11 +1,11 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { DashboardPageComponent } from './dashboard-page/dashboard-page.component';
-import { KpiCardComponent } from './kpi-card/kpi-card.component';
+import { TablePageComponent } from './table-page/table-page.component';
 
 const routes: Routes = [
   { path: '', component: DashboardPageComponent },
-  { path: 'table', component: KpiCardComponent },
+  { path: 'table', component: TablePageComponent },
 ];
 
 @NgModule({

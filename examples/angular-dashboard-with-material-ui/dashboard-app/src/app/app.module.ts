@@ -19,6 +19,10 @@ import { CountUpModule } from 'ngx-countup';
 import { DoughnutChartComponent } from './doughnut-chart/doughnut-chart.component';
 import { AppRoutingModule } from './app-routing.module';
 import { MatListModule } from '@angular/material/list';
+import { TablePageComponent } from './table-page/table-page.component';
+import { MaterialTableComponent } from './material-table/material-table.component';
+import { MatTableModule } from '@angular/material/table'
+
 
 const cubejsOptions = {
   token: 'YOUR-CUBEJS-API-TOKEN',
@@ -31,7 +35,9 @@ const cubejsOptions = {
     BarChartComponent,
     DashboardPageComponent,
     KpiCardComponent,
-    DoughnutChartComponent
+    DoughnutChartComponent,
+    TablePageComponent,
+    MaterialTableComponent
   ],
   imports: [
     BrowserModule,
@@ -48,6 +54,7 @@ const cubejsOptions = {
     MatProgressBarModule,
     AppRoutingModule,
     MatListModule,
+    MatTableModule
   ],
   providers: [],
   bootstrap: [AppComponent]

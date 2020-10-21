@@ -41,7 +41,8 @@ cube(`Orders`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
+      shown: true
     },
 
     status: {
@@ -57,6 +58,17 @@ cube(`Orders`, {
     completedAt: {
       sql: `completed_at`,
       type: `time`
+    },
+    size: {
+      sql: `${LineItems.count}`,
+      subQuery: true,
+      type: "number"
+    },
+
+    price: {
+      sql: `${LineItems.price}`,
+      subQuery: true,
+      type: "number"
     }
   }
 });
