@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.22.1](https://github.com/cube-js/cube.js/compare/v0.22.0...v0.22.1) (2020-10-21)
+
+
+### Bug Fixes
+
+* **cube-cli:** Missed deploy command ([4192e77](https://github.com/cube-js/cube.js/commit/4192e77))
+
+
+### Features
+
+* **cubejs-cli:** Check js files by tsc ([3b9f4a2](https://github.com/cube-js/cube.js/commit/3b9f4a2))
+* **cubejs-cli:** Move deploy command to TS ([b38cb4a](https://github.com/cube-js/cube.js/commit/b38cb4a))
+
+
+
+
+
 # [0.22.0](https://github.com/cube-js/cube.js/compare/v0.21.2...v0.22.0) (2020-10-20)
 
 
