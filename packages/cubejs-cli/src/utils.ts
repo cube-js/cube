@@ -72,7 +72,7 @@ export const displayError = async (text: string|string[], options = {}) => {
 export const packageExists = (moduleName: string) => {
   const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
   return fs.pathExistsSync(modulePath);
-}
+};
 
 export const requiredPackageExists = async (moduleName: string) => {
   const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
@@ -95,6 +95,7 @@ export const requirePackageManifest = async (moduleName: string) => {
     );
   }
 
+  // eslint-disable-next-line global-require,import/no-dynamic-require
   return require(path.join(modulePath, 'package.json'));
 };
 
@@ -113,5 +114,6 @@ export const logStage = async (stage: string, eventName: string, props?: any) =>
 };
 
 export function loadCliManifest() {
+  // eslint-disable-next-line global-require
   return require('../package.json');
 }

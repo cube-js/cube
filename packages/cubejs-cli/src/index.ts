@@ -9,7 +9,7 @@ import chalk from 'chalk';
 
 const currentNodeVersion = process.versions.node;
 const semver = currentNodeVersion.split('.');
-const major = parseInt(<string> semver[0]);
+const major = parseInt(<string> semver[0], 10);
 
 if (major < 8) {
   console.error(
