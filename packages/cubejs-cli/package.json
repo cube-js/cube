@@ -31,9 +31,6 @@
   ],
   "dependencies": {
     "@cubejs-backend/linter": "^0.22.0",
-    "@types/cli-progress": "^3.8.0",
-    "@types/fs-extra": "^9.0.2",
-    "@types/inquirer": "^7.3.1",
     "chalk": "^2.4.2",
     "cli-progress": "^3.8.2",
     "commander": "^2.19.0",
@@ -48,8 +45,13 @@
     "semver": "^7.3.2"
   },
   "devDependencies": {
+    "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
+    "@types/fs-extra": "^9.0.2",
+    "@types/inquirer": "^7.3.1",
+    "@types/jsonwebtoken": "^8.5.0",
     "@types/node": "^14.11.10",
+    "@types/request-promise": "^4.1.46",
     "@types/semver": "^7.3.4",
     "husky": "^4.2.3",
     "jest": "^24.8.0",

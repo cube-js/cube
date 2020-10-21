@@ -1,7 +1,6 @@
 import chalk from 'chalk';
 import jwt from 'jsonwebtoken';
-
-const { requireFromPackage, event } = require('./utils');
+import { event, requireFromPackage } from './utils';
 
 export const defaultExpiry = '30 days';
 
