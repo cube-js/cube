@@ -46,6 +46,7 @@
     "semver": "^7.3.2"
   },
   "devDependencies": {
+    "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
     "@types/fs-extra": "^9.0.2",
