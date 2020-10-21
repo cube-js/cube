@@ -35,9 +35,10 @@ export class Config {
   async deployAuth(url) {
     if (process.env.CUBE_CLOUD_DEPLOY_AUTH) {
       const payload = jwt.decode(process.env.CUBE_CLOUD_DEPLOY_AUTH);
-      if (!payload.url) {
+      if (!payload || typeof payload !== 'object' || !payload.url) {
         throw new Error('Malformed token in CUBE_CLOUD_DEPLOY_AUTH');
       }
+
       if (url && payload.url !== url) {
         throw new Error('CUBE_CLOUD_DEPLOY_AUTH token doesn\'t match url in .cubecloud');
       }
@@ -64,17 +65,20 @@ export class Config {
     if (!config) {
       config = await this.loadConfig();
     }
+
     const payload = jwt.decode(authToken);
-    if (!payload || !payload.url) {
-      // eslint-disable-next-line no-throw-literal
-      throw 'Malformed Cube Cloud token';
+    if (payload && typeof payload === 'object' && payload.url) {
+      config.auth = config.auth || {};
+      config.auth[payload.url] = {
+        auth: authToken
+      };
+
+      await this.writeConfig(config);
+      return config;
     }
-    config.auth = config.auth || {};
-    config.auth[payload.url] = {
-      auth: authToken
-    };
-    await this.writeConfig(config);
-    return config;
+
+    // eslint-disable-next-line no-throw-literal
+    throw 'Malformed Cube Cloud token';
   }
 
   async deployAuthForCurrentDir() {

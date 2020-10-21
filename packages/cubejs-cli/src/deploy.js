@@ -1,6 +1,6 @@
-const path = require('path');
-const fs = require('fs-extra');
-const crypto = require('crypto');
+import crypto from 'crypto';
+import fs from 'fs-extra';
+import path from 'path';
 
 export class DeployDirectory {
   constructor({ directory }) {
