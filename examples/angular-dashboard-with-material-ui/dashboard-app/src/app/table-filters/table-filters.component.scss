@@ -1,0 +1,20 @@
+.table-filters {
+  margin-bottom: 2rem;
+  .mat-button-toggle-appearance-standard {
+    background: transparent;
+    color: #43436b;
+  }
+}
+.mat-button-toggle-standalone.mat-button-toggle-appearance-standard, .mat-button-toggle-group-appearance-standard.table-filters {
+  border: none;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #7A77FF;
+}
+.mat-button-toggle-checked {
+  border-bottom: 2px solid #7A77FF;
+}
+.mat-button-toggle-group-appearance-standard .mat-button-toggle + .mat-button-toggle {
+  border-left: none;
+}

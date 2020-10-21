@@ -1,6 +1,7 @@
-<mat-button-toggle-group (change)="statusChanged($event)">
-  <mat-button-toggle value="All">All</mat-button-toggle>
-  <mat-button-toggle value="Shipped">Shipped</mat-button-toggle>
-  <mat-button-toggle value="Processing">Processing</mat-button-toggle>
-  <mat-button-toggle value="Completed">Completed</mat-button-toggle>
+<mat-button-toggle-group class="table-filters"
+                         (change)="statusChangedFunc($event)">
+  <mat-button-toggle value="all">All</mat-button-toggle>
+  <mat-button-toggle value="shipped">Shipped</mat-button-toggle>
+  <mat-button-toggle value="processing">Processing</mat-button-toggle>
+  <mat-button-toggle value="completed">Completed</mat-button-toggle>
 </mat-button-toggle-group>

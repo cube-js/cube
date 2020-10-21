@@ -27,30 +27,31 @@ export class TablePageComponent implements OnInit {
       "Orders.price",
       "Orders.status",
       "Orders.createdAt"
-    ]
+    ],
+    filters: []
   });
   public query = null;
   public changePage = (obj) => {
     this._query.next({
       "limit": obj.pageSize,
       "offset": obj.pageIndex * obj.pageSize,
-      "timeDimensions": [
-        {
-          "dimension": "Orders.createdAt",
-          "granularity": "day"
-        }
-      ],
-      "dimensions": [
-        "Users.id",
-        "Orders.id",
-        "Orders.size",
-        "Users.fullName",
-        "Users.city",
-        "Orders.price",
-        "Orders.status",
-        "Orders.createdAt"
-      ]
+      ...this._query.value
     });
+  };
+  public statusChanged(value) {
+    this._query.next({...this._query.value,
+      "filters": this.getFilters(value)});
+  };
+  private getFilters = (value) => {
+    return [
+      {
+        "dimension": "Orders.status",
+        "operator": value === 'all' ? "set" : "equals",
+        "values": [
+          value
+        ]
+      }
+    ]
   };
 
   constructor() { }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from "@angular/core";
 
 @Component({
   selector: 'app-table-filters',
@@ -6,8 +6,9 @@ import { Component, OnInit } from '@angular/core';
   styleUrls: ['./table-filters.component.scss']
 })
 export class TableFiltersComponent implements OnInit {
-  statusChanged = (obj) => {
-    console.log(obj.value);
+  @Output() statusChanged = new EventEmitter();
+  statusChangedFunc = (obj) => {
+    this.statusChanged.emit(obj.value);
   };
 
   constructor() { }
