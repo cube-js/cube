@@ -1,7 +1,7 @@
 import { CommanderStatic } from 'commander';
-import { displayError, loadCliManifest, packageExists, requireFromPackage, requirePackageManifest } from '../utils';
 import chalk from 'chalk';
 import semver from 'semver';
+import { displayError, loadCliManifest, packageExists, requireFromPackage, requirePackageManifest } from '../utils';
 
 export async function proxyCommand(program: CommanderStatic, command: string) {
   const serverPackageExists = packageExists('@cubejs-backend/server');

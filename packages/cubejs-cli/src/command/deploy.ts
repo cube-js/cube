@@ -1,10 +1,10 @@
 import fs from 'fs-extra';
 import path from 'path';
 import cliProgress from 'cli-progress';
+import { CommanderStatic } from 'commander';
 import { DeployDirectory } from '../deploy';
 import { logStage, displayError } from '../utils';
 import { Config } from '../config';
-import { CommanderStatic } from 'commander';
 
 const deploy = async ({ directory, auth }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
