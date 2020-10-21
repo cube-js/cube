@@ -8,6 +8,11 @@ import { packageExists } from './utils';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 export class ServerContainer {
+  constructor(
+    protected readonly configuration: { debug: boolean }
+  ) {
+  }
+
   protected getTypeScriptCompiler(): TypescriptCompilerType {
     if (packageExists('typescript')) {
       // eslint-disable-next-line global-require
@@ -51,13 +56,16 @@ export class ServerContainer {
       path.join(process.cwd(), 'cube.js')
     );
 
-    console.log(file);
+    if (this.configuration.debug) {
+      console.log('Loaded configuration file', file);
+    }
 
     if (file.default) {
       return file.default;
     }
 
-    console.log('Configure file must export configuration as default.');
-    process.exit(1);
+    throw new Error(
+      'Configure file must export configuration as default.'
+    );
   }
 }

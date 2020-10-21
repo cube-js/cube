@@ -29,7 +29,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
           // eslint-disable-next-line no-restricted-syntax
           for (const [name, option] of Object.entries(commandFlags)) {
             commandInfo
-              .option(`--${name}`, option.description || '');
+              .option(`--${name}`, option.description || '', option.default);
           }
         }
 
