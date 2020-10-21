@@ -42,8 +42,7 @@ export class ServerContainer {
       return this.loadConfiguration();
     }
 
-    console.log('Unable find configuration file: "cube.js".');
-    process.exit(1);
+    throw new Error('Unable find configuration file: "cube.js".');
   }
 
   // eslint-disable-next-line consistent-return
