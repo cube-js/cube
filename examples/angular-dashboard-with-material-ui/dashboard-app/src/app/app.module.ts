@@ -24,6 +24,8 @@ import { MaterialTableComponent } from './material-table/material-table.componen
 import { MatTableModule } from '@angular/material/table';
 import {MatPaginatorModule} from "@angular/material/paginator";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import { TableFiltersComponent } from './table-filters/table-filters.component';
+import {MatButtonToggleModule} from '@angular/material/button-toggle';
 
 
 const cubejsOptions = {
@@ -39,7 +41,8 @@ const cubejsOptions = {
     KpiCardComponent,
     DoughnutChartComponent,
     TablePageComponent,
-    MaterialTableComponent
+    MaterialTableComponent,
+    TableFiltersComponent
   ],
   imports: [
     BrowserModule,
@@ -58,7 +61,8 @@ const cubejsOptions = {
     MatListModule,
     MatTableModule,
     MatPaginatorModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatButtonToggleModule
   ],
   providers: [],
   bootstrap: [AppComponent]
