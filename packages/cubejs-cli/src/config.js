@@ -5,7 +5,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const rp = require('request-promise');
 
-class Config {
+export class Config {
   async loadConfig() {
     const { configFile } = this.configFile();
     if (await fs.exists(configFile)) {
@@ -165,5 +165,3 @@ class Config {
     });
   }
 }
-
-module.exports = Config;

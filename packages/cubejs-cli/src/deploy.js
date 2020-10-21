@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const crypto = require('crypto');
 
-class Deploy {
+export class DeployDirectory {
   constructor({ directory }) {
     this.directory = directory;
   }
@@ -46,5 +46,3 @@ class Deploy {
     });
   }
 }
-
-module.exports = Deploy;

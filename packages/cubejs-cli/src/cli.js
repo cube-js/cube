@@ -14,6 +14,7 @@ import inquirer from 'inquirer';
 
 import { configureDevServerCommand } from './command/dev-server';
 import { configureServerCommand } from './command/server';
+import { configureDeployCommand } from './command/deploy';
 import {
   executeCommand,
   npmInstall,
@@ -26,7 +27,6 @@ import {
 
 const Config = require('./config');
 const templates = require('./templates');
-const { deploy } = require('./deploy');
 const { token, defaultExpiry, collect } = require('./token');
 
 const packageJson = loadCliManifest();
@@ -255,20 +255,6 @@ program
     console.log('  $ cubejs token -e "1 day" -p foo=bar -p cool=true');
   });
 
-program
-  .command('deploy')
-  .description('Deploy project to Cube Cloud')
-  .action(
-    (options) => deploy({ directory: process.cwd(), ...options })
-      .catch(e => displayError(e.stack || e))
-  )
-  .on('--help', () => {
-    console.log('');
-    console.log('Examples:');
-    console.log('');
-    console.log('  $ cubejs deploy');
-  });
-
 const authenticate = async (currentToken) => {
   const config = new Config();
   await config.addAuthToken(currentToken);
@@ -292,6 +278,7 @@ program
   });
 
 (async () => {
+  await configureDeployCommand(program);
   await configureDevServerCommand(program);
   await configureServerCommand(program);
 
