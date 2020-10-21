@@ -1,6 +1,7 @@
 <style>
-
-
+  * {
+    box-sizing: border-box;
+  }
   .toolbar {
     position: relative;
     top: 0;
@@ -26,8 +27,36 @@
   .toolbar img {
     margin: 0 16px;
   }
+  .root {
+    width: 100%;
+    display: flex;
+    position: relative;
+  }
+  .component {
+    width: 82.2%;
+    min-height: 100vh;
+    padding-top: 1rem;
+    background: #F3F3FB;
+  }
+  .divider {
+    width: 17.8%;
+    background: #fff;
+    padding: 1rem;
+  }
+  .nav-link {
+    text-decoration: none;
+    color: #A1A1B5;
+  }
+  .nav-link:hover .mat-list-item {
+    background-color: rgba(67, 67, 107, 0.04);
+  }
+  .nav-link .mat-list-item {
+    color: #A1A1B5;
+  }
+  .nav-link.active-link .mat-list-item {
+    color: #7A77FF;
+  }
 </style>
-
 <!-- Toolbar -->
 <div class="toolbar" role="banner">
   <img
@@ -70,6 +99,22 @@
     </a>
   </div>
 </div>
-<div class="component">
-  <app-dashboard-page></app-dashboard-page>
+<div class="root">
+  <div class="divider">
+    <mat-list>
+      <a class="nav-link"
+         routerLinkActive="active-link"
+         [routerLinkActiveOptions]="{exact: true}"
+         *ngFor="let link of links" [routerLink]="[link.href]"
+      >
+        <mat-list-item>
+          <mat-icon mat-list-icon>{{link.icon}}</mat-icon>
+          <div mat-line>{{link.name}}</div>
+        </mat-list-item>
+      </a>
+    </mat-list>
+  </div>
+  <div class="component">
+    <router-outlet class="content"></router-outlet>
+  </div>
 </div>

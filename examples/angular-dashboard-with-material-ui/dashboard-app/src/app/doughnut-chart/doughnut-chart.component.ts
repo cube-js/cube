@@ -57,7 +57,6 @@ export class DoughnutChartComponent implements OnInit {
             return sum.value ? sum.value + current.value : sum + current.value
           });
         });
-        console.log(this.labels);
       },
       err => console.log("HTTP Error", err)
     );
