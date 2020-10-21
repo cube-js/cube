@@ -10,6 +10,7 @@ jest.mock('@cubejs-backend/server-core', () => {
   const initApp = jest.fn(() => Promise.resolve());
   const event = jest.fn(() => Promise.resolve());
   const releaseConnections = jest.fn(() => Promise.resolve());
+
   class CubejsServerCore {
     static create() {
       // eslint-disable-next-line prefer-rest-params

@@ -30,8 +30,9 @@
     "test": "npm run unit",
     "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* tests/ --ext .ts,.js",
     "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* tests/ --ext .ts,js",
-    "unit": "jest dist/tests",
-    "unit:debug": "node jest dist/ --runInBand"
+    "unit": "jest",
+    "unit:debug": "jest --runInBand",
+    "jest:shapshot": "jest --updateSnapshot"
   },
   "dependencies": {
     "@cubejs-backend/linter": "^0.21.2",
@@ -51,13 +52,26 @@
     "@types/node": "^10.0.10",
     "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
-    "jest": "^24.9.0",
-    "mocha": "^8.0.1",
+    "jest": "^26.0.0",
     "should": "^13.2.3",
+    "ts-jest": "^26.0.0",
     "typescript": "^4.0.3"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
     "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "ts",
+      "js"
+    ],
+    "transform": {
+      "^.+\\.ts$": "ts-jest",
+      "^.+\\.js$": "ts-jest"
+    },
+    "testMatch": [
+      "<rootDir>/tests/*.(test|spec).(ts|js)"
+    ]
   }
 }
