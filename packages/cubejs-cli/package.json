@@ -29,6 +29,7 @@
     "LICENSE"
   ],
   "dependencies": {
+    "@types/cli-progress": "^3.8.0",
     "chalk": "^2.4.2",
     "cli-progress": "^3.8.2",
     "commander": "^2.19.0",

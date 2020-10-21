@@ -1,11 +1,12 @@
-const fs = require('fs-extra');
-const path = require('path');
-const cliProgress = require('cli-progress');
-const { DeployDirectory } = require('./../deploy');
-const { logStage, displayError } = require('./../utils');
-const { Config } = require('./../config');
+import fs from 'fs-extra';
+import path from 'path';
+import cliProgress from 'cli-progress';
+import { DeployDirectory } from '../deploy';
+import { logStage, displayError } from '../utils';
+import { Config } from '../config';
+import { CommanderStatic } from 'commander';
 
-const deploy = async ({ directory, auth }) => {
+const deploy = async ({ directory, auth }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
     await displayError(
       '@cubejs-backend/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
@@ -22,14 +23,15 @@ const deploy = async ({ directory, auth }) => {
   });
 
   const deployDir = new DeployDirectory({ directory });
-  const fileHashes = await deployDir.fileHashes();
+  const fileHashes: any = await deployDir.fileHashes();
   const upstreamHashes = await config.cloudReq({
-    url: (deploymentId) => `build/deploy/${deploymentId}/files`,
+    url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
     method: 'GET',
     auth
   });
+
   const { transaction, deploymentName } = await config.cloudReq({
-    url: (deploymentId) => `build/deploy/${deploymentId}/start-upload`,
+    url: (deploymentId: string) => `build/deploy/${deploymentId}/start-upload`,
     method: 'POST',
     auth
   });
@@ -45,9 +47,10 @@ const deploy = async ({ directory, auth }) => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       bar.update(i, { file });
+
       if (!upstreamHashes[file] || upstreamHashes[file].hash !== fileHashes[file].hash) {
         await config.cloudReq({
-          url: (deploymentId) => `build/deploy/${deploymentId}/upload-file`,
+          url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
           method: 'POST',
           formData: {
             transaction: JSON.stringify(transaction),
@@ -66,7 +69,7 @@ const deploy = async ({ directory, auth }) => {
     }
     bar.update(files.length, { file: 'Post processing...' });
     await config.cloudReq({
-      url: (deploymentId) => `build/deploy/${deploymentId}/finish-upload`,
+      url: (deploymentId: string) => `build/deploy/${deploymentId}/finish-upload`,
       method: 'POST',
       body: {
         transaction,
@@ -81,7 +84,7 @@ const deploy = async ({ directory, auth }) => {
   await logStage('Done 🎉', 'Cube Cloud CLI Deploy Success');
 };
 
-export function configureDeployCommand(program) {
+export function configureDeployCommand(program: CommanderStatic) {
   program
     .command('deploy')
     .description('Deploy project to Cube Cloud')

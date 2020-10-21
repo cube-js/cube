@@ -105,7 +105,7 @@ export const requireFromPackage = async (moduleName: string) => {
   return require(path.join(process.cwd(), 'node_modules', moduleName));
 };
 
-const logStage = async (stage: string, eventName: string, props: any) => {
+export const logStage = async (stage: string, eventName: string, props?: any) => {
   console.log(`- ${stage}`);
   if (eventName) {
     await event(eventName, props);
