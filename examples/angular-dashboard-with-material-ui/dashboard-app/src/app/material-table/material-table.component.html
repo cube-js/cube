@@ -1,47 +1,57 @@
-<table style="width: 100%; box-shadow: none"
-       mat-table
-       matSort
-       [dataSource]="dataSource"
-       class="table mat-elevation-z8"
->
+<div class="example-loading-shade"
+     *ngIf="loading">
+  <mat-spinner></mat-spinner>
+</div>
 
-  <ng-container matColumnDef="id">
-    <th mat-header-cell *matHeaderCellDef mat-sort-header> Order ID</th>
-    <td mat-cell *matCellDef="let element"> {{element['Orders.id']}} </td>
-  </ng-container>
+<div class="example-table-container">
+  <table mat-table
+         matSort
+         [dataSource]="dataSource"
+         class="table mat-elevation-z8"
+  >
 
-  <ng-container matColumnDef="size">
-    <th mat-header-cell *matHeaderCellDef> Orders size</th>
-    <td mat-cell *matCellDef="let element"> {{element['Orders.size']}} </td>
-  </ng-container>
+    <ng-container matColumnDef="id">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Order ID</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.id']}} </td>
+    </ng-container>
 
-  <ng-container matColumnDef="name">
-    <th mat-header-cell *matHeaderCellDef> Full Name</th>
-    <td mat-cell *matCellDef="let element"> {{element['Users.fullName']}} </td>
-  </ng-container>
+    <ng-container matColumnDef="size">
+      <th mat-header-cell *matHeaderCellDef> Orders size</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.size']}} </td>
+    </ng-container>
 
-  <ng-container matColumnDef="city">
-    <th mat-header-cell *matHeaderCellDef> User city</th>
-    <td mat-cell *matCellDef="let element"> {{element['Users.city']}} </td>
-  </ng-container>
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef> Full Name</th>
+      <td mat-cell *matCellDef="let element"> {{element['Users.fullName']}} </td>
+    </ng-container>
 
-  <ng-container matColumnDef="price">
-    <th mat-header-cell *matHeaderCellDef> Order price</th>
-    <td mat-cell *matCellDef="let element"> {{element['Orders.price']}} </td>
-  </ng-container>
+    <ng-container matColumnDef="city">
+      <th mat-header-cell *matHeaderCellDef> User city</th>
+      <td mat-cell *matCellDef="let element"> {{element['Users.city']}} </td>
+    </ng-container>
 
-  <ng-container matColumnDef="status">
-    <th mat-header-cell *matHeaderCellDef> Status</th>
-    <td mat-cell *matCellDef="let element"> {{element['Orders.status']}} </td>
-  </ng-container>
+    <ng-container matColumnDef="price">
+      <th mat-header-cell *matHeaderCellDef> Order price</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.price']}} </td>
+    </ng-container>
 
-  <ng-container matColumnDef="date">
-    <th mat-header-cell *matHeaderCellDef> Created at</th>
-    <td mat-cell *matCellDef="let element"> {{element['Orders.createdAt'] | date}} </td>
-  </ng-container>
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef> Status</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.status']}} </td>
+    </ng-container>
 
-  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-  <!--<mat-paginator [pageSizeOptions]="[5, 10, 25, 100]"></mat-paginator>-->
-  <!--<mat-paginator [length]="dataSource.length" [pageSize]="30"></mat-paginator>-->
-</table>
+    <ng-container matColumnDef="date">
+      <th mat-header-cell *matHeaderCellDef> Created at</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.createdAt'] | date}} </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    <!--<mat-paginator [pageSizeOptions]="[5, 10, 25, 100]"></mat-paginator>-->
+  </table>
+</div>
+<mat-paginator [length]="length"
+               [pageSize]="pageSize"
+               [pageSizeOptions]="pageSizeOptions"
+               (page)="pageEvent.emit($event)"
+></mat-paginator>

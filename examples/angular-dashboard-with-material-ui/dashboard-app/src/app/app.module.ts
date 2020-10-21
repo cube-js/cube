@@ -21,7 +21,9 @@ import { AppRoutingModule } from './app-routing.module';
 import { MatListModule } from '@angular/material/list';
 import { TablePageComponent } from './table-page/table-page.component';
 import { MaterialTableComponent } from './material-table/material-table.component';
-import { MatTableModule } from '@angular/material/table'
+import { MatTableModule } from '@angular/material/table';
+import {MatPaginatorModule} from "@angular/material/paginator";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 
 
 const cubejsOptions = {
@@ -54,7 +56,9 @@ const cubejsOptions = {
     MatProgressBarModule,
     AppRoutingModule,
     MatListModule,
-    MatTableModule
+    MatTableModule,
+    MatPaginatorModule,
+    MatProgressSpinnerModule
   ],
   providers: [],
   bootstrap: [AppComponent]
