@@ -12,10 +12,10 @@
   "engines": {
     "node": ">=10.0"
   },
-  "main": "src/src/index.js",
-  "typings": "src/dist/index.d.ts",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "files": [
-    "dist/src",
+    "dist",
     "index.d.ts",
     "bin"
   ],

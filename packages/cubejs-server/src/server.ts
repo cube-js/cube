@@ -14,7 +14,7 @@ import cors from 'cors';
 
 import { WebSocketServer } from './websocket-server';
 
-import { version } from '../package.json';
+const { version } = require('../package.json');
 
 dotenv.config();
 

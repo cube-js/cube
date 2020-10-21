@@ -16,7 +16,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
       const cliManifiest = loadCliManifest();
       if (semver.satisfies(cliManifiest.version, PackageManifiest.cubejsCliVersion)) {
         const OriginalCommandPackage = await requireFromPackage(
-          `@cubejs-backend/server/dist/src/command/${command}`
+          `@cubejs-backend/server/dist/command/${command}`
         );
         // eslint-disable-next-line new-cap
         const Command = new OriginalCommandPackage.default([]);
