@@ -24,10 +24,9 @@ import {
   displayError,
   loadCliManifest,
 } from './utils';
-
-const Config = require('./config');
-const templates = require('./templates');
-const { token, defaultExpiry, collect } = require('./token');
+import { Config } from './config';
+import { token, defaultExpiry, collect } from './token';
+import templates from './templates';
 
 const packageJson = loadCliManifest();
 
