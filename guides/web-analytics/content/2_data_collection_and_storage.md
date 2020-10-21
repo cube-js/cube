@@ -37,7 +37,7 @@ The above snippet references a Snowplow Analytics hosted version of the Snowplow
 
 For more details about setting up the tracker, please refer to the [official Snowplow Javascript Tracker Setup guide](https://github.com/snowplow/snowplow/wiki/Setting-up-a-Tracker).
 
-To collect the data from the tracker, we need to setup Snowplow Collector. We'll use Scala Stream Collector. Here the detailed guide on how to install and configure it. This repository with the Docker images for the Snowplow components is very helpful if you plan to deploy Snowplow with Docker.
+To collect the data from the tracker, we need to setup Snowplow Collector. We'll use Scala Stream Collector. [Here the detailed guide](https://github.com/snowplow/snowplow/wiki/Setting-up-the-Scala-Stream-Collector) on how to install and configure it. [This repository with the Docker images](https://github.com/snowplow/snowplow-docker) for the Snowplow components is very helpful if you plan to deploy Snowplow with Docker.
 
 Next, we need to install Snowplow Stream Enrich. Same as for collector, I
 recommend following the official guide here and use these Docker images.
