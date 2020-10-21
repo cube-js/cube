@@ -1,16 +1,18 @@
-const inquirer = require('inquirer');
-const fs = require('fs-extra');
-const os = require('os');
-const path = require('path');
-const jwt = require('jsonwebtoken');
-const rp = require('request-promise');
+import inquirer from 'inquirer';
+import fs from 'fs-extra';
+import rp from 'request-promise';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import os from 'os';
 
 export class Config {
   async loadConfig() {
     const { configFile } = this.configFile();
-    if (await fs.exists(configFile)) {
+
+    if (await fs.pathExists(configFile)) {
       return fs.readJson(configFile);
     }
+
     return {};
   }
 
@@ -139,9 +141,10 @@ export class Config {
   }
 
   async loadDotCubeCloud() {
-    if (await fs.exists(this.dotCubeCloudFile())) {
+    if (await fs.pathExists(this.dotCubeCloudFile())) {
       return fs.readJson(this.dotCubeCloudFile());
     }
+
     return {};
   }
 

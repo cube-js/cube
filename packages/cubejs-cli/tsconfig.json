@@ -9,7 +9,8 @@
     "outDir": "./dist",                       /* Redirect output structure to the directory. */
     "strict": true,                           /* Enable all strict type-checking options. */
     "allowJs": true,
-    "noImplicitAny": true,                    /* Raise error on expressions and declarations with an implied 'any' type. */
+    "checkJs": true,
+    "noImplicitAny": false,                    /* Raise error on expressions and declarations with an implied 'any' type. */
     "strictNullChecks": true,                 /* Enable strict null checks. */
     "strictFunctionTypes": true,              /* Enable strict checking of function types. */
     "strictBindCallApply": true,              /* Enable strict 'bind', 'call', and 'apply' methods on functions. */

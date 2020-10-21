@@ -5,11 +5,11 @@ eslint no-var: 0
 /*
 eslint prefer-template: 0
  */
-var chalk = require('chalk');
+import chalk from 'chalk';
 
-var currentNodeVersion = process.versions.node;
-var semver = currentNodeVersion.split('.');
-var major = semver[0];
+const currentNodeVersion = process.versions.node;
+const semver = currentNodeVersion.split('.');
+const major = parseInt(<string> semver[0]);
 
 if (major < 8) {
   console.error(
