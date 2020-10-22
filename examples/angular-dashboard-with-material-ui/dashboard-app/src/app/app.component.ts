@@ -12,5 +12,5 @@ export class AppComponent {
     {name: 'Dashboard', href: '/', icon: 'dashboard'},
     {name: 'Orders', href: '/table', icon: 'assignment'}
     ];
-  title = 'dashboard-app';
+  title = 'Angular Material UI Dashboard';
 }
