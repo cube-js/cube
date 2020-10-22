@@ -90,8 +90,21 @@ export class CubejsServer {
         this.redirector.listen(PORT);
       }
 
-      const httpOrHttps = enableTls ? https : http;
-      this.server = httpOrHttps.createServer(options, app);
+      if (enableTls) {
+        this.server = https.createServer(options, app);
+      } else {
+        const [major] = process.version.split('.');
+        if (major === '8' && Object.keys(options).length) {
+          process.emitWarning(
+            'There is no support for passing options inside listen method in Node.js 8.',
+            'CustomWarning',
+          );
+
+          this.server = http.createServer(app);
+        } else {
+          this.server = http.createServer(options, app);
+        }
+      }
 
       if (this.webSockets) {
         this.socketServer = new WebSocketServer(this.core, this.core.options);
