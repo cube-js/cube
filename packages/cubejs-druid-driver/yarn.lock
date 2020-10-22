@@ -3069,10 +3069,10 @@ tar-stream@^2.0.0:
     inherits "^2.0.3"
     readable-stream "^3.1.1"
 
-testcontainers@^3.4.11:
-  version "3.5.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-3.5.0.tgz#da8a3fa53f1c6d106ccff7e0f71bf86d358c2589"
-  integrity sha512-iigGuzBDzOmTFlxfaTo1JO7EGMs4Dgf+XHd98XeEwp8J+WzOdkJfsSL5A8fdLSGQA5GvVAdxLcUfT4a32z4rbg==
+testcontainers@^4.5.0:
+  version "4.5.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-4.5.0.tgz#ad97f3f0d215d2f80bb0f34b59eb43e70f1da9f7"
+  integrity sha512-JHSwWC1Gpu3plRkSlubkME8nLRe8DZT9UcERDH6mf3ek1968/MTPpOe/HTouRGQPZoOcWwBbxqeobbnJolWeTw==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
@@ -3082,6 +3082,7 @@ testcontainers@^3.4.11:
     get-port "^5.1.1"
     glob "^7.1.6"
     node-duration "^1.0.4"
+    slash "^3.0.0"
     stream-to-array "^2.3.0"
     tar-fs "^2.1.0"
 
