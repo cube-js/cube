@@ -71,6 +71,12 @@ export class CubejsServer {
 
       const enableTls = process.env.CUBEJS_ENABLE_TLS === 'true';
       if (enableTls) {
+        process.emitWarning(
+          'Environment variable CUBEJS_ENABLE_TLS was deprecated and will be removed. \n' +
+          'Use own reverse proxy in front of Cube.js for proxying HTTPS traffic.',
+          'DeprecationWarning',
+        );
+
         this.redirector = http.createServer((req, res) => {
           if (req.headers.host) {
             res.writeHead(301, {
