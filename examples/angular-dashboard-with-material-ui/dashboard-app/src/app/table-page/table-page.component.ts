@@ -1,10 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
 
 @Component({
-  selector: 'app-table-page',
-  templateUrl: './table-page.component.html',
-  styleUrls: ['./table-page.component.scss']
+  selector: "app-table-page",
+  templateUrl: "./table-page.component.html",
+  styleUrls: ["./table-page.component.scss"]
 })
 export class TablePageComponent implements OnInit {
   public limit = 50;
@@ -31,30 +31,82 @@ export class TablePageComponent implements OnInit {
     filters: []
   });
   public query = null;
+  public sorting = ['Orders.createdAt', 'desc'];
+  public startDate = "01/1/2019";
+  public finishDate = "01/1/2022";
+  private minPrice = 0;
+  private status = "all";
   public changePage = (obj) => {
     this._query.next({
+      ...this._query.value,
       "limit": obj.pageSize,
-      "offset": obj.pageIndex * obj.pageSize,
-      ...this._query.value
+      "offset": obj.pageIndex * obj.pageSize
     });
   };
+
+  public dateChanged(value) {
+    console.log(value);
+    if (value.number === 0) {
+      this.startDate = value.date
+    }
+    if (value.number === 1) {
+      this.finishDate = value.date
+    }
+    this._query.next({
+      ...this._query.value,
+      timeDimensions: [
+        {
+          dimension: "Orders.createdAt",
+          dateRange: [this.startDate, this.finishDate],
+          granularity: null
+        }
+      ]
+    });
+  }
+
   public statusChanged(value) {
-    this._query.next({...this._query.value,
-      "filters": this.getFilters(value)});
-  };
-  private getFilters = (value) => {
-    return [
-      {
-        "dimension": "Orders.status",
-        "operator": value === 'all' ? "set" : "equals",
-        "values": [
-          value
-        ]
-      }
-    ]
+    this.status = value;
+    this._query.next({
+      ...this._query.value,
+      "filters": this.getFilters(this.status, this.minPrice)
+    });
   };
 
-  constructor() { }
+  public sliderChanged(obj) {
+    this.minPrice = obj.value;
+    this._query.next({
+      ...this._query.value,
+      "filters": this.getFilters(this.status, this.minPrice)
+    });
+  };
+
+  private getFilters = (status, price) => {
+    let filters = [];
+    if (status) {
+      filters.push(
+        {
+          "dimension": "Orders.status",
+          "operator": status === "all" ? "set" : "equals",
+          "values": [
+            status
+          ]
+        }
+      );
+    }
+    if (price) {
+      filters.push(
+        {
+          dimension: 'Orders.price',
+          operator: 'gt',
+          values: [`${price}`],
+        },
+      );
+    }
+    return filters;
+  };
+
+  constructor() {
+  }
 
   ngOnInit(): void {
     this._query.subscribe(query => {
