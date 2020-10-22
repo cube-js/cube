@@ -1,0 +1,13 @@
+{
+  "features":
+  {
+    "graphqltransformer":
+    {
+      "transformerversion": 5
+    },
+    "keytransformer":
+    {
+      "defaultquery": true
+    }
+  }
+}

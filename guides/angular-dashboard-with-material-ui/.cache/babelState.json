@@ -1,0 +1,168 @@
+{
+  "stages": {
+    "develop": {
+      "plugins": [
+        {
+          "name": "babel-plugin-lodash",
+          "options": {}
+        },
+        {
+          "name": "babel-plugin-styled-components",
+          "stage": "develop",
+          "options": {
+            "plugins": [],
+            "ssr": false
+          }
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-optional-chaining/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-nullish-coalescing-operator/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-numeric-separator/lib/index.js",
+          "options": {}
+        }
+      ],
+      "presets": [
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/preset-typescript/lib/index.js",
+          "options": {
+            "plugins": []
+          }
+        }
+      ],
+      "options": {
+        "cacheDirectory": true,
+        "sourceType": "unambiguous"
+      }
+    },
+    "develop-html": {
+      "plugins": [
+        {
+          "name": "babel-plugin-lodash",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-optional-chaining/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-nullish-coalescing-operator/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-numeric-separator/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "babel-plugin-styled-components",
+          "stage": "develop-html",
+          "options": {
+            "plugins": [],
+            "ssr": false
+          }
+        }
+      ],
+      "presets": [
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/preset-typescript/lib/index.js",
+          "options": {
+            "plugins": []
+          }
+        }
+      ],
+      "options": {
+        "cacheDirectory": true,
+        "sourceType": "unambiguous"
+      }
+    },
+    "build-html": {
+      "plugins": [
+        {
+          "name": "babel-plugin-lodash",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-optional-chaining/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-nullish-coalescing-operator/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-numeric-separator/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "babel-plugin-styled-components",
+          "stage": "build-html",
+          "options": {
+            "plugins": [],
+            "ssr": true
+          }
+        }
+      ],
+      "presets": [
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/preset-typescript/lib/index.js",
+          "options": {
+            "plugins": []
+          }
+        }
+      ],
+      "options": {
+        "cacheDirectory": true,
+        "sourceType": "unambiguous"
+      }
+    },
+    "build-javascript": {
+      "plugins": [
+        {
+          "name": "babel-plugin-lodash",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-optional-chaining/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-nullish-coalescing-operator/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/plugin-proposal-numeric-separator/lib/index.js",
+          "options": {}
+        },
+        {
+          "name": "babel-plugin-styled-components",
+          "stage": "build-javascript",
+          "options": {
+            "plugins": [],
+            "ssr": true
+          }
+        }
+      ],
+      "presets": [
+        {
+          "name": "/Users/lonya/Desktop/cube.js/guides/angular-dashboard-with-material-ui/node_modules/@babel/preset-typescript/lib/index.js",
+          "options": {
+            "plugins": []
+          }
+        }
+      ],
+      "options": {
+        "cacheDirectory": true,
+        "sourceType": "unambiguous"
+      }
+    }
+  },
+  "browserslist": [
+    ">0.25%",
+    "not dead"
+  ]
+}
