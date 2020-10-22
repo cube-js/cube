@@ -27,10 +27,14 @@ export class MaterialTableComponent {
   };
   @Input() limit: number;
   @Output() pageEvent = new EventEmitter();
+  @Output() sortingChanged = new EventEmitter();
   loading = true;
   length = 0;
   pageSize = 25;
   pageSizeOptions: number[] = [5, 10, 25, 100];
   dataSource = [];
   displayedColumns = ['id', 'size', 'name', 'city', 'price', 'status', 'date'];
+  changeSorting(value) {
+    this.sortingChanged.emit(value)
+  }
 }

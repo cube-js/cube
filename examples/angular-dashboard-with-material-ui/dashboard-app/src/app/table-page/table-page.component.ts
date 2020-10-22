@@ -9,12 +9,22 @@ import { BehaviorSubject } from "rxjs";
 export class TablePageComponent implements OnInit {
   public limit = 50;
   public page = 0;
+  public query = null;
+  public sorting = ['Orders.createdAt', 'desc'];
+  public startDate = "01/1/2019";
+  public finishDate = "01/1/2022";
+  private minPrice = 0;
+  private status = "all";
   public _query = new BehaviorSubject({
     "limit": this.limit,
     "offset": this.page * this.limit,
+    order: {
+      [`${this.sorting[0]}`]: this.sorting[1],
+    },
     "timeDimensions": [
       {
         "dimension": "Orders.createdAt",
+        "dateRange" : [this.startDate, this.finishDate],
         "granularity": "day"
       }
     ],
@@ -30,12 +40,6 @@ export class TablePageComponent implements OnInit {
     ],
     filters: []
   });
-  public query = null;
-  public sorting = ['Orders.createdAt', 'desc'];
-  public startDate = "01/1/2019";
-  public finishDate = "01/1/2022";
-  private minPrice = 0;
-  private status = "all";
   public changePage = (obj) => {
     this._query.next({
       ...this._query.value,
@@ -44,8 +48,26 @@ export class TablePageComponent implements OnInit {
     });
   };
 
+  public sortingChanged(value) {
+    if (value === this.sorting[0] && this.sorting[1] === 'desc') {
+      this.sorting[0] = value;
+      this.sorting[1] = 'asc'
+    } else if (value === this.sorting[0] && this.sorting[1] === 'asc') {
+      this.sorting[0] = value;
+      this.sorting[1] = 'desc'
+    } else {
+      this.sorting[0] = value;
+    }
+    this.sorting[0] = value;
+    this._query.next({
+      ...this._query.value,
+      order: {
+        [`${this.sorting[0]}`]: this.sorting[1],
+      },
+    });
+  }
+
   public dateChanged(value) {
-    console.log(value);
     if (value.number === 0) {
       this.startDate = value.date
     }
