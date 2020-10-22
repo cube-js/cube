@@ -30,7 +30,7 @@ export class MaterialTableComponent {
   @Output() sortingChanged = new EventEmitter();
   loading = true;
   length = 0;
-  pageSize = 25;
+  pageSize = 10;
   pageSizeOptions: number[] = [5, 10, 25, 100];
   dataSource = [];
   displayedColumns = ['id', 'size', 'name', 'city', 'price', 'status', 'date'];

@@ -48,12 +48,14 @@ export class DashboardPageComponent implements OnInit {
     {
       title: 'COMPLETED ORDERS',
       query: { measures: ['Orders.percentOfCompletedOrders'] },
+      difference: false,
       progress: true,
       duration: 2.75,
     },
     {
       title: 'TOTAL PROFIT',
       query: { measures: ['LineItems.price'] },
+      difference: false,
       progress: false,
       duration: 3.25,
     },

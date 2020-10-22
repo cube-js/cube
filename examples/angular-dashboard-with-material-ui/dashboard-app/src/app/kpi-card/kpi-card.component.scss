@@ -30,3 +30,28 @@
   -moz-border-radius: 0.5rem;
   border-radius: 0.5rem;
 }
+.kpi-difference {
+  margin-top: 1rem;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 13px;
+  letter-spacing: 0;
+  text-align: left;
+  color: #A1A1B5;
+  &--red {
+    color: #E56860;
+  }
+  &--green {
+    color: #51D084;
+  }
+  &__span {
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 13px;
+    letter-spacing: 0.02em;
+    text-align: left;
+    color: #A1A1B5;
+  }
+}

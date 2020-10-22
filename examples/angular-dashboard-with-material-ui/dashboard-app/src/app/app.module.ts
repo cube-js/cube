@@ -31,6 +31,7 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatNativeDateModule } from "@angular/material/core";
 import { MatInputModule } from "@angular/material/input";
 import {MatSliderModule} from "@angular/material/slider";
+import { UserAvatarComponent } from './user-avatar/user-avatar.component';
 
 
 const cubejsOptions = {
@@ -47,7 +48,8 @@ const cubejsOptions = {
     DoughnutChartComponent,
     TablePageComponent,
     MaterialTableComponent,
-    TableFiltersComponent
+    TableFiltersComponent,
+    UserAvatarComponent
   ],
   imports: [
     BrowserModule,

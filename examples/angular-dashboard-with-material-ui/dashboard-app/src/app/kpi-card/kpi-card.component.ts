@@ -11,10 +11,12 @@ export class KpiCardComponent implements OnInit {
   @Input() title: string;
   @Input() duration: number;
   @Input() progress: boolean;
+  @Input() difference: string;
   constructor(private cubejs:CubejsClient){}
   public result = 0;
   public postfix = null;
   public prefix = null;
+  public diffValue = null;
 
   ngOnInit(): void {
     this.cubejs.load(this.query).subscribe(
@@ -33,6 +35,21 @@ export class KpiCardComponent implements OnInit {
       },
       err => console.log('HTTP Error', err)
     );
+    if (this.difference) {
+      this.cubejs.load({...this.query, timeDimensions: [
+          {
+            dimension: `${this.difference}.createdAt`,
+            granularity: null,
+            dateRange: 'This year',
+          },
+        ],}).subscribe(
+        resultSet => {
+          this.diffValue = ((parseInt(resultSet.rawData()[0][`${this.difference}.count`]) / this.result) * 100).toFixed(1);
+          // this.diffValue = (resultSet.totalRow()[resultSet.measures[0]] / this.result) * 100;
+        },
+        err => console.log('HTTP Error', err)
+      );
+    }
   }
 
 }

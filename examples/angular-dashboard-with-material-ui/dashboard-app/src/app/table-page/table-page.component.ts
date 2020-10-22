@@ -7,7 +7,7 @@ import { BehaviorSubject } from "rxjs";
   styleUrls: ["./table-page.component.scss"]
 })
 export class TablePageComponent implements OnInit {
-  public limit = 50;
+  public limit = 10;
   public page = 0;
   public query = null;
   public sorting = ['Orders.createdAt', 'desc'];
