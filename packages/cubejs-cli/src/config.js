@@ -1,4 +1,3 @@
- 
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import rp from 'request-promise';
@@ -87,7 +86,7 @@ export class Config {
       };
 
       await this.writeConfig(config);
-      return config; 
+      return config;
     }
 
     const answer = await this.cloudTokenReq({
@@ -107,7 +106,7 @@ export class Config {
     }
 
     // eslint-disable-next-line no-throw-literal
-    throw 'Malformed Cube Cloud token'; 
+    throw 'Malformed Cube Cloud token';
   }
 
   async deployAuthForCurrentDir() {
@@ -202,7 +201,7 @@ export class Config {
   }
 
   async cloudTokenReq(options) {
-    const { url, auth, ...restOptions } = options;
+    const { url, ...restOptions } = options;
     const res = await rp({
       ...restOptions,
       url,
