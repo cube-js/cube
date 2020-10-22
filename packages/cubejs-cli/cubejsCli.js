@@ -269,6 +269,7 @@ program
 
 program
   .command('deploy')
+  .option('--upload-env', 'Upload .env file to CubeCloud')
   .description('Deploy project to Cube Cloud')
   .action(
     (options) => deploy({ directory: process.cwd(), ...options })
