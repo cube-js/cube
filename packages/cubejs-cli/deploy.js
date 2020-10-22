@@ -34,6 +34,17 @@ exports.deploy = async ({ directory, auth }) => {
     auth
   });
 
+  const envVariables = await config.envFile(`${directory}/.env`) 
+  await config.cloudReq({
+    url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
+    method: 'POST',
+    body: {
+      envVariables:JSON.stringify(envVariables),
+    },
+    auth
+  });
+
+// throw Error('test debug');
   await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
 
   const files = Object.keys(fileHashes);

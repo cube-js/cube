@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const rp = require('request-promise');
+const dotenv = require('dotenv');
 
 class Config {
   async loadConfig() {
@@ -23,7 +24,19 @@ class Config {
   configFile() {
     const cubeCloudConfigPath = this.cubeCloudConfigPath();
     const configFile = path.join(cubeCloudConfigPath, 'config.json');
+    console.log("configFile", configFile)
     return { cubeCloudConfigPath, configFile };
+  }
+
+  async envFile(envFile) { 
+    if (await fs.exists(envFile)) {  
+      return dotenv.config({ path:envFile}).parsed
+    }
+    return {};
+  }
+
+  cubeEnvConfigPath() {
+    return path.join(os.homedir(), '.env');
   }
 
   cubeCloudConfigPath() {
@@ -171,6 +184,7 @@ class Config {
     if (!authorization) {
       throw new Error('Auth isn\'t set');
     }
+    console.log(`${authorization.url}/${url(authorization.deploymentId)}`, restOptions)
     return rp({
       headers: {
         authorization: authorization.auth
@@ -183,7 +197,7 @@ class Config {
 
   async cloudTokenReq(options) {
     const { url, auth, ...restOptions } = options;
-    console.log(options);
+    console.log(url, options);
     const res = await rp({
       ...restOptions,
       url,
