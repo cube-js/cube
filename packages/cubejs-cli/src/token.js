@@ -1,9 +1,8 @@
-const jwt = require('jsonwebtoken');
-const chalk = require('chalk');
+import chalk from 'chalk';
+import jwt from 'jsonwebtoken';
+import { event, requireFromPackage } from './utils';
 
-const { requireFromPackage, event } = require('./utils');
-
-const defaultExpiry = '30 days';
+export const defaultExpiry = '30 days';
 
 const parsePayload = (payloadArray = []) => {
   const result = {};
@@ -16,7 +15,7 @@ const parsePayload = (payloadArray = []) => {
   return result;
 };
 
-const token = async (options = {}) => {
+export const token = async (options = {}) => {
   event('Generate Token');
   const CubejsServer = await requireFromPackage('@cubejs-backend/server');
   const { expiry = defaultExpiry, secret = CubejsServer.apiSecret() } = options;
@@ -45,8 +44,4 @@ const token = async (options = {}) => {
   return signedToken;
 };
 
-const collect = (val, memo) => [val, ...memo];
-
-exports.token = token;
-exports.defaultExpiry = defaultExpiry;
-exports.collect = collect;
+export const collect = (val, memo) => [val, ...memo];

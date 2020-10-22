@@ -1,17 +1,20 @@
-const inquirer = require('inquirer');
-const fs = require('fs-extra');
-const os = require('os');
-const path = require('path');
-const jwt = require('jsonwebtoken');
-const rp = require('request-promise');
-const dotenv = require('dotenv');
+ 
+import inquirer from 'inquirer';
+import fs from 'fs-extra';
+import rp from 'request-promise';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import os from 'os';
+import dotenv from 'dotenv';
 
-class Config {
+export class Config {
   async loadConfig() {
     const { configFile } = this.configFile();
-    if (await fs.exists(configFile)) {
+
+    if (await fs.pathExists(configFile)) {
       return fs.readJson(configFile);
     }
+
     return {};
   }
 
@@ -28,7 +31,7 @@ class Config {
   }
 
   async envFile(envFile) {
-    if (await fs.exists(envFile)) {
+    if (await fs.pathExists(envFile)) {
       return dotenv.config({ path: envFile }).parsed;
     }
     return {};
@@ -45,9 +48,10 @@ class Config {
   async deployAuth(url) {
     if (process.env.CUBE_CLOUD_DEPLOY_AUTH) {
       const payload = jwt.decode(process.env.CUBE_CLOUD_DEPLOY_AUTH);
-      if (!payload.url) {
+      if (!payload || typeof payload !== 'object' || !payload.url) {
         throw new Error('Malformed token in CUBE_CLOUD_DEPLOY_AUTH');
       }
+
       if (url && payload.url !== url) {
         throw new Error('CUBE_CLOUD_DEPLOY_AUTH token doesn\'t match url in .cubecloud');
       }
@@ -74,33 +78,36 @@ class Config {
     if (!config) {
       config = await this.loadConfig();
     }
-    const payload = jwt.decode(authToken);
-    if (!payload || !payload.url) {
-      const answer = await this.cloudTokenReq({
-        url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
-        method: 'POST',
-        body: {
-          token: authToken
-        }
-      });
-      
-      if (answer.error) {
-        throw answer.error;
-      }
-      
-      if (answer.jwt) {
-        return this.addAuthToken(answer.jwt, config);
-      }
 
-      // eslint-disable-next-line no-throw-literal
-      throw 'Malformed Cube Cloud token';
+    const payload = jwt.decode(authToken);
+    if (payload && typeof payload === 'object' && payload.url) {
+      config.auth = config.auth || {};
+      config.auth[payload.url] = {
+        auth: authToken
+      };
+
+      await this.writeConfig(config);
+      return config; 
     }
-    config.auth = config.auth || {};
-    config.auth[payload.url] = {
-      auth: authToken
-    };
-    await this.writeConfig(config);
-    return config;
+
+    const answer = await this.cloudTokenReq({
+      url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
+      method: 'POST',
+      body: {
+        token: authToken
+      }
+    });
+    
+    if (answer.error) {
+      throw answer.error;
+    }
+    
+    if (answer.jwt) {
+      return this.addAuthToken(answer.jwt, config);
+    }
+
+    // eslint-disable-next-line no-throw-literal
+    throw 'Malformed Cube Cloud token'; 
   }
 
   async deployAuthForCurrentDir() {
@@ -167,9 +174,10 @@ class Config {
   }
 
   async loadDotCubeCloud() {
-    if (await fs.exists(this.dotCubeCloudFile())) {
+    if (await fs.pathExists(this.dotCubeCloudFile())) {
       return fs.readJson(this.dotCubeCloudFile());
     }
+
     return {};
   }
 
@@ -206,5 +214,3 @@ class Config {
     return res;
   }
 }
-
-module.exports = Config;

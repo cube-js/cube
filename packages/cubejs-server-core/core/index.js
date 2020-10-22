@@ -168,6 +168,9 @@ class CubejsServerCore {
           password: process.env.CUBEJS_EXT_DB_PASS,
         })
       ),
+      externalDialectFactory: () => typeof options.externalDbType === 'string' &&
+        CubejsServerCore.lookupDriverClass(options.externalDbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(options.externalDbType).dialectClass(),
       externalDbType: process.env.CUBEJS_EXT_DB_TYPE,
       apiSecret: process.env.CUBEJS_API_SECRET,
       dbType: process.env.CUBEJS_DB_TYPE,
