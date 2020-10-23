@@ -19,7 +19,9 @@ export class TableFiltersComponent implements OnInit {
   };
   formatLabel(value: number) {
     if (value >= 1000) {
-      return Math.round(value / 1000) + 'k';
+      return '$' + Math.round(value / 1000) + 'k';
+    } else {
+      return '$' + value
     }
     return value;
   }

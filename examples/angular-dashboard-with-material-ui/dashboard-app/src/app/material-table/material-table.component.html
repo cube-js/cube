@@ -32,7 +32,7 @@
 
     <ng-container matColumnDef="price">
       <th mat-header-cell *matHeaderCellDef mat-sort-header (click)="changeSorting('Orders.price')"> Order price</th>
-      <td mat-cell *matCellDef="let element"> {{element['Orders.price']}} </td>
+      <td mat-cell *matCellDef="let element">$ {{element['Orders.price']}} </td>
     </ng-container>
 
     <ng-container matColumnDef="status">
