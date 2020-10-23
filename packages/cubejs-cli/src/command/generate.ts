@@ -1,7 +1,7 @@
-import { displayError, event, requireFromPackage } from '../utils';
 import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
+import { displayError, event, requireFromPackage } from '../utils';
 
 // @todo There is another function with similar name inside utils, but without analytics
 const logStage = (stage) => {

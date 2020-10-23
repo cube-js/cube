@@ -1,11 +1,11 @@
-import { displayError, event, executeCommand, npmInstall, requireFromPackage, writePackageJson } from '../utils';
 import fs from 'fs-extra';
 import chalk from 'chalk';
-import templates from '../templates';
 import inquirer from 'inquirer';
 import path from 'path';
 import crypto from 'crypto';
 import { CommanderStatic } from 'commander';
+import { displayError, event, executeCommand, npmInstall, requireFromPackage, writePackageJson } from '../utils';
+import templates from '../templates';
 
 // @todo There is another function with similar name inside utils, but without analytics
 const logStage = (stage) => {
@@ -13,8 +13,23 @@ const logStage = (stage) => {
 };
 
 const create = async (projectName, options) => {
-  const template = options.template || 'express';
-  const createAppOptions = { projectName, dbType: options.dbType, template };
+  if (!options.template) {
+    const prompt = await inquirer.prompt([{
+      type: 'list',
+      name: 'template',
+      message: 'Select template',
+      choices: [
+        'docker',
+        'express',
+        'serverless',
+        'serverless-google',
+      ]
+    }]);
+
+    options.template = prompt.template;
+  }
+
+  const createAppOptions = { projectName, dbType: options.dbType, template: options.template };
 
   event('Create App', createAppOptions);
 
@@ -26,9 +41,9 @@ const create = async (projectName, options) => {
       createAppOptions
     );
   }
-  if (!templates[template]) {
+  if (!templates[options.template]) {
     await displayError(
-      `Unknown template ${chalk.red(template)}`,
+      `Unknown template ${chalk.red(options.template)}`,
       createAppOptions
     );
   }
@@ -41,7 +56,7 @@ const create = async (projectName, options) => {
     version: '0.0.1',
     private: true,
     scripts: {
-      dev: template === 'express' ? 'node index.js' : './node_modules/.bin/cubejs-dev-server'
+      dev: options.template === 'express' ? 'node index.js' : './node_modules/.bin/cubejs-dev-server'
     }
   });
 
@@ -74,6 +89,8 @@ const create = async (projectName, options) => {
 
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
     logStage('Installing JDBC dependencies');
+
+    // eslint-disable-next-line import/no-dynamic-require,global-require
     const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
     const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
     if (!dbTypeDescription) {
@@ -97,7 +114,7 @@ const create = async (projectName, options) => {
 
   const driverClass = await requireFromPackage(driverDependencies[0]);
 
-  const templateConfig = templates[template];
+  const templateConfig = templates[options.template];
   const env = {
     dbType: options.dbType,
     apiSecret: crypto.randomBytes(64).toString('hex'),
@@ -131,7 +148,6 @@ const create = async (projectName, options) => {
 };
 
 export function configureCreateCommand(program: CommanderStatic) {
-
   program
     .command('create <name>')
     .option(

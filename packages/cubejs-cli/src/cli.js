@@ -6,20 +6,11 @@ eslint global-require: 0
  */
 
 import program from 'commander';
-import fs from 'fs-extra';
-import path from 'path';
-import chalk from 'chalk';
-import crypto from 'crypto';
-import inquirer from 'inquirer';
 
 import { configureDevServerCommand } from './command/dev-server';
 import { configureServerCommand } from './command/server';
 import { configureDeployCommand } from './command/deploy';
 import {
-  executeCommand,
-  npmInstall,
-  writePackageJson,
-  requireFromPackage,
   event,
   displayError,
   loadCliManifest,
