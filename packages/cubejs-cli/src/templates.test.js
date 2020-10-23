@@ -1,9 +1,9 @@
 /*
 global test expect
 */
-const { express } = require('./templates');
+import templates from './templates';
 
-const dotEnv = express.files['.env'];
+const dotEnv = templates.express.files['.env'];
 
 const secret = 123;
 const generateTestEnv = (apiSecret, dbType) => ({ apiSecret, dbType });

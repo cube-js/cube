@@ -197,34 +197,45 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
-exports.express = {
-  files: {
-    'index.js': () => indexJs,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
+const templates = {
+  express: {
+    scripts: {
+      dev: 'node index.js',
+    },
+    files: {
+      'index.js': () => indexJs,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    }
+  },
+  serverless: {
+    scripts: {
+      dev: './node_modules/.bin/cubejs-dev-server',
+    },
+    files: {
+      'cube.js': () => handlerJs,
+      'serverless.yml': serverlessYml,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    },
+    dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
+  },
+  'serverless-google': {
+    scripts: {
+      dev: './node_modules/.bin/cubejs-dev-server',
+    },
+    files: {
+      'index.js': () => handlerJs,
+      'serverless.yml': serverlessGoogleYml,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    },
+    dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],
+    devDependencies: ['serverless-google-cloudfunctions']
   }
 };
 
-exports.serverless = {
-  files: {
-    'cube.js': () => handlerJs,
-    'serverless.yml': serverlessYml,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
-  },
-  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
-};
-
-exports['serverless-google'] = {
-  files: {
-    'index.js': () => handlerJs,
-    'serverless.yml': serverlessGoogleYml,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
-  },
-  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],
-  devDependencies: ['serverless-google-cloudfunctions']
-};
+export default templates;

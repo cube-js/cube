@@ -41,12 +41,15 @@ const create = async (projectName, options) => {
       createAppOptions
     );
   }
+
   if (!templates[options.template]) {
     await displayError(
       `Unknown template ${chalk.red(options.template)}`,
       createAppOptions
     );
   }
+  const templateConfig = templates[options.template];
+
   await fs.ensureDir(projectName);
   process.chdir(projectName);
 
@@ -55,9 +58,7 @@ const create = async (projectName, options) => {
     name: projectName,
     version: '0.0.1',
     private: true,
-    scripts: {
-      dev: options.template === 'express' ? 'node index.js' : './node_modules/.bin/cubejs-dev-server'
-    }
+    scripts: templateConfig.scripts,
   });
 
   logStage('Installing server dependencies');
@@ -114,7 +115,6 @@ const create = async (projectName, options) => {
 
   const driverClass = await requireFromPackage(driverDependencies[0]);
 
-  const templateConfig = templates[options.template];
   const env = {
     dbType: options.dbType,
     apiSecret: crypto.randomBytes(64).toString('hex'),
