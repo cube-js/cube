@@ -197,7 +197,47 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
+const cubeJs = `
+  modules.export = {
+  };
+`;
+
+const dockerCompose = `
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    depends_on:
+      - redis
+    links:
+      - redis
+    ports:
+      - 4000
+    volumes:
+      - .:/cube/conf
+    # Remove this line for production, dev-server must be used only during development
+    entrypoint: cubejs dev-server
+
+  redis:
+    image: redis:6
+    restart: always
+
+`;
+
 const templates = {
+  docker: {
+    scripts: {
+      dev: './node_modules/.bin/cubejs-server dev-server',
+    },
+    files: {
+      'cube.js': () => cubeJs,
+      'docker-compose.yml': () => dockerCompose,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    }
+  },
   express: {
     scripts: {
       dev: 'node index.js',

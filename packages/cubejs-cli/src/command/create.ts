@@ -155,7 +155,10 @@ export function configureCreateCommand(program: CommanderStatic) {
       'Preconfigure for selected database.\n\t\t\t     ' +
       'Options: postgres, mysql, mongobi, athena, redshift, bigquery, mssql, clickhouse, snowflake, presto'
     )
-    .option('-t, --template <template>', 'App template. Options: express (default), serverless.')
+    .option(
+      '-t, --template <template>',
+      'App template. Options: docker (default), express, serverless, serverless-google.'
+    )
     .description('Create new Cube.js app')
     .action(
       (projectName, options) => create(projectName, options)
