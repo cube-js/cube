@@ -49,6 +49,8 @@ class PackageFetcher {
   }
 
   async downloadPackages() {
+    console.log(path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'packages'));
+    
     return {
       packagesPath: path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'packages'),
     };
