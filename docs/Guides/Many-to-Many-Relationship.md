@@ -40,7 +40,7 @@ cube(`Posts`, {
       sql: `${PostTopics}.post_id = ${Posts}.id`
     }
   }
-};
+});
 
 cube(`Topics`, {
   sql: `select * from topics`
@@ -55,7 +55,7 @@ cube(`PostTopics`, {
       sql: `${PostTopics}.topic_id = ${Topics}.id`
     }
   }
-};
+});
 ```
 
 In case when a table doesn't have a primary key you can define it manually as follows
