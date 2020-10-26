@@ -40,11 +40,12 @@ exports.query = (compilers, dbType, queryOptions) => {
 
   let externalQueryClass = queryOptions.externalDialectClass;
 
-  if (!externalQueryClass) {
+  if (!externalQueryClass && queryOptions.externalDbType) {
     if (!ADAPTERS[queryOptions.externalDbType]) {
       throw new Error(`Dialect for '${queryOptions.externalDbType}' is not found`);
     }
-    externalQueryClass = queryOptions.externalDbType && ADAPTERS[queryOptions.externalDbType];
+
+    externalQueryClass = ADAPTERS[queryOptions.externalDbType];
   }
 
   return new (queryOptions.dialectClass || ADAPTERS[dbType])(compilers, {
