@@ -21,7 +21,7 @@ module.exports = [{
       options: {"plugins":[]},
     },{
       plugin: require('../node_modules/gatsby-plugin-manifest/gatsby-browser.js'),
-      options: {"plugins":[],"name":"Building Material UI Dashboard with Cube.js","short_name":"Building Material UI Dashboard with Cube.js","description":"Learn how to build Material UI Dashboard with Cube.js.","start_url":"","background_color":"#e0e0e0","theme_color":"#c62828","display":"minimal-ui","icon":"/Users/lonya/Desktop/cube.js/guides/guides-base/static/logos/icon.png","cache_busting_mode":"query","include_favicon":true,"legacy":true,"theme_color_in_head":true,"cacheDigest":"c79b6ee44cd5a2d74a48cb83170cce6f"},
+      options: {"plugins":[],"name":"Material UI Dashboard with Angular","short_name":"Material UI Dashboard with Angular","description":"How to build Angular Material Dashboard with Cube.js.","start_url":"","background_color":"#e0e0e0","theme_color":"#c62828","display":"minimal-ui","icon":"/Users/lonya/Desktop/cube.js/guides/guides-base/static/logos/icon.png","cache_busting_mode":"query","include_favicon":true,"legacy":true,"theme_color_in_head":true,"cacheDigest":"c79b6ee44cd5a2d74a48cb83170cce6f"},
     },{
       plugin: require('../node_modules/gatsby-plugin-offline/gatsby-browser.js'),
       options: {"plugins":[]},
