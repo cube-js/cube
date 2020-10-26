@@ -198,8 +198,8 @@ const ordersJs = `cube(\`Orders\`, {
 `;
 
 const cubeJs = `
-  modules.export = {
-  };
+module.export = {
+};
 `;
 
 const dockerCompose = `
@@ -218,6 +218,7 @@ services:
       # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
       # - .:/cube/conf
       - ./cube.js:/cube/conf/cube.js
+      - ./.env:/cube/conf/.env
       - ./schema:/cube/conf/schema
     # Remove this line for production, dev-server must be used only during development
     entrypoint: cubejs dev-server
