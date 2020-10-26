@@ -69,38 +69,39 @@ export const displayError = async (text: string|string[], options = {}) => {
   process.exit(1);
 };
 
-export const packageExists = (moduleName: string) => {
+export const packageExists = (moduleName: string, relative: boolean = false) => {
+  if (relative) {
+    try {
+      // eslint-disable-next-line global-require,import/no-dynamic-require
+      require.resolve(`${moduleName}`);
+
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
   return fs.pathExistsSync(modulePath);
 };
 
-export const requiredPackageExists = async (moduleName: string) => {
-  const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
-
-  if (!fs.pathExistsSync(modulePath) && !fs.pathExistsSync(`${modulePath}.js`)) {
+const requiredPackageExists = async (moduleName: string, relative: boolean = false) => {
+  if (!packageExists(moduleName, relative)) {
     await displayError(
       `${moduleName} dependency not found. Please run this command from project directory.`
     );
   }
 };
 
-export const requirePackageManifest = async (moduleName: string) => {
-  await requiredPackageExists(moduleName);
+export const requireFromPackage = async (moduleName: string, relative: boolean = false) => {
+  await requiredPackageExists(moduleName, relative);
 
-  const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
+  if (relative) {
+    const resolvePath = require.resolve(`${moduleName}`);
 
-  if (!fs.pathExistsSync(modulePath) && !fs.pathExistsSync(path.join(modulePath, 'package.json'))) {
-    await displayError(
-      `${moduleName} dependency package.json not found. Please run this command from project directory.`
-    );
+    // eslint-disable-next-line global-require,import/no-dynamic-require
+    return require(resolvePath);
   }
-
-  // eslint-disable-next-line global-require,import/no-dynamic-require
-  return require(path.join(modulePath, 'package.json'));
-};
-
-export const requireFromPackage = async (moduleName: string) => {
-  await requiredPackageExists(moduleName);
 
   // eslint-disable-next-line global-require,import/no-dynamic-require
   return require(path.join(process.cwd(), 'node_modules', moduleName));

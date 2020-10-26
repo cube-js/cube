@@ -287,6 +287,7 @@ class CubejsServerCore {
           anonymousId,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
+          imageTag: process.env.CUBEJS_DOCKER_IMAGE_TAG,
           nodeVersion: process.version,
           ...props
         });

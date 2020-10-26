@@ -12,31 +12,37 @@
   "engines": {
     "node": ">=8.11.1"
   },
-  "main": "index.js",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "files": [
     "dist",
-    "index.js",
-    "index.d.ts",
-    "WebSocketServer.js",
-    "bin"
+    "bin",
+    "/oclif.manifest.json"
   ],
   "bin": {
+    "cubejs-server": "./bin/server.js",
     "cubejs-dev-server": "./bin/dev-server.js"
   },
   "cubejsCliVersion": "^0.22",
   "scripts": {
-    "tsc": "tsc",
-    "watch": "tsc -w",
+    "postpack": "rm -f oclif.manifest.json",
+    "prepack": "npm run tsc && oclif-dev manifest",
+    "tsc": "rm -rf dist && tsc",
+    "watch": "rm -rf dist && tsc -w",
     "build": "tsc",
     "test": "npm run unit",
-    "lint": "eslint *.js __mocks__/*.js",
-    "lint:fix": "eslint --fix *.js __mocks__/*.js",
-    "unit": "node scripts/test.js --testPathPattern=./index\\.test\\.js",
-    "unit:debug": "node --inspect-brk scripts/test.js --testPathPattern=./index\\.test\\.js --runInBand"
+    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* tests/ --ext .ts,.js",
+    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* tests/ --ext .ts,js",
+    "unit": "jest",
+    "unit:debug": "jest --runInBand",
+    "jest:shapshot": "jest --updateSnapshot"
   },
   "dependencies": {
+    "@cubejs-backend/linter": "^0.22.0",
     "@cubejs-backend/server-core": "^0.22.3",
     "@oclif/command": "^1.8.0",
+    "@oclif/errors": "^1.3.3",
+    "@oclif/plugin-help": "^3.2.0",
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
@@ -47,12 +53,39 @@
     "ws": "^7.1.2"
   },
   "devDependencies": {
+    "@cubejs-backend/linter": "^0.21.1",
+    "@oclif/dev-cli": "^1.22.2",
+    "@types/cors": "^2.8.8",
+    "@types/node": "^10.0.10",
     "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
-    "jest": "^24.9.0",
-    "mocha": "^8.0.1",
+    "jest": "^26.0.0",
     "should": "^13.2.3",
+    "ts-jest": "^26.0.0",
     "typescript": "^4.0.3"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "ts",
+      "js"
+    ],
+    "transform": {
+      "^.+\\.ts$": "ts-jest",
+      "^.+\\.js$": "ts-jest"
+    },
+    "testMatch": [
+      "<rootDir>/tests/*.(test|spec).(ts|js)"
+    ]
+  },
+  "oclif": {
+    "commands": "./dist/command",
+    "bin": "cubejs-server",
+    "plugins": [
+      "@oclif/plugin-help"
+    ]
+  }
 }

@@ -1,11 +1,16 @@
 /* globals describe,test,expect,jest,afterEach */
 /* eslint-disable no-underscore-dangle */
 
+import http from 'http';
+import https from 'https';
+import { CubejsServer as CubeServer } from '../src/server';
+
 jest.mock('@cubejs-backend/server-core', () => {
   const staticCreate = jest.fn();
   const initApp = jest.fn(() => Promise.resolve());
   const event = jest.fn(() => Promise.resolve());
   const releaseConnections = jest.fn(() => Promise.resolve());
+
   class CubejsServerCore {
     static create() {
       // eslint-disable-next-line prefer-rest-params
@@ -38,10 +43,6 @@ jest.mock('@cubejs-backend/server-core', () => {
 jest.mock('http', () => require('./__mocks__/http'));
 // eslint-disable-next-line global-require
 jest.mock('https', () => require('./__mocks__/https'));
-
-const http = require('http');
-const https = require('https');
-const CubeServer = require('./index');
 
 describe('CubeServer', () => {
   describe('listen', () => {

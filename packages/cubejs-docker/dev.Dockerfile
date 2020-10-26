@@ -2,7 +2,7 @@ FROM node:12.19-alpine
 
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
 
-WORKDIR /cube
+WORKDIR /cubejs
 
 COPY package.json .
 COPY lerna.json .
@@ -92,6 +92,10 @@ COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
 
 RUN yarn lerna run build
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
+
+# By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
+ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+RUN ln -s  /cubejs/packages/cubejs-docker /cube
 
 VOLUME /cube/conf
 WORKDIR /cube/conf

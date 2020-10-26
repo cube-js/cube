@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 const util = require('util');
 
-class WebSocketServer {
+export class WebSocketServer {
   constructor(serverCore, options) {
     options = options || {};
     this.serverCore = serverCore;
@@ -54,5 +54,3 @@ class WebSocketServer {
     }
   }
 }
-
-module.exports = WebSocketServer;
