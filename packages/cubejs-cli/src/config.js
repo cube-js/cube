@@ -4,6 +4,7 @@ import rp from 'request-promise';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import os from 'os';
+import dotenv from 'dotenv';
 
 export class Config {
   async loadConfig() {
@@ -26,6 +27,17 @@ export class Config {
     const cubeCloudConfigPath = this.cubeCloudConfigPath();
     const configFile = path.join(cubeCloudConfigPath, 'config.json');
     return { cubeCloudConfigPath, configFile };
+  }
+
+  async envFile(envFile) {
+    if (await fs.pathExists(envFile)) {
+      return dotenv.config({ path: envFile }).parsed;
+    }
+    return {};
+  }
+
+  cubeEnvConfigPath() {
+    return path.join(os.homedir(), '.env');
   }
 
   cubeCloudConfigPath() {
@@ -75,6 +87,11 @@ export class Config {
 
       await this.writeConfig(config);
       return config;
+    }
+
+    const answer = await this.cloudTokenReq(authToken);
+    if (answer) {
+      return this.addAuthToken(answer, config);
     }
 
     // eslint-disable-next-line no-throw-literal
@@ -170,5 +187,25 @@ export class Config {
       url: `${authorization.url}/${url(authorization.deploymentId)}`,
       json: true
     });
+  }
+
+  async cloudTokenReq(authToken) {
+    const res = await rp({
+      url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
+      method: 'POST',
+      headers: {
+        'Content-type': 'application/json'
+      },
+      json: true,
+      body: {
+        token: authToken
+      }
+    });
+    
+    if (res && res.error) {
+      throw res.error;
+    }
+    
+    return res.jwt;
   }
 }

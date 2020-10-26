@@ -35,6 +35,7 @@
     "cli-progress": "^3.8.2",
     "commander": "^2.19.0",
     "cross-spawn": "^7.0.1",
+    "dotenv": "^8.2.0",
     "fs-extra": "^8.1.0",
     "inquirer": "^7.1.0",
     "jsonwebtoken": "^8.5.1",

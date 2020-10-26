@@ -6,7 +6,7 @@ import { DeployDirectory } from '../deploy';
 import { logStage, displayError } from '../utils';
 import { Config } from '../config';
 
-const deploy = async ({ directory, auth }: any) => {
+const deploy = async ({ directory, auth, uploadEnv }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
     await displayError(
       '@cubejs-backend/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
@@ -36,6 +36,18 @@ const deploy = async ({ directory, auth }: any) => {
     auth
   });
 
+  if (uploadEnv) {
+    const envVariables = await config.envFile(`${directory}/.env`);
+    await config.cloudReq({
+      url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
+      method: 'POST',
+      body: {
+        envVariables: JSON.stringify(envVariables),
+      },
+      auth
+    });
+  }
+  
   await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
 
   const files = Object.keys(fileHashes);
@@ -88,6 +100,7 @@ export function configureDeployCommand(program: CommanderStatic) {
   program
     .command('deploy')
     .description('Deploy project to Cube Cloud')
+    .option('--upload-env', 'Upload .env file to CubeCloud')
     .action(
       (options) => deploy({ directory: process.cwd(), ...options })
         .catch(e => displayError(e.stack || e))
