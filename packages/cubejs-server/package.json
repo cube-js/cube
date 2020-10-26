@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
-  "version": "0.22.2",
+  "version": "0.22.3",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
@@ -35,7 +35,7 @@
     "unit:debug": "node --inspect-brk scripts/test.js --testPathPattern=./index\\.test\\.js --runInBand"
   },
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.22.2",
+    "@cubejs-backend/server-core": "^0.22.3",
     "@oclif/command": "^1.8.0",
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
