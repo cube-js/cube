@@ -191,7 +191,7 @@ export class Config {
 
   async cloudTokenReq(authToken) {
     const res = await rp({
-      url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
+      url: `${process.env.CUBE_CLOUD_HOST || 'https://cloud.cubecloud.dev'}/v1/token`,
       method: 'POST',
       headers: {
         'Content-type': 'application/json'
