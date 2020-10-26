@@ -1,5 +1,6 @@
 import {
-  groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft
+  groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
+  pluck, mergeAll
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -447,8 +448,11 @@ class ResultSet {
 
   tableColumns(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
-    const [{ annotation }] = this.loadResponses;
-    const flatMeta = Object.values(annotation).reduce((a, b) => ({ ...a, ...b }), {});
+    const annotations = pipe(
+      pluck('annotation'),
+      reduce(mergeDeepLeft(), {})
+    )(this.loadResponses);
+    const flatMeta = Object.values(annotations).reduce((a, b) => ({ ...a, ...b }), {});
     const schema = {};
     
     const extractFields = (key) => {
@@ -566,21 +570,24 @@ class ResultSet {
 
   seriesNames(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
-    const [{ annotation }] = this.loadResponses;
-    
+    const measures = pipe(
+      pluck('annotation'),
+      pluck('measures'),
+      mergeAll
+    )(this.loadResponses);
+
     const seriesNames = unnest(this.loadResponses.map((_, index) => pipe(
-      map(this.axisValues(pivotConfig.y)),
+      map(this.axisValues(pivotConfig.y, index)),
       unnest,
       uniq
     )(
       this.timeDimensionBackwardCompatibleData(index)
     )));
-
     return seriesNames.map(axisValues => ({
       title: this.axisValuesString(
         pivotConfig.y.find(d => d === 'measures') ?
           dropLast(1, axisValues).concat(
-            annotation.measures[
+            measures[
               ResultSet.measureFromAxis(axisValues)
             ].title
           ) :
