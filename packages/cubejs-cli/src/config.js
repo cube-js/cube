@@ -89,20 +89,9 @@ export class Config {
       return config;
     }
 
-    const answer = await this.cloudTokenReq({
-      url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
-      method: 'POST',
-      body: {
-        token: authToken
-      }
-    });
-    
-    if (answer.error) {
-      throw answer.error;
-    }
-    
-    if (answer.jwt) {
-      return this.addAuthToken(answer.jwt, config);
+    const answer = await this.cloudTokenReq(authToken);
+    if (answer) {
+      return this.addAuthToken(answer, config);
     }
 
     // eslint-disable-next-line no-throw-literal
@@ -200,16 +189,23 @@ export class Config {
     });
   }
 
-  async cloudTokenReq(options) {
-    const { url, ...restOptions } = options;
+  async cloudTokenReq(authToken) {
     const res = await rp({
-      ...restOptions,
-      url,
+      url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
+      method: 'POST',
       headers: {
         'Content-type': 'application/json'
       },
-      json: true
+      json: true,
+      body: {
+        token: authToken
+      }
     });
-    return res;
+    
+    if (res && res.error) {
+      throw res.error;
+    }
+    
+    return res.jwt;
   }
 }
