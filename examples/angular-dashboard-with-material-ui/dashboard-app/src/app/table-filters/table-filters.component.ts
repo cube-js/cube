@@ -1,4 +1,5 @@
 import { Component, EventEmitter, OnInit, Output } from "@angular/core";
+import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 
 @Component({
   selector: 'app-table-filters',
@@ -10,6 +11,7 @@ export class TableFiltersComponent implements OnInit {
   @Output() dateChange = new EventEmitter();
   @Output() sliderChanged = new EventEmitter();
 
+  cols = 4;
 
   statusChangedFunc = (obj) => {
     this.statusChanged.emit(obj.value);
@@ -29,7 +31,33 @@ export class TableFiltersComponent implements OnInit {
     this.sliderChanged.emit(value);
   }
 
-  constructor() { }
+  constructor(private breakpointObserver: BreakpointObserver) {
+    this.breakpointObserver.observe([
+      Breakpoints.XSmall,
+      Breakpoints.Small,
+      Breakpoints.Medium,
+      Breakpoints.Large,
+      Breakpoints.XLarge,
+    ]).subscribe(result => {
+      if (result.matches) {
+        if (result.breakpoints[Breakpoints.XSmall]) {
+          this.cols = 1;
+        }
+        if (result.breakpoints[Breakpoints.Small]) {
+          this.cols = 2;
+        }
+        if (result.breakpoints[Breakpoints.Medium]) {
+          this.cols = 4;
+        }
+        if (result.breakpoints[Breakpoints.Large]) {
+          this.cols = 4;
+        }
+        if (result.breakpoints[Breakpoints.XLarge]) {
+          this.cols = 4;
+        }
+      }
+    });
+  }
 
   ngOnInit(): void {
   }

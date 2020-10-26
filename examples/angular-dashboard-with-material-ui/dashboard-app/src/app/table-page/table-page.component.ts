@@ -1,5 +1,6 @@
 import { Component, OnInit } from "@angular/core";
 import { BehaviorSubject } from "rxjs";
+import { Meta, Title } from "@angular/platform-browser";
 
 @Component({
   selector: "app-table-page",
@@ -7,6 +8,12 @@ import { BehaviorSubject } from "rxjs";
   styleUrls: ["./table-page.component.scss"]
 })
 export class TablePageComponent implements OnInit {
+  constructor(private meta: Meta, private title: Title) {
+    this.title.setTitle('Angular Dashboard with Material');
+    this.meta.addTag({ name: 'description', content: 'How to build Angular Material Data Table with Cube.js' });
+    this.meta.addTag({ name: 'keywords', content: 'Angular, Cube.js, Data Table, Table, Material UI' });
+  }
+
   public limit = 10;
   public page = 0;
   public query = null;
@@ -126,9 +133,6 @@ export class TablePageComponent implements OnInit {
     }
     return filters;
   };
-
-  constructor() {
-  }
 
   ngOnInit(): void {
     this._query.subscribe(query => {

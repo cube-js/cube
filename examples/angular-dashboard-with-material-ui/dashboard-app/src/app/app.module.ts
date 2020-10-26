@@ -32,11 +32,12 @@ import { MatNativeDateModule } from "@angular/material/core";
 import { MatInputModule } from "@angular/material/input";
 import {MatSliderModule} from "@angular/material/slider";
 import { UserAvatarComponent } from './user-avatar/user-avatar.component';
+import { environment } from 'src/environments/environment';
 
-
+const API_URL = environment.apiUrl;
 const cubejsOptions = {
-  token: "YOUR-CUBEJS-API-TOKEN",
-  options: { apiUrl: "http://localhost:4000/cubejs-api/v1" }
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjAzNzMzMDA2fQ.zZ6C1OqWFuF0od3eb_M6Fqzeb7a8g4JXYepIes3CLos",
+  options: { apiUrl: `${API_URL}/cubejs-api/v1` }
 };
 
 @NgModule({

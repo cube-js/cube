@@ -1,6 +1,6 @@
 <div class="grid-container">
   <div class="kpi-wrap">
-    <mat-grid-list cols="4" rowHeight="131px">
+    <mat-grid-list [cols]="cols" rowHeight="131px">
       <mat-grid-tile *ngFor="let card of KPICards" [colspan]="1" [rowspan]="1">
         <app-kpi-card class="kpi-card"
                       [query]="card.query"
@@ -13,7 +13,7 @@
     </mat-grid-list>
   </div>
   <div>
-    <mat-grid-list cols="5" rowHeight="510px">
+    <mat-grid-list [cols]="chartCols" rowHeight="510px">
       <mat-grid-tile *ngFor="let card of cards" [colspan]="card.cols" [rowspan]="card.rows">
         <mat-card class="dashboard-card">
           <mat-card-header class="dashboard-card__header">
