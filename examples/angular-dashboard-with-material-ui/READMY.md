@@ -1,4 +1,4 @@
-# Material UI Dashboard
+# Angular Dashboard with Material
 
 Example: https://angular-dashboard.cubecloudapp.dev
 
