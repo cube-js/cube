@@ -18,7 +18,7 @@ class MongoBIDriver extends BaseDriver {
     ];
 
     if (
-      process.env.CUBEJS_DB_SSL ||
+      process.env.CUBEJS_DB_SSL === 'true' ||
       process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
       sslOptions.find(o => !!process.env[o.value])
     ) {

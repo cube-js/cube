@@ -14,7 +14,7 @@ class MSSqlDriver extends BaseDriver {
         process.env.CUBEJS_DB_DOMAIN : undefined,
       requestTimeout: 10 * 60 * 1000, // 10 minutes
       options: {
-        encrypt: !!process.env.CUBEJS_DB_SSL || false,
+        encrypt: process.env.CUBEJS_DB_SSL === 'true',
         useUTC: false
       },
       pool: {
