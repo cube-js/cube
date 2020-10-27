@@ -59,7 +59,7 @@ const serverlessYml = env => `service: ${env.projectName}
 
 provider:
   name: aws
-  runtime: nodejs8.10
+  runtime: nodejs12.19
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -118,7 +118,7 @@ const serverlessGoogleYml = env => `service: ${env.projectName} # NOTE: Don't pu
 provider:
   name: google
   stage: dev
-  runtime: nodejs8
+  runtime: nodejs12
   region: us-central1
   project: <YOUR_GOOGLE_PROJECT_ID_HERE>
   # The GCF credentials can be a little tricky to set up. Luckily we've documented this for you here:
