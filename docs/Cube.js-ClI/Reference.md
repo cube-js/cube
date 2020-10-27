@@ -72,7 +72,7 @@ _Use these manually generated tokens in production with caution._ <br> _Please r
 ### Usage
 
 ```bash
-$ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
+$ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 ```
 
 ### Flags
@@ -82,6 +82,7 @@ $ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
 | -e, --expiry &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;  | Token expiry. Set to 0 for no expiry (default: "30 days") | `1 day`, `30 days` &nbsp; &nbsp; &nbsp; &nbsp;  |
 | -s, --secret | Cube.js app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | - |
 | -p, --payload | Token Payload | `foo=bar`, `userId=2` |
+| -u, --user-context | Token USER_CONTEXT Payload | `baz=qux`, `companyId=5` |
 
 ### Example
 

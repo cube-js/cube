@@ -1,6 +1,5 @@
 import React from 'react';
 import Prism from 'prismjs';
-import './prism.css';
 
 class PrismCode extends React.Component {
   componentDidMount() {

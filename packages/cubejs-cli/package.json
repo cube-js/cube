@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
-  "version": "0.21.0",
+  "version": "0.22.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -12,23 +12,19 @@
     "node": ">=8.11.1"
   },
   "bin": {
-    "cubejs": "./index.js"
+    "cubejs": "dist/index.js"
   },
   "scripts": {
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "build": "tsc",
     "test": "npm run unit",
-    "unit": "jest",
-    "lint": "eslint -c ../../.eslintrc.js *.js"
+    "unit": "jest dist",
+    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts,.js",
+    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts,.js"
   },
   "files": [
-    "index.js",
-    "cubejsCli.js",
-    "token.js",
-    "utils.js",
-    "track.js",
-    "templates.js",
-    "deploy.js",
-    "DeployDir.js",
-    "Config.js",
+    "dist",
     "yarn.lock",
     "README.md",
     "LICENSE"
@@ -38,23 +34,35 @@
     "cli-progress": "^3.8.2",
     "commander": "^2.19.0",
     "cross-spawn": "^7.0.1",
+    "dotenv": "^8.2.0",
     "fs-extra": "^8.1.0",
     "inquirer": "^7.1.0",
     "jsonwebtoken": "^8.5.1",
     "node-fetch": "^2.6.0",
     "node-machine-id": "^1.1.10",
     "request": "^2.88.2",
-    "request-promise": "^4.2.5"
+    "request-promise": "^4.2.5",
+    "semver": "^7.3.2"
   },
   "devDependencies": {
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
+    "@cubejs-backend/linter": "^0.22.0",
+    "@oclif/command": "^1.8.0",
+    "@types/cli-progress": "^3.8.0",
+    "@types/cross-spawn": "^6.0.2",
+    "@types/fs-extra": "^9.0.2",
+    "@types/inquirer": "^7.3.1",
+    "@types/jsonwebtoken": "^8.5.0",
+    "@types/node": "^14.11.10",
+    "@types/request-promise": "^4.1.46",
+    "@types/semver": "^7.3.4",
     "husky": "^4.2.3",
     "jest": "^24.8.0",
     "mocha": "^8.0.1",
-    "should": "^13.2.3"
+    "should": "^13.2.3",
+    "typescript": "^4.0.3"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
 }

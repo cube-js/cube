@@ -5,6 +5,13 @@ import React, { useState, Fragment } from 'react';
 import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
+import { SectionRow } from '../components';
+import styled from 'styled-components';
+
+const Label = styled.div`
+  color: var(--dark-03-color);
+  line-height: 32px;
+`;
 
 const { RangePicker } = DatePicker;
 
@@ -34,7 +41,7 @@ const TimeGroup = ({
 }) => {
   const isCustomDateRange = Array.isArray(members[0]?.dateRange);
   const [isRangePickerVisible, toggleRangePicker] = useState(false);
-  
+
   function onDateRangeSelect(m, dateRange) {
     if (dateRange && !dateRange.some((d) => !d)) {
       updateMethods.update(m, {
@@ -71,7 +78,7 @@ const TimeGroup = ({
   );
 
   return (
-    <>
+    <SectionRow>
       {members.map((m, index) => (
         <Fragment key={index}>
           <RemoveButtonGroup onRemoveClick={() => updateMethods.remove(m)}>
@@ -85,7 +92,7 @@ const TimeGroup = ({
             </MemberDropdown>
           </RemoveButtonGroup>
 
-          <b>FOR</b>
+          <Label>for</Label>
 
           <ButtonDropdown
             overlay={dateRangeMenu((dateRange) => {
@@ -99,30 +106,24 @@ const TimeGroup = ({
                 toggleRangePicker(false);
               }
             })}
-            style={{
-              marginLeft: 8,
-              marginRight: 8,
-            }}
           >
             {(isRangePickerVisible || isCustomDateRange) ? 'Custom' : m.dateRange || 'All time'}
           </ButtonDropdown>
 
           {isRangePickerVisible || isCustomDateRange ? (
             <RangePicker
-              style={{ marginRight: 8 }}
               format="YYYY-MM-DD"
               defaultValue={(parsedDateRange || []).map((date) => moment(date))}
               onChange={(dateRange) => onDateRangeSelect(m, dateRange)}
             />
           ) : null}
 
-          <b>BY</b>
+          <Label>by</Label>
 
           <ButtonDropdown
             overlay={granularityMenu(m.dimension, (granularity) =>
               updateMethods.update(m, { ...m, granularity: granularity.name })
             )}
-            style={{ marginLeft: 8 }}
           >
             {m.dimension.granularities.find((g) => g.name === m.granularity) &&
               m.dimension.granularities.find((g) => g.name === m.granularity)
@@ -143,7 +144,7 @@ const TimeGroup = ({
           {addMemberName}
         </MemberDropdown>
       )}
-    </>
+    </SectionRow>
   );
 };
 

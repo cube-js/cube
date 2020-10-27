@@ -1,74 +1,52 @@
 ---
 title: Introduction
+frameworkOfChoice: vanilla
 permalink: /frontend-introduction
 category: Cube.js Frontend
 ---
 
-You can send queries to Cube.js Backend using JSON [Query Format](query-format) via [REST API](rest-api).
+Cube.js is an open-source analytical API platform, and it enables you to build internal business intelligence tools or add customer‑facing analytics to existing applications. Cube.js is visualization-agnostic, so you can build any user interface for your application.
 
-Alongside with it, Cube.js comes with Javascript client and bindings for
-popular frameworks such as React and Vue.
+You can directly query Cube.js Backend using JSON [Query Format](https://cube.dev/docs/query-format) via [HTTP API](https://cube.dev/docs/rest-api) or [WebSockets](https://cube.dev/docs/real-time-data-fetch#web-sockets) and visualize analytical data with tools of your choice. However, it's much easier to use Cube.js JavaScript Client and bindings for popular frameworks such as React, Angular, and Vue.
 
-The client itself doesn't provide any visualizations and is designed to work with existing chart libraries. It provides set of methods to access Cube.js API and to work with query result.
+The client has methods to communicate with Cube.js API Gateway, retrieve, and process data. It is designed to work with existing charting libraries such as Chart.js, D3.js, and more.
 
-## Installation
+## Cube.js JavaScript Client
 
-You can install Javascript  client with NPM or Yarn
+The client provides methods to solve common tasks:
+
+**Abstract from the transport and query data.** You can [fetch data](https://cube.dev/docs/@cubejs-client-core#cubejs-api-load)  from Cube.js Backend or subscribe to [real-time updates](https://cube.dev/docs/real-time-data-fetch) regardless of the protocol, be it HTTP or WebSockets.
+
+**Transform data for visualization.** You can [pivot](https://cube.dev/docs/@cubejs-client-core#result-set-pivot) the result set to display as a [chart](https://cube.dev/docs/@cubejs-client-core#result-set-chart-pivot) or as a [table](https://cube.dev/docs/@cubejs-client-core#result-set-table-pivot), split into [series](https://cube.dev/docs/@cubejs-client-core#result-set-series) or [table columns](https://cube.dev/docs/@cubejs-client-core#result-set-table-columns).
+
+**Simplify work with complex query types.** You can build [Drill Down](https://cube.dev/docs/@cubejs-client-core#result-set-drill-down) queries and [decompose](https://cube.dev/docs/@cubejs-client-core#result-set-decompose) the results of [compareDateRange](https://cube.dev/docs/query-format#time-dimensions-format) or [Data Blending](https://cube.dev/docs/data-blending) queries.
+
+[Learn more](https://cube.dev/docs/@cubejs-client-core) in the documentation for the `@cubejs-client/core` package.
+
+## Example Usage
+
+Here are the typical steps to query and visualize analytical data:
+
+- **Import the `@cubejs-client/core` package.** This package provides all the necessary methods.
+- **Create an instance of Cube.js JavaScript Client.** The client is initialized with Cube.js API URL. In development mode, the default URL is [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1). The client is also initialized with an [API token](https://cube.dev/docs/security), but it takes effect only in [production](https://cube.dev/docs/deployment#production-mode).
+- **Query data from Cube.js Backend.** The client accepts a query, which is a plain JavaScript object. See [Query Format](https://cube.dev/docs/query-format) for details.
+- **Transform data for visualization.** The result set has convenient methods, such as `series` and `chartPivot`, to prepare data for charting.
+- **Visualize the data.** Use tools of your choice to draw charts and create visualizations.
+
+See an example of using Cube.js with vanilla JavaScript and Chart.js library. Note that you can always use a different charting library that suits your needs:
+
+<iframe src="https://codesandbox.io/embed/cubejs-vanilla-javascript-client-yezyv?fontsize=14&hidenavigation=1&theme=dark&view=preview" style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;" sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
+
+## Getting Started
+
+You can install Cube.js JavaScript Client with npm or Yarn:
 
 ```bash
+# npm
 $ npm install --save @cubejs-client/core
-# or with Yarn
+
+# Yarn
 $ yarn add @cubejs-client/core
 ```
 
-## Example Usage
-First import `cubejs` from `@cubejs-client/core` and initiate client with your
-Cube.js [API Token](security) and API URL. The default API URL for Cube.js Backend in development mode is `http://localhost:4000/cubejs-api/v1`.
-
-Then, use [CubejsApi.load](@cubejs-client-core#cubejs-api-load) to load data from the backend. The `load` method accepts a query, which is plain Javascript object. [Learn more about query format
-here.](query-format)
-
-Below example shows how to use Cube.js Javascript Client with [Echarts charting
-library](http://echarts.apache.org).
-
-```javascript
-import cubejs from '@cubejs-client/core';
-import echarts from 'echarts';
-
-// initialize cubejs instance with API Token and API URL
-const cubejsApi = cubejs(
-  'YOUR-CUBEJS-API-TOKEN',
-  { apiUrl: 'http://localhost:4000/cubejs-api/v1' },
-);
-
-// Load query for orders by created month in 2017 year
-cubejsApi
-  .load({
-    measures: ['Orders.count'],
-    timeDimensions: [
-      {
-        dimension: 'Orders.createdAt',
-        dateRange: ['2017-01-01', '2017-12-31'],
-        granularity: 'month'
-      }
-    ]
-  })
-  .then(resultSet => {
-    // initialize echarts instance with prepared DOM
-    var myChart = echarts.init(document.getElementById('chart'));
-    // draw chart
-    myChart.setOption({
-      xAxis: {
-        data: resultSet.chartPivot().map(i => i.x)
-      },
-      yAxis: {},
-      series: [
-        {
-          type: 'bar',
-          data: resultSet.chartPivot().map(i => i['Orders.count'])
-        }
-      ]
-    });
-  });
-```
-<iframe src="https://codesandbox.io/embed/131ymrj8vl?fontsize=14" title="Cube.js Vanilla Javascript Client" style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;" sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
+Now you can build your application from scratch or generate the code with [Cube.js Playground](https://cube.dev/docs/dashboard-app). You can also [explore example applications](https://cube.dev/docs/examples) built with Cube.js.

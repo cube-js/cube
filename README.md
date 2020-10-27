@@ -238,7 +238,6 @@ export default () => {
 |[React Dashboard](https://react-dashboard-demo.cubecloudapp.dev/)|[react-dashboard](https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard/demo)|Dynamic dashboard with React, GraphQL, and Cube.js [[guide](https://react-dashboard.cube.dev)]|
 |[D3 Dashboard](https://d3-dashboard.cubecloudapp.dev/)|[d3-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard)|Dashboard with Cube.js, D3, and Material UI [[guide](https://d3-dashboard.cube.dev)]|
 |[Event Analytics](https://d1ygcqhosay4lt.cloudfront.net/)|[event-analytics](https://github.com/cube-js/cube.js/tree/master/examples/event-analytics)|Mixpanel like Event Analytics App built with Cube.js and Snowplow [[tutorial](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)]|
-|[Node Express Dashboard](https://express-analytics-dashboard.cubecloudapp.dev)|[node-express-dashboard](https://github.com/cube-js/cube.js/tree/master/examples/express-analytics-dashboard)|Analytics Dashboard with Node, Express, and Cube.js [[tutorial](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)]|
 |[External Rollups](https://external-rollups.cubecloudapp.dev/)|[external-rollups](https://github.com/cube-js/cube.js/tree/master/examples/external-rollups)|Compare performance of direct BigQuery querying vs MySQL cached version for the same data|
 |[AWS Web Analytics](https://statsbotco.github.io/cubejs-client/aws-web-analytics/)|[aws-web-analytics](https://github.com/cube-js/cube.js/tree/master/examples/aws-web-analytics)|Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js [[tutorial](https://cube.dev/blog/building-open-source-google-analytics-from-scratch/)]|
 |[Open Source Web Analytics Platform](https://web-analytics-demo.cubecloudapp.dev/)|[web-analytics](https://github.com/cube-js/cube.js/tree/master/examples/web-analytics)|Building Google Analytics alternative with Snowplow, AWS Athena, Cube.js and React. It shows the usage of external pre-aggregations to speed-up queries. [[guide](https://web-analytics.cube.dev)]|
@@ -248,10 +247,9 @@ export default () => {
 ## Tutorials
 
 ### Getting Started Tutorials
-- [React Dashboard: an Ultimate Guide](https://react-dashboard.cube.dev)
 - [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
+- [React Dashboard: an Ultimate Guide](https://react-dashboard.cube.dev)
 - [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
-- [Node Express Analytics Dashboard with Cube.js](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs/)
 ### Advanced
 - [Optimize Cube.js Performance with Pre-Aggregations](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/)
 - [Building an Open Source Mixpanel Alternative. Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1/)
@@ -265,6 +263,12 @@ export default () => {
 ## Community
 
 If you have any questions or need help - [please join our Slack community](https://slack.cube.dev) of amazing developers and contributors.
+
+You are also welcome to join our **monthly community calls** where we discuss community news, Cube Dev team's plans, backlogs, use cases, etc. If you miss the call, the recordings will also be available after the meeting. 
+* When: Second Wednesday of each month at [9am Pacific Time](https://www.thetimezoneconverter.com/?t=09:00&tz=PT%20%28Pacific%20Time%29).  
+* Meeting link: https://us02web.zoom.us/j/86717042169?pwd=VlBEd2VVK01DNDVVbU1EUXd5ajhsdz09
+* Meeting [agenda/notes](https://www.notion.so/Notes-from-monthly-community-meetings-f394e5c131cb4bd1bc64ed850b0186d8). 
+* Recordings will be posted on the [Community Playlist](https://www.youtube.com/playlist?list=PLtdXl_QTQjpb1dHZCM09qKTsgvgqjSvc9 ). 
 
 ## Architecture
 __Cube.js acts as an analytics backend__, translating business logic (metrics and dimensions) into SQL and handling database connection.

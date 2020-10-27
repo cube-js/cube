@@ -13,6 +13,10 @@ export default function Item({ id, index }) {
           {...dragHandleProps}
           style={{
             ...draggableProps.style,
+            border: `1px dashed var(--dark-05-color)`,
+            borderRadius: 4,
+            padding: '5px 12px',
+            lineHeight: '22px',
           }}
         >
           <Typography.Text ellipsis style={{ maxWidth: '100%' }}>

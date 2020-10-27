@@ -9,6 +9,7 @@ import { fetch } from 'whatwg-fetch';
 import { withRouter } from 'react-router';
 import Header from './components/Header';
 import { event, setAnonymousId } from './events';
+import GlobalStyles from './components/GlobalStyles';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
@@ -73,6 +74,7 @@ class App extends Component {
     const { location, children } = this.props;
     return (
       <Layout style={{ height: '100%' }}>
+        <GlobalStyles/>
         <Header selectedKeys={selectedTab(location.pathname)} />
         <Layout.Content style={{ height: '100%' }}>
           {fatalError ? (

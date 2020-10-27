@@ -38,9 +38,18 @@ exports.query = (compilers, dbType, queryOptions) => {
     return null;
   }
 
+  let externalQueryClass = queryOptions.externalDialectClass;
+
+  if (!externalQueryClass && queryOptions.externalDbType) {
+    if (!ADAPTERS[queryOptions.externalDbType]) {
+      throw new Error(`Dialect for '${queryOptions.externalDbType}' is not found`);
+    }
+
+    externalQueryClass = ADAPTERS[queryOptions.externalDbType];
+  }
+
   return new (queryOptions.dialectClass || ADAPTERS[dbType])(compilers, {
     ...queryOptions,
-    externalQueryClass: queryOptions.externalDialectClass ||
-      queryOptions.externalDbType && ADAPTERS[queryOptions.externalDbType]
+    externalQueryClass
   });
 };

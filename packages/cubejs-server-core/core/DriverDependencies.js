@@ -17,4 +17,5 @@ module.exports = {
   elasticsearch: '@cubejs-backend/elasticsearch-driver',
   dremio: '@cubejs-backend/dremio-driver',
   druid: '@cubejs-backend/druid-driver',
+  cubestore: '@cubejs-backend/cubestore-driver',
 };

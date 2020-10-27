@@ -49,6 +49,11 @@ services:
     env_file:
       - environment
     restart: always
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8081/status/health || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   broker:
     image: apache/druid:0.19.0
@@ -66,6 +71,11 @@ services:
     env_file:
       - environment
     restart: always
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8082/druid/broker/v1/loadstatus || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   historical:
     image: apache/druid:0.19.0
@@ -84,6 +94,11 @@ services:
     env_file:
       - environment
     restart: always
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8083/druid/historical/v1/readiness || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   middlemanager:
     image: apache/druid:0.19.0
@@ -102,6 +117,11 @@ services:
     env_file:
       - environment
     restart: always
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8091/status/health || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   router:
     image: apache/druid:0.19.0

@@ -17,13 +17,13 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
   const baseUmdConfig = {
     ...(umdConfig || baseConfig),
     plugins: [
-      resolve({
-        extensions: ['.ts', '.js', '.json'],
-        mainFields: ['browser', 'module', 'main'],
-      }),
       ...baseConfig.plugins,
       commonjs({
         extensions: ['.js', '.ts'],
+      }),
+      resolve({
+        extensions: ['.ts', '.js', '.json'],
+        mainFields: ['browser', 'module', 'main'],
       }),
       babel({
         exclude: ['node_modules/**', /\/core-js\//],
@@ -53,7 +53,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       }),
       alias({
         entries: {
-          '@cubejs-client/core': '../cubejs-client-core/src/index.js'
+          '@cubejs-client/core': '../cubejs-client-core/src/index.js',
         },
       }),
     ],
@@ -68,6 +68,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           file: `packages/${name}/dist/${name}.umd.js`,
           format: 'umd',
           name: globalName,
+          exports: 'auto',
         },
       ],
     },

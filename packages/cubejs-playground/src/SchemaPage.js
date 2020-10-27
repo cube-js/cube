@@ -3,17 +3,14 @@ import * as PropTypes from 'prop-types';
 import cubejs from '@cubejs-client/core';
 import {
   Layout,
-  Menu,
   Button,
-  Tree,
-  Tabs,
   Spin,
-  Alert,
   Modal,
   Empty,
 } from 'antd';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
+import { Menu, Tabs, Tree, Alert } from './components';
 
 import fetch from './playgroundFetch';
 
@@ -27,7 +24,7 @@ const schemaToTreeData = (schemas) =>
   Object.keys(schemas).map((schemaName) => ({
     title: schemaName,
     key: schemaName,
-    children: Object.keys(schemas[schemaName]).map((tableName) => {
+    treeData: Object.keys(schemas[schemaName]).map((tableName) => {
       const key = `${schemaName}.${tableName}`
       schemasMap[key] = [schemaName, tableName]
       return {
@@ -180,10 +177,10 @@ class SchemaPage extends Component {
     } = this.state;
     const renderTreeNodes = (data) =>
       data.map((item) => {
-        if (item.children) {
+        if (item.treeData) {
           return (
             <TreeNode title={item.title} key={item.key} dataRef={item}>
-              {renderTreeNodes(item.children)}
+              {renderTreeNodes(item.treeData)}
             </TreeNode>
           );
         }
@@ -251,7 +248,7 @@ class SchemaPage extends Component {
             </TabPane>
           </Tabs>
         </Sider>
-        <Content style={{ minHeight: 280 }}>
+        <Content style={{ minHeight: 280, padding: 24 }}>
           {selectedFile && (
             <Alert
               message={
@@ -267,7 +264,7 @@ class SchemaPage extends Component {
           {selectedFile ? (
             <PrismCode
               code={this.selectedFileContent()}
-              style={{ padding: 12 }}
+              style={{ padding: 0, marginTop: 24 }}
             />
           ) : (
             <Empty

@@ -83,7 +83,8 @@ cube(`Users`, {
 
 ## asyncModule
 
-> **NOTE:** Each `asyncModule` call will be invoked only once per schema compilation. 
+[[warning | Note]]
+| Each `asyncModule` call will be invoked only once per schema compilation. 
 To trigger schema recompile based on changes of underlying input data, [schemaVersion](@cubejs-backend-server-core#options-reference-schema-version) value should change accordingly.
 
 If there's a need to generate schema based on values from external API or database `asyncModule` method can be used for such scenario.

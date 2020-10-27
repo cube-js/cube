@@ -1,0 +1,13 @@
+**
+!package.json
+!yarn.lock
+!lerna.json
+!packages/
+
+packages/*/node_modules/
+packages/cubejs-jdbc-driver
+packages/cubejs-serverless
+packages/cubejs-serverless-aws
+packages/cubejs-serverless-google
+packages/cubejs-client-ngx
+packages/cubejs-client-vue

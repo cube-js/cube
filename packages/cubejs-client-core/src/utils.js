@@ -1,5 +1,25 @@
 export const DEFAULT_GRANULARITY = 'day';
 
+export function defaultOrder(query) {
+  const granularity = (query.timeDimensions || []).find((d) => d.granularity);
+
+  if (granularity) {
+    return {
+      [granularity.dimension]: 'asc'
+    };
+  } else if ((query.measures || []).length > 0 && (query.dimensions || []).length > 0) {
+    return {
+      [query.measures[0]]: 'desc'
+    };
+  } else if ((query.dimensions || []).length > 0) {
+    return {
+      [query.dimensions[0]]: 'asc'
+    };
+  }
+
+  return {};
+}
+
 export function defaultHeuristics(newQuery, oldQuery = {}, options) {
   const { meta, sessionGranularity } = options;
   const granularity = sessionGranularity || DEFAULT_GRANULARITY;

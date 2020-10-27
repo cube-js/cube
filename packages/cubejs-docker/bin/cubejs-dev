@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+
+require('/cubejs/packages/cubejs-cli/dist/index.js');

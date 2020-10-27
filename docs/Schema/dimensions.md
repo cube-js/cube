@@ -122,13 +122,8 @@ Specify which dimension is a primary key for a cube. The default value is `false
 
 A primary key is used to make [joins](joins) work properly.
 
-<div class="block help-block">
-  <p>
-    <b>Note:</b>
-    Setting <code>primaryKey</code> to <code>true</code> will change the default value of <code>shown</code>
-    parameter to <code>false</code>. If you still want <code>shown</code> to be <code>true</code> - set it manually.
-  </p>
-</div>
+[[warning | Note]]
+| Setting `primaryKey` to `true` will change the default value of `shown` parameter to `false`. If you still want `shown` to be `true` - set it manually.
 
 ```javascript
 dimensions: {

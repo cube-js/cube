@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import * as PropTypes from 'prop-types';
-import { Select } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import FilterInput from './FilterInput';
+import { SectionRow, Select } from '../components';
 
 const FilterGroup = ({
   members,
@@ -12,9 +12,9 @@ const FilterGroup = ({
   addMemberName,
   updateMethods,
 }) => (
-  <span>
+  <SectionRow>
     {members.map((m) => (
-      <div style={{ marginBottom: 12 }} key={m.index}>
+      <Fragment key={m.index}>
         <RemoveButtonGroup onRemoveClick={() => updateMethods.remove(m)}>
           <MemberDropdown
             onClick={(updateWith) =>
@@ -33,7 +33,7 @@ const FilterGroup = ({
         <Select
           value={m.operator}
           onChange={(operator) => updateMethods.update(m, { ...m, operator })}
-          style={{ width: 200, marginRight: 8 }}
+          style={{ width: 200 }}
         >
           {m.operators.map((operator) => (
             <Select.Option key={operator.name} value={operator.name}>
@@ -46,7 +46,7 @@ const FilterGroup = ({
           key="filterInput"
           updateMethods={updateMethods}
         />
-      </div>
+      </Fragment>
     ))}
     <MemberDropdown
       onClick={(m) => updateMethods.add({ dimension: m })}
@@ -54,9 +54,9 @@ const FilterGroup = ({
       type="dashed"
       icon={<PlusOutlined />}
     >
-      {addMemberName}
+      {!members.length ? addMemberName : null}
     </MemberDropdown>
-  </span>
+  </SectionRow>
 );
 
 FilterGroup.propTypes = {
