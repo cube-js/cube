@@ -264,6 +264,12 @@ export default () => {
 
 If you have any questions or need help - [please join our Slack community](https://slack.cube.dev) of amazing developers and contributors.
 
+You are also welcome to join our **monthly community calls** where we discuss community news, Cube Dev team's plans, backlogs, use cases, etc. If you miss the call, the recordings will also be available after the meeting. 
+* When: Second Wednesday of each month at [9am Pacific Time](https://www.thetimezoneconverter.com/?t=09:00&tz=PT%20%28Pacific%20Time%29).  
+* Meeting link: https://us02web.zoom.us/j/86717042169?pwd=VlBEd2VVK01DNDVVbU1EUXd5ajhsdz09
+* Meeting [agenda/notes](https://www.notion.so/Notes-from-monthly-community-meetings-f394e5c131cb4bd1bc64ed850b0186d8). 
+* Recordings will be posted on the [Community Playlist](https://www.youtube.com/playlist?list=PLtdXl_QTQjpb1dHZCM09qKTsgvgqjSvc9 ). 
+
 ## Architecture
 __Cube.js acts as an analytics backend__, translating business logic (metrics and dimensions) into SQL and handling database connection.
 
