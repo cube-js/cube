@@ -1,0 +1,16 @@
+.explore-container {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.controls-container {
+  display: grid;
+  gap: 16px;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}

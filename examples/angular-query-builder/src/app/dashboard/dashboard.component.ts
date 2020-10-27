@@ -1,14 +1,23 @@
 import { Component, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
-import { ResultSet } from '@cubejs-client/core';
+import { Router } from '@angular/router';
+import { Apollo, gql } from 'apollo-angular';
+import { BehaviorSubject, of } from 'rxjs';
 import {
-  BuilderMeta,
-  CubejsClient,
-  Query,
-  QueryBuilderService,
-} from '@cubejs-client/ngx';
+  CompactType,
+  DisplayGrid,
+  Draggable,
+  GridsterConfig,
+  GridsterItem,
+  GridType,
+  PushDirections,
+  Resizable,
+} from 'angular-gridster2';
 
-import { SettingsDialogComponent } from '../settings-dialog/settings-dialog.component';
+interface Safe extends GridsterConfig {
+  draggable: Draggable;
+  resizable: Resizable;
+  pushDirections: PushDirections;
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -16,68 +25,169 @@ import { SettingsDialogComponent } from '../settings-dialog/settings-dialog.comp
   styleUrls: ['./dashboard.component.css'],
 })
 export class DashboardComponent implements OnInit {
-  query: Query;
-  builderMeta: BuilderMeta;
-  resultSet: ResultSet;
-  chartTypeToIcon = [
-    {
-      chartType: 'line',
-      icon: 'multiline_chart',
-    },
-    {
-      chartType: 'area',
-      icon: 'multiline_chart',
-    },
-    {
-      chartType: 'bar',
-      icon: 'bar_chart',
-    },
-    {
-      chartType: 'pie',
-      icon: 'pie_chart',
-    },
-    {
-      chartType: 'table',
-      icon: 'table_chart',
-    },
-  ];
-  chartTypeMap = {};
-  filterMembers: any[] = [];
-  timeDimensionMembers: any[] = [];
+  dashboardItems = new BehaviorSubject<any[]>([]);
+  options: Safe;
+  dashboard: Array<GridsterItem>;
 
-  constructor(
-    public cubejsClient: CubejsClient,
-    public queryBuilder: QueryBuilderService,
-    public dialog: MatDialog
-  ) {
-    queryBuilder.setCubejsClient(cubejsClient);
-    this.chartTypeMap = this.chartTypeToIcon.reduce(
-      (memo, { chartType, icon }) => ({ ...memo, [chartType]: icon }),
-      {}
-    );
+  changedOptions(): void {
+    if (this.options.api && this.options.api.optionsChanged) {
+      this.options.api.optionsChanged();
+    }
   }
 
-  async ngOnInit() {
-    this.builderMeta = await this.queryBuilder.builderMeta;
-    this.query = await this.queryBuilder.query;
+  constructor(private apollo: Apollo, private router: Router) {}
 
-    this.query.subject.subscribe(() => {
-      this.filterMembers = this.query.filters.asArray();
-      this.timeDimensionMembers = this.query.timeDimensions.asArray();
-    });
+  ngOnInit() {
+    this.options = {
+      gridType: GridType.ScrollVertical,
+      compactType: CompactType.None,
+      margin: 10,
+      outerMargin: true,
+      outerMarginTop: null,
+      outerMarginRight: null,
+      outerMarginBottom: null,
+      outerMarginLeft: null,
+      useTransformPositioning: true,
+      mobileBreakpoint: 640,
+      minCols: 1,
+      maxCols: 100,
+      minRows: 1,
+      maxRows: 100,
+      maxItemCols: 100,
+      minItemCols: 1,
+      maxItemRows: 100,
+      minItemRows: 1,
+      maxItemArea: 2500,
+      minItemArea: 1,
+      defaultItemCols: 1,
+      defaultItemRows: 1,
+      fixedColWidth: 105,
+      fixedRowHeight: 105,
+      keepFixedHeightInMobile: false,
+      keepFixedWidthInMobile: false,
+      scrollSensitivity: 10,
+      scrollSpeed: 20,
+      enableEmptyCellClick: false,
+      enableEmptyCellContextMenu: false,
+      enableEmptyCellDrop: false,
+      enableEmptyCellDrag: false,
+      enableOccupiedCellDrop: false,
+      emptyCellDragMaxCols: 50,
+      emptyCellDragMaxRows: 50,
+      ignoreMarginInRow: false,
+      draggable: {
+        enabled: true,
+        stop: this.handleLayoutChange.bind(this)
+      },
+      resizable: {
+        enabled: true,
+        stop: this.handleLayoutChange.bind(this)
+      },
+      swap: false,
+      pushItems: true,
+      disablePushOnDrag: false,
+      disablePushOnResize: false,
+      pushDirections: {
+        north: true,
+        east: true,
+        south: true,
+        west: true,
+      },
+      pushResizeItems: false,
+      displayGrid: DisplayGrid.OnDragAndResize,
+      disableWindowResize: false,
+      disableWarnings: false,
+      scrollToNewItems: false,
+      setGridSize: true
+    };
+
+    this.dashboard = [
+      { id: 1, cols: 4, rows: 1, y: 0, x: 0 },
+      { id: 2, cols: 4, rows: 1, y: 0, x: 6 },
+    ];
+
+    this.apollo
+      .query({
+        query: gql`
+          query DashboardItems {
+            dashboardItems {
+              id
+              name
+              vizState
+            }
+          }
+        `,
+        fetchPolicy: 'network-only',
+      })
+      .subscribe((result: any) => {
+        this.dashboardItems.next(
+          (result?.data?.dashboardItems || []).map((item, index) => {
+            const vizState = JSON.parse(item.vizState);
+            return {
+              id: item.id,
+              name: item.name,
+              cubeQuery: of(vizState.query),
+              chartType: of(vizState.chartType || 'line'),
+              pivotConfig: of(vizState.pivotConfig || null),
+              plain: {
+                ...vizState,
+                grid: {
+                  id: Number(item.id),
+                  cols: 6,
+                  rows: 2,
+                  y: index,
+                  x: 0,
+                  minItemRows: 2
+                },
+              },
+            };
+          })
+        );
+      });
+  }
+  
+  handleLayoutChange(event) {
+    // todo
+    console.log(event)
   }
 
-  openDialog(): void {
-    const dialogRef = this.dialog.open(SettingsDialogComponent, {
-      width: '500px',
-      data: {
-        pivotConfig: this.queryBuilder.pivotConfig,
-        query: this.query,
+  toggleChartType() {
+    this._chartType.next(this._chartType.value === 'line' ? 'table' : 'line');
+  }
+
+  deleteItem(id: number) {
+    this.apollo
+      .mutate({
+        mutation: gql`
+          mutation DeleteItem($id: String!) {
+            deleteDashboardItem(id: $id) {
+              id
+            }
+          }
+        `,
+        variables: {
+          id,
+        },
+      })
+      .subscribe((result: any) => {
+        this.dashboardItems.next(
+          this.dashboardItems.value.filter(
+            ({ id }) => id != result?.data?.deleteDashboardItem.id
+          )
+        );
+      });
+  }
+
+  editItem(id: number, { query, pivotConfig, chartType }: any) {
+    this.router.navigate(['/explore'], {
+      queryParams: {
+        id,
+        query: JSON.stringify(query),
+        pivotConfig: JSON.stringify(pivotConfig),
+        chartType: chartType,
       },
     });
-
-    dialogRef.updatePosition({
-      top: '10%',
-    });
   }
+
+  add() {}
 }

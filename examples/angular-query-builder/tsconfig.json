@@ -12,6 +12,8 @@
     "target": "es2015",
     "module": "es2020",
     "emitDecoratorMetadata": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "lib": [
       "es2018",
       "dom"
