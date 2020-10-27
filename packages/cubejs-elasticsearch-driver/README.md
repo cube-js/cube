@@ -15,7 +15,7 @@ Elasticsearch driver.
 
 This driver has been contributed by Cube.js community member(s). This package is **community supported** and should be used at your own risk. 
 
-While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in [Cube.js Slack](cube-js.slack.com). 
+While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube.js Slack. 
 
 ### License
 
