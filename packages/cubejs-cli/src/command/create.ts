@@ -62,7 +62,7 @@ const create = async (projectName, options) => {
   });
 
   logStage('Installing server dependencies');
-  await npmInstall(['@cubejs-backend/server']);
+  await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
 
   if (!options.dbType) {
     const Drivers = await requireFromPackage('@cubejs-backend/server-core/core/DriverDependencies.js');
@@ -82,11 +82,13 @@ const create = async (projectName, options) => {
   if (!driverDependencies) {
     await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
   }
+
   driverDependencies = Array.isArray(driverDependencies) ? driverDependencies : [driverDependencies];
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
     driverDependencies.push('node-java-maven');
   }
-  await npmInstall(driverDependencies);
+
+  await npmInstall(driverDependencies, options.template === 'docker');
 
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
     logStage('Installing JDBC dependencies');
