@@ -1,0 +1,18 @@
+<div>
+  <canvas baseChart
+          height="215"
+          [datasets]="barChartData"
+          [labels]="barChartLabels"
+          [options]="barChartOptions"
+          [legend]="barChartLegend"
+          [chartType]="barChartType">
+  </canvas>
+  <mat-grid-list cols="3">
+    <mat-grid-tile *ngFor="let card of labels" [colspan]="1" [rowspan]="1">
+      <div>
+        <h3 class="doughnut-label">{{card.category}}</h3>
+        <h2 class="doughnut-number">{{((card.value/value) * 100).toFixed(1)}}%</h2>
+      </div>
+    </mat-grid-tile>
+  </mat-grid-list>
+</div>
