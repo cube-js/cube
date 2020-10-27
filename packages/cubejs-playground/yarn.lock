@@ -1375,10 +1375,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.21.1":
-  version "0.21.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.21.1.tgz#5bbdd1224aefa4b405e1f8b766504a4224aa4840"
-  integrity sha512-D6JAZ0W5rvoTZt7+cfCdMxm1d7U28v6YHOWcPzfNumQznBjZCTwM5lYj4Ro3DifvT1UBrmvWirDauvIq1+uWFg==
+"@cubejs-client/core@^0.22.2":
+  version "0.22.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.22.2.tgz#27b5b584fd3b6abb4b981fbd64ed41b8bfc35a89"
+  integrity sha512-ZDvipw8Il4/QoJd7B/vqboSrXOyIm1+Uidv/LoxPIAW14tjI2rTYh+gDpUH2URYWD+jpNWxEpcx8WB75KxGoow==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1389,10 +1389,10 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.21.1":
-  version "0.21.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.21.1.tgz#4c4aeee2acf42786b1aed50ff250333a08f75c07"
-  integrity sha512-IoGviMJeOXqf/s9z0CQl4LUwQeiWHaHrRu/09KC6etOxHLz5iDv0GHiyEQ8kjAdpmdjykdMLIhj3OAdp+e4LKA==
+"@cubejs-client/react@^0.22.2":
+  version "0.22.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.22.2.tgz#a178968a75d91d71ca44b43a75f0249f9c13f605"
+  integrity sha512-phfNV7dNRViMyf1DRm0W9EA/RoqeheArlM4OTLkEGiso3II9dHJtG9rxt2pmsyLEbSieG/p3hQPV2A0gIFvSfw==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
