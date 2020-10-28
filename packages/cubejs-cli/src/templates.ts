@@ -223,7 +223,14 @@ services:
       - redis
     #  - postgres
     ports:
-      - 4000
+      # It's better to use random port binding for 4000/3000 ports
+      # without it you will not able to start multiple projects inside docker
+      # - 4000
+      # - 3000
+      # 4000 is a port for Cube.js API
+      - 4000:4000
+      # 3000 is a port for Playground web-server
+      - 3000:3000
     volumes:
       # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
       # - .:/cube/conf
