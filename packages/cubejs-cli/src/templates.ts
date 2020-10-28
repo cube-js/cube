@@ -197,7 +197,7 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
-const cubeJs = `
+const cubeJs = `// Server options go here: https://cube.dev/docs/@cubejs-backend-server-core#options-reference
 module.export = {
 };
 `;
@@ -206,12 +206,22 @@ const dockerCompose = `
 version: '2.2'
 
 services:
+# Example of PostgreSQL configuration, uncomment if you want to use postgres
+#  postgres:
+#    image: postgres:12.4
+#    environment:
+#      POSTGRES_USER: 'test'
+#      POSTGRES_PASSWORD: 'test'
+#      POSTGRES_DB: 'test'
+
   cube:
     image: cubejs/cube:latest
     depends_on:
       - redis
+    #  - postgres
     links:
       - redis
+    #  - postgres
     ports:
       - 4000
     volumes:
