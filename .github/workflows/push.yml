@@ -1,4 +1,4 @@
-name: CI
+name: Build
 
 on: [push, pull_request]
 
@@ -388,6 +388,7 @@ jobs:
           TEST_DRUID_VERSION: 0.19.0
 
   docker-image-latest:
+    name: Build only :latest image
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: (github.event_name == 'push' || github.event_name == 'pull_request') && !contains(github.ref, 'refs/tags/')
@@ -409,6 +410,7 @@ jobs:
           push: false
 
   docker-image-dev:
+    name: Build only :dev image
     runs-on: ubuntu-latest
     timeout-minutes: 60
 

@@ -1,11 +1,11 @@
-name: Publish Docker image for master (nightly)
+name: Master
 on:
   push:
     branches:
       - master
 jobs:
   docker-image-dev:
-    name: Build & Push docker image
+    name: Release :dev image
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
