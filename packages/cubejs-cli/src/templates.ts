@@ -59,7 +59,7 @@ const serverlessYml = env => `service: ${env.projectName}
 
 provider:
   name: aws
-  runtime: nodejs8.10
+  runtime: nodejs12.x
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -118,7 +118,7 @@ const serverlessGoogleYml = env => `service: ${env.projectName} # NOTE: Don't pu
 provider:
   name: google
   stage: dev
-  runtime: nodejs8
+  runtime: nodejs12
   region: us-central1
   project: <YOUR_GOOGLE_PROJECT_ID_HERE>
   # The GCF credentials can be a little tricky to set up. Luckily we've documented this for you here:
@@ -197,34 +197,89 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
-exports.express = {
-  files: {
-    'index.js': () => indexJs,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
+const cubeJs = `
+module.export = {
+};
+`;
+
+const dockerCompose = `
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    depends_on:
+      - redis
+    links:
+      - redis
+    ports:
+      - 4000
+    volumes:
+      # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
+      # - .:/cube/conf
+      - ./cube.js:/cube/conf/cube.js
+      - ./.env:/cube/conf/.env
+      - ./schema:/cube/conf/schema
+    # Remove this line for production, dev-server must be used only during development
+    entrypoint: cubejs dev-server
+
+  redis:
+    image: redis:6
+    restart: always
+
+`;
+
+const templates = {
+  docker: {
+    scripts: {
+      dev: './node_modules/.bin/cubejs-server dev-server',
+    },
+    files: {
+      'cube.js': () => cubeJs,
+      'docker-compose.yml': () => dockerCompose,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    }
+  },
+  express: {
+    scripts: {
+      dev: 'node index.js',
+    },
+    files: {
+      'index.js': () => indexJs,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    }
+  },
+  serverless: {
+    scripts: {
+      dev: './node_modules/.bin/cubejs-dev-server',
+    },
+    files: {
+      'cube.js': () => handlerJs,
+      'serverless.yml': serverlessYml,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    },
+    dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
+  },
+  'serverless-google': {
+    scripts: {
+      dev: './node_modules/.bin/cubejs-dev-server',
+    },
+    files: {
+      'index.js': () => handlerJs,
+      'serverless.yml': serverlessGoogleYml,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'schema/Orders.js': () => ordersJs
+    },
+    dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],
+    devDependencies: ['serverless-google-cloudfunctions']
   }
 };
 
-exports.serverless = {
-  files: {
-    'cube.js': () => handlerJs,
-    'serverless.yml': serverlessYml,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
-  },
-  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
-};
-
-exports['serverless-google'] = {
-  files: {
-    'index.js': () => handlerJs,
-    'serverless.yml': serverlessGoogleYml,
-    '.env': dotEnv,
-    '.gitignore': () => gitIgnore,
-    'schema/Orders.js': () => ordersJs
-  },
-  dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-google'],
-  devDependencies: ['serverless-google-cloudfunctions']
-};
+export default templates;
