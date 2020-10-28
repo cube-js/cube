@@ -1,4 +1,4 @@
-FROM node:12.19-alpine
+FROM node:12.19
 
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
 
