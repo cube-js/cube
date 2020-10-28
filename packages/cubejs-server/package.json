@@ -12,7 +12,7 @@
   "engines": {
     "node": ">=8.11.1"
   },
-  "main": "dist/index.js",
+  "main": "index.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist",

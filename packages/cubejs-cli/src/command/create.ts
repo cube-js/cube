@@ -13,22 +13,7 @@ const logStage = (stage) => {
 };
 
 const create = async (projectName, options) => {
-  if (!options.template) {
-    const prompt = await inquirer.prompt([{
-      type: 'list',
-      name: 'template',
-      message: 'Select template',
-      choices: [
-        'docker',
-        'express',
-        'serverless',
-        'serverless-google',
-      ]
-    }]);
-
-    options.template = prompt.template;
-  }
-
+  options.template = options.template || 'docker';
   const createAppOptions = { projectName, dbType: options.dbType, template: options.template };
 
   event('Create App', createAppOptions);
