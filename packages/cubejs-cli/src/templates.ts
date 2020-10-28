@@ -59,7 +59,7 @@ const serverlessYml = env => `service: ${env.projectName}
 
 provider:
   name: aws
-  runtime: nodejs12.19
+  runtime: nodejs12.x
   iamRoleStatements:
     - Effect: "Allow"
       Action:
