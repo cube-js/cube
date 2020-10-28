@@ -6,8 +6,11 @@
   >
 </div>
 
-<div style="min-height: 100%; width: 100%">
-  <gridster [options]="options" style="background-color: #dadada;">
+<div
+  *ngIf="(dashboardItems | async).length > 0"
+  style="min-height: 100%; width: 100%"
+>
+  <gridster [options]="options" style="background-color: #dadada">
     <gridster-item
       [item]="item.plain.grid"
       *ngFor="let item of dashboardItems | async"
@@ -17,8 +20,14 @@
         [chartType]="item.chartType"
         [pivotConfig]="item.pivotConfig"
       >
-        <div style="margin-right: 12px;">
-          <button mat-button mat-icon-button mat-raised-button [matMenuTriggerFor]="menu" color="primary">
+        <div style="margin-right: 12px">
+          <button
+            mat-button
+            mat-icon-button
+            mat-raised-button
+            [matMenuTriggerFor]="menu"
+            color="primary"
+          >
             <mat-icon>menu</mat-icon>
           </button>
           <mat-menu #menu="matMenu">

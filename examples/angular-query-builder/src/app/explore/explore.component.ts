@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { ResultSet } from '@cubejs-client/core';
@@ -17,7 +17,7 @@ import { AddToDashboardDialogComponent } from './add-to-dashboard-dialog/add-to-
   templateUrl: './explore.component.html',
   styleUrls: ['./explore.component.css'],
 })
-export class ExploreComponent implements OnInit {
+export class ExploreComponent implements OnInit, OnDestroy {
   itemId: number | null = null;
   query: Query;
   builderMeta: BuilderMeta;
@@ -81,6 +81,12 @@ export class ExploreComponent implements OnInit {
     this.query.subject.subscribe(() => {
       this.filterMembers = this.query.filters.asArray();
       this.timeDimensionMembers = this.query.timeDimensions.asArray();
+    });
+  }
+  
+  ngOnDestroy() {
+    this.queryBuilder.deserialize({
+      query: {}
     });
   }
 

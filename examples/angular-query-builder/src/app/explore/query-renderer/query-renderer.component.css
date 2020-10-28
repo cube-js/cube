@@ -1,6 +1,7 @@
 .chart-container {
   position: relative;
   height: calc(100% - 52px);
+  height: 500px;
 }
 
 .action-button-wrapper {
@@ -15,4 +16,5 @@
   bottom: 0;
   left: 0;
   right: 0;
+  overflow-y: scroll;
 } 

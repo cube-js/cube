@@ -7,7 +7,6 @@ import {
   DisplayGrid,
   Draggable,
   GridsterConfig,
-  GridsterItem,
   GridType,
   PushDirections,
   Resizable,
@@ -27,7 +26,6 @@ interface Safe extends GridsterConfig {
 export class DashboardComponent implements OnInit {
   dashboardItems = new BehaviorSubject<any[]>([]);
   options: Safe;
-  dashboard: Array<GridsterItem>;
 
   changedOptions(): void {
     if (this.options.api && this.options.api.optionsChanged) {
@@ -101,11 +99,6 @@ export class DashboardComponent implements OnInit {
       setGridSize: true
     };
 
-    this.dashboard = [
-      { id: 1, cols: 4, rows: 1, y: 0, x: 0 },
-      { id: 2, cols: 4, rows: 1, y: 0, x: 6 },
-    ];
-
     this.apollo
       .query({
         query: gql`
@@ -151,10 +144,6 @@ export class DashboardComponent implements OnInit {
     console.log(event)
   }
 
-  toggleChartType() {
-    this._chartType.next(this._chartType.value === 'line' ? 'table' : 'line');
-  }
-
   deleteItem(id: number) {
     this.apollo
       .mutate({
@@ -188,6 +177,4 @@ export class DashboardComponent implements OnInit {
       },
     });
   }
-
-  add() {}
 }

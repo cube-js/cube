@@ -6,6 +6,7 @@ const spawn = require('cross-spawn');
 const AppContainer = require('../dev/AppContainer');
 const DependencyTree = require('../dev/DependencyTree');
 const PackageFetcher = require('../dev/PackageFetcher');
+const DevPackageFetcher = require('../dev/DevPackageFetcher');
 
 const repo = {
   owner: 'cube-js',
@@ -185,7 +186,7 @@ class DevServer {
     app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Download Template Packages');
       
-      const fetcher = new PackageFetcher(repo);
+      const fetcher = process.env.TEST_TEMPLATES ? new DevPackageFetcher(repo) : new PackageFetcher(repo);
 
       this.cubejsServer.event('Dev Server App File Write');
       const { toApply, templateConfig } = req.body;
@@ -198,9 +199,6 @@ class DevServer {
         if (typeof toApply === 'string') {
           const template = manifestJson.templates.find(({ name }) => name === toApply);
           templatePackages = template.templatePackages;
-          
-          console.log('templatePackages', templatePackages)
-          
         } else {
           templatePackages = toApply;
         }
@@ -250,7 +248,7 @@ class DevServer {
     }));
     
     app.get('/playground/manifest', catchErrors(async (_, res) => {
-      const fetcher = new PackageFetcher(repo);
+      const fetcher = process.env.TEST_TEMPLATES ? new DevPackageFetcher(repo) : new PackageFetcher(repo);
       res.json(await fetcher.manifestJSON());
     }));
 

@@ -4,9 +4,6 @@ class SourceContainer {
   constructor(sourceFiles) {
     this.fileToTargetSource = {};
     this.fileContent = fromPairs(sourceFiles.map(({ fileName, content }) => [fileName, content]));
-    
-    console.log('........', this.fileContent['/app/dashboard/query-renderer/query-renderer.component.ts']);
-    
     this.importDependencies = {};
   }
 

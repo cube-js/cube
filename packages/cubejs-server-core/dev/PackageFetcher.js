@@ -10,23 +10,25 @@ class PackageFetcher {
     this.repo = repo;
     this.tmpFolderPath = path.resolve('.', 'node_modules', '.tmp');
 
-    // try {
-    //   fs.mkdirSync(this.tmpFolderPath);
-    // } catch (err) {
-    //   if (err.code === 'EEXIST') {
-    //     fs.removeSync(this.tmpFolderPath);
-    //     fs.mkdirSync(this.tmpFolderPath);
-    //   } else {
-    //     throw err;
-    //   }
-    // }
+    this.init();
 
     this.repoArchivePath = `${this.tmpFolderPath}/master.tar.gz`;
   }
+  
+  init() {
+    try {
+      fs.mkdirSync(this.tmpFolderPath);
+    } catch (err) {
+      if (err.code === 'EEXIST') {
+        fs.removeSync(this.tmpFolderPath);
+        fs.mkdirSync(this.tmpFolderPath);
+      } else {
+        throw err;
+      }
+    }
+  }
 
   async manifestJSON() {
-    return JSON.parse(fs.readFileSync(path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'manifest.json'), 'utf-8'));
-    // todo: uncomment
     const response = await proxyFetch(
       `https://api.github.com/repos/${this.repo.owner}/${this.repo.name}/contents/manifest.json`
     );
@@ -35,8 +37,6 @@ class PackageFetcher {
   }
 
   async downloadRepo() {
-    return;
-    // todo: uncomment
     const url = `https://github.com/${this.repo.owner}/${this.repo.name}/archive/master.tar.gz`;
     const writer = fs.createWriteStream(this.repoArchivePath);
 
@@ -49,12 +49,6 @@ class PackageFetcher {
   }
 
   async downloadPackages() {
-    console.log(path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'packages'));
-    
-    return {
-      packagesPath: path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'packages'),
-    };
-    // todo: uncomment
     await this.downloadRepo();
 
     await decompress(this.repoArchivePath, this.tmpFolderPath, {

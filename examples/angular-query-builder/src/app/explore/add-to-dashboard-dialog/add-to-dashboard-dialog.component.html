@@ -18,13 +18,10 @@
   </div>
 
   <div mat-dialog-actions class="action-buttons">
-    <button mat-raised-button mat-button (click)="onNoClick()">Cancel</button>
-    <button 
-      mat-raised-button
-      mat-button
-      cdkFocusInitial
-      color="primary"
-    >
+    <button mat-raised-button mat-button type="button" (click)="onNoClick()">
+      Cancel
+    </button>
+    <button mat-raised-button mat-button cdkFocusInitial color="primary">
       Ok
     </button>
   </div>
