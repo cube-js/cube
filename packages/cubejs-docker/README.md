@@ -4,20 +4,8 @@
 
 # Cube.js Official Docker Image
 
-Attention: We are working on Docker, and it's not ready for use. Please wait for the official announcement before using it.
-
-## How to build
-
-Release version
-
 ```sh
-docker build -t cubejs/cube:latest -f latest.Dockerfile .
-```
-
-Not released, development (from `cubejs-docker` directory)
-
-```sh
-docker build -t cubejs/cube:dev -f dev.Dockerfile ../../
+docker pull cubejs/cube:latest
 ```
 
 ### License
