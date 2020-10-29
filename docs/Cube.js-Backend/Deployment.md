@@ -352,7 +352,7 @@ Starting from the `v0.23` version, Cube.js provides the [official docker image](
 
 Inside the docker image, there are two base paths:
 
-- `/cube` - System directory, preinstalled cube.js with all drivers (excluding jdbc).
+- `/cube` - System directory, preinstalled cube.js with [all drivers](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/package.json).
 - `/cube/conf` - Direction for configuration file (`cube.js`) and schema files.
 
 ### Create a new app using Cube.js-CLI
@@ -408,7 +408,7 @@ $ docker-compose stop
 
 ## Extending Docker image
 
-If you need to use npm packages with native extensions inside `cube.js` configuration file, you need to build docker image. 
+If you need to use npm packages with native extensions inside `cube.js` configuration file, you need to build your own docker image. 
 
 ```bash
 $ touch Dockerfile
