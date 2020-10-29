@@ -1,4 +1,4 @@
-name: Publish
+name: Release
 
 on:
   push:
@@ -56,7 +56,7 @@ jobs:
 
   docker:
     needs: npm
-    name: Push Docker image for latest & release
+    name: Release docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

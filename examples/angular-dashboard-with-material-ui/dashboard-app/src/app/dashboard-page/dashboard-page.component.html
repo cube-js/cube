@@ -1,0 +1,46 @@
+<div class="grid-container">
+  <div class="kpi-wrap">
+    <mat-grid-list [cols]="cols" rowHeight="131px">
+      <mat-grid-tile *ngFor="let card of KPICards" [colspan]="1" [rowspan]="1">
+        <app-kpi-card class="kpi-card"
+                      [query]="card.query"
+                      [title]="card.title"
+                      [duration]="card.duration"
+                      [progress]="card.progress"
+                      [difference]="card.difference"
+        ></app-kpi-card>
+      </mat-grid-tile>
+    </mat-grid-list>
+  </div>
+  <div>
+    <mat-grid-list [cols]="chartCols" rowHeight="510px">
+      <mat-grid-tile *ngFor="let card of cards" [colspan]="card.cols" [rowspan]="card.rows">
+        <mat-card class="dashboard-card">
+          <mat-card-header class="dashboard-card__header">
+            <mat-card-title>
+              <h3>{{card.title}}</h3>
+              <div *ngIf="card.hasDatePick">
+                <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #menu="matMenu" xPosition="before">
+                  <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
+                  <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
+                  <button mat-menu-item  (click)="changeDateRange('This quarter')">This quarter</button>
+                  <button mat-menu-item  (click)="changeDateRange('Last quarter')">Last quarter</button>
+                </mat-menu>
+              </div>
+            </mat-card-title>
+          </mat-card-header>
+          <!--<hr>-->
+          <mat-card-content class="dashboard-card-content">
+            <div>
+              <app-bar-chart [query]="card.query" *ngIf="card.chart === 'bar'"></app-bar-chart>
+              <app-doughnut-chart [query]="card.query" *ngIf="card.chart === 'doughnut'"></app-doughnut-chart>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </mat-grid-tile>
+    </mat-grid-list>
+  </div>
+</div>

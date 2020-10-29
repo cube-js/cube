@@ -1,0 +1,44 @@
+<mat-grid-list [cols]="cols" rowHeight="131px">
+
+  <mat-grid-tile>
+    <mat-button-toggle-group class="table-filters"
+                             (change)="statusChangedFunc($event)">
+      <mat-button-toggle value="all">All</mat-button-toggle>
+      <mat-button-toggle value="shipped">Shipped</mat-button-toggle>
+      <mat-button-toggle value="processing">Processing</mat-button-toggle>
+      <mat-button-toggle value="completed">Completed</mat-button-toggle>
+    </mat-button-toggle-group>
+  </mat-grid-tile>
+
+  <mat-grid-tile>
+    <mat-form-field class="table-filters__date-form" color="primary" (change)="changeDate(0, $event)">
+      <mat-label>Start date</mat-label>
+      <input #ref matInput [matDatepicker]="picker1" (dateChange)="changeDate(0, ref.value)">
+      <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+      <mat-datepicker #picker1></mat-datepicker>
+    </mat-form-field>
+  </mat-grid-tile>
+
+  <mat-grid-tile>
+    <mat-form-field class="table-filters__date-form" color="primary" (change)="changeDate(1, $event)">
+      <mat-label>Finish date</mat-label>
+      <input #ref1 matInput [matDatepicker]="picker2" (dateChange)="changeDate(1, ref1.value)">
+      <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
+      <mat-datepicker #picker2></mat-datepicker>
+    </mat-form-field>
+  </mat-grid-tile>
+
+  <mat-grid-tile>
+    <div>
+      <mat-label class="price-label">Price range</mat-label>
+      <mat-slider
+        color="primary"
+        thumbLabel
+        (change)="sliderChange($event)"
+        [displayWith]="formatLabel"
+        tickInterval="10"
+        min="1"
+        max="1200"></mat-slider>
+    </div>
+  </mat-grid-tile>
+</mat-grid-list>

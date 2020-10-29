@@ -1,0 +1,10 @@
+<div class="table-warp">
+  <app-table-filters (statusChanged)="statusChanged($event)"
+                     (dateChange)="dateChanged($event)"
+                     (sliderChanged)="sliderChanged($event)"
+  ></app-table-filters>
+  <app-material-table [query]="query"
+                      [limit]="limit"
+                      (pageEvent)="changePage($event)"
+                      (sortingChanged)="sortingChanged($event)"></app-material-table>
+</div>
