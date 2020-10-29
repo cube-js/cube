@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 const fs = require('fs-extra');
 const path = require('path');
 
@@ -20,10 +22,6 @@ class DevPackageFetcher extends PackageFetcher {
     return {
       packagesPath: path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'packages'),
     };
-  }
-
-  cleanup() {
-    fs.removeSync(this.tmpFolderPath);
   }
 }
 

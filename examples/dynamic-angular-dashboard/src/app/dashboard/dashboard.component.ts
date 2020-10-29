@@ -26,6 +26,12 @@ interface Safe extends GridsterConfig {
 export class DashboardComponent implements OnInit {
   dashboardItems = new BehaviorSubject<any[]>([]);
   options: Safe;
+  
+  onLayoutChange = (event) => {
+    setTimeout(() => {
+      this.handleLayoutChange(event);
+    }, 0);
+  };
 
   changedOptions(): void {
     if (this.options.api && this.options.api.optionsChanged) {
@@ -47,8 +53,8 @@ export class DashboardComponent implements OnInit {
       outerMarginLeft: null,
       useTransformPositioning: true,
       mobileBreakpoint: 640,
-      minCols: 1,
-      maxCols: 100,
+      minCols: 12,
+      maxCols: 12,
       minRows: 1,
       maxRows: 100,
       maxItemCols: 100,
@@ -75,11 +81,11 @@ export class DashboardComponent implements OnInit {
       ignoreMarginInRow: false,
       draggable: {
         enabled: true,
-        stop: this.handleLayoutChange.bind(this)
+        stop: this.onLayoutChange,
       },
       resizable: {
         enabled: true,
-        stop: this.handleLayoutChange.bind(this)
+        stop: this.onLayoutChange,
       },
       swap: false,
       pushItems: true,
@@ -96,7 +102,7 @@ export class DashboardComponent implements OnInit {
       disableWindowResize: false,
       disableWarnings: false,
       scrollToNewItems: false,
-      setGridSize: true
+      setGridSize: true,
     };
 
     this.apollo
@@ -106,6 +112,7 @@ export class DashboardComponent implements OnInit {
             dashboardItems {
               id
               name
+              layout
               vizState
             }
           }
@@ -115,7 +122,10 @@ export class DashboardComponent implements OnInit {
       .subscribe((result: any) => {
         this.dashboardItems.next(
           (result?.data?.dashboardItems || []).map((item, index) => {
+            const layout =
+              item.layout?.length > 2 ? JSON.parse(item.layout) : null;
             const vizState = JSON.parse(item.vizState);
+
             return {
               id: item.id,
               name: item.name,
@@ -124,13 +134,13 @@ export class DashboardComponent implements OnInit {
               pivotConfig: of(vizState.pivotConfig || null),
               plain: {
                 ...vizState,
-                grid: {
-                  id: Number(item.id),
+                layout: layout || {
+                  id: item.id,
                   cols: 6,
-                  rows: 2,
+                  rows: 6,
                   y: index,
                   x: 0,
-                  minItemRows: 2
+                  minItemRows: 3,
                 },
               },
             };
@@ -138,10 +148,38 @@ export class DashboardComponent implements OnInit {
         );
       });
   }
-  
+
   handleLayoutChange(event) {
-    // todo
-    console.log(event)
+    const { id } = event;
+    const currentItem = this.dashboardItems.value.find((item) => item.id == id);
+
+    if (!currentItem) {
+      console.error(`Can't find the item with id: ${id}`);
+      return;
+    }
+
+    this.apollo
+      .mutate({
+        mutation: gql`
+          mutation updateDashboardItem(
+            $id: String!
+            $input: DashboardItemInput
+          ) {
+            updateDashboardItem(id: $id, input: $input) {
+              id
+              name
+              layout
+            }
+          }
+        `,
+        variables: {
+          id,
+          input: {
+            layout: JSON.stringify(event),
+          },
+        },
+      })
+      .subscribe(() => undefined);
   }
 
   deleteItem(id: number) {

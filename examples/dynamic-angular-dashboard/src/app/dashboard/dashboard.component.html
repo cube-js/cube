@@ -12,8 +12,8 @@
 >
   <gridster [options]="options" style="background-color: #dadada">
     <gridster-item
-      [item]="item.plain.grid"
       *ngFor="let item of dashboardItems | async"
+      [item]="item.plain.layout"
     >
       <query-renderer
         [cubeQuery]="item.cubeQuery"
