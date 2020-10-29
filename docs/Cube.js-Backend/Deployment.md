@@ -348,9 +348,9 @@ $ git push heroku master
 
 ## Docker
 
-Starting from `v0.23` version, Cube.js provides the [official docker image](https://hub.docker.com/r/cubejs/cube).
+Starting from the `v0.23` version, Cube.js provides the [official docker image](https://hub.docker.com/r/cubejs/cube).
 
-Inside image there are two base paths:
+Inside the docker image, there are two base paths:
 
 - `/cube` - System directory, preinstalled cube.js with all drivers (excluding jdbc).
 - `/cube/conf` - Direction for configuration file (`cube.js`) and schema files.
@@ -362,11 +362,11 @@ $ cubejs create cubejs-docker-demo -t docker -d postgres
 $ cd cubejs-docker-demo
 ```
 
-Directory will contain files:
+The directory will contain files:
 
-- `docker-compose.yml` - example for docker-compose usage.
-- `cube.js` - configuration file.
-- `.env` - env variables for local development.
+- `docker-compose.yml` - Example of docker-compose usage.
+- `cube.js` - Configuration file.
+- `.env` - Env variables file for local development.
 
 ### Create Dockerfile and .dockerignore files
 
