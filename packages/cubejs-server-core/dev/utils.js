@@ -26,11 +26,6 @@ async function fileContentsRecursive(dir, rootPath, includeNodeModules) {
         if (!stats.isDirectory()) {
           const content = fs.readFileSync(fileName, 'utf-8');
           
-          // if (fileName.includes('/query-renderer.component.ts')) {
-          //   console.log(`\n${fileName}\n`)
-          //   console.log(',,,,,\n', content, '\n,,,');
-          // }
-          
           return [
             {
               fileName: fileName.replace(rootPath, '').replace(/\\/g, '/'),
