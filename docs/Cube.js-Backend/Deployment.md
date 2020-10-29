@@ -54,7 +54,7 @@ If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE
 [[warning | Warning]]
 | Express is a legacy way and will be entirely replaced by Docker. We highly recommend you start using Cube.js as a microservice inside Docker.
 
-Cube.js server is an Express application itself and it can be served as part of an existing Express application.
+Cube.js server is an Express application itself, and it can be served as part of an existing Express application.
 
 [[warning | Note]]
 | It is suitable to host single node applications this way without any significant load anticipated. Please consider deploying Cube.js as a micro service if you need to host multiple Cube.js instances.
