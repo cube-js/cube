@@ -36,7 +36,6 @@ export const frameworks = [
   {
     id: 'angular',
     title: 'Angular',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
   },
   {
     id: 'vue',

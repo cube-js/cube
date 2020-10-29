@@ -22,6 +22,7 @@ export const libraryToTemplate = {
   recharts: { library: rechartsLibrary, title: 'Recharts' },
   bizcharts: { library: bizChartLibrary, title: 'Bizcharts' },
   d3: { library: d3ChartLibrary, title: 'D3' },
+  ng2: { library: null, title: 'ng2-charts' },
 };
 
 export const babelConfig = {
