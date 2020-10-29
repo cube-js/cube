@@ -227,5 +227,6 @@ export {
   movePivotItem,
   isQueryPresent,
   moveItemInArray,
-  defaultOrder
+  defaultOrder,
+  flattenFilters
 } from './utils';

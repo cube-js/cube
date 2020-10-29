@@ -200,3 +200,16 @@ export function moveItemInArray(list, sourceIndex, destinationIndex) {
 
   return result;
 }
+
+export function flattenFilters(filters = []) {
+  return filters.reduce((memo, filter) => {
+    if (filter.or || filter.and) {
+      return [
+        ...memo,
+        ...flattenFilters(filter.or || filter.and)
+      ];
+    }
+    
+    return [...memo, filter];
+  }, []);
+}
