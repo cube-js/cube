@@ -320,6 +320,20 @@ cube(`OrderFacts`, {
 It'll generate aliases for members such as `ofacts__count`.
 `sqlAlias` affects all member names including pre-aggregation table names.
 
+### rewriteQueries
+
+Set this flag to true if you want Cube.js to rewrite your queries after final SQL has been generated.
+This may be helpful to apply filter pushdown optimizations or reduce unnecessary query nesting.
+For example:
+
+```javascript
+cube(`Tickets`, {
+  rewriteQueries: true,
+  
+  // ...
+});
+```
+
 
 ## Context Variables
 
