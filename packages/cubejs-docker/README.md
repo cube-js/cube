@@ -4,8 +4,8 @@
 
 # Supported tags
 
-- `latest`
-- `dev`
+- [latest](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/latest.Dockerfile) - Latest stable release (recommended)
+- [dev](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/latest.Dockerfile) - Latest development release from master branch.
 
 # What is Cube.js?
 
