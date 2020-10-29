@@ -1,0 +1,46 @@
+[package]
+name = "cubestore"
+version = "0.1.0"
+authors = ["Cube Dev, Inc."]
+edition = "2018"
+license = "Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "0.2", features = ["full"] }
+warp = "0.2"
+sqlparser = "0.6.1"
+serde_derive = "1.0.115"
+serde = "1.0.115"
+parquet = { path = '../../arrow/rust/parquet' }
+arrow = { path = '../../arrow/rust/arrow', features = ["simd"] }
+arrow-flight = { path = '../../arrow/rust/arrow-flight' }
+datafusion = { path = "../../arrow/rust/datafusion" }
+csv = "1.1.3"
+bytes = "0.5.4"
+serde_json = "1.0.56"
+futures = "0.3.5"
+smallvec = "1.4.0"
+flexbuffers = "0.1.1"
+byteorder = "1.3.4"
+log = "0.4.11"
+simple_logger = "1.7.0"
+async-trait = "0.1.36"
+actix-rt = "1.1.1"
+regex = "1.3.9"
+rocksdb = { version = "0.15.0", default-features = false, features = ["bzip2"] }
+uuid = { version = "0.8", features = ["serde", "v4"] }
+num = "0.3.0"
+enum_primitive = "0.1.1"
+msql-srv = { git = 'https://github.com/cube-js/msql-srv' }
+bincode = "1.3.1"
+chrono = "0.4.15"
+lazy_static = "1.4.0"
+mockall = "0.8.1"
+async-std = "0.99"
+itertools = "0.9.0"
+bigdecimal = { version = "0.2.0", features = ["serde"] }
+rust-s3 = "0.26.3"
+aws-creds = "0.24.1"
+aws-region = "0.22.1"
