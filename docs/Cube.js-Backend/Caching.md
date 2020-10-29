@@ -80,7 +80,7 @@ For situations like real-time analytics or responding to live user changes to un
 For these situations, you can mostly disable the `refreshKey` cache by setting the [refreshKey every](cube#parameters-refresh-key) parameter to something very low, like `1 second`.
 This means Cube.js will always check the data freshness before executing a query, and notice any changed data underneath.
 
-### How can I disable the cache?
+### How to disable the cache?
 
 There's no straightforward way to disable caching in Cube.js.
 The reason for it is Cube.js is not just stores cached values but uses cache as a point of synchronization and coordination between nodes in a cluster.
