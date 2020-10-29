@@ -27,3 +27,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: cubejs/cube:dev
+      - name: Update repo description
+        uses: peter-evans/dockerhub-description@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          repository: cubejs/cube
+          readme-filepath: ./packages/cubejs-docker/README.md
