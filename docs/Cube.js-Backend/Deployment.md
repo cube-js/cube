@@ -51,6 +51,9 @@ If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE
 
 ## Express
 
+[[warning | Warning]]
+| Express is a legacy way and will be entirely replaced by Docker. We highly recommend you start using Cube.js as a microservice inside Docker.
+
 Cube.js server is an Express application itself and it can be served as part of an existing Express application.
 
 [[warning | Note]]
@@ -234,7 +237,7 @@ $ serverless logs -t -f cubejsProcess
 [Server core options](@cubejs-backend-server-core#options-reference) can be passed by instantiating appropriate `Handlers` class directly.
 For example:
 
-**cube.js:**
+**index.js:**
 
 ```javascript
 const AWSHandlers = require('@cubejs-backend/serverless-aws');
@@ -289,7 +292,7 @@ $ serverless logs -t -f cubejsProcess
 ### Create new app using Cube.js-CLI
 
 ```bash
-$ cubejs create cubejs-heroku-demo -d postgres
+$ cubejs create cubejs-heroku-demo -t express -d postgres
 $ cd cubejs-heroku-demo
 ```
 
