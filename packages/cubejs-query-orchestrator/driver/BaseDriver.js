@@ -16,6 +16,7 @@ const DbTypeToGenericType = {
   integer: 'int',
   'character varying': 'text',
   varchar: 'text',
+  nvarchar: 'text',
   text: 'text',
   string: 'text',
   boolean: 'boolean',
