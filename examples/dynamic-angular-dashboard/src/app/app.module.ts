@@ -10,6 +10,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTableModule } from '@angular/material/table';
+import { MatListModule } from '@angular/material/list';
+import { MatMenuModule } from '@angular/material/menu';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { DragDropModule } from '@angular/cdk/drag-drop';
@@ -18,19 +20,26 @@ import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { CubejsClientModule, QueryBuilderService } from '@cubejs-client/ngx';
 import { ChartsModule } from 'ng2-charts';
+import { HttpLink } from 'apollo-angular/http';
+import { APOLLO_OPTIONS } from 'apollo-angular';
+import { GridsterModule } from 'angular-gridster2';
 
 import { AppComponent } from './app.component';
-import { DashboardComponent } from './dashboard/dashboard.component';
-import { QueryRendererComponent } from './dashboard/query-renderer/query-renderer.component';
-import { MembersGroupComponent } from './dashboard/members-group/members-group.component';
-import { TimeGroupComponent } from './dashboard/time-group/time-group.component';
-import { OrderComponent } from './dashboard/order/order.component';
-import { PivotComponent } from './dashboard/pivot/pivot.component';
+import { ExploreComponent } from './explore/explore.component';
+import { MembersGroupComponent } from './explore/members-group/members-group.component';
+import { TimeGroupComponent } from './explore/time-group/time-group.component';
+import { OrderComponent } from './explore/order/order.component';
+import { PivotComponent } from './explore/pivot/pivot.component';
 import { SettingsDialogComponent } from './settings-dialog/settings-dialog.component';
 import {
   FilterGroupComponent,
   FilterComponent,
-} from './dashboard/filter-group/filter-group.component';
+} from './explore/filter-group/filter-group.component';
+import { AppRoutingModule } from './app-routing.module';
+import { DashboardComponent } from './dashboard/dashboard.component';
+import { AddToDashboardDialogComponent } from './explore/add-to-dashboard-dialog/add-to-dashboard-dialog.component';
+import { QueryRendererComponent } from './explore/query-renderer/query-renderer.component';
+import apolloClient from '../graphql/client';
 
 const cubejsOptions = {
   token: 'environment.CUBEJS_API_TOKEN',
@@ -42,6 +51,7 @@ const cubejsOptions = {
 @NgModule({
   declarations: [
     AppComponent,
+    ExploreComponent,
     DashboardComponent,
     QueryRendererComponent,
     MembersGroupComponent,
@@ -49,10 +59,11 @@ const cubejsOptions = {
     OrderComponent,
     PivotComponent,
     SettingsDialogComponent,
+    AddToDashboardDialogComponent,
     FilterGroupComponent,
-    FilterComponent,
+    FilterComponent
   ],
-  entryComponents: [SettingsDialogComponent],
+  entryComponents: [SettingsDialogComponent, AddToDashboardDialogComponent],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
@@ -72,9 +83,20 @@ const cubejsOptions = {
     MatCheckboxModule,
     MatDialogModule,
     MatSnackBarModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    MatListModule,
+    AppRoutingModule,
+    MatMenuModule,
+    GridsterModule
   ],
-  providers: [QueryBuilderService],
+  providers: [
+    QueryBuilderService,
+    {
+      provide: APOLLO_OPTIONS,
+      useFactory: () => apolloClient,
+      deps: [HttpLink],
+    },
+  ],
   bootstrap: [AppComponent],
 })
 export class AppModule {

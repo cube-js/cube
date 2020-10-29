@@ -1,0 +1,73 @@
+<ng-container *ngIf="isQueryPresent">
+  <mat-divider></mat-divider>
+
+  <div class="action-button-wrapper">
+    <ng-content></ng-content>
+  </div>
+
+  <div *ngIf="chartType !== 'table'" class="chart-container">
+    <canvas
+      *ngIf="chartType === 'line'"
+      baseChart
+      legend="true"
+      chartType="line"
+      [datasets]="chartData"
+      [labels]="chartLabels"
+      [options]="noFillChartOptions"
+    >
+    </canvas>
+
+    <canvas
+      *ngIf="chartType === 'area'"
+      baseChart
+      legend="true"
+      chartType="line"
+      [datasets]="chartData"
+      [labels]="chartLabels"
+      [options]="chartOptions"
+    >
+    </canvas>
+
+    <canvas
+      *ngIf="chartType === 'bar'"
+      baseChart
+      legend="true"
+      chartType="bar"
+      [datasets]="chartData"
+      [labels]="chartLabels"
+      [options]="chartOptions"
+    >
+    </canvas>
+
+    <canvas
+      *ngIf="chartType === 'pie'"
+      baseChart
+      legend="true"
+      chartType="pie"
+      [datasets]="chartData"
+      [labels]="chartLabels"
+      [options]="chartOptions"
+    >
+    </canvas>
+  </div>
+
+  <table
+    *ngIf="chartType === 'table'"
+    mat-table
+    [dataSource]="tableData"
+    style="width: 100%"
+  >
+    <ng-container
+      *ngFor="let column of displayedColumns; let index = index"
+      [matColumnDef]="column"
+    >
+      <th mat-header-cell *matHeaderCellDef>
+        {{ columnTitles[index] }}
+      </th>
+      <td mat-cell *matCellDef="let element">{{ element[column] }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+</ng-container>

@@ -165,6 +165,7 @@ const CreateOwnModal = ({
             }
           />
         )}
+        
         <StyledFormItem label="Main Template">
           <Dropdown
             overlay={templatePackagesMenu}
@@ -176,6 +177,7 @@ const CreateOwnModal = ({
             </Button>
           </Dropdown>
         </StyledFormItem>
+        
         <StyledFormItem label="Charting Library">
           <Dropdown
             overlay={chartLibrariesMenu}
@@ -187,8 +189,10 @@ const CreateOwnModal = ({
             </Button>
           </Dropdown>
         </StyledFormItem>
+        
         <StyledFormItem label="Web Socket Transport (Real-time)">
           <Switch
+            disabled={framework.toLowerCase() === 'angular'}
             checked={enableWebSocketTransport}
             onChange={(checked) =>
               onChange('enableWebSocketTransport', checked)

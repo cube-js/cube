@@ -1,5 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute } from '@angular/router';
 import { ResultSet } from '@cubejs-client/core';
 import {
   BuilderMeta,
@@ -9,13 +10,15 @@ import {
 } from '@cubejs-client/ngx';
 
 import { SettingsDialogComponent } from '../settings-dialog/settings-dialog.component';
+import { AddToDashboardDialogComponent } from './add-to-dashboard-dialog/add-to-dashboard-dialog.component';
 
 @Component({
-  selector: 'app-dashboard',
-  templateUrl: './dashboard.component.html',
-  styleUrls: ['./dashboard.component.css'],
+  selector: 'app-explore',
+  templateUrl: './explore.component.html',
+  styleUrls: ['./explore.component.css'],
 })
-export class DashboardComponent implements OnInit {
+export class ExploreComponent implements OnInit, OnDestroy {
+  itemId: number | null = null;
   query: Query;
   builderMeta: BuilderMeta;
   resultSet: ResultSet;
@@ -48,7 +51,8 @@ export class DashboardComponent implements OnInit {
   constructor(
     public cubejsClient: CubejsClient,
     public queryBuilder: QueryBuilderService,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private route: ActivatedRoute
   ) {
     queryBuilder.setCubejsClient(cubejsClient);
     this.chartTypeMap = this.chartTypeToIcon.reduce(
@@ -61,9 +65,28 @@ export class DashboardComponent implements OnInit {
     this.builderMeta = await this.queryBuilder.builderMeta;
     this.query = await this.queryBuilder.query;
 
+    this.route.queryParams.subscribe((params) => {
+      this.itemId = params.id;
+      
+      if (params.query) {
+        this.queryBuilder.deserialize({
+          query: params.query && JSON.parse(params.query),
+          pivotConfig:
+            (params.pivotConfig && JSON.parse(params.pivotConfig)) || null,
+          chartType: params.chartType,
+        });
+      }
+    });
+
     this.query.subject.subscribe(() => {
       this.filterMembers = this.query.filters.asArray();
       this.timeDimensionMembers = this.query.timeDimensions.asArray();
+    });
+  }
+  
+  ngOnDestroy() {
+    this.queryBuilder.deserialize({
+      query: {}
     });
   }
 
@@ -73,6 +96,22 @@ export class DashboardComponent implements OnInit {
       data: {
         pivotConfig: this.queryBuilder.pivotConfig,
         query: this.query,
+      },
+    });
+
+    dialogRef.updatePosition({
+      top: '10%',
+    });
+  }
+
+  openAddToDashboardDialog() {
+    const dialogRef = this.dialog.open(AddToDashboardDialogComponent, {
+      width: '500px',
+      data: {
+        itemId: this.itemId,
+        cubeQuery: this.query.get(),
+        pivotConfig: this.queryBuilder.pivotConfig.get(),
+        chartType: this.queryBuilder.chartType.get(),
       },
     });
 

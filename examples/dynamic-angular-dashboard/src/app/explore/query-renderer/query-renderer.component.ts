@@ -1,20 +1,19 @@
 import { Component, Input, OnInit } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   isQueryPresent,
   PivotConfig as TPivotConfig,
+  Query,
   ResultSet,
 } from '@cubejs-client/core';
-import {
-  CubejsClient,
-  QueryBuilderService,
-  TChartType,
-} from '@cubejs-client/ngx';
+import { CubejsClient, TChartType } from '@cubejs-client/ngx';
 import { ChartDataSets, ChartOptions } from 'chart.js';
 import { Label } from 'ng2-charts';
-import { combineLatest, of } from 'rxjs';
-import { catchError, debounceTime, switchMap } from 'rxjs/operators';
+import { of, Observable, combineLatest } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 
+import { AddToDashboardDialogComponent } from '../add-to-dashboard-dialog/add-to-dashboard-dialog.component';
 import { flattenColumns, getDisplayedColumns } from './utils';
 
 @Component({
@@ -23,8 +22,7 @@ import { flattenColumns, getDisplayedColumns } from './utils';
   styleUrls: ['./query-renderer.component.css'],
 })
 export class QueryRendererComponent implements OnInit {
-  resultSet: ResultSet;
-  chartType: TChartType = 'line';
+  data: any = {};
   isQueryPresent: boolean;
   displayedColumns: string[] = [];
   tableData: any[] = [];
@@ -33,9 +31,11 @@ export class QueryRendererComponent implements OnInit {
   chartLabels: Label[] = [];
   chartOptions: ChartOptions = {
     responsive: true,
+    maintainAspectRatio: false
   };
   noFillChartOptions: ChartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     elements: {
       line: {
         fill: false,
@@ -46,23 +46,31 @@ export class QueryRendererComponent implements OnInit {
   @Input()
   resetResultSetOnChange: boolean = false;
 
-  @Input()
-  queryBuilder: QueryBuilderService;
+  @Input('cubeQuery')
+  cubeQuery$: Observable<Query>;
+
+  @Input('pivotConfig')
+  pivotConfig$: Observable<TPivotConfig>;
+
+  @Input('chartType')
+  chartType$: Observable<TChartType>;
+
+  chartType: TChartType;
 
   constructor(
     private cubejsClient: CubejsClient,
-    private snakBar: MatSnackBar
+    private snakBar: MatSnackBar,
+    private dialog: MatDialog
   ) {}
 
-  async ngOnInit() {
-    const query = await this.queryBuilder.query;
-
+  ngOnInit() {
     combineLatest([
-      query.subject.pipe(
+      this.cubeQuery$.pipe(
         switchMap((cubeQuery) => {
-          if (!isQueryPresent(cubeQuery)) {
+          if (!isQueryPresent(cubeQuery || {})) {
             return of(null);
           }
+          this.data.cubeQuery = cubeQuery;
           return this.cubejsClient.load(cubeQuery).pipe(
             catchError((error) => {
               this.snakBar.open(error.message || 'Request error', null, {
@@ -73,24 +81,21 @@ export class QueryRendererComponent implements OnInit {
           );
         })
       ),
-      this.queryBuilder.pivotConfig.subject,
-      this.queryBuilder.chartType.subject,
-    ])
-      .pipe(debounceTime(300))
-      .subscribe(
-        ([resultSet, pivotConfig, chartType]: [
-          ResultSet,
-          TPivotConfig,
-          TChartType
-        ]) => {
-          this.chartType = chartType;
-          if (resultSet != null || this.resetResultSetOnChange) {
-            this.resultSet = resultSet;
-          }
-          this.isQueryPresent = resultSet != null;
-          this.updateChart(resultSet, pivotConfig);
-        }
-      );
+      this.pivotConfig$,
+      this.chartType$,
+    ]).subscribe(
+      ([resultSet, pivotConfig, chartType]: [
+        ResultSet,
+        TPivotConfig,
+        TChartType
+      ]) => {
+        this.chartType = chartType;
+        this.data.chartType = chartType;
+        this.data.pivotConfig = pivotConfig;
+        this.isQueryPresent = resultSet != null;
+        this.updateChart(resultSet, pivotConfig);
+      }
+    );
   }
 
   updateChart(resultSet: ResultSet | null, pivotConfig: TPivotConfig) {
@@ -98,7 +103,7 @@ export class QueryRendererComponent implements OnInit {
       return;
     }
 
-    if (this.queryBuilder.chartType.get() === 'table') {
+    if (this.chartType === 'table') {
       this.tableData = resultSet.tablePivot(pivotConfig);
       this.displayedColumns = getDisplayedColumns(
         resultSet.tableColumns(pivotConfig)
@@ -114,5 +119,16 @@ export class QueryRendererComponent implements OnInit {
       });
       this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);
     }
+  }
+
+  openDialog(): void {
+    const dialogRef = this.dialog.open(AddToDashboardDialogComponent, {
+      width: '500px',
+      data: this.data
+    });
+
+    dialogRef.updatePosition({
+      top: '10%',
+    });
   }
 }

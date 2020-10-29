@@ -1,4 +1,4 @@
-<div *ngIf="query">
+<div *ngIf="query" class="explore-container">
   <div class="controls-container">
     <div class="controls-row no-padding-controls">
       <members-group
@@ -6,7 +6,9 @@
         [members]="query.measures.asArray()"
         [allMembers]="builderMeta.measures.slice()"
         (onSelect)="query.measures.add($event)"
-        (onReplace)="query.measures.replace($event.name, $event.replaceWithName)"
+        (onReplace)="
+          query.measures.replace($event.name, $event.replaceWithName)
+        "
         (onMemberClick)="query.measures.remove($event)"
       ></members-group>
 
@@ -17,7 +19,9 @@
         [members]="query.dimensions.asArray()"
         [allMembers]="builderMeta.dimensions.slice()"
         (onSelect)="query.dimensions.add($event)"
-        (onReplace)="query.dimensions.replace($event.name, $event.replaceWithName)"
+        (onReplace)="
+          query.dimensions.replace($event.name, $event.replaceWithName)
+        "
         (onMemberClick)="query.dimensions.remove($event)"
       ></members-group>
 
@@ -28,7 +32,9 @@
         [members]="query.segments.asArray()"
         [allMembers]="builderMeta.segments.slice()"
         (onSelect)="query.segments.add($event)"
-        (onReplace)="query.dimensions.replace($event.name, $event.replaceWithName)"
+        (onReplace)="
+          query.dimensions.replace($event.name, $event.replaceWithName)
+        "
         (onMemberClick)="query.segments.remove($event)"
       ></members-group>
 
@@ -49,7 +55,7 @@
 
     <div class="controls-row no-padding-controls">
       <mat-form-field appearance="fill">
-        <mat-icon matPrefix style="margin-right: 8px;">{{
+        <mat-icon matPrefix style="margin-right: 8px">{{
           chartTypeMap[queryBuilder.chartType.get()] || 'multiline_chart'
         }}</mat-icon>
 
@@ -87,5 +93,29 @@
     </div>
   </div>
 
-  <query-renderer [queryBuilder]="queryBuilder"></query-renderer>
+  <div
+    style="
+      margin-top: 24px;
+      margin-bottom: 24px;
+      flex-grow: 1;
+      position: relative;
+    "
+  >
+    <query-renderer
+      [cubeQuery]="query.subject"
+      [pivotConfig]="queryBuilder.pivotConfig.subject"
+      [chartType]="queryBuilder.chartType.subject"
+      style="display: block"
+    >
+      <button
+        class="add-button"
+        mat-raised-button
+        color="primary"
+        (click)="openAddToDashboardDialog()"
+      >
+        <ng-container *ngIf="!itemId">Add to Dashboard</ng-container>
+        <ng-container *ngIf="itemId">Update</ng-container>
+      </button>
+    </query-renderer>
+  </div>
 </div>

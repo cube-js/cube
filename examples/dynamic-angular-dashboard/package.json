@@ -11,6 +11,7 @@
   },
   "private": true,
   "dependencies": {
+    "-": "^0.0.1",
     "@angular/animations": "~10.1.0",
     "@angular/cdk": "^10.2.1",
     "@angular/common": "~10.1.0",
@@ -21,13 +22,23 @@
     "@angular/platform-browser": "~10.1.0",
     "@angular/platform-browser-dynamic": "~10.1.0",
     "@angular/router": "~10.1.0",
+    "@apollo/client": "^3.2.5",
     "@cubejs-client/core": "^0.20.3",
-    "@cubejs-client/ngx": "^0.20.3",
+    "@cubejs-client/ngx": "^0.22.0",
+    "angular-gridster2": "^10.1.7",
+    "apollo-angular": "^2.0.4",
+    "apollo-angular-link-http": "^1.11.0",
+    "apollo-cache-inmemory": "^1.6.6",
+    "apollo-client": "^2.6.10",
+    "apollo-link-schema": "^1.2.5",
     "chart.js": "^2.9.3",
+    "graphql": "^15.3.0",
+    "graphql-tag": "^2.11.0",
+    "graphql-tools": "^5.0.0",
     "ng2-charts": "^2.4.0",
     "rxjs": "~6.6.0",
     "tslib": "^2.0.0",
-    "zone.js": "~0.10.2"
+    "zone.js": "~0.10.3"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "~0.1001.0",

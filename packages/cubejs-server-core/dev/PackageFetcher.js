@@ -10,6 +10,12 @@ class PackageFetcher {
     this.repo = repo;
     this.tmpFolderPath = path.resolve('.', 'node_modules', '.tmp');
 
+    this.init();
+
+    this.repoArchivePath = `${this.tmpFolderPath}/master.tar.gz`;
+  }
+  
+  init() {
     try {
       // Folder node_modules does not exist by default inside docker in /cube/conf without sharing volume for it
       fs.mkdirpSync(this.tmpFolderPath);
@@ -21,8 +27,6 @@ class PackageFetcher {
         throw err;
       }
     }
-
-    this.repoArchivePath = `${this.tmpFolderPath}/master.tar.gz`;
   }
 
   async manifestJSON() {

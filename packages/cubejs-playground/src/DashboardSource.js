@@ -51,16 +51,24 @@ class DashboardSource {
     };
   }
 
-  get templatePackages() {
+  templatePackages(framework = 'react') {
     // TODO load
-    return [
-      { name: 'react-antd-dynamic', description: 'React Antd Dynamic' },
-      { name: 'react-antd-static', description: 'React Antd Static' },
-      {
-        name: 'react-material-static',
-        description: 'React Material UI Static',
-      },
-    ];
+    if (framework.toLowerCase() === 'react') {
+      return [
+        { name: 'react-antd-dynamic', description: 'React Antd Dynamic' },
+        { name: 'react-antd-static', description: 'React Antd Static' },
+        {
+          name: 'react-material-static',
+          description: 'React Material UI Static',
+        },
+      ];
+    } else if (framework.toLowerCase() === 'angular')  {
+      return [
+        { name: 'ng-material-dynamic', description: 'Angular Material UI Dynamic' },
+      ];
+    }
+    
+    return [];
   }
 
   async canAddChart() {
