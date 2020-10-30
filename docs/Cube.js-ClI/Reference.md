@@ -47,7 +47,7 @@ $ cubejs create demo-app -d athena -t serverless
 [[warning | Note]]
 | To define configuration you should use `cube.js` configuration file. See [available options](https://cube.dev/docs/@cubejs-backend-server-core#options-reference).
 
-`dev-server` command start Cube.js in development mode. To define configuration you should use `cube.js` configuration file.
+Command `dev-server` starts Cube.js in development mode. To define configuration you should use `cube.js` configuration file.
 
 ### Usage
 
@@ -68,7 +68,7 @@ $ cubejs dev-server --debug
 [[warning | Note]]
 | To define configuration you should use `cube.js` configuration file. See [available options](https://cube.dev/docs/@cubejs-backend-server-core#options-reference).
 
-`server` command start Cube.js in production mode.
+Command `server` starts Cube.js in production mode.
 
 Default start:
 
@@ -90,7 +90,7 @@ $ cubejs server
 
 ## generate
 
-`generate` command helps to build data schema for existing database tables.
+Command `generate` helps to build data schema for existing database tables.
 You can only run `generate` from the Cube.js app directory.
 This command could not be used without an active [Database connection](/connecting-to-the-database).
 
@@ -116,7 +116,7 @@ $ cubejs generate -t orders,customers
 
 ## token
 
-`token` command generates a JWT Cube.js token. It either uses the value of the `CUBEJS_API_SECRET` environment variable or provided value with `-s` flag.
+Command `token` generates a JWT Cube.js token. It either uses the value of the `CUBEJS_API_SECRET` environment variable or provided value with `-s` flag.
 You can only run `token` command from the Cube.js app directory.
 
 _Use these manually generated tokens in production with caution._ <br> _Please refer to the [Security Guide](https://cube.dev/docs/security) for production security best practices._
