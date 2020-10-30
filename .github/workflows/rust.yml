@@ -31,7 +31,7 @@ jobs:
           components: rustfmt
       - name: Run cargo test
         uses: actions-rs/cargo@v1
-        working-directory: rust
         with:
           command: test
+          args: --manifest-path rust/Cargo.toml
 
