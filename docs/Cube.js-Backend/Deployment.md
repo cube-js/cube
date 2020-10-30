@@ -52,7 +52,7 @@ If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE
 ## Express
 
 [[warning | Warning]]
-| Express is a legacy way and will be entirely replaced by Docker. We highly recommend you start using Cube.js as a microservice inside Docker.
+| Express is a legacy way and will be entirely replaced by Docker. We highly recommend you to use Cube.js as a microservice inside Docker.
 
 Cube.js server is an Express application itself, and it can be served as part of an existing Express application.
 
@@ -355,8 +355,8 @@ Starting from the `v0.23` version, Cube.js provides the [official docker image](
 
 Inside the docker image, there are two base paths:
 
-- `/cube` - System directory, preinstalled cube.js with [all drivers](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/package.json).
-- `/cube/conf` - Direction for configuration file (`cube.js`) and schema files.
+- `/cube` - System directory, preinstalled Cube.js with [all drivers](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/package.json).
+- `/cube/conf` - Directory for configuration file (`cube.js`) and schema files.
 
 ### Create a new app using Cube.js-CLI
 
