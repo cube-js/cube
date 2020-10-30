@@ -113,7 +113,7 @@ class BaseQuery {
         throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
       }
 
-      if (!f.dimension && !f.member) {
+      if (!f.member && !f.dimension) {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       }
 
