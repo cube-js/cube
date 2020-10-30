@@ -29,9 +29,9 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt
-      - name: Run cargo check
+      - name: Run cargo test
         uses: actions-rs/cargo@v1
+        working-directory: rust
         with:
           command: test
-          path: rust
 
