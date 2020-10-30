@@ -6,30 +6,34 @@ FROM rust:1.47-buster as builder
 # /build/arrow/rust/arrow/src/lib.rs:127:1
 # #![feature(specialization)]
 RUN rustup update && \
-    rustup default nightly && \
-    rustup component add rustfmt
+    rustup default nightly-2020-10-25 && \
+    rustup component add --toolchain nightly-2020-10-25 rustfmt
 
 RUN apt update && apt upgrade -y && apt install -y git llvm-dev libclang-dev clang
 
 WORKDIR /usr/src
 
-WORKDIR /build
-RUN git clone -b cubestore https://github.com/cube-js/arrow.git
-
 WORKDIR /build/cubestore
 COPY Cargo.toml .
-COPY crates/cubestore/Cargo.toml crates/cubestore/Cargo.toml
-RUN mkdir -p crates/cubestore/src/bin && \
-    echo "fn main() {print!(\"Dummy main\");} // dummy file" > crates/cubestore/src/bin/cubestored.rs
+COPY Cargo.lock .
+COPY cubestore/Cargo.toml cubestore/Cargo.toml
+RUN mkdir -p cubestore/src/bin && \
+    echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
 RUN cargo build --release
 
-COPY . .
+COPY cubestore .
 RUN cargo build --release
-RUN cargo install --path crates/cubestore
 
 FROM debian:buster-slim
 
 WORKDIR /cube
-COPY --from=builder /usr/local/cargo/bin/cubestored .
+
+RUN set -ex; \
+	apt-get update; \
+	apt-get install -y libssl1.1
+
+COPY --from=builder /build/cubestore/target/release/cubestored .
+
+EXPOSE 3306
 
 CMD ["./cubestored"]

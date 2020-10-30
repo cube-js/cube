@@ -26,7 +26,7 @@ async fn main() {
     services.start_processing_loops().await.unwrap();
 
     let (r1, r2, r3) = join3(
-        MySqlServer::listen("127.0.0.1:3306".to_string(), services.sql_service.clone()),
+        MySqlServer::listen("0.0.0.0:3306".to_string(), services.sql_service.clone()),
         services.scheduler.write().await.run_scheduler(),
         services.listener.run_listener()
     ).await;
