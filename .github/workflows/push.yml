@@ -1,6 +1,26 @@
 name: Build
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - '.github/workflows/push.yml'
+      - '.github/workflows/master.yml'
+      - 'packages/**'
+      - '.eslintrc.js'
+      - '.prettierrc'
+      - 'package.json'
+      - 'rollup.config.js'
+      - 'yarn.lock'
+  pull_request:
+    paths:
+      - '.github/workflows/push.yml'
+      - '.github/workflows/master.yml'
+      - 'packages/**'
+      - '.eslintrc.js'
+      - '.prettierrc'
+      - 'package.json'
+      - 'rollup.config.js'
+      - 'yarn.lock'
 
 jobs:
   unit:
