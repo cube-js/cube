@@ -2,7 +2,7 @@ name: Rust Master
 on:
   push:
     paths:
-      - '.github/workflows/rust.yml'
+      - '.github/workflows/rust-master.yml'
       - 'rust/**'
     branches:
       - master
