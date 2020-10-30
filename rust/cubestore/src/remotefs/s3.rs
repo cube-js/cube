@@ -78,7 +78,6 @@ impl RemoteFs for S3RemoteFs {
             Ok(RemoteFile {
                 remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
                 updated: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc),
-                created: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc), // TODO
             })
         })).collect::<Result<Vec<_>, _>>()?;
         Ok(result)

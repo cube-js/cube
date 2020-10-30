@@ -12,17 +12,12 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
     remote_path: String,
-    created: DateTime<Utc>,
     updated: DateTime<Utc>
 }
 
 impl RemoteFile {
     pub fn remote_path(&self) -> &str {
         self.remote_path.as_str()
-    }
-
-    pub fn created(&self) -> &DateTime<Utc> {
-        &self.created
     }
 
     pub fn updated(&self) -> &DateTime<Utc> {
@@ -168,7 +163,6 @@ impl LocalDirRemoteFs {
                 if relative_name.starts_with(&remote_prefix) {
                     result.push(RemoteFile {
                         remote_path: relative_name.to_string(),
-                        created: DateTime::from(file.metadata().await?.created()?),
                         updated: DateTime::from(file.metadata().await?.modified()?)
                     });
                 }
