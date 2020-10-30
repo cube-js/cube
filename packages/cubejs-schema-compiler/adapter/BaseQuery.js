@@ -60,7 +60,7 @@ class BaseQuery {
         allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.and));
       } else if (f.or) {
         allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
-      } else if (!f.dimension && !f.member) {
+      } else if (!f.member && !f.dimension) {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       } else if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
         allFilters.push({ measure: f.member || f.dimension });
@@ -113,7 +113,7 @@ class BaseQuery {
         throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
       }
 
-      if (!f.dimension && !f.member) {
+      if (!f.member && !f.dimension) {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       }
 
