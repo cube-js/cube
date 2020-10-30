@@ -1,0 +1,37 @@
+name: Rust
+
+on:
+  push:
+    paths:
+      - '.github/workflows/rust.yml'
+      - 'rust/**'
+  pull_request:
+    paths:
+      - '.github/workflows/rust.yml'
+      - 'rust/**'
+
+jobs:
+  debian:
+    name: Debian Rust ${{ matrix.rust }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [nightly-2020-10-25]
+    env:
+      RUST: ${{ matrix.rust }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          path: rust
+
