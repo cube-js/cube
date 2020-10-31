@@ -93,7 +93,7 @@ const cubejsApi = cubejs(() => {
 });
 ```
 
-You should then store this token in local storage or in a cookie, so that you can then use it to query the cube.js API.
+You can optionally store this token in local storage or in a cookie, so that you can then use it to query the cube.js API.
 
 ## Security Context
 
