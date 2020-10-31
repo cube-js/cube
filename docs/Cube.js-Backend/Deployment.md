@@ -351,9 +351,9 @@ $ git push heroku master
 
 ## Docker
 
-Starting from the `v0.23` version, Cube.js provides the [official docker image](https://hub.docker.com/r/cubejs/cube).
+Starting from the `v0.23` version, Cube.js provides the [official Docker image](https://hub.docker.com/r/cubejs/cube).
 
-Inside the docker image, there are two base paths:
+Inside the Docker image, there are two base paths:
 
 - `/cube` - System directory, preinstalled Cube.js with [all drivers](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/package.json).
 - `/cube/conf` - Directory for configuration file (`cube.js`) and schema files.
@@ -373,7 +373,7 @@ The directory will contain files:
 
 ### Run Docker image
 
-To test just built docker image, you need to set environment variables required by Cube.js Backend.
+To test just built Docker image, you need to set environment variables required by Cube.js Backend.
 Generate a secret for JWT Tokens as described in [Security](/security) section and fill in database credentials.
 
 ```bash
