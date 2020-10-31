@@ -424,7 +424,7 @@ jobs:
     name: Build only :latest image
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: !contains(needs['docker-image-latest-set-tag'].outputs.tag, 'v')
+#    if: !contains(needs['docker-image-latest-set-tag'].outputs.tag, 'v')
 
     steps:
       - name: Checkout
