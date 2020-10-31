@@ -407,11 +407,24 @@ jobs:
           TEST_ZOOKEEPER_VERSION: 3.5
           TEST_DRUID_VERSION: 0.19.0
 
+  docker-image-latest-set-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.get-tag.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - id: get-tag
+        run: echo "::set-output name=tag::$(git tag --contains $GITHUB_SHA)"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
   docker-image-latest:
+    needs: docker-image-latest-set-tag
     name: Build only :latest image
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: (github.event_name == 'push' || github.event_name == 'pull_request') && !contains(github.ref, 'refs/tags/')
+    if: !contains(needs.docker-image-latest-set-tag.outputs.tag, 'v')
 
     steps:
       - name: Checkout
