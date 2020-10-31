@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
-  "version": "0.23.2",
+  "version": "0.23.3",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@cubejs-backend/linter": "^0.23.0",
-    "@cubejs-backend/server-core": "^0.23.2",
+    "@cubejs-backend/server-core": "^0.23.3",
     "@oclif/command": "^1.8.0",
     "@oclif/errors": "^1.3.3",
     "@oclif/plugin-help": "^3.2.0",

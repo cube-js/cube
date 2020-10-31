@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.23.0",
+  "version": "0.23.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
