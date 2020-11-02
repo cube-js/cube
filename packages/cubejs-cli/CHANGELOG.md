@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.4](https://github.com/cube-js/cube.js/compare/v0.23.3...v0.23.4) (2020-11-02)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** Deploy and Windows-style paths ([#1277](https://github.com/cube-js/cube.js/issues/1277)) ([aa02f01](https://github.com/cube-js/cube.js/commit/aa02f0183008d6b49941d53321a68c59b999254d))
+
+
+
+
+
 ## [0.23.3](https://github.com/cube-js/cube.js/compare/v0.23.2...v0.23.3) (2020-10-31)
 
 
