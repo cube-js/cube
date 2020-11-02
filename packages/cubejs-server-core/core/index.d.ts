@@ -1,8 +1,4 @@
-import {
-  Request as ExpressRequest,
-  Response as ExpressResponse,
-  NextFunction as ExpressNextFunction
-} from "express";
+import { Request as ExpressRequest } from "express";
 import { NormalizedQuery as Query } from "@cubejs-backend/api-gateway";
 
 export type CubejsServerCore = any;
@@ -24,11 +20,7 @@ export interface CreateOptions {
   contextToAppId?: (context: RequestContext) => string;
   contextToDataSourceId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
-  checkAuthMiddleware?: (
-    req: ExpressRequest,
-    res: ExpressResponse,
-    next: ExpressNextFunction
-  ) => void;
+  checkAuth?: (req: ExpressRequest, auth?: string) => Promise<void>;
   queryTransformer?: (query: Query, context: RequestContext) => Query;
   preAggregationsSchema?: String | ((context: RequestContext) => string);
   schemaVersion?: (context: RequestContext) => string;
