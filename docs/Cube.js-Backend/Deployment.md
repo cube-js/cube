@@ -8,9 +8,8 @@ menuOrder: 4
 Below you can find guides for popular deployment environments:
 
 - [Docker](#docker)
-- [Extending Docker image](#extending-docker-image)
+- [Serverless](#serverless)
 - [As a part of Express application](#express)
-- [AWS Lambda with Serverless Framework](#serverless)
 - [Heroku](#heroku)
 
 ## Production Mode
@@ -109,7 +108,7 @@ $ docker-compose up
 $ docker-compose stop
 ```
 
-## Extending Docker image
+#### Extending Docker image
 
 If you need to use npm packages with native extensions inside `cube.js` configuration file, you need to build your own docker image.
 
@@ -154,121 +153,6 @@ $ docker run --rm \
   <YOUR-USERNAME>/cubejs-docker-demo
 ```
 
-## Express
-
-[[warning | Warning]]
-| Express is a legacy way and will be entirely replaced by Docker. We highly recommend you to use Cube.js as a microservice inside Docker.
-
-Cube.js server is an Express application itself, and it can be served as part of an existing Express application.
-
-[[warning | Note]]
-| It is suitable to host single node applications this way without any significant load anticipated. Please consider deploying Cube.js as a micro service if you need to host multiple Cube.js instances.
-
-Minimal setup for such serving looks as following:
-
-**index.js**
-```javascript
-require('dotenv').config();
-const express = require('express');
-const bodyParser = require('body-parser');
-const CubejsServerCore = require('@cubejs-backend/server-core');
-
-const app = express();
-app.use(require('cors')());
-app.use(bodyParser.json({ limit: '50mb' }));
-
-const serverCore = CubejsServerCore.create();
-serverCore.initApp(app);
-
-const port = process.env.PORT || 4000;
-app.listen(port, (err) => {
-  if (err) {
-    console.error('Fatal error during server start: ');
-    console.error(e.stack || e);
-  }
-  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
-});
-```
-
-## Express with Basic Passport Authentication
-
-To serve simple dashboard application with minimal basic authentication security following setup can be used:
-
-**index.js**
-```javascript
-require('dotenv').config();
-const http = require('http');
-const express = require('express');
-const bodyParser = require('body-parser');
-const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const passport = require('passport');
-const serveStatic = require('serve-static');
-const path = require('path');
-const { BasicStrategy } = require('passport-http');
-const CubejsServerCore = require('@cubejs-backend/server-core');
-
-const app = express();
-app.use(require('cors')());
-app.use(cookieParser());
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(session({ secret: process.env.CUBEJS_API_SECRET }));
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.use(new BasicStrategy(
-  (user, password, done) => {
-    if (user === 'admin' && password === 'admin') {
-      done(null, { user });
-    } else {
-      done(null, false);
-    }
-  }
-));
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((user, done) => done(null, user));
-
-app.get('/login', passport.authenticate('basic'), (req, res) => {
-  res.redirect('/')
-});
-
-app.use((req, res, next) => {
-  if (!req.user) {
-    res.redirect('/login');
-    return;
-  }
-  next();
-});
-
-if (process.env.NODE_ENV === 'production') {
-  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
-}
-
-const serverCore = CubejsServerCore.create({
-  checkAuth: (req, auth) => {
-    if (!req.user) {
-      throw new Error(`Unauthorized`);
-    }
-    req.authInfo = { u: req.user };
-  }
-});
-
-serverCore.initApp(app);
-
-const port = process.env.PORT || 4000;
-const server = http.createServer(app);
-
-server.listen(port, (err) => {
-  if (err) {
-    console.error('Fatal error during server start: ');
-    console.error(e.stack || e);
-  }
-  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
-});
-```
-
-Use **admin / admin** as **user / password** to access the dashboard.
 
 ## Serverless
 
@@ -391,6 +275,116 @@ $ serverless logs -t -f cubejs
 $ serverless logs -t -f cubejsProcess
 ```
 
+## Express
+
+[[warning | Warning]]
+| It is suitable to host single node applications this way without any significant load anticipated. Please consider deploying Cube.js as a microservice inside Docker if you need to host multiple Cube.js instances.
+
+Minimal setup for such serving looks as following:
+
+**index.js**
+```javascript
+require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const CubejsServerCore = require('@cubejs-backend/server-core');
+
+const app = express();
+app.use(require('cors')());
+app.use(bodyParser.json({ limit: '50mb' }));
+
+const serverCore = CubejsServerCore.create();
+serverCore.initApp(app);
+
+const port = process.env.PORT || 4000;
+app.listen(port, (err) => {
+  if (err) {
+    console.error('Fatal error during server start: ');
+    console.error(e.stack || e);
+  }
+  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
+});
+```
+
+### Express with Basic Passport Authentication
+
+To serve simple dashboard application with minimal basic authentication security following setup can be used:
+
+**index.js**
+```javascript
+require('dotenv').config();
+const http = require('http');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const passport = require('passport');
+const serveStatic = require('serve-static');
+const path = require('path');
+const { BasicStrategy } = require('passport-http');
+const CubejsServerCore = require('@cubejs-backend/server-core');
+
+const app = express();
+app.use(require('cors')());
+app.use(cookieParser());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(session({ secret: process.env.CUBEJS_API_SECRET }));
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.use(new BasicStrategy(
+  (user, password, done) => {
+    if (user === 'admin' && password === 'admin') {
+      done(null, { user });
+    } else {
+      done(null, false);
+    }
+  }
+));
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
+
+app.get('/login', passport.authenticate('basic'), (req, res) => {
+  res.redirect('/')
+});
+
+app.use((req, res, next) => {
+  if (!req.user) {
+    res.redirect('/login');
+    return;
+  }
+  next();
+});
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
+}
+
+const serverCore = CubejsServerCore.create({
+  checkAuth: (req, auth) => {
+    if (!req.user) {
+      throw new Error(`Unauthorized`);
+    }
+    req.authInfo = { u: req.user };
+  }
+});
+
+serverCore.initApp(app);
+
+const port = process.env.PORT || 4000;
+const server = http.createServer(app);
+
+server.listen(port, (err) => {
+  if (err) {
+    console.error('Fatal error during server start: ');
+    console.error(e.stack || e);
+  }
+  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
+});
+```
+
+Use **admin / admin** as **user / password** to access the dashboard.
 
 ## Heroku
 
