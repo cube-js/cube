@@ -3,14 +3,21 @@ import path from 'path';
 import cliProgress from 'cli-progress';
 import { CommanderStatic } from 'commander';
 import { DeployDirectory } from '../deploy';
-import { logStage, displayError } from '../utils';
+import { logStage, displayError, event } from '../utils';
 import { Config } from '../config';
 
-const deploy = async ({ directory, auth, uploadEnv }: any) => {
+const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
     await displayError(
       '@cubejs-backend/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
     );
+  }
+
+  if (token) {
+    const config = new Config();
+    await config.addAuthToken(token);
+    await event('Cube Cloud CLI Authenticate');
+    console.log('Token successfully added!');
   }
 
   const config = new Config();
@@ -106,6 +113,7 @@ export function configureDeployCommand(program: CommanderStatic) {
     .command('deploy')
     .description('Deploy project to Cube Cloud')
     .option('--upload-env', 'Upload .env file to CubeCloud')
+    .option('--token <token>', 'Add auth token to CubeCloud')
     .action(
       (options) => deploy({ directory: process.cwd(), ...options })
         .catch(e => displayError(e.stack || e))
