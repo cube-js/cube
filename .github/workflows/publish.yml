@@ -42,11 +42,11 @@ jobs:
         with:
           cmd: install
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
+        run: yarn lerna run --concurrency 1 --ignore @cubejs-client/vue build
       - name: Set NPM token
         run: echo //registry.npmjs.org/:_authToken=$NPM_TOKEN > ~/.npmrc
         env:

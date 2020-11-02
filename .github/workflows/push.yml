@@ -63,11 +63,11 @@ jobs:
         with:
           cmd: install
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Lerna test
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver unit
+        run: yarn lerna run --concurrency 1 unit
 
   lint:
     runs-on: ubuntu-latest
@@ -104,9 +104,9 @@ jobs:
         with:
           cmd: install
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Lerna lint
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver lint
+        run: yarn lerna run --concurrency 1 lint
 
   build:
     runs-on: ubuntu-latest
@@ -143,11 +143,11 @@ jobs:
         with:
           cmd: install
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
+        run: yarn lerna run --concurrency 1 --ignore @cubejs-client/vue build
 
 
   integration-wrk-1:
@@ -199,49 +199,49 @@ jobs:
         with:
           cmd: install
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run Postgres Integration with 9.6
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+          yarn lerna run --concurrency 1 integration:postgres
         env:
           TEST_PGSQL_VERSION: 9.6
       - name: Run Postgres Integration with 10
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+          yarn lerna run --concurrency 1 integration:postgres
         env:
           TEST_PGSQL_VERSION: 10
       - name: Run Postgres Integration with 11
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+          yarn lerna run --concurrency 1 integration:postgres
         env:
           TEST_PGSQL_VERSION: 11
       - name: Run Postgres Integration with 12
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:postgres
+          yarn lerna run --concurrency 1 integration:postgres
         env:
           TEST_PGSQL_VERSION: 12
       - name: Run MS SQL Integration with 2017-latest
         timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
+          yarn lerna run --concurrency 1 integration:mssql
         env:
           TEST_MSSQL_VERSION: 2017-latest
       - name: Run MS SQL Integration with 2019-latest
         timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mssql
+          yarn lerna run --concurrency 1 integration:mssql
         env:
           TEST_MSSQL_VERSION: 2019-latest
 
@@ -294,42 +294,42 @@ jobs:
         with:
           cmd: install
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run MySQL Integration with 5.6
         timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
+          yarn lerna run --concurrency 1 integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.6
       - name: Run MySQL Integration with 5.7
         timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:mysql
+          yarn lerna run --concurrency 1 integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.7
       - name: Run Clickhouse Integration with 20.6
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
+          yarn lerna run --concurrency 1 integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20.6
       - name: Run Clickhouse Integration with 20
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
+          yarn lerna run --concurrency 1 integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20
       - name: Run Clickhouse Integration with 19
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:clickhouse
+          yarn lerna run --concurrency 1 integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 19
 
@@ -382,7 +382,7 @@ jobs:
         with:
           cmd: install
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
       - name: Run PrestoDB Integration with Postgres 12.4
@@ -391,7 +391,7 @@ jobs:
           docker pull lewuathe/presto-coordinator:${TEST_PRESTO_VERSION}
           docker pull lewuathe/presto-worker:${TEST_PRESTO_VERSION}
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver integration:presto
+          yarn lerna run --concurrency 1 integration:presto
         env:
           TEST_PGSQL_VERSION: 12.4
           TEST_PRESTO_VERSION: 341-SNAPSHOT
