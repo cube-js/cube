@@ -16,9 +16,9 @@ import {
   loadCliManifest,
 } from './utils';
 import { Config } from './config';
-import { token, defaultExpiry, collect } from './token';
 import { configureCreateCommand } from './command/create';
 import { configureGenerateCommand } from './command/generate';
+import { configureTokenCommand } from './command/token';
 
 const packageJson = loadCliManifest();
 
@@ -31,24 +31,6 @@ program
     console.log('');
     console.log('Use cubejs <command> --help for more information about a command.');
     console.log('');
-  });
-
-program
-  .command('token')
-  .option('-e, --expiry [expiry]', 'Token expiry. Set to 0 for no expiry', defaultExpiry)
-  .option('-s, --secret [secret]', 'Cube.js app secret. Also can be set via environment variable CUBEJS_API_SECRET')
-  .option('-p, --payload [values]', 'Payload. Example: -p foo=bar', collect, [])
-  .option('-u, --user-context [values]', 'USER_CONTEXT. Example: -u baz=qux', collect, [])
-  .description('Create JWT token')
-  .action(
-    (options) => token(options)
-      .catch(e => displayError(e.stack || e))
-  )
-  .on('--help', () => {
-    console.log('');
-    console.log('Examples:');
-    console.log('');
-    console.log('  $ cubejs token -e "1 day" -p foo=bar -p cool=true');
   });
 
 const authenticate = async (currentToken) => {
@@ -74,6 +56,7 @@ program
   });
 
 (async () => {
+  await configureTokenCommand(program);
   await configureCreateCommand(program);
   await configureGenerateCommand(program);
   await configureDeployCommand(program);

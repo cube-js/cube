@@ -93,7 +93,7 @@ const requiredPackageExists = async (moduleName: string, relative: boolean = fal
   }
 };
 
-export const requireFromPackage = async (moduleName: string, relative: boolean = false) => {
+export const requireFromPackage = async <T = any>(moduleName: string, relative: boolean = false): Promise<T> => {
   await requiredPackageExists(moduleName, relative);
 
   if (relative) {
