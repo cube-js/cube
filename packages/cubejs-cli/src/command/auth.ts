@@ -2,9 +2,10 @@ import type { CommanderStatic } from 'commander';
 import { displayError, event } from '../utils';
 import { Config } from '../config';
 
-const authenticate = async (currentToken) => {
+const authenticate = async (currentToken: string) => {
   const config = new Config();
   await config.addAuthToken(currentToken);
+
   await event('Cube Cloud CLI Authenticate');
   console.log('Token successfully added!');
 };
