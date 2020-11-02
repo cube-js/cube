@@ -1,10 +1,3 @@
-/*
-eslint import/no-dynamic-require: 0
- */
-/*
-eslint global-require: 0
- */
-
 import program from 'commander';
 
 import { configureDevServerCommand } from './command/dev-server';
