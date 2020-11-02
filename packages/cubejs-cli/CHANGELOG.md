@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.6](https://github.com/cube-js/cube.js/compare/v0.23.5...v0.23.6) (2020-11-02)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** Incorrectly generated reference to `module.export` instead of `module.exports` ([7427d46](https://github.com/cube-js/cube.js/commit/7427d463e63f173d7069ee9d8065a77013c98c2b))
+
+
+### Features
+
+* **cubejs-cli:** Add --token option for deploy command ([#1279](https://github.com/cube-js/cube.js/issues/1279)) ([4fecd8c](https://github.com/cube-js/cube.js/commit/4fecd8ca2fe6f3f85defe0ecb20ccf9b3f9a7067))
+
+
+
+
+
 ## [0.23.5](https://github.com/cube-js/cube.js/compare/v0.23.4...v0.23.5) (2020-11-02)
 
 

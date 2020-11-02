@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.6](https://github.com/cube-js/cube.js/compare/v0.23.5...v0.23.6) (2020-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/mysql-driver
+
+
+
+
+
 ## [0.23.3](https://github.com/cube-js/cube.js/compare/v0.23.2...v0.23.3) (2020-10-31)
 
 **Note:** Version bump only for package @cubejs-backend/mysql-driver
