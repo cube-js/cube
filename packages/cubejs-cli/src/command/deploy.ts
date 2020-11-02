@@ -51,6 +51,8 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
   await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
 
   const files = Object.keys(fileHashes);
+  const fileHashesPosix = {};
+
   bar.start(files.length, 0, {
     file: ''
   });
@@ -61,6 +63,8 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
       bar.update(i, { file });
 
       const filePosix = file.split(path.sep).join(path.posix.sep);
+      fileHashesPosix[filePosix] = fileHashes[file];
+
       if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
         await config.cloudReq({
           url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
@@ -71,7 +75,7 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
             file: {
               value: fs.createReadStream(path.join(directory, file)),
               options: {
-                filename: path.posix.basename(file),
+                filename: path.basename(file),
                 contentType: 'application/octet-stream'
               }
             }
@@ -86,7 +90,7 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
       method: 'POST',
       body: {
         transaction,
-        files: fileHashes
+        files: fileHashesPosix
       },
       auth
     });
