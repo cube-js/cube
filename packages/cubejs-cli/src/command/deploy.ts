@@ -60,17 +60,18 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
       const file = files[i];
       bar.update(i, { file });
 
-      if (!upstreamHashes[file] || upstreamHashes[file].hash !== fileHashes[file].hash) {
+      const filePosix = file.split(path.sep).join(path.posix.sep);
+      if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
         await config.cloudReq({
           url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
           method: 'POST',
           formData: {
             transaction: JSON.stringify(transaction),
-            fileName: file,
+            fileName: filePosix,
             file: {
               value: fs.createReadStream(path.join(directory, file)),
               options: {
-                filename: path.basename(file),
+                filename: path.posix.basename(file),
                 contentType: 'application/octet-stream'
               }
             }
