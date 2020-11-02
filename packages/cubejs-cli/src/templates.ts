@@ -231,11 +231,11 @@ services:
       - 4000:4000
       # 3000 is a port for Playground web-server
       - 3000:3000
+    env_file: .env
     volumes:
       # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
       # - .:/cube/conf
       - ./cube.js:/cube/conf/cube.js
-      - ./.env:/cube/conf/.env
       - ./schema:/cube/conf/schema
     # Remove this line for production, dev-server must be used only during development
     entrypoint: cubejs dev-server
