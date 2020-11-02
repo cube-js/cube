@@ -13,7 +13,7 @@
   },
   "main": "driver/JDBCDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^^0.23.3",
+    "@cubejs-backend/query-orchestrator": "^0.23.3",
     "generic-pool": "^3.1.7",
     "jdbc": "^0.7.2",
     "node-java-maven": "^0.1.1",
