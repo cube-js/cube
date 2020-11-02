@@ -8,6 +8,7 @@ use tokio::fs;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
@@ -42,41 +43,44 @@ pub trait RemoteFs: Send + Sync {
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError>;
 }
 
-#[derive(Clone)]
 pub struct LocalDirRemoteFs {
-    remote_dir: PathBuf,
-    dir: PathBuf
+    remote_dir: RwLock<PathBuf>,
+    dir: RwLock<PathBuf>
 }
 
 impl LocalDirRemoteFs {
     pub fn new(remote_dir: PathBuf, dir: PathBuf) -> Arc<LocalDirRemoteFs> {
-        Arc::new(LocalDirRemoteFs { remote_dir, dir })
+        Arc::new(LocalDirRemoteFs { remote_dir: RwLock::new(remote_dir), dir: RwLock::new(dir) })
     }
 
     pub async fn drop_local_path(&self) -> Result<(), CubeError> {
-        Ok(fs::remove_dir_all(&self.dir).await?)
+        Ok(fs::remove_dir_all(&*self.dir.write().await).await?)
     }
 }
 
 #[async_trait]
 impl RemoteFs for LocalDirRemoteFs {
     async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
-        let dest = self.remote_dir.as_path().join(remote_path);
+        let remote_dir = self.remote_dir.write().await;
+        let dest = remote_dir.as_path().join(remote_path);
         fs::create_dir_all(dest.parent().unwrap()).await?;
+        let dir = self.dir.read().await;
         fs::copy(
-            self.dir.as_path().join(remote_path),
+            dir.as_path().join(remote_path),
             dest.clone()
         ).await?;
         Ok(())
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let local = self.dir.as_path().join(remote_path);
+        let dir = self.dir.write().await;
+        let local = dir.as_path().join(remote_path);
         let path = local.to_str().unwrap().to_owned();
         fs::create_dir_all(local.parent().unwrap()).await?;
         if !local.exists() {
+            let remote_dir = self.remote_dir.read().await;
             fs::copy(
-                self.remote_dir.as_path().join(remote_path),
+                remote_dir.as_path().join(remote_path),
                 local
             ).await.map_err(
                 |e| CubeError::internal(format!("Error during downloading of {}: {}", remote_path, e))
@@ -86,13 +90,15 @@ impl RemoteFs for LocalDirRemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
-        let remote = self.remote_dir.as_path().join(remote_path);
+        let remote_dir = self.remote_dir.write().await;
+        let remote = remote_dir.as_path().join(remote_path);
         fs::remove_file(remote.clone()).await?;
-        Self::remove_empty_paths(self.remote_dir.clone(), remote.clone()).await?;
+        Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
 
-        let local = self.dir.as_path().join(remote_path);
+        let dir = self.dir.write().await;
+        let local = dir.as_path().join(remote_path);
         fs::remove_file(local.clone()).await?;
-        Self::remove_empty_paths(self.dir.clone(), local.clone()).await?;
+        Self::remove_empty_paths(dir.clone(), local.clone()).await?;
 
         Ok(())
     }
@@ -102,16 +108,19 @@ impl RemoteFs for LocalDirRemoteFs {
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        let result = Self::list_recursive(self.remote_dir.clone(), remote_prefix.to_string(), self.remote_dir.clone()).await?;
+        let remote_dir = self.remote_dir.read().await;
+        let result = Self::list_recursive(remote_dir.clone(), remote_prefix.to_string(), remote_dir.clone()).await?;
         Ok(result)
     }
 
     async fn local_path(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
+        let dir = self.dir.read().await;
+        dir.to_str().unwrap().to_owned()
     }
 
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let buf = self.dir.join(remote_path);
+        let dir = self.dir.read().await;
+        let buf = dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }
