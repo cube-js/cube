@@ -128,7 +128,7 @@ module.exports = {
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
   }
-}
+};
 ```
 
 ### driverFactory
@@ -144,7 +144,7 @@ const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 module.exports = {
   driverFactory: ({ dataSource }) => new PostgresDriver({ database: dataSource })
-}
+};
 ```
 
 ### externalDriverFactory
@@ -169,7 +169,7 @@ module.exports = {
     user: process.env.CUBEJS_EXT_DB_USER,
     password: process.env.CUBEJS_EXT_DB_PASS,
   })
-}
+};
 ```
 
 ### contextToAppId
@@ -183,7 +183,7 @@ Called on each request.
 ```javascript
 module.exports = {
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`
-}
+};
 ```
 
 ### contextToDataSourceId
