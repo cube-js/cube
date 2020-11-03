@@ -17,9 +17,8 @@ const parsePayload = (payloadArray: string[] = []) => {
 };
 
 type TokenOptions = {
-  expiry: string;
-  secret: string;
-  // Extra options
+  expiry?: string;
+  secret?: string;
   expiresIn?: string
   payload: string[]
   userContext: string[]
@@ -68,7 +67,7 @@ export const collect = (val, memo) => [val, ...memo];
 export function configureTokenCommand(program: CommanderStatic) {
   program
     .command('token')
-    .option('-e, --expiry [expiry]', 'Token expiry. Set to 0 for no expiry', defaultExpiry)
+    .option('-e, --expiry [expiry]', 'Token expiry. Set to 0 for no expiry')
     .option('-s, --secret [secret]', 'Cube.js app secret. Also can be set via environment variable CUBEJS_API_SECRET')
     .option('-p, --payload [values]', 'Payload. Example: -p foo=bar', collect, [])
     .option('-u, --user-context [values]', 'USER_CONTEXT. Example: -u baz=qux', collect, [])
