@@ -496,5 +496,5 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           ALGOLIA_API_KEY: 665bbb3a2c36759517a8b75ddba8601f
           ALGOLIA_INDEX_NAME: cubejs
-          PATH_PREFIX: docs
+          # PATH_PREFIX: docs
         run: sh ./deploy-staging.sh
