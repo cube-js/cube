@@ -469,9 +469,9 @@ jobs:
   docs:
     name: Docs build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: docs-build
+    # defaults:
+    #   run:
+    #     working-directory: docs-build
     steps:
       - name: Checkout
         uses: actions/checkout@v2
