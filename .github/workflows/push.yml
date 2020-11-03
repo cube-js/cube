@@ -473,6 +473,9 @@ jobs:
       run:
         working-directory: docs-build
     steps:
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '15.x'
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -484,6 +487,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
+        if: steps.yarn-cache.outputs.cache-hit != 'true'
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install
