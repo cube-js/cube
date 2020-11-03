@@ -8,5 +8,6 @@ yarn-error.log
 # Cube.js repo
 cube.js/
 
+# testing
 .env.development
 .env.production
