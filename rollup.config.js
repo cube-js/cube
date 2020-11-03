@@ -69,6 +69,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           format: 'umd',
           name: globalName,
           exports: 'auto',
+          sourcemap: true,
         },
       ],
     },
@@ -112,7 +113,13 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           ],
         }),
       ],
-      output: [{ file: `packages/${name}/dist/${name}.js`, format: 'cjs' }],
+      output: [
+        {
+          file: `packages/${name}/dist/${name}.js`,
+          format: 'cjs',
+          sourcemap: true,
+        }
+      ],
     },
     // // ES module (for bundlers) build.
     {
@@ -150,6 +157,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
         {
           file: `packages/${name}/dist/${name}.esm.js`,
           format: 'es',
+          sourcemap: true,
           globals,
         },
       ],
