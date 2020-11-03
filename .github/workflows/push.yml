@@ -488,7 +488,7 @@ jobs:
         with:
           cmd: install
       - name: Build
-      - uses: chrislennon/action-aws-cli@v1.1
+        uses: chrislennon/action-aws-cli@v1.1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
