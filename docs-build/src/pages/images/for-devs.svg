@@ -1,0 +1,65 @@
+<svg width="50" height="50" viewBox="0 0 50 50" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<title>Group 10</title>
+<desc>Created using Figma</desc>
+<g id="Canvas" transform="translate(6208 1791)">
+<rect x="-6208" y="-1791" width="50" height="50" fill="#31334D"/>
+<clipPath id="clip-0" clip-rule="evenodd">
+<path d="M -6738 -2379L -5375 -2379L -5375 -1553L -6738 -1553L -6738 -2379Z" fill="#FFFFFF"/>
+</clipPath>
+<g id="Main" clip-path="url(#clip-0)">
+<path d="M -6738 -2379L -5375 -2379L -5375 -1553L -6738 -1553L -6738 -2379Z" fill="#FFFFFF"/>
+<g id="Component 2">
+<g id="Rectangle 74">
+<use xlink:href="#path0_fill" transform="translate(-6228 -1826)" fill="#FFFFFF"/>
+<mask id="mask0_outline_ins">
+<use xlink:href="#path0_fill" fill="white" transform="translate(-6228 -1826)"/>
+</mask>
+<g mask="url(#mask0_outline_ins)">
+<use xlink:href="#path1_stroke_2x" transform="translate(-6228 -1826)" fill="#ECECF0"/>
+</g>
+</g>
+</g>
+<g id="Group 10">
+<clipPath id="clip-1" clip-rule="evenodd">
+<path d="M -6208 -1791L -6158 -1791L -6158 -1741L -6208 -1741L -6208 -1791Z" fill="#FFFFFF"/>
+</clipPath>
+<g id="Frame" clip-path="url(#clip-1)">
+<path d="M -6208 -1791L -6158 -1791L -6158 -1741L -6208 -1741L -6208 -1791Z" fill="#FFFFFF"/>
+</g>
+<g id="Group 5">
+<g id="Group 4" opacity="0.8">
+<g id="Vector 2">
+<use xlink:href="#path2_stroke" transform="translate(-6201 -1780)" fill="#6F76D9"/>
+</g>
+<g id="Vector 2.1">
+<use xlink:href="#path2_stroke" transform="matrix(1 0 0 -1 -6201 -1752)" fill="#6F76D9"/>
+</g>
+</g>
+<g id="Group 4.1" opacity="0.8">
+<g id="Vector 2">
+<use xlink:href="#path2_stroke" transform="matrix(-1 0 0 1 -6164.5 -1780)" fill="#6F76D9"/>
+</g>
+<g id="Vector 2.1">
+<use xlink:href="#path2_stroke" transform="matrix(-1 0 -0 -1 -6164.5 -1752)" fill="#6F76D9"/>
+</g>
+</g>
+<g id="Ellipse">
+<use xlink:href="#path3_fill" transform="translate(-6191 -1768)"/>
+</g>
+<g id="Ellipse">
+<use xlink:href="#path3_fill" transform="translate(-6185 -1768)"/>
+</g>
+<g id="Ellipse">
+<use xlink:href="#path3_fill" transform="translate(-6179 -1768)"/>
+</g>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<path id="path0_fill" d="M 0 4C 0 1.79086 1.79086 0 4 0L 330 0C 332.209 0 334 1.79086 334 4L 334 116C 334 118.209 332.209 120 330 120L 4 120C 1.79086 120 0 118.209 0 116L 0 4Z"/>
+<path id="path1_stroke_2x" d="M 4 1L 330 1L 330 -1L 4 -1L 4 1ZM 333 4L 333 116L 335 116L 335 4L 333 4ZM 330 119L 4 119L 4 121L 330 121L 330 119ZM 1 116L 1 4L -1 4L -1 116L 1 116ZM 4 119C 2.34315 119 1 117.657 1 116L -1 116C -1 118.761 1.23858 121 4 121L 4 119ZM 333 116C 333 117.657 331.657 119 330 119L 330 121C 332.761 121 335 118.761 335 116L 333 116ZM 330 1C 331.657 1 333 2.34315 333 4L 335 4C 335 1.23858 332.761 -1 330 -1L 330 1ZM 4 -1C 1.23858 -1 -1 1.23858 -1 4L 1 4C 1 2.34315 2.34315 1 4 1L 4 -1Z"/>
+<path id="path2_stroke" d="M 8.5 2C 9.60457 2 10.5 1.10457 10.5 0C 10.5 -1.10457 9.60457 -2 8.5 -2L 8.5 2ZM 8.5 -2L 6.5 -2L 6.5 2L 8.5 2L 8.5 -2ZM 2.5 2L 2.5 10L 6.5 10L 6.5 2L 2.5 2ZM 0.5 12L 0 12L 0 16L 0.5 16L 0.5 12ZM 2.5 10C 2.5 11.1046 1.60457 12 0.5 12L 0.5 16C 3.81371 16 6.5 13.3137 6.5 10L 2.5 10ZM 6.5 -2C 4.29086 -2 2.5 -0.209139 2.5 2L 6.5 2L 6.5 -2Z"/>
+<path id="path3_fill" d="M 4 2C 4 3.10457 3.10457 4 2 4C 0.895431 4 0 3.10457 0 2C 0 0.895431 0.895431 0 2 0C 3.10457 0 4 0.895431 4 2Z"/>
+</defs>
+</svg>

@@ -1,0 +1,14 @@
+@import './variables.scss';
+
+blockquote {
+  padding: 16px;
+  border-radius: 4px;
+  background: $light;
+  //font-family: 'Roboto Mono', Consolas, monospace;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+blockquote p {
+  margin: 0;
+}

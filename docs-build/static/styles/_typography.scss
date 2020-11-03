@@ -1,0 +1,181 @@
+$purple: #7A77FF;
+
+html {
+  height: 100%;
+  max-height: 100%;
+  font-size: 10px;
+  -webkit-tap-highlight-color: transparent;
+  font-variant-ligatures: no-common-ligatures;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  height: 100%;
+  max-height: 100%;
+  font-family: Cera Pro, "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Ubuntu, "DejaVu Sans", Arial, sans-serif;
+  line-height: 28px;
+  font-size: 16px;
+  color: $dark-01;
+  font-weight: 400;
+  text-rendering: geometricPrecision;
+  font-feature-settings: "liga" 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+input,
+label,
+select,
+textarea,
+table {
+  text-rendering: geometricPrecision;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: inherit;
+  color: #31334D;
+  font-weight: 500;
+  margin: 0;
+}
+
+.page-header h1 {
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 32px;
+  line-height: 44px;
+  padding-top: 48px;
+  margin-bottom: 24px;
+}
+
+h2 {
+  font-size: 24px;
+  line-height: 32px;
+  margin-bottom: 16px;
+}
+
+h3 {
+  font-size: 20px;
+  line-height: 30px;
+  margin-bottom: 8px;
+}
+
+h4 {
+  font-size: 18px;
+  line-height: 28px;
+  margin-bottom: 8px;
+}
+
+
+h5 {
+  font-size: 14px;
+  line-height: 22px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+a {
+  color: #4A4A4A;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: #111;
+}
+
+p,
+ul,
+ol,
+dl,
+figure {
+  margin: 0 0 0 0;
+  text-rendering: geometricPrecision;
+}
+
+ol,
+ul {
+  padding-left: 18px;
+}
+
+ol ol,
+ul ul,
+ul ol,
+ol ul {
+  margin: 0 0 2px 0;
+  padding-left: 2em;
+}
+
+
+strong, b {
+  font-weight: 500;
+  color: #31334D;
+}
+
+dl dt {
+  float: left;
+  width: 180px;
+  overflow: hidden;
+  clear: left;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  margin-bottom: 1em;
+}
+
+dl dd {
+  margin-left: 200px;
+  margin-bottom: 1em;
+}
+
+hr {
+  display: block;
+  height: 1px;
+  border: 0;
+  border-top: #eee 1px solid;
+  margin: 3.2em 0;
+  padding: 0;
+}
+
+mark {
+  background-color: #fdffb6
+}
+
+kbd {
+  display: inline-block;
+  margin-bottom: 0.4em;
+  padding: 1px 8px;
+  border: #CCC 1px solid;
+  color: #666;
+  text-shadow: #FFF 0 1px 0;
+  font-size: 0.9em;
+  font-weight: 700;
+  background: #F4F4F4;
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 1px 0 0 #fff inset;
+}
+
+p {
+  margin-bottom: 24px;
+}
+
+@media only screen and (max-width: 900px) {
+}
+
+@media only screen and (max-width: 500px) {
+}

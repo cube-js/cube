@@ -1,0 +1,52 @@
+{
+  "name": "docs",
+  "version": "1.0.0",
+  "dependencies": {
+    "antd": "^3.3.3",
+    "classnames": "^2.2.6",
+    "cubedev-tracking": "^1.0.4",
+    "dompurify": "^1.0.10",
+    "dotenv": "^7.0.0",
+    "gatsby": "^2.0.0",
+    "gatsby-image": "^2.0.37",
+    "gatsby-link": "^2.0.16",
+    "gatsby-plugin-antd": "^2.0.2",
+    "gatsby-plugin-catch-links": "^2.0.13",
+    "gatsby-plugin-favicon": "^3.1.6",
+    "gatsby-plugin-google-analytics": "^2.1.1",
+    "gatsby-plugin-layout": "^1.0.14",
+    "gatsby-plugin-less": "^2.0.12",
+    "gatsby-plugin-react-helmet": "^3.0.11",
+    "gatsby-plugin-s3": "^0.2.5",
+    "gatsby-plugin-sass": "^2.0.11",
+    "gatsby-plugin-sharp": "^2.6.31",
+    "gatsby-plugin-sitemap": "^2.1.0",
+    "gatsby-remark-copy-linked-files": "^2.0.11",
+    "gatsby-remark-custom-blocks": "^2.3.13",
+    "gatsby-remark-images": "^3.0.10",
+    "gatsby-source-filesystem": "^2.0.28",
+    "gatsby-transformer-remark": "^2.3.8",
+    "lockr": "^0.8.5",
+    "node-sass": "^4.14.1",
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6",
+    "react-helmet": "^5.2.0",
+    "react-html-parser": "^2.0.2",
+    "react-scroll": "^1.7.11",
+    "remark-custom-blocks": "^2.5.0",
+    "sharp": "^0.26.0"
+  },
+  "keywords": [],
+  "license": "MIT",
+  "scripts": {
+    "build": "gatsby build",
+    "dev": "gatsby develop",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "gatsby-plugin-s3 deploy"
+  },
+  "devDependencies": {
+    "gatsby-plugin-root-import": "^2.0.5",
+    "loader-utils": "^1.2.3"
+  },
+  "private": true
+}

@@ -1,0 +1,51 @@
+@import './variables.scss';
+
+table {
+  width: 100%;
+  margin-bottom: 24px;
+  border: 1px solid #E5E4F7;
+  border-radius: 4px;
+  border-collapse: separate;
+  font-size: 16px;
+  line-height: 26px;
+}
+
+table code {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+:not(thead) > tr:nth-child(odd) {
+  background: $lighter;
+}
+
+:not(thead) > tr:nth-child(odd):last-child > td:first-child {
+  border-radius: 0 0 0 4px;
+}
+
+:not(thead) > tr:nth-child(odd):last-child > td:last-child {
+  border-radius: 0 0 4px 0;
+}
+
+th, td {
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+tbody > tr:not(:last-child), thead > tr {
+  & > td, & > th {
+    border-bottom: 1px solid #E5E4F7;
+  }
+}
+
+th {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 21px;
+  color: $dark-04;
+
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
