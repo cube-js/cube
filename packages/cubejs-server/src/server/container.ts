@@ -8,7 +8,7 @@ import { packageExists } from './utils';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 export class ServerContainer {
-  constructor(
+  public constructor(
     protected readonly configuration: { debug: boolean }
   ) {
   }

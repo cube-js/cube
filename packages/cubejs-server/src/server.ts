@@ -12,7 +12,7 @@ import util from 'util';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 
-import { WebSocketServer } from './websocket-server';
+import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
 
 const { version } = require('../package.json');
 
@@ -20,7 +20,7 @@ dotenv.config();
 
 export type InitAppFn = (app: express.Application) => void | Promise<void>;
 
-export interface CreateOptions extends CoreCreateOptions {
+export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions {
   webSockets?: boolean;
   initApp?: InitAppFn;
 }
@@ -38,7 +38,7 @@ export class CubejsServer {
 
   protected socketServer: WebSocketServer | null = null;
 
-  constructor(config: CreateOptions) {
+  public constructor(config: CreateOptions) {
     config = config || {};
     config.webSockets = config.webSockets || (process.env.CUBEJS_WEB_SOCKETS === 'true');
 
@@ -49,7 +49,7 @@ export class CubejsServer {
     this.initApp = config.initApp;
   }
 
-  async listen(options: https.ServerOptions | http.ServerOptions = {}) {
+  public async listen(options: https.ServerOptions | http.ServerOptions = {}) {
     try {
       if (this.server) {
         throw new Error('CubeServer is already listening');
@@ -130,15 +130,15 @@ export class CubejsServer {
     }
   }
 
-  testConnections() {
+  public testConnections() {
     return this.core.testConnections();
   }
 
-  runScheduledRefresh(context: any, queryingOptions: any) {
+  public runScheduledRefresh(context: any, queryingOptions: any) {
     return this.core.runScheduledRefresh(context, queryingOptions);
   }
 
-  async close() {
+  public async close() {
     try {
       if (this.socketServer) {
         await this.socketServer.close();
@@ -169,19 +169,19 @@ export class CubejsServer {
     }
   }
 
-  static createDriver(dbType: DatabaseType) {
+  public static createDriver(dbType: DatabaseType) {
     return CubeCore.createDriver(dbType);
   }
 
-  static driverDependencies(dbType: DatabaseType) {
+  public static driverDependencies(dbType: DatabaseType) {
     return CubeCore.driverDependencies(dbType);
   }
 
-  static apiSecret() {
+  public static apiSecret() {
     return process.env.CUBEJS_API_SECRET;
   }
 
-  static version() {
+  public static version() {
     return version;
   }
 }
