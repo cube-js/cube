@@ -7,7 +7,7 @@ type DeployDirectoryOptions = {
 };
 
 export class DeployDirectory {
-  constructor(
+  public constructor(
     protected readonly options: DeployDirectoryOptions
   ) { }
 

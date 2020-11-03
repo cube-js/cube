@@ -27,7 +27,7 @@ export class Config {
     return {};
   }
 
-  async writeConfig(config) {
+  protected async writeConfig(config) {
     const { cubeCloudConfigPath, configFile } = this.configFile();
     await fs.mkdirp(cubeCloudConfigPath);
     await fs.writeJson(configFile, config);
@@ -176,11 +176,11 @@ export class Config {
     };
   }
 
-  dotCubeCloudFile() {
+  protected dotCubeCloudFile() {
     return '.cubecloud';
   }
 
-  async loadDotCubeCloud() {
+  protected async loadDotCubeCloud() {
     if (await fs.pathExists(this.dotCubeCloudFile())) {
       return fs.readJson(this.dotCubeCloudFile());
     }
@@ -188,7 +188,7 @@ export class Config {
     return {};
   }
 
-  async writeDotCubeCloud(config) {
+  protected async writeDotCubeCloud(config) {
     await fs.writeJson(this.dotCubeCloudFile(), config);
   }
 

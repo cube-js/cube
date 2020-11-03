@@ -10,7 +10,7 @@ const authenticate = async (currentToken: string) => {
   console.log('Token successfully added!');
 };
 
-export function configureAuthCommand(program: CommanderStatic) {
+export function configureAuthCommand(program: CommanderStatic): void {
   program
     .command('auth <token>')
     .description('Authenticate access to Cube Cloud')
