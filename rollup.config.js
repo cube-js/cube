@@ -183,7 +183,7 @@ export default bundle(
 )
   .concat(
     bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
-      input: 'packages/cubejs-client-ws-transport/src/index.js',
+      input: 'packages/cubejs-client-ws-transport/src/index.ts',
     })
   )
   .concat(

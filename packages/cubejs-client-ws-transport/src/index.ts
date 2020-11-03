@@ -1,7 +1,11 @@
 import WebSocket from 'isomorphic-ws';
 
 class WebSocketTransportResult {
-  constructor({ status, message }) {
+  protected readonly status: unknown;
+
+  protected readonly result: unknown;
+
+  constructor({ status, message }: { status: unknown, message: unknown }) {
     this.status = status;
     this.result = message;
   }
@@ -11,18 +15,48 @@ class WebSocketTransportResult {
   }
 }
 
+type WebSocketTransportOptions = {
+  authorization: string,
+  apiUrl: string,
+  hearBeatInterval?: number,
+};
+
+type Message = {
+  messageId: number,
+  requestId: any,
+  method: string,
+  params: string,
+};
+
+type Subscription = {
+  message: Message,
+  callback: (result: WebSocketTransportResult) => void,
+};
+
 class WebSocketTransport {
-  constructor({ authorization, apiUrl, hearBeatInterval }) {
-    this.authorization = authorization;
+  protected readonly apiUrl: string;
+
+  protected readonly hearBeatInterval: number;
+
+  protected token: string;
+
+  protected ws: any = null;
+
+  protected messageCounter: number = 1;
+
+  protected messageIdToSubscription: Record<number, Subscription> = {};
+
+  protected messageQueue: Message[] = [];
+
+  constructor({ authorization, apiUrl, hearBeatInterval }: WebSocketTransportOptions) {
+    this.token = authorization;
     this.apiUrl = apiUrl;
-    this.messageCounter = 1;
-    this.messageIdToSubscription = {};
-    this.messageQueue = [];
     this.hearBeatInterval = hearBeatInterval || 60;
   }
 
   set authorization(token) {
     this.token = token;
+
     if (this.ws) {
       this.ws.close();
     }
@@ -37,11 +71,11 @@ class WebSocketTransport {
       return this.ws.initPromise;
     }
 
-    const ws = new WebSocket(this.apiUrl);
+    const ws: any = new WebSocket(this.apiUrl);
 
     ws.messageIdSent = {};
 
-    ws.sendMessage = (message) => {
+    ws.sendMessage = (message: any) => {
       if (!message.messageId || message.messageId && !ws.messageIdSent[message.messageId]) {
         ws.send(JSON.stringify(message));
         ws.messageIdSent[message.messageId] = true;
@@ -58,6 +92,7 @@ class WebSocketTransport {
         ws.close();
       } else {
         Object.keys(this.messageIdToSubscription).forEach(messageId => {
+          // @ts-ignore
           ws.sendMessage(this.messageIdToSubscription[messageId].message);
         });
       }
@@ -70,9 +105,10 @@ class WebSocketTransport {
         ws.sendMessage({ authorization: this.authorization });
       };
 
-      ws.onmessage = (message) => {
+      ws.onmessage = (event: any) => {
         ws.lastMessageTimestamp = new Date();
-        message = JSON.parse(message.data);
+
+        const message: any = JSON.parse(event.data);
         if (message.handshake) {
           ws.reconcile();
           ws.reconcileTimer = setInterval(() => {
@@ -81,9 +117,13 @@ class WebSocketTransport {
           }, this.hearBeatInterval * 1000);
           resolve();
         }
+
         if (this.messageIdToSubscription[message.messageId]) {
-          this.messageIdToSubscription[message.messageId].callback(new WebSocketTransportResult(message));
+          this.messageIdToSubscription[message.messageId].callback(
+            new WebSocketTransportResult(message)
+          );
         }
+
         ws.sendQueue();
       };
 
@@ -111,28 +151,29 @@ class WebSocketTransport {
     return this.ws.initPromise;
   }
 
-  sendMessage(message) {
+  protected sendMessage(message: any) {
     if (message.unsubscribe && this.messageQueue.find(m => m.messageId === message.unsubscribe)) {
       this.messageQueue = this.messageQueue.filter(m => m.messageId !== message.unsubscribe);
     } else {
       this.messageQueue.push(message);
     }
+
     setTimeout(async () => {
       await this.initSocket();
       this.ws.sendQueue();
     }, 100);
   }
 
-  request(method, { baseRequestId, ...params }) {
-    const message = {
+  request(method: string, { baseRequestId, ...params }: any) {
+    const message: Message = {
       messageId: this.messageCounter++,
       requestId: baseRequestId,
       method,
       params
     };
 
-    const pendingResults = [];
-    let nextMessage = null;
+    const pendingResults: WebSocketTransportResult[] = [];
+    let nextMessage: ((value: any) => void)|null = null;
 
     const runNextMessage = () => {
       if (nextMessage) {
@@ -152,7 +193,7 @@ class WebSocketTransport {
     const transport = this;
 
     return {
-      async subscribe(callback) {
+      async subscribe(callback: Function) {
         transport.sendMessage(message);
         const result = await new Promise((resolve) => {
           nextMessage = resolve;
