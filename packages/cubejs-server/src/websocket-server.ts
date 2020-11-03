@@ -23,9 +23,10 @@ export class WebSocketServer {
   }
 
   public initServer(server: http.Server | https.Server) {
-    this.wsServer = this.options.webSocketsBasePath
-      ? new WebSocket.Server({ server, path: this.options.webSocketsBasePath })
-      : new WebSocket.Server({ server });
+    this.wsServer = new WebSocket.Server({
+      server,
+      path: this.options.webSocketsBasePath,
+    });
 
     const connectionIdToSocket: Record<string, any> = {};
 
