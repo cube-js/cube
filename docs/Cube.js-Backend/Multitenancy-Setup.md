@@ -1,8 +1,8 @@
 ---
-title: Multitenancy Setup
+title: Multitenancy
 permalink: /multitenancy-setup
 category: Cube.js Backend
-menuOrder: 5
+menuOrder: 9
 ---
 
 Cube.js supports multitenancy out of the box, both on database and data schema levels.
