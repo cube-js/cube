@@ -1,0 +1,13 @@
+node_modules/
+public/
+.cache
+yarn-error.log
+.DS_Store
+.idea
+
+# Cube.js repo
+cube.js/
+
+# testing
+.env.development
+.env.production

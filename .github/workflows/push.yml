@@ -11,6 +11,8 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
+      - 'docs-build/**'
+      - 'docs-gen/**'
   pull_request:
     paths:
       - '.github/workflows/push.yml'
@@ -21,6 +23,8 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
+      - 'docs-build/**'
+      - 'docs-gen/**'
 
 jobs:
   unit:
@@ -148,7 +152,6 @@ jobs:
         run: yarn build
       - name: Build other packages
         run: yarn lerna run --concurrency 1 --ignore @cubejs-client/vue build
-
 
   integration-wrk-1:
     runs-on: ubuntu-latest
@@ -462,3 +465,36 @@ jobs:
           file: ./packages/cubejs-docker/dev.Dockerfile
           platforms: linux/amd64
           push: false
+
+  docs:
+    name: Docs build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./docs-build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '15.x'
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+      # - name: Yarn install
+      #   uses: borales/actions-yarn@v2.3.0
+      #   with:
+      #     cmd: install
+      - uses: chrislennon/action-aws-cli@v1.1
+      - name: Build
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_DEPLOY_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_DEPLOY_AWS_SECRET_ACCESS_KEY }}
+          ALGOLIA_API_KEY: 665bbb3a2c36759517a8b75ddba8601f
+          ALGOLIA_INDEX_NAME: cubejs
+          # PATH_PREFIX: docs
+        run: sh ./deploy-staging.sh
