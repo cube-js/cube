@@ -8,9 +8,11 @@
   },
   "description": "Cube.js WebSocket transport",
   "main": "dist/cubejs-client-ws-transport.js",
+  "typings": "dist/index.d.ts",
   "author": "Cube Dev, Inc.",
   "scripts": {
-    "tsc": "tsc",
+    "build": "npm run tsc",
+    "tsc": "tsc && rm -rf temp",
     "watch": "tsc -w",
     "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts",
     "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts"
