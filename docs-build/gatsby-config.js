@@ -7,7 +7,7 @@ const config = {
     title: 'Cube.js Docs',
     siteUrl: `https://cube.dev`,
   },
-  pathPrefix: process.env.PATH_PREFIX,
+  pathPrefix: process.env.PATH_PREFIX || '',
   plugins: [
     'gatsby-plugin-react-helmet',
     'gatsby-plugin-sass',
