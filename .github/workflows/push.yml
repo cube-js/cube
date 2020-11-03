@@ -11,6 +11,8 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
+      - 'docs-build/**'
+      - 'docs-gen/**'
   pull_request:
     paths:
       - '.github/workflows/push.yml'
@@ -21,8 +23,8 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-build'
-      - 'docs-gen'
+      - 'docs-build/**'
+      - 'docs-gen/**'
 
 jobs:
   unit:
