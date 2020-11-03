@@ -1,5 +1,14 @@
 import WebSocket from 'isomorphic-ws';
 
+/**
+ * @title @cubejs-client/ws-transport
+ * @permalink /@cubejs-client-ws-transport
+ * @menuCategory Cube.js Frontend
+ * @subcategory Reference
+ * @menuOrder 4
+ * @description WebSocket transport for Cube.js client
+ */
+
 class WebSocketTransportResult {
   protected readonly status: unknown;
 
