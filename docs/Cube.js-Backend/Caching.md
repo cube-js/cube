@@ -2,7 +2,7 @@
 title: Caching
 permalink: /caching
 category: Cube.js Backend
-menuOrder: 4
+menuOrder: 6
 ---
 
 Cube.js provides a two-level caching system. The first level is **in-memory** cache and is active by default. In-memory cache
