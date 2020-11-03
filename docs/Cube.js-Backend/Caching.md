@@ -180,36 +180,32 @@ For example if you have user dashboard you want to keep fresh, CRON job that iss
 If you want to continously look for a new data you can use [Real Time Data Fetch](real-time-data-fetch) for that.
 Please note `renewQuery` also triggers pre-aggregations refresh as well.
 
-To keep pre-aggregations fresh Refresh Scheduler can be used.
+**To keep pre-aggregations fresh Refresh Scheduler can be used.**
 All pre-aggregations intended to be refreshed during scheduled refresh run should be marked with [scheduledRefresh](pre-aggregations#scheduled-refresh) parameter.
-There're `CubejsServerCore.runScheduledRefresh(context, queryingOptions)` and `CubejsServer.runScheduledRefresh(context, queryingOptions)` methods that should be invoked at least once a minute to populate queue for pre-aggregations refresh.
 
-You can use [scheduledRefreshTimer](@cubejs-backend-server-core#options-reference-scheduled-refresh-timer) to trigger Refresh Scheduler or you can do it manually by using simple timer for example:
+```js
+cube(`Orders`, {
+  // ...
 
-```javascript
-setInterval(() => server.runScheduledRefresh(), 5000);
-```
-
-in your **index.js:**
-```javascript
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer();
-
-setInterval(() => server.runScheduledRefresh(), 5000);
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-}).catch(e => {
-  console.error('Fatal error during server start: ');
-  console.error(e.stack || e);
+  preAggregations: {
+    amountByCreated: {
+      type: `rollup`,
+      measureReferences: [amount],
+      timeDimensionReference: createdAt,
+      granularity: `month`,
+      scheduledRefresh: true
+    }
+  }
 });
 ```
 
-There's also [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) available to trigger run.
+You can set [scheduledRefreshTimer](config#options-reference-scheduled-refresh-timer) option to trigger Refresh Scheduler.
+For serverless deployments [REST
+API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
-> **NOTE**: `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.
 
+[[info]]
+| Pre-aggregations will be updated only if required by `refreshKey`. It is always used to check if refresh is required or not. In the case `refreshKey` value doesn't change it doesn't matter how frequent `scheduledRefreshTimer` is set: such pre-aggregation won't be refreshed.
 
 ## Inspecting Queries
 To inspect whether the query hits in-memory cache, pre-aggregation, or raw data, you can use Playground or Cube Cloud.

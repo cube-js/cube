@@ -312,11 +312,10 @@ module.exports = {
 
 Pass `true` to enable default every 5 second scheduled refresh timer with default querying options.
 Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
-Each timer invocation will call `runScheduledRefresh()` method as in:
 
 ```javascript
 module.exports = {
-  setInterval(() => serverCore.runScheduledRefresh(), 5000);
+  scheduledRefreshTimer: true
 };
 ```
 
