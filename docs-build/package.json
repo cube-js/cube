@@ -34,7 +34,9 @@
     "react-html-parser": "^2.0.2",
     "react-scroll": "^1.7.11",
     "remark-custom-blocks": "^2.5.0",
-    "sharp": "^0.26.0"
+    "sharp": "^0.26.0",
+    "gatsby-plugin-root-import": "^2.0.5",
+    "loader-utils": "^1.2.3"
   },
   "keywords": [],
   "license": "MIT",
@@ -43,10 +45,6 @@
     "dev": "gatsby develop",
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy": "gatsby-plugin-s3 deploy"
-  },
-  "devDependencies": {
-    "gatsby-plugin-root-import": "^2.0.5",
-    "loader-utils": "^1.2.3"
   },
   "private": true
 }
