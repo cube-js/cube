@@ -5,4 +5,5 @@ cd ../docs-gen && yarn && yarn generate && cd ../docs-build
 
 rm -rf .cache
 rm -rf public
-yarn build --prefix-paths
+
+yarn && yarn build --prefix-paths
