@@ -55,6 +55,8 @@ jobs:
             */*/node_modules
           key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
       - uses: chrislennon/action-aws-cli@v1.1
+      - name: Docs generation
+        run: sh ./docs-gen.sh
       - name: Build
         env:
           NODE_ENV: production
