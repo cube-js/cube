@@ -21,7 +21,6 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   }
 
   const config = new Config();
-  await config.loadDeployAuth();
   const bar = new cliProgress.SingleBar({
     format: '- Uploading files | {bar} | {percentage}% || {value} / {total} | {file}',
     barCompleteChar: '\u2588',
@@ -31,6 +30,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
 
   const deployDir = new DeployDirectory({ directory });
   const fileHashes: any = await deployDir.fileHashes();
+
   const upstreamHashes = await config.cloudReq({
     url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
     method: 'GET',
@@ -54,7 +54,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
       auth
     });
   }
-  
+
   await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
 
   const files = Object.keys(fileHashes);
