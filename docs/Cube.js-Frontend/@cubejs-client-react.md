@@ -160,8 +160,11 @@ availableMeasures | TCubeMeasure[] | An array of available measures to select. T
 availableSegments | TCubeMember[] | An array of available segments to select. They are loaded via the API from Cube.js Backend. |
 availableTimeDimensions | TCubeDimension[] | An array of available time dimensions to select. They are loaded via the API from Cube.js Backend. |
 dimensions | string[] | - |
+error? | Error &#124; null | - |
 isQueryPresent | boolean | Indicates whether the query is ready to be displayed or not |
+loadingState? | [TLoadingState](#types-t-loading-state) | - |
 measures | string[] | - |
+resultSet? | ResultSet &#124; null | - |
 segments | string[] | - |
 timeDimensions | Filter[] | - |
 updateDimensions | [MemberUpdater](#types-member-updater) | - |
