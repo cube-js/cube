@@ -15,9 +15,11 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.23.3",
     "generic-pool": "^3.1.7",
-    "jdbc": "^0.7.2",
-    "node-java-maven": "^0.1.1",
     "sqlstring": "^2.3.0"
+  },
+  "peerDependencies": {
+    "jdbc": "^0.7.2",
+    "node-java-maven": "^0.1.1"
   },
   "license": "Apache-2.0"
 }
