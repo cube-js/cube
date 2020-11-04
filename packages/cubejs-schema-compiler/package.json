@@ -22,10 +22,11 @@
     "lint": "eslint -c ../../.eslintrc.js adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*/*.js"
   },
   "dependencies": {
+    "@babel/core": "^7.4.0",
     "@babel/generator": "^7.4.0",
-    "@babel/parser": "^7.4.2",
-    "@babel/preset-env": "^7.3.4",
-    "@babel/standalone": "^7.3.4",
+    "@babel/parser": "^7.4.0",
+    "@babel/preset-env": "^7.4.0",
+    "@babel/standalone": "^7.4.0",
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
     "@hapi/joi": "^15.1.1",
