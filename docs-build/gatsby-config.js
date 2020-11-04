@@ -1,9 +1,13 @@
+require('dotenv').config({
+  path: `.env.${process.env.NODE_ENV}`,
+});
+
 const config = {
   siteMetadata: {
     title: 'Cube.js Docs',
     siteUrl: `https://cube.dev`,
   },
-  pathPrefix: process.env.PATH_PREFIX || '/docs',
+  pathPrefix: process.env.PATH_PREFIX,
   plugins: [
     'gatsby-plugin-react-helmet',
     'gatsby-plugin-sass',
