@@ -1,5 +1,7 @@
 import React from 'react';
 
+console.log('test_100', process.env);
+
 const Dev = props => (
   <head>
     <meta charSet="utf-8" />
