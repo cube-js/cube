@@ -8,7 +8,7 @@ COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
 COPY packages/cubejs-linter packages/cubejs-linter
-RUN yarn install
+RUN yarn install --frozen-lockfile
 
 # @todo https://stackoverflow.com/questions/49939960/docker-copy-files-using-glob-pattern/50010093
 #COPY packages/*/package.json ./
