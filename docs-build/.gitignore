@@ -9,5 +9,4 @@ yarn-error.log
 cube.js/
 
 # testing
-.env.development
 .env.production
