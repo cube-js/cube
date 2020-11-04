@@ -8,7 +8,7 @@ menuOrder: 9
 Cube.js supports multitenancy out of the box, both on database and data schema levels.
 Multiple drivers are also supported, meaning that you can have one customer’s data in MongoDB and others in Postgres with one Cube.js instance.
 
-There are 7 [configuration options](@cubejs-backend-server-core#options-reference) you can leverage to make your multitenancy setup.
+There are 7 [configuration options](config#options-reference) you can leverage to make your multitenancy setup.
 You can use all of them or just a couple, depending on your specific case.
 The options are:
 
@@ -20,9 +20,8 @@ The options are:
 - `preAggregationsSchema`
 - `queryTransformer`
 
-Please refer to [@cubejs-backend-server-core](@cubejs-backend-server-core) and [@cubejs-backend-server](@cubejs-backend-server) docs to see examples on how `CubejsServerCore` and `CubejsServer` can be used.
-
-All of the above options are functions, which you provide on Cube.js server instance creation. The
+All of the above options are functions, which you provide to Cube.js in [cube.js
+config file](config). The
 functions accept one argument - context object, which has a nested object -
 `authInfo`, which acts as a container, where you can provide all the necessary data to identify user, organization, app, etc.
 You put data into `authInfo` when creating a Cube.js API Token.
@@ -38,15 +37,14 @@ Multitenancy and multiple data sources features aren't mutually exclusive and ca
 
 Typical multiple data sources configuration looks like:
 
-**index.js:**
+**cube.js:**
 
 ```javascript
-const CubejsServer = require('@cubejs-backend/server');
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const AthenaDriver = require('@cubejs-backend/athena-driver');
 const BigQueryDriver = require('@cubejs-backend/bigquery-driver');
 
-const server = new CubejsServer({
+module.exports = {
   dbType: ({ dataSource } = {}) => {
     if (dataSource === 'web') {
       return 'athena';
@@ -72,11 +70,7 @@ const server = new CubejsServer({
       return new PostgresDriver();
     }
   }
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 ### User Context vs Multitenant Compile Context
@@ -104,20 +98,18 @@ cube(`Products`, {
 ### User Context vs queryTransformer
 
 [USER_CONTEXT](cube#context-variables-user-context) great for use cases where you want to get explicit control over filtering of underlying data seen by users.
-However for use cases where you want to reuse pre-aggregation tables for different users or even tenants [queryTransformer](@cubejs-backend-server-core#options-reference-query-transformer) is much better choice.
-[queryTransformer](@cubejs-backend-server-core#options-reference-query-transformer) is also very convenient way of enforcing row level security by means of join logic defined in your cubes instead of embedding [USER_CONTEXT](cube#context-variables-user-context) filtering boiler plate into each cube.
-Together with [contextToDataSourceId](@cubejs-backend-server-core#options-reference-context-to-data-source-id) it allows to define both row level security filtering as well as reuse the same pre-aggregation set for each tenant.
+However for use cases where you want to reuse pre-aggregation tables for different users or even tenants [queryTransformer](config#options-reference-query-transformer) is much better choice.
+[queryTransformer](config#options-reference-query-transformer) is also very convenient way of enforcing row level security by means of join logic defined in your cubes instead of embedding [USER_CONTEXT](cube#context-variables-user-context) filtering boiler plate into each cube.
+Together with [contextToDataSourceId](config#options-reference-context-to-data-source-id) it allows to define both row level security filtering as well as reuse the same pre-aggregation set for each tenant.
 
 ## Same DB Instance with per Tenant Row Level Security
 
-Per tenant row level security can be achieved by providing [queryTransformer](@cubejs-backend-server-core#query-transformer) which adds tenant identifier filter to the original query.
+Per tenant row level security can be achieved by providing [queryTransformer](config#options-reference-query-transformer) which adds tenant identifier filter to the original query.
 This way in fact every tenant starts to see it's own data however all the resources like query queue and pre-aggregations are shared between all the tenants.
 
-**index.js:**
+**cube.js:**
 ```javascript
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer({
+module.exports = {
   queryTransformer: (query, { authInfo }) => {
     const user = authInfo.u;
     if (user.id) {
@@ -129,11 +121,7 @@ const server = new CubejsServer({
     }
     return query;
   }
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 ## Multiple DB Instances with Same Schema
@@ -162,57 +150,39 @@ Now, we can access them as `authInfo` object inside the context object. Let's
 first use `contextToAppId` to create a dynamic Cube.js App ID for every combination of
 `appId` and `userId`. Cube.js App ID is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
 
-**index.js:**
+**cube.js:**
 ```javascript
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer({
+module.exports = {
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 Next, we can use `driverFactory` to dynamically select database, based on
 `appId` and `userId`.
 
-**index.js:**
+**cube.js:**
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
-const CubejsServer = require('@cubejs-backend/server');
 
-const server = new CubejsServer({
+module.exports = {
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
   driverFactory: ({ authInfo }) =>
     new PostgresDriver({
       database: `my_app_${authInfo.appId}_${authInfo.userId}`
     })
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 ## Same DB Instance with per Tenant Pre-Aggregations
 
 To support per tenant pre-aggregation of data within same database instance you should provide `preAggregationsSchema` option.
 
-**index.js:**
+**cube.js:**
 ```javascript
-const PostgresDriver = require("@cubejs-backend/postgres-driver");
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer({
+module.exports = {
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.userId}`,
   preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 ## Multiple Schema and Drivers
@@ -223,13 +193,12 @@ We can instruct Cube.js to connect to MongoDB in that case, instead of
 Postgres. For that purpose we'll use `dbType` option to dynamically set database
 type. We also need to modify our `driverFactory` option.
 
-**index.js:**
+**cube.js:**
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
-const CubejsServer = require('@cubejs-backend/server');
 
-const server = new CubejsServer({
+module.exports = {
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
   dbType: ({ authInfo }) => {
     if (authInfo.appId === 3) {
@@ -250,11 +219,7 @@ const server = new CubejsServer({
       })
     }
   }
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 Lastly, we want to have separate data schemas for every application. In this case we can
@@ -262,14 +227,13 @@ use `repositoryFactory` option to dynamically set a repository with schema files
 
 Below you can find final setup with `repositoryFactory` option.
 
-**index.js:**
+**cube.js:**
 ```javascript
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
-const CubejsServer = require('@cubejs-backend/server');
 
-const server = new CubejsServer({
+module.exports = {
   contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
   dbType: ({ authInfo }) => {
     if (authInfo.appId === 3) {
@@ -291,11 +255,7 @@ const server = new CubejsServer({
     }
   },
   repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 ## Serverless Deployment

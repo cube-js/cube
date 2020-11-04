@@ -19,7 +19,7 @@ module.exports = {
 
 ## Options Reference
 
-You can provide the following configuration options for Cube.js.
+You can provide the following configuration options to Cube.js.
 
 ```javascript
 {

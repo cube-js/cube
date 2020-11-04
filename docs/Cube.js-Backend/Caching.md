@@ -174,6 +174,7 @@ cube(`Orders`, {
 
 ## Keeping Cache Up-to-Date
 
+**Use the following technique to keep in-memory cache up-to-date**.
 Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
 In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
 For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
