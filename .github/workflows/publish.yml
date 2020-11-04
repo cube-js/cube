@@ -40,7 +40,7 @@ jobs:
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
-          cmd: install
+          cmd: install --frozen-lockfile
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Build Core Client libraries
