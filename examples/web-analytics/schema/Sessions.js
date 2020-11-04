@@ -256,7 +256,7 @@ cube(`SessionUsers`, {
   referrer_source,
   referrer_medium,
   events_count
-  from ${Sessions.sql()} WHERE ${FILTER_PARAMS.SessionUsers.sessionStart.filter('session_start')}`,
+  from ${Sessions.sql()}`,
 
   preAggregations: {
     main: {
