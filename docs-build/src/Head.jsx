@@ -25,10 +25,10 @@ const Prod = props => (
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"></script>
-    <script src={`/docs/scripts/prism.js`} />
-    <script src={`/docs/scripts/analytics.js`} />
-    <script src={`/docs/scripts/fullstory.js`} />
-    <link href={`/docs/styles/content.css`} rel="stylesheet" />
+    <script src={`${process.env.PATH_PREFIX}/scripts/prism.js`} />
+    <script src={`${process.env.PATH_PREFIX}/scripts/analytics.js`} />
+    <script src={`${process.env.PATH_PREFIX}/scripts/fullstory.js`} />
+    <link href={`${process.env.PATH_PREFIX}/styles/content.css`} rel="stylesheet" />
     <script dangerouslySetInnerHTML={{ __html: `
       (function(h,o,t,j,a,r){
           h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};

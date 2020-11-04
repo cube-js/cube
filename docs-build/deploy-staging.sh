@@ -1,8 +1,8 @@
 #!/bin/bash
 
-echo PATH_PREFIX=$PATH_PREFIX > .env.staging
-echo ALGOLIA_API_KEY=$ALGOLIA_API_KEY >> .env.staging
-echo ALGOLIA_INDEX_NAME=$ALGOLIA_INDEX_NAME >> .env.staging
+echo PATH_PREFIX=$PATH_PREFIX > .env.development
+echo ALGOLIA_API_KEY=$ALGOLIA_API_KEY >> .env.development
+echo ALGOLIA_INDEX_NAME=$ALGOLIA_INDEX_NAME >> .env.development
 
 /bin/bash ./build.sh \
 && aws s3 sync public/ s3://cubejs-docs-staging/docs \
