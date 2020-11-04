@@ -12,3 +12,4 @@ yarn-error.log
 .rpt2_cache/
 **/.nyc_output
 **/coverage
+lerna-debug.log
