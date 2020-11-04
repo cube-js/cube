@@ -9,8 +9,6 @@ import '../../../static/styles/docsearch-custom.css';
 
 const ALGOLIA_PATH_PREFIX = "/cubejs/docs";
 
-console.log('process.env.ALGOLIA_API_KEY', process.env.ALGOLIA_API_KEY)
-
 export default class Search extends Component {
   state = {
     open: false

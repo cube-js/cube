@@ -2,9 +2,6 @@ require('dotenv').config({
   path: `.env.${process.env.NODE_ENV}`,
 });
 
-console.log('test_key...');
-console.log(process.env)
-
 const config = {
   siteMetadata: {
     title: 'Cube.js Docs',
