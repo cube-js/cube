@@ -25,6 +25,7 @@ const CustomReportPage = ({ withTime }) => {
       const meta = await cubejsApi.meta();
       setMeta(meta);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading || error || !meta) {

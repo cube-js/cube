@@ -8,7 +8,6 @@ import { HashRouter as Router, Route } from "react-router-dom";
 
 import ReportPage from "./pages/ReportPage";
 
-import DashboardPage from "./pages/DashboardPage";
 import AudiencePage from "./pages/AudiencePage";
 import BehaviorPage from "./pages/BehaviorPage";
 import AcquisitionPage from "./pages/AcquisitionPage";
