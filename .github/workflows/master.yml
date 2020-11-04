@@ -1,6 +1,17 @@
 name: Master
 on:
   push:
+    paths:
+      - '.github/workflows/push.yml'
+      - '.github/workflows/master.yml'
+      - 'packages/**'
+      - '.eslintrc.js'
+      - '.prettierrc'
+      - 'package.json'
+      - 'rollup.config.js'
+      - 'yarn.lock'
+      - 'docs-build/**'
+      - 'docs-gen/**'
     branches:
       - master
 jobs:
