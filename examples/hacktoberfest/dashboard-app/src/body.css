@@ -1,0 +1,7 @@
+body {
+  background-color: #f0f2f5 !important;
+}
+
+.ant-popover-disabled-compatible-wrapper {
+  pointer-events: none;
+}
