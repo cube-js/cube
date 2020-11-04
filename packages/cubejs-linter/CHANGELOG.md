@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.7](https://github.com/cube-js/cube.js/compare/v0.23.6...v0.23.7) (2020-11-04)
+
+
+### Features
+
+* **cubejs-cli:** Completely move CLI to TypeScript ([#1281](https://github.com/cube-js/cube.js/issues/1281)) ([dd5f3e2](https://github.com/cube-js/cube.js/commit/dd5f3e2948c82713354743af4a2727becac81388))
+
+
+
+
+
 # [0.23.0](https://github.com/cube-js/cube.js/compare/v0.22.4...v0.23.0) (2020-10-28)
 
 **Note:** Version bump only for package @cubejs-backend/linter

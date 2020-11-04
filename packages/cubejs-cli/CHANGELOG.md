@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.7](https://github.com/cube-js/cube.js/compare/v0.23.6...v0.23.7) (2020-11-04)
+
+
+### Features
+
+* **cubejs-cli:** Completely move CLI to TypeScript ([#1281](https://github.com/cube-js/cube.js/issues/1281)) ([dd5f3e2](https://github.com/cube-js/cube.js/commit/dd5f3e2948c82713354743af4a2727becac81388))
+* **cubejs-cli:** Use env_file to pass .env file instead of sharing inside volume ([#1287](https://github.com/cube-js/cube.js/issues/1287)) ([876f549](https://github.com/cube-js/cube.js/commit/876f549dd9c5a7a79664006f6614a72a836b63ca))
+
+
+
+
+
 ## [0.23.6](https://github.com/cube-js/cube.js/compare/v0.23.5...v0.23.6) (2020-11-02)
 
 

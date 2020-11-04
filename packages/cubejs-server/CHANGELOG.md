@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.7](https://github.com/cube-js/cube.js/compare/v0.23.6...v0.23.7) (2020-11-04)
+
+
+### Features
+
+* **@cubejs-backend/server:** Migrate WebSocketServer to TS ([#1295](https://github.com/cube-js/cube.js/issues/1295)) ([94c39df](https://github.com/cube-js/cube.js/commit/94c39dfb35c0e8bed81a77cde093fd346bcd5646))
+
+
+
+
+
 ## [0.23.6](https://github.com/cube-js/cube.js/compare/v0.23.5...v0.23.6) (2020-11-02)
 
 **Note:** Version bump only for package @cubejs-backend/server

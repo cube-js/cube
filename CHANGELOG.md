@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.7](https://github.com/cube-js/cube.js/compare/v0.23.6...v0.23.7) (2020-11-04)
+
+
+### Bug Fixes
+
+* **docker:** Add missing MySQL and cubestore drivers to the docker ([a36e86e](https://github.com/cube-js/cube.js/commit/a36e86e4e2524602a2a8ac09e2703e89c72796f2))
+
+
+### Features
+
+* **@cubejs-backend/server:** Migrate WebSocketServer to TS ([#1295](https://github.com/cube-js/cube.js/issues/1295)) ([94c39df](https://github.com/cube-js/cube.js/commit/94c39dfb35c0e8bed81a77cde093fd346bcd5646))
+* **cubejs-cli:** Completely move CLI to TypeScript ([#1281](https://github.com/cube-js/cube.js/issues/1281)) ([dd5f3e2](https://github.com/cube-js/cube.js/commit/dd5f3e2948c82713354743af4a2727becac81388))
+* Generate source maps for client libraries ([#1292](https://github.com/cube-js/cube.js/issues/1292)) ([cb64118](https://github.com/cube-js/cube.js/commit/cb64118770dce58bf7f3a3e7181cf159b8f316d3))
+* **@cubejs-backend/jdbc-driver:** Upgrade vendors ([#1282](https://github.com/cube-js/cube.js/issues/1282)) ([94b9b37](https://github.com/cube-js/cube.js/commit/94b9b37484c55a4155578a84ade409035d62e152))
+* **cubejs-cli:** Use env_file to pass .env file instead of sharing inside volume ([#1287](https://github.com/cube-js/cube.js/issues/1287)) ([876f549](https://github.com/cube-js/cube.js/commit/876f549dd9c5a7a79664006f6614a72a836b63ca))
+
+
+
+
+
 ## [0.23.6](https://github.com/cube-js/cube.js/compare/v0.23.5...v0.23.6) (2020-11-02)
 
 
