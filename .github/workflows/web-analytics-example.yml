@@ -34,7 +34,7 @@ jobs:
       - name: Install Cube.js CLI
         run: npm install -g cubejs-cli
       - name: Yarn install
-        run: yarn
+        run: yarn install --frozen-lockfile
         working-directory: examples/web-analytics
       - name: Deploy to Cube Cloud
         run: cubejs deploy
@@ -42,7 +42,7 @@ jobs:
         env:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
       - name: Yarn install
-        run: yarn
+        run: yarn install --frozen-lockfile
         working-directory: examples/web-analytics/dashboard-app
       - name: Deploy Static
         run: yarn deploy

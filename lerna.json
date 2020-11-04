@@ -2,6 +2,11 @@
   "packages": [
     "packages/*"
   ],
+  "command": {
+    "bootstrap": {
+      "yarnClientArgs": ["--frozen-lockfile"]
+    }
+  },
   "npmClient": "yarn",
   "version": "0.23.7"
 }
