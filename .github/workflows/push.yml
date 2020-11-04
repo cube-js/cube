@@ -149,7 +149,7 @@ jobs:
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Check Yarn lock wasn't modified
-      - run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status;  else echo "Nothing to commit. Proceeding"; fi;
+      - run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
