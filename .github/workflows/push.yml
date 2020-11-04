@@ -413,6 +413,8 @@ jobs:
           TEST_DRUID_VERSION: 0.19.0
 
   docker-image-latest-set-tag:
+    # At least git should be completed pushed up until this moment
+    needs: integration-wrk-1
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
