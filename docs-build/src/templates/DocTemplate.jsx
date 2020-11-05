@@ -27,9 +27,9 @@ const mdContentCallback = () => {
   })
 }
 
-const repoBaseUrl = "https://github.com/statsbotco/cube.js/blob/master";
+const repoBaseUrl = "https://github.com/cube-js/cube.js/blob/master";
 const getGithubUrl = (fileAbsolutePath) => {
-  const arr = fileAbsolutePath.split("/");
+  const arr = fileAbsolutePath.replace(/(.*)cube\.js\/(.*)/g, '$2').split("/");
   return [repoBaseUrl, ...arr.slice(arr.indexOf('cube.js') + 1)].join("/");
 }
 
