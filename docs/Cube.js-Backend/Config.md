@@ -229,7 +229,7 @@ module.exports = {
 
 Used in both REST and Websocket API.
 Can be `async` functon.
-Default implementation parses [JSON Web Tokens (JWT)](https://jwt.io/) in `Authorization` and sets payload to `req.authInfo` if it's verified.
+Default implementation parses [JSON Web Tokens (JWT)](https://jwt.io/) in `Authorization` header and sets payload to `req.authInfo` if it's verified.
 More info on how to generate such tokens is [here](security#security-context).
 
 You can set `req.authInfo = { u: { ...userContextObj } }` inside the middleware if you want to customize [USER_CONTEXT](cube#context-variables-user-context).
@@ -426,8 +426,8 @@ Timeout and interval options' values are in seconds.
 
 ### authInfo
 
-Defined as `req.authInfo` which should be set by [checkAuthMiddleware](#checkAuthMiddleware).
-Default implementation of [checkAuthMiddleware](#checkAuthMiddleware) uses [JWT Security Token](security) payload and sets it to `req.authInfo`.
+Defined as `req.authInfo` which should be set by [checkAuth](#options-reference-check-auth).
+Default implementation of [checkAuth](#options-reference-check-auth) uses [JWT Security Token](security) payload and sets it to `req.authInfo`.
 
 ## SchemaFileRepository
 
