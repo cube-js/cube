@@ -1,0 +1,37 @@
+.content {
+    margin: 50px;
+}
+
+.logo {
+    align-items: center;
+    display: grid;
+    grid-template-columns: min-content 1fr;
+    grid-gap: 50px;
+    margin: auto;
+    width: 700px;
+}
+
+.image {
+    background: url('./Icon.png') 50% 50%;
+    background-size: contain;
+    height: 200px;
+    width: 200px;
+}
+
+.text {
+    white-space: nowrap;
+}
+
+.text h1 {
+    line-height: 10px;
+}
+
+.banner {
+    background: var(--color-light-blue);
+    color: var(--color-very-dark-blue);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 32px;
+    padding: 10px 20px;
+    text-align: center;
+}
