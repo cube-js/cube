@@ -27,7 +27,9 @@ class WebSocketTransportResult {
 type WebSocketTransportOptions = {
   authorization: string,
   apiUrl: string,
+  // @deprecated
   hearBeatInterval?: number,
+  heartBeatInterval?: number,
 };
 
 type Message = {
@@ -45,7 +47,7 @@ type Subscription = {
 class WebSocketTransport {
   protected readonly apiUrl: string;
 
-  protected readonly hearBeatInterval: number;
+  protected readonly heartBeatInterval: number = 60;
 
   protected token: string;
 
@@ -57,10 +59,16 @@ class WebSocketTransport {
 
   protected messageQueue: Message[] = [];
 
-  constructor({ authorization, apiUrl, hearBeatInterval }: WebSocketTransportOptions) {
+  constructor({ authorization, apiUrl, heartBeatInterval, hearBeatInterval }: WebSocketTransportOptions) {
     this.token = authorization;
     this.apiUrl = apiUrl;
-    this.hearBeatInterval = hearBeatInterval || 60;
+
+    if (heartBeatInterval) {
+      this.heartBeatInterval = heartBeatInterval;
+    } else if (hearBeatInterval) {
+      console.warn('Option hearBeatInterval is deprecated. It was replaced by heartBeatInterval.');
+      this.heartBeatInterval = hearBeatInterval;
+    }
   }
 
   set authorization(token) {
@@ -97,7 +105,7 @@ class WebSocketTransport {
     };
 
     ws.reconcile = () => {
-      if (new Date().getTime() - ws.lastMessageTimestamp.getTime() > 4 * this.hearBeatInterval * 1000) {
+      if (new Date().getTime() - ws.lastMessageTimestamp.getTime() > 4 * this.heartBeatInterval * 1000) {
         ws.close();
       } else {
         Object.keys(this.messageIdToSubscription).forEach(messageId => {
@@ -123,7 +131,7 @@ class WebSocketTransport {
           ws.reconcileTimer = setInterval(() => {
             ws.messageIdSent = {};
             ws.reconcile();
-          }, this.hearBeatInterval * 1000);
+          }, this.heartBeatInterval * 1000);
           resolve();
         }
 

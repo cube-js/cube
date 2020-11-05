@@ -99,3 +99,4 @@ Name | Type |
 apiUrl | string |
 authorization | string |
 hearBeatInterval? | number |
+heartBeatInterval? | number |

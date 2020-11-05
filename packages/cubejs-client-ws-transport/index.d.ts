@@ -26,7 +26,9 @@ declare module '@cubejs-client/ws-transport' {
     type WebSocketTransportOptions = {
         authorization: string;
         apiUrl: string;
-        hearBeatInterval?: number;
+        // @deprecated
+        hearBeatInterval?: number,
+        heartBeatInterval?: number,
     };
     type Message = {
         messageId: number;
