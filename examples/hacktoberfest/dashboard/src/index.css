@@ -35,6 +35,10 @@ h1 {
   line-height: 50px;
 }
 
+h2 {
+  font-size: 27px;
+}
+
 a {
   color: inherit;
   text-decoration: none;

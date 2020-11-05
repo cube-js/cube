@@ -1,5 +1,6 @@
-import React from 'react';
-import styles from './styles.module.css';
+import React from 'react'
+import styles from './styles.module.css'
+import LanguageSelector from '../LanguageSelector'
 
 export default function App() {
   return (
@@ -19,7 +20,11 @@ export default function App() {
             <h2>told with data and admiration</h2>
           </div>
         </div>
+        <LanguageSelector
+          initial={[ 'all' ]}
+          onUpdate={selected => console.log(selected)}
+        />
       </div>
     </>
-  );
+  )
 }

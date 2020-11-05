@@ -1,5 +1,5 @@
 .content {
-    margin: 50px;
+    margin: 50px 25px;
 }
 
 .logo {
@@ -7,7 +7,7 @@
     display: grid;
     grid-template-columns: min-content 1fr;
     grid-gap: 50px;
-    margin: auto;
+    margin: auto auto 50px;
     width: 700px;
 }
 

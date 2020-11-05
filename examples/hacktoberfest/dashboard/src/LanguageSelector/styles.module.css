@@ -1,0 +1,27 @@
+.root {
+    color: #ffffff;
+    display: flex;
+    flex-wrap: wrap;
+    font-weight: 600;
+    list-style: none;
+    margin: auto;
+    text-align: center;
+    padding: 0;
+    max-width: 700px;
+}
+
+li {
+    cursor: pointer;
+    margin: 0 0 3px 3px;
+    padding: 5px 13px;
+}
+
+li:first-child {
+    background: var(--color-red);
+    width: 200px;
+}
+
+.selected {
+    background: #ffffff !important;
+    color: #000000 !important;
+}
