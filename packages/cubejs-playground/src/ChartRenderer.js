@@ -66,7 +66,7 @@ const cubejsApi = cubejs(
   { apiUrl: API_URL + "/cubejs-api/v1" }
 );
 
-const renderChart = (Component, query, pivotConfig) => ({ resultSet, error }) => {
+const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => {
   return (
     (resultSet && (
       <Component
@@ -82,12 +82,11 @@ const ChartRenderer = () => {
   ${!codeExample ? 'const { query, pivotConfig } = React.useContext(CubeJsQueryRenderer);' : ''}
   return (
     <QueryRenderer
-      query={query}
+      query={${codeExample ? prettify(query) : 'query'}}
       cubejsApi={cubejsApi}
       resetResultSetOnChange={false}
       render={renderChart(
-        ${renderFnName}, 
-        ${codeExample ? prettify(query) : 'query'}, 
+        ${renderFnName},
         ${codeExample ? prettify(pivotConfig) : 'pivotConfig'}
       )}
     />
