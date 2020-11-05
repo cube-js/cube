@@ -1,11 +1,24 @@
 import { CreateOptions } from '@cubejs-backend/server-core';
 import path from 'path';
 import fs from 'fs';
+import color from '@oclif/color';
 
 import { CubejsServer } from '../server';
 import { packageExists } from './utils';
 
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
+
+const devPackages = [
+  'typescript',
+];
+
+function isCubePackage(pkgName: string): boolean {
+  return pkgName.toLowerCase().startsWith('@cubejs-backend/');
+}
+
+function isDevPackage(pkgName: string): boolean {
+  return isCubePackage(pkgName) || devPackages.includes(pkgName.toLowerCase());
+}
 
 export class ServerContainer {
   public constructor(
@@ -24,6 +37,42 @@ export class ServerContainer {
     throw new Error(
       'Typescript dependency not found. Please run this command from project directory.'
     );
+  }
+
+  public runProjectDiagnostics() {
+    if (!fs.existsSync(path.join(process.cwd(), 'package.json'))) {
+      if (this.configuration.debug) {
+        console.log('Unable to find package.json, configuration diagnostics skipped');
+      }
+
+      return;
+    }
+
+    // eslint-disable-next-line global-require,import/no-dynamic-require
+    const manifiest = require(path.join(process.cwd(), 'package.json'));
+    if (manifiest) {
+      if (manifiest.dependencies) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [pkgName] of Object.entries(manifiest.dependencies)) {
+          if (isDevPackage(pkgName)) {
+            throw new Error(
+              `"${pkgName}" package must be installed in devDependencies`
+            );
+          }
+        }
+      }
+
+      if (manifiest.devDependencies) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [pkgName] of Object.entries(manifiest.devDependencies)) {
+          if (!isDevPackage(pkgName)) {
+            console.log(
+              `${color.yellow('warning')} "${pkgName}" will not be installed in Cube Cloud (please move it to dependencies)`
+            );
+          }
+        }
+      }
+    }
   }
 
   public runServerInstance(configuration: CreateOptions) {
