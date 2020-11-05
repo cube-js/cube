@@ -2,6 +2,7 @@ name: Master
 on:
   push:
     paths:
+      - '.github/workflows/docs.yml'
       - 'docs-build/**'
       - 'docs-gen/**'
       - 'docs/**'
