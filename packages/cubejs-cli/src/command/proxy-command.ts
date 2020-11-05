@@ -43,11 +43,11 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
           }
         }
 
-        commandInfo.action(() => {
+        commandInfo.action(async () => {
           try {
             // eslint-disable-next-line new-cap
             const CommandInstance: Command = new OriginalCommandPackage.default(process.argv.slice(3));
-            CommandInstance.run();
+            await CommandInstance.run();
           } catch (e) {
             displayError(e.stack || e.message);
           }
