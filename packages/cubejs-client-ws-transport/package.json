@@ -8,11 +8,21 @@
   },
   "description": "Cube.js WebSocket transport",
   "main": "dist/cubejs-client-ws-transport.js",
+  "typings": "dist/index.d.ts",
   "author": "Cube Dev, Inc.",
+  "scripts": {
+    "build": "npm run tsc",
+    "tsc": "tsc && rm -rf temp",
+    "watch": "tsc -w",
+    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts",
+    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts"
+  },
   "dependencies": {
     "@babel/runtime": "^7.1.2",
+    "@types/ws": "^7.2.9",
     "core-js": "^3.6.5",
-    "isomorphic-ws": "^4.0.1"
+    "isomorphic-ws": "^4.0.1",
+    "ws": "^7.3.1"
   },
   "files": [
     "src",
@@ -22,10 +32,16 @@
   "devDependencies": {
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
+    "@babel/preset-typescript": "^7.12.1",
+    "@cubejs-backend/linter": "^0.23.0",
     "babel-jest": "^24.1.0",
-    "jest": "^24.1.0"
+    "jest": "^24.1.0",
+    "typescript": "^4.0.5"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   }
 }

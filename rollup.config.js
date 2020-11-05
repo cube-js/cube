@@ -19,17 +19,19 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     plugins: [
       ...baseConfig.plugins,
       commonjs({
-        extensions: ['.js', '.ts'],
+        extensions: ['.js'],
       }),
       resolve({
         extensions: ['.ts', '.js', '.json'],
         mainFields: ['browser', 'module', 'main'],
       }),
       babel({
+        extensions: ['.js', '.jsx', '.ts', '.tsx'],
         exclude: ['node_modules/**', /\/core-js\//],
         babelHelpers: 'runtime',
         presets: [
           '@babel/preset-react',
+          '@babel/preset-typescript',
           [
             '@babel/preset-env',
             {
@@ -87,10 +89,12 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       plugins: [
         ...baseConfig.plugins,
         babel({
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
           babelHelpers: 'runtime',
           presets: [
             '@babel/preset-react',
+            '@babel/preset-typescript',
             [
               '@babel/preset-env',
               {
@@ -127,10 +131,12 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       plugins: [
         ...baseConfig.plugins,
         babel({
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
           babelHelpers: 'runtime',
           presets: [
             '@babel/preset-react',
+            '@babel/preset-typescript',
             [
               '@babel/preset-env',
               {
@@ -177,7 +183,7 @@ export default bundle(
 )
   .concat(
     bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
-      input: 'packages/cubejs-client-ws-transport/src/index.js',
+      input: 'packages/cubejs-client-ws-transport/src/index.ts',
     })
   )
   .concat(
