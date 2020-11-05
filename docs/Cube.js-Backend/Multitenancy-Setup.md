@@ -23,8 +23,8 @@ The options are:
 All of the above options are functions, which you provide to Cube.js in [cube.js
 config file](config). The
 functions accept one argument - context object, which has a nested object -
-`authInfo`, which acts as a container, where you can provide all the necessary data to identify user, organization, app, etc.
-You put data into `authInfo` when creating a Cube.js API Token.
+[authInfo](config#request-context-auth-info), which acts as a container, where you can provide all the necessary data to identify user, organization, app, etc.
+By default [authInfo](config#request-context-auth-info) is defined by [Cube.js API Token](security).
 
 There're several multitenancy setup scenarios that can be achieved by using combinations of these configuration options.
 
@@ -105,6 +105,7 @@ Together with [contextToDataSourceId](config#options-reference-context-to-data-s
 ## Same DB Instance with per Tenant Row Level Security
 
 Per tenant row level security can be achieved by providing [queryTransformer](config#options-reference-query-transformer) which adds tenant identifier filter to the original query.
+It uses [authInfo](config#request-context-auth-info) to determine which tenant is requesting the data.
 This way in fact every tenant starts to see it's own data however all the resources like query queue and pre-aggregations are shared between all the tenants.
 
 **cube.js:**
@@ -128,12 +129,11 @@ module.exports = {
 
 Let's consider the following example:
 
-We store data for different users in different databases, but on the same Postgres host. The database name is `my_app_1_2`, where `1`
-is **Application ID** and `2` is **User ID**.
+We store data for different users in different databases, but on the same Postgres host. 
+The database name is `my_app_1_2`, where `1` is **Application ID** and `2` is **User ID**.
 
-To make it work with Cube.js,
-first we need to pass the `appId` and `userId` as context to every query. We
-should include that into our token generation code.
+To make it work with Cube.js, first we need to pass the `appId` and `userId` as context to every query. 
+We should include that into our token generation code.
 
 ```javascript
 const jwt = require('jsonwebtoken');
@@ -146,9 +146,9 @@ const cubejsToken = jwt.sign(
 );
 ```
 
-Now, we can access them as `authInfo` object inside the context object. Let's
-first use `contextToAppId` to create a dynamic Cube.js App ID for every combination of
-`appId` and `userId`. Cube.js App ID is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
+Now, we can access them as [authInfo](config#request-context-auth-info) object inside the context object. 
+Let's first use [contextToAppId](config#options-reference-context-to-app-id) to create a dynamic Cube.js App ID for every combination of `appId` and `userId`. 
+Cube.js App ID is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
 
 **cube.js:**
 ```javascript
@@ -157,8 +157,7 @@ module.exports = {
 };
 ```
 
-Next, we can use `driverFactory` to dynamically select database, based on
-`appId` and `userId`.
+Next, we can use [driverFactory](config#options-reference-driver-factory) to dynamically select database, based on `appId` and `userId`.
 
 **cube.js:**
 ```javascript
@@ -175,7 +174,8 @@ module.exports = {
 
 ## Same DB Instance with per Tenant Pre-Aggregations
 
-To support per tenant pre-aggregation of data within same database instance you should provide `preAggregationsSchema` option.
+To support per tenant pre-aggregation of data within same database instance you should provide [preAggregationsSchema](config#options-reference-pre-aggregations-schema) option.
+You should use [authInfo](config#request-context-auth-info) to determine tenant which requesting the data.
 
 **cube.js:**
 ```javascript
@@ -190,8 +190,9 @@ module.exports = {
 What if for application with ID 3 data is stored not in Postgres, but in MongoDB?
 
 We can instruct Cube.js to connect to MongoDB in that case, instead of
-Postgres. For that purpose we'll use `dbType` option to dynamically set database
-type. We also need to modify our `driverFactory` option.
+Postgres. For that purpose we'll use [dbType](config#options-reference-db-type) option to dynamically set database
+type. We also need to modify our [driverFactory](config#options-reference-driver-factory) option.
+You should use [authInfo](config#request-context-auth-info) to determine tenant which requesting the data.
 
 **cube.js:**
 ```javascript
