@@ -19,15 +19,13 @@ const staticOptions = {
     text: 'Orders by region<small>Highcharts Map API</small>',
     useHTML: true,
   },
-  colorAxis: {
-    min: 0,
-  },
   tooltip: {
     headerFormat: '',
     pointFormat: `
       <b>{point.name}</b>: {point.value}`,
   },
   colorAxis: {
+    min: 0,
     minColor: '#FFEAE4',
     maxColor: '#FF6492',
   },
@@ -74,7 +72,7 @@ export default ({ data, setRegion }) => {
         },
       ],
     });
-  }, [data]);
+  }, [data, setRegion]);
 
   return (
     <HighchartsReact

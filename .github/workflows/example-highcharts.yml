@@ -1,4 +1,4 @@
-name: Web Analytics Example
+name: HighCharts Example
 on:
   push:
     paths:
