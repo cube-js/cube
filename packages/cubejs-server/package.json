@@ -54,7 +54,7 @@
     "ws": "^7.1.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.21.1",
+    "@cubejs-backend/linter": "^0.23.7",
     "@oclif/dev-cli": "^1.22.2",
     "@types/cors": "^2.8.8",
     "@types/node": "^10.0.10",
