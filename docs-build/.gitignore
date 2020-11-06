@@ -9,3 +9,4 @@ yarn-error.log
 cube.js/
 
 .env.*
+!.env.example
