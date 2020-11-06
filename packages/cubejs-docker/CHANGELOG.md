@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.8](https://github.com/cube-js/cube.js/compare/v0.23.7...v0.23.8) (2020-11-06)
+
+
+### Features
+
+* **docker:** Use --frozen-lockfile for docker image building ([60a0ca9](https://github.com/cube-js/cube.js/commit/60a0ca9e77a8f95c40cc501dbdfd8ae80c3f8481))
+
+
+
+
+
 ## [0.23.7](https://github.com/cube-js/cube.js/compare/v0.23.6...v0.23.7) (2020-11-04)
 
 

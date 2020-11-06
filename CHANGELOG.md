@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.8](https://github.com/cube-js/cube.js/compare/v0.23.7...v0.23.8) (2020-11-06)
+
+
+### Bug Fixes
+
+* **@cubejs-playground:** undefined query ([7d87fa6](https://github.com/cube-js/cube.js/commit/7d87fa60f207c2fa3360405a05d84fb6ffaba4c7))
+* **cubejs-cli:** proxyCommand - await external command run on try/catch ([dc84460](https://github.com/cube-js/cube.js/commit/dc84460d740eedfff3a874f13316c1c2dedb9135))
+
+
+### Features
+
+* **@cubejs-backend/server:** Init source-map-support for cubejs-server/cubejs-dev-server ([aed319a](https://github.com/cube-js/cube.js/commit/aed319a33e84ba924a21a1270ee18f2ab054b9d5))
+* **@cubejs-client/ws-transport:** Move to TypeScript ([#1293](https://github.com/cube-js/cube.js/issues/1293)) ([e7e1100](https://github.com/cube-js/cube.js/commit/e7e1100ee2adc7e1e9f6368c2edc6208a8eea774))
+* **docker:** Use --frozen-lockfile for docker image building ([60a0ca9](https://github.com/cube-js/cube.js/commit/60a0ca9e77a8f95c40cc501dbdfd8ae80c3f8481))
+
+
+
+
+
 ## [0.23.7](https://github.com/cube-js/cube.js/compare/v0.23.6...v0.23.7) (2020-11-04)
 
 

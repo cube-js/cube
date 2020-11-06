@@ -4,9 +4,11 @@
   ],
   "command": {
     "bootstrap": {
-      "npmClientArgs": ["--frozen-lockfile"]
+      "npmClientArgs": [
+        "--frozen-lockfile"
+      ]
     }
   },
   "npmClient": "yarn",
-  "version": "0.23.7"
+  "version": "0.23.8"
 }
