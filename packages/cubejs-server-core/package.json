@@ -37,6 +37,7 @@
     "http-proxy-agent": "^4.0.1",
     "jsonwebtoken": "^8.4.0",
     "lru-cache": "^5.1.1",
+    "moment": "^2.29.1",
     "node-fetch": "^2.6.0",
     "node-machine-id": "^1.1.10",
     "prettier": "^1.16.4",
