@@ -14,7 +14,7 @@
   resolved "https://registry.yarnpkg.com/@babel/compat-data/-/compat-data-7.12.5.tgz#f56db0c4bb1bbbf221b4e81345aab4141e7cb0e9"
   integrity sha512-DTsS7cxrsH3by8nqQSpFSyjSfSYl57D6Cf4q8dW3LK83tBKBDCkfcay1nYkXq1nIHXnpX8WMMb/O25HOy3h1zg==
 
-"@babel/core@^7.1.0", "@babel/core@^7.7.5":
+"@babel/core@^7.1.0", "@babel/core@^7.4.0", "@babel/core@^7.7.5":
   version "7.12.3"
   resolved "https://registry.yarnpkg.com/@babel/core/-/core-7.12.3.tgz#1b436884e1e3bff6fb1328dc02b208759de92ad8"
   integrity sha512-0qXcZYKZp3/6N2jKYVxZv0aNCsxTSVCiK72DTiTYZAu7sjg73W0/aynWjMbiGd87EQL4WyA8reiJVh92AVla9g==
@@ -255,7 +255,7 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
-"@babel/parser@^7.1.0", "@babel/parser@^7.10.4", "@babel/parser@^7.12.3", "@babel/parser@^7.12.5", "@babel/parser@^7.4.2":
+"@babel/parser@^7.1.0", "@babel/parser@^7.10.4", "@babel/parser@^7.12.3", "@babel/parser@^7.12.5", "@babel/parser@^7.4.0":
   version "7.12.5"
   resolved "https://registry.yarnpkg.com/@babel/parser/-/parser-7.12.5.tgz#b4af32ddd473c0bfa643bd7ff0728b8e71b81ea0"
   integrity sha512-FVM6RZQ0mn2KCf1VUED7KepYeUWoVShczewOCfm3nzoBybaih51h+sYVVGthW9M6lPByEPTQf+xm27PBdlpwmQ==
@@ -715,7 +715,7 @@
     "@babel/helper-create-regexp-features-plugin" "^7.12.1"
     "@babel/helper-plugin-utils" "^7.10.4"
 
-"@babel/preset-env@^7.3.4":
+"@babel/preset-env@^7.4.0":
   version "7.12.1"
   resolved "https://registry.yarnpkg.com/@babel/preset-env/-/preset-env-7.12.1.tgz#9c7e5ca82a19efc865384bb4989148d2ee5d7ac2"
   integrity sha512-H8kxXmtPaAGT7TyBvSSkoSTUK6RHh61So05SyEbpmr0MCZrsNYn7mGMzzeYoOUCdHzww61k8XBft2TaES+xPLg==
@@ -805,7 +805,7 @@
   dependencies:
     regenerator-runtime "^0.13.4"
 
-"@babel/standalone@^7.3.4":
+"@babel/standalone@^7.4.0":
   version "7.12.6"
   resolved "https://registry.yarnpkg.com/@babel/standalone/-/standalone-7.12.6.tgz#fa59cf6f1cea940a790179f1375394ab31f025b9"
   integrity sha512-yA/OV3jN1nhr0JsAdYWAqbeZ7cAOw/6Fh52rxVMzujr0HF4Z3cau0JBzJfQppFfR9IArrUtcqhBu/+Q/IevoyQ==
@@ -892,15 +892,16 @@
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.23.6":
-  version "0.23.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.6.tgz#d3bed0c6e69a4eb6a1d182d1b961609a02acffcb"
-  integrity sha512-/+kjz4fVJPn5TR0wSl25A4yRTaioGaU47cCxBwhGvmmqkCMv6MYA8dvkhvmN+L94ImW24tqCqmZdL22x8fixDg==
+"@cubejs-backend/schema-compiler@^0.23.8":
+  version "0.23.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.8.tgz#2996a10b438b3708a358b5b8ff4fc1621b0f0d80"
+  integrity sha512-O+0QWAjvoHU9KANLry/9n0ZShA4h09GqvjftKl5UHbITZ/bwvT4etX+ssAoEyVKrb5otfgNU96cZUMyYUc1+6w==
   dependencies:
+    "@babel/core" "^7.4.0"
     "@babel/generator" "^7.4.0"
-    "@babel/parser" "^7.4.2"
-    "@babel/preset-env" "^7.3.4"
-    "@babel/standalone" "^7.3.4"
+    "@babel/parser" "^7.4.0"
+    "@babel/preset-env" "^7.4.0"
+    "@babel/standalone" "^7.4.0"
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
     "@hapi/joi" "^15.1.1"
@@ -915,14 +916,14 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.23.6":
-  version "0.23.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.23.6.tgz#9e62a1bfb4b70791c64b129e8d2d9dbccc4c619c"
-  integrity sha512-Ryxx6oyN8Eq6cpGPUSchuz+6bdfP13lxkNOdc9XfbxUBhqkKXkQOer7jvy55244RGpv58oMEkRJZf+e3bE2wAQ==
+"@cubejs-backend/server-core@^0.23.8":
+  version "0.23.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.23.8.tgz#0486277b037d7d8fe0011bd5847f38a275a30bbf"
+  integrity sha512-/dRuxj+o1quZsu8oMPexFanyV7Q8DADJPmKsy8AIcwSgo9ILZpPrORIuKJIPbZgeqmZ5PEQ3fse9MxteisOxFQ==
   dependencies:
     "@cubejs-backend/api-gateway" "^0.23.6"
     "@cubejs-backend/query-orchestrator" "^0.23.6"
-    "@cubejs-backend/schema-compiler" "^0.23.6"
+    "@cubejs-backend/schema-compiler" "^0.23.8"
     "@hapi/joi" "^15.1.1"
     codesandbox-import-utils "^2.1.12"
     cross-spawn "^7.0.1"
@@ -1217,7 +1218,7 @@
     debug "^4.1.1"
     semver "^7.3.2"
 
-"@oclif/config@^1.12.12", "@oclif/config@^1.15.1":
+"@oclif/config@^1.12.12", "@oclif/config@^1.15.1", "@oclif/config@^1.17.0":
   version "1.17.0"
   resolved "https://registry.yarnpkg.com/@oclif/config/-/config-1.17.0.tgz#ba8639118633102a7e481760c50054623d09fcab"
   integrity sha512-Lmfuf6ubjQ4ifC/9bz1fSCHc6F6E653oyaRXxg+lgT4+bYf9bk+nqrUpAbrXyABkCqgIBiFr3J4zR/kiFdE1PA==
@@ -2001,7 +2002,7 @@ browser-process-hrtime@^1.0.0:
   resolved "https://registry.yarnpkg.com/browser-process-hrtime/-/browser-process-hrtime-1.0.0.tgz#3c9b4b7d782c8121e56f10106d84c0d0ffc94626"
   integrity sha512-9o5UecI3GhkpM6DrXr69PblIuWxPKk9Y0jHBRhdocZ2y7YECBFCsHm79Pr3OyR2AvjhDkabFJaDJMYRazHgsow==
 
-browserslist@^4.14.5, browserslist@^4.8.5:
+browserslist@^4.14.5, browserslist@^4.14.6:
   version "4.14.6"
   resolved "https://registry.yarnpkg.com/browserslist/-/browserslist-4.14.6.tgz#97702a9c212e0c6b6afefad913d3a1538e348457"
   integrity sha512-zeFYcUo85ENhc/zxHbiIp0LGzzTrE2Pv2JhxvS7kpUb9Q9D38kUX6Bie7pGutJ/5iF5rOxE7CepAuWD56xJ33A==
@@ -2389,11 +2390,11 @@ copy-descriptor@^0.1.0:
   integrity sha1-Z29us8OZl8LuGsOpJP1hJHSPV40=
 
 core-js-compat@^3.6.2:
-  version "3.6.5"
-  resolved "https://registry.yarnpkg.com/core-js-compat/-/core-js-compat-3.6.5.tgz#2a51d9a4e25dfd6e690251aa81f99e3c05481f1c"
-  integrity sha512-7ItTKOhOZbznhXAQ2g/slGg1PJV5zDO/WdkTwi7UEOJmkvsE32PWvx6mKtDjiMpjnR2CNf6BAD6sSxIlv7ptng==
+  version "3.7.0"
+  resolved "https://registry.yarnpkg.com/core-js-compat/-/core-js-compat-3.7.0.tgz#8479c5d3d672d83f1f5ab94cf353e57113e065ed"
+  integrity sha512-V8yBI3+ZLDVomoWICO6kq/CD28Y4r1M7CWeO4AGpMdMfseu8bkSubBmUPySMGKRTS+su4XQ07zUkAsiu9FCWTg==
   dependencies:
-    browserslist "^4.8.5"
+    browserslist "^4.14.6"
     semver "7.0.0"
 
 core-util-is@1.0.2, core-util-is@~1.0.0:
