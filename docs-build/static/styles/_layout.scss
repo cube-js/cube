@@ -53,6 +53,7 @@ a {
   }
 
   ol li, ul li {
+    font-family: $body-font;
     margin-bottom: 8px;
     padding-left: 8px;
   }
@@ -297,6 +298,7 @@ a {
       }
 
       .mainTabText {
+        font-family: $body-font;
         line-height: 22px;
         font-size: 16px;
         letter-spacing: 0.02em;

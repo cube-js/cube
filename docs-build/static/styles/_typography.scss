@@ -1,4 +1,4 @@
-$purple: #7A77FF;
+@import "variables";
 
 html {
   height: 100%;
@@ -16,7 +16,7 @@ html {
 body {
   height: 100%;
   max-height: 100%;
-  font-family: Cera Pro, "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Ubuntu, "DejaVu Sans", Arial, sans-serif;
+  font-family: $header-font;
   line-height: 28px;
   font-size: 16px;
   color: $dark-01;
@@ -96,6 +96,12 @@ a {
 
 a:hover {
   color: #111;
+}
+
+p {
+  font-family: $body-font;
+  font-size: 17px;
+  line-height: 30px;
 }
 
 p,

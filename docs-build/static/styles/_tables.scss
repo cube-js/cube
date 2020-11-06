@@ -1,4 +1,4 @@
-@import './variables.scss';
+@import 'variables';
 
 table {
   width: 100%;
@@ -48,4 +48,10 @@ th {
 
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+td {
+  font-family: $body-font;
+  font-size: 15px;
+  letter-spacing: 0.01em;
 }
