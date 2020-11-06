@@ -36,11 +36,11 @@
     "react-scripts": "3.4.1"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
     "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "npm run build && netlify deploy --prod --dir build"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -63,5 +63,8 @@
     "credentials": "0.0.1",
     "chartjs-charts": "0.0.1",
     "antd-tables": "0.0.1"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.2"
   }
 }
