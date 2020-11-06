@@ -148,7 +148,10 @@ const cubejsToken = jwt.sign(
 
 Now, we can access them as [authInfo](config#request-context-auth-info) object inside the context object. 
 Let's first use [contextToAppId](config#options-reference-context-to-app-id) to create a dynamic Cube.js App ID for every combination of `appId` and `userId`. 
-Cube.js App ID is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
+
+[[warning | Note]]
+| Cube.js App ID (result of [contextToAppId](config#options-reference-context-to-app-id)) is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.
+| Missing [contextToAppId](config#options-reference-context-to-app-id) definition will result in unexpected caching issues such as schema of one tenant is used for another one.
 
 **cube.js:**
 ```javascript
