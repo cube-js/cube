@@ -3,7 +3,7 @@ on:
   push:
     paths:
       - '.github/workflows/example-drill-downs.yml'
-      - 'examples/react-dashboard/**'
+      - 'examples/drill-downs/**'
     branches:
       - master
 
@@ -26,7 +26,7 @@ jobs:
         id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('examples/drill-down/yarn.lock') }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('examples/drill-downs/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Install Netlify CLI
@@ -35,17 +35,17 @@ jobs:
         run: npm install -g cubejs-cli
       - name: Yarn install
         run: yarn install --frozen-lockfile
-        working-directory: examples/drill-down
+        working-directory: examples/drill-downs
       - name: Deploy to Cube Cloud
         run: cubejs deploy
-        working-directory: examples/drill-down
+        working-directory: examples/drill-downs
         env:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
       - name: Yarn install
         run: yarn install --frozen-lockfile
-        working-directory: examples/drill-down/dashboard-app
+        working-directory: examples/drill-downs/dashboard-app
       - name: Deploy Static
         run: yarn deploy
-        working-directory: examples/drill-down/dashboard-app
+        working-directory: examples/drill-downs/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
