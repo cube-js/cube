@@ -37,7 +37,9 @@ behavior. Some of these variables can also be set via [configuration options][li
 
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
-## Database
+## Database Connection
+
+The following environment variables are used to provide credentials for Cube.js to connect to the databases. You can [learn more about connecting to the databases in this guide.](connecting-to-the-database)
 
 |Environment variable               |Used With           |Description                                                                     |Possible Values                                                                                                                |
 |-----------------------------------|--------------------|--------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
