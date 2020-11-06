@@ -147,14 +147,17 @@ export const ChartRenderer = (props) => {
     pivotConfig,
     codeExample: true,
   });
-  const dependencies = {
+  const commonDependencies = {
     '@cubejs-client/core': cubejs,
     '@cubejs-client/react': cubejsReact,
-    'cubejs-context': CubeJsQueryRenderer,
     antd,
     react: React,
     ...selectedChartLibrary.imports,
   };
+  const dependencies = {
+    ...commonDependencies,
+    'cubejs-context': CubeJsQueryRenderer
+  }
 
   useEffect(() => {
     if (jsCompilingError) {
@@ -176,7 +179,7 @@ export const ChartRenderer = (props) => {
         sqlQuery={sqlQuery}
         codeExample={codeExample}
         codeSandboxSource={forCodeSandBox(codeExample)}
-        dependencies={dependencies}
+        dependencies={commonDependencies}
         dashboardSource={dashboardSource}
         chartLibrary={chartLibrary}
         setChartLibrary={setChartLibrary}
