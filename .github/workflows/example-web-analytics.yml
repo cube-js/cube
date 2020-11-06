@@ -1,8 +1,8 @@
-name: Web Analytics Example
+name: HighCharts Example
 on:
   push:
     paths:
-      - '.github/workflows/web-analytics-example.yml'
+      - '.github/workflows/example-web-analytics.yml'
       - 'examples/web-analytics/**'
     branches:
       - master
@@ -30,7 +30,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Install Netlify CLI
-        run: npm install -g netlify
+        run: npm install -g netlify-cli
       - name: Install Cube.js CLI
         run: npm install -g cubejs-cli
       - name: Yarn install
