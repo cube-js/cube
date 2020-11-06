@@ -8,7 +8,11 @@ COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
 COPY packages/cubejs-linter packages/cubejs-linter
-RUN yarn install --frozen-lockfile
+
+# There is a problem with release process.
+# We are doing version bump without updating lock files for the docker package.
+#RUN yarn install --frozen-lockfile
+RUN yarn install
 
 # @todo https://stackoverflow.com/questions/49939960/docker-copy-files-using-glob-pattern/50010093
 #COPY packages/*/package.json ./
