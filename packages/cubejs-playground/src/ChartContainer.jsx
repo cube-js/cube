@@ -15,6 +15,7 @@ import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import { fetch } from 'whatwg-fetch';
 import { map } from 'ramda';
+import styled from 'styled-components';
 import { Redirect, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from 'sql-formatter';
@@ -22,6 +23,20 @@ import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
+
+const StyledCard = styled(Card)`
+  .ant-card-head {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+  }
+  
+  .ant-card-body {
+    max-width: 100%;
+    overflow: auto;
+  }
+`;
 
 export const frameworks = [
   {
@@ -420,9 +435,9 @@ class ChartContainer extends React.Component {
     return hideActions ? (
       render({ resultSet, error, sandboxId })
     ) : (
-      <Card title={title} style={{ minHeight: 420 }} extra={extra}>
+      <StyledCard title={title} style={{ minHeight: 420 }} extra={extra}>
         {renderChart()}
-      </Card>
+      </StyledCard>
     );
   }
 }
