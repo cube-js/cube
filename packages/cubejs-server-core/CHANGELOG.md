@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.10](https://github.com/cube-js/cube.js/compare/v0.23.9...v0.23.10) (2020-11-07)
+
+
+### Bug Fixes
+
+* Warnings on installation ([cecaa6e](https://github.com/cube-js/cube.js/commit/cecaa6e9797ef23c52964b3c3e76ace6fb567e8a))
+
+
+
+
+
 ## [0.23.8](https://github.com/cube-js/cube.js/compare/v0.23.7...v0.23.8) (2020-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

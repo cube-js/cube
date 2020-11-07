@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.10](https://github.com/cube-js/cube.js/compare/v0.23.9...v0.23.10) (2020-11-07)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** add horizontal scroll and sticky head for chart card ([#1256](https://github.com/cube-js/cube.js/issues/1256)) ([025f15d](https://github.com/cube-js/cube.js/commit/025f15dbee101e12f086ef3bbe4c6cceaf543670))
+* **@cubejs-playground:** codesandbox dependencies ([1ed6309](https://github.com/cube-js/cube.js/commit/1ed63096d60b241b6966b4bc29cb455214a59ee5))
+
+
+
+
+
 ## [0.23.8](https://github.com/cube-js/cube.js/compare/v0.23.7...v0.23.8) (2020-11-06)
 
 

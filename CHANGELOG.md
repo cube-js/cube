@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.10](https://github.com/cube-js/cube.js/compare/v0.23.9...v0.23.10) (2020-11-07)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** add horizontal scroll and sticky head for chart card ([#1256](https://github.com/cube-js/cube.js/issues/1256)) ([025f15d](https://github.com/cube-js/cube.js/commit/025f15dbee101e12f086ef3bbe4c6cceaf543670))
+* **@cubejs-playground:** codesandbox dependencies ([1ed6309](https://github.com/cube-js/cube.js/commit/1ed63096d60b241b6966b4bc29cb455214a59ee5))
+* **ci:** Force usinging /build directory for netlify deployment ([7ca10f0](https://github.com/cube-js/cube.js/commit/7ca10f05cfec6e85d8eaf3042d18bd15c33b84ce))
+* **ci:** Install netlify-cli instead of netlify (api client) ([60bfaa2](https://github.com/cube-js/cube.js/commit/60bfaa2531efdecc3f76af50cfe53f89752c3ae2))
+* **cubejs-cli:** scaffolding/ScaffoldingTemplate dependency not found. ([8f3e6c7](https://github.com/cube-js/cube.js/commit/8f3e6c7594a406b689ed43ba1c0dd004f0a14e3b))
+* **examples/drill-down:** Automatically deploy ([b04148b](https://github.com/cube-js/cube.js/commit/b04148b6bf8a5a47b927b83771f7953ae2905631))
+* **examples/drill-down:** Automatically deploy ([570b903](https://github.com/cube-js/cube.js/commit/570b90341e87b458ef12873ce43f01b630abc8ac))
+* **examples/highcharts:** Switch configuration for production/development ([978eb89](https://github.com/cube-js/cube.js/commit/978eb89cb4179ce9d5e3eb4008b1744ead08041c))
+* **examples/highcharts:** Warnings on build ([72bb74b](https://github.com/cube-js/cube.js/commit/72bb74b6a8493611b3e3f878a1e432c49e1961e6))
+* **examples/react-dashboard:** Automatically deploy ([0036016](https://github.com/cube-js/cube.js/commit/0036016b5947d95d362a52e5fe8029ec3298c58d))
+* update message in CLI template ([d5a24ba](https://github.com/cube-js/cube.js/commit/d5a24ba1fad5a9b8bb1e5abed09a30b7bc5a8751))
+* Warnings on installation ([cecaa6e](https://github.com/cube-js/cube.js/commit/cecaa6e9797ef23c52964b3c3e76ace6fb567e8a))
+
+
+### Features
+
+* **@cubejs-backend/server:** dev-server/server - introduce project diagnostics ([#1330](https://github.com/cube-js/cube.js/issues/1330)) ([0606926](https://github.com/cube-js/cube.js/commit/0606926146abfd33edc707efc617460b6b77e006))
+* **ci:** Automatically deploy examples/highcharts ([c227137](https://github.com/cube-js/cube.js/commit/c227137793f10914485d0c05f498d759e21e3ef6))
+* **cubestore:** Upgrade datafusion to 3.0 ([85f2165](https://github.com/cube-js/cube.js/commit/85f216517c6c611aca39c5f775669749a9e74387))
+
+
+
+
+
 ## [0.23.9](https://github.com/cube-js/cube.js/compare/v0.23.8...v0.23.9) (2020-11-06)
 
 **Note:** Version bump only for package cubejs
