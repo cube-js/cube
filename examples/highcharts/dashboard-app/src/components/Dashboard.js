@@ -141,10 +141,12 @@ export default () => {
     if (solidGauge) {
       let temp = [];
       let sum = 0;
-      solidGauge.tablePivot().map((item) => {
+
+      solidGauge.tablePivot().forEach((item) => {
         temp.push([item['Orders.status'], parseInt(item['Orders.count'])]);
         sum += parseInt(item['Orders.count']);
       });
+
       setSolidGaugeData({ status: temp, count: sum });
     }
   }, [solidGauge]);
@@ -152,12 +154,14 @@ export default () => {
   useEffect(() => {
     if (pie) {
       let temp = [];
-      pie.tablePivot().map((item) => {
+
+      pie.tablePivot().forEach((item) => {
         temp.push({
           name: item['ProductCategories.name'],
           y: parseInt(item['LineItems.quantity']),
         });
       });
+
       setPieData(temp);
     }
   }, [pie]);
@@ -165,12 +169,14 @@ export default () => {
   useEffect(() => {
     if (orders) {
       let temp = [];
-      orders.tablePivot().map((item) => {
+
+      orders.tablePivot().forEach((item) => {
         temp.push([
           parseInt(moment(item['Orders.createdAt']).format('x')),
           parseInt(item['Orders.count']),
         ]);
       });
+
       setOrdersData(temp);
     }
   }, [orders]);
@@ -178,9 +184,11 @@ export default () => {
   useEffect(() => {
     if (regions) {
       let temp = [];
-      regions.tablePivot().map((item) => {
+
+      regions.tablePivot().forEach((item) => {
         temp.push([item['Users.state'], parseInt(item['Orders.count'])]);
       });
+
       setRegionsData(temp);
     }
   }, [regions]);
@@ -189,14 +197,17 @@ export default () => {
     if (stacked) {
       let range = {};
       let categories = new Set();
-      stacked.tablePivot().map((item) => {
+
+      stacked.tablePivot().forEach((item) => {
         categories.add(moment(item['Orders.createdAt.month']).format('MMMM'));
+
         if (!range[item['ProductCategories.name']]) {
           range[item['ProductCategories.name']] = {
             name: item['ProductCategories.name'],
             data: [],
           };
         }
+
         range[item['ProductCategories.name']].data.push(
           parseInt(item['LineItems.quantity'])
         );

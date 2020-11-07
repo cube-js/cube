@@ -7,7 +7,7 @@ menuOrder: 2
 
 ## create
 
-`create` command generates barebones Cube.js app.
+The `create` command generates barebones Cube.js app.
 
 ### Usage
 
@@ -19,15 +19,21 @@ $ cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
 
 | Parameter | Description | Values |
 | --------- | ----------- | ------ |
-| -d, --db-type <db-type> | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto` |
-| -t, --template <template> | Framework running Cube.js backend. | `express` (default), `serverless` |
+| -d, --db-type <db-type> | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto`, `druid` |
+| -t, --template <template> | Framework running Cube.js backend. | `docker` (default), `express`, `serverless`, `serverless-aws` |
 
 ### Example
 
-Create app called `demo-app` using default (`express`) template and `mysql` database:
+Create app called `demo-app` using default (`docker`) template and `mysql` database:
 
 ```bash
 $ cubejs create demo-app -d mysql
+```
+
+Create app called `demo-app` using `express` template and `mysql` database:
+
+```bash
+$ cubejs create demo-app -t express -d mysql
 ```
 
 Create app called `demo-app` using `serverless` template and `athena` database:
@@ -36,9 +42,55 @@ Create app called `demo-app` using `serverless` template and `athena` database:
 $ cubejs create demo-app -d athena -t serverless
 ```
 
+## dev-server
+
+[[warning | Note]]
+| To define configuration you should use `cube.js` configuration file. See [available options](https://cube.dev/docs/@cubejs-backend-server-core#options-reference).
+
+The `dev-server` command starts Cube.js in development mode.
+
+### Usage
+
+Default start:
+
+```bash
+$ cubejs dev-server
+```
+
+With debug information:
+
+```sh
+$ cubejs dev-server --debug
+```
+
+## server
+
+[[warning | Note]]
+| To define configuration you should use `cube.js` configuration file. See [available options](https://cube.dev/docs/@cubejs-backend-server-core#options-reference).
+
+The `server` command starts Cube.js in production mode.
+
+Default start:
+
+```bash
+$ cubejs server
+```
+
+With debug information:
+
+```sh
+$ cubejs server --debug
+```
+
+### Usage
+
+```bash
+$ cubejs server
+```
+
 ## generate
 
-`generate` command helps building data schema for existing database tables.
+The `generate` command helps to build data schema for existing database tables.
 You can only run `generate` from the Cube.js app directory.
 This command could not be used without an active [Database connection](/connecting-to-the-database).
 
@@ -64,7 +116,7 @@ $ cubejs generate -t orders,customers
 
 ## token
 
-`token` command generates a JWT Cube.js token. It either uses the value of the `CUBEJS_API_SECRET` environment variable or provided value with `-s` flag.
+The `token` command generates a JWT Cube.js token. It either uses the value of the `CUBEJS_API_SECRET` environment variable or provided value with `-s` flag.
 You can only run `token` command from the Cube.js app directory.
 
 _Use these manually generated tokens in production with caution._ <br> _Please refer to the [Security Guide](https://cube.dev/docs/security) for production security best practices._

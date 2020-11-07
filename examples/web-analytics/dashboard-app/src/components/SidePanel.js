@@ -1,6 +1,5 @@
 import React from "react";
 import Drawer from '@material-ui/core/Drawer';
-import Divider from '@material-ui/core/Divider';
 import { useLocation } from "react-router-dom";
 import { matchPath } from "react-router";
 

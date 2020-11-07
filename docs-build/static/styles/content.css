@@ -1,0 +1,88 @@
+/* Global styles */
+
+/* Hack to fix layout bug on Safari with zoom out active. */
+@media (min-width: 768px) {
+  .ant-col-md-22.ant-col-md-22 {
+    display: flex;
+  }
+}
+
+/* Custom blocks */
+
+.custom-block > .custom-block-body > p {
+  padding: 0;
+  margin: 0;
+}
+
+.custom-block {
+  color: #43436B;
+  font-size: 16px;
+  line-height: 26px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  background: var(--custom-block-bg-color);
+  box-shadow: 3px 0 0 var(--custom-block-text-color) inset;
+}
+
+.custom-block > .custom-block-heading {
+  color: var(--custom-block-text-color);
+  font-weight: bold;
+}
+
+.custom-block.danger {
+  --custom-block-bg-color: rgba(255, 79, 79, .1);
+  --custom-block-text-color: rgba(255, 79, 79, 1);
+}
+
+.custom-block.info {
+  --custom-block-bg-color: rgba(54, 146, 232, .1);
+  --custom-block-text-color: rgba(54, 146, 232, 1);
+}
+.custom-block.warning {
+  --custom-block-bg-color: rgba(242, 165, 87, .1);
+  --custom-block-text-color: rgba(242, 165, 87, 1);
+}
+.custom-block.success {
+  --custom-block-bg-color: rgba(22, 195, 122, .1);
+  --custom-block-text-color: rgba(22, 195, 122, 1);
+}
+
+/* Block link */
+
+.block-link a {
+  position: relative;
+  display: block;
+  padding: 12px 16px;
+  border: 1px solid #CAC9FF;
+  border-radius: 4px;
+  color: #7A77FF;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.block-link a::after {
+  content: '';
+  display: block;
+  position: absolute;
+  right: 12px;
+  top: calc(50% - 13px);
+  width: 24px;
+  height: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8.485 3.515L16.971 12l-8.486 8.485' stroke='%237A77FF' stroke-width='1.6'/%3E%3C/svg%3E");
+}
+
+/* Table */
+
+.table-wrapper {
+  display: flex;
+  overflow: auto hidden;
+  width: calc(100% + 64px);
+  max-width: 100vw;
+  margin: 0 -32px 0 -32px;
+  padding-left: 32px;
+}
+
+.table-wrapper > div {
+  min-width: 32px;
+}

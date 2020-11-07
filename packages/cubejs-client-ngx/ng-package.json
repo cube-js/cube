@@ -5,6 +5,7 @@
     "entryFile": "index.ts"
   },
   "whitelistedNonPeerDependencies": [
-    "@cubejs-client/core"
+    "@cubejs-client/core",
+    "fast-deep-equal"
   ]
 }

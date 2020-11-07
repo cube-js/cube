@@ -26,6 +26,11 @@ const projects = [
     docsPath: '../packages/cubejs-client-react/index.d.ts',
     outputDir: '../docs/Cube.js-Frontend',
   },
+  {
+    name: '@cubejs-client-ws-transport',
+    docsPath: '../packages/cubejs-client-ws-transport/index.d.ts',
+    outputDir: '../docs/Cube.js-Frontend',
+  },
 ];
 
 projects.forEach(({ name, docsPath, outputDir }) => {

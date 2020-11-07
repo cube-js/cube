@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import Grid from "@material-ui/core/Grid";
 
-import ChartRenderer from "../components/ChartRenderer";
-import DashboardItem from "../components/DashboardItem";
 import OverTimeChart from "../components/OverTimeChart";
 import Chart from "../components/Chart";
 import Dropdown from "../components/Dropdown";

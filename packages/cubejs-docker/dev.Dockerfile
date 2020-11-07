@@ -1,4 +1,4 @@
-FROM node:12.19-alpine
+FROM node:12.19
 
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
 
@@ -8,6 +8,10 @@ COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
 COPY packages/cubejs-linter packages/cubejs-linter
+
+# There is a problem with release process.
+# We are doing version bump without updating lock files for the docker package.
+#RUN yarn install --frozen-lockfile
 RUN yarn install
 
 # @todo https://stackoverflow.com/questions/49939960/docker-copy-files-using-glob-pattern/50010093
@@ -31,6 +35,7 @@ COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/packag
 COPY packages/cubejs-mongobi-driver/package.json packages/cubejs-mongobi-driver/package.json
 COPY packages/cubejs-mssql-driver/package.json packages/cubejs-mssql-driver/package.json
 COPY packages/cubejs-mysql-driver/package.json packages/cubejs-mysql-driver/package.json
+COPY packages/cubejs-cubestore-driver/package.json packages/cubejs-cubestore-driver/package.json
 COPY packages/cubejs-oracle-driver/package.json packages/cubejs-oracle-driver/package.json
 COPY packages/cubejs-postgres-driver/package.json packages/cubejs-postgres-driver/package.json
 COPY packages/cubejs-prestodb-driver/package.json packages/cubejs-prestodb-driver/package.json
@@ -54,6 +59,7 @@ COPY packages/cubejs-hive-driver/yarn.lock packages/cubejs-hive-driver/yarn.lock
 COPY packages/cubejs-mongobi-driver/yarn.lock packages/cubejs-mongobi-driver/yarn.lock
 COPY packages/cubejs-mssql-driver/yarn.lock packages/cubejs-mssql-driver/yarn.lock
 COPY packages/cubejs-mysql-driver/yarn.lock packages/cubejs-mysql-driver/yarn.lock
+COPY packages/cubejs-cubestore-driver/yarn.lock packages/cubejs-cubestore-driver/yarn.lock
 COPY packages/cubejs-oracle-driver/yarn.lock packages/cubejs-oracle-driver/yarn.lock
 COPY packages/cubejs-postgres-driver/yarn.lock packages/cubejs-postgres-driver/yarn.lock
 COPY packages/cubejs-prestodb-driver/yarn.lock packages/cubejs-prestodb-driver/yarn.lock
@@ -80,6 +86,7 @@ COPY packages/cubejs-hive-driver/ packages/cubejs-hive-driver/
 COPY packages/cubejs-mongobi-driver/ packages/cubejs-mongobi-driver/
 COPY packages/cubejs-mssql-driver/ packages/cubejs-mssql-driver/
 COPY packages/cubejs-mysql-driver/ packages/cubejs-mysql-driver/
+COPY packages/cubejs-cubestore-driver/ packages/cubejs-cubestore-driver/
 COPY packages/cubejs-oracle-driver/ packages/cubejs-oracle-driver/
 COPY packages/cubejs-postgres-driver/ packages/cubejs-postgres-driver/
 COPY packages/cubejs-prestodb-driver/ packages/cubejs-prestodb-driver/

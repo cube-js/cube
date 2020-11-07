@@ -19,17 +19,19 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     plugins: [
       ...baseConfig.plugins,
       commonjs({
-        extensions: ['.js', '.ts'],
+        extensions: ['.js'],
       }),
       resolve({
         extensions: ['.ts', '.js', '.json'],
         mainFields: ['browser', 'module', 'main'],
       }),
       babel({
+        extensions: ['.js', '.jsx', '.ts', '.tsx'],
         exclude: ['node_modules/**', /\/core-js\//],
         babelHelpers: 'runtime',
         presets: [
           '@babel/preset-react',
+          '@babel/preset-typescript',
           [
             '@babel/preset-env',
             {
@@ -69,6 +71,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           format: 'umd',
           name: globalName,
           exports: 'auto',
+          sourcemap: true,
         },
       ],
     },
@@ -86,10 +89,12 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       plugins: [
         ...baseConfig.plugins,
         babel({
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
           babelHelpers: 'runtime',
           presets: [
             '@babel/preset-react',
+            '@babel/preset-typescript',
             [
               '@babel/preset-env',
               {
@@ -112,7 +117,13 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           ],
         }),
       ],
-      output: [{ file: `packages/${name}/dist/${name}.js`, format: 'cjs' }],
+      output: [
+        {
+          file: `packages/${name}/dist/${name}.js`,
+          format: 'cjs',
+          sourcemap: true,
+        }
+      ],
     },
     // // ES module (for bundlers) build.
     {
@@ -120,10 +131,12 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       plugins: [
         ...baseConfig.plugins,
         babel({
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
           babelHelpers: 'runtime',
           presets: [
             '@babel/preset-react',
+            '@babel/preset-typescript',
             [
               '@babel/preset-env',
               {
@@ -150,6 +163,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
         {
           file: `packages/${name}/dist/${name}.esm.js`,
           format: 'es',
+          sourcemap: true,
           globals,
         },
       ],
@@ -169,7 +183,7 @@ export default bundle(
 )
   .concat(
     bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
-      input: 'packages/cubejs-client-ws-transport/src/index.js',
+      input: 'packages/cubejs-client-ws-transport/src/index.ts',
     })
   )
   .concat(

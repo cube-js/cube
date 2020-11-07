@@ -41,6 +41,18 @@ options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 >  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
 
+## defaultHeuristics
+
+>  **defaultHeuristics**(**newQuery**: [Query](#types-query), **oldQuery**: [Query](#types-query), **options**: [TDefaultHeuristicsOptions](#types-t-default-heuristics-options)): *any*
+
+## defaultOrder
+
+>  **defaultOrder**(**query**: [Query](#types-query)): *object*
+
+## movePivotItem
+
+>  **movePivotItem**(**pivotConfig**: [PivotConfig](#types-pivot-config), **sourceIndex**: number, **destinationIndex**: number, **sourceAxis**: TSourceAxis, **destinationAxis**: TSourceAxis): *[PivotConfig](#types-pivot-config)*
+
 ## CubejsApi
 
 Main class for accessing Cube.js API
@@ -164,7 +176,7 @@ Contains information about available cubes and it's members.
 
 ### filterOperatorsForMember
 
->  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type)): *any*
+>  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type) | [MemberType](#types-member-type)[]): *any*
 
 ### membersForQuery
 
@@ -182,7 +194,7 @@ memberType | [MemberType](#types-member-type) | - |
 
 ### resolveMember
 
->  **resolveMember**‹**T**›(**memberName**: string, **memberType**: T): *object | [TCubeMemberByType](#types-t-cube-member-by-type)‹T›*
+>  **resolveMember**‹**T**›(**memberName**: string, **memberType**: T | T[]): *object | [TCubeMemberByType](#types-t-cube-member-by-type)‹T›*
 
 Get meta information for a cube member
 Member meta information contains:
@@ -206,7 +218,7 @@ Member meta information contains:
 Name | Type | Description |
 ------ | ------ | ------ |
 memberName | string | Fully qualified member name in a form `Cube.memberName` |
-memberType | T | - |
+memberType | T &#124; T[] | - |
 
 ## ProgressResult
 
@@ -305,6 +317,24 @@ the result will be a query with the required filters applied and the dimensions/
     //...
   ]
 }
+```
+
+In case when you want to add `order` or `limit` to the query, you can simply spread it
+
+```js
+// An example for React
+const drillDownResponse = useCubeQuery(
+   {
+     ...drillDownQuery,
+     limit: 30,
+     order: {
+       'Orders.ts': 'desc'
+     }
+   },
+   {
+     skip: !drillDownQuery
+   }
+ );
 ```
 
 ### pivot
@@ -611,9 +641,11 @@ type | string |
 
 Name | Type |
 ------ | ------ |
+and? | [BinaryFilter](#types-binary-filter)[] |
 dimension? | string |
 member? | string |
 operator | [BinaryOperator](#types-binary-operator) |
+or? | [BinaryFilter](#types-binary-filter)[] |
 values | string[] |
 
 ### BinaryOperator
@@ -642,6 +674,7 @@ Name | Type | Description |
 apiUrl | string | URL of your Cube.js Backend. By default, in the development environment it is `http://localhost:4000/cubejs-api/v1` |
 credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
 headers? | Record‹string, string› | - |
+parseDateMeasures? | boolean | - |
 pollInterval? | number | - |
 transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
 
@@ -779,7 +812,7 @@ filters? | [Filter](#types-filter)[] |
 limit? | number |
 measures? | string[] |
 offset? | number |
-order? | object |
+order? | [TQueryOrderObject](#types-t-query-order-object) &#124; [TQueryOrderArray](#types-t-query-order-array) |
 renewQuery? | boolean |
 segments? | string[] |
 timeDimensions? | [TimeDimension](#types-time-dimension)[] |
@@ -867,6 +900,13 @@ type | [TCubeMemberType](#types-t-cube-member-type) |
 
 > **TCubeSegment**: *Pick‹[TCubeMember](#types-t-cube-member), "name" | "shortTitle" | "title"›*
 
+### TDefaultHeuristicsOptions
+
+Name | Type |
+------ | ------ |
+meta | [Meta](#meta) |
+sessionGranularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
+
 ### TDryRunResponse
 
 Name | Type |
@@ -875,6 +915,12 @@ normalizedQueries | [Query](#types-query)[] |
 pivotQuery | [PivotQuery](#types-pivot-query) |
 queryOrder | Array‹object› |
 queryType | [QueryType](#types-query-type) |
+
+### TQueryOrderArray
+
+> **TQueryOrderArray**: *Array‹[string, [QueryOrder](#types-query-order)]›*
+
+### TQueryOrderObject
 
 ### TableColumn
 
@@ -914,9 +960,11 @@ headers? | Record‹string, string› | custom headers |
 
 Name | Type |
 ------ | ------ |
+and? | [UnaryFilter](#types-unary-filter)[] |
 dimension? | string |
 member? | string |
 operator | [UnaryOperator](#types-unary-operator) |
+or? | [UnaryFilter](#types-unary-filter)[] |
 values? | never |
 
 ### UnaryOperator

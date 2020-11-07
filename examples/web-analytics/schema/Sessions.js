@@ -1,5 +1,5 @@
 cube(`Sessions`, {
-  sqlAlias: `ss`,
+//  sqlAlias: `ss`,
   refreshKey: {
     every: `5 minutes`
   },
@@ -195,7 +195,7 @@ cube(`Sessions`, {
 
     sourceMedium: {
       type: `string`,
-      sql: `concat(${CUBE.referrerSource}, " / ", ${CUBE.referrerMedium})`,
+      sql: `concat(${CUBE.referrerSource}, ' / ', ${CUBE.referrerMedium})`,
       title: `Source / Medium`
     }
   },
@@ -242,7 +242,7 @@ cube(`Sessions`, {
 
 cube(`SessionUsers`, {
   extends: Sessions,
-  sqlAlias: `su`,
+//  sqlAlias: `su`,
 
   sql: `select distinct
   date_trunc('hour', session_start) as session_start,
@@ -268,11 +268,11 @@ cube(`SessionUsers`, {
       scheduledRefresh: true,
       partitionGranularity: `month`,
       timeDimensionReference: sessionStart,
-      indexes: {
-        sessionId: {
-          columns: [`session_id`]
-        }
-      }
+      //indexes: {
+      //  sessionId: {
+      //    columns: [`session_id`]
+      //  }
+      //}
     }
   }
 });

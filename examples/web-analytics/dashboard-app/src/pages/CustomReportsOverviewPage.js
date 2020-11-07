@@ -25,7 +25,7 @@ const CustomReportsOverviewPage = ({ history }) => {
       }
     ]
   });
-  const { loading, error, data } = useQuery(GET_CUSTOM_REPORTS);
+  const { data } = useQuery(GET_CUSTOM_REPORTS);
   return (
     <Grid container spacing={3} justify="space-between">
       <Grid item>

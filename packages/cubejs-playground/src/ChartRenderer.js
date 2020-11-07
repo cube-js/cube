@@ -22,6 +22,7 @@ export const libraryToTemplate = {
   recharts: { library: rechartsLibrary, title: 'Recharts' },
   bizcharts: { library: bizChartLibrary, title: 'Bizcharts' },
   d3: { library: d3ChartLibrary, title: 'D3' },
+  ng2: { library: null, title: 'ng2-charts' },
 };
 
 export const babelConfig = {
@@ -65,7 +66,7 @@ const cubejsApi = cubejs(
   { apiUrl: API_URL + "/cubejs-api/v1" }
 );
 
-const renderChart = (Component, query, pivotConfig) => ({ resultSet, error }) => {
+const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => {
   return (
     (resultSet && (
       <Component
@@ -81,12 +82,11 @@ const ChartRenderer = () => {
   ${!codeExample ? 'const { query, pivotConfig } = React.useContext(CubeJsQueryRenderer);' : ''}
   return (
     <QueryRenderer
-      query={query}
+      query={${codeExample ? prettify(query) : 'query'}}
       cubejsApi={cubejsApi}
       resetResultSetOnChange={false}
       render={renderChart(
-        ${renderFnName}, 
-        ${codeExample ? prettify(query) : 'query'}, 
+        ${renderFnName},
         ${codeExample ? prettify(pivotConfig) : 'pivotConfig'}
       )}
     />
@@ -147,14 +147,17 @@ export const ChartRenderer = (props) => {
     pivotConfig,
     codeExample: true,
   });
-  const dependencies = {
+  const commonDependencies = {
     '@cubejs-client/core': cubejs,
     '@cubejs-client/react': cubejsReact,
-    'cubejs-context': CubeJsQueryRenderer,
     antd,
     react: React,
     ...selectedChartLibrary.imports,
   };
+  const dependencies = {
+    ...commonDependencies,
+    'cubejs-context': CubeJsQueryRenderer
+  }
 
   useEffect(() => {
     if (jsCompilingError) {
@@ -176,7 +179,7 @@ export const ChartRenderer = (props) => {
         sqlQuery={sqlQuery}
         codeExample={codeExample}
         codeSandboxSource={forCodeSandBox(codeExample)}
-        dependencies={dependencies}
+        dependencies={commonDependencies}
         dashboardSource={dashboardSource}
         chartLibrary={chartLibrary}
         setChartLibrary={setChartLibrary}

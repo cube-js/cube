@@ -2,7 +2,7 @@
 title: REST API
 permalink: /rest-api
 category: Cube.js Backend
-menuOrder: 2
+menuOrder: 4
 ---
 
 ## Prerequisites

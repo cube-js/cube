@@ -2,18 +2,18 @@ import { Command, flags } from '@oclif/command';
 import { ServerContainer } from '../server/container';
 
 export class Server extends Command {
-  static description = 'Run server in Production mode';
+  public static description = 'Run server in Production mode';
 
-  static flags = {
+  public static flags = {
     debug: flags.boolean({
       default: false,
       description: 'Print useful debug information'
     })
   }
 
-  static args = [];
+  public static args = [];
 
-  async run() {
+  public async run() {
     const options = this.parse(Server);
 
     process.env.NODE_ENV = 'production';
@@ -21,6 +21,7 @@ export class Server extends Command {
     const container = new ServerContainer({
       debug: options.flags.debug,
     });
+    container.runProjectDiagnostics();
 
     const configuration = await container.lookupConfiguration();
     container.runServerInstance(configuration);

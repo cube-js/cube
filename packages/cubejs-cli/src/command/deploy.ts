@@ -3,18 +3,24 @@ import path from 'path';
 import cliProgress from 'cli-progress';
 import { CommanderStatic } from 'commander';
 import { DeployDirectory } from '../deploy';
-import { logStage, displayError } from '../utils';
+import { logStage, displayError, event } from '../utils';
 import { Config } from '../config';
 
-const deploy = async ({ directory, auth, uploadEnv }: any) => {
+const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
     await displayError(
       '@cubejs-backend/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
     );
   }
 
+  if (token) {
+    const config = new Config();
+    await config.addAuthToken(token);
+    await event('Cube Cloud CLI Authenticate');
+    console.log('Token successfully added!');
+  }
+
   const config = new Config();
-  await config.loadDeployAuth();
   const bar = new cliProgress.SingleBar({
     format: '- Uploading files | {bar} | {percentage}% || {value} / {total} | {file}',
     barCompleteChar: '\u2588',
@@ -24,6 +30,7 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
 
   const deployDir = new DeployDirectory({ directory });
   const fileHashes: any = await deployDir.fileHashes();
+
   const upstreamHashes = await config.cloudReq({
     url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
     method: 'GET',
@@ -47,10 +54,12 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
       auth
     });
   }
-  
+
   await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
 
   const files = Object.keys(fileHashes);
+  const fileHashesPosix = {};
+
   bar.start(files.length, 0, {
     file: ''
   });
@@ -60,13 +69,16 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
       const file = files[i];
       bar.update(i, { file });
 
-      if (!upstreamHashes[file] || upstreamHashes[file].hash !== fileHashes[file].hash) {
+      const filePosix = file.split(path.sep).join(path.posix.sep);
+      fileHashesPosix[filePosix] = fileHashes[file];
+
+      if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
         await config.cloudReq({
           url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
           method: 'POST',
           formData: {
             transaction: JSON.stringify(transaction),
-            fileName: file,
+            fileName: filePosix,
             file: {
               value: fs.createReadStream(path.join(directory, file)),
               options: {
@@ -85,7 +97,7 @@ const deploy = async ({ directory, auth, uploadEnv }: any) => {
       method: 'POST',
       body: {
         transaction,
-        files: fileHashes
+        files: fileHashesPosix
       },
       auth
     });
@@ -101,6 +113,7 @@ export function configureDeployCommand(program: CommanderStatic) {
     .command('deploy')
     .description('Deploy project to Cube Cloud')
     .option('--upload-env', 'Upload .env file to CubeCloud')
+    .option('--token <token>', 'Add auth token to CubeCloud')
     .action(
       (options) => deploy({ directory: process.cwd(), ...options })
         .catch(e => displayError(e.stack || e))

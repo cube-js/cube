@@ -3,7 +3,7 @@ title: '@cubejs-client/ngx'
 permalink: /@cubejs-client-ngx
 category: Cube.js Frontend
 subCategory: Reference
-menuOrder: 5
+menuOrder: 4
 ---
 
 `@cubejs-client/ngx` provides Angular Module for easy integration Cube.js

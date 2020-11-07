@@ -2,7 +2,7 @@
 title: Caching
 permalink: /caching
 category: Cube.js Backend
-menuOrder: 4
+menuOrder: 6
 ---
 
 Cube.js provides a two-level caching system. The first level is **in-memory** cache and is active by default. In-memory cache
@@ -31,8 +31,7 @@ Cube.js takes great care to prevent unnecessary queries from hitting your databa
 
 So, Cube.js defines a `refreshKey` for each cube. [refreshKeys](cube#parameters-refresh-key) can be evaluated by Cube.js to assess if cube data has changed.
 
-[[warning | Note]] 
-| Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
+> **NOTE**: Cube.js *also caches* the results of `refreshKeys` for a fixed time interval in order to avoid issuing them too often. If you need Cube.js to immediately respond to changes in data, see the [Force Query Renewal](#in-memory-cache-force-query-renewal) section.
 
 When a query's result needs to be refreshed, Cube.js will re-execute the query in the foreground and repopulate the cache.
 This means that cached results may still be served to users requesting them while `refreshKey` values aren't changed from Cube.js perspective.
@@ -58,7 +57,7 @@ You can set up a custom refresh check SQL by changing [refreshKey](cube#paramete
 
 In these instances, Cube.js needs a query crafted to detect updates to the rows that power the cubes. Often, a `MAX(updated_at_timestamp)` for OLTP data will accomplish this, or examining a metadata table for whatever system is managing the data to see when it last ran.
 
-> **Note:** The result of `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default.
+> **NOTE:** The result of `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default.
 You can change it by passing [refreshKey every](cube#parameters-refresh-key) parameter.
 See [refreshKey every](cube#parameters-refresh-key) doc to learn more about the implementation.
 This cache is useful so that Cube.js can build query result cache keys without issuing database queries and respond to cached requests very quickly.
@@ -80,6 +79,19 @@ The `renewQuery` option applies to the `refreshKey` caching system mentioned abo
 For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately.
 For these situations, you can mostly disable the `refreshKey` cache by setting the [refreshKey every](cube#parameters-refresh-key) parameter to something very low, like `1 second`.
 This means Cube.js will always check the data freshness before executing a query, and notice any changed data underneath.
+
+### How to disable the cache?
+
+There's no straightforward way to disable caching in Cube.js.
+The reason for it is Cube.js is not just stores cached values but uses cache as a point of synchronization and coordination between nodes in a cluster.
+For the sake of design simplicity, Cube.js doesn't distinguish client invocations, and all calls to the data load API are idempotent.
+It provides excellent reliability and scalability but has some drawbacks.
+One of those load data calls can't be traced to specific clients, and as a consequence, there's no guaranteed way for a client to initiate a new data loading query or know if the current invocation wasn't initiated earlier by another client.
+Only Refresh Key freshness guarantees are provided in this case.
+
+If you find yourself in a situation that you want to disable the cache, it usually means you'd like to revisit your Refresh Key strategy.
+Great place to start is to enable [scheduledRefreshTimer](@cubejs-backend-server-core#options-reference-scheduled-refresh-timer) and set [refreshKey every](cube#parameters-refresh-key) on cubes of interest.
+This way, Refresh Scheduler will maintain those `refreshKey` up to date so queries won't hit stale `refreshKey` value.
 
 ## Pre-Aggregations
 
@@ -162,43 +174,39 @@ cube(`Orders`, {
 
 ## Keeping Cache Up-to-Date
 
+**Use the following technique to keep in-memory cache up-to-date**.
 Cube.js cache is lazy populated on user requests so additional care should be taken to pre-populate it and keep cache data up-to-date.
 In order to implement it simple CRON jobs can be used to issue background queries with `renewQuery: true` flag.
 For example if you have user dashboard you want to keep fresh, CRON job that issues every query this dashboard have with `renewQuery: true` flag should be run at desired interval to keep this dashboard up-to-date.
 If you want to continously look for a new data you can use [Real Time Data Fetch](real-time-data-fetch) for that.
 Please note `renewQuery` also triggers pre-aggregations refresh as well.
 
-To keep pre-aggregations fresh Refresh Scheduler can be used.
+**To keep pre-aggregations fresh Refresh Scheduler can be used.**
 All pre-aggregations intended to be refreshed during scheduled refresh run should be marked with [scheduledRefresh](pre-aggregations#scheduled-refresh) parameter.
-There're `CubejsServerCore.runScheduledRefresh(context, queryingOptions)` and `CubejsServer.runScheduledRefresh(context, queryingOptions)` methods that should be invoked at least once a minute to populate queue for pre-aggregations refresh.
 
-You can use [scheduledRefreshTimer](@cubejs-backend-server-core#options-reference-scheduled-refresh-timer) to trigger Refresh Scheduler or you can do it manually by using simple timer for example:
+```js
+cube(`Orders`, {
+  // ...
 
-```javascript
-setInterval(() => server.runScheduledRefresh(), 5000);
-```
-
-in your **index.js:**
-```javascript
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer();
-
-setInterval(() => server.runScheduledRefresh(), 5000);
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-}).catch(e => {
-  console.error('Fatal error during server start: ');
-  console.error(e.stack || e);
+  preAggregations: {
+    amountByCreated: {
+      type: `rollup`,
+      measureReferences: [amount],
+      timeDimensionReference: createdAt,
+      granularity: `month`,
+      scheduledRefresh: true
+    }
+  }
 });
 ```
 
-There's also [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) available to trigger run.
+You can set [scheduledRefreshTimer](config#options-reference-scheduled-refresh-timer) option to trigger Refresh Scheduler.
+For serverless deployments [REST
+API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
-[[warning | Note]]
-| `runScheduledRefresh()` call is idempotent and just updates pre-aggregations if required by `refreshKey`. It always uses refreshKey to check if refresh is required or not. In the case `refreshKey` doesn't change it's value it doesn't matter how often you call `runScheduledRefresh()`: such pre-aggregation won't be refreshed.
 
+[[info]]
+| Pre-aggregations will be updated only if required by `refreshKey`. It is always used to check if refresh is required or not. In the case `refreshKey` value doesn't change it doesn't matter how frequent `scheduledRefreshTimer` is set: such pre-aggregation won't be refreshed.
 
 ## Inspecting Queries
 To inspect whether the query hits in-memory cache, pre-aggregation, or raw data, you can use Playground or Cube Cloud.
@@ -208,8 +216,7 @@ Playground can be used to inspect a single query. To do that, click the "cache" 
 To inspect multiple queries or list existing pre-aggregations, you can use Cube Cloud.
 
 
-[[warning | Note]]
-| Cube Cloud currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
+> **NOTE**: Cube Cloud currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
 
 To inspect queries in the Cube Cloud, navigate to the "History" page. You can filter queries by multiple parameters on this page, including whether they hit the cache, pre-aggregations, or raw data. Additionally, you can click on the query to see its details, such as time spent in the database, the database queue's size when the query was executed, generated SQL, query timeline, and more. It will also show you the optimal pre-aggregation that can be used for this query.
 

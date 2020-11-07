@@ -1,4 +1,4 @@
-name: Publish
+name: Release
 
 on:
   push:
@@ -40,13 +40,13 @@ jobs:
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
-          cmd: install
+          cmd: install --frozen-lockfile
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
+        run: yarn lerna bootstrap
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-backend/jdbc-driver --ignore @cubejs-client/vue build
+        run: yarn lerna run --concurrency 1 --ignore @cubejs-client/vue build
       - name: Set NPM token
         run: echo //registry.npmjs.org/:_authToken=$NPM_TOKEN > ~/.npmrc
         env:
@@ -56,7 +56,7 @@ jobs:
 
   docker:
     needs: npm
-    name: Push Docker image for latest & release
+    name: Release docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

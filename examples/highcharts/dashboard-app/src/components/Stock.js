@@ -83,6 +83,7 @@ const staticOptions = {
 
 export default ({ data, setRange }) => {
   const [options, setOptions] = useState({});
+
   useEffect(() => {
     setOptions({
       ...staticOptions,
@@ -100,7 +101,7 @@ export default ({ data, setRange }) => {
         },
       ],
     });
-  }, [data]);
+  }, [data, setRange]);
 
   return (
     <div>

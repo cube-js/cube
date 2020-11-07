@@ -62,6 +62,7 @@ function DateRangePicker({
       onChange({ begin, end });
       onClose ? onClose() : setOpen(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [begin, end, autoOk, accepted, isOpen, prevBegin, hasClicked, prevEnd]);
 
   function renderDay(day, selectedDate, dayInCurrentMonth, dayComponent) {

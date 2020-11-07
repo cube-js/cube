@@ -11,14 +11,11 @@ import client from './graphql/client';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 
-const API_URL =
-  process.env.NODE_ENV === 'production' ? `wss://${window.location.host}` : 'ws://localhost:4000/'; //'ws://localhost:4000';
-
-const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjExMzQsImV4cCI6MTYyNjE5NzEzNH0._sWwksID3MLJxXmqNnECV_A3x7gUcVzSgn4szFox76s';
-
 const cubejsApi = cubejs({
-  transport: new WebSocketTransport({ authorization: CUBEJS_TOKEN, apiUrl: API_URL })
+  transport: new WebSocketTransport({
+    authorization: process.env.REACT_APP_CUBEJS_TOKEN,
+    apiUrl: process.env.REACT_APP_API_URL
+  })
 });
 
 /*const cubejsApi = cubejs({

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-const CubejsServer = require('../');
 
-const server = new CubejsServer();
+require('source-map-support/register');
+
+const { CubejsServer } = require('../dist/server');
+
+const server = new CubejsServer({});
 
 server.listen().then(({ version, port }) => {
   console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);

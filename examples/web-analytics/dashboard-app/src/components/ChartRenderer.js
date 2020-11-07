@@ -87,6 +87,7 @@ const durationMeasures = [
   'Sessions.averageDurationSeconds'
 ];
 
+// eslint-disable-next-line no-unused-vars
 const stackedChartData = resultSet => {
   const data = resultSet
     .pivot()

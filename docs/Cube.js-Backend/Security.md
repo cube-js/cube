@@ -2,7 +2,7 @@
 title: Security
 permalink: /security
 category: Cube.js Backend
-menuOrder: 4
+menuOrder: 8
 ---
 
 Cube.js uses [JSON Web Tokens (JWT)](https://jwt.io/) which should be passed in the `Authorization` header to authenticate requests. JWTs can also be used for passing
@@ -93,7 +93,7 @@ const cubejsApi = cubejs(() => {
 });
 ```
 
-You should then store this token in local storage or in a cookie, so that you can then use it to query the cube.js API.
+You can optionally store this token in local storage or in a cookie, so that you can then use it to query the cube.js API.
 
 ## Security Context
 
