@@ -18,6 +18,7 @@ const ADAPTERS = {
   postgres,
   redshift,
   mysql,
+  mysqlserverless: mysql,
   mongobi,
   mssql,
   bigquery,
@@ -34,6 +35,7 @@ const ADAPTERS = {
   elasticsearch
 };
 exports.query = (compilers, dbType, queryOptions) => {
+  console.log('BUILDING QUERY');
   if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
     return null;
   }

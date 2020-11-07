@@ -58,7 +58,10 @@ class CompilerApi {
     options = options || {};
     const { includeDebugInfo } = options;
     const dbType = this.getDbType();
+
+    console.log('DB TYPE:', dbType);
     const compilers = await this.getCompilers({ requestId: query.requestId });
+
     let sqlGenerator = this.createQueryByDataSource(compilers, query);
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
