@@ -197,7 +197,7 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
-const cubeJs = `// Server options go here: https://cube.dev/docs/@cubejs-backend-server-core#options-reference
+const cubeJs = `// Cube.js configuration options: https://cube.dev/docs/config
 module.exports = {
 };
 `;
