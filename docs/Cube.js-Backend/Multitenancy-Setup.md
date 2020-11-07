@@ -37,6 +37,11 @@ Multitenancy and multiple data sources features aren't mutually exclusive and ca
 
 Typical multiple data sources configuration looks like:
 
+[[warning | Note]]
+| Existence of handling route for `default` data source is mandatory. 
+| It's used to resolve target query data source for now.
+| This behavior will be changed in future releases.
+
 **cube.js:**
 
 ```javascript
