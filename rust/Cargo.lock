@@ -120,8 +120,8 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
 name = "arrow"
-version = "2.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore#7b0bad908e7b4280736fc080bb99584f3ca94b31"
+version = "3.0.0-SNAPSHOT"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
 dependencies = [
  "chrono",
  "csv",
@@ -141,8 +141,8 @@ dependencies = [
 
 [[package]]
 name = "arrow-flight"
-version = "2.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore#7b0bad908e7b4280736fc080bb99584f3ca94b31"
+version = "3.0.0-SNAPSHOT"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
 dependencies = [
  "arrow",
  "bytes",
@@ -938,8 +938,8 @@ dependencies = [
 
 [[package]]
 name = "datafusion"
-version = "2.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore#7b0bad908e7b4280736fc080bb99584f3ca94b31"
+version = "3.0.0-SNAPSHOT"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
 dependencies = [
  "arrow",
  "async-trait",
@@ -947,6 +947,7 @@ dependencies = [
  "clap",
  "crossbeam",
  "fnv",
+ "futures",
  "itertools 0.9.0",
  "num_cpus",
  "parquet",
@@ -2387,10 +2388,11 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "2.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore#7b0bad908e7b4280736fc080bb99584f3ca94b31"
+version = "3.0.0-SNAPSHOT"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
 dependencies = [
  "arrow",
+ "base64 0.12.3",
  "brotli",
  "byteorder",
  "chrono",

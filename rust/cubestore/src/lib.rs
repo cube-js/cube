@@ -17,7 +17,6 @@ use tokio::sync::mpsc::error::SendError;
 use std::backtrace::Backtrace;
 use core::fmt;
 use smallvec::alloc::fmt::Formatter;
-use datafusion::error::ExecutionError;
 use arrow::error::ArrowError;
 
 pub mod http;
@@ -126,15 +125,15 @@ impl From<tokio::time::Elapsed> for CubeError {
     }
 }
 
-impl From<datafusion::error::ExecutionError> for CubeError {
-    fn from(v: ExecutionError) -> Self {
+impl From<datafusion::error::DataFusionError> for CubeError {
+    fn from(v: datafusion::error::DataFusionError) -> Self {
         CubeError::internal(v.to_string())
     }
 }
 
-impl From<CubeError> for datafusion::error::ExecutionError {
+impl From<CubeError> for datafusion::error::DataFusionError {
     fn from(v: CubeError) -> Self {
-        datafusion::error::ExecutionError::General(v.to_string())
+        datafusion::error::DataFusionError::Execution(v.to_string())
     }
 }
 

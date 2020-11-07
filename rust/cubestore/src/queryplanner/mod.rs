@@ -5,15 +5,15 @@ use crate::{
     table::Row,
     table::TableValue,
 };
-use arrow::{array::{Int64Array, StringArray, UInt64Array}, record_batch::RecordBatchReader};
+use arrow::{array::{Int64Array, StringArray, UInt64Array}};
 use arrow::{
-    array::Array, array::Int64Builder, array::PrimitiveArrayOps, array::StringBuilder,
+    array::Array, array::Int64Builder, array::StringBuilder,
     datatypes::Schema, datatypes::SchemaRef,
 };
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
-use datafusion::{error::{ExecutionError, Result as DFResult}, physical_plan::Partitioning, physical_plan::merge::MergeExec};
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::{error::{DataFusionError, Result as DFResult}, physical_plan::Partitioning, physical_plan::merge::MergeExec};
+use datafusion::physical_plan::{ExecutionPlan, RecordBatchStream};
 use datafusion::{
     datasource::MemTable, datasource::TableProvider,
     physical_plan::parquet::ParquetExec, prelude::ExecutionContext,
@@ -35,6 +35,7 @@ use arrow::datatypes::{Field, TimeUnit};
 use arrow::array::{TimestampMicrosecondArray, TimestampNanosecondArray, BooleanArray, Float64Array};
 use bigdecimal::BigDecimal;
 use std::convert::TryFrom;
+use std::pin::Pin;
 
 #[automock]
 #[async_trait]
@@ -313,14 +314,14 @@ impl ExecutionPlan for CubeTableExec {
         self.partition_execs.clone()
     }
 
-    fn with_new_children(&self, children: Vec<Arc<dyn ExecutionPlan>>) -> Result<Arc<dyn ExecutionPlan>, ExecutionError> {
+    fn with_new_children(&self, children: Vec<Arc<dyn ExecutionPlan>>) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         Ok(Arc::new(CubeTableExec {
             schema: self.schema.clone(),
             partition_execs: children,
         }))
     }
 
-    async fn execute(&self, partition: usize) -> Result<Box<dyn RecordBatchReader + Send>, ExecutionError> {
+    async fn execute(&self, partition: usize) -> Result<Pin<Box<dyn RecordBatchStream + Send>>, DataFusionError> {
         self.partition_execs[partition].execute(0).await
     }
 }
@@ -471,7 +472,7 @@ impl InfoSchemaTableProvider {
         InfoSchemaTableProvider { meta_store, table }
     }
 
-    async fn mem_table(&self) -> Result<MemTable, ExecutionError> {
+    async fn mem_table(&self) -> Result<MemTable, DataFusionError> {
         let batch = self.table.scan(self.meta_store.clone()).await?;
         MemTable::new(batch.schema(), vec![vec![batch]])
     }
@@ -482,7 +483,7 @@ impl TableProvider for InfoSchemaTableProvider {
         self.table.schema()
     }
 
-    fn scan(&self, projection: &Option<Vec<usize>>, batch_size: usize) -> Result<Arc<dyn ExecutionPlan>, ExecutionError> {
+    fn scan(&self, projection: &Option<Vec<usize>>, batch_size: usize) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let handle = Handle::current();
         let mem_table = handle.block_on(async move { self.mem_table().await })?;
         mem_table.scan(projection, batch_size)

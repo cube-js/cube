@@ -549,11 +549,12 @@ mod tests {
     use datafusion::physical_plan::{expressions, ExecutionPlan};
     use arrow::datatypes::DataType;
     use std::sync::Arc;
-    use arrow::array::{PrimitiveArrayOps, UInt64Array};
+    use arrow::array::{UInt64Array};
     use datafusion::physical_plan::filter::FilterExec;
     use datafusion::logical_plan::Operator;
     use datafusion::scalar::ScalarValue;
     use futures::executor::block_on;
+    use futures::StreamExt;
 
     #[test]
     fn gutter() {
@@ -717,8 +718,7 @@ mod tests {
                     )],
                     filter,
                 ).unwrap();
-                let mut res = block_on(async { aggregate.execute(0).await }).unwrap();
-                let batch = res.next().unwrap().unwrap();
+                let batch = block_on(async { aggregate.execute(0).await.unwrap().next().await.unwrap().unwrap() });
                 let result = batch.column(0).as_any().downcast_ref::<UInt64Array>().unwrap();
                 println!("San Francisco count ({:?}): {}", start.elapsed().unwrap(), result.value(0));
             });

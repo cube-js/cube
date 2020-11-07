@@ -17,10 +17,10 @@ warp = "0.2"
 sqlparser = "0.6.1"
 serde_derive = "1.0.115"
 serde = "1.0.115"
-parquet = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore', version = "2.0.0-SNAPSHOT" }
-arrow = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore', features = ["simd"], version = "2.0.0-SNAPSHOT" }
-arrow-flight = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore', version = "2.0.0-SNAPSHOT" }
-datafusion = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore', version = "2.0.0-SNAPSHOT" }
+parquet = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2020-11-06', version = "3.0.0-SNAPSHOT" }
+arrow = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2020-11-06', features = ["simd"], version = "3.0.0-SNAPSHOT" }
+arrow-flight = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2020-11-06', version = "3.0.0-SNAPSHOT" }
+datafusion = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2020-11-06', version = "3.0.0-SNAPSHOT" }
 csv = "1.1.3"
 bytes = "0.5.4"
 serde_json = "1.0.56"
