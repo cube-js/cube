@@ -27,7 +27,7 @@
     "d3": "^5.14.2",
     "history": "^4.9.0",
     "less": "^3.10.3",
-    "less-loader": "^5.0.0",
+    "less-loader": "^7.0.2",
     "moment": "^2.24.0",
     "prettier": "^2.0.5",
     "prismjs": "^1.21.0",
