@@ -8,6 +8,8 @@ import CubeContext from './CubeContext';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
+  { name: 'second', title: 'Second' },
+  { name: 'minute', title: 'Minute' },
   { name: 'hour', title: 'Hour' },
   { name: 'day', title: 'Day' },
   { name: 'week', title: 'Week' },
@@ -108,7 +110,7 @@ export default class QueryBuilder extends React.Component {
     const { query, pivotConfig } = this.state;
     let meta;
     let pivotQuery;
-    
+
     if (this.isQueryPresent()) {
       [meta, { pivotQuery }] = await Promise.all([
         this.cubejsApi().meta(),
@@ -299,10 +301,10 @@ export default class QueryBuilder extends React.Component {
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig } = this.state;
-    
+
     let finalState = this.applyStateChangeHeuristics(state);
     const query = { ...(finalState.query || stateQuery) };
-    
+
     const runSetters = (currentState) => {
       if (setVizState) {
         const { meta, validatedQuery, ...toSet } = currentState;
@@ -312,34 +314,34 @@ export default class QueryBuilder extends React.Component {
         setQuery(currentState.query);
       }
     };
-    
+
     if (finalState.shouldApplyHeuristicOrder) {
       query.order = defaultOrder(query);
     }
-    
+
     const updatedOrderMembers = indexBy(prop('id'), QueryBuilder.getOrderMembers({
       ...this.state,
       ...finalState
     }));
     const currentOrderMemberIds = (finalState.orderMembers || []).map(({ id }) => id);
     const currentOrderMembers = (finalState.orderMembers || []).filter(({ id }) => Boolean(updatedOrderMembers[id]));
-      
+
     Object.entries(updatedOrderMembers).forEach(([id, orderMember]) => {
       if (!currentOrderMemberIds.includes(id)) {
         currentOrderMembers.push(orderMember);
       }
     });
-      
+
     const nextQuery = {
       ...query,
       order: fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean))
     };
-    
+
     finalState.pivotConfig = ResultSet.getNormalizedPivotConfig(
       nextQuery,
       finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig
     );
-    
+
     runSetters({
       ...state,
       query: nextQuery,
@@ -362,14 +364,14 @@ export default class QueryBuilder extends React.Component {
         if (finalState.shouldApplyHeuristicOrder) {
           nextQuery.order = (response.queryOrder || []).reduce((memo, current) => ({ ...memo, ...current }), {});
         }
-            
+
         if (QueryRenderer.isQueryPresent(stateQuery)) {
           finalState = {
             ...finalState,
             query: nextQuery,
             pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, finalState.pivotConfig)
           };
-          
+
           this.setState({
             ...finalState,
             validatedQuery: this.validatedQuery(finalState)
@@ -554,7 +556,7 @@ export default class QueryBuilder extends React.Component {
   render() {
     const { query } = this.state;
     const { cubejsApi, render, wrapWithQueryRenderer } = this.props;
-    
+
     if (wrapWithQueryRenderer) {
       return (
         <QueryRenderer
