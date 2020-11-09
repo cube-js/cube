@@ -4,7 +4,15 @@ import inquirer from 'inquirer';
 import path from 'path';
 import crypto from 'crypto';
 import { CommanderStatic } from 'commander';
-import { displayError, event, executeCommand, npmInstall, requireFromPackage, writePackageJson } from '../utils';
+import {
+  displayError,
+  event,
+  executeCommand,
+  loadCliManifest,
+  npmInstall,
+  requireFromPackage,
+  writePackageJson,
+} from '../utils';
 import templates from '../templates';
 
 // @todo There is another function with similar name inside utils, but without analytics
@@ -38,12 +46,16 @@ const create = async (projectName, options) => {
   await fs.ensureDir(projectName);
   process.chdir(projectName);
 
+  const cliManifest = loadCliManifest();
+
   logStage('Creating project structure');
   await writePackageJson({
     name: projectName,
     version: '0.0.1',
     private: true,
     scripts: templateConfig.scripts,
+    template: options.template,
+    templateVersion: cliManifest.version,
   });
 
   logStage('Installing server dependencies');
