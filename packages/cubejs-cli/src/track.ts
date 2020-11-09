@@ -1,3 +1,5 @@
+import { loadCliManifest } from './utils';
+
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 
@@ -40,10 +42,13 @@ const flush = async (toFlush?: Array<Event>, retries: number = 10): Promise<any>
 };
 
 export const track = async (event: BaseEvent) => {
+  const cliManifest = loadCliManifest();
+
   trackEvents.push({
     ...event,
     id: crypto.randomBytes(16).toString('hex'),
-    clientTimestamp: new Date().toJSON()
+    clientTimestamp: new Date().toJSON(),
+    cliVersion: cliManifest.version,
   });
 
   const currentPromise = (flushPromise || Promise.resolve()).then(() => flush()).then(() => {
