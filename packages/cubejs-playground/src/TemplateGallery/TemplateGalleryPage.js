@@ -131,7 +131,7 @@ const RecipeCard = styled(Card)`
 
     && .ant-card-meta-description {
       color: ${(props) =>
-        props.createYourOwn ? 'var(--primary-color)' : 'var(--dark-03-color)'};
+        props.createYourOwn ? 'var(--primary-color)' : 'var(--dark-04-color)'};
       opacity: ${(props) => (props.createYourOwn ? '0.8' : 1)};
       font-size: 13px;
       text-align: ${(props) => (props.createYourOwn ? 'center' : 'left')};
