@@ -52,6 +52,7 @@
     "express": "^4.17.1",
     "jsonwebtoken": "^8.4.0",
     "node-machine-id": "^1.1.10",
+    "semver": "^7.3.2",
     "source-map-support": "^0.5.19",
     "ws": "^7.1.2"
   },
@@ -60,6 +61,7 @@
     "@oclif/dev-cli": "^1.23.1",
     "@types/cors": "^2.8.8",
     "@types/node": "^10.0.10",
+    "@types/semver": "^7.3.4",
     "@types/ws": "^7.2.9",
     "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
