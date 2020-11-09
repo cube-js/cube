@@ -35,7 +35,6 @@ const ADAPTERS = {
   elasticsearch
 };
 exports.query = (compilers, dbType, queryOptions) => {
-  console.log('BUILDING QUERY');
   if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
     return null;
   }
