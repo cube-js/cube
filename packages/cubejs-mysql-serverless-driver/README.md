@@ -21,4 +21,4 @@ Pure Javascript MySql Serverless Aurora Data Api driver.
 
 ### License
 
-Cube.js Serverless Aurora Data Api Driver is [Apache 2.0 licensed](./LICENSE).
+Cube.js MySql Serverless Aurora Data Api Driver for is [Apache 2.0 licensed](./LICENSE).

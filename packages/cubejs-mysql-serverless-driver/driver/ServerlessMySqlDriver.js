@@ -1,5 +1,6 @@
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const crypto = require('crypto');
+const dataApi = require('data-api-client');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
@@ -16,15 +17,15 @@ class ServerlessMySqlDriver extends BaseDriver {
       ...config
     };
 
-    this.dataApi = require('data-api-client')({
+    this.dataApi = dataApi({
       secretArn: this.config.secretArn,
       resourceArn: this.config.resourceArn,
       database: this.config.database
-    })
+    });
   }
 
   async testConnection() {
-    return await this.dataApi.query('SELECT 1');
+    return this.dataApi.query('SELECT 1');
   }
 
   positionBindings(sql) {
@@ -39,13 +40,13 @@ class ServerlessMySqlDriver extends BaseDriver {
     });
   }
 
-  async query(query, values, options) {
+  async query(query, values) {
     const sql = this.positionBindings(query);
 
-    let parameters = {};
+    const parameters = {};
 
     if (values) {
-      for (var i = 0; i < values.length; i++) {
+      for (let i = 0; i < values.length; i++) {
         parameters[`b${i}`] = values[i];
       }
     }
@@ -82,7 +83,7 @@ class ServerlessMySqlDriver extends BaseDriver {
 
   async downloadQueryResults(query, values) {
     if (!this.config.database) {
-      throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
+      throw new Error('Default database should be defined to be used for temporary tables during query results downloads');
     }
     const tableName = crypto.randomBytes(10).toString('hex');
 
@@ -90,7 +91,7 @@ class ServerlessMySqlDriver extends BaseDriver {
       .query(`CREATE TEMPORARY TABLE \`${this.config.database}\`.t_${tableName} AS ${query} LIMIT 0`, values)
       .query(`DESCRIBE \`${this.config.database}\`.t_${tableName}`)
       .query(`DROP TEMPORARY TABLE \`${this.config.database}\`.t_${tableName}`)
-      .rollback((error, status) => { if (error) throw new Error(error); });
+      .rollback((error) => { if (error) throw new Error(error); });
 
     const results = await transaction.commit();
     const columns = results[1].records;

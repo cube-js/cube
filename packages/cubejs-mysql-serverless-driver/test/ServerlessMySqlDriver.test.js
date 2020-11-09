@@ -1,11 +1,10 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
-const { GenericContainer } = require("testcontainers");
+const { GenericContainer } = require('testcontainers');
+const AWS = require('aws-sdk');
 const ServerlessMySqlDriver = require('../driver/ServerlessMySqlDriver');
 
 const DUMMY_SECRET_ARN = 'arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy';
 const DUMMY_RESOURCE_ARN = 'arn:aws:rds:us-east-1:123456789012:cluster:dummy';
-
-const AWS = require('aws-sdk');
 
 describe('ServerlessMySqlDriver', () => {
   let mysqlContainer;
@@ -36,12 +35,6 @@ describe('ServerlessMySqlDriver', () => {
       .withEnv('RESOURCE_ARN', DUMMY_RESOURCE_ARN)
       .withExposedPorts(80)
       .start();
-
-    // const stream = await container.logs();
-    // stream
-    //   .on("data", line => console.log(line))
-    //   .on("err", line => console.error(line))
-    //   .on("end", () => console.log("Stream closed"));
 
     const mappedPort = container.getMappedPort(80);
     const host = container.getHost();
@@ -85,19 +78,19 @@ describe('ServerlessMySqlDriver', () => {
   });
 
   test('truncated wrong value', async () => {
-    await driver.uploadTable(`test.wrong_value`, [{ name: 'value', type: 'string' }], {
-      rows: [{ value: "Tekirdağ" }]
+    await driver.uploadTable('test.wrong_value', [{ name: 'value', type: 'string' }], {
+      rows: [{ value: 'Tekirdağ' }]
     });
 
     expect(JSON.parse(JSON.stringify(await driver.query('select * from test.wrong_value'))))
-      .toStrictEqual([{ value: "Tekirdağ" }]);
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
 
     expect(JSON.parse(JSON.stringify((await driver.downloadQueryResults('select * from test.wrong_value')).rows)))
-      .toStrictEqual([{ value: "Tekirdağ" }]);
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
   });
 
   test('boolean field', async () => {
-    await driver.uploadTable(`test.boolean`, [{ name: 'b_value', type: 'boolean' }], {
+    await driver.uploadTable('test.boolean', [{ name: 'b_value', type: 'boolean' }], {
       rows: [
         { b_value: true },
         { b_value: true },
