@@ -24,10 +24,18 @@ pub struct Table {
 }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TablePath {
     pub table: IdRow<Table>,
     pub schema: Arc<IdRow<Schema>>
+}
+
+impl TablePath {
+    pub fn table_name(&self) -> String {
+        let schema_name = self.schema.get_row().get_name();
+        let table_name = self.table.get_row().get_table_name();
+        format!("{}.{}", schema_name, table_name)
+    }
 }
 
 impl Table {

@@ -11,7 +11,7 @@ use crate::{store::{DataFrame, WALDataStore}, metastore::{MetaStore, Column, Col
 use std::sync::Arc;
 use crate::metastore::{IdRow, Schema, table::Table, ImportFormat, Index, IndexDef, TableId, RowKey};
 
-use crate::queryplanner::{QueryPlanner};
+use crate::queryplanner::{QueryPlanner, QueryPlan};
 
 use crate::cluster::{Cluster, JobEvent};
 
@@ -233,7 +233,11 @@ impl SqlService for SqlServiceImpl {
                 }
                 DFStatement::Statement(Statement::Query(_)) => {
                     let logical_plan = self.query_planner.logical_plan(query.clone()).await?;
-                    let res = self.cluster.run_select(self.cluster.server_name().to_string(), logical_plan).await?; // TODO distribute and combine
+                    // TODO distribute and combine
+                    let res = match logical_plan {
+                        QueryPlan::Meta(logical_plan) => self.query_planner.execute_meta_plan(logical_plan).await?,
+                        QueryPlan::Select(serialized) => self.cluster.run_select(self.cluster.server_name().to_string(), serialized).await?
+                    };
                     return Ok(res);
                 }
                 _ => return Err(CubeError::user(format!("Unsupported SQL: '{}'", q)))

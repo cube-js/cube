@@ -9,6 +9,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use log::{debug};
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
@@ -61,6 +62,7 @@ impl LocalDirRemoteFs {
 #[async_trait]
 impl RemoteFs for LocalDirRemoteFs {
     async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        debug!("Uploading {}", remote_path);
         let remote_dir = self.remote_dir.write().await;
         let dest = remote_dir.as_path().join(remote_path);
         fs::create_dir_all(dest.parent().unwrap()).await?;
@@ -78,6 +80,7 @@ impl RemoteFs for LocalDirRemoteFs {
         let path = local.to_str().unwrap().to_owned();
         fs::create_dir_all(local.parent().unwrap()).await?;
         if !local.exists() {
+            debug!("Downloading {}", remote_path);
             let remote_dir = self.remote_dir.read().await;
             fs::copy(
                 remote_dir.as_path().join(remote_path),
@@ -90,6 +93,7 @@ impl RemoteFs for LocalDirRemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        debug!("Deleting {}", remote_path);
         let remote_dir = self.remote_dir.write().await;
         let remote = remote_dir.as_path().join(remote_path);
         fs::remove_file(remote.clone()).await?;

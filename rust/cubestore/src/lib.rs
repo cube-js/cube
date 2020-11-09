@@ -16,8 +16,9 @@ use parquet::errors::ParquetError;
 use tokio::sync::mpsc::error::SendError;
 use std::backtrace::Backtrace;
 use core::fmt;
-use smallvec::alloc::fmt::Formatter;
+use smallvec::alloc::fmt::{Formatter, Debug};
 use arrow::error::ArrowError;
+use serde_derive::{Deserialize, Serialize};
 
 pub mod http;
 pub mod remotefs;
@@ -33,13 +34,13 @@ pub mod import;
 pub mod config;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
     message: String,
     cause: CubeErrorCauseType
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CubeErrorCauseType {
     User,
     Internal
@@ -55,6 +56,20 @@ impl CubeError {
     fn internal(message: String) -> CubeError {
         CubeError {
             message, cause: CubeErrorCauseType::Internal
+        }
+    }
+
+    fn from_error<E: fmt::Display>(error: E) -> CubeError {
+        CubeError {
+            message: format!("{}\n{}", error, Backtrace::capture()),
+            cause: CubeErrorCauseType::Internal
+        }
+    }
+
+    fn from_debug_error<E: Debug>(error: E) -> CubeError {
+        CubeError {
+            message: format!("{:?}\n{}", error, Backtrace::capture()),
+            cause: CubeErrorCauseType::Internal
         }
     }
 }
@@ -200,5 +215,29 @@ impl From<chrono::ParseError> for CubeError {
 impl From<std::string::FromUtf8Error> for CubeError {
     fn from(v: std::string::FromUtf8Error) -> Self {
         CubeError::internal(v.to_string())
+    }
+}
+
+impl From<procspawn::SpawnError> for CubeError {
+    fn from(v: procspawn::SpawnError) -> Self {
+        CubeError::internal(v.to_string())
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for CubeError {
+    fn from(v: tokio::sync::oneshot::error::RecvError) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<ipc_channel::ipc::IpcError> for CubeError {
+    fn from(v: ipc_channel::ipc::IpcError) -> Self {
+        CubeError::from_debug_error(v)
+    }
+}
+
+impl From<Box<bincode::ErrorKind>> for CubeError {
+    fn from(v: Box<bincode::ErrorKind>) -> Self {
+        CubeError::from_debug_error(v)
     }
 }

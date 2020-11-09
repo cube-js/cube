@@ -6,7 +6,6 @@ use std::sync::Arc;
 use crate::metastore::Column;
 use ::parquet::file::metadata::RowGroupMetaData;
 use chrono::{Utc, SecondsFormat, TimeZone};
-use bigdecimal::BigDecimal;
 
 pub(crate) mod parquet;
 
@@ -15,7 +14,7 @@ pub enum TableValue {
     Null,
     String(String),
     Int(i64),
-    Decimal(BigDecimal),
+    Decimal(String), // TODO bincode is incompatible with BigDecimal
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
     Boolean(bool),
@@ -111,16 +110,6 @@ impl<'a> Ord for RowSortKey<'a> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
     }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ColumnType {
-    String,
-    Int,
-    Double,
-    Bytes,
-    Timestamp,
-    Boolean
 }
 
 pub trait TableStore {

@@ -48,3 +48,6 @@ bigdecimal = { version = "0.2.0", features = ["serde"] }
 rust-s3 = "0.26.3"
 aws-creds = "0.24.1"
 aws-region = "0.22.1"
+procspawn = { version = "0.9.0", features = ["test-support"] }
+deadqueue = "0.1.0"
+ipc-channel = "0.14.1"

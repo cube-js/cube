@@ -1,3 +1,5 @@
+pub mod worker_pool;
+
 use crate::CubeError;
 use tokio::net::TcpStream;
 use futures::future::join_all;
@@ -8,7 +10,7 @@ use async_trait::async_trait;
 use chrono::{Utc};
 use crate::metastore::job::{Job, JobType, JobStatus};
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use tokio::fs::File;
 use std::path::Path;
 use tokio::io::AsyncWriteExt;
@@ -18,23 +20,26 @@ use crate::store::{ChunkDataStore, DataFrame};
 use crate::metastore::{RowKey, TableId, MetaStore, IdRow};
 use log::{info, error, debug};
 use crate::store::compaction::CompactionService;
-use crate::queryplanner::{QueryPlanner};
 use tokio::sync::{Notify, oneshot, broadcast, RwLock};
 use core::mem;
 use std::time::Duration;
 use futures::{FutureExt};
 use crate::import::ImportService;
-use datafusion::logical_plan::LogicalPlan;
 use mockall::automock;
 use tokio::sync::broadcast::{Sender, Receiver};
 use serde::{Deserialize, Serialize};
+use tokio::runtime::Handle;
+use crate::queryplanner::serialized_plan::{SerializedPlan};
+use crate::config::{Config, ConfigObj};
+use crate::queryplanner::query_executor::QueryExecutor;
+use crate::cluster::worker_pool::{WorkerPool, MessageProcessor};
 
 #[automock]
 #[async_trait]
 pub trait Cluster: Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
 
-    async fn run_select(&self, node_name: String, plan_node: LogicalPlan) -> Result<DataFrame, CubeError>;
+    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<DataFrame, CubeError>;
 
     async fn available_nodes(&self) -> Result<Vec<String>, CubeError>;
 
@@ -60,7 +65,6 @@ pub struct ClusterImpl {
     chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
     import_service: Arc<dyn ImportService>,
-    query_planner: Arc<dyn QueryPlanner>,
     connect_timeout: Duration,
     server_name: String,
     server_addresses: Vec<String>,
@@ -69,7 +73,32 @@ pub struct ClusterImpl {
     event_sender: Sender<JobEvent>,
     jobs_enabled: Arc<RwLock<bool>>,
     // used just to hold a reference so event_sender won't be collected
-    _receiver: Receiver<JobEvent>
+    _receiver: Receiver<JobEvent>,
+    select_process_pool: RwLock<Option<Arc<WorkerPool<WorkerMessage, DataFrame, WorkerProcessor>>>>,
+    config_obj: Arc<dyn ConfigObj>,
+    query_executor: Arc<dyn QueryExecutor>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum WorkerMessage {
+    Select(SerializedPlan, HashMap<String, String>)
+}
+
+pub struct WorkerProcessor;
+
+impl MessageProcessor<WorkerMessage, DataFrame> for WorkerProcessor {
+    fn process(args: WorkerMessage) -> Result<DataFrame, CubeError> {
+        match args {
+            WorkerMessage::Select(plan_node, remote_to_local_names) => {
+                debug!("Running select in worker started: {:?}", plan_node);
+                let handle = Handle::current();
+                let plan_node_to_send = plan_node.clone();
+                let res = handle.block_on(async move { Config::current_worker_services().query_executor.execute_plan(plan_node_to_send, remote_to_local_names).await });
+                debug!("Running select in worker completed: {:?}", plan_node);
+                res
+            }
+        }
+    }
 }
 
 pub struct JobRunner {
@@ -99,7 +128,7 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn run_select(&self, node_name: String, plan_node: LogicalPlan) -> Result<DataFrame, CubeError> {
+    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<DataFrame, CubeError> {
         if self.server_name == node_name {
             // TODO timeout config
             timeout(Duration::from_secs(60), self.run_local_select(plan_node)).await?
@@ -184,7 +213,7 @@ impl JobRunner {
         });
         debug!("Running job: {:?}", job);
         self.event_sender.send(JobEvent::Started(job.get_row().row_reference().clone(), job.get_row().job_type().clone()))?;
-        let res = timeout(Duration::from_secs(600), self.route_job(job.get_row())).await;
+        let res = timeout(Duration::from_secs(300), self.route_job(job.get_row())).await;
         mem::drop(rx);
         heart_beat_timer.await?;
         if let Err(timeout_err) = res {
@@ -252,7 +281,8 @@ impl ClusterImpl {
         compaction_service: Arc<dyn CompactionService>,
         meta_store: Arc<dyn MetaStore>,
         import_service: Arc<dyn ImportService>,
-        query_planner: Arc<dyn QueryPlanner>,
+        config_obj: Arc<dyn ConfigObj>,
+        query_executor: Arc<dyn QueryExecutor>,
     ) -> Arc<ClusterImpl> {
         let (sender, receiver) = broadcast::channel(10000); // TODO config
         Arc::new(ClusterImpl {
@@ -264,16 +294,22 @@ impl ClusterImpl {
             compaction_service,
             import_service,
             meta_store,
-            query_planner,
             connected_nodes: Vec::new(),
             job_notify: Arc::new(Notify::new()),
             event_sender: sender,
             jobs_enabled: Arc::new(RwLock::new(true)),
-            _receiver: receiver
+            _receiver: receiver,
+            select_process_pool: RwLock::new(None),
+            config_obj,
+            query_executor
         })
     }
 
-    pub fn start_processing_loops(&self) {
+    pub async fn start_processing_loops(&self) {
+        if self.config_obj.select_worker_pool_size() > 0 {
+            let mut pool = self.select_process_pool.write().await;
+            *pool = Some(Arc::new(WorkerPool::new(self.config_obj.select_worker_pool_size(), Duration::from_secs(60))));
+        }
         for _ in 0..4 { // TODO number of job event loops
             let job_runner = JobRunner {
                 meta_store: self.meta_store.clone(),
@@ -297,14 +333,30 @@ impl ClusterImpl {
         for _ in 0..4 { // TODO number of job event loops
             self.job_notify.notify();
         }
+        // if let Some(pool) = self.select_process_pool.read().await.as_ref() {
+        //     pool.shutdown();
+        // }
         Ok(())
     }
 
-    async fn run_local_select(&self, plan_node: LogicalPlan) -> Result<DataFrame, CubeError> {
+    async fn run_local_select(&self, plan_node: SerializedPlan) -> Result<DataFrame, CubeError> {
         let start = SystemTime::now();
         debug!("Running select: {:?}", plan_node);
-        let res = Ok(self.query_planner.execute_plan(plan_node).await?);
-        info!("Running select completed ({:?})", start.elapsed()?);
+        let to_download = plan_node.files_to_download();
+        let file_futures = to_download.iter().map(|remote| {
+            self.remote_fs.download_file(remote)
+        }).collect::<Vec<_>>();
+        let remote_to_local_names = to_download.clone().into_iter().zip(join_all(file_futures).await
+            .into_iter().collect::<Result<Vec<_>, _>>()?.into_iter())
+            .collect::<HashMap<_, _>>();
+        let pool_option = self.select_process_pool.read().await.clone();
+        let res = if let Some(pool) = pool_option {
+            let serialized_plan_node = plan_node.clone();
+            pool.process(WorkerMessage::Select(serialized_plan_node, remote_to_local_names)).await
+        } else {
+            self.query_executor.execute_plan(plan_node.clone(), remote_to_local_names).await
+        };
+        info!("Running select completed ({:?}): {:?}", start.elapsed()?, plan_node);
         res
     }
 
@@ -374,7 +426,7 @@ mod tests {
     use crate::metastore::{WAL, table::Table, IdRow, Chunk, RocksMetaStore};
     use async_trait::async_trait;
     use crate::import::MockImportService;
-    use crate::queryplanner::MockQueryPlanner;
+    use crate::queryplanner::query_executor::QueryExecutorImpl;
 
     struct MockWalStore;
 
@@ -434,6 +486,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn elect_leader() {
+        let config = Config::test("leader");
         let local = env::temp_dir().join(Path::new("local-leader"));
         if fs::read_dir(local.to_owned()).is_ok() {
             fs::remove_dir_all(local.to_owned()).unwrap();
@@ -460,7 +513,8 @@ mod tests {
             compaction.clone(),
             meta_store.clone(),
             Arc::new(MockImportService::new()),
-            Arc::new(MockQueryPlanner::new()),
+            config.config_obj(),
+            Arc::new(QueryExecutorImpl)
         );
 
         let bar = ClusterImpl::new(
@@ -472,7 +526,8 @@ mod tests {
             compaction.clone(),
             meta_store.clone(),
             Arc::new(MockImportService::new()),
-            Arc::new(MockQueryPlanner::new()),
+            config.config_obj(),
+            Arc::new(QueryExecutorImpl)
         );
 
         remote_fs.drop_local_path().await.unwrap();

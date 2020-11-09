@@ -2,3 +2,4 @@
 /.idea
 upstream
 .cubestore
+.cargo/config.toml

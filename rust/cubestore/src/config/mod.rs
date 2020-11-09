@@ -1,5 +1,5 @@
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-use std::env;
+use std::{env};
 use tokio::sync::{RwLock};
 use crate::metastore::RocksMetaStore;
 use std::sync::Arc;
@@ -17,7 +17,9 @@ use tokio::sync::broadcast;
 use crate::metastore::listener::{MetastoreListenerImpl};
 use crate::CubeError;
 use crate::remotefs::s3::S3RemoteFs;
+use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 
+#[derive(Clone)]
 pub struct CubeServices {
     pub sql_service: Arc<dyn SqlService>,
     pub scheduler: Arc<RwLock<SchedulerImpl>>,
@@ -26,9 +28,14 @@ pub struct CubeServices {
     pub cluster: Arc<ClusterImpl>
 }
 
+#[derive(Clone)]
+pub struct WorkerServices {
+    pub query_executor: Arc<dyn QueryExecutor>
+}
+
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
-        self.cluster.start_processing_loops();
+        self.cluster.start_processing_loops().await;
         let meta_store = self.meta_store.clone();
         tokio::spawn(async move { meta_store.run_upload_loop().await });
         Ok(())
@@ -56,18 +63,29 @@ pub struct Config {
 #[automock]
 pub trait ConfigObj: Send + Sync {
     fn partition_split_threshold(&self) -> u64;
+
+    fn select_worker_pool_size(&self) -> usize;
 }
 
 pub struct ConfigObjImpl {
     partition_split_threshold: u64,
     data_dir: PathBuf,
-    store_provider: FileStoreProvider
+    store_provider: FileStoreProvider,
+    select_worker_pool_size: usize
 }
 
 impl ConfigObj for ConfigObjImpl {
     fn partition_split_threshold(&self) -> u64 {
         self.partition_split_threshold
     }
+
+    fn select_worker_pool_size(&self) -> usize {
+        self.select_worker_pool_size
+    }
+}
+
+lazy_static! {
+    pub static ref WORKER_SERVICES: std::sync::RwLock<Option<WorkerServices>> = std::sync::RwLock::new(None);
 }
 
 impl Config {
@@ -82,7 +100,8 @@ impl Config {
                     } else {
                         FileStoreProvider::Filesystem { remote_dir: env::current_dir().unwrap().join("upstream") }
                     }
-                }
+                },
+                select_worker_pool_size: 4
             })
         }
     }
@@ -92,9 +111,14 @@ impl Config {
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::current_dir().unwrap().join(format!("{}-local-store", name)),
                 partition_split_threshold: 20,
-                store_provider: FileStoreProvider::Filesystem { remote_dir: env::current_dir().unwrap().join(format!("{}-upstream", name)) }
+                store_provider: FileStoreProvider::Filesystem { remote_dir: env::current_dir().unwrap().join(format!("{}-upstream", name)) },
+                select_worker_pool_size: 0
             })
         }
+    }
+
+    pub fn config_obj(&self) -> Arc<dyn ConfigObj> {
+        self.config_obj.clone()
     }
 
     pub fn local_dir(&self) -> &PathBuf {
@@ -138,7 +162,8 @@ impl Config {
         let chunk_store = ChunkStore::new(meta_store.clone(), remote_fs.clone(), wal_store.clone(), 262144);
         let compaction_service = CompactionServiceImpl::new(meta_store.clone(), chunk_store.clone(), remote_fs.clone(), self.config_obj.clone());
         let import_service = ImportServiceImpl::new(meta_store.clone(), wal_store.clone());
-        let query_planner = QueryPlannerImpl::new(meta_store.clone(), remote_fs.clone(), chunk_store.clone());
+        let query_planner = QueryPlannerImpl::new(meta_store.clone());
+        let query_executor = Arc::new(QueryExecutorImpl);
         let cluster = ClusterImpl::new(
             "localhost".to_string(),
             vec!["localhost".to_string()],
@@ -148,7 +173,8 @@ impl Config {
             compaction_service.clone(),
             meta_store.clone(),
             import_service.clone(),
-            query_planner.clone()
+            self.config_obj.clone(),
+            query_executor
         );
 
         let sql_service = SqlServiceImpl::new(meta_store.clone(), wal_store.clone(), query_planner.clone(), cluster.clone());
@@ -162,4 +188,16 @@ impl Config {
             cluster
         }
     }
+
+    pub fn configure_worker(&self) {
+        let mut services = WORKER_SERVICES.write().unwrap();
+        *services = Some(WorkerServices {
+            query_executor: Arc::new(QueryExecutorImpl)
+        })
+    }
+
+    pub fn current_worker_services() -> WorkerServices {
+        WORKER_SERVICES.read().unwrap().as_ref().unwrap().clone()
+    }
+
 }

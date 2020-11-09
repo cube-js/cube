@@ -367,7 +367,7 @@ pub struct WAL {
     uploaded: bool
 }
 
-#[derive(Clone, Serialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct IdRow<T: Clone> {
     id: u64,
     row: T
@@ -475,7 +475,7 @@ pub trait MetaStore: Send + Sync {
     fn schemas_table(&self) -> Box<dyn MetaStoreTable<T=Schema>>;
     async fn create_schema(&self, schema_name: String) -> Result<IdRow<Schema>, CubeError>;
     async fn get_schemas(&self) -> Result<Vec<IdRow<Schema>>, CubeError>;
-    async fn get_schema_by_id(&self, schema_id: u64) -> Result<Option<IdRow<Schema>>, CubeError>;
+    async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError>;
     //TODO Option
     async fn get_schema_id(&self, schema_name: String) -> Result<u64, CubeError>;
     //TODO Option
@@ -1379,10 +1379,10 @@ impl MetaStore for RocksMetaStore {
         }).await
     }
 
-    async fn get_schema_by_id(&self, schema_id: u64) -> Result<Option<IdRow<Schema>>, CubeError> {
+    async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError> {
         self.read_operation(move |db_ref| {
             let table = SchemaRocksTable::new(db_ref);
-            table.get_row(schema_id)
+            table.get_row_or_not_found(schema_id)
         }).await
     }
 
@@ -1865,9 +1865,9 @@ mod tests {
             assert_eq!(meta_store.get_schema("bar".to_string()).await.unwrap(), schema_2);
             assert_eq!(meta_store.get_schema("boo".to_string()).await.unwrap(), schema_3);
 
-            assert_eq!(meta_store.get_schema_by_id(schema_1_id).await.unwrap().unwrap(), schema_1);
-            assert_eq!(meta_store.get_schema_by_id(schema_2_id).await.unwrap().unwrap(), schema_2);
-            assert_eq!(meta_store.get_schema_by_id(schema_3_id).await.unwrap().unwrap(), schema_3);
+            assert_eq!(meta_store.get_schema_by_id(schema_1_id).await.unwrap(), schema_1);
+            assert_eq!(meta_store.get_schema_by_id(schema_2_id).await.unwrap(), schema_2);
+            assert_eq!(meta_store.get_schema_by_id(schema_3_id).await.unwrap(), schema_3);
 
             assert_eq!(meta_store.get_schemas().await.unwrap(), vec![
                IdRow::new(1, Schema { name: "foo".to_string() }),
@@ -1878,14 +1878,14 @@ mod tests {
             assert_eq!(meta_store.rename_schema("foo".to_string(), "foo1".to_string()).await.unwrap(), IdRow::new(schema_1_id, Schema{name: "foo1".to_string()}));
             assert!(meta_store.get_schema("foo".to_string()).await.is_err());
             assert_eq!(meta_store.get_schema("foo1".to_string()).await.unwrap(), IdRow::new(schema_1_id, Schema{name: "foo1".to_string()}));
-            assert_eq!(meta_store.get_schema_by_id(schema_1_id).await.unwrap().unwrap(), IdRow::new(schema_1_id, Schema{name: "foo1".to_string()}));
+            assert_eq!(meta_store.get_schema_by_id(schema_1_id).await.unwrap(), IdRow::new(schema_1_id, Schema{name: "foo1".to_string()}));
 
             assert!(meta_store.rename_schema("boo1".to_string(), "foo1".to_string()).await.is_err());
 
             assert_eq!(meta_store.rename_schema_by_id(schema_2_id, "bar1".to_string()).await.unwrap(), IdRow::new(schema_2_id, Schema{name: "bar1".to_string()}));
             assert!(meta_store.get_schema("bar".to_string()).await.is_err());
             assert_eq!(meta_store.get_schema("bar1".to_string()).await.unwrap(), IdRow::new(schema_2_id, Schema{name: "bar1".to_string()}));
-            assert_eq!(meta_store.get_schema_by_id(schema_2_id).await.unwrap().unwrap(), IdRow::new(schema_2_id, Schema{name: "bar1".to_string()}));
+            assert_eq!(meta_store.get_schema_by_id(schema_2_id).await.unwrap(), IdRow::new(schema_2_id, Schema{name: "bar1".to_string()}));
 
             assert_eq!(meta_store.delete_schema("bar1".to_string()).await.unwrap(), ());
             assert!(meta_store.delete_schema("bar1".to_string()).await.is_err());

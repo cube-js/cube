@@ -414,6 +414,7 @@ dependencies = [
  "miniz_oxide",
  "object",
  "rustc-demangle",
+ "serde",
 ]
 
 [[package]]
@@ -895,6 +896,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctor"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fbaabec2c953050352311293be5c6aba8e141ba19d6811862b232d6fd020484"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "cubestore"
 version = "0.1.0"
 dependencies = [
@@ -912,9 +923,11 @@ dependencies = [
  "chrono",
  "csv",
  "datafusion",
+ "deadqueue",
  "enum_primitive",
  "flexbuffers",
  "futures",
+ "ipc-channel",
  "itertools 0.9.0",
  "lazy_static",
  "log",
@@ -922,6 +935,7 @@ dependencies = [
  "msql-srv",
  "num",
  "parquet",
+ "procspawn",
  "regex",
  "rocksdb",
  "rust-s3",
@@ -954,6 +968,16 @@ dependencies = [
  "paste",
  "rustyline",
  "sqlparser",
+ "tokio",
+]
+
+[[package]]
+name = "deadqueue"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f41ebddf24094fe55ed9861f925e8fd88d761e5231ec1dcc844e7fd66179b1b"
+dependencies = [
+ "crossbeam-queue",
  "tokio",
 ]
 
@@ -1160,6 +1184,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca5faf057445ce5c9d4329e382b2ce7ca38550ef3b73a5348362d5f24e0c7fe3"
 dependencies = [
  "instant",
+]
+
+[[package]]
+name = "findshlibs"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1260d61e4fe2a6ab845ffdc426a0bd68ffb240b91cf0ec5a8d1170cec535bd8"
+dependencies = [
+ "lazy_static",
+ "libc",
 ]
 
 [[package]]
@@ -1667,6 +1701,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2b3ea6ff95e175473f8ffe6a7eb7c00d054240321b84c57051175fe3c1e075e"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "ipc-channel"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3698b8affd5656032a074a7d40b3c2a29b71971f3e1ff6042b9d40724e20d97c"
+dependencies = [
+ "bincode",
+ "crossbeam-channel 0.4.4",
+ "fnv",
+ "lazy_static",
+ "libc",
+ "mio",
+ "rand 0.7.3",
+ "serde",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]
@@ -2392,7 +2444,7 @@ version = "3.0.0-SNAPSHOT"
 source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
 dependencies = [
  "arrow",
- "base64 0.12.3",
+ "base64 0.13.0",
  "brotli",
  "byteorder",
  "chrono",
@@ -2583,6 +2635,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0704ee1a7e00d7bb417d0770ea303c1bccbabf0ef1667dae92b5967f5f8a71"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "procspawn"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22d4628f0f2a777c58aa7b64654ffc577c4057a50e611c4d69cbe9fe207bf9b6"
+dependencies = [
+ "backtrace",
+ "ctor",
+ "findshlibs",
+ "ipc-channel",
+ "libc",
+ "serde",
 ]
 
 [[package]]
