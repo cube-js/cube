@@ -662,6 +662,7 @@ pub struct RocksMetaStore {
     write_notify: Arc<Notify>,
     write_completed_notify: Arc<Notify>,
     last_upload_seq: Arc<RwLock<u64>>,
+    last_check_seq: Arc<RwLock<u64>>,
     upload_loop_enabled: Arc<RwLock<bool>>
 }
 
@@ -1091,6 +1092,7 @@ impl RocksMetaStore {
             write_notify: Arc::new(Notify::new()),
             write_completed_notify: Arc::new(Notify::new()),
             last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
+            last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             upload_loop_enabled: Arc::new(RwLock::new(true))
         };
         meta_store
@@ -1203,11 +1205,12 @@ impl RocksMetaStore {
     }
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
-        let mut last_upload_seq = self.last_upload_seq().await;
-        if last_upload_seq == self.db.read().await.latest_sequence_number() {
+        let last_check_seq = self.last_check_seq().await;
+        let last_db_seq = self.db.read().await.latest_sequence_number();
+        if last_check_seq == last_db_seq {
             let _ = tokio::time::timeout(Duration::from_secs(5), self.write_notify.notified()).await; // TODO
         }
-        last_upload_seq = self.last_upload_seq().await;
+        let last_upload_seq = self.last_upload_seq().await;
         let (serializer, min, max) = {
             let updates = self.db.write().await.get_updates_since(last_upload_seq)?;
             let mut serializer = WriteBatchContainer::new();
@@ -1236,6 +1239,10 @@ impl RocksMetaStore {
         if last_checkpoint_time + time::Duration::from_secs(60) < SystemTime::now() {
             self.upload_check_point().await?;
         }
+
+        let mut check_seq = self.last_check_seq.write().await;
+        *check_seq = last_db_seq;
+
         Ok(())
     }
 
@@ -1251,6 +1258,10 @@ impl RocksMetaStore {
 
     async fn last_upload_seq(&self) -> u64 {
         *self.last_upload_seq.read().await
+    }
+
+    async fn last_check_seq(&self) -> u64 {
+        *self.last_check_seq.read().await
     }
 
     async fn upload_checkpoint(db: Arc<DB>, remote_fs: Arc<dyn RemoteFs>, checkpoint_time: &SystemTime) -> Result<(), CubeError> {
