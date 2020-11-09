@@ -17,14 +17,16 @@ const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 const sharedDotEnvVars = env => `CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}`;
 
-const defaultDotEnvVars = env => `CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
+const defaultDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
+CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
 CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
 CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
 CUBEJS_WEB_SOCKETS=true
 ${sharedDotEnvVars(env)}`;
 
-const athenaDotEnvVars = env => `CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
+const athenaDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
+CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
 CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
 # You can find the Athena S3 Output location here: https://docs.aws.amazon.com/athena/latest/ug/querying.html
@@ -45,6 +47,7 @@ const dotEnv = env => {
     const envVars = env.driverEnvVariables.map(v => `${v}=<${v.replace('CUBEJS', 'YOUR')}>`).join('\n');
     return `${envVars}\n${sharedDotEnvVars(env)}`;
   }
+
   return {
     athena: athenaDotEnvVars(env),
     mongobi: mongobiDotEnvVars(env)
