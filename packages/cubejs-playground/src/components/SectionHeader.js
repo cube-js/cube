@@ -7,7 +7,7 @@ const SectionHeader = styled.div`
   line-height: 18px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--dark-03-color);
+  color: var(--dark-04-color);
   margin-bottom: 8px;
 `;
 

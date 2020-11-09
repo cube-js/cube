@@ -9,7 +9,7 @@ import { SectionRow } from '../components';
 import styled from 'styled-components';
 
 const Label = styled.div`
-  color: var(--dark-03-color);
+  color: var(--dark-04-color);
   line-height: 32px;
 `;
 
