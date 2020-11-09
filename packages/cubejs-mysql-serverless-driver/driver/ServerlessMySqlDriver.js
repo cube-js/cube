@@ -10,15 +10,16 @@ class ServerlessMySqlDriver extends BaseDriver {
   constructor(config) {
     super();
     this.config = {
-      secretArn: process.env.CUBEJS_DATABASE_SECRET_ARN,
-      resourceArn: process.env.CUBEJS_DATABASE_CLUSTER_ARN,
-      database: process.env.CUBEJS_DATABASE,
+      secretArn: process.env.CUBEJS_DATABASE_SECRET_ARN || config.secretArn,
+      resourceArn: process.env.CUBEJS_DATABASE_CLUSTER_ARN || config.resourceArm,
+      database: process.env.CUBEJS_DATABASE || config.database,
       ...config
     };
+
     this.dataApi = require('data-api-client')({
       secretArn: this.config.secretArn,
       resourceArn: this.config.resourceArn,
-      database: this.config.database,
+      database: this.config.database
     })
   }
 
@@ -40,12 +41,6 @@ class ServerlessMySqlDriver extends BaseDriver {
 
   async query(query, values, options) {
     const sql = this.positionBindings(query);
-
-    console.log('ROCKING THE QUERY');
-    console.log(sql);
-
-    console.log('VALUES');
-    console.log(values);
 
     let parameters = {};
 
@@ -98,6 +93,7 @@ class ServerlessMySqlDriver extends BaseDriver {
       .rollback((error, status) => { if (error) throw new Error(error); });
 
     const results = await transaction.commit();
+    const columns = results[1].records;
 
     const types = columns.map(c => ({ name: c.Field, type: this.toGenericType(c.Type) }));
 

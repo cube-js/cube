@@ -7,9 +7,17 @@
 
 # Cube.js MySql Serverless Aurora Data Api Driver
 
-Pure Javascript Serverless Aurora Data Api MySql driver.
+Pure Javascript MySql Serverless Aurora Data Api driver.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
+
+## Using the Data API for Aurora Serverless
+
+[Learn more](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/data-api.html)
+
+## Unit Testing
+
+[local-data-api container](https://hub.docker.com/r/koxudaxi/local-data-api)
 
 ### License
 
