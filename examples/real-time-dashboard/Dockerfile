@@ -1,8 +1,5 @@
-FROM node:10-alpine
+FROM cubejs/cube:latest
 
-WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install
 COPY . .
-
-CMD [ "npm", "start" ]

@@ -3,15 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "./node_modules/.bin/cubejs-dev-server",
-    "build-front": "cd dashboard-app && yarn build",
-    "start": "node index.js"
+    "dev": "./node_modules/.bin/cubejs-server dev-server"
   },
   "dependencies": {
-    "@cubejs-backend/mongobi-driver": "^0.17.5",
-    "@cubejs-backend/server": "^0.17.7",
-    "moment": "^2.24.0",
-    "mongodb": "^3.3.3",
-    "serve-static": "^1.14.1"
+    "mongodb": "^3.3.3"
+  },
+  "devDependencies": {
+    "@cubejs-backend/mongobi-driver": "^0.23.8",
+    "@cubejs-backend/server": "^0.23.8"
   }
 }
