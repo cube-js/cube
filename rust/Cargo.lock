@@ -121,7 +121,7 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#c51fe307f2ee7cdeb2db1230b311f12f43f895ad"
 dependencies = [
  "chrono",
  "csv",
@@ -142,7 +142,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#c51fe307f2ee7cdeb2db1230b311f12f43f895ad"
 dependencies = [
  "arrow",
  "bytes",
@@ -953,7 +953,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#c51fe307f2ee7cdeb2db1230b311f12f43f895ad"
 dependencies = [
  "arrow",
  "async-trait",
@@ -967,6 +967,8 @@ dependencies = [
  "parquet",
  "paste",
  "rustyline",
+ "serde",
+ "serde_derive",
  "sqlparser",
  "tokio",
 ]
@@ -2441,7 +2443,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#5498441dec7bba6f4b18f45f8920c51aff11cf66"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-06#c51fe307f2ee7cdeb2db1230b311f12f43f895ad"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3916,7 +3918,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04f8ab788026715fa63b31960869617cba39117e520eb415b0139543e325ab59"
 dependencies = [
  "cfg-if 0.1.10",
- "rand 0.7.3",
+ "rand 0.6.5",
  "static_assertions",
 ]
 
