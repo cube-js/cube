@@ -14,8 +14,9 @@
   "main": "driver/ServerlessMySqlDriver.js",
   "typings": "driver/index.d.ts",
   "scripts": {
-    "integration": "jest",
-    "integration:mysql": "jest",
+    "test": "npm run unit && npm run integration",
+    "unit": "jest ./**/*.test.js",
+    "integration": "jest ./**/*.integration.js",
     "lint": "eslint driver/*.js test/*.js"
   },
   "dependencies": {
@@ -35,5 +36,11 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
+  },
+  "jest": {
+    "testMatch": [
+      "**/__tests__/**/*.js?(x)",
+      "**/?(*.)+(spec|test|integration).js?(x)"
+    ]
   }
 }
