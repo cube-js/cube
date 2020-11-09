@@ -6,7 +6,6 @@ import { Layout, Row, Col } from 'antd';
 import { StaticQuery, graphql } from 'gatsby';
 
 import FrameworkOfChoiceStore, {
-  FRAMEWORKS,
   useFrameworkOfChoice
 } from '../../stores/frameworkOfChoice';
 import Search from '../Search';
@@ -24,7 +23,6 @@ import { renameCategory } from '../../../rename-category';
 export const trimSlashes = (str) => str.replace(/^\/|\/$/g, '');
 
 const { Content } = Layout;
-const FRAMEWORK_LIST = FRAMEWORKS.map(fr => fr.slug);
 
 const MOBILE_MODE_SET = ['content', 'menu', 'search'];
 

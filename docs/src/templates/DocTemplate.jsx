@@ -177,7 +177,6 @@ class DocTemplate extends Component {
         key: item.id,
         id: item.id,
         type: item.type,
-        title: item.title,
         className: item.className
       }, item.nodes);
     });
