@@ -13,8 +13,9 @@ describe('ServerlessMySqlDriver', () => {
 
   jest.setTimeout(120000);
 
-  const mysqlVersion = process.env.TEST_MYSQL_VERSION || '5.6.50'; // We want to bypass the ssl defauls
-  const version = process.env.TEST_LOCAL_DATA_API_VERSION || 'latest';
+  // Aurora Serverless doesn't support mysql 8.0 && We want to bypass the ssl defauls
+  const mysqlVersion = process.env.TEST_MYSQL_VERSION || '5.6.50';
+  const localDataApiVersion = process.env.TEST_LOCAL_DATA_API_VERSION || 'latest';
 
   beforeAll(async () => {
     const mysqlRootPassword = process.env.TEST_DB_PASSWORD || 'Test1test';
@@ -26,7 +27,7 @@ describe('ServerlessMySqlDriver', () => {
 
     const mappedSqlPort = mysqlContainer && mysqlContainer.getMappedPort(3306) || 3306;
 
-    container = await new GenericContainer('koxudaxi/local-data-api', version)
+    container = await new GenericContainer('koxudaxi/local-data-api', localDataApiVersion)
       .withEnv('MYSQL_HOST', 'host.docker.internal')
       .withEnv('MYSQL_PORT', mappedSqlPort)
       .withEnv('MYSQL_USER', 'root')

@@ -1,7 +1,12 @@
-import { ConnectionConfig } from "mysql";
+declare module '@cubejs-backend/mysql-serverless-driver' {
+  export default interface ConnectionOptions {
+    secretArn?: string
+    resourceArn?: string
+    database?: string
+  }
+  export default class ServerlessMySqlDriver {
+    constructor(options?: ConnectionOptions);
 
-declare module "@cubejs-backend/mysql-driver" {
-  export default class MySqlDriver {
-    constructor(options?: ConnectionConfig);
+    positionBindings(sql: string): string;
   }
 }
