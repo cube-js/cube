@@ -333,9 +333,9 @@ impl ClusterImpl {
         for _ in 0..4 { // TODO number of job event loops
             self.job_notify.notify();
         }
-        // if let Some(pool) = self.select_process_pool.read().await.as_ref() {
-        //     pool.shutdown();
-        // }
+        if let Some(pool) = self.select_process_pool.read().await.as_ref() {
+            pool.stop_workers()?;
+        }
         Ok(())
     }
 

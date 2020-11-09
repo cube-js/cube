@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{oneshot};
+use tokio::sync::{oneshot, watch, RwLock};
 use std::marker::PhantomData;
 use crate::CubeError;
 use ipc_channel::ipc;
@@ -20,6 +20,7 @@ pub struct WorkerPool<
     // TODO stop implementation
     _workers: Vec<Arc<WorkerProcess<T, R, P>>>,
     queue: Arc<unlimited::Queue<Message<T, R>>>,
+    stopped_tx: watch::Sender<bool>,
     processor: PhantomData<P>
 }
 
@@ -48,11 +49,12 @@ impl<
         timeout: Duration,
     ) -> WorkerPool<T, R, P> {
         let queue = Arc::new(unlimited::Queue::new());
+        let (stopped_tx, stopped_rx) =  watch::channel(false);
 
         let mut workers = Vec::new();
 
         for _ in 0..num {
-            let process = Arc::new(WorkerProcess::new(queue.clone(), timeout.clone()));
+            let process = Arc::new(WorkerProcess::new(queue.clone(), timeout.clone(), stopped_rx.clone()));
             workers.push(process.clone());
             tokio::spawn(async move {
                 process.processing_loop().await
@@ -61,6 +63,7 @@ impl<
 
         WorkerPool {
             _workers: workers,
+            stopped_tx,
             queue,
             processor: PhantomData
         }
@@ -74,6 +77,10 @@ impl<
         });
         Ok(rx.await??)
     }
+
+    pub fn stop_workers(&self) -> Result<(), CubeError> {
+        Ok(self.stopped_tx.broadcast(true)?)
+    }
 }
 
 pub struct WorkerProcess<
@@ -83,7 +90,8 @@ pub struct WorkerProcess<
 > {
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     timeout: Duration,
-    processor: PhantomData<P>
+    processor: PhantomData<P>,
+    stopped_rx: RwLock<watch::Receiver<bool>>
 }
 
 impl<
@@ -91,10 +99,11 @@ impl<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static
 > WorkerProcess<T, R, P> {
-    fn new(queue: Arc<unlimited::Queue<Message<T, R>>>, timeout: Duration) -> Self {
+    fn new(queue: Arc<unlimited::Queue<Message<T, R>>>, timeout: Duration, stopped_rx: watch::Receiver<bool>) -> Self {
         WorkerProcess {
             queue,
             timeout,
+            stopped_rx: RwLock::new(stopped_rx),
             processor: PhantomData
         }
     }
@@ -106,7 +115,21 @@ impl<
             match process {
                 Ok((mut args_tx, mut res_rx, mut handle)) => {
                     loop {
-                        let Message { message, sender } = self.queue.pop().await;
+                        let mut stopped_rx = self.stopped_rx.write().await;
+                        let Message { message, sender } = tokio::select! {
+                            stopped = stopped_rx.recv() => {
+                                if let Some(x) = stopped {
+                                    if x {
+                                        <WorkerProcess<T, R, P>>::kill(&mut handle);
+                                        return;
+                                    }
+                                }
+                                continue;
+                            }
+                            message = self.queue.pop() => {
+                                message
+                            }
+                        };
                         let process_message_res_timeout = tokio::time::timeout(self.timeout, self.process_message(message, args_tx, res_rx)).await;
                         let process_message_res = match process_message_res_timeout {
                             Ok(r) => r,
@@ -125,9 +148,7 @@ impl<
                                 if sender.send(Err(e.clone())).is_err() {
                                     error!("Error during worker message processing: Send Error");
                                 }
-                                if let Err(e) = handle.kill() {
-                                    error!("Error during kill: {:?}", e);
-                                }
+                                <WorkerProcess<T, R, P>>::kill(&mut handle);
                                 break;
                             }
                         }
@@ -139,6 +160,12 @@ impl<
             }
         }
 
+    }
+
+    fn kill(handle: &mut JoinHandle<()>) {
+        if let Err(e) = handle.kill() {
+            error!("Error during kill: {:?}", e);
+        }
     }
 
     async fn process_message(&self, message:T, args_tx: IpcSender<T>, res_rx: IpcReceiver<Result<R, CubeError>>) -> Result<(R, IpcSender<T>, IpcReceiver<Result<R, CubeError>>), CubeError> {
@@ -202,6 +229,7 @@ mod tests {
     async fn test_basic() {
         let pool = WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
         assert_eq!(pool.process(Message::Delay(100)).await.unwrap(), Response::Foo(100));
+        pool.stop_workers().unwrap();
     }
 
     #[tokio::test]
@@ -215,6 +243,7 @@ mod tests {
             println!("Testing {} future", i);
             assert_eq!(f.await.unwrap(), Response::Foo(i * 100));
         }
+        pool.stop_workers().unwrap();
     }
 
     #[tokio::test]
@@ -232,5 +261,6 @@ mod tests {
                 assert_eq!(f.await.unwrap(), Response::Foo(i * 300));
             }
         }
+        pool.stop_workers().unwrap();
     }
 }

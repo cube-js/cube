@@ -241,3 +241,9 @@ impl From<Box<bincode::ErrorKind>> for CubeError {
         CubeError::from_debug_error(v)
     }
 }
+
+impl From<tokio::sync::watch::error::SendError<bool>> for CubeError {
+    fn from(v: tokio::sync::watch::error::SendError<bool>) -> Self {
+        CubeError::from_error(v)
+    }
+}
