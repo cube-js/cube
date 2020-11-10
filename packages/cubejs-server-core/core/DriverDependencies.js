@@ -1,7 +1,7 @@
 module.exports = {
   postgres: '@cubejs-backend/postgres-driver',
   mysql: '@cubejs-backend/mysql-driver',
-  mysqlserverless: '@cubejs-backend/mysql-serverless-driver',
+  mysqlauroraserverless: '@cubejs-backend/mysql-aurora-serverless-driver',
   mssql: '@cubejs-backend/mssql-driver',
   athena: '@cubejs-backend/athena-driver',
   jdbc: '@cubejs-backend/jdbc-driver',

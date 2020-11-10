@@ -18,7 +18,7 @@ const ADAPTERS = {
   postgres,
   redshift,
   mysql,
-  mysqlserverless: mysql,
+  mysqlauroraserverless: mysql,
   mongobi,
   mssql,
   bigquery,
