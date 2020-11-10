@@ -7,7 +7,7 @@ const GenericTypeToMySql = {
   text: 'varchar(255) CHARACTER SET utf8mb4'
 };
 
-class ServerlessMySqlDriver extends BaseDriver {
+class AuroraServerlessMySqlDriver extends BaseDriver {
   constructor(config) {
     super();
     this.config = {
@@ -149,4 +149,4 @@ class ServerlessMySqlDriver extends BaseDriver {
   }
 }
 
-module.exports = ServerlessMySqlDriver;
+module.exports = AuroraServerlessMySqlDriver;

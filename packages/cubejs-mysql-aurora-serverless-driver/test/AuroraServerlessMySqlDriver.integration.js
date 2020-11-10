@@ -1,12 +1,12 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
 const { GenericContainer } = require('testcontainers');
 const AWS = require('aws-sdk');
-const ServerlessMySqlDriver = require('../driver/ServerlessMySqlDriver');
+const AuroraServerlessMySqlDriver = require('../driver/AuroraServerlessMySqlDriver');
 
 const DUMMY_SECRET_ARN = 'arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy';
 const DUMMY_RESOURCE_ARN = 'arn:aws:rds:us-east-1:123456789012:cluster:dummy';
 
-describe('ServerlessMySqlDriver', () => {
+describe('AuroraServerlessMySqlDriver', () => {
   let mysqlContainer;
   let container;
   let driver;
@@ -47,7 +47,7 @@ describe('ServerlessMySqlDriver', () => {
     AWS.config.region = 'us-east-1';
     AWS.config.endpoint = new AWS.Endpoint(endpoint);
 
-    driver = new ServerlessMySqlDriver({
+    driver = new AuroraServerlessMySqlDriver({
       secretArn: DUMMY_SECRET_ARN,
       resourceArn: DUMMY_RESOURCE_ARN,
       database: 'mysql'
