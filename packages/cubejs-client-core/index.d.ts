@@ -82,7 +82,7 @@ declare module '@cubejs-client/core' {
     title: string;
     shortTitle: string;
     type: string;
-    format?: 'currency' | 'percentage';
+    format?: 'currency' | 'percent' | 'number';
   };
 
   export type QueryAnnotations = {
