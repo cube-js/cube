@@ -21,7 +21,7 @@ use arrow::array::{UInt64Array, Int64Array, Float64Array, TimestampMicrosecondAr
 use std::collections::HashMap;
 use async_trait::async_trait;
 use mockall::automock;
-use log::{debug};
+use log::{debug, warn};
 use datafusion::{error::{Result as DFResult}};
 use bigdecimal::BigDecimal;
 use std::convert::TryFrom;
@@ -38,29 +38,27 @@ pub struct QueryExecutorImpl;
 impl QueryExecutor for QueryExecutorImpl {
     async fn execute_plan(&self, plan: SerializedPlan, remote_to_local_names: HashMap<String, String>) -> Result<DataFrame, CubeError> {
         let plan_to_move = plan.logical_plan();
-        let ctx = self.execution_context(plan, remote_to_local_names)?;
+        let ctx = self.execution_context(plan.index_snapshots(), remote_to_local_names)?;
         let plan_ctx = ctx.clone();
 
         let physical_plan = tokio::task::spawn_blocking(move || {
             plan_ctx.create_physical_plan(&plan_to_move)
         }).await??;
 
-        if format!("{:#?}", &physical_plan).contains("ParquetExec") {
-            debug!("Physical plan: {:#?}", physical_plan);
-        }
-
         let execution_time = SystemTime::now();
-        let results = ctx.collect(physical_plan).await?;
+        let results = ctx.collect(physical_plan.clone()).await?;
         debug!("Query data processing time: {:?}", execution_time.elapsed()?);
+        if execution_time.elapsed()?.as_millis() > 200 {
+            warn!("Slow Query ({:?}):\n{:#?}", execution_time.elapsed()?, plan.logical_plan());
+            debug!("Slow Query Physical Plan ({:?}): {:#?}", execution_time.elapsed()?, &physical_plan);
+        }
         let data_frame = batch_to_dataframe(&results)?;
         Ok(data_frame)
     }
 }
 
 impl QueryExecutorImpl {
-    fn execution_context(&self, plan: SerializedPlan, remote_to_local_names: HashMap<String, String>) -> Result<Arc<ExecutionContext>, CubeError> {
-        let index_snapshots = plan.index_snapshots();
-
+    fn execution_context(&self, index_snapshots: &Vec<IndexSnapshot>, remote_to_local_names: HashMap<String, String>) -> Result<Arc<ExecutionContext>, CubeError> {
         let mut ctx = ExecutionContext::new();
 
         for row in index_snapshots.iter() {

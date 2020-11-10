@@ -356,7 +356,7 @@ impl ClusterImpl {
         } else {
             self.query_executor.execute_plan(plan_node.clone(), remote_to_local_names).await
         };
-        info!("Running select completed ({:?}): {:?}", start.elapsed()?, plan_node);
+        info!("Running select completed ({:?})", start.elapsed()?);
         res
     }
 

@@ -6,7 +6,8 @@ use tokio::net::TcpListener;
 use std::sync::Arc;
 use crate::sql::SqlService;
 use crate::table::TableValue;
-use log::{info, error};
+use log::{info, error, warn};
+use std::time::SystemTime;
 
 struct Backend {
     sql_service: Arc<dyn SqlService>
@@ -31,6 +32,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     }
 
     async fn on_query<'a>(&'a mut self, query: &'a str, results: QueryResultWriter<'a, W>) -> Result<(), Self::Error> {
+        let start = SystemTime::now();
         let res = self.sql_service.exec_query(query).await;
         if let Err(e) = res {
             error!("Error during processing {}: {}", query, e.message);
@@ -68,6 +70,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             rw.end_row()?;
         }
         rw.finish()?;
+        if start.elapsed().unwrap().as_millis() > 200 && query.to_lowercase().starts_with("select") {
+            warn!("Slow Query SQL ({:?}):\n{}", start.elapsed().unwrap(), query);
+        }
         Ok(())
     }
 }

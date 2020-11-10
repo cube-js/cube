@@ -63,10 +63,10 @@ impl QueryPlanner for QueryPlannerImpl {
 
         logical_plan = ctx.optimize(&logical_plan)?;
 
-        let plan = if SerializedPlan::is_meta_query(&logical_plan) {
-            QueryPlan::Meta(logical_plan)
-        } else {
+        let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             QueryPlan::Select(SerializedPlan::try_new(logical_plan, self.meta_store.clone()).await?)
+        } else {
+            QueryPlan::Meta(logical_plan)
         };
 
         Ok(plan)

@@ -336,7 +336,7 @@ impl SerializedPlan {
         }
     }
 
-    pub fn is_meta_query(plan: &LogicalPlan) -> bool {
+    pub fn is_data_select_query(plan: &LogicalPlan) -> bool {
         match plan {
             LogicalPlan::EmptyRelation { .. } => false,
             LogicalPlan::InMemoryScan { .. } => false,
@@ -347,20 +347,20 @@ impl SerializedPlan {
                     TableSource::FromContext(name) => name.split(".").collect::<Vec<_>>(),
                     TableSource::FromProvider(_) => unimplemented!()
                 };
-                name_split[0].to_string() == "information_schema"
+                name_split[0].to_string() != "information_schema"
             }
-            LogicalPlan::Projection { input, .. } => Self::is_meta_query(input),
-            LogicalPlan::Filter { input, .. } => Self::is_meta_query(input),
-            LogicalPlan::Aggregate { input, .. } => Self::is_meta_query(input),
-            LogicalPlan::Sort { input, .. } => Self::is_meta_query(input),
-            LogicalPlan::Limit { input, .. } => Self::is_meta_query(input),
+            LogicalPlan::Projection { input, .. } => Self::is_data_select_query(input),
+            LogicalPlan::Filter { input, .. } => Self::is_data_select_query(input),
+            LogicalPlan::Aggregate { input, .. } => Self::is_data_select_query(input),
+            LogicalPlan::Sort { input, .. } => Self::is_data_select_query(input),
+            LogicalPlan::Limit { input, .. } => Self::is_data_select_query(input),
             LogicalPlan::CreateExternalTable { .. } => false,
             LogicalPlan::Explain { .. } => false,
             LogicalPlan::Extension { .. } => false,
             LogicalPlan::Union { inputs, .. } => {
                 let mut snapshots = false;
                 for i in inputs.iter() {
-                    snapshots = snapshots || Self::is_meta_query(i);
+                    snapshots = snapshots || Self::is_data_select_query(i);
                 }
                 snapshots
             }
