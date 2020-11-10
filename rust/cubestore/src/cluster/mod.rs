@@ -334,7 +334,7 @@ impl ClusterImpl {
             self.job_notify.notify();
         }
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
-            pool.stop_workers()?;
+            pool.stop_workers().await?;
         }
         Ok(())
     }

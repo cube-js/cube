@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{oneshot, watch, RwLock};
+use tokio::sync::{oneshot, watch, RwLock, Notify};
 use std::marker::PhantomData;
 use crate::CubeError;
 use ipc_channel::ipc;
@@ -18,7 +18,7 @@ pub struct WorkerPool<
     P: MessageProcessor<T, R> + Sync + Send + 'static
 > {
     // TODO stop implementation
-    _workers: Vec<Arc<WorkerProcess<T, R, P>>>,
+    workers: Vec<Arc<WorkerProcess<T, R, P>>>,
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     stopped_tx: watch::Sender<bool>,
     processor: PhantomData<P>
@@ -62,7 +62,7 @@ impl<
         }
 
         WorkerPool {
-            _workers: workers,
+            workers: workers,
             stopped_tx,
             queue,
             processor: PhantomData
@@ -78,8 +78,12 @@ impl<
         Ok(rx.await??)
     }
 
-    pub fn stop_workers(&self) -> Result<(), CubeError> {
-        Ok(self.stopped_tx.broadcast(true)?)
+    pub async fn stop_workers(&self) -> Result<(), CubeError> {
+        self.stopped_tx.broadcast(true)?;
+        for worker in self.workers.iter() {
+            worker.finished_notify.notified().await;
+        }
+        Ok(())
     }
 }
 
@@ -91,7 +95,8 @@ pub struct WorkerProcess<
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     timeout: Duration,
     processor: PhantomData<P>,
-    stopped_rx: RwLock<watch::Receiver<bool>>
+    stopped_rx: RwLock<watch::Receiver<bool>>,
+    finished_notify: Arc<Notify>
 }
 
 impl<
@@ -99,11 +104,16 @@ impl<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static
 > WorkerProcess<T, R, P> {
-    fn new(queue: Arc<unlimited::Queue<Message<T, R>>>, timeout: Duration, stopped_rx: watch::Receiver<bool>) -> Self {
+    fn new(
+        queue: Arc<unlimited::Queue<Message<T, R>>>,
+        timeout: Duration,
+        stopped_rx: watch::Receiver<bool>
+    ) -> Self {
         WorkerProcess {
             queue,
             timeout,
             stopped_rx: RwLock::new(stopped_rx),
+            finished_notify: Arc::new(Notify::new()),
             processor: PhantomData
         }
     }
@@ -121,6 +131,7 @@ impl<
                                 if let Some(x) = stopped {
                                     if x {
                                         <WorkerProcess<T, R, P>>::kill(&mut handle);
+                                        self.finished_notify.notify();
                                         return;
                                     }
                                 }
@@ -190,7 +201,7 @@ impl<
     }
 }
 
-/*
+
 #[cfg(test)]
 mod tests {
     use std::thread;
@@ -230,7 +241,7 @@ mod tests {
     async fn test_basic() {
         let pool = WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
         assert_eq!(pool.process(Message::Delay(100)).await.unwrap(), Response::Foo(100));
-        pool.stop_workers().unwrap();
+        pool.stop_workers().await.unwrap();
     }
 
     #[tokio::test]
@@ -244,7 +255,7 @@ mod tests {
             println!("Testing {} future", i);
             assert_eq!(f.await.unwrap(), Response::Foo(i * 100));
         }
-        pool.stop_workers().unwrap();
+        pool.stop_workers().await.unwrap();
     }
 
     #[tokio::test]
@@ -262,6 +273,6 @@ mod tests {
                 assert_eq!(f.await.unwrap(), Response::Foo(i * 300));
             }
         }
-        pool.stop_workers().unwrap();
+        pool.stop_workers().await.unwrap();
     }
-}*/
+}
