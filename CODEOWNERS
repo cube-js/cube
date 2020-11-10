@@ -1,0 +1,9 @@
+# The following people will be the default owners for this repo. Unless a
+# later match takes precedence, @cube-js/core will be requested for review when
+# someone opens a pull request.
+*           @cube-js/core
+
+# Developer Relations and Community
+/docs/      @cube-js/developer-relations-and-community
+/examples/  @cube-js/developer-relations-and-community
+/guides/    @cube-js/developer-relations-and-community
