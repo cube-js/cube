@@ -29,6 +29,11 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build -j 2
+          args: --manifest-path rust/Cargo.toml
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
