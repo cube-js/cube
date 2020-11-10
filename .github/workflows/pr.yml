@@ -1,6 +1,6 @@
 name: Pull Requests
 on:
-  issues:
+  pull_request:
     types: [opened]
 
 jobs:
