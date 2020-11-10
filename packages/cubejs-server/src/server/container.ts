@@ -2,7 +2,7 @@ import { CreateOptions } from '@cubejs-backend/server-core';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
-import { parse as semverParse, SemVer } from 'semver';
+import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 
 import { CubejsServer } from '../server';
 import { packageExists } from './utils';
@@ -13,6 +13,10 @@ import { requireFromPackage } from '../shared';
 const devPackages = [
   'typescript',
 ];
+
+function isCubeNotServerPackage(pkgName: string): boolean {
+  return pkgName !== '@cubejs-backend/server' && pkgName.toLowerCase().startsWith('@cubejs-backend/');
+}
 
 function isCubePackage(pkgName: string): boolean {
   return pkgName.toLowerCase().startsWith('@cubejs-backend/');
@@ -28,7 +32,7 @@ function isDockerImage(): boolean {
 
 function isSimilarPackageRelease(pkg: SemVer, core: SemVer): boolean {
   if (pkg.major === 0 && core.major === 0) {
-    return pkg.minor === pkg.minor;
+    return pkg.minor === core.minor;
   }
 
   return pkg.major === core.major;
@@ -67,37 +71,114 @@ export class ServerContainer {
     );
   }
 
-  protected async resolveBuiltInPackageVersion(pkgName: string) {
-    const resolvedManifest = await requireFromPackage(
+  protected async resolvePackageVersion(basePath: string, pkgName: string) {
+    const resolvedManifest = await requireFromPackage<PackageManifest|null>(
       path.join(pkgName, 'package.json'),
-      false
+      {
+        basePath,
+        relative: false,
+        silent: true,
+      },
     );
     if (resolvedManifest) {
       return semverParse(resolvedManifest.version);
     }
 
+    if (this.configuration.debug) {
+      console.log(
+        `[resolvePackageVersion] Unable to resolve version for ${pkgName} by ${basePath} prefix`
+      );
+    }
+
     return null;
+  }
+
+  protected async resolveBuiltInPackageVersion(pkgName: string) {
+    return this.resolvePackageVersion(
+      '/cube',
+      pkgName,
+    );
   }
 
   protected async resolveUserPackageVersion(pkgName: string) {
-    const resolvedManifest = await requireFromPackage(
-      path.join(pkgName, 'package.json'),
-      false
+    return this.resolvePackageVersion(
+      // In the official docker image, it will be resolved to /cube/conf
+      process.cwd(),
+      pkgName,
     );
-    if (resolvedManifest) {
-      return semverParse(resolvedManifest.version);
-    }
-
-    return null;
   }
 
-  protected async runProjectDiagnosticsForDocker(manifest: PackageManifest) {
+  protected compareBuiltInAndUserVersions(builtInVersion: SemVer, userVersion: SemVer) {
+    const compareResult = semverCompare(builtInVersion, userVersion);
+
+    if (this.configuration.debug) {
+      console.log('[runProjectDockerDiagnostics] compare', {
+        builtIn: builtInVersion.raw,
+        user: userVersion.raw,
+        compare: compareResult,
+      });
+    }
+
+    if (compareResult === -1) {
+      console.log(
+        `${color.yellow('warning')} You are using old Docker image (${getMajorityVersion(builtInVersion)}) `
+        + `with new packages (${getMajorityVersion(userVersion)})`
+      );
+    }
+
+    if (compareResult === 1) {
+      console.log(
+        `${color.yellow('warning')} You are using old Cube.js packages (${getMajorityVersion(userVersion)}) `
+        + `with new Docker image (${getMajorityVersion(builtInVersion)})`
+      );
+    }
+  }
+
+  protected async runProjectDockerDiagnostics(manifest: PackageManifest) {
+    if (this.configuration.debug) {
+      console.log('[runProjectDockerDiagnostics] do');
+    }
+
+    const builtInCoreVersion = await this.resolveBuiltInPackageVersion(
+      '@cubejs-backend/server',
+    );
+    if (!builtInCoreVersion) {
+      return;
+    }
+
+    const userCoreVersion = await this.resolveUserPackageVersion(
+      '@cubejs-backend/server',
+    );
+    if (userCoreVersion) {
+      this.compareBuiltInAndUserVersions(builtInCoreVersion, userCoreVersion);
+
+      return;
+    }
+
+    /**
+     * It's needed to detect case when user didnt install @cubejs-backend/server, but
+     * install @cubejs-backend/postgres-driver and it doesn't fit to built-in server
+     */
+    const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
+      isCubeNotServerPackage
+    );
+    // eslint-disable-next-line no-restricted-syntax
+    for (const pkgName of depsToCompareVersions) {
+      const pkgVersion = await this.resolveUserPackageVersion(
+        pkgName,
+      );
+      if (pkgVersion) {
+        this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
+
+        return;
+      }
+    }
   }
 
   public async runProjectDiagnostics() {
     if (!fs.existsSync(path.join(process.cwd(), 'package.json'))) {
       if (this.configuration.debug) {
-        console.log('Unable to find package.json, configuration diagnostics skipped');
+        console.log('[runProjectDiagnostics] Unable to find package.json, configuration diagnostics skipped');
       }
 
       return;
@@ -132,7 +213,7 @@ export class ServerContainer {
         );
         if (coreVersion) {
           const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
-            (v) => v !== '@cubejs-backend/server' && isCubePackage(v)
+            isCubeNotServerPackage
           );
           // eslint-disable-next-line no-restricted-syntax
           for (const pkgName of depsToCompareVersions) {
@@ -150,7 +231,9 @@ export class ServerContainer {
       }
 
       if (isDockerImage()) {
-        await this.runProjectDiagnosticsForDocker(manifest);
+        await this.runProjectDockerDiagnostics(manifest);
+      } else if (this.configuration.debug) {
+        console.log('[runProjectDockerDiagnostics] skipped');
       }
     }
   }
