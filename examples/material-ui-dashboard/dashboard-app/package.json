@@ -1,5 +1,5 @@
 {
-  "name": "dashboard-app",
+  "name": "material-ui-dashboard",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
