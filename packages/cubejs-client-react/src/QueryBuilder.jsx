@@ -2,7 +2,9 @@ import React from 'react';
 import {
   prop, uniqBy, indexBy, fromPairs
 } from 'ramda';
-import { ResultSet, moveItemInArray, defaultOrder } from '@cubejs-client/core';
+import {
+  ResultSet, moveItemInArray, defaultOrder, flattenFilters
+} from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 
@@ -184,6 +186,21 @@ export default class QueryBuilder extends React.Component {
       pivotConfig,
       validatedQuery
     } = this.state;
+    
+    const flatFilters = uniqBy(
+      prop('member'),
+      flattenFilters((meta && query.filters) || []).map((filter) => ({
+        ...filter,
+        member: filter.member || filter.dimension
+      }))
+    );
+    
+    const filters = flatFilters.map((m, i) => ({
+      ...m,
+      dimension: meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+      operators: meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
+      index: i
+    }));
 
     return {
       meta,
@@ -195,12 +212,7 @@ export default class QueryBuilder extends React.Component {
       dimensions: QueryBuilder.resolveMember('dimensions', this.state),
       timeDimensions: QueryBuilder.resolveMember('timeDimensions', this.state),
       segments: ((meta && query.segments) || []).map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
-      filters: ((meta && query.filters) || []).map((m, i) => ({
-        ...m,
-        dimension: meta.resolveMember(m.dimension, ['dimensions', 'measures']),
-        operators: meta.filterOperatorsForMember(m.dimension, ['dimensions', 'measures']),
-        index: i
-      })),
+      filters,
       orderMembers,
       availableMeasures: (meta && meta.membersForQuery(query, 'measures')) || [],
       availableDimensions: (meta && meta.membersForQuery(query, 'dimensions')) || [],

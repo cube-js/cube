@@ -881,6 +881,18 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function moveItemInArray<T = any>(list: T[], sourceIndex: number, destinationIndex: number): T[];
-  
-  export function defaultOrder(query: Query): { [key: string]: QueryOrder }
+
+  export function defaultOrder(query: Query): { [key: string]: QueryOrder };
+
+  type TFlatFilter = {
+    dimension?: string;
+    member?: string;
+    operator: BinaryOperator;
+    values: string[];
+  };
+
+  /**
+   * @hidden
+   */
+  export function flattenFilters(filters: Filter[]): TFlatFilter[];
 }
