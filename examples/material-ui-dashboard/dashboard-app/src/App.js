@@ -7,11 +7,8 @@ import 'typeface-roboto';
 import { Main } from './layouts';
 import palette from './theme/palette';
 
-const API_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000';
-const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjExMzQsImV4cCI6MTYyNjE5NzEzNH0._sWwksID3MLJxXmqNnECV_A3x7gUcVzSgn4szFox76s';
-const cubejsApi = cubejs(CUBEJS_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
+const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
+  apiUrl: process.env.REACT_APP_API_URL
 });
 
 const useStyles = makeStyles((theme) => ({

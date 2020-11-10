@@ -1,14 +1,12 @@
 {
-  "name": "real-time-dashboard",
+  "name": "material-ui-dashboard",
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "./node_modules/.bin/cubejs-dev-server",
-    "start": "node index.js"
+    "dev": "./node_modules/.bin/cubejs-server dev-server"
   },
-  "dependencies": {
-    "@cubejs-backend/postgres-driver": "^0.19.20",
-    "@cubejs-backend/server": "^0.19.21",
-    "serve-static": "^1.14.1"
+  "devDependencies": {
+    "@cubejs-backend/postgres-driver": "^0.23.8",
+    "@cubejs-backend/server": "^0.23.8"
   }
 }
