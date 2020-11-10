@@ -48,6 +48,28 @@ If you want to run Cube.js in production without redis you can use `CUBEJS_CACHE
 [[warning | Note]]
 | Serverless and clustered deployments can't be run without Redis as it's used to manage querying queue.
 
+## Enable HTTPS
+
+Cube.js doesn't handle SSL/TLS for your API. To serve your API on HTTPS URL you should use reverse proxy, like Nginx, Kong, Caddy, etc., or the cloud provider's load balancer SSL termination features.
+
+### Nginx Sample Configuration
+
+Below you can find the sample `nginx.conf` to proxy requests to Cube.js. To learn how to set up SSL with Nginx please refer to [Nginx docs](https://nginx.org/en/docs/http/configuring_https_servers.html).
+
+```jsx
+server {
+  listen 80;
+  server_name cube.my-domain.com;
+
+  location / {
+    proxy_pass http://localhost:4000/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
+```
+
 ## Docker
 
 Starting from the `v0.23` version, Cube.js provides the [official Docker image](https://hub.docker.com/r/cubejs/cube).
