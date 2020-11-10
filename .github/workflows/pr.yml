@@ -1,0 +1,24 @@
+name: Pull Requests
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  authorDetector:
+    name: Detect PR's author
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Actions
+        uses: actions/checkout@v2
+        with:
+          repository: 'cube-js/github-actions'
+          path: ./actions
+          ref: v1
+      - name: Install Actions
+        run: npm install --production --prefix ./actions
+      - name: Detect author
+        uses: ./actions/author-detector
+        with:
+          token: ${{secrets.GITHUB_TOKEN}}
+          addCoreLabel: false
+          communityLabel: pr:community
