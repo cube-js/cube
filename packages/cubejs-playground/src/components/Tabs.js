@@ -3,10 +3,9 @@ import { Tabs as AntdTabs } from 'antd';
 
 const StyledTabs = styled(AntdTabs)`
   && {
-    user-select: none;
-  
     .ant-tabs-nav {
       padding: 0 16px;
+      user-select: none;
     }
     
     .ant-tabs-content-holder {
