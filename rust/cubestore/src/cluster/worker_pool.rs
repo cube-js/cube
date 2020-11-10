@@ -190,6 +190,7 @@ impl<
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use std::thread;
@@ -263,4 +264,4 @@ mod tests {
         }
         pool.stop_workers().unwrap();
     }
-}
+}*/
