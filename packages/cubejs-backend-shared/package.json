@@ -15,6 +15,9 @@
     "README.md",
     "dist/*"
   ],
+  "engines": {
+    "node": ">=8.11.1"
+  },
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {

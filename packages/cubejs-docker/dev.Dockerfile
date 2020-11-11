@@ -22,6 +22,7 @@ RUN yarn install
 # ls  | awk '{ print "COPY packages/" $1 "/package.json packages/" $1 "/package.json"}'
 # ls  | awk '{ print "COPY packages/" $1 "/yarn.lock packages/" $1 "/yarn.lock"}'
 
+COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
 COPY packages/cubejs-bigquery-driver/package.json packages/cubejs-bigquery-driver/package.json
@@ -46,6 +47,7 @@ COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/packag
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
 
+COPY packages/cubejs-backend-shared/yarn.lock packages/cubejs-backend-shared/yarn.lock
 COPY packages/cubejs-api-gateway/yarn.lock packages/cubejs-api-gateway/yarn.lock
 COPY packages/cubejs-athena-driver/yarn.lock packages/cubejs-athena-driver/yarn.lock
 COPY packages/cubejs-bigquery-driver/yarn.lock packages/cubejs-bigquery-driver/yarn.lock
@@ -73,6 +75,7 @@ COPY packages/cubejs-sqlite-driver/yarn.lock packages/cubejs-sqlite-driver/yarn.
 #  --ignore @cubejs-backend/jdbc-driver not needed, because it's ignored by .dockerignore
 RUN yarn lerna bootstrap
 
+COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
 COPY packages/cubejs-bigquery-driver/ packages/cubejs-bigquery-driver/

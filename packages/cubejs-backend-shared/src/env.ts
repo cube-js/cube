@@ -8,7 +8,7 @@ const variables = {
     .default(4000)
     .required()
     .asPortNumber(),
-  tlsPort: () => get('PORT')
+  tlsPort: () => get('TLS_PORT')
     .default(4433)
     .required()
     .asPortNumber(),
