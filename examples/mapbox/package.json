@@ -3,14 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "node index.js",
-    "start": "node index.js"
+    "dev": "./node_modules/.bin/cubejs-server dev-server"
   },
   "dependencies": {
-    "@cubejs-backend/bigquery-driver": "^0.19.17",
-    "@cubejs-backend/postgres-driver": "^0.19.20",
-    "@cubejs-backend/server": "^0.19.23",
-    "cubejs-cli": "^0.19.34",
+    "@cubejs-backend/bigquery-driver": "^0.23.8",
+    "@cubejs-backend/postgres-driver": "^0.23.8",
+    "@cubejs-backend/server": "^0.23.8",
     "global": "^4.4.0"
   }
 }
