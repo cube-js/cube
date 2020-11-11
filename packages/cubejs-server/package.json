@@ -38,6 +38,7 @@
     "jest:shapshot": "jest --updateSnapshot"
   },
   "dependencies": {
+    "@cubejs-backend/shared": "^0.23.11",
     "@cubejs-backend/server-core": "^0.23.11",
     "@oclif/color": "^0.1.2",
     "@oclif/command": "^1.8.0",
