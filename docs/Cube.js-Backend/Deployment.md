@@ -410,23 +410,75 @@ Use **admin / admin** as **user / password** to access the dashboard.
 
 ## Heroku
 
+Heroku Container Registry allows you to deploy your Docker images to Heroku. Both Common Runtime and Private Spaces are supported.
+
 ### Create new app using Cube.js-CLI
 
 ```bash
-$ cubejs create cubejs-heroku-demo -t express -d postgres
+$ cubejs create cubejs-heroku-demo -d postgres
 $ cd cubejs-heroku-demo
-```
-
-### Init a git repository
-
-```bash
-$ git init
 ```
 
 ### Create new Heroku app
 
 ```bash
 $ heroku create cubejs-heroku-demo
+
+Creating ⬢ cubejs-heroku-demo... done
+https://cubejs-heroku-demo.herokuapp.com/ | https://git.heroku.com/cubejs-heroku-demo.git
+```
+
+### Init a Docker image
+
+```bash
+$ touch Dockerfile
+$ touch .dockerignore
+```
+
+Example `Dockerfile`:
+
+```dockerfile
+FROM cubejs/cube:latest
+
+COPY . .
+```
+
+Example `.dockerignore`:
+
+```bash
+node_modules
+npm-debug.log
+.env
+```
+
+### Building the Docker image
+
+Log in to Container Registry:
+
+```bash
+$ heroku container:login
+```
+
+Build the image and push to Container Registry:
+
+```bash
+$ heroku container:push web -a cubejs-heroku-demo
+```
+
+Then release the image to your app:
+
+```bash
+$ heroku container:release web -a cubejs-heroku-demo
+```
+
+### Set up connection to your database
+
+```bash
+$ heroku config:set -a cubejs-heroku-demo \
+  CUBEJS_DB_HOST=<YOUR-DB-HOST> \
+  CUBEJS_DB_NAME=<YOUR-DB-NAME> \
+  CUBEJS_DB_USER=<YOUR-DB-USER> \
+  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
 ```
 
 ### Provision Redis
@@ -440,32 +492,16 @@ $ heroku addons:create heroku-redis:hobby-dev -a cubejs-heroku-demo
 If you use another Redis server, you should pass your Redis URL as an environment variable:
 
 ```bash
-$ heroku config:set REDIS_URL:<YOUR-REDIS-URL>
+$ heroku config:set REDIS_URL=<YOUR-REDIS-URL> -a cubejs-heroku-demo
 ```
 
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis server.
 Please [setup connection pool](deployment#production-mode-redis-pool) according to your redis max connections.
 
-### Create Heroku Procfile
+### Finally
+
+Now you can use your Cube.js instance:
 
 ```bash
-$ echo "web: node index.js" > Procfile
-```
-
-### Set up connection to your database
-
-```bash
-$ heroku config:set \
-  CUBEJS_DB_HOST=<YOUR-DB-HOST> \
-  CUBEJS_DB_NAME=<YOUR-DB-NAME> \
-  CUBEJS_DB_USER=<YOUR-DB-USER> \
-  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
-```
-
-### Deploy app to Heroku
-
-```bash
-$ git add -A
-$ git commit -am "Initial"
-$ git push heroku master
+$ heroku open -a cubejs-heroku-demo
 ```
