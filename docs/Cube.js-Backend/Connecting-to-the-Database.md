@@ -23,11 +23,12 @@ Cube.js currently provides connectors to the following databases:
 | Oracle                                           | oracle          |
 | Apache Druid                                     | druid           |
 
-_If you'd like to connect to a database which is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver)._
+[[info | ]]
+| If you'd like to connect to a database which is not yet supported, you can create a Cube.js-compilant driver package. [Here's a simple step-by-step guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver).
 
-### Configuring a Connection for Cube.js CLI Created Apps
+### Source Database
 
-When you create a new Cube.js service with the [Cube.js CLI](using-the-cubejs-cli), the `.env` will be
+When you create a new Cube.js app with the [Cube.js CLI](using-the-cubejs-cli), the `.env` will be
 generated to manage all connection credentials. The set of variables could be different based on your database type. For example, for PostgreSQL the `.env` will look like this:
 
 
@@ -53,7 +54,7 @@ The table below shows which environment variables are used for different databas
 | Presto | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 | Druid | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 
-### Configuring a Connection to an External Pre-aggregations Database
+### External Pre-aggregations Database
 
 To enable [external pre-aggregations](pre-aggregations#external-pre-aggregations) you need to configure an external database to store these pre-aggregations.
 
@@ -69,6 +70,8 @@ CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 ```  
 
 ## Notes
+
+Below you can find useful tips for configuring the connection to specific databases.
 
 ### MongoDB
 
