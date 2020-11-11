@@ -242,8 +242,6 @@ services:
       - ./dashboard-app:/cube/conf/dashboard-app
       - ./cube.js:/cube/conf/cube.js
       - ./schema:/cube/conf/schema
-    # Remove this line for production, dev-server must be used only during development
-    entrypoint: cubejs dev-server
 
   redis:
     image: redis:6
@@ -254,7 +252,7 @@ services:
 const templates = {
   docker: {
     scripts: {
-      dev: './node_modules/.bin/cubejs-server dev-server',
+      dev: './node_modules/.bin/cubejs-server server',
     },
     files: {
       'cube.js': () => cubeJs,

@@ -454,7 +454,7 @@ Boolean to enable or disable a check duplicate property names in all objects of 
 
 Since 0.23 Cube.js CLI uses `docker` insead of `express` template as a default for app creation and it's recommended way for production purposes.
 To migrate you should move all of your Cube.js dependencies in package.json to `devDependencies` and leave all of your dependencies that you use to configure Cube.js in `dependencies`.
-Also `./node_modules/.bin/cubejs-server dev-server` command should be used to run Cube.js Dev Server.
+
 For example:  
 
 **package.json**:
@@ -485,7 +485,7 @@ Should become
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "./node_modules/.bin/cubejs-server dev-server"
+    "dev": "./node_modules/.bin/cubejs-server server"
   },
   "dependencies": {
     "jwk-to-pem": "^2.0.4"
