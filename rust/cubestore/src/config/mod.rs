@@ -101,7 +101,7 @@ impl Config {
                         FileStoreProvider::Filesystem { remote_dir: env::current_dir().unwrap().join("upstream") }
                     }
                 },
-                select_worker_pool_size: 4
+                select_worker_pool_size: env::var("CUBESTORE_SELECT_WORKERS").ok().map(|v| v.parse::<usize>().unwrap()).unwrap_or(4)
             })
         }
     }
