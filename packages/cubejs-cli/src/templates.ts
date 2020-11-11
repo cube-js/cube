@@ -14,7 +14,8 @@ const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 `;
 
 // Shared environment variables, across all DB types
-const sharedDotEnvVars = env => `CUBEJS_DB_TYPE=${env.dbType}
+const sharedDotEnvVars = env => `CUBEJS_DEV_MODE=true
+CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}`;
 
 const defaultDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
