@@ -80,6 +80,7 @@ specifying the project name and your database using `-d` flag. Available options
 * `prestodb`
 * `oracle`
 * `druid`
+* `mysqlauroraserverless`
 
 For example,
 

@@ -1,0 +1,46 @@
+{
+  "name": "@cubejs-backend/mysql-aurora-serverless-driver",
+  "description": "Cube.js Aurora Serverless Mysql database driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.23.8",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-mysql-aurora-serverless-driver"
+  },
+  "engines": {
+    "node": ">=8.11.1"
+  },
+  "main": "driver/AuroraServerlessMySqlDriver.js",
+  "typings": "driver/index.d.ts",
+  "scripts": {
+    "test": "npm run unit && npm run integration",
+    "unit": "jest ./**/*.test.js",
+    "integration": "jest ./**/*.integration.js",
+    "lint": "eslint driver/*.js test/*.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.23.6",
+    "@types/mysql": "^2.15.15",
+    "aws-sdk": "^2.787.0",
+    "data-api-client": "^1.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0",
+    "eslint-plugin-node": "^5.2.1",
+    "jest": "^25.1.0",
+    "testcontainers": "^6.0.0"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "jest": {
+    "testMatch": [
+      "**/__tests__/**/*.js?(x)",
+      "**/?(*.)+(spec|test|integration).js?(x)"
+    ]
+  }
+}
