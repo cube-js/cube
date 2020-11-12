@@ -17,6 +17,7 @@
     "gatsby-plugin-layout": "^1.0.14",
     "gatsby-plugin-less": "^2.0.12",
     "gatsby-plugin-react-helmet": "^3.0.11",
+    "gatsby-plugin-root-import": "^2.0.5",
     "gatsby-plugin-s3": "^0.2.5",
     "gatsby-plugin-sass": "^2.0.11",
     "gatsby-plugin-sharp": "^2.6.31",
@@ -26,6 +27,7 @@
     "gatsby-remark-images": "^3.0.10",
     "gatsby-source-filesystem": "^2.0.28",
     "gatsby-transformer-remark": "^2.3.8",
+    "loader-utils": "^1.2.3",
     "lockr": "^0.8.5",
     "node-sass": "^4.14.1",
     "react": "^16.8.6",
@@ -34,16 +36,13 @@
     "react-html-parser": "^2.0.2",
     "react-scroll": "^1.7.11",
     "remark-custom-blocks": "^2.5.0",
-    "sharp": "^0.26.0",
-    "gatsby-plugin-root-import": "^2.0.5",
-    "loader-utils": "^1.2.3"
+    "sharp": "^0.26.0"
   },
   "keywords": [],
   "license": "MIT",
   "scripts": {
-    "build": "gatsby build",
-    "dev": "gatsby develop",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "GATSBY_ENV=production gatsby build",
+    "dev": "GATSBY_ENV=development gatsby develop",
     "deploy": "gatsby-plugin-s3 deploy"
   },
   "private": true
