@@ -22,7 +22,7 @@ RUN mkdir -p cubestore/src/bin && \
 RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
 COPY cubestore .
-RUN cargo build --release
+RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
 FROM debian:buster-slim
 
