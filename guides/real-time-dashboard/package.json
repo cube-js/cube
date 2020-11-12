@@ -7,6 +7,7 @@
     "gatsby": "^2.15.28",
     "gatsby-image": "^2.2.23",
     "gatsby-plugin-catch-links": "^2.1.12",
+    "gatsby-plugin-snowplow-tracker": "^1.0.1",
     "gatsby-plugin-google-analytics": "^2.1.19",
     "gatsby-plugin-lodash": "^3.1.10",
     "gatsby-plugin-manifest": "^2.2.20",
@@ -76,7 +77,7 @@
     "lint:md": "remark content/",
     "write-good": "write-good $(glob 'content/posts/**/*.md')",
     "format:js": "prettier '**/*.{js,jsx}' --write",
-    "deploy": "amplify publish -c"
+    "deploy": "npm run build && netlify deploy --prod --dir public"
   },
   "remarkConfig": {
     "plugins": [

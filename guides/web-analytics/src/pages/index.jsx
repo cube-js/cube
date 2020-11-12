@@ -30,7 +30,7 @@ class Index extends React.Component {
         <Hero
           title="Building an Open Source Web Analytics Platform"
           subtitle="Learn how to build open source Google Analytics alternative with Cube.js."
-          demoUrl="https://web-analytics-demo.cubecloudapp.dev"
+          demoUrl="https://web-analytics-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={
