@@ -17,6 +17,7 @@
     "test": "npm run unit && npm run integration",
     "unit": "jest ./**/*.test.js",
     "integration": "jest ./**/*.integration.js",
+    "integration:aurora-mysql": "jest ./**/*.integration.js",
     "lint": "eslint driver/*.js test/*.js"
   },
   "dependencies": {
