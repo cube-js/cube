@@ -21,7 +21,7 @@ class Index extends React.Component {
         <Hero
           title="Material UI Dashboard with Angular"
           subtitle="Learn how to build a Material UI Dashboard with Angular and Cube.js"
-          demoUrl="https://flaky-sheep.gcp-us-central1.cubecloudapp.dev/"
+          demoUrl="https://angular-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={
