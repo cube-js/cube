@@ -19,7 +19,7 @@ COPY Cargo.lock .
 COPY cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
-RUN cargo build --release
+RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
 COPY cubestore .
 RUN cargo build --release
