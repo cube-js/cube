@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cubejs-client/core": "^0.10.15",
-    "@cubejs-client/react": "^0.10.15",
+    "@cubejs-client/core": "^0.23.6",
+    "@cubejs-client/react": "^0.23.6",
     "antd": "^3.20.3",
     "bizcharts": "^3.5.4",
     "moment": "^2.24.0",
