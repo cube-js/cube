@@ -47,10 +47,12 @@ export const frameworks = [
   {
     id: 'react',
     title: 'React',
+    supported: true
   },
   {
     id: 'angular',
     title: 'Angular',
+    docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
   },
   {
     id: 'vue',
@@ -324,7 +326,7 @@ class ChartContainer extends React.Component {
     const queryText = JSON.stringify(query, null, 2);
 
     const renderChart = () => {
-      if (frameworkItem && frameworkItem.docsLink) {
+      if (!frameworkItem?.supported) {
         return (
           <h2 style={{ padding: 24, textAlign: 'center' }}>
             We do not support&nbsp;

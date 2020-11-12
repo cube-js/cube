@@ -84,7 +84,6 @@ const ChartRenderer = () => {
     <QueryRenderer
       query={${codeExample ? prettify(query) : 'query'}}
       cubejsApi={cubejsApi}
-      resetResultSetOnChange={false}
       render={renderChart(
         ${renderFnName},
         ${codeExample ? prettify(pivotConfig) : 'pivotConfig'}
