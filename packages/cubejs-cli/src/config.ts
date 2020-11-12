@@ -156,14 +156,17 @@ export class Config {
       throw `${url} doesn't have any managed deployments. Please create one.`;
     }
 
-    const { deployment } = await inquirer.prompt([{
-      type: 'list',
-      name: 'deployment',
-      message: 'Please select a deployment to deploy to',
-      choices: deployments
-    }]);
+    let deploymentId = deployments[0].id;
+    if (deployments.length > 1) {
+      const { deployment } = await inquirer.prompt([{
+        type: 'list',
+        name: 'deployment',
+        message: 'Please select a deployment to deploy to',
+        choices: deployments
+      }]);
+      deploymentId = deployments.find(d => d.name === deployment).id;
+    }
 
-    const deploymentId = deployments.find(d => d.name === deployment).id;
     await this.writeDotCubeCloud({
       url,
       deploymentId
