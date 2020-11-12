@@ -6,14 +6,14 @@ https://prismjs.com/download.html#themes=prism&languages=clike+javascript+sql */
  * @author Lea Verou
  */
 
-@import './variables.scss';
+@import 'variables';
 
 code[class*="language-"],
 pre[class*="language-"] {
   color: white;
   background: none;
   /*text-shadow: 0 1px white;*/
-  font-family: "Roboto Mono", Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-family: $code-font;
   text-align: left;
   font-weight: normal;
   font-size: 14px;

@@ -97,7 +97,7 @@ provider:
 
 functions:
   cubejs:
-    handler: cube.api
+    handler: index.api
     timeout: 30
     events:
       - http:
@@ -107,7 +107,7 @@ functions:
           path: /{proxy+}
           method: ANY
   cubejsProcess:
-    handler: cube.process
+    handler: index.process
     timeout: 630
     events:
       - sns: "\${self:service.name}-\${self:provider.stage}-process"
@@ -278,7 +278,7 @@ const templates = {
       dev: './node_modules/.bin/cubejs-dev-server',
     },
     files: {
-      'cube.js': () => handlerJs,
+      'index.js': () => handlerJs,
       'serverless.yml': serverlessYml,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,

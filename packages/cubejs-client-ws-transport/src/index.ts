@@ -25,7 +25,7 @@ class WebSocketTransportResult {
 }
 
 type WebSocketTransportOptions = {
-  authorization: string,
+  authorization?: string,
   apiUrl: string,
   // @deprecated
   hearBeatInterval?: number,
@@ -49,7 +49,7 @@ class WebSocketTransport {
 
   protected readonly heartBeatInterval: number = 60;
 
-  protected token: string;
+  protected token: string | undefined;
 
   protected ws: any = null;
 
@@ -59,7 +59,7 @@ class WebSocketTransport {
 
   protected messageQueue: Message[] = [];
 
-  constructor({ authorization, apiUrl, heartBeatInterval, hearBeatInterval }: WebSocketTransportOptions) {
+  public constructor({ authorization, apiUrl, heartBeatInterval, hearBeatInterval }: WebSocketTransportOptions) {
     this.token = authorization;
     this.apiUrl = apiUrl;
 
@@ -71,7 +71,7 @@ class WebSocketTransport {
     }
   }
 
-  set authorization(token) {
+  public set authorization(token) {
     this.token = token;
 
     if (this.ws) {
@@ -79,11 +79,11 @@ class WebSocketTransport {
     }
   }
 
-  get authorization() {
+  public get authorization() {
     return this.token;
   }
 
-  initSocket() {
+  protected initSocket() {
     if (this.ws) {
       return this.ws.initPromise;
     }
@@ -181,7 +181,7 @@ class WebSocketTransport {
     }, 100);
   }
 
-  request(method: string, { baseRequestId, ...params }: any) {
+  public request(method: string, { baseRequestId, ...params }: any) {
     const message: Message = {
       messageId: this.messageCounter++,
       requestId: baseRequestId,

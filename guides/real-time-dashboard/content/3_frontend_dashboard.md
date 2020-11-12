@@ -37,29 +37,20 @@ Add the following line to the `.env` file.
 CUBEJS_WEB_SOCKETS=true
 ```
 
-Next, we need to update the `index.js` file to pass a few additional options to the
+Next, we need to update the `cube.js` file to pass a few additional options to the
 Cube.js server.
 
-Update the content of the `index.js` file the following.
+Update the content of the `cube.js` file the following.
 
 ```javascript
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer({
-  processSubscriptionsInterval: 1,
+module.exports = {
   orchestratorOptions: {
     queryCacheOptions: {
       refreshKeyRenewalThreshold: 1,
     }
-  }
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-}).catch(e => {
-  console.error('Fatal error during server start: ');
-  console.error(e.stack || e);
-});
+  },
+  processSubscriptionsInterval: 1,
+};
 ```
 
 We have passed two configuration options to the Cube.js backend. The first,
