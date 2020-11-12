@@ -137,7 +137,7 @@ const CreateOwnModal = ({
             </Button>
           </Dropdown>
         </StyledFormItem>
-        {frameworkItem && frameworkItem.docsLink && (
+        {!frameworkItem?.scaffoldingSupported && (
           <Alert
             style={{ marginBottom: 23 }}
             type="info"
@@ -169,7 +169,7 @@ const CreateOwnModal = ({
         <StyledFormItem label="Main Template">
           <Dropdown
             overlay={templatePackagesMenu}
-            disabled={!!frameworkItem.docsLink}
+            disabled={!frameworkItem.scaffoldingSupported}
           >
             <Button>
               {templatePackage && templatePackage.description}
@@ -181,7 +181,7 @@ const CreateOwnModal = ({
         <StyledFormItem label="Charting Library">
           <Dropdown
             overlay={chartLibrariesMenu}
-            disabled={!!frameworkItem.docsLink}
+            disabled={!frameworkItem.scaffoldingSupported}
           >
             <Button>
               {currentLibraryItem && currentLibraryItem.title}

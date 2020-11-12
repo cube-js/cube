@@ -47,12 +47,14 @@ export const frameworks = [
   {
     id: 'react',
     title: 'React',
-    supported: true
+    supported: true,
+    scaffoldingSupported: true
   },
   {
     id: 'angular',
     title: 'Angular',
     docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
+    scaffoldingSupported: true,
   },
   {
     id: 'vue',
@@ -192,7 +194,7 @@ class ChartContainer extends React.Component {
             </Dropdown>
             <Dropdown
               overlay={chartLibrariesMenu}
-              disabled={!!frameworkItem.docsLink}
+              disabled={!frameworkItem.supported}
             >
               <Button size="small">
                 {currentLibraryItem && currentLibraryItem.title}
@@ -210,7 +212,7 @@ class ChartContainer extends React.Component {
               }}
               size="small"
               type={!showCode ? 'primary' : 'default'}
-              disabled={!!frameworkItem.docsLink}
+              disabled={!frameworkItem.supported}
             >
               Chart
             </Button>
@@ -224,7 +226,7 @@ class ChartContainer extends React.Component {
               icon={<ThunderboltOutlined />}
               size="small"
               type={showCode === 'query' ? 'primary' : 'default'}
-              disabled={!!frameworkItem.docsLink}
+              disabled={!frameworkItem.supported}
             >
               JSON Query
             </Button>
@@ -236,7 +238,7 @@ class ChartContainer extends React.Component {
               icon={<CodeOutlined />}
               size="small"
               type={showCode === 'code' ? 'primary' : 'default'}
-              disabled={!!frameworkItem.docsLink}
+              disabled={!frameworkItem.supported}
             >
               Code
             </Button>
@@ -248,7 +250,7 @@ class ChartContainer extends React.Component {
               icon={<QuestionCircleOutlined />}
               size="small"
               type={showCode === 'sql' ? 'primary' : 'default'}
-              disabled={!!frameworkItem.docsLink}
+              disabled={!frameworkItem.supported}
             >
               SQL
             </Button>
@@ -262,7 +264,7 @@ class ChartContainer extends React.Component {
               icon={<SyncOutlined />}
               size="small"
               type={showCode === 'cache' ? 'primary' : 'default'}
-              disabled={!!frameworkItem.docsLink}
+              disabled={!frameworkItem.supported}
             >
               Cache
             </Button>
@@ -272,7 +274,7 @@ class ChartContainer extends React.Component {
             size="small"
             onClick={() => playgroundAction('Open Code Sandbox')}
             htmlType="submit"
-            disabled={!!frameworkItem.docsLink}
+            disabled={!frameworkItem.supported}
           >
             Edit
           </Button>
@@ -311,7 +313,7 @@ class ChartContainer extends React.Component {
               icon={<PlusOutlined />}
               size="small"
               loading={addingToDashboard}
-              disabled={!!frameworkItem.docsLink}
+              disabled={!frameworkItem.supported}
               type="primary"
             >
               {addingToDashboard
