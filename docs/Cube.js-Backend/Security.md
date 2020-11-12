@@ -7,7 +7,7 @@ menuOrder: 8
 
 Cube.js uses [JSON Web Tokens (JWT)](https://jwt.io/) which should be passed in the `Authorization` header to authenticate requests. JWTs can also be used for passing
 additional information about the user, which can be accessed in the [USER_CONTEXT](cube#context-variables-user-context) object in the Data
-Schema. 
+Schema.
 
 The `Authorization` header is parsed and the JWT's contents set to the [authInfo](@cubejs-backend-server-core#authinfo) variable which can be used to support [Multitenancy](multitenancy-setup).
 
@@ -21,8 +21,6 @@ If you are using the [REST API](rest-api) you must pass the API Token via the Au
 
 **In the development environment the token is not required for authorization**, but
 you can still use it to [pass a security context](security#security-context).
-
-Cube.js also supports Transport Layer Encryption (TLS) using Node.js native packages. For more information, see [Enabling TLS](security#enabling-tls).
 
 ## Generating Tokens
 
