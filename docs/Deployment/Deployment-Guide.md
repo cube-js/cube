@@ -1,6 +1,6 @@
 ---
 title: Deployment Guide
-permalink: /deployment/guide
+permalink: /deployment
 category: Deployment
 menuOrder: 1
 ---
