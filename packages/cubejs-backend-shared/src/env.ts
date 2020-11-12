@@ -2,7 +2,7 @@ import { get } from 'env-var';
 
 const variables = {
   devMode: () => get('CUBEJS_DEV_MODE')
-    .required()
+    .default('false')
     .asBoolStrict(),
   port: () => get('PORT')
     .default(4000)
