@@ -8,7 +8,6 @@ const Dev = props => (
     <meta name="description" content="Documentation for working with Cube.js, the open-source analytics framework." />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 
     <script src="/scripts/prism.js"/>
     <script src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"/>

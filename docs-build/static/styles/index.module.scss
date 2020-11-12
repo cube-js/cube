@@ -48,6 +48,16 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "Source Code Pro";
+  src: url('../fonts/SourceCodePro-Regular.eot');
+  src: url('../fonts/SourceCodePro-Regular.eot?#iefix') format('embedded-opentype'),
+  url('../fonts/SourceCodePro-Regular.woff2') format('woff2'),
+  url('../fonts/SourceCodePro-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @import "mixins";
 @import "normalize";
 @import "typography";
