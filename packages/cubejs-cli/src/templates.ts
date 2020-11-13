@@ -252,7 +252,7 @@ services:
 const templates = {
   docker: {
     scripts: {
-      dev: './node_modules/.bin/cubejs-server server',
+      dev: './node_modules/.bin/cubejs-server',
     },
     files: {
       'cube.js': () => cubeJs,
