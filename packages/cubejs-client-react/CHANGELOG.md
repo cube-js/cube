@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.11](https://github.com/cube-js/cube.js/compare/v0.23.10...v0.23.11) (2020-11-13)
+
+
+### Bug Fixes
+
+* **@cubejs-playground:** boolean filters support ([#1269](https://github.com/cube-js/cube.js/issues/1269)) ([adda809](https://github.com/cube-js/cube.js/commit/adda809e4cd08436ffdf8f3396a6f35725f3dc22))
+
+
+### Features
+
+* **@cubejs-client/react:** Add minute and second granularities to React QueryBuilder ([#1332](https://github.com/cube-js/cube.js/issues/1332)). Thanks to [@danielnass](https://github.com/danielnass)! ([aa201ae](https://github.com/cube-js/cube.js/commit/aa201aecdc66d920e7a6f84a1043cf5964bc6cb9))
+
+
+
+
+
 ## [0.23.10](https://github.com/cube-js/cube.js/compare/v0.23.9...v0.23.10) (2020-11-07)
 
 **Note:** Version bump only for package @cubejs-client/react

@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.11](https://github.com/cube-js/cube.js/compare/v0.23.10...v0.23.11) (2020-11-13)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server-core:** Node.js 8 support (downgrade fs-extra to 8.x) ([#1367](https://github.com/cube-js/cube.js/issues/1367)) ([be10ac6](https://github.com/cube-js/cube.js/commit/be10ac6912ebbaa57d386625dd4b2e3c40808c48))
+
+
+### Features
+
+* **@cubejs-backend/mysql-aurora-serverless-driver:** Add a new driver to support AWS Aurora Serverless MySql ([#1333](https://github.com/cube-js/cube.js/issues/1333)) Thanks to [@kcwinner](https://github.com/kcwinner)! ([154fab1](https://github.com/cube-js/cube.js/commit/154fab1a222685e1e83d5187a4f00f745c4613a3))
+* **cubejs-cli:** Share /dashboard-app directory by default ([#1380](https://github.com/cube-js/cube.js/issues/1380)) ([d571dcc](https://github.com/cube-js/cube.js/commit/d571dcc9ad5c14916cd33740c0a3dba85e8c8be2))
+
+
+
+
+
 ## [0.23.10](https://github.com/cube-js/cube.js/compare/v0.23.9...v0.23.10) (2020-11-07)
 
 

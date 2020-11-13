@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.11](https://github.com/cube-js/cube.js/compare/v0.23.10...v0.23.11) (2020-11-13)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server-core:** Node.js 8 support (downgrade fs-extra to 8.x) ([#1367](https://github.com/cube-js/cube.js/issues/1367)) ([be10ac6](https://github.com/cube-js/cube.js/commit/be10ac6912ebbaa57d386625dd4b2e3c40808c48))
+* **@cubejs-client/core:** annotation format type ([e5004f6](https://github.com/cube-js/cube.js/commit/e5004f6bf687e7df4b611bf1d772da278558759d))
+* **@cubejs-client/ws-transport:** make auth optional ([#1368](https://github.com/cube-js/cube.js/issues/1368)) ([28a07bd](https://github.com/cube-js/cube.js/commit/28a07bdc0e7e506bbc60daa2ad621415c93b54e2))
+* **@cubejs-playground:** boolean filters support ([#1269](https://github.com/cube-js/cube.js/issues/1269)) ([adda809](https://github.com/cube-js/cube.js/commit/adda809e4cd08436ffdf8f3396a6f35725f3dc22))
+* **@cubejs-playground:** ng scaffolding support ([0444744](https://github.com/cube-js/cube.js/commit/0444744dda44250c35eb22c1a7e2da1f2183cbc6))
+* **@cubejs-playground:** ng support notification, loader ([2f73f16](https://github.com/cube-js/cube.js/commit/2f73f16f49c1c7325ea2104f44c8e8e437bc1ab6))
+* **ci:** Trigger on pull_request, not issue ([193dc81](https://github.com/cube-js/cube.js/commit/193dc81fbbc506141656c6b0cc879b7b241ad33b))
+* CUBEJS_DB_SSL must be true to affect SSL ([#1252](https://github.com/cube-js/cube.js/issues/1252)) ([f2e9d9d](https://github.com/cube-js/cube.js/commit/f2e9d9db3f7b8fc5a7c5bbaaebca56f5331d4332)), closes [#1212](https://github.com/cube-js/cube.js/issues/1212)
+* **cubejs-cli:** Generate/token should work inside docker ([67d7501](https://github.com/cube-js/cube.js/commit/67d7501a8419e9f5be6d39ae9116592134d99c91))
+* **cubestore:** Endless upload loop ([0494122](https://github.com/cube-js/cube.js/commit/049412257688c3971449cff22a789697c1b5eb04))
+* **cubestore:** Worker Pool graceful shutdown ([56377dc](https://github.com/cube-js/cube.js/commit/56377dca194e76d9be4ec1f8ad18055af041914b))
+* **examples/real-time-dashboard:** Configure collect entrypoint by REACT_APP_COLLECT_URL ENV ([bde3ad8](https://github.com/cube-js/cube.js/commit/bde3ad8ef9f5d6dbe5b07a0e496709adedc8abf7))
+
+
+### Features
+
+* **@cubejs-backend/mysql-aurora-serverless-driver:** Add a new driver to support AWS Aurora Serverless MySql ([#1333](https://github.com/cube-js/cube.js/issues/1333)) Thanks to [@kcwinner](https://github.com/kcwinner)! ([154fab1](https://github.com/cube-js/cube.js/commit/154fab1a222685e1e83d5187a4f00f745c4613a3))
+* **@cubejs-client/react:** Add minute and second granularities to React QueryBuilder ([#1332](https://github.com/cube-js/cube.js/issues/1332)). Thanks to [@danielnass](https://github.com/danielnass)! ([aa201ae](https://github.com/cube-js/cube.js/commit/aa201aecdc66d920e7a6f84a1043cf5964bc6cb9))
+* **cubejs-cli:** .env file - add link to the docs ([b63405c](https://github.com/cube-js/cube.js/commit/b63405cf78acabf80faec5d910be7a53af8702b9))
+* **cubejs-cli:** create - persist template name & version ([8555290](https://github.com/cube-js/cube.js/commit/8555290dda3f36bc3b185fecef2ad17fba5aae80))
+* **cubejs-cli:** Share /dashboard-app directory by default ([#1380](https://github.com/cube-js/cube.js/issues/1380)) ([d571dcc](https://github.com/cube-js/cube.js/commit/d571dcc9ad5c14916cd33740c0a3dba85e8c8be2))
+* **cubejs-cli:** Use index.js file instead of cube.js ([#1350](https://github.com/cube-js/cube.js/issues/1350)) ([9b6c593](https://github.com/cube-js/cube.js/commit/9b6c59359e10cba7ec37e8a5be2ac7cc7dabd9da))
+* **cubestore:** Add avx2 target-feature for docker build ([68e5a8a](https://github.com/cube-js/cube.js/commit/68e5a8a4d14d8028b5060bb6825d391b3c7ce8e5))
+* **cubestore:** CUBESTORE_SELECT_WORKERS env variable ([9e59b2d](https://github.com/cube-js/cube.js/commit/9e59b2dbd8bdb43327560320d863569e77ba507c))
+* **cubestore:** Select worker process pool ([c282cdd](https://github.com/cube-js/cube.js/commit/c282cdd0c1f80b444991290ba5753f8ce9ac710c))
+* **cubestore:** Slow query logging ([d854303](https://github.com/cube-js/cube.js/commit/d8543033d764157139f2ffe3b6c96adaac070940))
+* **docs-build:** change code font to Source Code Pro ([#1338](https://github.com/cube-js/cube.js/issues/1338)) ([79ec3db](https://github.com/cube-js/cube.js/commit/79ec3db573739ca0bbe85e92a86493232fee2991)), closes [#1337](https://github.com/cube-js/cube.js/issues/1337)
+* **examples/real-time-dashboard:** Automatically deploy ([54303d8](https://github.com/cube-js/cube.js/commit/54303d88604593f48661f5980fe105d1f1bea8b4))
+
+
+
+
+
 ## [0.23.10](https://github.com/cube-js/cube.js/compare/v0.23.9...v0.23.10) (2020-11-07)
 
 
