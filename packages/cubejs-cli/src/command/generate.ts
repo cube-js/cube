@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
-import { displayError, event, requireFromPackage } from '../utils';
+import { displayError, event, isDockerImage, packageExists, requireFromPackage } from '../utils';
 
 // @todo There is another function with similar name inside utils, but without analytics
 const logStage = (stage) => {
@@ -19,7 +19,9 @@ const generate = async (options) => {
       ' $ cubejs generate -t orders,customers'
     ], generateSchemaOptions);
   }
-  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server')))) {
+
+  const relativeResolution = isDockerImage();
+  if (!packageExists('@cubejs-backend/server', relativeResolution)) {
     await displayError(
       '@cubejs-backend/server dependency not found. Please run generate command from project directory.',
       generateSchemaOptions
@@ -27,7 +29,10 @@ const generate = async (options) => {
   }
 
   logStage('Fetching DB schema');
-  const CubejsServer = await requireFromPackage('@cubejs-backend/server');
+  const CubejsServer = await requireFromPackage(
+    '@cubejs-backend/server',
+    relativeResolution
+  );
   const driver = await CubejsServer.createDriver();
   await driver.testConnection();
   const dbSchema = await driver.tablesSchema();
@@ -37,7 +42,8 @@ const generate = async (options) => {
 
   logStage('Generating schema files');
   const ScaffoldingTemplate = await requireFromPackage(
-    '@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate.js'
+    '@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate.js',
+    relativeResolution
   );
   const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
   const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
