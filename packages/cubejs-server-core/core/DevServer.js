@@ -104,7 +104,7 @@ class DevServer {
 
     app.get('/playground/dashboard-app-create-status', catchErrors(async (req, res) => {
       const sourcePath = path.join(dashboardAppPath, 'src');
-      
+
       if (lastApplyTemplatePackagesError) {
         const toThrow = lastApplyTemplatePackagesError;
         lastApplyTemplatePackagesError = null;
@@ -116,20 +116,24 @@ class DevServer {
           res.status(404).json({ error: 'Dashboard app creating' });
           return;
         }
+
         await this.applyTemplatePackagesPromise;
       }
 
-      if (!(fs.pathExistsSync(sourcePath))) {
+      // docker-compose share a volume for /dashboard-app and directory will be empty
+      if (!fs.pathExistsSync(dashboardAppPath) || fs.readdirSync(dashboardAppPath).length === 0) {
         res.status(404).json({
-          error: fs.pathExistsSync(dashboardAppPath) ?
-            `Dashboard app corrupted. Please remove '${path.resolve(dashboardAppPath)}' directory and recreate it` :
-            `Dashboard app not found in '${path.resolve(dashboardAppPath)}' directory`
+          error: `Dashboard app not found in '${path.resolve(dashboardAppPath)}' directory`
         });
+
         return;
       }
 
-      if (!(await fs.pathExists(sourcePath))) {
-        res.status(404).json({ error: 'Dashboard app not found' });
+      if (!fs.pathExistsSync(sourcePath)) {
+        res.status(404).json({
+          error: `Dashboard app corrupted. Please remove '${path.resolve(dashboardAppPath)}' directory and recreate it`
+        });
+
         return;
       }
 
@@ -185,16 +189,16 @@ class DevServer {
 
     app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Download Template Packages');
-      
+
       const fetcher = process.env.TEST_TEMPLATES ? new DevPackageFetcher(repo) : new PackageFetcher(repo);
 
       this.cubejsServer.event('Dev Server App File Write');
       const { toApply, templateConfig } = req.body;
-      
+
       const applyTemplates = async () => {
         const manifestJson = await fetcher.manifestJSON();
         const response = await fetcher.downloadPackages();
-        
+
         let templatePackages = [];
         if (typeof toApply === 'string') {
           const template = manifestJson.templates.find(({ name }) => name === toApply);
@@ -202,9 +206,9 @@ class DevServer {
         } else {
           templatePackages = toApply;
         }
-        
+
         const dt = new DependencyTree(manifestJson, templatePackages);
-        
+
         const appContainer = new AppContainer(
           dt.getRootNode(),
           {
@@ -213,26 +217,26 @@ class DevServer {
           },
           templateConfig
         );
-        
+
         this.cubejsServer.event('Dev Server Create Dashboard App');
         await appContainer.applyTemplates();
         this.cubejsServer.event('Dev Server Create Dashboard App Success');
 
         this.cubejsServer.event('Dev Server Dashboard Npm Install');
-        
+
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
-        
+
         fetcher.cleanup();
       };
-      
+
       if (this.applyTemplatePackagesPromise) {
         this.applyTemplatePackagesPromise = this.applyTemplatePackagesPromise.then(applyTemplates);
       } else {
         this.applyTemplatePackagesPromise = applyTemplates();
       }
       const promise = this.applyTemplatePackagesPromise;
-      
+
       promise.then(() => {
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
@@ -246,7 +250,7 @@ class DevServer {
       });
       res.json(true); // TODO
     }));
-    
+
     app.get('/playground/manifest', catchErrors(async (_, res) => {
       const fetcher = process.env.TEST_TEMPLATES ? new DevPackageFetcher(repo) : new PackageFetcher(repo);
       res.json(await fetcher.manifestJSON());
