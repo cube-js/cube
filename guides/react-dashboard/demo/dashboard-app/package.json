@@ -89,7 +89,7 @@
     "start": "node scripts/start.js",
     "build": "node scripts/build.js",
     "test": "node scripts/test.js",
-    "deploy": "amplify publish -c"
+    "deploy": "npm run build && netlify deploy --prod --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"
