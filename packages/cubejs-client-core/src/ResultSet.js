@@ -141,6 +141,11 @@ class ResultSet {
               range.end
             ].map((dt) => dt.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)),
           });
+        } else if (value == null) {
+          filters.push({
+            member,
+            operator: 'notSet',
+          });
         } else {
           filters.push({
             member,

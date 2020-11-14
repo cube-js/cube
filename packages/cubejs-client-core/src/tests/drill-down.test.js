@@ -98,6 +98,11 @@ describe('drill down query', () => {
       ],
     })
   );
+  const resultSet4 = new ResultSet(
+    loadResponse({
+      dimensions: ["Statuses.potential"]
+    }
+  ))
 
   it('handles a query with a time dimension', () => {
     expect(
@@ -175,4 +180,40 @@ describe('drill down query', () => {
       timezone: 'UTC',
     });
   });
+
+  
+  it('handles null values', () => {
+    expect(
+      resultSet4.drillDown({ xvalues: [null] })
+    ).toEqual(
+      {
+        measures: [],
+        dimensions: [
+          "Orders.id",
+          "Orders.title",
+        ],
+        filters: [
+          {
+            member: "Orders.count",
+            operator: "measureFilter",
+          },
+          {
+            member: "Statuses.potential",
+            operator: "notSet",
+          },
+        ],
+        timeDimensions: [
+          {
+            dimension: "Orders.ts",
+            dateRange: [
+              "-271821-04-19T18:27:49.000",
+              "275760-09-12T20:00:00.000",
+            ],
+          },
+        ],
+        timezone: "UTC",
+      }
+    )
+   
+  })
 });
