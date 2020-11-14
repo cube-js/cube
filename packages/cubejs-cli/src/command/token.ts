@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import jwt from 'jsonwebtoken';
 import type { CommanderStatic } from 'commander';
-import { displayError, event, requireFromPackage } from '../utils';
+import { displayError, event, isDockerImage, requireFromPackage } from '../utils';
 
 export const defaultExpiry = '30 days';
 
@@ -27,7 +27,9 @@ type TokenOptions = {
 export const token = async (options: TokenOptions) => {
   event('Generate Token');
 
-  const CubejsServer = await requireFromPackage('@cubejs-backend/server');
+  const relativeResolution = isDockerImage();
+
+  const CubejsServer = await requireFromPackage('@cubejs-backend/server', relativeResolution);
   const { expiry = defaultExpiry, secret = CubejsServer.apiSecret() } = options;
 
   if (!secret) {

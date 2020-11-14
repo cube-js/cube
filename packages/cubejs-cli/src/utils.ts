@@ -7,6 +7,8 @@ import { machineIdSync } from 'node-machine-id';
 
 import { track } from './track';
 
+export const isDockerImage = () => Boolean(process.env.CUBEJS_DOCKER_IMAGE_TAG);
+
 export const executeCommand = (command: string, args: string[]) => {
   const child = spawn(command, args, { stdio: 'inherit' });
 

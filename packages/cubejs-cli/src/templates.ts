@@ -238,6 +238,7 @@ services:
     volumes:
       # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
       # - .:/cube/conf
+      - ./dashboard-app:/cube/conf/dashboard-app
       - ./cube.js:/cube/conf/cube.js
       - ./schema:/cube/conf/schema
     # Remove this line for production, dev-server must be used only during development

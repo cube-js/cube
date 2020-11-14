@@ -17,10 +17,10 @@ Being executed in VM data schema JavaScript code doesn't have access to [Node.js
 Instead `require()` is implemented by Schema Compiler to provide access to other data schema files and to regular Node.js modules.
 Besides that data schema `require()` can resolve Cube.js packages such as `Funnels` unlike standard Node.js `require()`.
 
-## Node.js globals (process.env and others)
+## Node.js globals (process.env, console.log and others)
 
-Data schema JavaScript code doesn't have access to any standard Node.js globals like `process`.
-In order to access `process.env` variable helper service can be introduced outside of `schema` directory:
+Data schema JavaScript code doesn't have access to any standard Node.js globals like `process` or `console`.
+In order to access `process.env`, helper service can be introduced outside of `schema` directory:
 
 **tablePrefix.js:**
 ```javascript
@@ -37,6 +37,11 @@ cube(`Users`, {
  // ...
 });
 ```
+
+## console.log
+
+Data schema cannot access `console.log` due to a separate [VM instance](https://nodejs.org/api/vm.html) runs it.
+Suppose you find yourself writing complex logic for SQL generation that depends on a lot of external input. In that case, you probably want to introduce a helper service outside of `schema` directory that you can debug as usual Node.js code.
 
 ## Cube.js globals (cube and others)
 
