@@ -80,6 +80,7 @@ const loadResponse = (query = {}) => ({
   },
 });
 
+
 describe('drill down query', () => {
   const resultSet1 = new ResultSet(loadResponse());
   const resultSet2 = new ResultSet(
@@ -100,7 +101,8 @@ describe('drill down query', () => {
   );
   const resultSet4 = new ResultSet(
     loadResponse({
-      dimensions: ["Statuses.potential"]
+      dimensions: ["Statuses.potential"],
+      timeDimensions: []
     }
   ))
 
@@ -202,15 +204,7 @@ describe('drill down query', () => {
             operator: "notSet",
           },
         ],
-        timeDimensions: [
-          {
-            dimension: "Orders.ts",
-            dateRange: [
-              "-271821-04-19T18:27:49.000",
-              "275760-09-12T20:00:00.000",
-            ],
-          },
-        ],
+        timeDimensions: [],
         timezone: "UTC",
       }
     )
