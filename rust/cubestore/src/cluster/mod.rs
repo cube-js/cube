@@ -16,7 +16,7 @@ use std::path::Path;
 use tokio::io::AsyncWriteExt;
 use std::time::{SystemTime};
 use tokio::{fs, time};
-use crate::store::{ChunkDataStore, DataFrame};
+use crate::store::{ChunkDataStore};
 use crate::metastore::{RowKey, TableId, MetaStore, IdRow};
 use log::{info, error, debug};
 use crate::store::compaction::CompactionService;
@@ -31,23 +31,22 @@ use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use crate::queryplanner::serialized_plan::{SerializedPlan};
 use crate::config::{Config, ConfigObj};
-use crate::queryplanner::query_executor::QueryExecutor;
+use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
 use crate::cluster::worker_pool::{WorkerPool, MessageProcessor};
+use arrow::record_batch::RecordBatch;
 
 #[automock]
 #[async_trait]
 pub trait Cluster: Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
 
-    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<DataFrame, CubeError>;
+    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn available_nodes(&self) -> Result<Vec<String>, CubeError>;
 
     fn server_name(&self) -> &str;
 
     async fn download(&self, remote_path: &str) -> Result<String, CubeError>;
-
-    fn get_chunk_store(&self) -> &Arc<dyn ChunkDataStore>;
 
     async fn wait_for_job_result(&self, row_key: RowKey, job_type: JobType) -> Result<JobEvent, CubeError>;
 }
@@ -68,13 +67,12 @@ pub struct ClusterImpl {
     connect_timeout: Duration,
     server_name: String,
     server_addresses: Vec<String>,
-    connected_nodes: Vec<String>,
     job_notify: Arc<Notify>,
     event_sender: Sender<JobEvent>,
     jobs_enabled: Arc<RwLock<bool>>,
     // used just to hold a reference so event_sender won't be collected
     _receiver: Receiver<JobEvent>,
-    select_process_pool: RwLock<Option<Arc<WorkerPool<WorkerMessage, DataFrame, WorkerProcessor>>>>,
+    select_process_pool: RwLock<Option<Arc<WorkerPool<WorkerMessage, SerializedRecordBatchStream, WorkerProcessor>>>>,
     config_obj: Arc<dyn ConfigObj>,
     query_executor: Arc<dyn QueryExecutor>,
 }
@@ -86,16 +84,16 @@ pub enum WorkerMessage {
 
 pub struct WorkerProcessor;
 
-impl MessageProcessor<WorkerMessage, DataFrame> for WorkerProcessor {
-    fn process(args: WorkerMessage) -> Result<DataFrame, CubeError> {
+impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProcessor {
+    fn process(args: WorkerMessage) -> Result<SerializedRecordBatchStream, CubeError> {
         match args {
             WorkerMessage::Select(plan_node, remote_to_local_names) => {
                 debug!("Running select in worker started: {:?}", plan_node);
                 let handle = Handle::current();
                 let plan_node_to_send = plan_node.clone();
-                let res = handle.block_on(async move { Config::current_worker_services().query_executor.execute_plan(plan_node_to_send, remote_to_local_names).await });
+                let res = handle.block_on(async move { Config::current_worker_services().query_executor.execute_worker_plan(plan_node_to_send, remote_to_local_names).await });
                 debug!("Running select in worker completed: {:?}", plan_node);
-                res
+                SerializedRecordBatchStream::write(res?)
             }
         }
     }
@@ -128,7 +126,7 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<DataFrame, CubeError> {
+    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError> {
         if self.server_name == node_name {
             // TODO timeout config
             timeout(Duration::from_secs(60), self.run_local_select(plan_node)).await?
@@ -138,7 +136,7 @@ impl Cluster for ClusterImpl {
     }
 
     async fn available_nodes(&self) -> Result<Vec<String>, CubeError> {
-        Ok(self.connected_nodes.clone())
+        Ok(vec![self.server_name.to_string()])
     }
 
     fn server_name(&self) -> &str {
@@ -147,10 +145,6 @@ impl Cluster for ClusterImpl {
 
     async fn download(&self, remote_path: &str) -> Result<String, CubeError> {
         self.remote_fs.download_file(remote_path).await
-    }
-
-    fn get_chunk_store(&self) -> &Arc<dyn ChunkDataStore> {
-        &self.chunk_store
     }
 
     async fn wait_for_job_result(&self, row_key: RowKey, job_type: JobType) -> Result<JobEvent, CubeError> {
@@ -294,7 +288,6 @@ impl ClusterImpl {
             compaction_service,
             import_service,
             meta_store,
-            connected_nodes: Vec::new(),
             job_notify: Arc::new(Notify::new()),
             event_sender: sender,
             jobs_enabled: Arc::new(RwLock::new(true)),
@@ -339,7 +332,7 @@ impl ClusterImpl {
         Ok(())
     }
 
-    async fn run_local_select(&self, plan_node: SerializedPlan) -> Result<DataFrame, CubeError> {
+    async fn run_local_select(&self, plan_node: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError> {
         let start = SystemTime::now();
         debug!("Running select: {:?}", plan_node);
         let to_download = plan_node.files_to_download();
@@ -354,10 +347,11 @@ impl ClusterImpl {
             let serialized_plan_node = plan_node.clone();
             pool.process(WorkerMessage::Select(serialized_plan_node, remote_to_local_names)).await
         } else {
-            self.query_executor.execute_plan(plan_node.clone(), remote_to_local_names).await
+            // TODO optimize for no double conversion
+            SerializedRecordBatchStream::write(self.query_executor.execute_worker_plan(plan_node.clone(), remote_to_local_names).await?)
         };
         info!("Running select completed ({:?})", start.elapsed()?);
-        res
+        res?.read()
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {

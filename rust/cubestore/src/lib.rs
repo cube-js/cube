@@ -142,7 +142,7 @@ impl From<tokio::time::Elapsed> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
