@@ -20,6 +20,7 @@ use datafusion::sql::parser::{Statement as DFStatement};
 use futures::future::join_all;
 use crate::metastore::job::JobType;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
+use crate::queryplanner::query_executor::QueryExecutor;
 
 #[async_trait]
 pub trait SqlService: Send + Sync {
@@ -30,6 +31,7 @@ pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
     wal_store: Arc<dyn WALDataStore>,
     query_planner: Arc<dyn QueryPlanner>,
+    query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
 }
 
@@ -38,9 +40,10 @@ impl SqlServiceImpl {
         db: Arc<dyn MetaStore>,
         wal_store: Arc<dyn WALDataStore>,
         query_planner: Arc<dyn QueryPlanner>,
+        query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>
     ) -> Arc<SqlServiceImpl> {
-        Arc::new(SqlServiceImpl { db, wal_store, query_planner, cluster })
+        Arc::new(SqlServiceImpl { db, wal_store, query_planner, query_executor, cluster })
     }
 
     async fn create_schema(&self, name: String) -> Result<IdRow<Schema>, CubeError> {
@@ -236,7 +239,7 @@ impl SqlService for SqlServiceImpl {
                     // TODO distribute and combine
                     let res = match logical_plan {
                         QueryPlan::Meta(logical_plan) => self.query_planner.execute_meta_plan(logical_plan).await?,
-                        QueryPlan::Select(serialized) => self.cluster.run_select(self.cluster.server_name().to_string(), serialized).await?
+                        QueryPlan::Select(serialized) => self.query_executor.execute_router_plan(serialized, self.cluster.clone()).await?
                     };
                     return Ok(res);
                 }
@@ -369,6 +372,7 @@ mod tests {
     use crate::remotefs::LocalDirRemoteFs;
     use std::path::PathBuf;
     use crate::queryplanner::MockQueryPlanner;
+    use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::config::Config;
     use crate::metastore::{MetaStoreEvent, RocksMetaStore};
     use crate::metastore::job::JobType;
@@ -397,6 +401,7 @@ mod tests {
                 meta_store,
                 store,
                 Arc::new(MockQueryPlanner::new()),
+                Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
@@ -419,7 +424,7 @@ mod tests {
             let remote_fs = LocalDirRemoteFs::new(PathBuf::from(store_path.clone()), PathBuf::from(remote_store_path.clone()));
             let meta_store = RocksMetaStore::new(path, remote_fs.clone());
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
-            let service = SqlServiceImpl::new(meta_store, store, Arc::new(MockQueryPlanner::new()), Arc::new(MockCluster::new()));
+            let service = SqlServiceImpl::new(meta_store, store, Arc::new(MockQueryPlanner::new()), Arc::new(MockQueryExecutor::new()), Arc::new(MockCluster::new()));
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(i.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::String("Foo".to_string())]));
             let query = "CREATE TABLE Foo.Persons (
@@ -465,7 +470,7 @@ mod tests {
                     move |k, t| Ok(JobEvent::Success(k, t))
                 );
 
-            let service = SqlServiceImpl::new(meta_store.clone(), store, Arc::new(MockQueryPlanner::new()), Arc::new(mock_cluster));
+            let service = SqlServiceImpl::new(meta_store.clone(), store, Arc::new(MockQueryPlanner::new()), Arc::new(MockQueryExecutor::new()), Arc::new(mock_cluster));
             let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             let query = "CREATE TABLE Foo.Persons (
                                 PersonID int,

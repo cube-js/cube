@@ -174,10 +174,10 @@ impl Config {
             meta_store.clone(),
             import_service.clone(),
             self.config_obj.clone(),
-            query_executor
+            query_executor.clone()
         );
 
-        let sql_service = SqlServiceImpl::new(meta_store.clone(), wal_store.clone(), query_planner.clone(), cluster.clone());
+        let sql_service = SqlServiceImpl::new(meta_store.clone(), wal_store.clone(), query_planner.clone(), query_executor.clone(), cluster.clone());
         let scheduler = SchedulerImpl::new(meta_store.clone(), cluster.clone(), remote_fs.clone(), event_receiver);
 
         CubeServices {

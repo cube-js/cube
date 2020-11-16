@@ -14,8 +14,9 @@ use futures::FutureExt;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializedPlan {
-    logical_plan: SerializedLogicalPlan,
-    schema_snapshot: SchemaSnapshot,
+    logical_plan: Arc<SerializedLogicalPlan>,
+    schema_snapshot: Arc<SchemaSnapshot>,
+    partition_id_to_execute: Option<u64>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -224,11 +225,24 @@ impl SerializedPlan {
         let serialized_logical_plan = Self::serialized_logical_plan(&plan);
         let index_snapshots = Self::index_snapshots_from_plan(Arc::new(plan), meta_store, Vec::new()).await?;
         Ok(SerializedPlan {
-            logical_plan: serialized_logical_plan,
-            schema_snapshot: SchemaSnapshot {
+            logical_plan: Arc::new(serialized_logical_plan),
+            schema_snapshot: Arc::new(SchemaSnapshot {
                 index_snapshots
-            },
+            }),
+            partition_id_to_execute: None
         })
+    }
+
+    pub fn with_partition_id_to_execute(&self, partition_id_to_execute: u64) -> Self {
+        Self {
+            logical_plan: self.logical_plan.clone(),
+            schema_snapshot: self.schema_snapshot.clone(),
+            partition_id_to_execute: Some(partition_id_to_execute)
+        }
+    }
+
+    pub fn partition_id_to_execute(&self) -> Option<u64> {
+        self.partition_id_to_execute.clone()
     }
 
     pub fn logical_plan(&self) -> LogicalPlan {
