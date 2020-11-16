@@ -258,7 +258,7 @@ Example response:
 
 ### /v1/run-scheduled-refresh
 
-Trigger scheduled refresh run to refresh pre-aggregations.
+Trigger scheduled refresh run to refresh pre-aggregations. Use it in serverless deployments.
 
 [[warning | Note]]
 | Single call to this API may be not enough to refresh everything is pending. This call just populates queue with refresh workload and it should be continously called until refresh jobs are done. Otherwise refresh jobs will be marked orphaned and they will be removed from queue.

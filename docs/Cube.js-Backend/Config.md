@@ -321,14 +321,6 @@ module.exports = {
 
 Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date)
 
-You can also pass custom interval in seconds as value:
-
-```javascript
-module.exports = {
-  scheduledRefreshTimer: 10
-};
-```
-
 You can pass comma separated list of timezones to refresh in `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable. For example:
 ```
 CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
@@ -336,6 +328,9 @@ CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 
 Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance.
 For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
+
+[[info]]
+| Pre-aggregations will be updated only if required by `refreshKey`. It is always used to check if refresh is required or not. In the case `refreshKey` value doesn't change it doesn't matter how frequent `scheduledRefreshTimer` is set: such pre-aggregation won't be refreshed.
 
 ### extendContext
 
