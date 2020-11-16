@@ -5,41 +5,180 @@ title: "Multi-Page Dashboard with Data Table"
 
 Now we have a single-page dashboard that displays aggregated business metrics and provides at-a-glance view of several KPIs. However, there's no way to get information about a particular order or a range of orders.
 
-We're going to fix it by adding a second page to our dashboard with the information about all orders. On that page, we'll use the [Data Table](https://material-ui.com/components/tables/) component from Material UI which is great for displaying tabular data. It privdes many rich features like sorting, searching, pagination, inline-editing, and row selection.
-
-However, we'll need a way to navigate between two pages. So, let's add a navigation side bar.
+We're going to fix it by adding a second page to our dashboard with the information about all orders. However, we'll need a way to navigate between two pages. So, let's add a navigation side bar.
 
 ## Navigation Side Bar
 
-First, let's downaload a pre-built layout and images for our dashboard application. Run these commands, extract the `layout.zip` file to the `src/layouts` folder, and the `images.zip` file to the `public/images` folder:
+Now we need a router, so let's add a module for this. Run:
 
-```jsx
-curl -LJO https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard/dashboard-app/src/layouts/layouts.zip
-curl -LJO https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard/dashboard-app/public/images/images.zip
+```bash
+ng generate module app-routing --flat --module=app
 ```
 
-Now we can add this layout to the application. Let's modify the `src/App.js` file:
+And then edit the `app-routing.module.ts` file:
+
+```javascript
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { DashboardPageComponent } from './dashboard-page/dashboard-page.component';
+import { TablePageComponent } from './table-page/table-page.component';
+
+const routes: Routes = [
+  { path: '', component: DashboardPageComponent },
+  { path: 'table', component: TablePageComponent },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+```
+
+Now we need to add new modules to the `app.module.ts` file:
 
 ```diff
 // ...
-import 'typeface-roboto';
-- import Header from "./components/Header";
-+ import { Main } from './layouts'
+
+import { CountUpModule } from 'ngx-countup';
+import { DoughnutChartComponent } from './doughnut-chart/doughnut-chart.component';
++ import { AppRoutingModule } from './app-routing.module';
++ import { MatListModule } from '@angular/material/list';
+
 // ...
 
-const AppLayout = ({children}) => {
-  const classes = useStyles();
-  return (
-    <ThemeProvider theme={theme}>
-+      <Main>
-        <div className={classes.root}>
--         <Header/>
-          <div>{children}</div>
-        </div>
-+      </Main>
-    </ThemeProvider>
-  );
-};
+    CountUpModule,
+    MatProgressBarModule,
++    AppRoutingModule,
++    MatListModule,
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+```
+
+The last step is to set the `app.component.html` file to this code:
+
+```html
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  .toolbar {
+    position: relative;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    background-color: #43436B;
+    color: #D5D5E2;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 26px;
+    letter-spacing: 0.02em;
+    text-align: left;
+    padding: 0 1rem;
+  }
+  .spacer {
+    flex: 1;
+  }
+
+  .toolbar img {
+    margin: 0 16px;
+  }
+  .root {
+    width: 100%;
+    display: flex;
+    position: relative;
+  }
+  .component {
+    width: 82.2%;
+    min-height: 100vh;
+    padding-top: 1rem;
+    background: #F3F3FB;
+  }
+  .divider {
+    width: 17.8%;
+    background: #fff;
+    padding: 1rem;
+  }
+  .nav-link {
+    text-decoration: none;
+    color: #A1A1B5;
+  }
+  .nav-link:hover .mat-list-item {
+    background-color: rgba(67, 67, 107, 0.04);
+  }
+  .nav-link .mat-list-item {
+    color: #A1A1B5;
+  }
+  .nav-link.active-link .mat-list-item {
+    color: #7A77FF;
+  }
+</style>
+<!-- Toolbar -->
+<div class="toolbar" role="banner">
+  <span>Angular Dashboard with Material</span>
+  <div class="spacer"></div>
+  <div class="links">
+    <a
+      aria-label="Cube.js on github"
+      target="_blank"
+      rel="noopener"
+      href="https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui"
+      title="Cube.js on GitHub"
+    >GitHub</a>
+    <a
+      aria-label="Cube.js on Slack"
+      target="_blank"
+      rel="noopener"
+      href="https://slack.cube.dev/"
+      title="Cube.js on Slack"
+    >Slack</a>
+  </div>
+</div>
+<div class="root">
+  <div class="divider">
+    <mat-list>
+      <a class="nav-link"
+         routerLinkActive="active-link"
+         [routerLinkActiveOptions]="{exact: true}"
+         *ngFor="let link of links" [routerLink]="[link.href]"
+      >
+        <mat-list-item>
+          <mat-icon mat-list-icon>{{link.icon}}</mat-icon>
+          <div mat-line>{{link.name}}</div>
+        </mat-list-item>
+      </a>
+    </mat-list>
+  </div>
+  <div class="component">
+    <router-outlet class="content"></router-outlet>
+  </div>
+</div>
+```
+
+To make everything finally work, let's add links to our `app.component.ts`:
+
+```diff
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss'],
+})
+export class AppComponent {
++  public links = [
++    {name: 'Dashboard', href: '/', icon: 'dashboard'},
++    {name: 'Orders', href: '/table', icon: 'assignment'}
++    ];
+  title = 'dashboard-app';
+}
 ```
 
 Wow! 🎉 Here's our navigation side bar which can be used to switch between different pages of the dashboard:
@@ -136,60 +275,25 @@ cube(`Orders`, {
 });
 ```
 
-Now we're ready to add a new page. Open the `src/index.js` file and add a new route and a default redirect:
+Now we're ready to add a new page. Let's creating the `table-page` component. Run:
 
-```diff
-import React from "react";
-import ReactDOM from "react-dom";
-import "./index.css";
-import App from "./App";
-import * as serviceWorker from "./serviceWorker";
-- import { HashRouter as Router, Route } from "react-router-dom";
-+ import { HashRouter as Router, Route, Switch, Redirect } from "react-router-dom";
-import DashboardPage from "./pages/DashboardPage";
-+ import DataTablePage from './pages/DataTablePage';
-
-ReactDOM.render(
-  <React.StrictMode>
-    <Router>
-      <App>
--				<Route key="index" exact path="/" component={DashboardPage} />
-+        <Switch>
-+         <Redirect exact from="/" to="/dashboard"/>
-+          <Route key="index" exact path="/dashboard" component={DashboardPage} />
-+          <Route key="table" path="/orders" component={DataTablePage} />
-+          <Redirect to="/dashboard" />
-+        </Switch>
-      </App>
-    </Router>
-  </React.StrictMode>,
-  document.getElementById("root")
-); 
-
-serviceWorker.unregister();
+```bash
+ng generate component table-page
 ```
 
-The next step is to create the page referenced in the new route. Add the `src/pages/DataTablePage.js` file with the following contents:
+Edit the `table-page.module.ts` file:
 
-```jsx
-import React from "react";
-import { makeStyles } from "@material-ui/styles";
+```javascript
+import { Component, OnInit } from '@angular/core';
+import { BehaviorSubject } from "rxjs";
 
-import Table from "../components/Table.js";
-
-const useStyles = makeStyles(theme => ({
-  root: {
-    padding: theme.spacing(4)
-  },
-  content: {
-    marginTop: 15
-  },
-}));
-
-const DataTablePage = () => {
-  const classes = useStyles();
-
-  const query = {
+@Component({
+  selector: 'app-table-page',
+  templateUrl: './table-page.component.html',
+  styleUrls: ['./table-page.component.scss']
+})
+export class TablePageComponent implements OnInit {
+  public _query = new BehaviorSubject({
     "limit": 500,
     "timeDimensions": [
       {
@@ -207,475 +311,303 @@ const DataTablePage = () => {
       "Orders.status",
       "Orders.createdAt"
     ]
-  };
+  });
+  public query = {};
 
-  return (
-    <div className={classes.root}>
-      <div className={classes.content}>
-        <Table query={query}/>
-      </div>
-    </div>
-  );
-};
+  constructor() { }
 
-export default DataTablePage;
+  ngOnInit(): void {
+    this._query.subscribe(query => {
+      this.query = query;
+    });
+  }
+
+}
 ```
 
-Note that this component contains a Cube.js query. Later, we'll modify this query to enable filtering of the data.
+And set the template to these contents:
 
-All data items are rendered with the `<Table />` component, and changes to the query result are reflected in the table. Let's create this `<Table />` component in the `src/components/Table.js` file with the following contents:
-
-```jsx
-import React, { useState } from "react";
-import clsx from "clsx";
-import PropTypes from "prop-types";
-import moment from "moment";
-import PerfectScrollbar from "react-perfect-scrollbar";
-import { makeStyles } from "@material-ui/styles";
-import { useCubeQuery } from "@cubejs-client/react";
-import CircularProgress from "@material-ui/core/CircularProgress";
-import {
-  Card,
-  CardActions,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TablePagination, Typography
-} from "@material-ui/core";
-
-import StatusBullet from "./StatusBullet";
-import palette from "../theme/palette";
-
-const useStyles = makeStyles(theme => ({
-  root: {
-    padding: 0
-  },
-  content: {
-    padding: 0
-  },
-  head: {
-    backgroundColor: palette.background.gray
-  },
-  inner: {
-    minWidth: 1050
-  },
-  nameContainer: {
-    display: "flex",
-    alignItems: "baseline"
-  },
-  status: {
-    marginRight: theme.spacing(2)
-  },
-  actions: {
-    justifyContent: "flex-end"
-  },
-}));
-
-const statusColors = {
-  completed: "success",
-  processing: "info",
-  shipped: "danger"
-};
-
-const TableComponent = props => {
-
-  const { className, query, cubejsApi, ...rest } = props;
-
-  const classes = useStyles();
-
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [page, setPage] = useState(0);
-
-  const tableHeaders = [
-    {
-      text: "Order id",
-      value: "Orders.id"
-    },
-    {
-      text: "Orders size",
-      value: "Orders.size"
-    },
-    {
-      text: "Full Name",
-      value: "Users.fullName"
-    },
-    {
-      text: "User city",
-      value: "Users.city"
-    },
-    {
-      text: "Order price",
-      value: "Orders.price"
-    },
-    {
-      text: "Status",
-      value: "Orders.status"
-    },
-    {
-      text: "Created at",
-      value: "Orders.createdAt"
-    }
-  ];
-  const { resultSet, error, isLoading } = useCubeQuery(query, { cubejsApi });
-  if (isLoading) {
-    return <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}><CircularProgress color="secondary" /></div>;
-  }
-  if (error) {
-    return <pre>{error.toString()}</pre>;
-  }
-  if (resultSet) {
-    let orders = resultSet.tablePivot();
-
-    const handlePageChange = (event, page) => {
-      setPage(page);
-    };
-    const handleRowsPerPageChange = event => {
-      setRowsPerPage(event.target.value);
-    };
-
-    return (
-      <Card
-        {...rest}
-        padding={"0"}
-        className={clsx(classes.root, className)}
-      >
-        <CardContent className={classes.content}>
-          <PerfectScrollbar>
-            <div className={classes.inner}>
-              <Table>
-                <TableHead className={classes.head}>
-                  <TableRow>
-                    {tableHeaders.map((item) => (
-                      <TableCell key={item.value + Math.random()} 
-																 className={classes.hoverable}           
-                      >
-                        <span>{item.text}</span>
-              
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(obj => (
-                    <TableRow
-                      className={classes.tableRow}
-                      hover
-                      key={obj["Orders.id"]}
-                    >
-                      <TableCell>
-                        {obj["Orders.id"]}
-                      </TableCell>
-                      <TableCell>
-                        {obj["Orders.size"]}
-                      </TableCell>
-                      <TableCell>
-                        {obj["Users.fullName"]}
-                      </TableCell>
-                      <TableCell>
-                        {obj["Users.city"]}
-                      </TableCell>
-                      <TableCell>
-                        {"$ " + obj["Orders.price"]}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBullet
-                          className={classes.status}
-                          color={statusColors[obj["Orders.status"]]}
-                          size="sm"
-                        />
-                        {obj["Orders.status"]}
-                      </TableCell>
-                      <TableCell>
-                        {moment(obj["Orders.createdAt"]).format("DD/MM/YYYY")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </PerfectScrollbar>
-        </CardContent>
-        <CardActions className={classes.actions}>
-          <TablePagination
-            component="div"
-            count={orders.length}
-            onChangePage={handlePageChange}
-            onChangeRowsPerPage={handleRowsPerPageChange}
-            page={page}
-            rowsPerPage={rowsPerPage}
-            rowsPerPageOptions={[5, 10, 25, 50, 100]}
-          />
-        </CardActions>
-      </Card>
-    );
-  } else {
-    return null
-  }
-};
-
-TableComponent.propTypes = {
-  className: PropTypes.string,
-  query: PropTypes.object.isRequired
-};
-
-export default TableComponent;
+```html
+<div class="table-warp">
+  <app-material-table [query]="query"></app-material-table>
+</div>
 ```
 
-The table contains a cell with a custom `<StatusBullet />` component which displays an order's status with a colorful dot. Let's create this component in the `src/components/StatusBullet.js` file with the following contents:
+Note that this component contains a Cube.js query. Later, we'll modify this query to enable the filtering of the data.
 
-```jsx
-import React from 'react';
-import PropTypes from 'prop-types';
-import clsx from 'clsx';
-import { makeStyles } from '@material-ui/styles';
+Also, let's create the `material-table` component. Run:
 
-const useStyles = makeStyles(theme => ({
-  root: {
-    display: 'inline-block',
-    borderRadius: '50%',
-    flexGrow: 0,
-    flexShrink: 0
-  },
-  sm: {
-    height: theme.spacing(1),
-    width: theme.spacing(1)
-  },
-  md: {
-    height: theme.spacing(2),
-    width: theme.spacing(2)
-  },
-  lg: {
-    height: theme.spacing(3),
-    width: theme.spacing(3)
-  },
-  neutral: {
-    backgroundColor: theme.palette.neutral
-  },
-  primary: {
-    backgroundColor: theme.palette.primary.main
-  },
-  info: {
-    backgroundColor: theme.palette.info.main
-  },
-  warning: {
-    backgroundColor: theme.palette.warning.main
-  },
-  danger: {
-    backgroundColor: theme.palette.error.main
-  },
-  success: {
-    backgroundColor: theme.palette.success.main
-  }
-}));
-
-const StatusBullet = props => {
-  const { className, size, color, ...rest } = props;
-
-  const classes = useStyles();
-
-  return (
-    <span
-      {...rest}
-      className={clsx(
-        {
-          [classes.root]: true,
-          [classes[size]]: size,
-          [classes[color]]: color
-        },
-        className
-      )}
-    />
-  );
-};
-
-StatusBullet.propTypes = {
-  className: PropTypes.string,
-  color: PropTypes.oneOf([
-    'neutral',
-    'primary',
-    'info',
-    'success',
-    'warning',
-    'danger'
-  ]),
-  size: PropTypes.oneOf(['sm', 'md', 'lg'])
-};
-
-StatusBullet.defaultProps = {
-  size: 'md',
-  color: 'default'
-};
-
-export default StatusBullet;
+```bash
+ng generate component material-table
 ```
 
-Nice! 🎉 Now we have a table which displays information about all orders: 
-
-![](/images/image-47.png)
-
-However, its hard to explore this orders using only the controls provided. To fix this, we'll add a comprehensive toolbar with filters and make our table interactive.
-
-First, let's add a few dependencies. Run the command in the `dashboard-app` folder:
-
-```jsx
-npm install --save @date-io/date-fns@1.x date-fns @date-io/moment@1.x moment @material-ui/lab/Autocomplete
-```
-
-Then, create the `<Toolbar />` component in the `src/components/Toolbar.js` file with the following contents:
-
-```jsx
-import "date-fns";
-import React from "react";
-import PropTypes from "prop-types";
-import clsx from "clsx";
-import { makeStyles } from "@material-ui/styles";
-import Grid from "@material-ui/core/Grid";
-import Typography from "@material-ui/core/Typography";
-import Tab from "@material-ui/core/Tab";
-import Tabs from "@material-ui/core/Tabs";
-import withStyles from "@material-ui/core/styles/withStyles";
-import palette from "../theme/palette";
-
-const AntTabs = withStyles({
-  root: {
-    borderBottom: `1px solid ${palette.primary.main}`,
-  },
-  indicator: {
-    backgroundColor: `${palette.primary.main}`,
-  },
-})(Tabs);
-const AntTab = withStyles((theme) => ({
-  root: {
-    textTransform: 'none',
-    minWidth: 25,
-    fontSize: 12,
-    fontWeight: theme.typography.fontWeightRegular,
-    marginRight: theme.spacing(0),
-    color: palette.primary.dark,
-    opacity: 0.6,
-    '&:hover': {
-      color: `${palette.primary.main}`,
-      opacity: 1,
-    },
-    '&$selected': {
-      color: `${palette.primary.main}`,
-      fontWeight: theme.typography.fontWeightMedium,
-      outline: 'none',
-    },
-    '&:focus': {
-      color: `${palette.primary.main}`,
-      outline: 'none',
-    },
-  },
-  selected: {},
-}))((props) => <Tab disableRipple {...props} />);
-const useStyles = makeStyles(theme => ({
-  root: {},
-  row: {
-    marginTop: theme.spacing(1)
-  },
-  spacer: {
-    flexGrow: 1
-  },
-  importButton: {
-    marginRight: theme.spacing(1)
-  },
-  exportButton: {
-    marginRight: theme.spacing(1)
-  },
-  searchInput: {
-    marginRight: theme.spacing(1)
-  },
-  formControl: {
-    margin: 25,
-    fullWidth: true,
-    display: "flex",
-    wrap: "nowrap"
-  },
-  date: {
-    marginTop: 3
-  },
-  range: {
-    marginTop: 13
-  }
-}));
-
-const Toolbar = props => {
-  const { className,
-    statusFilter,
-    setStatusFilter,
-    tabs,
-    ...rest } = props;
-  const [tabValue, setTabValue] = React.useState(statusFilter);
-
-  const classes = useStyles();
-
-  const handleChangeTab = (e, value) => {
-    setTabValue(value);
-    setStatusFilter(value);
-  };
-
-  return (
-    <div
-      {...rest}
-      className={clsx(classes.root, className)}
-    >
-      <Grid container spacing={4}>
-        <Grid
-          item
-          lg={3}
-          sm={6}
-          xl={3}
-          xs={12}
-          m={2}
-        >
-          <div className={classes}>
-            <AntTabs value={tabValue} onChange={(e,value) => {handleChangeTab(e,value)}} aria-label="ant example">
-              {tabs.map((item) => (<AntTab key={item} label={item} />))}
-            </AntTabs>
-            <Typography className={classes.padding} />
-          </div>
-        </Grid>
-      </Grid>
-    </div>
-  );
-};
-
-Toolbar.propTypes = {
-  className: PropTypes.string
-};
-
-export default Toolbar;
-```
-
-Note that we have customized the `<Tab />` component with styles and and the `setStatusFilter` method which is passed via props. Now we can add this component, props, and filter to the parent component. Let's modify the `src/pages/DataTablePage.js` file:
+Add it to the `app.module.ts` file:
 
 ```diff
-import React from "react";
-import { makeStyles } from "@material-ui/styles";
++ import { MatTableModule } from '@angular/material/table'
 
-+ import Toolbar from "../components/Toolbar.js";
-import Table from "../components/Table.js";
+  imports: [
 
-const useStyles = makeStyles(theme => ({
-  root: {
-    padding: theme.spacing(4)
-  },
-  content: {
-    marginTop: 15
-  },
-}));
+// ...
 
-const DataTablePage = () => {
-  const classes = useStyles();
-+  const tabs = ['All', 'Shipped', 'Processing', 'Completed'];
-+  const [statusFilter, setStatusFilter] = React.useState(0);
++    MatTableModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+```
 
-  const query = {
-    "limit": 500,
+And edit the `material-table.module.ts` file:
+
+```jsx
+import { Component, OnInit, Input } from "@angular/core";
+import { CubejsClient } from "@cubejs-client/ngx";
+
+@Component({
+  selector: "app-material-table",
+  templateUrl: "./material-table.component.html",
+  styleUrls: ["./material-table.component.scss"]
+})
+export class MaterialTableComponent implements OnInit {
+  @Input() query: object;
+
+  constructor(private cubejs: CubejsClient) {
+  }
+  public dataSource = [];
+  displayedColumns = ['id', 'size', 'name', 'city', 'price', 'status', 'date'];
+
+  ngOnInit(): void {
+    this.cubejs.load(this.query).subscribe(
+      resultSet => {
+        this.dataSource = resultSet.tablePivot();
+      },
+      err => console.log("HTTP Error", err)
+    );
+  }
+
+}
+```
+
+Then set its template to these contents:
+
+```html
+<table style="width: 100%; box-shadow: none"
+       mat-table
+       matSort
+       [dataSource]="dataSource"
+       class="table mat-elevation-z8"
+>
+
+  <ng-container matColumnDef="id">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header> Order ID</th>
+    <td mat-cell *matCellDef="let element"> {{element['Orders.id']}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="size">
+    <th mat-header-cell *matHeaderCellDef> Orders size</th>
+    <td mat-cell *matCellDef="let element"> {{element['Orders.size']}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="name">
+    <th mat-header-cell *matHeaderCellDef> Full Name</th>
+    <td mat-cell *matCellDef="let element"> {{element['Users.fullName']}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="city">
+    <th mat-header-cell *matHeaderCellDef> User city</th>
+    <td mat-cell *matCellDef="let element"> {{element['Users.city']}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="price">
+    <th mat-header-cell *matHeaderCellDef> Order price</th>
+    <td mat-cell *matCellDef="let element"> {{element['Orders.price']}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="status">
+    <th mat-header-cell *matHeaderCellDef> Status</th>
+    <td mat-cell *matCellDef="let element"> {{element['Orders.status']}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="date">
+    <th mat-header-cell *matHeaderCellDef> Created at</th>
+    <td mat-cell *matCellDef="let element"> {{element['Orders.createdAt'] | date}} </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  <!--<mat-paginator [pageSizeOptions]="[5, 10, 25, 100]"></mat-paginator>-->
+</table>
+```
+
+Time to add pagination!
+
+Again, let's add modules to `app.module.ts`:
+
+```diff
++ import {MatPaginatorModule} from "@angular/material/paginator";
++ import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+
+@NgModule({
+  ...
+  imports: [
++    MatPaginatorModule,
++    MatProgressSpinnerModule
+  ],
+  ...
+})
+export class AppModule { }
+```
+
+Then, let's edit the template:
+
+```diff
++ <div class="example-loading-shade"
++      *ngIf="loading">
++   <mat-spinner></mat-spinner>
++ </div>
+
++ <div class="example-table-container">
+  <table style="width: 100%; box-shadow: none"
+         mat-table
+         matSort
+         [dataSource]="dataSource"
+         class="table mat-elevation-z8"
+  >
+
+// ...
+
+  </table>
++ </div>
++ <mat-paginator [length]="length"
++               [pageSize]="pageSize"
++               [pageSizeOptions]="pageSizeOptions"
++               (page)="pageEvent.emit($event)"
++ ></mat-paginator>
+```
+
+The styles...
+
+```scss
+/* Structure */
+.example-container {
+  position: relative;
+  min-height: 200px;
+}
+
+.example-table-container {
+  position: relative;
+  max-height: 75vh;
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+}
+
+.example-loading-shade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 56px;
+  right: 0;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.example-rate-limit-reached {
+  color: #980000;
+  max-width: 360px;
+  text-align: center;
+}
+
+/* Column Widths */
+.mat-column-number,
+.mat-column-state {
+  max-width: 64px;
+}
+
+.mat-column-created {
+  max-width: 124px;
+}
+
+.table th {
+  background: #F8F8FC;
+  color: #43436B;
+  font-weight: 500;
+  line-height: 1.5rem;
+  border-bottom: 1px solid #eeeeee;
+  &:hover {
+    color: #7A77FF;
+    cursor: pointer;
+  }
+}
+.table thead {
+  background: #F8F8FC;
+}
+```
+
+And the component:
+
+```scss
+import { Component, Input, Output } from "@angular/core";
+import { CubejsClient } from "@cubejs-client/ngx";
+import { EventEmitter } from '@angular/core';
+
+@Component({
+  selector: "app-material-table",
+  templateUrl: "./material-table.component.html",
+  styleUrls: ["./material-table.component.scss"]
+})
+export class MaterialTableComponent {
+  constructor(private cubejs: CubejsClient) {}
+  @Input() set query(query: object) {
+    this.loading = true;
+    this.cubejs.load(query).subscribe(
+      resultSet => {
+        this.dataSource = resultSet.tablePivot();
+        this.loading = false;
+      },
+      err => console.log("HTTP Error", err)
+    );
+    this.cubejs.load({...query, limit: 50000, offset: 0}).subscribe(
+      resultSet => {
+        this.length = resultSet.tablePivot().length;
+      },
+      err => console.log("HTTP Error", err)
+    );
+  };
+  @Input() limit: number;
+  @Output() pageEvent = new EventEmitter();
+  loading = true;
+  length = 0;
+  pageSize = 10;
+  pageSizeOptions: number[] = [5, 10, 25, 100];
+  dataSource = [];
+  displayedColumns = ['id', 'size', 'name', 'city', 'price', 'status', 'date'];
+}
+```
+
+The last edits will be to the `table-page-component.ts` file:
+
+```jsx
+import { Component, OnInit } from '@angular/core';
+import { BehaviorSubject } from "rxjs";
+
+@Component({
+  selector: 'app-table-page',
+  templateUrl: './table-page.component.html',
+  styleUrls: ['./table-page.component.scss']
+})
+export class TablePageComponent implements OnInit {
+  public limit = 50;
+  public page = 0;
+  public _query = new BehaviorSubject({
+    "limit": this.limit,
+    "offset": this.page * this.limit,
     "timeDimensions": [
       {
         "dimension": "Orders.createdAt",
@@ -692,228 +624,304 @@ const DataTablePage = () => {
       "Orders.status",
       "Orders.createdAt"
     ],
-+    "filters": [
-+      {
-+        "dimension": "Orders.status",
-+        "operator": tabs[statusFilter] !== 'All' ? "equals" : "set",
-+        "values": [
-+          `${tabs[statusFilter].toLowerCase()}`
-+        ]
-+      }
-+    ]
+    filters: []
+  });
+  public query = null;
+  public changePage = (obj) => {
+    this._query.next({
+      ...this._query.value,
+      "limit": obj.pageSize,
+      "offset": obj.pageIndex * obj.pageSize,
+    });
+  };
+  public statusChanged(value) {
+    this._query.next({...this._query.value,
+      "filters": this.getFilters(value)});
+  };
+  private getFilters = (value) => {
+    return [
+      {
+        "dimension": "Orders.status",
+        "operator": value === 'all' ? "set" : "equals",
+        "values": [
+          value
+        ]
+      }
+    ]
   };
 
-  return (
-    <div className={classes.root}>
-+      <Toolbar
-+        statusFilter={statusFilter}
-+        setStatusFilter={setStatusFilter}
-+        tabs={tabs}
-+      />
-      <div className={classes.content}>
-        <Table
-          query={query}/>
-      </div>
-    </div>
-  );
-};
+  constructor() { }
 
-export default DataTablePage;
+  ngOnInit(): void {
+    this._query.subscribe(query => {
+      this.query = query;
+    });
+  }
+
+}
+```
+
+And the related template:
+
+```html
+<div class="table-warp">
+  <app-material-table [query]="query" [limit]="limit" (pageEvent)="changePage($event)"></app-material-table>
+</div>
+```
+
+Voila! 🎉 Now we have a table which displays information about all orders: 
+
+![](/images/image-47.png)
+
+However, its hard to explore this orders using only the controls provided. To fix this, we'll add a comprehensive toolbar with filters and make our table interactive.
+
+For this, let's create the `table-filters` component. Run:
+
+```bash
+ng generate component table-filters
+```
+
+Set the module contents:
+
+```jsx
+import { Component, EventEmitter, OnInit, Output } from "@angular/core";
+
+@Component({
+  selector: 'app-table-filters',
+  templateUrl: './table-filters.component.html',
+  styleUrls: ['./table-filters.component.scss']
+})
+export class TableFiltersComponent implements OnInit {
+  @Output() statusChanged = new EventEmitter();
+  statusChangedFunc = (obj) => {
+    this.statusChanged.emit(obj.value);
+  };
+
+  constructor() { }
+
+  ngOnInit(): void {
+  }
+
+}
+```
+
+And the template...
+
+```html
+<mat-button-toggle-group class="table-filters"
+                         (change)="statusChangedFunc($event)">
+  <mat-button-toggle value="all">All</mat-button-toggle>
+  <mat-button-toggle value="shipped">Shipped</mat-button-toggle>
+  <mat-button-toggle value="processing">Processing</mat-button-toggle>
+  <mat-button-toggle value="completed">Completed</mat-button-toggle>
+</mat-button-toggle-group>
+```
+
+With styles...
+
+```scss
+.table-filters {
+  margin-bottom: 2rem;
+  .mat-button-toggle-appearance-standard {
+    background: transparent;
+    color: #43436b;
+  }
+}
+.mat-button-toggle-standalone.mat-button-toggle-appearance-standard, .mat-button-toggle-group-appearance-standard.table-filters {
+  border: none;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #7A77FF;
+}
+.mat-button-toggle-checked {
+  border-bottom: 2px solid #7A77FF;
+}
+.mat-button-toggle-group-appearance-standard .mat-button-toggle + .mat-button-toggle {
+  border-left: none;
+}
+```
+
+The last step will be to add it to the `table-page.component.html` file:
+
+```diff
+ <div class="table-warp">
++  <app-table-filters (statusChanged)="statusChanged($event)"></app-table-filters>
+  <app-material-table [query]="query" [limit]="limit" (pageEvent)="changePage($event)"></app-material-table>
+ </div>
 ```
 
 Perfect! 🎉 Now the data table has a filter which switches between different types of orders:
 
 ![](/images/image-1.gif)
 
-However, orders have other parameters such as price and dates. Let's create filters for these parameters. To do so, modify the `src/components/Toolbar.js` file:
+However, orders have other parameters such as price and dates. Let's create filters for these parameters and enable sorting in the table. 
 
-```diff
-import "date-fns";
-import React from "react";
-import PropTypes from "prop-types";
-import clsx from "clsx";
-import { makeStyles } from "@material-ui/styles";
-import Grid from "@material-ui/core/Grid";
-import Typography from "@material-ui/core/Typography";
-import Tab from "@material-ui/core/Tab";
-import Tabs from "@material-ui/core/Tabs";
-import withStyles from "@material-ui/core/styles/withStyles";
-import palette from "../theme/palette";
-+ import DateFnsUtils from "@date-io/date-fns";
-+ import {
-+   MuiPickersUtilsProvider,
-+   KeyboardDatePicker
-+ } from "@material-ui/pickers";
-+ import Slider from "@material-ui/core/Slider";
+Edit the `table-filters` component:
 
-// ...
+```jsx
+import { Component, EventEmitter, OnInit, Output } from "@angular/core";
 
-const Toolbar = props => {
-  const { className,
-+   startDate,
-+   setStartDate,
-+   finishDate,
-+   setFinishDate,
-+   priceFilter,
-+   setPriceFilter,
-    statusFilter,
-    setStatusFilter,
-    tabs,
-    ...rest } = props;
-  const [tabValue, setTabValue] = React.useState(statusFilter);
-+ const [rangeValue, rangeSetValue] = React.useState(priceFilter);
+@Component({
+  selector: 'app-table-filters',
+  templateUrl: './table-filters.component.html',
+  styleUrls: ['./table-filters.component.scss']
+})
+export class TableFiltersComponent implements OnInit {
+  @Output() statusChanged = new EventEmitter();
+  @Output() dateChange = new EventEmitter();
+  @Output() sliderChanged = new EventEmitter();
 
-  const classes = useStyles();
-
-  const handleChangeTab = (e, value) => {
-    setTabValue(value);
-    setStatusFilter(value);
+  statusChangedFunc = (obj) => {
+    this.statusChanged.emit(obj.value);
   };
-+  const handleDateChange = (date) => {
-+    setStartDate(date);
-+  };
-+  const handleDateChangeFinish = (date) => {
-+    setFinishDate(date);
-+  };
-+ const handleChangeRange = (event, newValue) => {
-+   rangeSetValue(newValue);
-+ };
-+ const setRangeFilter = (event, newValue) => {
-+   setPriceFilter(newValue);
-+ };
+  changeDate(number, date) {
+    this.dateChange.emit({number, date});
+  };
+  formatLabel(value: number) {
+    if (value >= 1000) {
+      return Math.round(value / 1000) + 'k';
+    }
+    return value;
+  }
+  sliderChange(value) {
+    this.sliderChanged.emit(value);
+  }
 
-  return (
-    <div
-      {...rest}
-      className={clsx(classes.root, className)}
-    >
-      <Grid container spacing={4}>
-        <Grid
-          item
-          lg={3}
-          sm={6}
-          xl={3}
-          xs={12}
-          m={2}
-        >
-          <div className={classes}>
-            <AntTabs value={tabValue} onChange={(e,value) => {handleChangeTab(e,value)}} aria-label="ant example">
-              {tabs.map((item) => (<AntTab key={item} label={item} />))}
-            </AntTabs>
-            <Typography className={classes.padding} />
-          </div>
-        </Grid>
-+        <Grid
-+          className={classes.date}
-+          item
-+          lg={3}
-+          sm={6}
-+          xl={3}
-+          xs={12}
-+          m={2}
-+        >
-+          <MuiPickersUtilsProvider utils={DateFnsUtils}>
-+            <Grid container justify="space-around">
-+              <KeyboardDatePicker
-+                id="date-picker-dialog"
-+               label={<span style={{opacity: 0.6}}>Start Date</span>}
-+                format="MM/dd/yyyy"
-+                value={startDate}
-+                onChange={handleDateChange}
-+                KeyboardButtonProps={{
-+                  "aria-label": "change date"
-+                }}
-+              />
-+            </Grid>
-+          </MuiPickersUtilsProvider>
-+        </Grid>
-+        <Grid
-+          className={classes.date}
-+          item
-+          lg={3}
-+          sm={6}
-+          xl={3}
-+          xs={12}
-+          m={2}
-+        >
-+          <MuiPickersUtilsProvider utils={DateFnsUtils}>
-+            <Grid container justify="space-around">
-+              <KeyboardDatePicker
-+                id="date-picker-dialog-finish"
-+                label={<span style={{opacity: 0.6}}>Finish Date</span>}
-+                format="MM/dd/yyyy"
-+                value={finishDate}
-+                onChange={handleDateChangeFinish}
-+                KeyboardButtonProps={{
-+                  "aria-label": "change date"
-+                }}
-+              />
-+            </Grid>
-+          </MuiPickersUtilsProvider>
-+        </Grid>
-+        <Grid
-+          className={classes.range}
-+          item
-+          lg={3}
-+          sm={6}
-+          xl={3}
-+          xs={12}
-+          m={2}
-+        >
-+          <Typography id="range-slider">
-+            Order price range
-+          </Typography>
-+          <Slider
-+            value={rangeValue}
-+            onChange={handleChangeRange}
-+            onChangeCommitted={setRangeFilter}
-+            aria-labelledby="range-slider"
-+            valueLabelDisplay="auto"
-+            min={0}
-+            max={2000}
-+          />
-+        </Grid>
-      </Grid>
-    </div>
-  );
-};
+  constructor() { }
 
-Toolbar.propTypes = {
-  className: PropTypes.string
-};
+  ngOnInit(): void {
+  }
 
-export default Toolbar;
+}
 ```
 
-To make these filters work, we need to connect them to the parent component: add state, modify our query, and add new props to the `<Toolbar />` component. Also, we will add sorting to the data table. So, modify the `src/pages/DataTablePage.js` file like this:
+And its template:
+
+```html
+<mat-grid-list cols="4" rowHeight="131px">
+
+  <mat-grid-tile>
+    <mat-button-toggle-group class="table-filters"
+                             (change)="statusChangedFunc($event)">
+      <mat-button-toggle value="all">All</mat-button-toggle>
+      <mat-button-toggle value="shipped">Shipped</mat-button-toggle>
+      <mat-button-toggle value="processing">Processing</mat-button-toggle>
+      <mat-button-toggle value="completed">Completed</mat-button-toggle>
+    </mat-button-toggle-group>
+  </mat-grid-tile>
+
+  <mat-grid-tile>
+    <mat-form-field class="table-filters__date-form" color="primary" (change)="changeDate(0, $event)">
+      <mat-label>Start date</mat-label>
+      <input #ref matInput [matDatepicker]="picker1" (dateChange)="changeDate(0, ref.value)">
+      <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+      <mat-datepicker #picker1></mat-datepicker>
+    </mat-form-field>
+  </mat-grid-tile>
+
+  <mat-grid-tile>
+    <mat-form-field class="table-filters__date-form" color="primary" (change)="changeDate(1, $event)">
+      <mat-label>Finish date</mat-label>
+      <input #ref1 matInput [matDatepicker]="picker2" (dateChange)="changeDate(1, ref1.value)">
+      <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
+      <mat-datepicker #picker2></mat-datepicker>
+    </mat-form-field>
+  </mat-grid-tile>
+
+  <mat-grid-tile>
+    <div>
+      <mat-label class="price-label">Price range</mat-label>
+      <mat-slider
+        color="primary"
+        thumbLabel
+        (change)="sliderChange($event)"
+        [displayWith]="formatLabel"
+        tickInterval="10"
+        min="1"
+        max="1200"></mat-slider>
+    </div>
+  </mat-grid-tile>
+</mat-grid-list>
+```
+
+Again, add plenty of modules to the `app.module.ts` file:
 
 ```diff
 // ...
 
-const DataTablePage = () => {
-  const classes = useStyles();
-  const tabs = ['All', 'Shipped', 'Processing', 'Completed'];
-  const [statusFilter, setStatusFilter] = React.useState(0);
-+ const [startDate, setStartDate] = React.useState(new Date("2019-01-01T00:00:00"));
-+ const [finishDate, setFinishDate] = React.useState(new Date("2022-01-01T00:00:00"));
-+ const [priceFilter, setPriceFilter] = React.useState([0, 200]);
-+ const [sorting, setSorting] = React.useState(['Orders.createdAt', 'desc']);
+import { TableFiltersComponent } from "./table-filters/table-filters.component";
+import { MatButtonToggleModule } from "@angular/material/button-toggle";
++ import { MatDatepickerModule } from "@angular/material/datepicker";
++ import { MatFormFieldModule } from "@angular/material/form-field";
++ import { MatNativeDateModule } from "@angular/material/core";
++ import { MatInputModule } from "@angular/material/input";
++ import {MatSliderModule} from "@angular/material/slider";
 
-  const query = {
-    "limit": 500,
-+    "order": {
-+      [`${sorting[0]}`]: sorting[1]
+// ...
+
+    MatProgressSpinnerModule,
+    MatButtonToggleModule,
++    MatDatepickerModule,
++    MatFormFieldModule,
++    MatNativeDateModule,
++    MatInputModule,
++    MatSliderModule
+  ],
++  providers: [MatDatepickerModule],
+  bootstrap: [AppComponent]
+})
+export class AppModule {
+}
+```
+
+Edit the `table-page.component.html` file:
+
+```diff
+ <div class="table-warp">
+  <app-table-filters (statusChanged)="statusChanged($event)"
+                     (dateChange)="dateChanged($event)"
+                     (sliderChanged)="sliderChanged($event)"
+  ></app-table-filters>
+  <app-material-table [query]="query"
+                      [limit]="limit"
+                      (pageEvent)="changePage($event)"
++                      (sortingChanged)="sortingChanged($event)"></app-material-table>
+ </div>
+```
+
+And the `table-page` component:
+
+```diff
+import { Component, OnInit } from "@angular/core";
+import { BehaviorSubject } from "rxjs";
+
+@Component({
+  selector: "app-table-page",
+  templateUrl: "./table-page.component.html",
+  styleUrls: ["./table-page.component.scss"]
+})
+export class TablePageComponent implements OnInit {
+...
++  public limit = 50;
++  public page = 0;
++  public sorting = ['Orders.createdAt', 'desc'];
++  public startDate = "01/1/2019";
++  public finishDate = "01/1/2022";
++  private minPrice = 0;
+  public _query = new BehaviorSubject({
++    "limit": this.limit,
++    "offset": this.page * this.limit,
++    order: {
++      [`${this.sorting[0]}`]: this.sorting[1],
 +    },
-    "measures": [
-      "Orders.count"
-    ],
-    "timeDimensions": [
-      {
-        "dimension": "Orders.createdAt",
-+				"dateRange": [startDate, finishDate],
-        "granularity": "day"
-      }
-    ],
++    "timeDimensions": [
++      {
++        "dimension": "Orders.createdAt",
++        "dateRange" : [this.startDate, this.finishDate],
++        "granularity": "day"
++      }
++    ],
     "dimensions": [
       "Users.id",
       "Orders.id",
@@ -924,375 +932,176 @@ const DataTablePage = () => {
       "Orders.status",
       "Orders.createdAt"
     ],
-    "filters": [
-      {
-        "dimension": "Orders.status",
-        "operator": tabs[statusFilter] !== 'All' ? "equals" : "set",
-        "values": [
-          `${tabs[statusFilter].toLowerCase()}`
-        ]
-      },
-+     {
-+        "dimension": "Orders.price",
-+        "operator": "gt",
-+        "values": [
-+         `${priceFilter[0]}`
-+       ]
-+     },
-+     {
-+       "dimension": "Orders.price",
-+       "operator": "lt",
-+       "values": [
-+         `${priceFilter[1]}`
-+       ]
-+     },
-    ]
-  };
++    filters: []
+  });
++  public changePage = (obj) => {
++    this._query.next({
++      ...this._query.value,
++      "limit": obj.pageSize,
++      "offset": obj.pageIndex * obj.pageSize
++    });
++  };
 
-  return (
-    <div className={classes.root}>
-      <Toolbar
-+       startDate={startDate}
-+       setStartDate={setStartDate}
-+       finishDate={finishDate}
-+       setFinishDate={setFinishDate}
-+       priceFilter={priceFilter}
-+       setPriceFilter={setPriceFilter}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        tabs={tabs}
-      />
-      <div className={classes.content}>
-        <Table
-+          sorting={sorting}
-+          setSorting={setSorting}
-          query={query}/>
-      </div>
-    </div>
-  );
-};
++  public sortingChanged(value) {
++    if (value === this.sorting[0] && this.sorting[1] === 'desc') {
++      this.sorting[0] = value;
++      this.sorting[1] = 'asc'
++    } else if (value === this.sorting[0] && this.sorting[1] === 'asc') {
++      this.sorting[0] = value;
++      this.sorting[1] = 'desc'
++    } else {
++      this.sorting[0] = value;
++    }
++    this.sorting[0] = value;
++    this._query.next({
++      ...this._query.value,
++      order: {
++        [`${this.sorting[0]}`]: this.sorting[1],
++      },
++    });
++  }
 
-export default DataTablePage;
++  public dateChanged(value) {
++    if (value.number === 0) {
++      this.startDate = value.date
++    }
++    if (value.number === 1) {
++      this.finishDate = value.date
++    }
++    this._query.next({
++      ...this._query.value,
++      timeDimensions: [
++        {
++          dimension: "Orders.createdAt",
++          dateRange: [this.startDate, this.finishDate],
++          granularity: null
++        }
++      ]
++    });
++  }
+
++  public statusChanged(value) {
++    this.status = value;
++    this._query.next({
++      ...this._query.value,
++      "filters": this.getFilters(this.status, this.minPrice)
++    });
++  };
+
++  public sliderChanged(obj) {
++    this.minPrice = obj.value;
++    this._query.next({
++      ...this._query.value,
++      "filters": this.getFilters(this.status, this.minPrice)
++    });
++  };
+
++  private getFilters = (status, price) => {
++    let filters = [];
++    if (status) {
++      filters.push(
++        {
++          "dimension": "Orders.status",
++          "operator": status === "all" ? "set" : "equals",
++          "values": [
++            status
++          ]
++        }
++      );
++    }
++    if (price) {
++      filters.push(
++        {
++          dimension: 'Orders.price',
++          operator: 'gt',
++          values: [`${price}`],
++        },
++      );
++    }
++    return filters;
++  };
+	
+ ...
+}
 ```
 
-Fantastic! 🎉 We've added some useful filters. Indeed, you can add even more filters with custom logic. See the [documentation](https://cube.dev/docs/query-format#filters-format) for the filter format options.
-
-And there's one more thing. We've added sorting props to the toolbar, but we also need to pass them to the `<Table />` component. To fix this, let's modify the `src/components/Table.js` file:
+Now we need to propagate the changes to the `material-table` component:
 
 ```diff
 // ...
 
-+ import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
-+ import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
-import { useCubeQuery } from "@cubejs-client/react";
-import CircularProgress from "@material-ui/core/CircularProgress";
+export class MaterialTableComponent {
 
 // ...
 
-const useStyles = makeStyles(theme => ({
-  // ...
-  actions: {
-    justifyContent: "flex-end"
-  },
-+ tableRow: {
-+   padding: '0 5px',
-+   cursor: "pointer",
-+   '.MuiTableRow-root.MuiTableRow-hover&:hover': {
-+     backgroundColor: palette.primary.action
-+   }
-+ },
-+ hoverable: {
-+   "&:hover": {
-+     color: `${palette.primary.normal}`,
-+     cursor: `pointer`
-+   }
-+ },
-+ arrow: {
-+   fontSize: 10,
-+   position: "absolute"
-+ }
-}));
-
-const statusColors = {
-  completed: "success",
-  processing: "info",
-  shipped: "danger"
-};
-
-const TableComponent = props => {
--  const { className, query, cubejsApi, ...rest } = props;
-+  const { className, sorting, setSorting, query, cubejsApi, ...rest } = props;
++  @Output() sortingChanged = new EventEmitter();
 
 // ...
 
-  if (resultSet) {
++  changeSorting(value) {
++    this.sortingChanged.emit(value)
++  }
+}
+``` 
 
-	   //...
-+     const handleSetSorting = str => {
-+       setSorting([str, sorting[1] === "desc" ? "asc" : "desc"]);
-+     };
+And its template:
 
-    return (
+```diff
+// ...
 
-								// ...
-                <TableHead className={classes.head}>
-                  <TableRow>
-                    {tableHeaders.map((item) => (
-                      <TableCell key={item.value + Math.random()} className={classes.hoverable}
-+                                 onClick={() => {
-+                                 handleSetSorting(`${item.value}`);
-+                                 }}
-                      >
-                        <span>{item.text}</span>
-+                        <Typography
-+                          className={classes.arrow}
-+                          variant="body2"
-+                          component="span"
-+                        >
-+                          {(sorting[0] === item.value) ? (sorting[1] === "desc" ? <KeyboardArrowUpIcon/> :
-+                            <KeyboardArrowDownIcon/>) : null}
-+                        </Typography>
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-						 // ...
+    <ng-container matColumnDef="id">
+      <th matSort mat-header-cell *matHeaderCellDef mat-sort-header 
++.    (click)="changeSorting('Orders.id')"> Order ID</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.id']}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="size">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header 
++     (click)="changeSorting('Orders.size')"> Orders size</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.size']}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header 
++     (click)="changeSorting('Users.fullName')"> Full Name</th>
+      <td mat-cell *matCellDef="let element"> {{element['Users.fullName']}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="city">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header 
++    (click)="changeSorting('Users.city')"> User city</th>
+      <td mat-cell *matCellDef="let element"> {{element['Users.city']}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="price">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header 
++    (click)="changeSorting('Orders.price')"> Order price</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.price']}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header 
++    (click)="changeSorting('Orders.status')"> Status</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.status']}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="date">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header 
++     (click)="changeSorting('Orders.createdAt')"> Created at</th>
+      <td mat-cell *matCellDef="let element"> {{element['Orders.createdAt'] | date}} </td>
+    </ng-container>
+
+// ...
 ```
 
 Wonderful! 🎉 Now we have the data table that fully supports filtering and sorting: 
 
 ![](/images/image-7.gif)
 
-## User Drill Down Page
-
-The data table we've built allows to find informations about a particular order. However, our e-commerce business is quite successful and has a good return rate which means that users are highly likely to make multiple orders over time. So, let's add a drill down page to explore the complete order informations for a particular user.
-
-As it's a new page, let's add a new route to the `src/index.js` file:
-
-```diff
-// ...
-
-				<Switch>
-          <Redirect exact from="/" to="/dashboard" />
-          <Route key="index" exact path="/dashboard" component={DashboardPage} />
-          <Route key="table" path="/orders" component={DataTablePage} />
-+         <Route key="table" path="/user/:id" component={UsersPage} />
-          <Redirect to="/dashboard" />
-        </Switch>
-
-// ...
-```
-
-For this route to work, we also need to add the `src/pages/UsersPage.js` file with these contents:
-
-```diff
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import { makeStyles } from '@material-ui/styles';
-import { useCubeQuery } from '@cubejs-client/react';
-import { Grid } from '@material-ui/core';
-import AccountProfile from '../components/AccountProfile';
-import BarChart from '../components/BarChart';
-import CircularProgress from '@material-ui/core/CircularProgress';
-import UserSearch from '../components/UserSearch';
-import KPIChart from '../components/KPIChart';
-
-const useStyles = makeStyles((theme) => ({
-  root: {
-    padding: theme.spacing(4),
-  },
-  row: {
-    display: 'flex',
-    margin: '0 -15px',
-  },
-  info: {
-    paddingLeft: theme.spacing(2),
-    paddingRight: theme.spacing(2),
-  },
-  sales: {
-    marginTop: theme.spacing(4),
-  },
-  loaderWrap: {
-    width: '100%',
-    height: '100%',
-    minHeight: 'calc(100vh - 64px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-}));
-
-const UsersPage = (props) => {
-  const classes = useStyles();
-  let { id } = useParams();
-  const query = {
-    measures: ['Users.count'],
-    timeDimensions: [
-      {
-        dimension: 'Users.createdAt',
-      },
-    ],
-    dimensions: [
-      'Users.id',
-      'Products.id',
-      'Users.firstName',
-      'Users.lastName',
-      'Users.gender',
-      'Users.age',
-      'Users.city',
-      'LineItems.itemPrice',
-      'Orders.createdAt',
-    ],
-    filters: [
-      {
-        dimension: 'Users.id',
-        operator: 'equals',
-        values: [`${id}`],
-      },
-    ],
-  };
-  const barChartQuery = {
-    measures: ['Orders.count'],
-    timeDimensions: [
-      {
-        dimension: 'Orders.createdAt',
-        granularity: 'month',
-        dateRange: 'This week',
-      },
-    ],
-    dimensions: ['Orders.status'],
-    filters: [
-      {
-        dimension: 'Users.id',
-        operator: 'equals',
-        values: [id],
-      },
-    ],
-  };
-  const cards = [
-    {
-      title: 'ORDERS',
-      query: {
-        measures: ['Orders.count'],
-        filters: [
-          {
-            dimension: 'Users.id',
-            operator: 'equals',
-            values: [`${id}`],
-          },
-        ],
-      },
-      duration: 1.25,
-    },
-    {
-      title: 'TOTAL SALES',
-      query: {
-        measures: ['LineItems.price'],
-        filters: [
-          {
-            dimension: 'Users.id',
-            operator: 'equals',
-            values: [`${id}`],
-          },
-        ],
-      },
-      duration: 1.5,
-    },
-  ];
-
-  const { resultSet, error, isLoading } = useCubeQuery(query);
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress color="secondary" />
-      </div>
-    );
-  }
-  if (error) {
-    return <pre>{error.toString()}</pre>;
-  }
-  if (!resultSet) {
-    return null;
-  }
-  if (resultSet) {
-    let data = resultSet.tablePivot();
-    let userData = data[0];
-    return (
-      <div className={classes.root}>
-        <Grid container spacing={4}>
-          <Grid item lg={4} sm={6} xl={4} xs={12}>
-            <UserSearch />
-            <AccountProfile
-              userFirstName={userData['Users.firstName']}
-              userLastName={userData['Users.lastName']}
-              gender={userData['Users.gender']}
-              age={userData['Users.age']}
-              city={userData['Users.city']}
-              id={id}
-            />
-          </Grid>
-          <Grid item lg={8} sm={6} xl={4} xs={12}>
-            <div className={classes.row}>
-              {cards.map((item, index) => {
-                return (
-                  <Grid className={classes.info} key={item.title + index} item lg={6} sm={6} xl={6} xs={12}>
-                    <KPIChart {...item} />
-                  </Grid>
-                );
-              })}
-            </div>
-            <div className={classes.sales}>
-              <BarChart query={barChartQuery} dates={['This year', 'Last year']} />
-            </div>
-          </Grid>
-        </Grid>
-      </div>
-    );
-  }
-};
-
-export default UsersPage;
-```
-
-The last thing will be enable the data table to navigate to this page by clicking on a cell with a user's full name. Let's modify the `src/components/Table.js` like this:
-
-```diff
-// ...
-
-import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
-import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
-+ import OpenInNewIcon from '@material-ui/icons/OpenInNew';
-import { useCubeQuery } from '@cubejs-client/react';
-import CircularProgress from '@material-ui/core/CircularProgress';
-
-// ...
-
-                      <TableCell>{obj['Orders.id']}</TableCell>
-                      <TableCell>{obj['Orders.size']}</TableCell>
-+                     <TableCell
-+                       className={classes.hoverable}
-+                       onClick={() => handleClick(`/user/${obj['Users.id']}`)}
-+                     >
-+                       {obj['Users.fullName']}
-+                       &nbsp;
-+                       <Typography className={classes.arrow} variant="body2" component="span">
-+                         <OpenInNewIcon fontSize="small" />
-+                       </Typography>
-+                     </TableCell>
-                      <TableCell>{obj['Users.city']}</TableCell>
-                      <TableCell>{'$ ' + obj['Orders.price']}</TableCell>
-
-// ...
-```
-
-Here's what we eventually got:
-
-![](/images/image-202.gif)
-
 And that's all! 😇 Congratulations on completing this guide! 🎉
 
-Also, check the [live demo](https://material-ui-dashboard.cubecloudapp.dev/#/dashboard) and the [full source code](https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard) available on GitHub.
+Also, check the [live demo](https://angular-dashboard-demo.cube.dev) and the [full source code](https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui) available on GitHub.
 
-Now you should be able to create comprehensive analytical dashboards powered by Cube.js and using React and Material UI to display aggregate metrics and detailed information.
+Now you should be able to create comprehensive analytical dashboards powered by Cube.js using Angular and Material to display aggregate metrics and detailed information.
 
 Feel free to explore [other examples](https://github.com/cube-js/cube.js/#examples) of what can be done with Cube.js such as the [Real-Time Dashboard Guide](https://real-time-dashboard.cube.dev) and the [Open Source Web Analytics Platform Guide](https://web-analytics.cube.dev).

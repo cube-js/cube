@@ -4,7 +4,7 @@ BigQuery is great at handling large datasets, but will never give you a sub-seco
 
 But we still can leverage BigQuery’s cheap data storage and the power to process large datasets, while not giving up on the performance. As BigQuery acts as a single source of truth and stores all the raw data, MySQL can act as cache layer on top of it and store only small, aggregated tables and provides us with a desired sub-second response.
 
-[You can check out the demo here](https://external-rollups.cubecloudapp.dev/). Make sure to play with date range and switchers—dynamic dashboards benefit the most from the pre-aggregations.
+[You can check out the demo here](https://external-rollups-demo.cube.dev/). Make sure to play with date range and switchers—dynamic dashboards benefit the most from the pre-aggregations.
 
 ![cubejs-external-rollups.gif](https://media.graphcms.com/7fvaHi7TymwSBb01Y3Zi)
 
@@ -42,25 +42,12 @@ Now, let’s install the Cube.js MySQL driver.
 $ npm install @cubejs-backend/mysql-driver --save
 ```
 
-Once we have it, the last configuration step is to provide MySQL related options via the `externalDbType` and `externalDriverFactory` properties. Replace the content of the `index.js` file with the following.
+Once we have it, the last configuration step is to provide MySQL related options via the `externalDbType` and `externalDriverFactory` properties. Replace the content of the `cube.js` file with the following.
 
 ```javascript
-const CubejsServer = require("@cubejs-backend/server");
-const MySQLDriver = require('@cubejs-backend/mysql-driver');
-
-const server = new CubejsServer({
-  externalDbType: 'mysql',
-  externalDriverFactory: () => new MySQLDriver({
-    host: process.env.CUBEJS_EXT_DB_HOST,
-    database: process.env.CUBEJS_EXT_DB_NAME,
-    user: process.env.CUBEJS_EXT_DB_USER,
-    password: process.env.CUBEJS_EXT_DB_PASS.toString()
-  })
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+module.exports = {
+  preAggregationsSchema: process.env.PRE_AGGREGATIONS_SCHEMA || 'stb_pre_aggregations',
+};
 ```
 
 That is all we need to let Cube.js connect to both BigQuery and MySQL. Now, we can create our first Cube.js data schema file. Cube.js uses the data schema to generate an SQL code, which will be executed in your database.
@@ -97,7 +84,7 @@ cube(`Stories`, {
 });
 ```
 
-Now start the Cube.js server by running `node index.js` and navigate to the development playground at http://localhost:4000.
+Now start the Cube.js server by running `npm run dev` and navigate to the development playground at http://localhost:4000.
 
 You can select the Stories count measure and category dimension, alongside a time dimension to build a chart as shown below.
 
@@ -171,4 +158,4 @@ LIMIT
 ```
 As you can see, it now queries data from the `stb_pre_aggregations.stories_pre_agg_main` table inside MySQL. You can play around with filters to see the performance boost of the aggregated query compared to the raw one.
 
-You can also check [this demo dashboard with multiple charts](https://external-rollups.cubecloudapp.dev/) and compare its performance with and without pre-aggregations.
+You can also check [this demo dashboard with multiple charts](https://external-rollups-demo.cube.dev/) and compare its performance with and without pre-aggregations.

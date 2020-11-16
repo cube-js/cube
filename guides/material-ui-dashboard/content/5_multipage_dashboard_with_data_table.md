@@ -1291,7 +1291,7 @@ Here's what we eventually got:
 
 And that's all! 😇 Congratulations on completing this guide! 🎉
 
-Also, check the [live demo](https://material-ui-dashboard.cubecloudapp.dev/#/dashboard) and the [full source code](https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard) available on GitHub.
+Also, check the [live demo](https://material-ui-dashboard.cube.dev/#/dashboard) and the [full source code](https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard) available on GitHub.
 
 Now you should be able to create comprehensive analytical dashboards powered by Cube.js and using React and Material UI to display aggregate metrics and detailed information.
 

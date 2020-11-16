@@ -17,17 +17,17 @@ We’ll use a [PostgreSQL](https://www.postgresql.org/) database. Please make su
 
 **To create the backend, we run this command:**
 
-`$ cubejs create react-material-dashboard -d postgres`
+`$ cubejs create angular-dashboard -d postgres`
 
 Now we can download and import a sample e-commerce dataset for PostgreSQL:
 
-```
+```bash
 $ curl http://cube.dev/downloads/ecom-dump.sql > ecom-dump.sql
 $ createdb ecom
 $ psql --dbname ecom -f ecom-dump.sql
 ```
 
-Once the database is ready, the backend can be [configured to connect to the database](https://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps). To do so, we provide a few options via the `.env` file in the root of the Cube.js project folder (`react-material-dashboard`):
+Once the database is ready, the backend can be [configured to connect to the database](https://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps). To do so, we provide a few options via the `.env` file in the root of the Cube.js project folder (`angular-dashboard`):
 
 ```
 CUBEJS_DB_NAME=ecom
@@ -35,23 +35,23 @@ CUBEJS_DB_TYPE=postgres
 CUBEJS_API_SECRET=secret
 ```
 
-![](/images/start.gif)
+![](https://d2cq47x6codx9u.cloudfront.net/images/start.gif)
 
 Now we can run the backend!
 
-**In development mode, the backend will also run the Cube.js Playground.** It's a time-saving web application that helps to create a data schema, test out the charts, and generate a React dashboard boilerplate. Run the following command in the Cube.js project folder:
+**In development mode, the backend will also run the Cube.js Playground.** It's a time-saving web application that helps to create a data schema, test out the charts, etc. Run the following command in the Cube.js project folder:
 
 `$ node index.js`
 
 Next, open [http://localhost:4000](http://localhost:4000/) in your browser.
 
-![](/images/demo.gif)
+![](https://d2cq47x6codx9u.cloudfront.net/images/demo.gif)
 
 **We'll use the Cube.js Playground to create a data schema.** It's essentially a JavaScript code that declaratively describes the data, defines analytical entities like measures and dimensions, and maps them to SQL queries. Here is an example of the schema which can be used to describe users’ data.
 
 ```jsx
-cube(`Users`, {
-  sql: `SELECT * FROM users`,
+cube('Users', {
+  sql: 'SELECT * FROM users',
 
   measures: {
     count: {

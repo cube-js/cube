@@ -1,6 +1,6 @@
 ## Example of Cube.js compareDateRange property with React and Highcharts
 
-The [live demo](https://compare-date-range.cubecloudapp.dev/).
+The [live demo](https://compare-date-range-demo.cube.dev/).
 
 Here you can find a usage of:
 
