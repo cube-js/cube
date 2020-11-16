@@ -16,15 +16,15 @@ category: Examples
 
 [link-real-time-dashboard]: https://real-time-dashboard-demo.cube.dev/
 [code-real-time-dashboard]: https://github.com/cube-js/cube.js/tree/master/examples/real-time-dashboard
-[link-react-dashboard]: https://react-dashboard-demo.cubecloudapp.dev/
+[link-react-dashboard]: https://react-dashboard-demo.cube.dev/
 [code-react-dashboard]: https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard/demo
-[link-d3-dashboard]: https://d3-dashboard.cubecloudapp.dev/
+[link-d3-dashboard]: https://d3-dashboard-demo.cube.dev/
 [code-d3-dashboard]: https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard
 [link-stripe-dashboard]: http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/
 [code-stripe-dashboard]: https://github.com/cube-js/cube.js/tree/master/examples/stripe-dashboard
 [link-event-analytics]: https://d1ygcqhosay4lt.cloudfront.net/
 [code-event-analytics]: https://github.com/cube-js/cube.js/tree/master/examples/event-analytics
-[link-external-rollups]: https://external-rollups.cubecloudapp.dev/
+[link-external-rollups]: https://external-rollups-demo.cube.dev/
 [code-external-rollups]: https://github.com/cube-js/cube.js/tree/master/examples/external-rollups
 [link-aws-web-analytics]: http://aws-web-analytics-dashboard.s3-website-us-east-1.amazonaws.com/
 [code-aws-web-analytics]: https://github.com/cube-js/cube.js/tree/master/examples/aws-web-analytics
