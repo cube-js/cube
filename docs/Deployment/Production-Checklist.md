@@ -10,7 +10,7 @@ deployment.
 
 ## Enable Production Mode
 
-When running Cube.js in production, make sure `NODE_ENV` is set to `production`.
+When running Cube.js in production make sure `NODE_ENV` is set to `production` and `CUBEJS_DEV_MODE` is not set to `true`.
 Some platforms, such as Heroku, do it by default.
 
 In this mode, the insecure development server and Playground will be disabled
