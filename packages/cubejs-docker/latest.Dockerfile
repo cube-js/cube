@@ -2,6 +2,12 @@ FROM node:12.19
 
 ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
+RUN DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends rxvt-unicode \
+    && rm -rf /var/lib/apt/lists/* \
+    && export TERM=rxvt-unicode
+
 WORKDIR /cube
 COPY . .
 
