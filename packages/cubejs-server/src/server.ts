@@ -5,6 +5,7 @@ import CubeCore, {
   CubejsServerCore,
   DatabaseType,
 } from '@cubejs-backend/server-core';
+import { getEnv } from '@cubejs-backend/shared';
 import express from 'express';
 import https from 'https';
 import http from 'http';
@@ -40,7 +41,7 @@ export class CubejsServer {
 
   public constructor(config: CreateOptions) {
     config = config || {};
-    config.webSockets = config.webSockets || (process.env.CUBEJS_WEB_SOCKETS === 'true');
+    config.webSockets = config.webSockets || getEnv('webSockets');
 
     this.core = CubeCore.create(config);
     this.webSockets = config.webSockets;
@@ -66,10 +67,10 @@ export class CubejsServer {
 
       await this.core.initApp(app);
 
-      const PORT = process.env.PORT || 4000;
-      const TLS_PORT = process.env.TLS_PORT || 4433;
+      const PORT = getEnv('port');
+      const TLS_PORT = getEnv('tlsPort');
 
-      const enableTls = process.env.CUBEJS_ENABLE_TLS === 'true';
+      const enableTls = getEnv('tls');
       if (enableTls) {
         process.emitWarning(
           'Environment variable CUBEJS_ENABLE_TLS was deprecated and will be removed. \n' +
@@ -116,7 +117,7 @@ export class CubejsServer {
       return {
         app,
         port: PORT,
-        tlsPort: process.env.CUBEJS_ENABLE_TLS === 'true' ? TLS_PORT : undefined,
+        tlsPort: enableTls ? TLS_PORT : undefined,
         server: this.server,
         version
       };

@@ -1,6 +1,5 @@
 import program from 'commander';
 
-import { configureDevServerCommand } from './command/dev-server';
 import { configureServerCommand } from './command/server';
 import { configureDeployCommand } from './command/deploy';
 import { configureCreateCommand } from './command/create';
@@ -28,7 +27,6 @@ program
   await configureCreateCommand(program);
   await configureGenerateCommand(program);
   await configureDeployCommand(program);
-  await configureDevServerCommand(program);
   await configureServerCommand(program);
 
   if (!process.argv.slice(2).length) {
