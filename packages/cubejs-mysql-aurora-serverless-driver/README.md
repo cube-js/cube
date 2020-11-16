@@ -21,6 +21,12 @@ Uses Jeremy Daly's [data-api-client](https://github.com/jeremydaly/data-api-clie
 
 Uses the `mysql` and [local-data-api](https://hub.docker.com/r/koxudaxi/local-data-api) containers to mock the RDS Data API
 
+## Support
+
+This driver has been contributed by Cube.js community member [Kenneth Winner](https://github.com/kcwinner) . This package is **community supported** and should be used at your own risk. 
+
+While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube.js Slack. 
+
 ### License
 
-Cube.js MySql Serverless Aurora Data Api Driver for is [Apache 2.0 licensed](./LICENSE).
+Cube.js MySql Serverless Aurora Data Api Driver is [Apache 2.0 licensed](./LICENSE).
