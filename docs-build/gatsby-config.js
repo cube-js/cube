@@ -96,8 +96,10 @@ const config = {
           },
         ]
       }
-    }
-  ]
-}
+    },
+    'gatsby-redirect-from',
+    'gatsby-plugin-meta-redirect',
+  ],
+};
 
 module.exports = config;

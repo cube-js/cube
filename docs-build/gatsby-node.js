@@ -1,10 +1,10 @@
-const path = require("path");
+const path = require('path');
 const { renameCategory } = require('./rename-category.js');
 
 exports.createPages = ({ actions, graphql }) => {
   const { createPage } = actions;
 
-  const DocTemplate = path.resolve(`src/templates/DocTemplate.jsx`);
+  const DocTemplate = path.resolve('src/templates/DocTemplate.jsx');
 
   return graphql(`{
     allMarkdownRemark(
@@ -38,11 +38,24 @@ exports.createPages = ({ actions, graphql }) => {
           scope: node.frontmatter.scope,
           fileAbsolutePath: node.fileAbsolutePath,
           category: renameCategory(node.frontmatter.category),
-          noscrollmenu: false
-        }
+          noscrollmenu: false,
+          slug: node.frontmatter.permalink,
+        },
       });
     });
   });
+};
+
+exports.onCreateNode = ({ node, actions, getNode }) => {
+  const { createNodeField } = actions;
+
+  if (node.internal.type === 'MarkdownRemark') {
+    createNodeField({
+      name: 'slug',
+      node,
+      value: node.frontmatter.permalink,
+    });
+  }
 };
 
 exports.onCreateWebpackConfig = ({ actions, stage }) => {
@@ -51,6 +64,6 @@ exports.onCreateWebpackConfig = ({ actions, stage }) => {
     // Turn off source maps
     actions.setWebpackConfig({
       devtool: false,
-    })
+    });
   }
 };

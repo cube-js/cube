@@ -1,8 +1,10 @@
 ---
 title: Deployment Guide
-permalink: /deployment
+permalink: /deployment/guide
 category: Deployment
 menuOrder: 1
+redirect_from:
+  - /deployment/
 ---
 
 This section contains guides, best practices and advices related to deploying
