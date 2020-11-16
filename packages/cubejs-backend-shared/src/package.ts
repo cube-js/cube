@@ -1,28 +1,5 @@
 import path from 'path';
-import color from '@oclif/color';
 import * as fs from 'fs';
-
-export const displayError = async (text: string|string[]) => {
-  console.error('');
-  console.error(color.cyan('Cube.js Error ---------------------------------------'));
-  console.error('');
-
-  if (Array.isArray(text)) {
-    text.forEach((str) => console.error(str));
-  } else {
-    console.error(text);
-  }
-
-  console.error('');
-  console.error(color.yellow('Need some help? -------------------------------------'));
-
-  console.error('');
-  console.error(`${color.yellow('  Ask this question in Cube.js Slack:')} https://slack.cube.dev`);
-  console.error(`${color.yellow('  Post an issue:')} https://github.com/cube-js/cube.js/issues`);
-  console.error('');
-
-  process.exit(1);
-};
 
 export const packageExists = (
   moduleName: string,
@@ -60,7 +37,7 @@ export async function requireFromPackage<T = unknown>(
       return null;
     }
 
-    await displayError(
+    throw new Error(
       `${pkg} dependency not found. Please run this command from project directory.`
     );
   }

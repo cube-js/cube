@@ -1,4 +1,5 @@
 import { CreateOptions } from '@cubejs-backend/server-core';
+import { requireFromPackage, isDockerImage } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
@@ -6,9 +7,7 @@ import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 
 import { CubejsServer } from '../server';
 import { packageExists } from './utils';
-
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
-import { requireFromPackage } from '../shared';
 
 const devPackages = [
   'typescript',
@@ -24,10 +23,6 @@ function isCubePackage(pkgName: string): boolean {
 
 function isDevPackage(pkgName: string): boolean {
   return isCubePackage(pkgName) || devPackages.includes(pkgName.toLowerCase());
-}
-
-function isDockerImage(): boolean {
-  return Boolean(process.env.CUBEJS_DOCKER_IMAGE_TAG);
 }
 
 function isSimilarPackageRelease(pkg: SemVer, core: SemVer): boolean {
