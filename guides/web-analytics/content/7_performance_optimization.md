@@ -190,7 +190,7 @@ can inspect query by query in your dashboard and apply pre-aggregations to speed
 
 Congratulations on completing this guide! 🎉
 
-You can check [the online demo here](https://web-analytics-demo.cubecloudapp.dev/) and [the source code is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/web-analytics).
+You can check [the online demo here](https://web-analytics-demo.cube.dev/) and [the source code is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/web-analytics).
 
 I’d love to hear from you about your experience following this guide. Please send any comments or feedback you might have in this [Slack Community](http://slack.cube.dev/). Thank you and I hope you found this guide helpful!
 
