@@ -853,6 +853,17 @@
     "@google-cloud/bigquery" "^4.1.4"
     ramda "^0.27.0"
 
+"@cubejs-backend/cubestore-driver@^0.23.8":
+  version "0.23.11"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore-driver/-/cubestore-driver-0.23.11.tgz#32826153ad10c954eb4e043f42de98552b5a1ae2"
+  integrity sha512-txSeIZtgwkXZA27A4tDjiu5ugOP6GW7yvV1L97TJGou09yXs6nOJBK4iz1slgIZdK0NvDjPLaarnxeOk4pz/bQ==
+  dependencies:
+    "@cubejs-backend/query-orchestrator" "^0.23.6"
+    "@cubejs-backend/schema-compiler" "^0.23.11"
+    generic-pool "^3.6.0"
+    moment-timezone "^0.5.31"
+    mysql "^2.16.0"
+
 "@cubejs-backend/mysql-driver@^0.23.8":
   version "0.23.8"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/mysql-driver/-/mysql-driver-0.23.8.tgz#f0de4d1a7867c82351469482d39ec243ae3c0c41"
@@ -871,6 +882,30 @@
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
+
+"@cubejs-backend/schema-compiler@^0.23.11":
+  version "0.23.11"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.11.tgz#49a97745d364ceee32d1865e3986d469d84d8390"
+  integrity sha512-SWtu8nzYOdWwSyTtgGuhYvDYm62fM75GYOzGuyP0YpaYxFhUGYa561AWQ0uOCDowRszuRgbca/3VS3Y6V+UerQ==
+  dependencies:
+    "@babel/core" "^7.4.0"
+    "@babel/generator" "^7.4.0"
+    "@babel/parser" "^7.4.0"
+    "@babel/preset-env" "^7.4.0"
+    "@babel/standalone" "^7.4.0"
+    "@babel/traverse" "^7.4.0"
+    "@babel/types" "^7.4.0"
+    "@hapi/joi" "^15.1.1"
+    antlr4 "^4.8.0"
+    cron-parser "^2.16.3"
+    humps "^2.0.1"
+    inflection "^1.12.0"
+    lru-cache "^5.1.1"
+    moment-range "^4.0.1"
+    moment-timezone "^0.5.28"
+    node-dijkstra "^2.5.0"
+    ramda "^0.27.0"
+    syntax-error "^1.3.0"
 
 "@cubejs-backend/schema-compiler@^0.23.8":
   version "0.23.8"
