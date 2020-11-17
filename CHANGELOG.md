@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.13](https://github.com/cube-js/cube.js/compare/v0.23.12...v0.23.13) (2020-11-17)
+
+
+### Bug Fixes
+
+* **docker:** Use CMD instead of entrypoint for cubejs server ([d6066a8](https://github.com/cube-js/cube.js/commit/d6066a8049881ca5a53b5aa35b32c10f3adbd277))
+* **docs:** fix broken link in 'Deployment Guide' page ([#1399](https://github.com/cube-js/cube.js/issues/1399)) ([4c01e2d](https://github.com/cube-js/cube.js/commit/4c01e2d9c548f0b2db9a19dc295dab5fe5179b68))
+
+
+
+
+
 ## [0.23.12](https://github.com/cube-js/cube.js/compare/v0.23.11...v0.23.12) (2020-11-17)
 
 
