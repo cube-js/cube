@@ -1,34 +1,27 @@
-const CubejsServerCore = require('@cubejs-backend/server-core');
-const express = require('express');
-const bodyParser = require('body-parser');
+const CubejsServerCore = require("@cubejs-backend/server-core");
+const MySQLDriver = require('@cubejs-backend/mysql-driver');
+const express = require('express')
+const app = express()
 const path = require('path');
-const http = require('http');
-const serveStatic = require('serve-static');
-const session = require('express-session');
-const passport = require('passport');
 require('dotenv').config();
 
-const app = express();
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(require('cors')());
+if (process.env.NODE_ENV === 'production') {
+  app.use('/', express.static(path.join(__dirname, 'dashboard-app', 'build')))
+} else {
+  app.use(require('cors')());
+}
 
-const cubejsServer = CubejsServerCore.create({
-  preAggregationsSchema: 'stb_pre_aggregations',
+const CubejsServer = new CubejsServerCore({
+  preAggregationsSchema: () => process.env.CUBEJS_PREAGGREGATIONS_SCHEMA || 'stb_pre_aggregations',
+  externalDbType: 'mysql',
+  externalDriverFactory: () => new MySQLDriver({
+    host: process.env.CUBEJS_EXT_DB_HOST,
+    database: process.env.CUBEJS_EXT_DB_NAME,
+    user: process.env.CUBEJS_EXT_DB_USER,
+    password: process.env.CUBEJS_EXT_DB_PASS.toString()
+  })
 });
 
-app.get('/healthy', (req, res) => {
-  res.json({ status: 'ok' });
-});
+CubejsServer.initApp(app)
 
-app.use(session({ secret: process.env.CUBEJS_API_SECRET }));
-app.use(passport.initialize());
-app.use(passport.session());
-
-cubejsServer.initApp(app);
-
-const port = process.env.PORT || 4000;
-const server = http.createServer({}, app);
-
-server.listen(port, () => {
-  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
-});
+app.listen(process.env.PORT || 4000, () => console.log('App is up and running!'))
