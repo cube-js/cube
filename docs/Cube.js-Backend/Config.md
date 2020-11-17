@@ -310,7 +310,7 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
-Pass `true` to enable scheduled refresh timer with default querying options.
+Pass `true` to enable scheduled refresh timer.
 Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 
 ```javascript
