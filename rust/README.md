@@ -22,6 +22,16 @@ docker build -t cubejs/cubestore:latest .
 docker run --rm cubejs/cubestore:latest
 ```
 
+## Development
+
+Checkout https://github.com/cube-js/arrow/tree/cubestore-2020-11-06 and put **.cargo/config.toml** in the current directory with following contents:
+
+```
+paths = ["../../arrow/rust"]
+```
+
+It'll allow to build project against locally modified Apache Arrow and Datafusion.
+
 ## License
 
 Cubestore is [Apache 2.0 licensed](./cubestore/LICENSE).
