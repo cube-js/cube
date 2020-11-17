@@ -28,7 +28,7 @@ development mode does the following:
 
 - Disables authentication checks
 - Allows another log level to be set (`trace`)
-- Enables the Dev Server and Playground
+- Enables the Developer Playground on `http://localhost:4000`
 - Uses `memory` instead of `redis` as the default cache/queue engine
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew` instead of throwing errors
 
