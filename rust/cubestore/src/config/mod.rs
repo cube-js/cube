@@ -1,6 +1,5 @@
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-use std::{env};
-use tokio::sync::{RwLock};
+use std::{env, fs};
 use crate::metastore::RocksMetaStore;
 use std::sync::Arc;
 use crate::store::{WALStore, ChunkStore};
@@ -14,16 +13,16 @@ use crate::scheduler::SchedulerImpl;
 use std::path::PathBuf;
 use mockall::automock;
 use tokio::sync::broadcast;
-use crate::metastore::listener::{MetastoreListenerImpl};
 use crate::CubeError;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
+use rocksdb::{DB, Options};
+use std::future::Future;
 
 #[derive(Clone)]
 pub struct CubeServices {
     pub sql_service: Arc<dyn SqlService>,
-    pub scheduler: Arc<RwLock<SchedulerImpl>>,
-    pub listener: Arc<MetastoreListenerImpl>,
+    pub scheduler: Arc<SchedulerImpl>,
     pub meta_store: Arc<RocksMetaStore>,
     pub cluster: Arc<ClusterImpl>
 }
@@ -38,6 +37,8 @@ impl CubeServices {
         self.cluster.start_processing_loops().await;
         let meta_store = self.meta_store.clone();
         tokio::spawn(async move { meta_store.run_upload_loop().await });
+        let scheduler = self.scheduler.clone();
+        tokio::spawn(async move { scheduler.run_scheduler().await });
         Ok(())
     }
 
@@ -45,6 +46,7 @@ impl CubeServices {
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
         self.cluster.stop_processing_loops().await?;
         self.meta_store.stop_processing_loops().await;
+        self.scheduler.stop_processing_loops()?;
         Ok(())
     }
 }
@@ -117,6 +119,30 @@ impl Config {
         }
     }
 
+    pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
+    where
+    T: Future + Send + 'static,
+    T::Output: Send + 'static
+    {
+        let config = Self::test(name);
+
+        let store_path = config.local_dir().clone();
+        let remote_store_path = config.remote_dir().clone();
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        {
+            let services = config.configure().await;
+            services.start_processing_loops().await.unwrap();
+
+            test_fn(services.clone()).await;
+
+            services.stop_processing_loops().await.unwrap();
+        }
+        let _ = DB::destroy(&Options::default(), config.meta_store_path());
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
     pub fn config_obj(&self) -> Arc<dyn ConfigObj> {
         self.config_obj.clone()
     }
@@ -155,7 +181,6 @@ impl Config {
         let remote_fs = self.remote_fs().unwrap();
         let (event_sender, event_receiver) = broadcast::channel(10000); // TODO config
 
-        let listener = MetastoreListenerImpl::new(event_sender.subscribe());
         let meta_store = RocksMetaStore::load_from_remote(self.meta_store_path().to_str().unwrap(), remote_fs.clone()).await.unwrap();
         meta_store.add_listener(event_sender).await;
         let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 500000);
@@ -182,8 +207,7 @@ impl Config {
 
         CubeServices {
             sql_service,
-            scheduler: Arc::new(RwLock::new(scheduler)),
-            listener,
+            scheduler: Arc::new(scheduler),
             meta_store,
             cluster
         }

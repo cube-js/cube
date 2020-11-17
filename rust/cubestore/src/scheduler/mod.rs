@@ -7,12 +7,15 @@ use crate::metastore::job::{JobType, Job};
 use log::{error};
 use crate::remotefs::RemoteFs;
 use crate::store::{WALStore, ChunkStore};
+use tokio::sync::{Mutex, watch};
 
 pub struct SchedulerImpl {
     meta_store: Arc<dyn MetaStore>,
     cluster: Arc<dyn Cluster>,
     remote_fs: Arc<dyn RemoteFs>,
-    event_receiver: Receiver<MetaStoreEvent>
+    event_receiver: Mutex<Receiver<MetaStoreEvent>>,
+    stop_sender: watch::Sender<bool>,
+    stop_receiver: Mutex<watch::Receiver<bool>>,
 }
 
 impl SchedulerImpl {
@@ -22,17 +25,33 @@ impl SchedulerImpl {
         remote_fs: Arc<dyn RemoteFs>,
         event_receiver: Receiver<MetaStoreEvent>
     ) -> SchedulerImpl {
+        let (tx,rx) = watch::channel(false);
         SchedulerImpl {
             meta_store,
             cluster,
             remote_fs,
-            event_receiver
+            event_receiver: Mutex::new(event_receiver),
+            stop_sender: tx,
+            stop_receiver: Mutex::new(rx)
         }
     }
 
-    pub async fn run_scheduler(&mut self) -> Result<(), CubeError> {
+    pub async fn run_scheduler(&self) -> Result<(), CubeError> {
         loop {
-            let event = self.event_receiver.recv().await?;
+            let mut stop_receiver = self.stop_receiver.lock().await;
+            let mut event_receiver = self.event_receiver.lock().await;
+            let event = tokio::select! {
+                Some(stopped) = stop_receiver.recv() => {
+                    if stopped {
+                        return Ok(());
+                    } else {
+                        continue;
+                    }
+                }
+                event = event_receiver.recv() => {
+                    event?
+                }
+            };
             let res = self.process_event(event.clone()).await;
             if let Err(e) = res {
                 error!("Error processing event {:?}: {}", event, e);
@@ -40,20 +59,11 @@ impl SchedulerImpl {
         }
     }
 
-    pub async fn run_scheduler_until(&mut self, last_event_fn: impl Fn(MetaStoreEvent) -> bool) -> Result<(), CubeError> {
-        loop {
-            let event = self.event_receiver.recv().await?;
-            let res = self.process_event(event.clone()).await;
-            if let Err(e) = res {
-                error!("Error processing event {:?}: {}", event, e);
-            }
-            if last_event_fn(event) {
-                return Ok(())
-            }
-        }
+    pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
+        Ok(self.stop_sender.broadcast(true)?)
     }
 
-    async fn process_event(&mut self, event: MetaStoreEvent) -> Result<(), CubeError> {
+    async fn process_event(&self, event: MetaStoreEvent) -> Result<(), CubeError> {
         if let
         MetaStoreEvent::Insert(TableId::WALs, row_id) |
         MetaStoreEvent::Update(TableId::WALs, row_id) = event {
