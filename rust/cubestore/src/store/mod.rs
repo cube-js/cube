@@ -386,7 +386,7 @@ mod tests {
             let first_rows = (0..35).map(|i| Row::new(vec![TableValue::Int(34 - i), TableValue::String(format!("Foo {}", 34 - i)), TableValue::String(format!("Boo {}", 34 - i))])).collect::<Vec<_>>();
 
             let data_frame = DataFrame::new(col.clone(), first_rows);
-            meta_store.create_schema("foo".to_string()).await.unwrap();
+            meta_store.create_schema("foo".to_string(), false).await.unwrap();
             let table = meta_store.create_table("foo".to_string(), "bar".to_string(), col.clone(), None, None, vec![]).await.unwrap();
 
             let _ = wal_store.add_wal(table.clone(), data_frame).await;

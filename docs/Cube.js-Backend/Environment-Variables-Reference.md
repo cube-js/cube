@@ -30,8 +30,8 @@ behavior. Some of these variables can also be set via [configuration options][li
 |`REDIS_URL`                         |The host URL for a Redis server                                                                                                                                 |A valid Redis host URL                                   |
 |`REDIS_PASSWORD`                    |The password used to connect to the Redis server                                                                                                                |A valid Redis password                                   |
 |`REDIS_TLS`                         |If `true`, then the connection to the Redis server is protected by TLS authentication. Defaults to `false`                                                      |`true | false`                                           |
-|`CUBEJS_REDIS_POOL_MAX`             |The maximum number of connections to keep active in the Redis connection pool. Must be higher than CUBEJS_REDIS_POOL_MIN. Defaults to `1000`                    |A valid number of connections.                           |
-|`CUBEJS_REDIS_POOL_MIN`             |The minimum number of connections to keep active in the Redis connection pool. Must be lower than CUBEJS_REDIS_POOL_MAX. Defaults to `2`                        |A valid number of connections                            |
+|`CUBEJS_REDIS_POOL_MAX`             |The maximum number of connections to keep active in the Redis connection pool. Must be higher than `CUBEJS_REDIS_POOL_MIN`. Defaults to `1000`                  |A valid number of connections.                           |
+|`CUBEJS_REDIS_POOL_MIN`             |The minimum number of connections to keep active in the Redis connection pool. Must be lower than `CUBEJS_REDIS_POOL_MAX`. Defaults to `2`                      |A valid number of connections                            |
 
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 

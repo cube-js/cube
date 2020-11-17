@@ -1,3 +1,5 @@
+mod parser;
+
 use log::{trace};
 
 use sqlparser::dialect::{Dialect};
@@ -15,12 +17,13 @@ use crate::queryplanner::{QueryPlanner, QueryPlan};
 
 use crate::cluster::{Cluster, JobEvent};
 
-use datafusion::sql::parser::{DFParser, CreateExternalTable};
+use parser::{Statement as CubeStoreStatement};
 use datafusion::sql::parser::{Statement as DFStatement};
 use futures::future::join_all;
 use crate::metastore::job::JobType;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use crate::queryplanner::query_executor::QueryExecutor;
+use crate::sql::parser::CubeStoreParser;
 
 #[async_trait]
 pub trait SqlService: Send + Sync {
@@ -46,8 +49,8 @@ impl SqlServiceImpl {
         Arc::new(SqlServiceImpl { db, wal_store, query_planner, query_executor, cluster })
     }
 
-    async fn create_schema(&self, name: String) -> Result<IdRow<Schema>, CubeError> {
-        self.db.create_schema(name).await
+    async fn create_schema(&self, name: String, if_not_exists: bool) -> Result<IdRow<Schema>, CubeError> {
+        self.db.create_schema(name, if_not_exists).await
     }
 
     async fn create_table(&self, schema_name: String, table_name: String, columns: &Vec<ColumnDef>, external: bool, location: Option<String>, indexes: Vec<Statement>) -> Result<IdRow<Table>, CubeError> {
@@ -153,100 +156,97 @@ impl SqlService for SqlServiceImpl {
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(q) {
             return Ok(data_frame);
         }
-        let dialect = &MySqlDialectWithBackTicks {};
         let replaced_quote = q.replace("\\'", "''");
-        let ast = DFParser::parse_sql_with_dialect(&replaced_quote, dialect)?;
+        let mut parser = CubeStoreParser::new(&replaced_quote)?;
+        let ast = parser.parse_statement()?;
         // trace!("AST is: {:?}", ast);
-        for query in ast {
-            match query {
-                DFStatement::Statement(Statement::ShowVariable { variable }) => {
-                    return match variable.value.to_lowercase() {
-                        s if s == "schemas" => Ok(DataFrame::from(self.db.get_schemas().await?)),
-                        s if s == "tables" => Ok(DataFrame::from(self.db.get_tables().await?)),
-                        s if s == "chunks" => Ok(DataFrame::from(self.db.chunks_table().all_rows().await?)),
-                        s if s == "indexes" => Ok(DataFrame::from(self.db.index_table().all_rows().await?)),
-                        s if s == "partitions" => Ok(DataFrame::from(self.db.partition_table().all_rows().await?)),
-                        x => Err(CubeError::user(format!("Unknown SHOW: {}", x)))
-                    };
+        match ast {
+            CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
+                match variable.value.to_lowercase() {
+                    s if s == "schemas" => Ok(DataFrame::from(self.db.get_schemas().await?)),
+                    s if s == "tables" => Ok(DataFrame::from(self.db.get_tables().await?)),
+                    s if s == "chunks" => Ok(DataFrame::from(self.db.chunks_table().all_rows().await?)),
+                    s if s == "indexes" => Ok(DataFrame::from(self.db.index_table().all_rows().await?)),
+                    s if s == "partitions" => Ok(DataFrame::from(self.db.partition_table().all_rows().await?)),
+                    x => Err(CubeError::user(format!("Unknown SHOW: {}", x)))
                 }
-                DFStatement::Statement(Statement::SetVariable { .. }) => {
-                    return Ok(DataFrame::new(vec![], vec![]));
+            }
+            CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
+                Ok(DataFrame::new(vec![], vec![]))
+            }
+            CubeStoreStatement::CreateSchema { schema_name, if_not_exists } => {
+                let name = schema_name.to_string();
+                let res = self.create_schema(name, if_not_exists).await?;
+                Ok(DataFrame::from(vec![res]))
+            }
+            CubeStoreStatement::Statement(Statement::CreateTable { name, columns, external, location, .. }) => {
+                let nv = &name.0;
+                if nv.len() != 2 {
+                    return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
                 }
-                DFStatement::Statement(Statement::CreateSchema { schema_name }) => {
-                    let name = schema_name.to_string();
-                    let res = self.create_schema(name).await?;
-                    return Ok(DataFrame::from(vec![res]));
-                }
-                DFStatement::Statement(Statement::CreateTable { name, columns, external, location, .. }) => {
-                    let nv = &name.0;
-                    if nv.len() != 2 {
-                        return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
-                    }
-                    let schema_name = &nv[0].value;
-                    let table_name = &nv[1].value;
+                let schema_name = &nv[0].value;
+                let table_name = &nv[1].value;
 
-                    let res = self.create_table(schema_name.clone(), table_name.clone(), &columns, external, location, vec![]).await?;
-                    return Ok(DataFrame::from(vec![res]));
-                }
-                DFStatement::Statement(Statement::Drop { object_type, names, .. }) => {
-                    match object_type {
-                        ObjectType::Schema => {
-                            self.db.delete_schema(names[0].to_string()).await?;
-                        }
-                        ObjectType::Table => {
-                            let table = self.db.get_table(names[0].0[0].to_string(), names[0].0[1].to_string()).await?;
-                            self.db.drop_table(table.get_id()).await?;
-                        }
-                        _ => return Err(CubeError::user("Unsupported drop operation".to_string()))
+                let res = self.create_table(schema_name.clone(), table_name.clone(), &columns, external, location, vec![]).await?;
+                Ok(DataFrame::from(vec![res]))
+            }
+            CubeStoreStatement::Statement(Statement::Drop { object_type, names, .. }) => {
+                match object_type {
+                    ObjectType::Schema => {
+                        self.db.delete_schema(names[0].to_string()).await?;
                     }
-                    return Ok(DataFrame::new(vec![], vec![]))
-                }
-                DFStatement::CreateExternalTable(CreateExternalTable { name, columns, location, indexes, .. }) => {
-                    let ObjectName(table_ident) = name.clone();
-                    if table_ident.len() != 2 {
-                        return Err(CubeError::user(format!("Schema name expected in table name but '{}' found", name.to_string())));
+                    ObjectType::Table => {
+                        let table = self.db.get_table(names[0].0[0].to_string(), names[0].0[1].to_string()).await?;
+                        self.db.drop_table(table.get_id()).await?;
                     }
-
-                    let res = self.create_table(
-                        table_ident[0].value.to_string(),
-                        table_ident[1].value.to_string(),
-                        &columns,
-                        true,
-                        Some(location),
-                        indexes
-                    ).await?;
-                    return Ok(DataFrame::from(vec![res]));
+                    _ => return Err(CubeError::user("Unsupported drop operation".to_string()))
                 }
-                DFStatement::Statement(Statement::Insert { table_name, columns, source }) => {
-                    let data = if let SetExpr::Values(Values(data_series)) = &source.body {
-                        data_series
-                    } else {
-                        return Err(CubeError::user(format!("Data should be present in query. Your query was '{}'", q)));
-                    };
-
-                    let nv = &table_name.0;
-                    if nv.len() != 2 {
-                        return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
-                    }
-                    let schema_name = &nv[0].value;
-                    let table_name = &nv[1].value;
-
-                    self.insert_data(schema_name.clone(), table_name.clone(), &columns, data).await?;
-                    return Ok(DataFrame::new(vec![], vec![]));
+                Ok(DataFrame::new(vec![], vec![]))
+            }
+            /*CubeStoreStatement::CreateExternalTable(CreateExternalTable { name, columns, location, indexes, .. }) => {
+                let ObjectName(table_ident) = name.clone();
+                if table_ident.len() != 2 {
+                    return Err(CubeError::user(format!("Schema name expected in table name but '{}' found", name.to_string())));
                 }
-                DFStatement::Statement(Statement::Query(_)) => {
-                    let logical_plan = self.query_planner.logical_plan(query.clone()).await?;
-                    // TODO distribute and combine
-                    let res = match logical_plan {
-                        QueryPlan::Meta(logical_plan) => self.query_planner.execute_meta_plan(logical_plan).await?,
-                        QueryPlan::Select(serialized) => self.query_executor.execute_router_plan(serialized, self.cluster.clone()).await?
-                    };
-                    return Ok(res);
+
+                let res = self.create_table(
+                    table_ident[0].value.to_string(),
+                    table_ident[1].value.to_string(),
+                    &columns,
+                    true,
+                    Some(location),
+                    indexes
+                ).await?;
+                Ok(DataFrame::from(vec![res]));
+            }*/
+            CubeStoreStatement::Statement(Statement::Insert { table_name, columns, source }) => {
+                let data = if let SetExpr::Values(Values(data_series)) = &source.body {
+                    data_series
+                } else {
+                    return Err(CubeError::user(format!("Data should be present in query. Your query was '{}'", q)));
+                };
+
+                let nv = &table_name.0;
+                if nv.len() != 2 {
+                    return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
                 }
-                _ => return Err(CubeError::user(format!("Unsupported SQL: '{}'", q)))
-            };
+                let schema_name = &nv[0].value;
+                let table_name = &nv[1].value;
+
+                self.insert_data(schema_name.clone(), table_name.clone(), &columns, data).await?;
+                Ok(DataFrame::new(vec![], vec![]))
+            }
+            CubeStoreStatement::Statement(Statement::Query(q)) => {
+                let logical_plan = self.query_planner.logical_plan(DFStatement::Statement(Statement::Query(q))).await?;
+                // TODO distribute and combine
+                let res = match logical_plan {
+                    QueryPlan::Meta(logical_plan) => self.query_planner.execute_meta_plan(logical_plan).await?,
+                    QueryPlan::Select(serialized) => self.query_executor.execute_router_plan(serialized, self.cluster.clone()).await?
+                };
+                Ok(res)
+            }
+            _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", q)))
         }
-        Err(CubeError::user(format!("Unsupported SQL: '{}'", q)))
     }
 }
 
@@ -374,14 +374,9 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::config::Config;
-    use crate::metastore::{MetaStoreEvent, RocksMetaStore};
-    use crate::metastore::job::JobType;
-    use std::borrow::BorrowMut;
+    use crate::metastore::{RocksMetaStore};
     use crate::cluster::MockCluster;
-    use crate::metastore::listener::{MetastoreListenerImpl};
-    use futures::future::{join3};
     use std::fs;
-    use crate::scheduler::SchedulerImpl;
     use crate::store::WALStore;
 
     #[actix_rt::test]
@@ -514,73 +509,46 @@ mod tests {
         // let _ =  fs::remove_dir_all(remote_store_path.clone());
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn select_test() {
-        let config = Config::test("select");
+        Config::run_test("select", async move |services| {
+           let service = services.sql_service;
 
-        let store_path = config.local_dir().clone();
-        let remote_store_path = config.remote_dir().clone();
-        let _ = fs::remove_dir_all(store_path.clone());
-        let _ = fs::remove_dir_all(remote_store_path.clone());
-        {
-            let services = config.configure().await;
-            services.start_processing_loops().await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
 
-            select_tests(services.scheduler.write().await.borrow_mut(), services.listener.clone(), services.sql_service.clone()).await;
-            services.stop_processing_loops().await.unwrap();
-        }
-        let _ = DB::destroy(&Options::default(), config.meta_store_path());
-        let _ = fs::remove_dir_all(store_path.clone());
-        let _ = fs::remove_dir_all(remote_store_path.clone());
-    }
-
-    async fn select_tests(scheduler: &mut SchedulerImpl, listener: Arc<MetastoreListenerImpl>, service: Arc<dyn SqlService>) {
-        let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
-
-        let query = "CREATE TABLE Foo.Persons (
+            let _ = service.exec_query(
+                "CREATE TABLE Foo.Persons (
                                 PersonID int,
                                 LastName varchar(255),
                                 FirstName varchar(255),
                                 Address varchar(255),
                                 City varchar(255)
-                              );";
+                              );"
+            ).await.unwrap();
 
-        let _ = service.exec_query(query).await.unwrap();
+            service.exec_query(
+                "INSERT INTO Foo.Persons
+                (LastName, PersonID, FirstName, Address, City)
+                VALUES
+                ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'),
+                ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');"
+            ).await.unwrap();
 
-        let query = "INSERT INTO Foo.Persons
-            (LastName, PersonID, FirstName, Address, City)
-            VALUES
-            ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'), ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');";
+            let result = service.exec_query("SELECT PersonID person_id from Foo.Persons").await.unwrap();
 
-        let (r1, r2, r3) = join3(
-            service.exec_query(query),
-            listener.run_listener_until(|e| match e {
-                MetaStoreEvent::DeleteJob(job) => {
-                    match job.get_row().job_type() {
-                        JobType::WalPartitioning => true,
-                        _ => false
-                    }
-                }
-                _ => false
-            }),
-            scheduler.run_scheduler_until(|e| match e {
-                MetaStoreEvent::DeleteJob(job) => {
-                    match job.get_row().job_type() {
-                        JobType::WalPartitioning => true,
-                        _ => false
-                    }
-                }
-                _ => false
-            }),
-        ).await;
-        r1.unwrap();
-        r2.unwrap();
-        r3.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(22)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(23)]));
+        }).await;
+    }
 
-        let result = service.exec_query("SELECT PersonID person_id from Foo.Persons").await.unwrap();
+    #[tokio::test]
+    async fn create_schema_if_not_exists() {
+        Config::run_test("create_schema_if_not_exists", async move |services| {
+            let service = services.sql_service;
 
-        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(22)]));
-        assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(23)]));
+            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+        }).await;
     }
 }
 

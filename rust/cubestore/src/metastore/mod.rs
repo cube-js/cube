@@ -473,7 +473,7 @@ impl<R: RocksTable + 'static, F: Fn(Arc<DB>) -> R + Send + Sync + Clone + 'stati
 pub trait MetaStore: Send + Sync {
     async fn wait_for_current_seq_to_sync(&self) -> Result<(), CubeError>;
     fn schemas_table(&self) -> Box<dyn MetaStoreTable<T=Schema>>;
-    async fn create_schema(&self, schema_name: String) -> Result<IdRow<Schema>, CubeError>;
+    async fn create_schema(&self, schema_name: String, if_not_exists: bool) -> Result<IdRow<Schema>, CubeError>;
     async fn get_schemas(&self) -> Result<Vec<IdRow<Schema>>, CubeError>;
     async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError>;
     //TODO Option
@@ -1376,10 +1376,16 @@ impl MetaStore for RocksMetaStore {
         })
     }
 
-    async fn create_schema(&self, schema_name: String) -> Result<IdRow<Schema>, CubeError> {
+    async fn create_schema(&self, schema_name: String, if_not_exists: bool) -> Result<IdRow<Schema>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let table = SchemaRocksTable::new(db_ref.clone());
-            let schema = Schema { name: schema_name };
+            if if_not_exists {
+                let rows = table.get_rows_by_index(&schema_name, &SchemaRocksIndex::Name)?;
+                if let Some(row) = rows.into_iter().nth(0) {
+                    return Ok(row);
+                }
+            }
+            let schema = Schema { name: schema_name.clone() };
             Ok(table.insert(schema, batch_pipe)?)
         }).await
     }
@@ -1859,18 +1865,18 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(store_path.join("metastore").as_path(), remote_fs);
 
-            let schema_1 = meta_store.create_schema("foo".to_string()).await.unwrap();
+            let schema_1 = meta_store.create_schema("foo".to_string(), false).await.unwrap();
             println!("New id: {}", schema_1.id);
-            let schema_2 = meta_store.create_schema("bar".to_string()).await.unwrap();
+            let schema_2 = meta_store.create_schema("bar".to_string(), false).await.unwrap();
             println!("New id: {}", schema_2.id);
-            let schema_3 = meta_store.create_schema("boo".to_string()).await.unwrap();
+            let schema_3 = meta_store.create_schema("boo".to_string(), false).await.unwrap();
             println!("New id: {}", schema_3.id);
 
             let schema_1_id = schema_1.id;
             let schema_2_id = schema_2.id;
             let schema_3_id = schema_3.id;
 
-            assert!(meta_store.create_schema("foo".to_string()).await.is_err());
+            assert!(meta_store.create_schema("foo".to_string(), false).await.is_err());
 
             assert_eq!(meta_store.get_schema("foo".to_string()).await.unwrap(), schema_1);
             assert_eq!(meta_store.get_schema("bar".to_string()).await.unwrap(), schema_2);
@@ -1928,7 +1934,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(store_path.clone().join("metastore").as_path(), remote_fs);
 
-            let schema_1 = meta_store.create_schema( "foo".to_string()).await.unwrap();
+            let schema_1 = meta_store.create_schema( "foo".to_string(), false).await.unwrap();
             let mut columns =  Vec::new();
             columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
             columns.push(Column::new("col2".to_string(), ColumnType::String, 1));
@@ -1962,11 +1968,11 @@ mod tests {
             {
                 let services = config.configure().await;
                 services.start_processing_loops().await.unwrap();
-                services.meta_store.create_schema("foo1".to_string()).await.unwrap();
+                services.meta_store.create_schema("foo1".to_string(), false).await.unwrap();
                 services.meta_store.run_upload().await.unwrap();
-                services.meta_store.create_schema("foo".to_string()).await.unwrap();
+                services.meta_store.create_schema("foo".to_string(), false).await.unwrap();
                 services.meta_store.upload_check_point().await.unwrap();
-                services.meta_store.create_schema("bar".to_string()).await.unwrap();
+                services.meta_store.create_schema("bar".to_string(), false).await.unwrap();
                 services.meta_store.run_upload().await.unwrap();
                 services.stop_processing_loops().await.unwrap();
             }

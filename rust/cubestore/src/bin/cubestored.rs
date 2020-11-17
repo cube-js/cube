@@ -1,5 +1,4 @@
 use cubestore::mysql::MySqlServer;
-use futures::future::{join3};
 use cubestore::config::Config;
 use simple_logger::SimpleLogger;
 use log::Level;
@@ -43,13 +42,6 @@ fn main() {
         let services = config.configure().await;
         services.start_processing_loops().await.unwrap();
 
-        let (r1, r2, r3) = join3(
-            MySqlServer::listen("0.0.0.0:3306".to_string(), services.sql_service.clone()),
-            services.scheduler.write().await.run_scheduler(),
-            services.listener.run_listener(),
-        ).await;
-        r1.unwrap();
-        r2.unwrap();
-        r3.unwrap();
+        MySqlServer::listen("0.0.0.0:3306".to_string(), services.sql_service.clone()).await.unwrap();
     });
 }
