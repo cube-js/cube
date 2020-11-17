@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.12](https://github.com/cube-js/cube.js/compare/v0.23.11...v0.23.12) (2020-11-17)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** pivot should work well with null values ([#1386](https://github.com/cube-js/cube.js/issues/1386)). Thanks to [@mspiegel31](https://github.com/mspiegel31)! ([d4c2446](https://github.com/cube-js/cube.js/commit/d4c24469b8eea2d84f04c540b0a5f9a8d285ad1d))
+* **cubestore:** CREATE SCHEMA IF NOT EXISTS support ([7c590b3](https://github.com/cube-js/cube.js/commit/7c590b30ca2c4bb3ef9ac6d9cbfc181f322de14c))
+
+
+### Features
+
+* Introduce CUBEJS_DEV_MODE & improve ENV variables experience ([#1356](https://github.com/cube-js/cube.js/issues/1356)) ([cc2aa92](https://github.com/cube-js/cube.js/commit/cc2aa92bbec87b21b147d5003fa546d4b1807185))
+* **@cubejs-server:** Require the latest oclif packages to support Node.js 8 ([7019966](https://github.com/cube-js/cube.js/commit/70199662cc3370c0c8763bb69dcec045e4e52590))
+* **cubestore:** Distributed query execution ([102c641](https://github.com/cube-js/cube.js/commit/102c64120e2488a6ba2eff960d674cd5aedb9e8f))
+
+
+
+
+
 ## [0.23.11](https://github.com/cube-js/cube.js/compare/v0.23.10...v0.23.11) (2020-11-13)
 
 
