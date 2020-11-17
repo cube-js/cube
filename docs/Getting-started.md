@@ -4,10 +4,13 @@ permalink: /getting-started
 category: Getting Started
 ---
 
+[link-connecting-to-the-database]: /connecting-to-the-database
+[link-cubejs-schema]: /getting-started-cubejs-schema
+
 ## 1. Scaffold the project
 
-Run the following command to get started with Cube.js, optionally specifying
-the project name and your database using `-d` flag.
+Run the following command to get started with Cube.js, specifying
+the project name and optionally your database using the `-d` flag.
 
 ```bash
 $ npx cubejs-cli create <project name> -d <database type>
@@ -17,16 +20,13 @@ You can find [all available databases here][link-connecting-to-the-database].
 For example, to create a new project with the Postgres database, use the
 following:
 
-[link-connecting-to-the-database]: /connecting-to-the-database
-
 ```bash
 $ npx cubejs-cli create hello-world -d postgres
 ```
 
 Once run, the `create` command will create a new project directory that
 contains the scaffolding for your new Cube.js project. This includes all the
-files necessary to spin up the Cube.js backend, example frontend code for
-displaying the results of Cube.js queries in a React app, and some example
+files necessary to spin up the Cube.js backend and some example
 schema files to highlight the format of the Cube.js Data Schema layer.
 
 The `.env` file in this project directory contains placeholders for the
@@ -35,13 +35,11 @@ relevant database credentials. Setting credentials is covered in the
 
 ## 2. Define Your Data Schema
 
-Cube.js uses data schemas to generate and execute SQL.
+Cube.js uses [Data Schema][link-cubejs-schema] to generate and execute SQL.
 
 It acts as an ORM for your database and it is flexible enough to model
 everything from simple counts to cohort retention and funnel analysis.
 [Read more about Cube.js Schema][link-cubejs-schema].
-
-[link-cubejs-schema]: /getting-started-cubejs-schema
 
 You can generate schema files using the Developer Playground. To do so, you can
 start the dev server from project directory like this:
@@ -50,7 +48,8 @@ start the dev server from project directory like this:
 $ npm run dev
 ```
 
-Then go to `http://localhost:4000` and use UI to generate schema files.
+Then go to `http://localhost:4000` and use the Developer Playground to generate
+schema files.
 
 ### Manually creating Data Schema files
 
@@ -355,7 +354,3 @@ For more information on deploying with the Serverless Framework, consult the
 [Deployment Guide][link-sls-aws-deployment-guide].
 
 [link-sls-aws-deployment-guide]: /deployment#aws-serverless-deploy
-
-```bash
-$ serverless deploy -v
-```
