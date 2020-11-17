@@ -1,8 +1,8 @@
 ---
 title: Config
 permalink: /config
-category: Cube.js Backend
-menuOrder: 2
+category: Configuration
+menuOrder: 3
 ---
 
 Cube.js can be configured both via environment variables and by providing configuration options in the `cube.js` file.
@@ -442,5 +442,3 @@ module.exports = {
 ### allowJsDuplicatePropsInSchema
 
 Boolean to enable or disable a check duplicate property names in all objects of a schema. The default value is `false`, and it is means the compiler would use the additional transpiler for check duplicates.
-
-

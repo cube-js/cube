@@ -1,8 +1,8 @@
 ---
 title: Environment Variables
 permalink: /reference/environment-variables
-category: Cube.js Backend
-menuOrder: 3
+category: Configuration
+menuOrder: 4
 ---
 
 Cube.js defines a number of environment variables that can be used to change
