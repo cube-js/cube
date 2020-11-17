@@ -10,6 +10,7 @@ import * as cubejsReact from '@cubejs-client/react';
 import * as antd from 'antd';
 import { Alert } from 'antd';
 
+// import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import ChartContainer from './ChartContainer';
 import * as bizChartLibrary from './libraries/bizChart';
 import * as rechartsLibrary from './libraries/recharts';
@@ -49,7 +50,7 @@ const sourceCodeTemplate = (props) => {
     cubejsToken,
     chartType,
     codeExample,
-    pivotConfig
+    pivotConfig,
   } = props;
   const renderFnName = `${chartType}Render`;
 
@@ -79,7 +80,11 @@ const renderChart = (Component, pivotConfig) => ({ resultSet, error }) => {
 };
 
 const ChartRenderer = () => {
-  ${!codeExample ? 'const { query, pivotConfig } = React.useContext(CubeJsQueryRenderer);' : ''}
+  ${
+    !codeExample
+      ? 'const { query, pivotConfig } = React.useContext(CubeJsQueryRenderer);'
+      : ''
+  }
   return (
     <QueryRenderer
       query={${codeExample ? prettify(query) : 'query'}}
@@ -122,7 +127,6 @@ export const ChartRenderer = (props) => {
 
   const {
     query,
-    resultSet,
     error,
     sqlQuery,
     dashboardSource,
@@ -155,77 +159,78 @@ export const ChartRenderer = (props) => {
   };
   const dependencies = {
     ...commonDependencies,
-    'cubejs-context': CubeJsQueryRenderer
-  }
+    'cubejs-context': CubeJsQueryRenderer,
+  };
 
   useEffect(() => {
     if (jsCompilingError) {
       setError(null);
     }
   }, [source, chartType, jsCompilingError]);
+  
+  return <ChartRenderer />
 
-  return (
-    <CubeJsQueryRenderer.Provider
-      value={{
-        query,
-        pivotConfig,
-      }}
-    >
-      <ChartContainer
-        query={query}
-        resultSet={resultSet}
-        error={error}
-        sqlQuery={sqlQuery}
-        codeExample={codeExample}
-        codeSandboxSource={forCodeSandBox(codeExample)}
-        dependencies={commonDependencies}
-        dashboardSource={dashboardSource}
-        chartLibrary={chartLibrary}
-        setChartLibrary={setChartLibrary}
-        chartLibraries={chartLibraries}
-        cubejsApi={cubejsApi}
-        render={() => {
-          if (jsCompilingError) {
-            return (
-              <Alert
-                message="Error occurred while compiling JS"
-                description={<pre>{jsCompilingError.toString()}</pre>}
-                type="error"
-              />
-            );
-          }
+  // return (
+  //   <CubeJsQueryRenderer.Provider
+  //     value={{
+  //       query,
+  //       pivotConfig,
+  //     }}
+  //   >
+  //     <ChartContainer
+  //       query={query}
+  //       error={error}
+  //       sqlQuery={sqlQuery}
+  //       codeExample={codeExample}
+  //       codeSandboxSource={forCodeSandBox(codeExample)}
+  //       dependencies={commonDependencies}
+  //       dashboardSource={dashboardSource}
+  //       chartLibrary={chartLibrary}
+  //       setChartLibrary={setChartLibrary}
+  //       chartLibraries={chartLibraries}
+  //       cubejsApi={cubejsApi}
+  //       render={() => {
+  //         if (jsCompilingError) {
+  //           return (
+  //             <Alert
+  //               message="Error occurred while compiling JS"
+  //               description={<pre>{jsCompilingError.toString()}</pre>}
+  //               type="error"
+  //             />
+  //           );
+  //         }
 
-          return (
-            <SourceRender
-              onRender={(renderError) => {
-                if (renderError) {
-                  setError(renderError);
-                }
-              }}
-              babelConfig={babelConfig}
-              resolver={(importName) => dependencies[importName]}
-              source={source}
-            />
-          );
-        }}
-      />
-    </CubeJsQueryRenderer.Provider>
-  );
+  //         return (
+  //           <SourceRender
+  //             onRender={(renderError) => {
+  //               if (renderError) {
+  //                 setError(renderError);
+  //               }
+  //             }}
+  //             babelConfig={babelConfig}
+  //             resolver={(importName) => dependencies[importName]}
+  //             source={source}
+  //           />
+  //         );
+  //       }}
+  //     />
+  //   </CubeJsQueryRenderer.Provider>
+  // );
 };
 
 ChartRenderer.propTypes = {
   query: PropTypes.object.isRequired,
-  resultSet: PropTypes.object,
   error: PropTypes.object,
   sqlQuery: PropTypes.object,
   dashboardSource: PropTypes.object,
   cubejsApi: PropTypes.object,
   chartType: PropTypes.string,
   sourceCodeFn: PropTypes.func,
+  apiUrl: PropTypes.string,
+  cubejsToken: PropTypes.string,
 };
 
 ChartRenderer.defaultProps = {
-  resultSet: null,
   error: null,
   sqlQuery: null,
   dashboardSource: null,

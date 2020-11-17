@@ -73,22 +73,24 @@ class ChartContainer extends React.Component {
   }
 
   async componentDidMount() {
-    const { codeSandboxSource, dependencies } = this.props;
-    const codeSandboxRes = await fetch(
-      'https://codesandbox.io/api/v1/sandboxes/define?json=1',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(
-          this.codeSandboxDefinition(codeSandboxSource, dependencies),
-        ),
-      },
-    );
-    const codeSandboxJson = await codeSandboxRes.json();
-    this.setState({ sandboxId: codeSandboxJson.sandbox_id });
+    // todo: me!
+    
+    // const { codeSandboxSource, dependencies } = this.props;
+    // const codeSandboxRes = await fetch(
+    //   'https://codesandbox.io/api/v1/sandboxes/define?json=1',
+    //   {
+    //     method: 'POST',
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //       Accept: 'application/json',
+    //     },
+    //     body: JSON.stringify(
+    //       this.codeSandboxDefinition(codeSandboxSource, dependencies),
+    //     ),
+    //   },
+    // );
+    // const codeSandboxJson = await codeSandboxRes.json();
+    // this.setState({ sandboxId: codeSandboxJson.sandbox_id });
   }
 
   codeSandboxDefinition(codeSandboxSource, dependencies) {
@@ -143,9 +145,9 @@ class ChartContainer extends React.Component {
       return <Redirect to="/dashboard" />;
     }
 
-    const parameters = getParameters(
-      this.codeSandboxDefinition(codeSandboxSource, dependencies),
-    );
+    // const parameters = getParameters(
+    //   this.codeSandboxDefinition(codeSandboxSource, dependencies),
+    // );
 
     const chartLibrariesMenu = (
       <Menu
@@ -183,7 +185,7 @@ class ChartContainer extends React.Component {
         method="POST"
         target="_blank"
       >
-        <input type="hidden" name="parameters" value={parameters} />
+        {/* <input type="hidden" name="parameters" value={parameters} /> */}
         <SectionRow>
           <Button.Group>
             <Dropdown overlay={frameworkMenu}>
@@ -370,7 +372,7 @@ class ChartContainer extends React.Component {
       } else if (showCode === 'cache') {
         return <CachePane query={query} cubejsApi={cubejsApi} />;
       }
-      return render({ resultSet, error, sandboxId });
+      return render({ framework, error, sandboxId });
     };
 
     let title;
