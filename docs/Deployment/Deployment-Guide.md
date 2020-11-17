@@ -10,7 +10,7 @@ and managing Cube.js in production.
 
 If you are moving Cube.js to production, check this guide:
 
-[Production Checklist](production-checklist)
+[Production Checklist](/deployment/production-checklist)
 
 &nbsp;
 
