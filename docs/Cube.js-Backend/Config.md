@@ -310,7 +310,7 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
-Pass `true` to enable default every 5 second scheduled refresh timer with default querying options.
+Pass `true` to enable scheduled refresh timer with default querying options.
 Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 
 ```javascript
@@ -329,8 +329,6 @@ CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js instance.
 For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
-[[info]]
-| Pre-aggregations will be updated only if required by `refreshKey`. It is always used to check if refresh is required or not. In the case `refreshKey` value doesn't change it doesn't matter how frequent `scheduledRefreshTimer` is set: such pre-aggregation won't be refreshed.
 
 ### extendContext
 
