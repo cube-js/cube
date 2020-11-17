@@ -19,7 +19,7 @@ docker build -t cubejs/cubestore:latest .
 ```
 
 ```
-docker run --rm cubejs/cubestore:latest cubestored
+docker run --rm cubejs/cubestore:latest
 ```
 
 ## License
