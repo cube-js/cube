@@ -2,6 +2,7 @@
 title: Environment Variables
 permalink: /reference/environment-variables
 category: Configuration
+subCategory: Reference
 menuOrder: 4
 ---
 

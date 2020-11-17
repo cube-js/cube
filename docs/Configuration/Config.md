@@ -2,6 +2,7 @@
 title: Config
 permalink: /config
 category: Configuration
+subCategory: Reference
 menuOrder: 3
 ---
 
