@@ -337,10 +337,12 @@ $ heroku container:release web -a cubejs-heroku-demo
 
 ```bash
 $ heroku config:set -a cubejs-heroku-demo \
+  CUBEJS_DB_TYPE=<YOUR-DB-TYPE> \
   CUBEJS_DB_HOST=<YOUR-DB-HOST> \
   CUBEJS_DB_NAME=<YOUR-DB-NAME> \
   CUBEJS_DB_USER=<YOUR-DB-USER> \
-  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
+  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD> \
+  CUBEJS_API_SECRET=<RANDOM_B64_STRING_FROM_ENV_FILE>
 ```
 
 ### Provision Redis
