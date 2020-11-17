@@ -15,6 +15,7 @@ variables][link-env-vars].
 
 ## Configuration Precedence
 
+HELLO WORLD!
 In Cube.js, environment variables take precedence over values specified
 in `cube.js`. In production scenarios, it allows changing configuration
 by simply switching environment variables, which is generally safer,
