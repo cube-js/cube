@@ -30,5 +30,5 @@ ReactDOM.render(
     </App>
   </Router>,
   // eslint-disable-next-line no-undef
-  document.getElementById('root')
+  document.getElementById('playground-root')
 );
