@@ -34,6 +34,7 @@ use crate::config::{Config, ConfigObj};
 use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
 use crate::cluster::worker_pool::{WorkerPool, MessageProcessor};
 use arrow::record_batch::RecordBatch;
+use itertools::Itertools;
 
 #[automock]
 #[async_trait]
@@ -48,7 +49,7 @@ pub trait Cluster: Send + Sync {
 
     async fn download(&self, remote_path: &str) -> Result<String, CubeError>;
 
-    async fn wait_for_job_result(&self, row_key: RowKey, job_type: JobType) -> Result<JobEvent, CubeError>;
+    fn job_result_listener(&self) -> JobResultListener;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -147,13 +148,33 @@ impl Cluster for ClusterImpl {
         self.remote_fs.download_file(remote_path).await
     }
 
-    async fn wait_for_job_result(&self, row_key: RowKey, job_type: JobType) -> Result<JobEvent, CubeError> {
-        let mut receiver = self.event_sender.subscribe();
+    fn job_result_listener(&self) -> JobResultListener {
+        JobResultListener {
+            receiver: self.event_sender.subscribe()
+        }
+    }
+}
+
+pub struct JobResultListener {
+    receiver: Receiver<JobEvent>,
+}
+
+impl JobResultListener {
+    pub async fn wait_for_job_result(self, row_key: RowKey, job_type: JobType) -> Result<JobEvent, CubeError> {
+        Ok(self.wait_for_job_results(vec![(row_key, job_type)]).await?.into_iter().nth(0).unwrap())
+    }
+
+    pub async fn wait_for_job_results(mut self, mut results: Vec<(RowKey, JobType)>) -> Result<Vec<JobEvent>, CubeError> {
+        let mut res = Vec::new();
         loop {
-            let event = receiver.recv().await?;
+            if results.len() == 0 {
+                return Ok(res);
+            }
+            let event = self.receiver.recv().await?;
             if let JobEvent::Success(k, t) | JobEvent::Error(k, t, _) = &event {
-                if k == &row_key && t == &job_type {
-                    return Ok(event);
+                if let Some((index, _)) = results.iter().find_position(|(row_key, job_type)| k == row_key && t == job_type) {
+                    res.push(event);
+                    results.remove(index);
                 }
             }
         }

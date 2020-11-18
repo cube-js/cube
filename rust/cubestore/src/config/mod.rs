@@ -18,6 +18,8 @@ use crate::remotefs::s3::S3RemoteFs;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use rocksdb::{DB, Options};
 use std::future::Future;
+use simple_logger::SimpleLogger;
+use log::{Level};
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -90,6 +92,10 @@ lazy_static! {
     pub static ref WORKER_SERVICES: std::sync::RwLock<Option<WorkerServices>> = std::sync::RwLock::new(None);
 }
 
+lazy_static! {
+    pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> = tokio::sync::RwLock::new(false);
+}
+
 impl Config {
     pub fn default() -> Config {
         Config {
@@ -124,6 +130,16 @@ impl Config {
     T: Future + Send + 'static,
     T::Output: Send + 'static
     {
+        if !*TEST_LOGGING_INITIALIZED.read().await {
+            let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
+            if !*initialized {
+                SimpleLogger::new()
+                    .with_level(Level::Error.to_level_filter())
+                    .with_module_level("cubestore", Level::Trace.to_level_filter())
+                    .init().unwrap();
+            }
+            *initialized = true;
+        }
         let config = Self::test(name);
 
         let store_path = config.local_dir().clone();
