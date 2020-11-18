@@ -33,8 +33,16 @@ function isSimilarPackageRelease(pkg: SemVer, core: SemVer): boolean {
   return pkg.major === core.major;
 }
 
-function getMajorityVersion(pkg: SemVer): string {
+function getMajorityVersion(pkg: SemVer, strict: boolean = false): string {
   if (pkg.major === 0) {
+    if (strict) {
+      return `^${pkg.major}.${pkg.minor}.${pkg.patch}`;
+    }
+
+    return `^${pkg.major}.${pkg.minor}`;
+  }
+
+  if (strict) {
     return `^${pkg.major}.${pkg.minor}`;
   }
 
@@ -116,15 +124,15 @@ export class ServerContainer {
 
     if (compareResult === -1) {
       console.log(
-        `${color.yellow('warning')} You are using old Docker image (${getMajorityVersion(builtInVersion)}) `
-        + `with new packages (${getMajorityVersion(userVersion)})`
+        `${color.yellow('warning')} You are using old Docker image (${getMajorityVersion(builtInVersion, true)}) `
+        + `with new packages (${getMajorityVersion(userVersion, true)})`
       );
     }
 
     if (compareResult === 1) {
       console.log(
-        `${color.yellow('warning')} You are using old Cube.js packages (${getMajorityVersion(userVersion)}) `
-        + `with new Docker image (${getMajorityVersion(builtInVersion)})`
+        `${color.yellow('warning')} You are using old Cube.js packages (${getMajorityVersion(userVersion, true)}) `
+        + `with new Docker image (${getMajorityVersion(builtInVersion, true)})`
       );
     }
   }
