@@ -220,11 +220,9 @@ services:
 
   cube:
     image: cubejs/cube:latest
-    depends_on:
-      - redis
+    #depends_on:
     #  - postgres
-    links:
-      - redis
+    #links:
     #  - postgres
     ports:
       # It's better to use random port binding for 4000/3000 ports
@@ -242,11 +240,6 @@ services:
       - ./dashboard-app:/cube/conf/dashboard-app
       - ./cube.js:/cube/conf/cube.js
       - ./schema:/cube/conf/schema
-
-  redis:
-    image: redis:6
-    restart: always
-
 `;
 
 const templates = {
