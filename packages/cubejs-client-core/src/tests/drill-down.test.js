@@ -80,7 +80,6 @@ const loadResponse = (query = {}) => ({
   },
 });
 
-
 describe('drill down query', () => {
   const resultSet1 = new ResultSet(loadResponse());
   const resultSet2 = new ResultSet(
@@ -101,10 +100,10 @@ describe('drill down query', () => {
   );
   const resultSet4 = new ResultSet(
     loadResponse({
-      dimensions: ["Statuses.potential"],
+      dimensions: ['Statuses.potential'],
       timeDimensions: []
-    }
-  ))
+    })
+  );
 
   it('handles a query with a time dimension', () => {
     expect(
@@ -182,7 +181,6 @@ describe('drill down query', () => {
       timezone: 'UTC',
     });
   });
-
   
   it('handles null values', () => {
     expect(
@@ -191,23 +189,22 @@ describe('drill down query', () => {
       {
         measures: [],
         dimensions: [
-          "Orders.id",
-          "Orders.title",
+          'Orders.id',
+          'Orders.title',
         ],
         filters: [
           {
-            member: "Orders.count",
-            operator: "measureFilter",
+            member: 'Orders.count',
+            operator: 'measureFilter',
           },
           {
-            member: "Statuses.potential",
-            operator: "notSet",
+            member: 'Statuses.potential',
+            operator: 'notSet',
           },
         ],
         timeDimensions: [],
-        timezone: "UTC",
+        timezone: 'UTC',
       }
-    )
-   
-  })
+    );
+  });
 });

@@ -104,7 +104,7 @@ class ResultSet {
     normalizedPivotConfig.x.forEach((member, currentIndex) => values.push([member, xValues[currentIndex]]));
     normalizedPivotConfig.y.forEach((member, currentIndex) => values.push([member, yValues[currentIndex]]));
 
-    const { filters: parentFilters = [] } = this.query();
+    const { filters: parentFilters = [], segments = [] } = this.query();
     const { measures } = this.loadResponses[0].annotation;
     let [, measureName] = values.find(([member]) => member === 'measures') || [];
 
@@ -158,6 +158,7 @@ class ResultSet {
     return {
       ...measures[measureName].drillMembersGrouped,
       filters,
+      ...(segments.length > 0 ? { segments } : {}),
       timeDimensions,
       timezone: this.loadResponses[0].query.timezone
     };
