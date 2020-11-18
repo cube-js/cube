@@ -65,7 +65,7 @@ If you want to run Cube.js in production without Redis, you can use
 If you are using [external pre-aggregations][link-pre-aggregations], you need
 to set up and configure external pre-aggregations storage.
 
-[link-pre-aggregations]: pre-aggregations#external-pre-aggregations
+[link-pre-aggregations]: /pre-aggregations#external-pre-aggregations
 
 Currently, we recommend using MySQL for external pre-aggregations storage.
 There is some additional MySQL configuration required to optimize for
@@ -79,7 +79,7 @@ recommend running a separate Cube.js worker instance to refresh scheduled
 pre-aggregations in the background. This allows your main Cube.js instance
 to continue to serve requests with high availability.
 
-[link-scheduled-refresh]: pre-aggregations#scheduled-refresh
+[link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
 
 ```bash
 # Set to true so a Cube.js instance acts as a refresh worker
