@@ -24,7 +24,7 @@ category: Examples
 [code-stripe-dashboard]: https://github.com/cube-js/cube.js/tree/master/examples/stripe-dashboard
 [link-event-analytics]: https://d1ygcqhosay4lt.cloudfront.net/
 [code-event-analytics]: https://github.com/cube-js/cube.js/tree/master/examples/event-analytics
-[link-external-rollups]: https://external-rollups.cubecloudapp.dev/
+[link-external-rollups]: https://external-rollups-demo.cube.dev/
 [code-external-rollups]: https://github.com/cube-js/cube.js/tree/master/examples/external-rollups
 [link-aws-web-analytics]: http://aws-web-analytics-dashboard.s3-website-us-east-1.amazonaws.com/
 [code-aws-web-analytics]: https://github.com/cube-js/cube.js/tree/master/examples/aws-web-analytics
