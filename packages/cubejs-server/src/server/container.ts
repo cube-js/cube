@@ -1,12 +1,11 @@
 import { CreateOptions } from '@cubejs-backend/server-core';
-import { requireFromPackage, isDockerImage } from '@cubejs-backend/shared';
+import { requireFromPackage, isDockerImage, packageExists } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 
 import { CubejsServer } from '../server';
-import { packageExists } from './utils';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 const devPackages = [
@@ -62,7 +61,7 @@ export class ServerContainer {
   }
 
   protected getTypeScriptCompiler(): TypescriptCompilerType {
-    if (packageExists('typescript')) {
+    if (packageExists('typescript', isDockerImage())) {
       // eslint-disable-next-line global-require
       const { TypescriptCompiler } = require('./typescript-compiler');
 
