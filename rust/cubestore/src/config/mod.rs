@@ -20,6 +20,7 @@ use rocksdb::{DB, Options};
 use std::future::Future;
 use simple_logger::SimpleLogger;
 use log::{Level};
+use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -41,6 +42,7 @@ impl CubeServices {
         tokio::spawn(async move { meta_store.run_upload_loop().await });
         let scheduler = self.scheduler.clone();
         tokio::spawn(async move { scheduler.run_scheduler().await });
+        start_track_event_loop().await;
         Ok(())
     }
 
@@ -49,6 +51,7 @@ impl CubeServices {
         self.cluster.stop_processing_loops().await?;
         self.meta_store.stop_processing_loops().await;
         self.scheduler.stop_processing_loops()?;
+        stop_track_event_loop().await;
         Ok(())
     }
 }

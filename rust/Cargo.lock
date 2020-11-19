@@ -945,10 +945,12 @@ dependencies = [
  "log",
  "mockall",
  "msql-srv",
+ "nanoid",
  "num",
  "parquet",
  "procspawn",
  "regex",
+ "reqwest",
  "rocksdb",
  "rust-s3",
  "serde",
@@ -2147,6 +2149,15 @@ dependencies = [
  "time 0.2.7",
  "twox-hash",
  "uuid",
+]
+
+[[package]]
+name = "nanoid"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6226bc4e142124cb44e309a37a04cd9bb10e740d8642855441d3b14808f635e"
+dependencies = [
+ "rand 0.6.5",
 ]
 
 [[package]]
