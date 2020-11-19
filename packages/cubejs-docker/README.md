@@ -2,9 +2,10 @@
 
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
 
-# Supported tags
+# Supported tags and respective `Dockerfile` links
 
-- [latest](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/latest.Dockerfile) - Latest stable release (recommended)
+- [latest](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/latest.Dockerfile) - Latest stable release based on Debian (recommended)
+- [alpine](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/latest-alpine.Dockerfile) - Latest stable release on Alpine
 - [dev](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-docker/dev.Dockerfile) - Latest development release from master branch.
 
 # What is Cube.js?
