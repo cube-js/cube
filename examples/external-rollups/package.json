@@ -3,12 +3,11 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "./node_modules/.bin/cubejs-dev-server",
-    "start": "node index.js"
+    "dev": "./node_modules/.bin/cubejs-server"
   },
-  "dependencies": {
-    "@cubejs-backend/bigquery-driver": "^0.10.35",
-    "@cubejs-backend/mysql-driver": "^0.10.35",
-    "@cubejs-backend/server": "^0.10.36"
+  "devDependencies":  {
+    "@cubejs-backend/bigquery-driver": "^0.23.8",
+    "@cubejs-backend/mysql-driver": "^0.23.11",
+    "@cubejs-backend/server": "^0.23.11"
   }
 }
