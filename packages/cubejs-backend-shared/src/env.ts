@@ -25,3 +25,7 @@ type Vars = typeof variables;
 export function getEnv<T extends keyof Vars>(key: T): ReturnType<Vars[T]> {
   return <any>variables[key]();
 }
+
+export function isDockerImage(): boolean {
+  return Boolean(process.env.CUBEJS_DOCKER_IMAGE_TAG);
+}

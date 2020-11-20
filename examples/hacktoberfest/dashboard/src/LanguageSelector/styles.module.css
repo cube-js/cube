@@ -1,0 +1,30 @@
+.root {
+    color: var(--color-gray);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    list-style: none;
+    padding: 0;
+}
+
+.root li {
+    margin-bottom: 3px;
+}
+
+.root li:hover {
+    color: var(--color-red);
+}
+
+.dot {
+    border-radius: 50%;
+    display: inline-block;
+    height: 8px;
+    margin: 0 9px 1px;
+    width: 8px;
+}
+
+.selected {
+    background: var(--color-white);
+    border-radius: 10px;
+    color: var(--color-black) !important;
+}

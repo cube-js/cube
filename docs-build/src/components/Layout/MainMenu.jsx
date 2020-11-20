@@ -13,6 +13,7 @@ const { SubMenu } = Menu;
 const menuOrder = [
   'Getting Started',
   'Cube.js Introduction',
+  'Configuration',
   'Cube.js CLI',
   'Cube.js Backend',
   'Cube.js Frontend',

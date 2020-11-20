@@ -51,6 +51,7 @@ use futures::future::join_all;
 use table::Table;
 use std::collections::HashMap;
 use crate::metastore::table::{TablePath, TableIndexKey};
+use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 
 #[macro_export]
 macro_rules! format_table_value {
@@ -522,6 +523,7 @@ pub trait MetaStore: Send + Sync {
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
     async fn delete_wal(&self, wal_id: u64) -> Result<(), CubeError>;
     async fn wal_uploaded(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
+    async fn get_wals_for_table(&self, table_id: u64) -> Result<Vec<IdRow<WAL>>, CubeError>;
 
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn get_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
@@ -1748,6 +1750,12 @@ impl MetaStore for RocksMetaStore {
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError> {
         self.read_operation(move |db_ref| {
             WALRocksTable::new(db_ref).get_row_or_not_found(wal_id)
+        }).await
+    }
+
+    async fn get_wals_for_table(&self, table_id: u64) -> Result<Vec<IdRow<WAL>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            WALRocksTable::new(db_ref).get_rows_by_index(&WALIndexKey::ByTable(table_id), &WALRocksIndex::TableID)
         }).await
     }
 

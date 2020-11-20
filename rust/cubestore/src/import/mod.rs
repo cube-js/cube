@@ -38,6 +38,7 @@ impl ImportFormat {
 
                         row.push(match column.get_column_type() {
                             ColumnType::String => TableValue::String(value.to_string()),
+                            ColumnType::Int => TableValue::Int(value.parse()?),
                             x => panic!("CSV import for {:?} is not implemented", x)
                         });
 

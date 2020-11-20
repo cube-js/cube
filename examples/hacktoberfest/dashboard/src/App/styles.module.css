@@ -1,0 +1,96 @@
+.banner {
+    background: var(--color-light-blue);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 22px;
+    padding: 15px 20px;
+    position: fixed;
+    text-align: center;
+    width: 100%;
+    z-index: 999;
+}
+
+.banner a {
+    color: inherit;
+}
+
+.banner a:hover {
+    text-decoration: underline;
+}
+
+.root {
+    padding: 100px 0 0;
+    margin: auto;
+    max-width: 1200px;
+}
+
+.content {
+    padding: 50px calc(8vw + 250px) 50px 8vw;
+}
+
+.paragraph {
+    margin-bottom: 25px;
+    width: 90%;
+}
+
+.footer {
+    margin-top: 75px;
+    margin-bottom: 25px;
+    width: 90%;
+}
+
+.footnote {
+    font-size: 14px;
+    line-height: 21px;
+    margin-top: 25px;
+    margin-bottom: 25px;
+    width: 80%;
+}
+
+.code {
+    color: var(--color-gray);
+}
+
+.sidebar {
+    padding-top: 25px;
+    padding-right: 100px;
+    position: fixed;
+    top: 100px;
+    right: 0;
+    width: 250px;
+    z-index: 999;
+}
+
+.menu {
+    display: grid;
+    grid-row-gap: 30px;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 14px;
+    list-style: none;
+    margin-bottom: 50px;
+    padding: 0;
+    text-transform: uppercase;
+}
+
+.menu a {
+    color: var(--color-gray);
+}
+
+.menu a:hover {
+    color: var(--color-red);
+}
+
+@media only screen and (max-width: 1100px) {
+    .content {
+        padding: 25px 8vw 100px 8vw;
+    }
+
+    .paragraph {
+        width: 100%;
+    }
+
+    .sidebar {
+        display: none;
+    }
+}

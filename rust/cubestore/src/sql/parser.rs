@@ -61,8 +61,46 @@ impl CubeStoreParser {
     pub fn parse_create(&mut self) -> Result<Statement, ParserError> {
         if self.parser.parse_keyword(Keyword::SCHEMA) {
             self.parse_create_schema()
+        } else if self.parser.parse_keyword(Keyword::TABLE) {
+            self.parse_create_table()
         } else {
             Ok(Statement::Statement(self.parser.parse_create()?))
+        }
+    }
+
+    pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
+        let statement = self.parser.parse_create_table()?;
+        if let SQLStatement::CreateTable {
+            name,
+            columns,
+            constraints,
+            with_options,
+            if_not_exists,
+            file_format,
+            query,
+            without_rowid,
+            ..
+        } = statement {
+            let location = if self.parser.parse_keyword(Keyword::LOCATION) {
+                Some(self.parser.parse_literal_string()?)
+            } else {
+                None
+            };
+
+            Ok(Statement::Statement(SQLStatement::CreateTable {
+                name,
+                columns,
+                constraints,
+                with_options,
+                if_not_exists,
+                external: location.is_some(),
+                file_format,
+                location,
+                query,
+                without_rowid,
+            }))
+        } else {
+            Ok(Statement::Statement(statement))
         }
     }
 
