@@ -19,7 +19,6 @@ use crate::cluster::{Cluster, JobEvent};
 
 use parser::{Statement as CubeStoreStatement};
 use datafusion::sql::parser::{Statement as DFStatement};
-use futures::future::join_all;
 use crate::metastore::job::JobType;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use crate::queryplanner::query_executor::QueryExecutor;
@@ -62,7 +61,20 @@ impl SqlServiceImpl {
             }
         }
         if external {
-            self.db.create_table(schema_name, table_name, columns_to_set, location, Some(ImportFormat::CSV), indexes_to_create).await
+            let listener = self.cluster.job_result_listener();
+            let table = self.db.create_table(schema_name, table_name, columns_to_set, location, Some(ImportFormat::CSV), indexes_to_create).await?;
+            listener.wait_for_job_result(RowKey::Table(TableId::Tables, table.get_id()), JobType::TableImport).await?;
+            let wal_listener = self.cluster.job_result_listener();
+            let wals = self.db.get_wals_for_table(table.get_id()).await?;
+            let events = wal_listener.wait_for_job_results(wals.into_iter().map(|wal| (RowKey::Table(TableId::WALs, wal.get_id()), JobType::WalPartitioning)).collect()).await?;
+
+            for v in events {
+                if let JobEvent::Error(_, _, e) = v {
+                    return Err(CubeError::user(format!("Create table failed: {}", e)));
+                }
+            }
+
+            Ok(table)
         } else {
             self.db.create_table(schema_name, table_name, columns_to_set, None, None, indexes_to_create).await
         }
@@ -106,17 +118,18 @@ impl SqlServiceImpl {
 
         let mut wal_ids = Vec::new();
 
+        let listener = self.cluster.job_result_listener();
         for rows_chunk in data.chunks(chunk_len) {
             let data_frame = parse_chunk(rows_chunk, &real_col)?;
             wal_ids.push(self.wal_store.add_wal(table.clone(), data_frame).await?.get_id());
         }
 
-        let res = join_all(wal_ids.into_iter().map(|id| {
-            self.cluster.wait_for_job_result(RowKey::Table(TableId::WALs, id), JobType::WalPartitioning)
-        })).await;
+        let res = listener.wait_for_job_results(
+            wal_ids.into_iter().map(|id| (RowKey::Table(TableId::WALs, id), JobType::WalPartitioning)).collect()
+        ).await?;
 
         for v in res {
-            if let JobEvent::Error(_, _, e) = v? {
+            if let JobEvent::Error(_, _, e) = v {
                 return Err(CubeError::user(format!("Insert job failed: {}", e)));
             }
         }
@@ -203,22 +216,6 @@ impl SqlService for SqlServiceImpl {
                 }
                 Ok(DataFrame::new(vec![], vec![]))
             }
-            /*CubeStoreStatement::CreateExternalTable(CreateExternalTable { name, columns, location, indexes, .. }) => {
-                let ObjectName(table_ident) = name.clone();
-                if table_ident.len() != 2 {
-                    return Err(CubeError::user(format!("Schema name expected in table name but '{}' found", name.to_string())));
-                }
-
-                let res = self.create_table(
-                    table_ident[0].value.to_string(),
-                    table_ident[1].value.to_string(),
-                    &columns,
-                    true,
-                    Some(location),
-                    indexes
-                ).await?;
-                Ok(DataFrame::from(vec![res]));
-            }*/
             CubeStoreStatement::Statement(Statement::Insert { table_name, columns, source }) => {
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
@@ -376,8 +373,10 @@ mod tests {
     use crate::config::Config;
     use crate::metastore::{RocksMetaStore};
     use crate::cluster::MockCluster;
-    use std::fs;
+    use std::{fs, env};
     use crate::store::WALStore;
+    use std::fs::File;
+    use std::io::Write;
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -444,40 +443,25 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
 
-    #[actix_rt::test]
-    async fn insert_test() {
-        let path = "/tmp/test_insert";
-        let _ = DB::destroy(&Options::default(), path);
-        let store_path = path.to_string() + &"_store".to_string();
-        let remote_store_path = path.to_string() + &"remote_store".to_string();
-        let _ = fs::remove_dir_all(store_path.clone());
-        let _ = fs::remove_dir_all(remote_store_path.clone());
-        {
-            let remote_fs = LocalDirRemoteFs::new(PathBuf::from(store_path.clone()), PathBuf::from(remote_store_path.clone()));
-            let meta_store = RocksMetaStore::new(path, remote_fs);
-            let remote_fs = LocalDirRemoteFs::new(PathBuf::from(store_path.clone()), PathBuf::from(remote_store_path.clone()));
-            let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
-            let mut mock_cluster = MockCluster::new();
+    #[tokio::test]
+    async fn insert() {
+        Config::run_test("insert", async move |services| {
+            let service = services.sql_service;
 
-            mock_cluster.expect_wait_for_job_result()
-                .times(3)
-                .returning(
-                    move |k, t| Ok(JobEvent::Success(k, t))
-                );
-
-            let service = SqlServiceImpl::new(meta_store.clone(), store, Arc::new(MockQueryPlanner::new()), Arc::new(MockQueryExecutor::new()), Arc::new(mock_cluster));
             let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
-            let query = "CREATE TABLE Foo.Persons (
+
+            let _ = service.exec_query(
+                "CREATE TABLE Foo.Persons (
                                 PersonID int,
                                 LastName varchar(255),
                                 FirstName varchar(255),
                                 Address varchar(255),
                                 City varchar(255)
-                              )";
-            let meta_store_to_move = meta_store.clone();
-            tokio::spawn(async move { meta_store_to_move.run_upload_loop().await });
-            service.exec_query(query).await.unwrap();
-            let query = "INSERT INTO Foo.Persons
+                              )"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO Foo.Persons
             (
                 PersonID,
                 LastName,
@@ -494,19 +478,14 @@ mod tests {
             (27, 'LastName 6', 'FirstName 1', 'Address 1', 'City 1'), (34, 'LastName 25', 'FirstName 2', 'Address 2', 'City 2'),
             (28, 'LastName 7', 'FirstName 1', 'Address 1', 'City 1'), (33, 'LastName 26', 'FirstName 2', 'Address 2', 'City 2'),
             (29, 'LastName 8', 'FirstName 1', 'Address 1', 'City 1'), (32, 'LastName 27', 'FirstName 2', 'Address 2', 'City 2'),
-            (30, 'LastName 9', 'FirstName 1', 'Address 1', 'City 1'), (31, 'LastName 28', 'FirstName 2', 'Address 2', 'City 2');";
-            let _ = service.exec_query(query).await.unwrap();
+            (30, 'LastName 9', 'FirstName 1', 'Address 1', 'City 1'), (31, 'LastName 28', 'FirstName 2', 'Address 2', 'City 2')"
+            ).await.unwrap();
 
-            let query = "INSERT INTO Foo.Persons
+            service.exec_query("INSERT INTO Foo.Persons
             (LastName, PersonID, FirstName, Address, City)
             VALUES
-            ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'), ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');";
-            let _ = service.exec_query(query).await.unwrap();
-            meta_store.stop_processing_loops().await;
-        }
-        let _ = DB::destroy(&Options::default(), path);
-        // let _ =  fs::remove_dir_all(store_path.clone());
-        // let _ =  fs::remove_dir_all(remote_store_path.clone());
+            ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'), ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');").await.unwrap();
+        }).await;
     }
 
     #[tokio::test]
@@ -548,6 +527,31 @@ mod tests {
 
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn create_table_with_location() {
+        Config::run_test("create_table_with_location", async move |services| {
+            let service = services.sql_service;
+
+            let path = {
+                let mut dir = env::temp_dir();
+                dir.push("foo.csv");
+
+                let mut file = File::create(dir.clone()).unwrap();
+
+                file.write_all("1,San Francisco\n".as_bytes()).unwrap();
+                file.write_all("2,New York\n".as_bytes()).unwrap();
+
+                dir
+            };
+
+            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
         }).await;
     }
 }

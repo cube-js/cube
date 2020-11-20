@@ -27,7 +27,7 @@ export class Server extends Command {
     const container = new ServerContainer({
       debug: options.flags.debug,
     });
-    container.runProjectDiagnostics();
+    await container.runProjectDiagnostics();
 
     const configuration = await container.lookupConfiguration();
     container.runServerInstance(configuration);

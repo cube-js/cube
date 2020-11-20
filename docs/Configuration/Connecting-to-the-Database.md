@@ -1,8 +1,8 @@
 ---
 title: Connecting to the Database
 permalink: /connecting-to-the-database
-category: Cube.js Backend
-menuOrder: 1
+category: Configuration
+menuOrder: 2
 ---
 
 Cube.js currently provides connectors to the following databases:
@@ -50,7 +50,7 @@ The table below shows which environment variables are used for different databas
 | AWS Athena | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION` |
 | Google Bigquery | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS` |
 | MongoDB | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` |
-| Snowflake | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`|
+| Snowflake | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`|
 | Presto | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 | Druid | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 
@@ -67,7 +67,7 @@ CUBEJS_EXT_DB_NAME=<YOUR_DB_NAME_HERE>
 CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
 CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
-```  
+```
 
 ## Notes
 
@@ -83,10 +83,10 @@ here.](https://cube.dev/blog/building-mongodb-dashboard-using-node.js)
 
 Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` can be left blank.
 
-### AWS RDS Postgres 
+### AWS RDS Postgres
 
-Use `CUBEJS_DB_SSL=true` to enable SSL if you have force ssl enabled for your RDS. 
-Download the new certificate [here](https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem) provide the contents of the downloaded file to `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` can be left blank. 
+Use `CUBEJS_DB_SSL=true` to enable SSL if you have force ssl enabled for your RDS.
+Download the new certificate [here](https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem) provide the contents of the downloaded file to `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE` can be left blank.
 More info on AWS RDS SSL can be found [here](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html)
 
 ### AWS Athena
@@ -105,7 +105,7 @@ Another way is to encode the key file with **base64**:
 $ cat /path/to/key-file.json | base64
 ```
 
-Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key. 
+Now you can set the `CUBEJS_DB_BQ_CREDENTIALS` environment variable with the base64-encoded key.
 
 You can learn more about acquiring Google BigQuery credentials [here](https://cloud.google.com/docs/authentication/getting-started) and [here](https://console.cloud.google.com/apis/credentials/serviceaccountkey).
 

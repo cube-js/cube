@@ -1,8 +1,8 @@
 ---
 title: Multitenancy
 permalink: /multitenancy-setup
-category: Cube.js Backend
-menuOrder: 9
+category: Configuration
+menuOrder: 5
 ---
 
 Cube.js supports multitenancy out of the box, both on database and data schema levels.
@@ -38,7 +38,7 @@ Multitenancy and multiple data sources features aren't mutually exclusive and ca
 Typical multiple data sources configuration looks like:
 
 [[warning | Note]]
-| Existence of handling route for `default` data source is mandatory. 
+| Existence of handling route for `default` data source is mandatory.
 | It's used to resolve target query data source for now.
 | This behavior will be changed in future releases.
 
@@ -80,7 +80,7 @@ module.exports = {
 
 ### User Context vs Multitenant Compile Context
 
-As a rule of thumb [USER_CONTEXT](cube#context-variables-user-context) should be used in scenarios when you want to define row level security within the same database for different users of such database. 
+As a rule of thumb [USER_CONTEXT](cube#context-variables-user-context) should be used in scenarios when you want to define row level security within the same database for different users of such database.
 For example to separate access of two ecommerce administrators who work on different product categories within same ecommerce store.
 
 ```javascript
@@ -134,10 +134,10 @@ module.exports = {
 
 Let's consider the following example:
 
-We store data for different users in different databases, but on the same Postgres host. 
+We store data for different users in different databases, but on the same Postgres host.
 The database name is `my_app_1_2`, where `1` is **Application ID** and `2` is **User ID**.
 
-To make it work with Cube.js, first we need to pass the `appId` and `userId` as context to every query. 
+To make it work with Cube.js, first we need to pass the `appId` and `userId` as context to every query.
 We should include that into our token generation code.
 
 ```javascript
@@ -151,8 +151,8 @@ const cubejsToken = jwt.sign(
 );
 ```
 
-Now, we can access them as [authInfo](config#request-context-auth-info) object inside the context object. 
-Let's first use [contextToAppId](config#options-reference-context-to-app-id) to create a dynamic Cube.js App ID for every combination of `appId` and `userId`. 
+Now, we can access them as [authInfo](config#request-context-auth-info) object inside the context object.
+Let's first use [contextToAppId](config#options-reference-context-to-app-id) to create a dynamic Cube.js App ID for every combination of `appId` and `userId`.
 
 [[warning | Note]]
 | Cube.js App ID (result of [contextToAppId](config#options-reference-context-to-app-id)) is used as caching key for various in-memory structures like schema compilation results, connection pool, etc.

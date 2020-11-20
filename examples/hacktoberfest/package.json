@@ -1,0 +1,12 @@
+{
+  "name": "hacktoberfest",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-server dev-server"
+  },
+  "devDependencies": {
+    "@cubejs-backend/athena-driver": "^0.23.8",
+    "@cubejs-backend/server": "^0.23.6"
+  }
+}

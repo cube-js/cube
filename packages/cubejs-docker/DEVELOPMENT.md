@@ -4,8 +4,16 @@
 
 Release version
 
+Buster:
+
 ```sh
 docker build -t cubejs/cube:latest -f latest.Dockerfile .
+```
+
+Alpine
+
+```sh
+docker build -t cubejs/cube:alpine -f latest-alpine.Dockerfile .
 ```
 
 Not released, development (from `cubejs-docker` directory)

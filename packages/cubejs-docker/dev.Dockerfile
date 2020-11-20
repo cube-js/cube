@@ -120,4 +120,4 @@ WORKDIR /cube/conf
 
 EXPOSE 4000
 
-ENTRYPOINT ["cubejs", "server"]
+CMD ["cubejs", "server"]

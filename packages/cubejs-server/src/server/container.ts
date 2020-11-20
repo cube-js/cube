@@ -1,16 +1,20 @@
 import { CreateOptions } from '@cubejs-backend/server-core';
+import { requireFromPackage, isDockerImage, packageExists } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
+import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 
 import { CubejsServer } from '../server';
-import { packageExists } from './utils';
-
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 const devPackages = [
   'typescript',
 ];
+
+function isCubeNotServerPackage(pkgName: string): boolean {
+  return pkgName !== '@cubejs-backend/server' && pkgName.toLowerCase().startsWith('@cubejs-backend/');
+}
 
 function isCubePackage(pkgName: string): boolean {
   return pkgName.toLowerCase().startsWith('@cubejs-backend/');
@@ -20,6 +24,36 @@ function isDevPackage(pkgName: string): boolean {
   return isCubePackage(pkgName) || devPackages.includes(pkgName.toLowerCase());
 }
 
+function isSimilarPackageRelease(pkg: SemVer, core: SemVer): boolean {
+  if (pkg.major === 0 && core.major === 0) {
+    return pkg.minor === core.minor;
+  }
+
+  return pkg.major === core.major;
+}
+
+function getMajorityVersion(pkg: SemVer, strict: boolean = false): string {
+  if (pkg.major === 0) {
+    if (strict) {
+      return `^${pkg.major}.${pkg.minor}.${pkg.patch}`;
+    }
+
+    return `^${pkg.major}.${pkg.minor}`;
+  }
+
+  if (strict) {
+    return `^${pkg.major}.${pkg.minor}`;
+  }
+
+  return `^${pkg.major}`;
+}
+
+type PackageManifest = {
+  version: string,
+  dependencies: Record<string, string>,
+  devDependencies: Record<string, string>
+}
+
 export class ServerContainer {
   public constructor(
     protected readonly configuration: { debug: boolean }
@@ -27,7 +61,7 @@ export class ServerContainer {
   }
 
   protected getTypeScriptCompiler(): TypescriptCompilerType {
-    if (packageExists('typescript')) {
+    if (packageExists('typescript', isDockerImage())) {
       // eslint-disable-next-line global-require
       const { TypescriptCompiler } = require('./typescript-compiler');
 
@@ -39,21 +73,125 @@ export class ServerContainer {
     );
   }
 
-  public runProjectDiagnostics() {
+  protected async resolvePackageVersion(basePath: string, pkgName: string) {
+    const resolvedManifest = await requireFromPackage<PackageManifest|null>(
+      path.join(pkgName, 'package.json'),
+      {
+        basePath,
+        relative: false,
+        silent: true,
+      },
+    );
+    if (resolvedManifest) {
+      return semverParse(resolvedManifest.version);
+    }
+
+    if (this.configuration.debug) {
+      console.log(
+        `[resolvePackageVersion] Unable to resolve version for ${pkgName} by ${basePath} prefix`
+      );
+    }
+
+    return null;
+  }
+
+  protected async resolveBuiltInPackageVersion(pkgName: string) {
+    return this.resolvePackageVersion(
+      '/cube',
+      pkgName,
+    );
+  }
+
+  protected async resolveUserPackageVersion(pkgName: string) {
+    return this.resolvePackageVersion(
+      // In the official docker image, it will be resolved to /cube/conf
+      process.cwd(),
+      pkgName,
+    );
+  }
+
+  protected compareBuiltInAndUserVersions(builtInVersion: SemVer, userVersion: SemVer) {
+    const compareResult = semverCompare(builtInVersion, userVersion);
+
+    if (this.configuration.debug) {
+      console.log('[runProjectDockerDiagnostics] compare', {
+        builtIn: builtInVersion.raw,
+        user: userVersion.raw,
+        compare: compareResult,
+      });
+    }
+
+    if (compareResult === -1) {
+      console.log(
+        `${color.yellow('warning')} You are using old Docker image (${getMajorityVersion(builtInVersion, true)}) `
+        + `with new packages (${getMajorityVersion(userVersion, true)})`
+      );
+    }
+
+    if (compareResult === 1) {
+      console.log(
+        `${color.yellow('warning')} You are using old Cube.js packages (${getMajorityVersion(userVersion, true)}) `
+        + `with new Docker image (${getMajorityVersion(builtInVersion, true)})`
+      );
+    }
+  }
+
+  protected async runProjectDockerDiagnostics(manifest: PackageManifest) {
+    if (this.configuration.debug) {
+      console.log('[runProjectDockerDiagnostics] do');
+    }
+
+    const builtInCoreVersion = await this.resolveBuiltInPackageVersion(
+      '@cubejs-backend/server',
+    );
+    if (!builtInCoreVersion) {
+      return;
+    }
+
+    const userCoreVersion = await this.resolveUserPackageVersion(
+      '@cubejs-backend/server',
+    );
+    if (userCoreVersion) {
+      this.compareBuiltInAndUserVersions(builtInCoreVersion, userCoreVersion);
+
+      return;
+    }
+
+    /**
+     * It's needed to detect case when user didnt install @cubejs-backend/server, but
+     * install @cubejs-backend/postgres-driver and it doesn't fit to built-in server
+     */
+    const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
+      isCubeNotServerPackage
+    );
+    // eslint-disable-next-line no-restricted-syntax
+    for (const pkgName of depsToCompareVersions) {
+      const pkgVersion = await this.resolveUserPackageVersion(
+        pkgName,
+      );
+      if (pkgVersion) {
+        this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
+
+        return;
+      }
+    }
+  }
+
+  public async runProjectDiagnostics() {
     if (!fs.existsSync(path.join(process.cwd(), 'package.json'))) {
       if (this.configuration.debug) {
-        console.log('Unable to find package.json, configuration diagnostics skipped');
+        console.log('[runProjectDiagnostics] Unable to find package.json, configuration diagnostics skipped');
       }
 
       return;
     }
 
     // eslint-disable-next-line global-require,import/no-dynamic-require
-    const manifiest = require(path.join(process.cwd(), 'package.json'));
-    if (manifiest) {
-      if (manifiest.dependencies) {
+    const manifest: PackageManifest = require(path.join(process.cwd(), 'package.json'));
+    if (manifest) {
+      if (manifest.dependencies) {
         // eslint-disable-next-line no-restricted-syntax
-        for (const [pkgName] of Object.entries(manifiest.dependencies)) {
+        for (const [pkgName] of Object.entries(manifest.dependencies)) {
           if (isDevPackage(pkgName)) {
             throw new Error(
               `"${pkgName}" package must be installed in devDependencies`
@@ -62,15 +200,42 @@ export class ServerContainer {
         }
       }
 
-      if (manifiest.devDependencies) {
+      if (manifest.devDependencies) {
         // eslint-disable-next-line no-restricted-syntax
-        for (const [pkgName] of Object.entries(manifiest.devDependencies)) {
+        for (const pkgName of Object.keys(manifest.devDependencies)) {
           if (!isDevPackage(pkgName)) {
             console.log(
               `${color.yellow('warning')} "${pkgName}" will not be installed in Cube Cloud (please move it to dependencies)`
             );
           }
         }
+
+        const coreVersion = await this.resolveUserPackageVersion(
+          '@cubejs-backend/server',
+        );
+        if (coreVersion) {
+          const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
+            isCubeNotServerPackage
+          );
+          // eslint-disable-next-line no-restricted-syntax
+          for (const pkgName of depsToCompareVersions) {
+            const pkgVersion = await this.resolveUserPackageVersion(
+              pkgName,
+            );
+            if (pkgVersion && !isSimilarPackageRelease(pkgVersion, coreVersion)) {
+              console.log(
+                `${color.yellow('error')} "${pkgName}" (${getMajorityVersion(coreVersion)}) `
+                + `is using another release then @cubejs-backend/server (${getMajorityVersion(pkgVersion)}).`
+              );
+            }
+          }
+        }
+      }
+
+      if (isDockerImage()) {
+        await this.runProjectDockerDiagnostics(manifest);
+      } else if (this.configuration.debug) {
+        console.log('[runProjectDockerDiagnostics] skipped');
       }
     }
   }
@@ -96,7 +261,11 @@ export class ServerContainer {
       return this.loadConfiguration();
     }
 
-    throw new Error('Unable find configuration file: "cube.js".');
+    console.log(
+      `${color.yellow('warning')} There is no cube.js file. Continue with environment variables`
+    );
+
+    return {};
   }
 
   // eslint-disable-next-line consistent-return
