@@ -61,7 +61,7 @@ impl EventSender {
     async fn send_events(mut to_send: Vec<HashMap<String, String>>) -> Result<(), CubeError> {
         let max_retries = 10usize;
         for retry in 0..max_retries {
-            let client = reqwest::Client::new();
+            let client = reqwest::ClientBuilder::new().use_rustls_tls().user_agent("cubestore").build().unwrap();
 
             let sent_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
             for event in to_send.iter_mut() {
