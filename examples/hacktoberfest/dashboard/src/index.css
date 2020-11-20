@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+:root {
+  --color-white: #FFFFFF;
+  --color-black: #072540;
+  --color-gray: #5B6987;
+  --color-brown: #542247;
+  --color-red: #9c4668;
+  --color-pink: #FF8AE2;
+  --color-very-light-blue: #F1F7FA;
+  --color-light-blue: #93C2DB;
+  --color-blue: #0069FF;
+  /*--color-dark-blue: #183D5D;*/
+  /*--color-very-dark-blue: #072540;*/
+}
+
+body {
+  background-color: var(--color-very-light-blue);
+  color: var(--color-black);
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: normal;
+  line-height: 27px;
+/*  -webkit-font-smoothing: antialiased;*/
+/*  -moz-osx-font-smoothing: grayscale;*/
+}
+
+/*code {*/
+/*  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',*/
+/*    monospace;*/
+/*}*/
+
+h1 {
+  color: inherit;
+  font-size: 45px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 50px;
+}
+
+h2 {
+  color: inherit;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.125;
+  margin-top: 40px;
+}
+
+/*h3 {*/
+/*  font-size: 20px;*/
+/*}*/
+
+/*a {*/
+/*  color: inherit;*/
+/*  text-decoration: none;*/
+/*}*/
+
+/*a:hover {*/
+/*  text-decoration: underline;*/
+/*}*/
