@@ -94,6 +94,7 @@ const config = {
               },
             },
           },
+          'gatsby-remark-check-links',
         ]
       }
     },

@@ -24,6 +24,7 @@
     "gatsby-plugin-sharp": "^2.6.31",
     "gatsby-plugin-sitemap": "^2.1.0",
     "gatsby-redirect-from": "^0.2.4",
+    "gatsby-remark-check-links": "^2.1.0",
     "gatsby-remark-copy-linked-files": "^2.0.11",
     "gatsby-remark-custom-blocks": "^2.3.13",
     "gatsby-remark-images": "^3.0.10",
