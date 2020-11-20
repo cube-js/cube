@@ -8,15 +8,22 @@ menuOrder: 2
 This is a checklist for configuring and securing Cube.js for a production
 deployment.
 
-## Enable Production Mode
+## Disable Development Mode
 
-When running Cube.js in production make sure `NODE_ENV` is set to `production` and `CUBEJS_DEV_MODE` is not set to `true`.
-Some platforms, such as Heroku, do it by default.
+When running Cube.js in production environments, make sure development mode is
+disabled. Running Cube.js in development mode in a production environment can
+lead to security vulnerabilities. You can read more on the differences between
+[production and development mode here][link-cubejs-dev-vs-prod].
 
-In this mode, the insecure development server and Playground will be disabled
-by default because there's a security risk serving those in production
-environments. Production Cube.js servers can only be accessed through the
-[REST API](rest-api) and Cube.js frontend libraries.
+[link-cubejs-dev-vs-prod]: /configuration/overview#development-vs-production
+
+[[info | Note]]
+| Development mode is disabled by default.
+
+```bash
+# Set this to false or leave unset to disable development mode
+CUBEJS_DEV_MODE=false
+```
 
 ## Set up Redis
 
