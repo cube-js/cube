@@ -3,121 +3,72 @@ order: 4
 title: "Interactive Dashboard with Multiple Charts"
 ---
 
-In the previous part, we've created an analytical backend and a basic dashboard with the first chart. Now we're going to expand the dashboard so it provides the at-a-glance view of key performance indicators of our e-commerce company.
+In the previous part, we've created an analytical backend and a basic dashboard with the first chart. Now we're going to expand the dashboard so it provides the view of key performance indicators of our e-commerce company.
 
 ## Custom Date Range
 
 As the first step, we'll let users change the date range of the existing chart.
 
-We'll use a separate `<BarChartHeader />` component to control the date range. Let's create the `src/components/BarChartHeader.js` file with the following contents:
-
-```jsx
-import React from 'react';
-import PropTypes from 'prop-types';
-import { makeStyles } from '@material-ui/styles';
-import { CardHeader, Button } from '@material-ui/core';
-import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
-import Menu from '@material-ui/core/Menu';
-import MenuItem from '@material-ui/core/MenuItem';
-
-const useStyles = makeStyles(() => ({
-  headerButton: {
-    letterSpacing: '0.4px',
-  },
-}));
-
-const BarChartHeader = (props) => {
-  const { setDateRange, dateRange, dates } = props;
-  const defaultDates = ['This week', 'This month', 'Last 7 days', 'Last month'];
-  const classes = useStyles();
-
-  const [anchorEl, setAnchorEl] = React.useState(null);
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-  const handleClose = (date) => {
-    setDateRange(date);
-    setAnchorEl(null);
-  };
-  return (
-    <CardHeader
-      action={
-        <div>
-          <Button
-            className={classes.headerButton}
-            size="small"
-            variant="text"
-            aria-controls="simple-menu"
-            aria-haspopup="true"
-            onClick={handleClick}
-          >
-            {dateRange} <ArrowDropDownIcon />
-          </Button>
-          <Menu
-            id="simple-menu"
-            anchorEl={anchorEl}
-            keepMounted
-            open={Boolean(anchorEl)}
-            onClose={() => handleClose(dateRange)}
-          >
-            {dates ?
-              dates.map((date) => (
-                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
-              ))
-             : defaultDates.map((date) => (
-                <MenuItem key={date} onClick={() => handleClose(date)}>{date}</MenuItem>
-              ))}
-          </Menu>
-        </div>
-      }
-      title="Latest Sales"
-    />
-  );
-};
-
-BarChartHeader.propTypes = {
-  className: PropTypes.string,
-};
-
-export default BarChartHeader;
-```
-
-Now let's add this `<BarChartHeader />` component to our existing chart. Make the following changes in the `src/components/BarChart.js` file:
+For that, we'll need to make a change to the `dashboard-page.component.ts` file: 
 
 ```diff
 // ...
-import ChartRenderer from './ChartRenderer'
-+ import BarChartHeader from "./BarChartHeader";
-// ...
-const BarChart = (props) => {
--  const { className, query, ...rest } = props;
-+  const { className, query, dates, ...rest } = props;
-  const classes = useStyles();
 
-+  const [dateRange, setDateRange] = React.useState(dates ? dates[0] : 'This week');
-+  let queryWithDate = {...query,
-+    timeDimensions: [
-+      {
-+        dimension: query.timeDimensions[0].dimension,
-+        granularity: query.timeDimensions[0].granularity,
-+        dateRange: `${dateRange}`
-+      }
-+    ],
+export class DashboardPageComponent implements OnInit {
+  private query = new BehaviorSubject({
+    measures: ["Orders.count"],
+    timeDimensions: [{ dimension: "Orders.createdAt", granularity: "month", dateRange: "This year" }],
+    dimensions: ["Orders.status"],
+    filters: [{ dimension: "Orders.status", operator: "notEquals", values: ["completed"] }]
+  });
++  changeDateRange = (value) => {
++    this.query.next({
++      ...this.query.value,
++      timeDimensions: [{ dimension: "Orders.createdAt", granularity: "month", dateRange: value }]
++    });
 +  };
 
-  return (
-    <Card {...rest} className={clsx(classes.root, className)}>
-+      <BarChartHeader dates={dates} dateRange={dateRange} setDateRange={setDateRange} />
-+      <Divider />
-      <CardContent>
-        <div className={classes.chartContainer}>
-          <ChartRenderer vizState={{ query: queryWithDate, chartType: 'bar' }}/>
-        </div>
-      </CardContent>
-    </Card>
-  )
-};
-// ...
+  cards = [];
+
+  ngOnInit() {
+    this.query.subscribe(data => {
+      this.cards[0] = {
+        chart: "bar", cols: 2, rows: 1,
+        query: data
+      };
+    });
+  }
+}
+```
+
+And another one to the `dashobard-page.component.html` file:
+
+```diff
+<div class="grid-container">
+  <h1 class="mat-h1">Dashboard</h1>
+  <mat-grid-list cols="3" rowHeight="450px">
+    <mat-grid-tile *ngFor="let card of cards" [colspan]="card.cols" [rowspan]="card.rows">
+      <mat-card class="dashboard-card">
+        <mat-card-header>
+          <mat-card-title>
+            <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #menu="matMenu" xPosition="before">
++            <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
++            <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
+            </mat-menu>
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="dashboard-card-content">
+          <div>
+            <app-bar-chart [query]="card.query" *ngIf="card.chart === 'bar'"></app-bar-chart>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </mat-grid-tile>
+  </mat-grid-list>
+</div>
 ```
 
 Well done! 🎉 Here's what our dashboard application looks like:
@@ -128,157 +79,181 @@ Well done! 🎉 Here's what our dashboard application looks like:
 
 The KPI chart can be used to display business indicators that provide information about the current performance of our e-commerce company. The chart will consist of a grid of tiles, where each tile will display a single numeric KPI value for a certain category.
 
-First, let's use the `react-countup` package to add the count-up animation to the values on the KPI chart. Run the following command in the `dashboard-app` folder:
+First, let's add the `countUp` package to add the count-up animation to the values on the KPI chart. Run the following command in the dashboard-app folder:
 
-```jsx
-npm install --save react-countup
+```bash
+npm i ngx-countup @angular/material/progress-bar
 ```
 
-New we're ready to add new `<KPIChart/>` component. Add the `src/components/KPIChart.js` component with the following contents:
+We weed to import these modules:
 
-```jsx
-import React from 'react';
-import clsx from 'clsx';
-import PropTypes from 'prop-types';
-import { makeStyles } from '@material-ui/styles';
-import { Card, CardContent, Grid, Typography, LinearProgress } from '@material-ui/core';
-import { useCubeQuery } from '@cubejs-client/react';
-import CountUp from 'react-countup';
-import CircularProgress from '@material-ui/core/CircularProgress';
+```diff
++ import { CountUpModule } from 'ngx-countup';
++ import { MatProgressBarModule } from '@angular/material/progress-bar'
 
-const useStyles = makeStyles((theme) => ({
-  root: {
-    height: '100%',
-  },
-  content: {
-    alignItems: 'center',
-    display: 'flex',
-  },
-  title: {
-    fontWeight: 500,
-  },
-  progress: {
-    marginTop: theme.spacing(3),
-    height: '8px',
-    borderRadius: '10px',
-  },
-  difference: {
-    marginTop: theme.spacing(2),
-    display: 'flex',
-    alignItems: 'center',
-  },
-  differenceIcon: {
-    color: theme.palette.error.dark,
-  },
-  differenceValue: {
-    marginRight: theme.spacing(1),
-  },
-  green: {
-    color: theme.palette.success.dark,
-  },
-  red: {
-    color: theme.palette.error.dark,
-  },
-}));
+@NgModule({
+  imports: [
 
-const KPIChart = (props) => {
-  const classes = useStyles();
-  const { className, title, progress, query, difference, duration, ...rest } = props;
-  const { resultSet, error, isLoading } = useCubeQuery(query);
-  const differenceQuery = {...query,
-    "timeDimensions": [
-      {
-        "dimension": `${difference || query.measures[0].split('.')[0]}.createdAt`,
-        "granularity": null,
-        "dateRange": "This year"
-      }
-    ]};
-  const differenceValue = useCubeQuery(differenceQuery);
+//    ...
 
-  if (isLoading || differenceValue.isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress color="secondary" />
-      </div>
++    CountUpModule,
++    MatProgressBarModule
+
+  ],
+  ...
+})
+```
+
+Second, let's add an array of cards we're going to display to the `dashboard-page.component.ts` file:
+
+```diff
+export class DashboardPageComponent implements OnInit {
+
+// ...
+
++  public KPICards = [
++    {
++      title: 'ORDERS',
++      query: { measures: ['Orders.count'] },
++      difference: 'Orders',
++      duration: 1.25,
++    },
++    {
++      title: 'TOTAL USERS',
++      query: { measures: ['Users.count'] },
++      difference: 'Users',
++      duration: 1.5,
++    },
++    {
++      title: 'COMPLETED ORDERS',
++      query: { measures: ['Orders.percentOfCompletedOrders'] },
++      progress: true,
++      duration: 1.75,
++    },
++    {
++      title: 'TOTAL PROFIT',
++      query: { measures: ['LineItems.price'] },
++      duration: 2.25,
++    },
++  ];
+
+// ...
+
+}
+```
+
+The next step is create the KPI Card component. Run:
+
+```bash
+ng generate component kpi-card
+```
+
+Edit this component's code:
+
+```javascript
+import { Component, Input, OnInit } from "@angular/core";
+import { CubejsClient } from "@cubejs-client/ngx";
+
+@Component({
+  selector: 'app-kpi-card',
+  templateUrl: './kpi-card.component.html',
+  styleUrls: ['./kpi-card.component.scss']
+})
+export class KpiCardComponent implements OnInit {
+  @Input() query: object;
+  @Input() title: string;
+  @Input() duration: number;
+  @Input() progress: boolean;
+  constructor(private cubejs:CubejsClient){}
+  public result = 0;
+  public postfix = null;
+  public prefix = null;
+
+  ngOnInit(): void {
+    this.cubejs.load(this.query).subscribe(
+      resultSet => {
+        resultSet.series().map((s) => {
+          this.result = s['series'][0]['value'].toFixed(1);
+          const measureKey = resultSet.seriesNames()[0].key;
+          const annotations = resultSet.tableColumns().find((tableColumn) => tableColumn.key === measureKey);
+          const format = annotations.format || (annotations.meta && annotations.meta.format);
+          if (format === 'percent') {
+            this.postfix = '%';
+          } else if (format === 'currency') {
+            this.prefix = '$';
+          }
+        })
+      },
+      err => console.log('HTTP Error', err)
     );
   }
-  if (error || differenceValue.error) {
-    return <pre>{(error || differenceValue.error).toString()}</pre>;
-  }
-  if (!resultSet || !differenceValue.resultSet) {
-    return null
-  }
-  if (resultSet && differenceValue.resultSet) {
-    let postfix = null;
-    let prefix = null;
-    const measureKey = resultSet.seriesNames()[0].key;
-    const annotations = resultSet.tableColumns().find(tableColumn => tableColumn.key === measureKey);
-    const format = annotations.format || (annotations.meta && annotations.meta.format);
-    if (format === 'percent') {
-      postfix = '%'
-    } else if (format === 'currency') {
-      prefix = '$'
-    }
 
-    let value = null;
-    let fullValue = resultSet.seriesNames().map((s) => resultSet.totalRow()[s.key])[0];
-    if (difference) {
-      value = differenceValue.resultSet.totalRow()[differenceQuery.measures[0]] / fullValue * 100;
-    }
-    return (
-      <Card {...rest} className={clsx(classes.root, className)}>
-        <CardContent>
-          <Grid container justify="space-between">
-            <Grid item>
-              <Typography className={classes.title} color="textSecondary" gutterBottom variant="body2">
-                {title}
-              </Typography>
-              <Typography variant="h3">
-                {prefix}
-                <CountUp
-                  end={fullValue}
-                  duration={duration}
-                  separator=","
-                  decimals={0}
-                />
-                {postfix}
-              </Typography>
-            </Grid>
-          </Grid>
-          {progress ? (
-            <LinearProgress
-              className={classes.progress}
-              value={fullValue}
-              variant="determinate"
-            />
-          ) : null}
-          {difference ? (
-            <div className={classes.difference}>
-              <Typography className={classes.differenceValue} variant="body2">
-                {value > 1 ? (
-                  <span className={classes.green}>{value.toFixed(1)}%</span>
-                ) : (
-                  <span className={classes.red}>{value.toFixed(1)}%</span>
-                )}
-              </Typography>
-              <Typography className={classes.caption} variant="caption">
-                Since this year
-              </Typography>
+}
+```
+
+And the component's template:
+
+```html
+<mat-card class="dashboard-card">
+  <mat-card-header class="dashboard-card__header">
+    <mat-card-title>
+      <h3 class="kpi-title">{{title}}</h3>
+    </mat-card-title>
+  </mat-card-header>
+  <mat-card-content class="dashboard-card-content kpi-result">
+    <span>{{prefix}}</span>
+    <span [countUp]="result" [options]="{duration: duration}">0</span>
+    <span>{{postfix}}</span>
+    <mat-progress-bar [color]="'primary'" class="kpi-progress" *ngIf="progress" value="{{result}}"></mat-progress-bar>
+  </mat-card-content>
+</mat-card>
+```
+
+The final step is to add this component to our dashboard page. To do so, open `dashboard-page.component.html` and replace the code:
+
+```html
+<div class="grid-container">
+  <div class="kpi-wrap">
+    <mat-grid-list cols="4" rowHeight="131px">
+      <mat-grid-tile *ngFor="let card of KPICards" [colspan]="1" [rowspan]="1">
+        <app-kpi-card class="kpi-card"
+                      [query]="card.query"
+                      [title]="card.title"
+                      [duration]="card.duration"
+                      [progress]="card.progress"
+        ></app-kpi-card>
+      </mat-grid-tile>
+    </mat-grid-list>
+  </div>
+  <div>
+    <mat-grid-list cols="5" rowHeight="510px">
+      <mat-grid-tile *ngFor="let card of cards" [colspan]="card.cols" [rowspan]="card.rows">
+        <mat-card class="dashboard-card">
+          <mat-card-header class="dashboard-card__header">
+            <mat-card-title>
+              <h3>Last sales</h3>
+              <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu" xPosition="before">
+                <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
+                <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
+              </mat-menu>
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content class="dashboard-card-content">
+            <div>
+              <app-bar-chart [query]="card.query" *ngIf="card.chart === 'bar'"></app-bar-chart>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
-    );
-  }
-};
-
-KPIChart.propTypes = {
-  className: PropTypes.string,
-  title: PropTypes.string,
-};
-
-export default KPIChart;
+          </mat-card-content>
+        </mat-card>
+      </mat-grid-tile>
+    </mat-grid-list>
+  </div>
+</div>
 ```
+
+The only thing left is to adjust the Cube.js schema. While doing it, we'll learn an important aspect of Cube.js...
 
 **Let's learn how to create custom measures in the data schema and display their values.** In the e-commerce business, it's crucial to know the share of completed orders. To enable our users to monitor this metric, we'll want to display it on the KPI chart. So, we will modify the data schema by [adding a custom measure](https://cube.dev/docs/measures/) (`percentOfCompletedOrders`) which will calculate the share based on another measure (`completedCount`).
 
@@ -291,7 +266,7 @@ Let's customize the "Orders" schema. Open the `schema/Orders.js` file in the roo
 cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
 
-  //.. 
+  // ...
 
   measures: {
     count: {
@@ -310,83 +285,13 @@ cube(`Orders`, {
 +      ]
 +    },
 +    percentOfCompletedOrders: {
-+      sql: `${completedCount}*100.0/${count}`,
++      sql: `${completedCount} * 100.0 / ${count}`,
 +      type: `number`,
 +      format: `percent`
 +    }
   },
 
   // ...
-```
-
-Now we're ready to add the KPI chart displaying a number of KPIs to the dashboard. Make the following changes to the `src/pages/DashboardPage.js` file:
-
-```diff
-// ...
-+ import KPIChart from '../components/KPIChart';
-import BarChart from '../components/BarChart.js'
-// ...
-+ const cards = [
-+  {
-+    title: 'ORDERS',
-+    query: { measures: ['Orders.count'] },
-+    difference: 'Orders',
-+    duration: 1.25,
-+  },
-+  {
-+    title: 'TOTAL USERS',
-+    query: { measures: ['Users.count'] },
-+    difference: 'Users',
-+    duration: 1.5,
-+  },
-+  {
-+    title: 'COMPLETED ORDERS',
-+    query: { measures: ['Orders.percentOfCompletedOrders'] },
-+    progress: true,
-+    duration: 1.75,
-+  },
-+  {
-+    title: 'TOTAL PROFIT',
-+    query: { measures: ['LineItems.price'] },
-+    duration: 2.25,
-+  },
-+ ];
-
-const Dashboard = () => {
-  const classes = useStyles();
-  return (
-    <div className={classes.root}>
-      <Grid
-        container
-        spacing={4}
-      >
-+        {cards.map((item, index) => {
-+         return (
-+           <Grid
-+             key={item.title + index}
-+             item
-+             lg={3}
-+             sm={6}
-+             xl={3}
-+             xs={12}
-+           >
-+             <KPIChart {...item}/>
-+           </Grid>
-+         )
-+       })}
-        <Grid
-          item
-          lg={8}
-          md={12}
-          xl={9}
-          xs={12}
-        >
-          <BarChart/>
-        </Grid>
-      </Grid>
-    </div>
-  );
-};
 ```
 
 Great! 🎉 Now our dashboard has a row of nice and informative KPI metrics:
@@ -399,183 +304,174 @@ Now, using the KPI chart, our users are able to monitor the share of completed o
 
 To enable our users to monitor all these kinds of orders, we'll want to add one final chart to our dashboard. It's best to use the Doughnut chart for that, because it's quite useful to visualize the distribution of a certain metric between several states (e.g., all kinds of orders).
 
-First, just like in the previous part, we're going to put the chart options to a separate file. Let's create the `src/helpers/DoughnutOptions.js` file with the following contents:
+First, let's create the `DoughnutChart` component. Run:
 
-```jsx
-import palette from "../theme/palette";
-export const DoughnutOptions = {
-  legend: {
-    display: false
-  },
-  responsive: true,
-  maintainAspectRatio: false,
-  cutoutPercentage: 80,
-  layout: { padding: 0 },
-  tooltips: {
-    enabled: true,
-    mode: "index",
-    intersect: false,
-    borderWidth: 1,
-    borderColor: palette.divider,
-    backgroundColor: palette.white,
-    titleFontColor: palette.text.primary,
-    bodyFontColor: palette.text.secondary,
-    footerFontColor: palette.text.secondary
-  }
-};
+```bash
+ng generate component doughnut-chart
 ```
 
-Then, let's create the `src/components/DoughnutChart.js` for the new chart with the following contents:
+Then edit the `doughnut-chart.component.ts` file:
 
-```jsx
-import React from 'react';
-import { Doughnut } from 'react-chartjs-2';
-import clsx from 'clsx';
-import PropTypes from 'prop-types';
-import { makeStyles, useTheme } from '@material-ui/styles';
-import { Card, CardHeader, CardContent, Divider, Typography } from '@material-ui/core';
-import { useCubeQuery } from '@cubejs-client/react';
-import CircularProgress from '@material-ui/core/CircularProgress';
-import { DoughnutOptions } from '../helpers/DoughnutOptions.js';
+```javascript
+import { Component, Input, OnInit } from "@angular/core";
+import { CubejsClient } from "@cubejs-client/ngx";
 
-const useStyles = makeStyles((theme) => ({
-  root: {
-    height: '100%',
-  },
-  chartContainer: {
-    marginTop: theme.spacing(3),
-    position: 'relative',
-    height: '300px',
-  },
-  stats: {
-    marginTop: theme.spacing(2),
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  status: {
-    textAlign: 'center',
-    padding: theme.spacing(1),
-  },
-  title: {
-    color: theme.palette.text.secondary,
-    paddingBottom: theme.spacing(1),
-  },
-  statusIcon: {
-    color: theme.palette.icon,
-  },
-}));
+@Component({
+  selector: "app-doughnut-chart",
+  templateUrl: "./doughnut-chart.component.html",
+  styleUrls: ["./doughnut-chart.component.scss"]
+})
+export class DoughnutChartComponent implements OnInit {
+  @Input() query: Object;
 
-const DoughnutChart = (props) => {
-  const { className, query, ...rest } = props;
+  public barChartOptions = {
+    legend: {
+      display: false
+    },
+    responsive: true,
+    maintainAspectRatio: false,
+    cutoutPercentage: 80,
+    layout: { padding: 0 },
+    tooltips: {
+      enabled: true,
+      mode: "index",
+      intersect: false,
+      borderWidth: 1,
+      borderColor: "#eeeeee",
+      backgroundColor: "#ffffff",
+      titleFontColor: "#43436B",
+      bodyFontColor: "#A1A1B5",
+      footerFontColor: "#A1A1B5"
+    }
+  };
 
-  const classes = useStyles();
-  const theme = useTheme();
+  public barChartLabels = [];
+  public barChartType = "doughnut";
+  public barChartLegend = true;
+  public barChartData = [];
+  public value = 0;
+  public labels = [];
 
-  const { resultSet, error, isLoading } = useCubeQuery(query);
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress color="secondary" />
+  constructor(private cubejs: CubejsClient) {
+  }
+
+  ngOnInit() {
+    this.cubejs.load(this.query).subscribe(
+      resultSet => {
+        const COLORS_SERIES = ["#FF6492", "#F3F3FB", "#FFA2BE"];
+        this.barChartLabels = resultSet.chartPivot().map((c) => c.category);
+        this.barChartData = resultSet.series().map((s) => ({
+          label: s.title,
+          data: s.series.map((r) => r.value),
+          backgroundColor: COLORS_SERIES,
+          hoverBackgroundColor: COLORS_SERIES
+        }));
+        resultSet.series().map(s => {
+          this.labels = s.series;
+          this.value = s.series.reduce((sum, current) => {
+            return sum.value ? sum.value + current.value : sum + current.value
+          });
+        });
+      },
+      err => console.log("HTTP Error", err)
+    );
+  }
+
+}
+```
+
+And the template in the `doughnut-chart.component.html` file:
+
+```html
+<div>
+  <canvas baseChart
+          height="215"
+          [datasets]="barChartData"
+          [labels]="barChartLabels"
+          [options]="barChartOptions"
+          [legend]="barChartLegend"
+          [chartType]="barChartType">
+  </canvas>
+  <mat-grid-list cols="3">
+    <mat-grid-tile *ngFor="let card of labels" [colspan]="1" [rowspan]="1">
+      <div>
+        <h3 class="doughnut-label">{{card.category}}</h3>
+        <h2 class="doughnut-number">{{((card.value/value) * 100).toFixed(1)}}%</h2>
       </div>
-    );
-  }
-  if (error) {
-    return <pre>{error.toString()}</pre>;
-  }
-  if (!resultSet) {
-    return null
-  }
-  if (resultSet) {
-    const COLORS_SERIES = [
-      theme.palette.secondary.light,
-      theme.palette.secondary.lighten,
-      theme.palette.secondary.main,
-    ];
-    const data = {
-      labels: resultSet.categories().map((c) => c.category),
-      datasets: resultSet.series().map((s) => ({
-        label: s.title,
-        data: s.series.map((r) => r.value),
-        backgroundColor: COLORS_SERIES,
-        hoverBackgroundColor: COLORS_SERIES,
-      })),
-    };
-    const reducer = (accumulator, currentValue) => accumulator + currentValue;
-    return (
-      <Card {...rest} className={clsx(classes.root, className)}>
-        <CardHeader title="Orders status" />
-        <Divider />
-        <CardContent>
-          <div className={classes.chartContainer}>
-            <Doughnut data={data} options={DoughnutOptions} />
-          </div>
-          <div className={classes.stats}>
-            {resultSet.series()[0].series.map((status) => (
-              <div className={classes.status} key={status.category}>
-                <Typography variant="body1" className={classes.title}>
-                  {status.category}
-                </Typography>
-                <Typography variant="h2">{((status.value/resultSet.series()[0].series.map(el => el.value).reduce(reducer)) * 100).toFixed(0)}%</Typography>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-};
-
-DoughnutChart.propTypes = {
-  className: PropTypes.string,
-};
-
-export default DoughnutChart;
+    </mat-grid-tile>
+  </mat-grid-list>
+</div>
 ```
 
-The last step is to add the new chart to the dashboard. Let's modify the `src/pages/DashboardPage.js` file:
+The next step is to add this card to the `dashboard-page.component.ts` file:
 
 ```diff
-// ...
-import DataCard from '../components/DataCard';
-import BarChart from '../components/BarChart.js'
-+ import DoughnutChart from '../components/DoughnutChart.js'
+export class DashboardPageComponent implements OnInit {
 
 // ...
-+ const doughnutChartQuery = {
-+  measures: ['Orders.count'],
-+  timeDimensions: [
-+    {
-+      dimension: 'Orders.createdAt',
-+    },
-+  ],
-+  filters: [],
-+  dimensions: ['Orders.status'],
-+ };
-//...
 
-return (
-    <div className={classes.root}>
-      <Grid
-        container
-        spacing={4}
-      >
-        // ..
-+        <Grid
-+          item
-+          lg={4}
-+          md={6}
-+          xl={3}
-+          xs={12}
-+        >
-+          <DoughnutChart query={doughnutChartQuery}/>
-+        </Grid>
-      </Grid>
-    </div>
-  );
++  private doughnutQuery = new BehaviorSubject({
++    measures: ['Orders.count'],
++    timeDimensions: [
++      {
++        dimension: 'Orders.createdAt',
++      },
++    ],
++    filters: [],
++    dimensions: ['Orders.status'],
++  });
+ 
+  ngOnInit() {
+    ...
++    this.doughnutQuery.subscribe(data => {
++      this.cards[1] = {
++        hasDatePick: false,
++        title: 'Users by Device',
++        chart: "doughnut", cols: 2, rows: 1,
++        query: data
++      };
++    });
+  }
+}
+```
+
+And the last step is to use this template in the `dashboard-page.component.html` file:
+
+```diff
+<div class="grid-container">
+
+// ...
+
+    <mat-grid-list cols="5" rowHeight="510px">
+      <mat-grid-tile *ngFor="let card of cards" [colspan]="card.cols" [rowspan]="card.rows">
+        <mat-card class="dashboard-card">
+          <mat-card-header class="dashboard-card__header">
+            <mat-card-title>
+              <h3>{{card.title}}</h3>
++             <div *ngIf="card.hasDatePick">
+                <button mat-icon-button class="more-button" [matMenuTriggerFor]="menu" aria-label="Toggle menu">
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #menu="matMenu" xPosition="before">
+                  <button mat-menu-item  (click)="changeDateRange('This year')">This year</button>
+                  <button mat-menu-item  (click)="changeDateRange('Last year')">Last year</button>
+                </mat-menu>
++             </div>
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content class="dashboard-card-content">
+            <div>
+              <app-bar-chart [query]="card.query" *ngIf="card.chart === 'bar'"></app-bar-chart>
++              <app-doughnut-chart [query]="card.query" *ngIf="card.chart === 'doughnut'"></app-doughnut-chart>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </mat-grid-tile>
+    </mat-grid-list>
+  </div>
+</div>
 ```
 
 Awesome! 🎉 Now the first page of our dashboard is complete:
 
 ![](/images/image-53.png)
-
-If you like the layout of our dashboard, check out the [Devias Kit Admin Dashboard](https://github.com/devias-io/react-material-dashboard), an open source React Dashboard made with Material UI's components. 

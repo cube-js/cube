@@ -1,6 +1,6 @@
 ## Example of Cube.js Data Blending approach with React and Highcharts
 
-The [live demo](https://data-blending.cubecloudapp.dev).
+The [live demo](https://data-blending-demo.cube.dev).
 
 Here you can find a usage of:
 

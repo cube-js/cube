@@ -30,7 +30,7 @@ class Index extends React.Component {
         <Hero
           title="D3 Dashboard Tutorial"
           subtitle="Learn how to build a D3 dashboard with an example in React, Material UI, and Cube.js."
-          demoUrl="https://d3-dashboard.cubecloudapp.dev/"
+          demoUrl="https://d3-dashboard-demo.cube.dev/"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={ <StyledHeroImage alt="hero" src={hero} /> }

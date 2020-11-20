@@ -2,7 +2,7 @@
 
 The example application uses Cube.js as the analytics backend, Snowplow for data collection, and Athena as the main data warehouse. The frontend is built with React, Material UI, and Recharts.
 
-**Online demo:** [web-analytics-demo.cubecloudapp.dev](https://web-analytics-demo.cubecloudapp.dev)
+**Online demo:** [web-analytics-demo.cube.dev](https://web-analytics-demo.cube.dev)
 
 **Tutorial**: [Building an Open Source Web Analytics Platform](http://web-analytics.cube.dev)
 

@@ -1,6 +1,6 @@
 # Angular Dashboard with Material
 
-Example: https://angular-dashboard.cubecloudapp.dev
+Example: https://angular-dashboard-demo.cube.dev
 
 Guide: https://angular-dashboard.cube.dev
 

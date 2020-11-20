@@ -76,7 +76,7 @@
     "lint:md": "remark content/",
     "write-good": "write-good $(glob 'content/posts/**/*.md')",
     "format:js": "prettier '**/*.{js,jsx}' --write",
-    "deploy": "amplify publish -c"
+    "deploy": "npm run build && netlify deploy --prod --dir public"
   },
   "remarkConfig": {
     "plugins": [

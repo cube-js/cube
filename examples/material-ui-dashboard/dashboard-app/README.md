@@ -1,6 +1,6 @@
 # Material UI Dashboard
 
-Example: https://material-ui-dashboard.cubecloudapp.dev/
+Example: https://material-ui-dashboard-demo.cube.dev/
 
 Guide: https://cube.dev/blog/material-ui-dashboard/
 

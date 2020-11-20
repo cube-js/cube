@@ -16,9 +16,9 @@ category: Examples
 
 [link-real-time-dashboard]: https://real-time-dashboard-demo.cube.dev/
 [code-real-time-dashboard]: https://github.com/cube-js/cube.js/tree/master/examples/real-time-dashboard
-[link-react-dashboard]: https://react-dashboard-demo.cubecloudapp.dev/
+[link-react-dashboard]: https://react-dashboard-demo.cube.dev/
 [code-react-dashboard]: https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard/demo
-[link-d3-dashboard]: https://d3-dashboard.cubecloudapp.dev/
+[link-d3-dashboard]: https://d3-dashboard-demo.cube.dev/
 [code-d3-dashboard]: https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard
 [link-stripe-dashboard]: http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/
 [code-stripe-dashboard]: https://github.com/cube-js/cube.js/tree/master/examples/stripe-dashboard

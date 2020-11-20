@@ -2,7 +2,7 @@
 
 Query builder example built with Vue.js and Vuetify.
 
-Demo: https://vue-query-builder.cubecloudapp.dev/
+Demo: https://vue-query-builder-demo.cube.dev/
 
 ## Run Project
 
