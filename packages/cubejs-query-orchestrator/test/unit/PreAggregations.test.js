@@ -1,4 +1,4 @@
-/* eslint-disable global-require */
+/* eslint-disable global-require,no-unused-vars */
 /* globals describe, jest, beforeEach, test, expect */
 const R = require('ramda');
 
