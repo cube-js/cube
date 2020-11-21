@@ -16,7 +16,7 @@
     "unit": "jest --runInBand --verbose test/unit",
     "integration": "jest --runInBand --verbose test/integration",
     "integration:redis": "jest --runInBand --verbose test/integration",
-    "lint": "eslint orchestrator/*.js driver/*.js"
+    "lint": "eslint orchestrator/*.js driver/*.js test/**/*.js"
   },
   "dependencies": {
     "generic-pool": "^3.7.1",

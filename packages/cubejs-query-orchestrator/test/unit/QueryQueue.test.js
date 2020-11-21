@@ -41,8 +41,8 @@ const QueryQueueTest = (name, options) => {
 
     test('instant double wait resolve', async () => {
       const results = await Promise.all([
-        queue.executeInQueue('delay', `instant`, { delay: 400, result: '2' }),
-        queue.executeInQueue('delay', `instant`, { delay: 400, result: '2' })
+        queue.executeInQueue('delay', 'instant', { delay: 400, result: '2' }),
+        queue.executeInQueue('delay', 'instant', { delay: 400, result: '2' })
       ]);
       expect(results).toStrictEqual(['20', '20']);
     });
@@ -50,13 +50,12 @@ const QueryQueueTest = (name, options) => {
     test('priority', async () => {
       delayCount = 0;
       const result = await Promise.all([
-        queue.executeInQueue('delay', `11`, { delay: 600, result: '1' }, 1),
-        queue.executeInQueue('delay', `12`, { delay: 100, result: '2' }, 0),
-        queue.executeInQueue('delay', `13`, { delay: 100, result: '3' }, 10)
+        queue.executeInQueue('delay', '11', { delay: 600, result: '1' }, 1),
+        queue.executeInQueue('delay', '12', { delay: 100, result: '2' }, 0),
+        queue.executeInQueue('delay', '13', { delay: 100, result: '3' }, 10)
       ]);
       expect(parseInt(result.find(f => f[0] === '3'), 10) % 10).toBeLessThan(2);
     });
-
 
     test('timeout', async () => {
       delayCount = 0;
@@ -77,7 +76,6 @@ const QueryQueueTest = (name, options) => {
       }
       expect(errorString).toEqual(expect.stringContaining('timeout'));
     });
-
 
     test('stage reporting', async () => {
       delayCount = 0;
@@ -122,18 +120,18 @@ const QueryQueueTest = (name, options) => {
       cancelledQuery = null;
       delayCount = 0;
 
-      let result = queue.executeInQueue('delay', `111`, { delay: 800, result: '1' }, 0);
-      delayFn(null, 50).then(() => queue.executeInQueue('delay', `112`, { delay: 800, result: '2' }, 0)).catch(e => e);
-      delayFn(null, 60).then(() => queue.executeInQueue('delay', `113`, { delay: 500, result: '3' }, 0)).catch(e => e);
-      delayFn(null, 70).then(() => queue.executeInQueue('delay', `114`, { delay: 900, result: '4' }, 0)).catch(e => e);
+      let result = queue.executeInQueue('delay', '111', { delay: 800, result: '1' }, 0);
+      delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0)).catch(e => e);
+      delayFn(null, 60).then(() => queue.executeInQueue('delay', '113', { delay: 500, result: '3' }, 0)).catch(e => e);
+      delayFn(null, 70).then(() => queue.executeInQueue('delay', '114', { delay: 900, result: '4' }, 0)).catch(e => e);
 
       expect(await result).toBe('10');
-      await queue.executeInQueue('delay', `112`, { delay: 800, result: '2' }, 0);
-      result = await queue.executeInQueue('delay', `113`, { delay: 900, result: '3' }, 0);
+      await queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0);
+      result = await queue.executeInQueue('delay', '113', { delay: 900, result: '3' }, 0);
       expect(result).toBe('32');
       await delayFn(null, 200);
       expect(cancelledQuery).toBe('114');
-      await queue.executeInQueue('delay', `114`, { delay: 50, result: '4' }, 0);
+      await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
     });
 
     test('removed before reconciled', async () => {

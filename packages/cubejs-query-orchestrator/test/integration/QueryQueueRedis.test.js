@@ -1,4 +1,3 @@
-/* globals describe, test, expect, afterAll */
 const QueryQueueTest = require('../unit/QueryQueue.test');
 const RedisPool = require('../../orchestrator/RedisPool');
 
