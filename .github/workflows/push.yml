@@ -207,6 +207,10 @@ jobs:
         run: yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn lerna run --concurrency 1 tsc
+      - name: Run Redis Integration
+        timeout-minutes: 10
+        run: |
+          yarn lerna run --concurrency 1 integration:redis
       - name: Run Postgres Integration with 9.6
         timeout-minutes: 10
         run: |

@@ -258,7 +258,7 @@ describe('PreAggregations', () => {
     let PreAggregations = null;
 
     beforeEach(async () => {
-      PreAggregations = require('../orchestrator/PreAggregations');
+      PreAggregations = require('../../orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
@@ -308,7 +308,7 @@ describe('PreAggregations', () => {
     let PreAggregations = null;
 
     beforeEach(async () => {
-      PreAggregations = require('../orchestrator/PreAggregations');
+      PreAggregations = require('../../orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         "TEST",
         mockDriverFactory,
