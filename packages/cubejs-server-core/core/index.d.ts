@@ -39,7 +39,7 @@ export interface CreateOptions {
   updateCompilerCacheKeepAlive?: boolean;
   telemetry?: boolean;
   allowUngroupedWithoutPrimaryKey?: boolean;
-  orchestratorOptions?: OrchestratorOptions;
+  orchestratorOptions?: OrchestratorOptions | ((context: RequestContext) => OrchestratorOptions);
 }
 
 export interface OrchestratorOptions {
