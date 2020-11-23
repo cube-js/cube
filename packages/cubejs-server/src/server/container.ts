@@ -1,58 +1,13 @@
 import { CreateOptions } from '@cubejs-backend/server-core';
-import { requireFromPackage, isDockerImage, packageExists } from '@cubejs-backend/shared';
+import { requireFromPackage, isDockerImage, packageExists, PackageManifest } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 
+import { getMajorityVersion, isCubeNotServerPackage, isDevPackage, isSimilarPackageRelease } from './utils';
 import { CubejsServer } from '../server';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
-
-const devPackages = [
-  'typescript',
-];
-
-function isCubeNotServerPackage(pkgName: string): boolean {
-  return pkgName !== '@cubejs-backend/server' && pkgName.toLowerCase().startsWith('@cubejs-backend/');
-}
-
-function isCubePackage(pkgName: string): boolean {
-  return pkgName.toLowerCase().startsWith('@cubejs-backend/');
-}
-
-function isDevPackage(pkgName: string): boolean {
-  return isCubePackage(pkgName) || devPackages.includes(pkgName.toLowerCase());
-}
-
-function isSimilarPackageRelease(pkg: SemVer, core: SemVer): boolean {
-  if (pkg.major === 0 && core.major === 0) {
-    return pkg.minor === core.minor;
-  }
-
-  return pkg.major === core.major;
-}
-
-function getMajorityVersion(pkg: SemVer, strict: boolean = false): string {
-  if (pkg.major === 0) {
-    if (strict) {
-      return `^${pkg.major}.${pkg.minor}.${pkg.patch}`;
-    }
-
-    return `^${pkg.major}.${pkg.minor}`;
-  }
-
-  if (strict) {
-    return `^${pkg.major}.${pkg.minor}`;
-  }
-
-  return `^${pkg.major}`;
-}
-
-type PackageManifest = {
-  version: string,
-  dependencies: Record<string, string>,
-  devDependencies: Record<string, string>
-}
 
 export class ServerContainer {
   public constructor(
@@ -240,18 +195,19 @@ export class ServerContainer {
     }
   }
 
-  public runServerInstance(configuration: CreateOptions) {
+  public async runServerInstance(configuration: CreateOptions) {
     const server = new CubejsServer(configuration);
 
-    server.listen().then(({ version, port }) => {
+    try {
+      const { version, port } = await server.listen();
+
       console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-    }).catch(e => {
+    } catch (e) {
       console.error('Fatal error during server start: ');
       console.error(e.stack || e);
-    });
+    }
   }
 
-  // eslint-disable-next-line consistent-return
   public async lookupConfiguration(): Promise<CreateOptions> {
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
       this.getTypeScriptCompiler().compileConfiguration();
@@ -268,7 +224,6 @@ export class ServerContainer {
     return {};
   }
 
-  // eslint-disable-next-line consistent-return
   protected async loadConfiguration(): Promise<CreateOptions> {
     const file = await import(
       path.join(process.cwd(), 'cube.js')
