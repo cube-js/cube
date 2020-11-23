@@ -27,6 +27,12 @@ type RequireFromPackageOptions = {
   silent?: true
 }
 
+export type PackageManifest = {
+  version: string,
+  dependencies: Record<string, string>,
+  devDependencies: Record<string, string>
+}
+
 export async function requireFromPackage<T = unknown>(
   pkg: string,
   { basePath = process.cwd(), relative, silent }: RequireFromPackageOptions
