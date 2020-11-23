@@ -1,5 +1,7 @@
 name: Pull Requests
 on:
+  pull_request_target:
+    types: [opened]
   pull_request:
     types: [opened]
 
@@ -13,7 +15,7 @@ jobs:
         with:
           repository: 'cube-js/github-actions'
           path: ./actions
-          ref: v1
+          ref: v2
       - name: Install Actions
         run: npm install --production --prefix ./actions
       - name: Detect author
