@@ -58,7 +58,9 @@ export class CubejsServer {
 
       const app = express();
 
-      app.use(cors());
+      app.use(cors({
+        allowedHeaders: 'Authorization,X-Request-Id'
+      }));
       app.use(bodyParser.json({ limit: '50mb' }));
 
       if (this.initApp) {
