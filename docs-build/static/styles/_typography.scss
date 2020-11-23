@@ -1,4 +1,5 @@
-@import "variables";
+@import 'variables';
+@import 'mixins';
 
 html {
   height: 100%;
@@ -99,9 +100,7 @@ a:hover {
 }
 
 p {
-  font-family: $body-font;
-  font-size: 17px;
-  line-height: 30px;
+  @include body-text;
 }
 
 p,

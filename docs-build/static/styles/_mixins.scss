@@ -1,3 +1,5 @@
+@import 'variables';
+
 @mixin flex-direction($values) {
 	-webkit-flex-direction: $values;
 	flex-direction: $values;
@@ -31,4 +33,10 @@
 @mixin display-inline-flex() {
 	display: -webkit-inline-flex;
 	display: inline-flex;
+}
+
+@mixin body-text() {
+  font-family: $body-font;
+  font-size: 17px;
+  line-height: 30px;
 }
