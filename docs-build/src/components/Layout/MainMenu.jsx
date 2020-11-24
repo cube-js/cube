@@ -21,8 +21,7 @@ const menuOrder = [
   'Cube.js Frontend',
   'Deployment',
   'Cube.js CLI',
-  'Tutorials',
-  'Examples'
+  'Examples & Tutorials'
 ];
 
 const nameRules = {
