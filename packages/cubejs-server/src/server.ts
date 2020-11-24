@@ -74,6 +74,7 @@ export class CubejsServer {
 
       const app = express();
 
+      app.set('x-powered-by', 'Cube.js');
       app.use(cors(this.config.http.cors));
       app.use(bodyParser.json({ limit: '50mb' }));
 
