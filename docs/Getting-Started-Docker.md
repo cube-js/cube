@@ -76,7 +76,7 @@ network_mode: "host"
 $ docker-compose up -d
 ```
 
-Check if the containers are running:
+Check if the container is running:
 
 ```bash
 $ docker ps
@@ -84,13 +84,15 @@ $ docker ps
 
 ## 4. Open Playground
 
-Head to [http://localhost:4000](http://localhost:8080/console) to open the Developer Playground.
+Head to [http://localhost:4000](http://localhost:8080/console) to open the Playground.
 
-## 5. Next Steps
+You can generate data schema files using the Playground. Once schema files are
+generated you can execute queries on the Build tab in the Playground.
 
-In the Playground you will be able to generate a simple schema based on your
-database tables. You can [learn more about Cube.js Data Schema][link-cubejs-schema] for complex data
-modelling techniques. 
+## Next Steps
+
+Generating data schema files in the Playground is a good first step to start modelling your data. You can [learn more about Cube.js Data Schema][link-cubejs-schema] for complex data
+modelling techniques.
 
 Learn how to [query Cube.js with REST API][link-rest-api] or [use Javascript client library and
 integrations with frontend frameworks][link-frontend-introduction].
