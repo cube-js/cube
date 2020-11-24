@@ -1,8 +1,8 @@
 ---
 title: Caching
 permalink: /caching
-category: Cube.js Backend
-menuOrder: 6
+category: Caching
+menuOrder: 1
 ---
 
 [link-cube-cloud]: https://cube.dev/cloud
