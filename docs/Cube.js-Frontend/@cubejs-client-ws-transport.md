@@ -18,9 +18,9 @@ WebSocket transport for Cube.js client
 
 > **apiUrl**: *string*
 
-### hearBeatInterval
+### heartBeatInterval
 
-> **hearBeatInterval**: *number*
+> **heartBeatInterval**: *number*
 
 ### messageCounter
 
@@ -98,5 +98,5 @@ Name | Type |
 ------ | ------ |
 apiUrl | string |
 authorization | string |
-hearBeatInterval? | number |
+heartBeatInterval? | number |
 heartBeatInterval? | number |
