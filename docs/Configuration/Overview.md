@@ -20,15 +20,15 @@ in `cube.js`. In production scenarios, it allows changing configuration
 by simply switching environment variables, which is generally safer,
 faster and easier than re-deploying the codebase.
 
-## Development vs Production
+## Development Mode
 
-Cube.js can be run in an insecure, development-only mode by setting the
+Cube.js can be run in an insecure, development mode by setting the
 `CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube.js in
 development mode does the following:
 
 - Disables authentication checks
 - Allows another log level to be set (`trace`)
-- Enables the Developer Playground on `http://localhost:4000`
+- Enables the Playground on `http://localhost:4000`
 - Uses `memory` instead of `redis` as the default cache/queue engine
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew` instead of throwing errors
 

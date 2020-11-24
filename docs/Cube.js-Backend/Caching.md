@@ -5,6 +5,8 @@ category: Cube.js Backend
 menuOrder: 6
 ---
 
+[link-cube-cloud]: https://cube.dev/cloud
+
 Cube.js provides a two-level caching system. The first level is **in-memory** cache and is active by default. We recommend using [Redis](https://redis.io) for in-memory cache when [running Cube.js in production](/deployment/production-checklist).
 
 Cube.js [in-memory cache](#in-memory-cache) acts as a buffer for your database when there's a burst of requests hitting the same data from multiple concurrent users while [pre-aggregations](#pre-aggregations) are designed to provide the right balance between time to insight and querying performance.
@@ -197,12 +199,12 @@ You can set [scheduledRefreshTimer](config#options-reference-scheduled-refresh-t
 For serverless deployments [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead of timer.
 
 ## Inspecting Queries
-To inspect whether the query hits in-memory cache, pre-aggregation, or the underlying data source, you can use the Playground or Cube Cloud.
+To inspect whether the query hits in-memory cache, pre-aggregation, or the underlying data source, you can use the Playground or [Cube Cloud][link-cube-cloud].
 
 The Playground can be used to inspect a single query. To do that, click the "cache" button after executing the query. It will show you the information about the `refreshKey` for the query and whether the query uses any pre-aggregations. To inspect multiple queries or list existing pre-aggregations, you can use Cube Cloud.
 
 [[info | ]]
-| Cube Cloud currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
+| [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
 
 To inspect queries in the Cube Cloud, navigate to the "History" page. You can filter queries by multiple parameters on this page, including whether they hit the cache, pre-aggregations, or raw data. Additionally, you can click on the query to see its details, such as time spent in the database, the database queue's size at the point of query execution, generated SQL, query timeline, and more. It will also show you the optimal pre-aggregations that could be used for this query.
 
