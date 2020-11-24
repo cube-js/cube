@@ -6,6 +6,12 @@ category: Getting Started
 
 [link-connecting-to-the-database]: /connecting-to-the-database
 [link-cubejs-schema]: /getting-started-cubejs-schema
+[link-getting-started-docker]: /getting-started-docker
+
+This guide walks you through getting started with the Cube.js and requires having [Node.js](https://nodejs.org/en/) installed.
+
+In case you don't have Node.js or you'd like to run Cube.js with Docker, follow [Getting started with Docker guide][link-getting-started-docker].
+
 
 ## 1. Scaffold the project
 
