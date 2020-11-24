@@ -15,6 +15,7 @@ const menuOrder = [
   'Cube.js Introduction',
   'Configuration',
   'Caching',
+  'Authentication & Authorization',
   'Cube.js Backend',
   'Data Schema',
   'Cube.js Frontend',

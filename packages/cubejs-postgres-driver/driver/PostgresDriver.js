@@ -29,6 +29,7 @@ class PostgresDriver extends BaseDriver {
     const sslOptions = [
       { name: 'ca', value: 'CUBEJS_DB_SSL_CA' },
       { name: 'cert', value: 'CUBEJS_DB_SSL_CERT' },
+      { name: 'key', value: 'CUBEJS_DB_SSL_KEY' },
       { name: 'ciphers', value: 'CUBEJS_DB_SSL_CIPHERS' },
       { name: 'passphrase', value: 'CUBEJS_DB_SSL_PASSPHRASE' },
     ];
