@@ -3,11 +3,11 @@ order: 4
 title: "Frontend App with React and Material UI"
 ---
 
-We can quickly generate a frontend application with Cube.js Templates. Templates are open-source, ready-to-use frontend analytics apps. We can just pick what technologies we need and it gets everything configured and ready to use. In the Cube.js playground navigate to the Dashboard App and click *Create Your Own*. We will use React and Material UI and let's pick Recharts as our charting library.
+We can quickly create a frontend application with Cube.js, because it can generate it using open-source, ready-to-use templates. We can just pick what technologies we need and it gets everything configured and ready to use. In the Developer Playground, navigate to the Dashboard App and click *Create Your Own*. We will use React, Material UI, and Recharts as our charting library.
 
 ![](/images/4-screenshot-1.png)
 
-It will create the `dashboard-app` folder with the frontend application inside the project folder. It could take several minutes to download and install all the dependencies. Once it is done, you can start Dashboard App either from "Dashboard App" tab in the Playground or by running `npm run start` inside the `dashboard-app` folder.
+It will create the `dashboard-app` folder with the frontend application inside the project folder. It could take several minutes to download and install all the dependencies. Once it is done, you can start Dashboard App either from "Dashboard App" tab in the Playground or by running `npm start` inside the `dashboard-app` folder.
 
 To keep things simple we're not going to build the [full demo
 application](https://web-analytics-demo.cube.dev/), but
@@ -136,42 +136,42 @@ Next, make the following changes in the
 `dashbooard-app/src/components/ChartRenderer.js` file.
 
 ```diff
- import TableCell from "@material-ui/core/TableCell";
- import TableHead from "@material-ui/core/TableHead";
- import TableRow from "@material-ui/core/TableRow";
-+import moment from "moment";
-+import numeral from "numeral";
-+const dateFormatter = item => moment(item).format("MMM DD");
-+const numberFormatter = item => numeral(item).format("0,0");
+  import TableCell from "@material-ui/core/TableCell";
+  import TableHead from "@material-ui/core/TableHead";
+  import TableRow from "@material-ui/core/TableRow";
++ import moment from "moment";
++ import numeral from "numeral";
++ const dateFormatter = item => moment(item).format("MMM DD");
++ const numberFormatter = item => numeral(item).format("0,0");
 
- const CartesianChart = ({ resultSet, children, ChartComponent }) => (
-   <ResponsiveContainer width="100%" height={350}>
--    <ChartComponent data={resultSet.chartPivot()}>
--      <XAxis dataKey="x" />
--      <YAxis />
--      <CartesianGrid />
-+    <ChartComponent
-+      margin={{
-+            top: 16,
-+            right: 16,
-+            bottom: 0,
-+            left: 0,
-+          }}
-+       data={resultSet.chartPivot()}
-+     >
-+      <XAxis dataKey="x" axisLine={false} tickLine={false} tickFormatter={dateFormatter} />
-+      <YAxis axisLine={false} tickLine={false} />
-+      <CartesianGrid vertical={false} />
-       {children}
-       <Legend />
--      <Tooltip />
-+      <Tooltip labelFormatter={dateFormatter} formatter={numberFormatter} />
-     </ChartComponent>
-   </ResponsiveContainer>
- );
+  const CartesianChart = ({ resultSet, children, ChartComponent }) => (
+    <ResponsiveContainer width="100%" height={350}>
+-     <ChartComponent data={resultSet.chartPivot()}>
+-       <XAxis dataKey="x" />
+-       <YAxis />
+-       <CartesianGrid />
++     <ChartComponent
++       margin={{
++             top: 16,
++             right: 16,
++             bottom: 0,
++             left: 0,
++           }}
++        data={resultSet.chartPivot()}
++      >
++       <XAxis dataKey="x" axisLine={false} tickLine={false} tickFormatter={dateFormatter} />
++       <YAxis axisLine={false} tickLine={false} />
++       <CartesianGrid vertical={false} />
+        {children}
+        <Legend />
+-       <Tooltip />
++       <Tooltip labelFormatter={dateFormatter} formatter={numberFormatter} />
+      </ChartComponent>
+    </ResponsiveContainer>
+  );
 
--const colors = ["#FF6492", "#141446", "#7A77FF"];
-+const colors = ["#4791db", "#e33371", "#e57373"];
+- const colors = ["#FF6492", "#141446", "#7A77FF"];
++ const colors = ["#4791db", "#e33371", "#e57373"];
 ```
 
 The code above uses Moment.js and Numeral.js to define formatter for axes and
@@ -347,86 +347,86 @@ file.
 
 
 ```diff
--import React from "react";
-+import React, { useState } from "react";
- import { makeStyles } from "@material-ui/core/styles";
- import Grid from "@material-ui/core/Grid";
- import OverTimeChart from "../components/OverTimeChart";
-+import Dropdown from "../components/Dropdown";
+- import React from "react";
++ import React, { useState } from "react";
+  import { makeStyles } from "@material-ui/core/styles";
+  import Grid from "@material-ui/core/Grid";
+  import OverTimeChart from "../components/OverTimeChart";
++ import Dropdown from "../components/Dropdown";
 
-const useStyles = makeStyles(theme => ({
-  root: {
-    padding: theme.spacing(3),
-  }
-}));
+  const useStyles = makeStyles(theme => ({
+    root: {
+      padding: theme.spacing(3),
+    }
+  }));
 
-+const overTimeQueries = {
-+  "Users": {
-+    measures: ["Sessions.usersCount"],
-+    timeDimensions: [{
-+      dimension: "Sessions.timestamp",
-+      granularity: "day",
-+      dateRange: "Last 30 days"
-+    }]
-+  },
-+  "Sessions": {
-+    measures: ["Sessions.count"],
-+    timeDimensions: [{
-+      dimension: "Sessions.timestamp",
-+      granularity: "day",
-+      dateRange: "Last 30 days"
-+    }]
-+  },
-+  "Page Views": {
-+    measures: ["PageViews.count"],
-+    timeDimensions: [{
-+      dimension: "PageViews.timestamp",
-+      granularity: "day",
-+      dateRange: "Last 30 days"
-+    }]
-+  },
-+};
-+
- const DashboardPage = () => {
-   const classes = useStyles();
-+  const [overTimeQuery, setOverTimeQuery] = useState("Users");
-   return (
-     <Grid item xs={12} className={classes.root}>
-       <OverTimeChart
-+        title={
-+          <Dropdown
-+            value={overTimeQuery}
-+            options={
-+              Object.keys(overTimeQueries).reduce((out, measure) => {
-+                out[measure] = () => setOverTimeQuery(measure)
-+                return out;
-+              }, {})
-+            }
-+          />
-+        }
-         vizState={{
-           chartType: 'line',
--          query: {
--            measures: ["Sessions.count"],
--            timeDimensions: [{
--              dimension: "Sessions.timestamp",
--              granularity: "day",
--              dateRange: "Last 30 days"
--            }]
--          }
-+          query: overTimeQueries[overTimeQuery]
-         }}
-       />
-     </Grid>
-  )
-};
++ const overTimeQueries = {
++   "Users": {
++     measures: ["Sessions.usersCount"],
++     timeDimensions: [{
++       dimension: "Sessions.timestamp",
++       granularity: "day",
++       dateRange: "Last 30 days"
++     }]
++   },
++   "Sessions": {
++     measures: ["Sessions.count"],
++     timeDimensions: [{
++       dimension: "Sessions.timestamp",
++       granularity: "day",
++       dateRange: "Last 30 days"
++     }]
++   },
++   "Page Views": {
++     measures: ["PageViews.count"],
++     timeDimensions: [{
++       dimension: "PageViews.timestamp",
++       granularity: "day",
++       dateRange: "Last 30 days"
++     }]
++   },
++ };
 
-export default DashboardPage;
+  const DashboardPage = () => {
+    const classes = useStyles();
++   const [overTimeQuery, setOverTimeQuery] = useState("Users");
+    return (
+      <Grid item xs={12} className={classes.root}>
+        <OverTimeChart
++         title={
++           <Dropdown
++             value={overTimeQuery}
++             options={
++               Object.keys(overTimeQueries).reduce((out, measure) => {
++                 out[measure] = () => setOverTimeQuery(measure)
++                 return out;
++               }, {})
++             }
++           />
++         }
+          vizState={{
+            chartType: 'line',
+-           query: {
+-             measures: ["Sessions.count"],
+-             timeDimensions: [{
+-               dimension: "Sessions.timestamp",
+-               granularity: "day",
+-               dateRange: "Last 30 days"
+-             }]
+-           }
++           query: overTimeQueries[overTimeQuery]
+          }}
+        />
+      </Grid>
+    )
+  };
+
+  export default DashboardPage;
 ```
 
-Navigate to the http://localhost:3000 and you should be able to switch between charts and change the granularity like on the GIF below.
+Navigate to http://localhost:3000 and you should be able to switch between charts and change the granularity like on the animated image below.
 
 ![](https://cube.dev/downloads/media/web-analytics-guide-gif-1.gif)
 
-In the next part we'll add more new charts to this dashboard!📊🎉
+In the next part we'll add more new charts to this dashboard! 📊🎉
 
