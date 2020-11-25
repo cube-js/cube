@@ -25,14 +25,34 @@ const Section = styled.div`
   }
 `;
 
+export function dispatchChartEvent(detail) {
+  const event = new CustomEvent('cubejs', {
+    detail,
+  });
+  event.initEvent('cubejs', true);
+  document.body.dispatchEvent(event);
+}
+
 const chartLibraries = [
   {
-    name: 'bizcharts',
+    key: 'bizcharts',
+    value: 'bizcharts',
     title: 'Bizcharts',
   },
   {
-    name: 'recharts',
+    key: 'recharts',
+    value: 'recharts',
     title: 'Recharts',
+  },
+  {
+    key: 'd3',
+    value: 'd3',
+    title: 'D3',
+  },
+  {
+    key: 'chartjs',
+    value: 'chartjs',
+    title: 'Chart.js',
   },
 ];
 
@@ -230,13 +250,15 @@ export default function PlaygroundQueryBuilder({
                   <ChartContainer
                     query={query}
                     error={error}
-                    // sqlQuery={sqlQuery}
-                    // codeExample={codeExample}
-                    // codeSandboxSource={forCodeSandBox(codeExample)}
-                    // dependencies={commonDependencies}
-                    // dashboardSource={dashboardSource}
+                    chartType={chartType}
+                    pivotConfig={pivotConfig}
                     chartingLibrary={chartingLibrary}
-                    setChartLibrary={setChartingLibrary}
+                    setChartLibrary={(value) => {
+                      dispatchChartEvent({
+                        chartingLibrary: value,
+                      });
+                      setChartingLibrary(value);
+                    }}
                     chartLibraries={chartLibraries}
                     cubejsApi={cubejsApi}
                     render={({ framework }) => {
@@ -246,8 +268,6 @@ export default function PlaygroundQueryBuilder({
                           chartingLibrary={chartingLibrary}
                           chartType={chartType}
                           query={query}
-                          apiUrl={apiUrl}
-                          cubejsToken={cubejsToken}
                           pivotConfig={pivotConfig}
                         />
                       );

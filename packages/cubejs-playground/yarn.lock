@@ -1312,7 +1312,7 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.23.14":
+"@cubejs-client/core@^0.23.11", "@cubejs-client/core@^0.23.14":
   version "0.23.14"
   resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.23.14.tgz#4c3418828cef181a06d04a4e31af0b8a2aab8008"
   integrity sha512-UqRa+J9SMTIHuio+BI4WsoIIfuoQF3Uhb61wonesz8WqPELIEd2Wq8OpHuZ4+dnQ6ZBHOjerqc0iDkRWZwUDcQ==
@@ -1326,23 +1326,13 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-<<<<<<< HEAD
-"@cubejs-client/react@^0.23.15":
-  version "0.23.15"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.23.15.tgz#6a7d0660b379a98e5df236da9ac2c8c9627e7b54"
-  integrity sha512-ep9nJxysjOKT8/JhDjm4iWlwJ81BWdSxNmPkIwc8MdeqTglmEn62Y0fqbw3pw82a9jW/I6BQr5xSVUBf8aucPw==
+"@cubejs-client/react@^0.23.11":
+  version "0.23.14"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.23.14.tgz#282706bfad3f09c3b09e9011f2ba10a39792ad33"
+  integrity sha512-nnuhA1iNIaLea7kGEHpZH9gToahu8QQhilf5QW9NNtAll4IZlOGxU9OJ/qj0AnVrpxlgx4D75FqeoHCLuZWBWQ==
   dependencies:
     "@babel/runtime" "^7.1.2"
     "@cubejs-client/core" "^0.23.14"
-=======
-"@cubejs-client/react@^0.23.10":
-  version "0.23.10"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.23.10.tgz#9d124865c97b14cc53a48e25a5400b0669f5ee65"
-  integrity sha512-mtYQNYqUdJmsxK3Opb1sdiHQpq00t6F+Zq306Cgg6Ax9nxJLdncCo1Tdm0FZ6AYFFUWeDpGV6rXmQYPno6Af0g==
-  dependencies:
-    "@babel/runtime" "^7.1.2"
-    "@cubejs-client/core" "^0.23.6"
->>>>>>> 6aaaa314... feat: pre-built chart renderers
     core-js "^3.6.5"
     ramda "^0.27.0"
 
@@ -5374,7 +5364,7 @@ extsprintf@^1.2.0:
   resolved "https://registry.yarnpkg.com/extsprintf/-/extsprintf-1.4.0.tgz#e2689f8f356fad62cca65a3a91c5df5f9551692f"
   integrity sha1-4mifjzVvrWLMplo6kcXfX5VRaS8=
 
-fast-deep-equal@^3.1.1:
+fast-deep-equal@^3.1.1, fast-deep-equal@^3.1.3:
   version "3.1.3"
   resolved "https://registry.yarnpkg.com/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz#3a7d56b559d6cbc3eb512325244e619a65c6c525"
   integrity sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
+import { dispatchChartEvent } from '../../PlaygroundQueryBuilder';
+import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
 
 const buildPath = '/chart-renderers/build';
 
-async function getEmbeds(framework = 'react') {
+async function getEmbeds() {
   return fetch(`${buildPath}/index.html`)
     .then((response) => response.text())
     .then((html) => {
@@ -25,14 +27,6 @@ async function getEmbeds(framework = 'react') {
     });
 }
 
-function updateState(detail) {
-  const event = new CustomEvent('cubejs', {
-    detail,
-  });
-  event.initEvent('cubejs', true);
-  document.body.dispatchEvent(event);
-}
-
 export default function ChartRenderer({
   framework,
   chartingLibrary,
@@ -40,49 +34,31 @@ export default function ChartRenderer({
   query,
   pivotConfig,
 }) {
+  const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [embeds, setEmbeds] = useState({});
 
   useEffect(() => {
-    getEmbeds().then((embeds) => {
-      console.log('???', embeds);
-      setEmbeds(embeds);
+    document.body.addEventListener('cubejsChartReady', async () => {
+      setReady(true);
+      setEmbeds(await getEmbeds());
       setLoading(false);
     });
   }, []);
 
   useEffect(() => {
-    console.log('triggerEvent', {
-      pivotConfig,
-      query,
-      chartType,
-      chartingLibrary,
-    });
-    updateState({
-      pivotConfig,
-      query,
-      chartType,
-      chartingLibrary,
-    });
-  }, [pivotConfig, query, chartType]);
+    if (ready) {
+      dispatchChartEvent({
+        pivotConfig,
+        query,
+        chartType,
+        chartingLibrary,
+      });
+    }
+  }, useDeepCompareMemoize([ready, pivotConfig, query, chartType]));
 
   return (
     <>
-      <button
-        onClick={() => {
-          const event = new CustomEvent('cubejs', {
-            detail: {
-              query: {
-                yo: Math.random(),
-              },
-            },
-          });
-          event.initEvent('cubejs', true);
-          document.body.dispatchEvent(event);
-        }}
-      >
-        Change Chart Type
-      </button>
       <div id="root">
         {loading ? (
           <p>Loading...</p>
