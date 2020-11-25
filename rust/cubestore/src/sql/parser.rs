@@ -45,6 +45,17 @@ impl CubeStoreParser {
         })
     }
 
+    /// Parse an aribtrary string token
+    pub fn parse_token_str(&mut self, token_str: &str) -> bool {
+        match self.parser.peek_token() {
+            Token::Word(w) if token_str.to_lowercase() == w.value.to_lowercase() => {
+                    self.parser.next_token();
+                    true
+                }
+                _ => false,
+        }
+    }
+
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         match self.parser.peek_token() {
             Token::Word(w) => match w.keyword {
@@ -59,7 +70,7 @@ impl CubeStoreParser {
     }
 
     pub fn parse_create(&mut self) -> Result<Statement, ParserError> {
-        if self.parser.parse_keyword(Keyword::SCHEMA) {
+        if self.parser.parse_keyword(Keyword::SCHEMA) || self.parse_token_str("database") {
             self.parse_create_schema()
         } else if self.parser.parse_keyword(Keyword::TABLE) {
             self.parse_create_table()
