@@ -10,11 +10,11 @@ permalink: /getting-started-docker
 [link-config]: /config
 [link-env-vars]: /reference/environment-variables
 
-This guide will help you get the Cube.js running as Docker container using Docker Compose. 
+This guide will help you get Cube.js running as a Docker container using Docker Compose.
 
-## 1. Create docker-compose file
+## 1. Create a Docker Compose file
 
-Create `docker-compose.yml` file with the following content.
+Create a `docker-compose.yml` file with the following content.
 
 ```yaml
 version: '2.2'
@@ -35,11 +35,11 @@ services:
 
 ## 2. Configure Cube.js
 
-There are two main ways you can set configuration options for Cube.js. Via a [configuration file][link-config], commonly known as the `cube.js`, and [environment variables][link-env-vars].
+There are two ways you can set configuration options for Cube.js; via a [configuration file][link-config], commonly known as the `cube.js` file, and [environment variables][link-env-vars].
 
 We'll configure the database connection via environment variables. You can learn more about setting credentials for different databases in the [Connecting to the Database guide][link-connecting-to-the-database].
 
-The example below is for Postgres instance running locally. 
+The example below is for a Postgres instance running locally. 
 
 ```bash
 # Create the .env file with the following content
@@ -86,12 +86,12 @@ $ docker ps
 
 Head to [http://localhost:4000](http://localhost:8080/console) to open the Playground.
 
-You can generate data schema files using the Playground. Once schema files are
+You can generate Data Schema files using the Playground. Once schema files are
 generated you can execute queries on the Build tab in the Playground.
 
 ## Next Steps
 
-Generating data schema files in the Playground is a good first step to start modelling your data. You can [learn more about Cube.js Data Schema][link-cubejs-schema] for complex data
+Generating Data Schema files in the Playground is a good first step to start modelling your data. You can [learn more about Cube.js Data Schema][link-cubejs-schema] for complex data
 modelling techniques.
 
 Learn how to [query Cube.js with REST API][link-rest-api] or [use Javascript client library and
@@ -99,8 +99,8 @@ integrations with frontend frameworks][link-frontend-introduction].
 
 ### Configuration with cube.js file
 
-In case you're planning to use cube.js file for configuration you need to add it
-to the volumes.
+When using the `cube.js` file for configuration, you need to add it
+to the `volumes` definition in your `docker-compose.yml`:
 
 ```yaml
   volumes:
