@@ -126,7 +126,7 @@ impl Log for ReportingLogger {
     fn log(&self, record: &Record<'a>) {
         if let Level::Error = record.metadata().level() {
             track_event_spawn(
-                "Cubestore Error".to_string(),
+                "Cube Store Error".to_string(),
                 vec![
                     ("error".to_string(), format!("{}", record.args()))
                 ].into_iter().collect()
