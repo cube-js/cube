@@ -42,7 +42,7 @@ We'll configure the database connection via environment variables. You can learn
 The example below is for a Postgres instance running locally. 
 
 ```bash
-# Create the .env file with the following content
+# Create an .env file with the following content
 CUBEJS_DB_TYPE=postgres
 
 # For Mac
@@ -84,7 +84,7 @@ $ docker ps
 
 ## 4. Open Playground
 
-Head to [http://localhost:4000](http://localhost:8080/console) to open the Playground.
+Head to [http://localhost:4000](http://localhost:4000) to open the Playground.
 
 You can generate Data Schema files using the Playground. Once schema files are
 generated you can execute queries on the Build tab in the Playground.
