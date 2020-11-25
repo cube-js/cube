@@ -43,98 +43,97 @@ have in the data schema: Users and Sessions.
 Make the following changes to the `dashboard-app/src/components/DashboardPage.js` file.
 
 ```diff
-@@ -3,6 +3,7 @@ import { makeStyles } from "@material-ui/core/styles";
- import Grid from "@material-ui/core/Grid";
- import OverTimeChart from "../components/OverTimeChart";
- import Dropdown from "../components/Dropdown";
-+import Chart from "../components/Chart";
+  import { makeStyles } from "@material-ui/core/styles";
+  import Grid from "@material-ui/core/Grid";
+  import OverTimeChart from "../components/OverTimeChart";
+  import Dropdown from "../components/Dropdown";
++ import Chart from "../components/Chart";
 
- const useStyles = makeStyles(theme => ({
-   root: {
-@@ -37,30 +38,65 @@ const overTimeQueries = {
-   },
- };
+  const useStyles = makeStyles(theme => ({
+    root: {
+    },
+  };
 
-+const queries = {
-+  users: {
-+    chartType: 'number',
-+    query: {
-+      measures: ['Sessions.usersCount'],
-+      timeDimensions: [{
-+        dimension: 'Sessions.timestamp',
-+        dateRange: "Last 30 days"
-+      }]
-+    }
-+  },
-+  sessions: {
-+    chartType: 'number',
-+    query: {
-+      measures: ['Sessions.count'],
-+      timeDimensions: [{
-+        dimension: 'Sessions.timestamp',
-+        dateRange: "Last 30 days"
-+      }]
-+    }
-+  },
-+}
-+
- const DashboardPage = () => {
-   const classes = useStyles();
-   const [overTimeQuery, setOverTimeQuery] = useState("Users");
-   return (
--    <Grid item xs={12} className={classes.root}>
--      <OverTimeChart
--        title={
--          <Dropdown
--            value={overTimeQuery}
--            options={
--              Object.keys(overTimeQueries).reduce((out, measure) => {
--                out[measure] = () => setOverTimeQuery(measure)
--                return out;
--              }, {})
--            }
--          />
--        }
--        vizState={{
--          chartType: 'line',
--          query: overTimeQueries[overTimeQuery]
--        }}
--      />
-+    <Grid container spacing={3}  className={classes.root}>
-+      <Grid item xs={12}>
-+        <OverTimeChart
-+          title={
-+            <Dropdown
-+              value={overTimeQuery}
-+              options={
-+                Object.keys(overTimeQueries).reduce((out, measure) => {
-+                  out[measure] = () => setOverTimeQuery(measure)
-+                  return out;
-+                }, {})
-+              }
-+            />
-+          }
-+          vizState={{
-+            chartType: 'line',
-+            query: overTimeQueries[overTimeQuery]
-+          }}
-+        />
-+      </Grid>
-+      <Grid item xs={6}>
-+        <Grid container spacing={3}>
-+          <Grid item xs={6}>
-+            <Chart title="Users" vizState={queries.users} />
-+          </Grid>
-+          <Grid item xs={6}>
-+            <Chart title="Sessions" vizState={queries.sessions} />
-+          </Grid>
-+        </Grid>
-+      </Grid>
-     </Grid>
-   )
- };
++ const queries = {
++   users: {
++     chartType: 'number',
++     query: {
++       measures: ['Sessions.usersCount'],
++       timeDimensions: [{
++         dimension: 'Sessions.timestamp',
++         dateRange: "Last 30 days"
++       }]
++     }
++   },
++   sessions: {
++     chartType: 'number',
++     query: {
++       measures: ['Sessions.count'],
++       timeDimensions: [{
++         dimension: 'Sessions.timestamp',
++         dateRange: "Last 30 days"
++       }]
++     }
++   },
++ }
 
-export default DashboardPage;
+  const DashboardPage = () => {
+    const classes = useStyles();
+    const [overTimeQuery, setOverTimeQuery] = useState("Users");
+    return (
+-     <Grid item xs={12} className={classes.root}>
+-       <OverTimeChart
+-         title={
+-           <Dropdown
+-             value={overTimeQuery}
+-             options={
+-               Object.keys(overTimeQueries).reduce((out, measure) => {
+-                 out[measure] = () => setOverTimeQuery(measure)
+-                 return out;
+-               }, {})
+-             }
+-           />
+-         }
+-         vizState={{
+-           chartType: 'line',
+-           query: overTimeQueries[overTimeQuery]
+-         }}
+-       />
++     <Grid container spacing={3}  className={classes.root}>
++       <Grid item xs={12}>
++         <OverTimeChart
++           title={
++             <Dropdown
++               value={overTimeQuery}
++               options={
++                 Object.keys(overTimeQueries).reduce((out, measure) => {
++                   out[measure] = () => setOverTimeQuery(measure)
++                   return out;
++                 }, {})
++               }
++             />
++           }
++           vizState={{
++             chartType: 'line',
++             query: overTimeQueries[overTimeQuery]
++           }}
++         />
++       </Grid>
++       <Grid item xs={6}>
++         <Grid container spacing={3}>
++           <Grid item xs={6}>
++             <Chart title="Users" vizState={queries.users} />
++           </Grid>
++           <Grid item xs={6}>
++             <Chart title="Sessions" vizState={queries.sessions} />
++           </Grid>
++         </Grid>
++       </Grid>
+      </Grid>
+    )
+  };
+
+  export default DashboardPage;
 ```
 
 Refresh the dashboard after making the above changes and you should see something
@@ -333,33 +332,33 @@ percent or time.
 Make the following changes to the `dashboard-app/src/components/ChartRenderer.js` file.
 
 ```diff
--  number: ({ resultSet }) => (
--    <Typography
--      variant="h4"
--      style={{
--        textAlign: "center"
--      }}
--    >
--      {resultSet.seriesNames().map(s => resultSet.totalRow()[s.key])}
--    </Typography>
--  ),
-+  number: ({ resultSet }) => {
-+    const measureKey = resultSet.seriesNames()[0].key;
-+    const annotations = resultSet.tableColumns().find(tableColumn => tableColumn.key === measureKey)
-+    const format = annotations.format || (annotations.meta && annotations.meta.format);
-+    const value = resultSet.totalRow()[measureKey];
-+    let formattedValue;
-+    const percentFormatter = item => numeral(item/100.0).format('0.00%');
-+    const timeNumberFormatter = item => numeral(item).format('00:00:00');
-+    if (format === 'percent') {
-+      formattedValue = percentFormatter(value);
-+    } else if (format === 'time') {
-+      formattedValue = timeNumberFormatter(value);
-+    } else {
-+      formattedValue = numberFormatter(value);
-+    }
-+    return (<Typography variant="h4" > {formattedValue} </Typography>)
-+  },
+- number: ({ resultSet }) => (
+-   <Typography
+-     variant="h4"
+-     style={{
+-       textAlign: "center"
+-     }}
+-   >
+-     {resultSet.seriesNames().map(s => resultSet.totalRow()[s.key])}
+-   </Typography>
+- ),
++ number: ({ resultSet }) => {
++   const measureKey = resultSet.seriesNames()[0].key;
++   const annotations = resultSet.tableColumns().find(tableColumn => tableColumn.key === measureKey)
++   const format = annotations.format || (annotations.meta && annotations.meta.format);
++   const value = resultSet.totalRow()[measureKey];
++   let formattedValue;
++   const percentFormatter = item => numeral(item/100.0).format('0.00%');
++   const timeNumberFormatter = item => numeral(item).format('00:00:00');
++   if (format === 'percent') {
++     formattedValue = percentFormatter(value);
++   } else if (format === 'time') {
++     formattedValue = timeNumberFormatter(value);
++   } else {
++     formattedValue = numberFormatter(value);
++   }
++   return (<Typography variant="h4" > {formattedValue} </Typography>)
++ },
 ```
 
 Finally, we can make a simple change to the `<DashboardPage />` component. All
@@ -370,91 +369,94 @@ Duration, Bounce Rate and the breakdown of Users by Type.
 Make the following changes to the `dashboard-app/src/pages/DashboardPage.js` file.
 
 ```diff
-@@ -58,6 +58,57 @@ const queries = {
-         dateRange: "Last 30 days"
-       }]
-     }
-+  },
-+  newUsers: {
-+    chartType: 'number',
-+    query: {
-+      measures: ['Sessions.newUsersCount'],
-+      timeDimensions: [{
-+        dimension: 'Sessions.timestamp',
-+        dateRange: "Last 30 days"
-+      }]
-+    }
-+  },
-+  avgEvents: {
-+    chartType: 'number',
-+    query: {
-+      measures: ['Sessions.avgEvents'],
-+      timeDimensions: [{
-+        dimension: 'Sessions.timestamp',
-+        dateRange: "Last 30 days"
-+      }]
-+    }
-+  },
-+  avgSessionDuration: {
-+    chartType: 'number',
-+    query: {
-+      measures: ['Sessions.averageDurationSeconds'],
-+      timeDimensions: [{
-+        dimension: 'Sessions.timestamp',
-+        dateRange: "Last 30 days"
-+      }]
-+    }
-+  },
-+  bounceRate: {
-+    chartType: 'number',
-+    query: {
-+      measures: ['Sessions.bounceRate'],
-+      timeDimensions: [{
-+        dimension: 'Sessions.timestamp',
-+        dateRange: "Last 30 days"
-+      }]
-+    }
-+  },
-+  usersByType: {
-+    chartType: 'pie',
-+    query: {
-+      measures: ['Sessions.usersCount'],
-+      dimensions: ['Sessions.type'],
-+      timeDimensions: [{
-+        dimension: 'Sessions.timestamp',
-+        dateRange: "Last 30 days"
-+      }]
-+    }
-   }
- }
+ const queries = {
 
-@@ -93,8 +144,26 @@ const DashboardPage = () => {
-           <Grid item xs={6}>
-             <Chart title="Sessions" vizState={queries.sessions} />
-           </Grid>
-+          <Grid item xs={6}>
-+            <Chart title="New Users" vizState={queries.newUsers} />
-+          </Grid>
-+          <Grid item xs={6}>
-+            <Chart title="Avg. Events per Session" vizState={queries.avgEvents} />
-+          </Grid>
-+          <Grid item xs={6}>
-+            <Chart title="Avg. Session Duration" vizState={queries.avgSessionDuration} />
-+          </Grid>
-+          <Grid item xs={6}>
-+            <Chart title="Bounce Rate" vizState={queries.bounceRate} />
-+          </Grid>
-         </Grid>
-       </Grid>
-+      <Grid item xs={6}>
-+        <Chart
-+          title="Users by Type"
-+          vizState={queries.usersByType}
-+        />
-+      </Grid>
-     </Grid>
-   )
- };
+ // ...
+
+- }
++ },
++ newUsers: {
++   chartType: 'number',
++   query: {
++     measures: ['Sessions.newUsersCount'],
++     timeDimensions: [{
++       dimension: 'Sessions.timestamp',
++       dateRange: "Last 30 days"
++     }]
++   }
++ },
++ avgEvents: {
++   chartType: 'number',
++   query: {
++     measures: ['Sessions.avgEvents'],
++     timeDimensions: [{
++       dimension: 'Sessions.timestamp',
++       dateRange: "Last 30 days"
++     }]
++   }
++ },
++ avgSessionDuration: {
++   chartType: 'number',
++   query: {
++     measures: ['Sessions.averageDurationSeconds'],
++     timeDimensions: [{
++       dimension: 'Sessions.timestamp',
++       dateRange: "Last 30 days"
++     }]
++   }
++ },
++ bounceRate: {
++   chartType: 'number',
++   query: {
++     measures: ['Sessions.bounceRate'],
++     timeDimensions: [{
++       dimension: 'Sessions.timestamp',
++       dateRange: "Last 30 days"
++     }]
++   }
++ },
++ usersByType: {
++   chartType: 'pie',
++   query: {
++     measures: ['Sessions.usersCount'],
++     dimensions: ['Sessions.type'],
++     timeDimensions: [{
++       dimension: 'Sessions.timestamp',
++       dateRange: "Last 30 days"
++     }]
++   }
++ }
+
+  // ...
+
+  const DashboardPage = () => {
+
+  // ...
+
+          <Grid item xs={6}>
+            <Chart title="Sessions" vizState={queries.sessions} />
+          </Grid>
++         <Grid item xs={6}>
++           <Chart title="New Users" vizState={queries.newUsers} />
++         </Grid>
++         <Grid item xs={6}>
++           <Chart title="Avg. Events per Session" vizState={queries.avgEvents} />
++         </Grid>
++         <Grid item xs={6}>
++           <Chart title="Avg. Session Duration" vizState={queries.avgSessionDuration} />
++         </Grid>
++         <Grid item xs={6}>
++           <Chart title="Bounce Rate" vizState={queries.bounceRate} />
++         </Grid>
+        </Grid>
+      </Grid>
++     <Grid item xs={6}>
++       <Chart
++         title="Users by Type"
++         vizState={queries.usersByType}
++       />
++     </Grid>
+    </Grid>
 ```
 
 That's it for this chapter. We have added 7 more new charts to our dashboard.

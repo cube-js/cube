@@ -10,10 +10,6 @@ Athena is great at handling large datasets, but will never give you a sub-second
 
 To solve that issue we'll use Cube.js external pre-aggregations. We'll still leverage Athena's power to process large datasets, but will put all aggregated data into MySQL. Cube.js manages all the process of building and maintaining the pre-aggregations, including refreshes and partitioning.
 
-The schema below shows the setup for Cube.js with Athena as main data source and MySQL for pre-aggregations.
-
-SCHEMA
-
 ### Connecting to MySQL
 
 To use the external pre-aggregations feature, we need to configure Cube.js to connect to both Athena and MySQL, as well as specify which pre-aggregation we want to build externally. We've already configured the connection to Athena, so all we need to setup now is MySQL connection.
@@ -24,38 +20,18 @@ First, we need to install Cube.js MySQL driver. Run the following command in the
 $ npm install --save @cubejs-backend/mysql-driver
 ```
 
-Next, let's edit our `index.js` file in the root folder of the project.
-Replace its content with the following.
-
-```js
-const CubejsServer = require("@cubejs-backend/server");
-const MySQLDriver = require('@cubejs-backend/mysql-driver');
-
-const server = new CubejsServer({
-  externalDbType: 'mysql',
-  externalDriverFactory: () => new MySQLDriver({
-    host: process.env.CUBEJS_EXT_DB_HOST,
-    database: process.env.CUBEJS_EXT_DB_NAME,
-    user: process.env.CUBEJS_EXT_DB_USER,
-    password: process.env.CUBEJS_EXT_DB_PASS.toString()
-  })
-});
-
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
-});
-```
-
-Lastly, we're going to add credentials to connect to MySQL to the `.env` file. Please note, that in order to build pre-aggregations inside MySQL, Cube.js should have write access to the `stb_pre_aggregations` schema where pre-aggregation tables will be stored.
+Next, let's edit our `.env` file in the root folder of the project.
+Add the following configuration options with relevant credentials to connect to MySQL. Please note that in order to build pre-aggregations inside MySQL, Cube.js should have write access to the `stb_pre_aggregations` schema where pre-aggregation tables will be stored.
 
 ```bash
-CUBEJS_EXT_DB_NAME=preags
+CUBEJS_EXT_DB_TYPE=mysql
+CUBEJS_EXT_DB_NAME=stb_pre_aggregations
 CUBEJS_EXT_DB_HOST=localhost
 CUBEJS_EXT_DB_USER=root
 CUBEJS_EXT_DB_PASS=12345
 ```
 
-That is all we need to let Cube.js connect to MySQL. Now, we can move forward and start defining pre-aggregations insides our data schema.
+That is all we need to let Cube.js connect to MySQL. Now, we can move forward and start defining pre-aggregations inside our data schema.
 
 ### Defining Pre-Aggregations in the Data Schema
 
@@ -145,44 +121,27 @@ refreshing them in the background. To enable it we need to add
 Update your pre-aggregation to enable `scheduledRefresh`.
 
 ```diff
-preAggregations: {
-  additive: {
-    type: `rollup`,
-    measureReferences: [count],
-    timeDimensionReference: timestamp,
-    granularity: `day`,
-    refreshKey: {
-      every: `5 minutes`
-    },
-    external: true,
-+   scheduledRefresh: true
+  preAggregations: {
+    additive: {
+      type: `rollup`,
+      measureReferences: [count],
+      timeDimensionReference: timestamp,
+      granularity: `day`,
+      refreshKey: {
+        every: `5 minutes`
+      },
+      external: true,
++     scheduledRefresh: true
+    }
   }
-}
 ```
 
 Refresh Scheduler isn't enabled by default. We need to trigger it externally.
-The simplest way to do that would be to make it constantly run by using `setInterval` in our
-`index.js` file.
+The simplest way to do that would be to add the following configuration option to the
+`.env` file:
 
-```diff
-const CubejsServer = require("@cubejs-backend/server");
-const MySQLDriver = require('@cubejs-backend/mysql-driver');
-
-const server = new CubejsServer({
-  externalDbType: 'mysql',
-  externalDriverFactory: () => new MySQLDriver({
-    host: process.env.CUBEJS_EXT_DB_HOST,
-    database: process.env.CUBEJS_EXT_DB_NAME,
-    user: process.env.CUBEJS_EXT_DB_USER,
-    password: process.env.CUBEJS_EXT_DB_PASS.toString()
-  })
-});
-
-+ setInterval(() => server.runScheduledRefresh(), 5000);
-
-server.listen().then(({ port }) => {
-  console.log(`🚀 Cube.js server is listening on ${port}`);
-});
+```
+CUBEJS_SCHEDULED_REFRESH_TIMER=true
 ```
 
 That is the basics we need to know to start configuring pre-aggregations for our example. You
