@@ -5,7 +5,7 @@ on:
       - '.github/workflows/guide-real-time-dashboard.yml'
       - 'guides/real-time-dashboard/**'
     branches:
-      - '**'
+      - master
 
 jobs:
   deploy-real-time-dashboard:
