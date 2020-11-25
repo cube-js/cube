@@ -60,8 +60,8 @@ class CubeEvaluator extends CubeSymbols {
     }).reduce((a, b) => a.concat(b), []);
   }
 
-  cubeNamesWithRefreshKeys() {
-    return Object.keys(this.evaluatedCubes).filter(c => !!this.evaluatedCubes[c].refreshKey);
+  cubeNames() {
+    return Object.keys(this.evaluatedCubes);
   }
 
   isMeasure(measurePath) {

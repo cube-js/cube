@@ -599,7 +599,7 @@ describe('PreAggregations', function test() {
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/>=/);
+    preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/FLOOR/);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()

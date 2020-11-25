@@ -117,7 +117,7 @@ class RefreshScheduler {
   async refreshCubesRefreshKey(context, compilerApi, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
-    await Promise.all(queryForEvaluation.cubeEvaluator.cubeNamesWithRefreshKeys().map(async cube => {
+    await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
       const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;

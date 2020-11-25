@@ -176,7 +176,7 @@ class CubejsServerCore {
       dbType: process.env.CUBEJS_DB_TYPE,
       devServer: process.env.NODE_ENV !== 'production',
       telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
-      scheduledRefreshTimer: process.env.CUBEJS_SCHEDULED_REFRESH_TIMER,
+      scheduledRefreshTimer: process.env.CUBEJS_SCHEDULED_REFRESH_TIMER || process.env.CUBEJS_SCHEDULED_REFRESH,
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],
@@ -232,8 +232,25 @@ class CubejsServerCore {
     this.scheduledRefreshTimeZones = options.scheduledRefreshTimeZones;
     this.scheduledRefreshContexts = options.scheduledRefreshContexts;
 
-    if (this.scheduledRefreshTimer) {
-      setInterval(
+    if (this.scheduledRefreshTimer && (
+      typeof this.scheduledRefreshTimer === 'number' ||
+      typeof this.scheduledRefreshTimer === 'string' && this.scheduledRefreshTimer.match(/^\d+$/)
+    )) {
+      this.scheduledRefreshTimer = parseInt(this.scheduledRefreshTimer, 10) * 1000;
+    }
+    if (this.scheduledRefreshTimer && typeof this.scheduledRefreshTimer === 'string') {
+      this.scheduledRefreshTimer = this.scheduledRefreshTimer.toLowerCase() === 'true';
+    }
+    if (this.scheduledRefreshTimer == null) {
+      this.scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
+    }
+    if (typeof this.scheduledRefreshTimer === 'boolean' && this.scheduledRefreshTimer) {
+      this.scheduledRefreshTimer = 5000;
+    }
+    if (
+      this.scheduledRefreshTimer
+    ) {
+      this.scheduledRefreshTimerInterval = setInterval(
         async () => {
           const contexts = await this.scheduledRefreshContexts();
           if (contexts.length < 1) {
@@ -252,10 +269,7 @@ class CubejsServerCore {
             }
           }));
         },
-        typeof this.scheduledRefreshTimer === 'number' ||
-        typeof this.scheduledRefreshTimer === 'string' && this.scheduledRefreshTimer.match(/^\d+$/) ?
-          (this.scheduledRefreshTimer * 1000) :
-          5000
+        this.scheduledRefreshTimer
       );
     }
 
@@ -581,6 +595,9 @@ class CubejsServerCore {
     });
     await Promise.all(releases);
     this.dataSourceIdToOrchestratorApi = {};
+    if (this.scheduledRefreshTimerInterval) {
+      clearInterval(this.scheduledRefreshTimerInterval);
+    }
   }
 
   static version() {

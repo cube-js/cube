@@ -133,6 +133,12 @@ class BigqueryQuery extends BaseQuery {
   defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
+
+  defaultEveryRefreshKey() {
+    return {
+      every: '2 minutes'
+    };
+  }
 }
 
 module.exports = BigqueryQuery;
