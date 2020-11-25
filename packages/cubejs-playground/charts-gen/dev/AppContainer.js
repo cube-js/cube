@@ -78,16 +78,20 @@ class AppContainer {
   }
 
   async persistSources(sourceContainer, packageVersions) {
-    const sources = sourceContainer.outputSources();
-    await Promise.all(sources.map((file) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
-    const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
-    packageJson.cubejsTemplates = {
-      ...packageJson.cubejsTemplates,
-      ...packageVersions,
-    };
-    await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
-      spaces: 2,
-    });
+    try {
+      const sources = sourceContainer.outputSources();
+      await Promise.all(sources.map((file) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
+      const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+      packageJson.cubejsTemplates = {
+        ...packageJson.cubejsTemplates,
+        ...packageVersions,
+      };
+      await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
+        spaces: 2,
+      });
+    } catch (error) {
+      console.warn('Error persisting sources');
+    }
   }
 
   executeCommand(command, args, options) {
@@ -105,7 +109,7 @@ class AppContainer {
     const toInstall = R.toPairs(dependencies)
       .filter(([dependency]) => !packageJson.dependencies[dependency])
       .map(([dependency, version]) => (version !== 'latest' ? `${dependency}@${version}` : dependency));
-
+      
     if (toInstall.length) {
       await this.executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(this.appPath) });
     }

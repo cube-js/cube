@@ -843,19 +843,19 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.24.0":
-  version "0.24.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.0.tgz#b732a7640b19f018d63152ac377a67931ad2ee7d"
-  integrity sha512-3Ns6ONTnaK8Fl/CK+Xl+jKCl+mWS5wz0KtY/3Z25QoX04LvAatvrQsJyaZSfrjxOClvx3ZlW/M5fIKW5GUTDPA==
+"@cubejs-backend/query-orchestrator@^0.23.14":
+  version "0.23.14"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.23.14.tgz#5126524266554ca1748f536056eb9aec388984d5"
+  integrity sha512-KyAuI43CJp6SsXjuyLyv9L6OgjY/tUQR4z+TEYEt11mFdLn4sqMkHWz3fITsZEFK5wz3Mf7xPR+Ky4rB/ufrHw==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.24.1":
-  version "0.24.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.24.1.tgz#8884446b72f3e810b8ffa27e924eae3a940963b8"
-  integrity sha512-vLQWH+KHg3wt2Ig40zNWIKdjAN+ZHApz0xyGbpxyi8X52AmmdL8il0/UaL/iE06eqiwyj/k9G2e6pRSeOvdf6w==
+"@cubejs-backend/schema-compiler@^0.23.15":
+  version "0.23.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.15.tgz#35075e945ebe9432354ffb4762581051fe2328f2"
+  integrity sha512-Z1MvZvfIGjxxHJF2PpW0IsXEIj15tJeq42HP8kk3Rw8Hd7jyG7+vFl39M/W6ejpD9YpaZKF4X0nIjwNhCh5sQA==
   dependencies:
     "@babel/core" "^7.4.0"
     "@babel/generator" "^7.4.0"
@@ -875,6 +875,13 @@
     node-dijkstra "^2.5.0"
     ramda "^0.27.0"
     syntax-error "^1.3.0"
+
+"@cubejs-backend/shared@^0.23.15":
+  version "0.23.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.23.15.tgz#bb780783add268770b40d1da003d277b2b9d210b"
+  integrity sha512-9Px1UH2CT55aNAjJC7kUToXQ6eU9S647AT8zhXzdYNZEWUwVJUlnw7cKhuIIgMDfVn1scVCctlS/g07t2SN85w==
+  dependencies:
+    env-var "^6.3.0"
 
 "@hapi/address@2.x.x":
   version "2.1.4"
@@ -2172,6 +2179,11 @@ end-of-stream@^1.0.0, end-of-stream@^1.1.0:
   integrity sha512-+uw1inIHVPQoaVuHzRyXd21icM+cnt4CzD5rW+NC1wjOUSTOs+Te7FOv7AhN7vS9x/oIyhLP5PR1H+phQAHu5Q==
   dependencies:
     once "^1.4.0"
+
+env-var@^6.3.0:
+  version "6.3.0"
+  resolved "https://registry.yarnpkg.com/env-var/-/env-var-6.3.0.tgz#b4ace5bcd1d293629a2c509ae7b46f8add2f8892"
+  integrity sha512-gaNzDZuVaJQJlP2SigAZLu/FieZN5MzdN7lgHNehESwlRanHwGQ/WUtJ7q//dhrj3aGBZM45yEaKOuvSJaf4mA==
 
 errlop@^2.0.0:
   version "2.2.0"
