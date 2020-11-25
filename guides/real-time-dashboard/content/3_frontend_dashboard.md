@@ -8,7 +8,7 @@ In the previous part we've successfully configured a database, [BigQuery](cube-j
 Cube.js Playground can generate a boilerplate frontend app. It is
 a convenient way to start developing a dashboard or analytics application. You can
 select your favorite frontend framework and charting library and Playground will
-generate a new application and wire all things together to work with the Cube.js backend API.
+generate a new application and wire all things together to work with the Cube.js API.
 
 We'll use React and Chart.js in our tutorial. To generate a new application,
 navigate to "Dashboard App,” select "React Antd Static" with "Chart.js," and click on the “Create dashboard app” button.
@@ -44,12 +44,12 @@ Update the content of the `cube.js` file the following.
 
 ```javascript
 module.exports = {
+  processSubscriptionsInterval: 1,
   orchestratorOptions: {
     queryCacheOptions: {
       refreshKeyRenewalThreshold: 1,
     }
   },
-  processSubscriptionsInterval: 1,
 };
 ```
 
@@ -77,30 +77,34 @@ Next, update the `src/App.js` file to use real-time transport to work with the C
 API.
 
 ```diff
--const API_URL = "http://localhost:4000";
-+import WebSocketTransport from '@cubejs-client/ws-transport';
- const CUBEJS_TOKEN = "SECRET";
--const cubejsApi = cubejs(CUBEJS_TOKEN, {
--  apiUrl: `${API_URL}/cubejs-api/v1`
-+const cubejsApi = cubejs({
-+  transport: new WebSocketTransport({
-+    authorization: CUBEJS_TOKEN,
-+    apiUrl: 'ws://localhost:4000/'
-+  })
- });
++ import WebSocketTransport from '@cubejs-client/ws-transport';
+
+  const CUBEJS_TOKEN = "SECRET";
+
+- const API_URL = "http://localhost:4000";
+- const cubejsApi = cubejs(CUBEJS_TOKEN, {
+-   apiUrl: `${API_URL}/cubejs-api/v1`
+- });
+
++ const cubejsApi = cubejs({
++   transport: new WebSocketTransport({
++     authorization: CUBEJS_TOKEN,
++     apiUrl: 'ws://localhost:4000/'
++   })
++ });
 ```
 
 Now, we need to update how we request a query itself in the `src/components/ChartRenderer.js`. Make the following changes.
 
 ```diff
--const ChartRenderer = ({ vizState }) => {
-+const ChartRenderer = ({ vizState, cubejsApi }) => {
-   const { query, chartType } = vizState;
-   const component = TypeToMemoChartComponent[chartType];
--  const renderProps = useCubeQuery(query);
-+  const renderProps = useCubeQuery(query, { subscribe: true, cubejsApi });;
-   return component && renderChart(component)(renderProps);
- };
+- const ChartRenderer = ({ vizState }) => {
++ const ChartRenderer = ({ vizState, cubejsApi }) => {
+    const { query, chartType } = vizState;
+    const component = TypeToMemoChartComponent[chartType];
+-   const renderProps = useCubeQuery(query);
++   const renderProps = useCubeQuery(query, { subscribe: true, cubejsApi });;
+    return component && renderChart(component)(renderProps);
+  };
 ```
 
 That's it! Now you can add more charts to your dashboard, perform changes in the
