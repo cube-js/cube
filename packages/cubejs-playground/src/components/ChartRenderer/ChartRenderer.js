@@ -3,28 +3,30 @@ import { Helmet } from 'react-helmet';
 import { dispatchChartEvent } from '../../PlaygroundQueryBuilder';
 import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
 
-const buildPath = '/chart-renderers/build';
+const buildPath = '/chart-renderers/react';
 
 async function getEmbeds() {
-  return fetch(`${buildPath}/index.html`)
-    .then((response) => response.text())
-    .then((html) => {
-      const styles = [];
+  try {
+    const html = await (await fetch(`${buildPath}/index.html`)).text();
+    const styles = [];
 
-      const reg = /<script src="([^"]*)"/g;
-      const scripts = (html.match(reg) || []).map((e) => ({
-        src: buildPath + e.replace(reg, '$1').replace(/^\.\//, '/'),
-      }));
-      const [, body] = html.match(/<script>(.*?)<\/script>/);
-      scripts.push({
-        body: body.replace(/\.\/static/, `${buildPath}/static`),
-      });
-
-      return {
-        scripts,
-        styles,
-      };
+    const reg = /<script src="([^"]*)"/g;
+    const scripts = (html.match(reg) || []).map((e) => ({
+      src: buildPath + e.replace(reg, '$1').replace(/^\.\//, '/'),
+    }));
+    const [, body] = html.match(/<script>(.*?)<\/script>/);
+    scripts.push({
+      body: body.replace(/\.\/static/, `${buildPath}/static`),
     });
+
+    return {
+      scripts,
+      styles,
+    };
+  } catch (error) {
+    console.error(error);
+    return {};
+  }
 }
 
 export default function ChartRenderer({
@@ -39,10 +41,14 @@ export default function ChartRenderer({
   const [embeds, setEmbeds] = useState({});
 
   useEffect(() => {
-    document.body.addEventListener('cubejsChartReady', async () => {
-      setReady(true);
-      setEmbeds(await getEmbeds());
+    getEmbeds().then((embeds) => {
+      setEmbeds(embeds);
       setLoading(false);
+    });
+
+    document.body.addEventListener('cubejsChartReady', async () => {
+      console.log('READY!');
+      setReady(true);
     });
   }, []);
 

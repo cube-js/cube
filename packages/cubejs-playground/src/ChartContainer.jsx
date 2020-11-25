@@ -13,7 +13,6 @@ import {
 import { Dropdown, Menu, Modal, notification } from 'antd';
 import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
-import { fetch } from 'whatwg-fetch';
 import styled from 'styled-components';
 import { Redirect, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
@@ -93,24 +92,6 @@ class ChartContainer extends React.Component {
         isChartRendererReady: true,
       });
     });
-
-    // const { codeSandboxSource, dependencies } = this.props;
-
-    // const codeSandboxRes = await fetch(
-    //   'https://codesandbox.io/api/v1/sandboxes/define?json=1',
-    //   {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       Accept: 'application/json',
-    //     },
-    //     body: JSON.stringify(
-    //       this.codeSandboxDefinition(codeSandboxSource, dependencies),
-    //     ),
-    //   },
-    // );
-    // const codeSandboxJson = await codeSandboxRes.json();
-    // this.setState({ sandboxId: codeSandboxJson.sandbox_id });
   }
 
   codeSandboxDefinition(codeSandboxSource, dependencies = []) {
@@ -142,7 +123,6 @@ class ChartContainer extends React.Component {
       dependencies,
       redirectToDashboard,
       showCode,
-      sandboxId,
       addingToDashboard,
       framework,
       isChartRendererReady,
@@ -396,7 +376,7 @@ class ChartContainer extends React.Component {
       } else if (showCode === 'cache') {
         return <CachePane query={query} cubejsApi={cubejsApi} />;
       }
-      return render({ framework, error, sandboxId });
+      return render({ framework, error });
     };
 
     let title;
@@ -463,7 +443,7 @@ class ChartContainer extends React.Component {
     }
 
     return hideActions ? (
-      render({ resultSet, error, sandboxId })
+      render({ resultSet, error })
     ) : (
       <StyledCard title={title} style={{ minHeight: 420 }} extra={extra}>
         {renderChart()}

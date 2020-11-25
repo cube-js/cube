@@ -24,4 +24,5 @@ yarn-debug.log*
 yarn-error.log*
 
 src/codegen/
+charts-dist/
 public/chart-renderers/
