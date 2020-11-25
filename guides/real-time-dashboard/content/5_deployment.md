@@ -5,7 +5,7 @@ title: "Deployment"
 
 Now, let's deploy our Cube.js API and the dashboard application. In this tutorial, we'll deploy both the Cube.js API and the dashboard application to Heroku.
 
-## Cube.js API Deployment (Test)
+## Cube.js API Deployment (Test 2)
 
 There are multiple ways you can deploy a Cube.js API microservice; you can learn more about them [here in the docs](https://cube.dev/docs/deployment/).
 
