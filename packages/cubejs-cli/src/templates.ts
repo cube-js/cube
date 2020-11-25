@@ -72,8 +72,7 @@ provider:
 #        - "athena:*"
 #        - "s3:*"
 #        - "glue:*"
-      Resource:
-        - "*"
+      Resource: '*'
 # When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12
 #  vpc:
 #    securityGroupIds:
