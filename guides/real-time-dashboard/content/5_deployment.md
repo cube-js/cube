@@ -3,7 +3,11 @@ order: 5
 title: "Deployment"
 ---
 
-There are multiple ways you can deploy a Cube.js Backend service; you can learn more about them [here in the docs](https://cube.dev/docs/deployment/). In this tutorial, we'll deploy both the backend and the dashboard on Heroku.
+Now, let's deploy our Cube.js API and the dashboard application. In this tutorial, we'll deploy both the Cube.js API and the dashboard application to Heroku.
+
+## Cube.js API Deployment
+
+There are multiple ways you can deploy a Cube.js API microservice; you can learn more about them [here in the docs](https://cube.dev/docs/deployment/).
 
 The tutorial assumes that you have a free [Heroku account](https://signup.heroku.com/signup/dc). You'd also need a Heroku CLI; you can [learn how to install it here](https://devcenter.heroku.com/articles/heroku-cli).
 
@@ -11,7 +15,7 @@ First, let's create a new Heroku app. Run the following command inside your
 Cube.js project folder.
 
 ```bash
-$ heroku create real-time-dashboard-demo
+$ heroku create real-time-dashboard-api
 ```
 
 We also need to provide credentials to access the database. I assume you have
@@ -24,68 +28,81 @@ $ heroku config:set \
   CUBEJS_DB_HOST=<YOUR-DB-HOST> \
   CUBEJS_DB_NAME=<YOUR-DB-NAME> \
   CUBEJS_DB_USER=<YOUR-DB-USER> \
-  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
+  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD> \
+  CUBEJS_API_SECRET=<YOUR-SECRET> \
+  --app real-time-dashboard-api
 ```
 
-Next, we need to make some changes to our `index.js` file to make it serve
-static files from the `dashboard-app/build` folder. Update the content of
-`index.js` with the following.
+Then, we need to create two files for Docker. The first file, `Dockerfile`, describes how to build a Docker image. Add these contents:
 
-```javascript
-const CubejsServerCore = require('@cubejs-backend/server-core');
-const WebSocketServer = require('@cubejs-backend/server/WebSocketServer');
-const express = require('express');
-const bodyParser = require('body-parser');
-const http = require('http');
-const path = require('path');
-const serveStatic = require('serve-static');
-require('dotenv').config();
+```dockerfile
+FROM cubejs/cube:latest
 
-const app = express();
+COPY . .
+```
 
-app.use(require('cors')());
-app.use(bodyParser.json({ limit: '50mb' }));
+The second file, `.dockerignore`, provides a list of files to be excluded from the image. Add these patterns:
 
-const cubejsServer = CubejsServerCore.create({
-  orchestratorOptions: {
-    queryCacheOptions: {
-      refreshKeyRenewalThreshold: 1,
-    }
-  }
-});
+```
+node_modules
+npm-debug.log
+dashboard-app
+.env
+```
 
-cubejsServer.initApp(app);
-const server = http.createServer({}, app);
+Now we need to build the image, push it to the Heroku Container Registry, and release it to our app:
 
-const socketServer = new WebSocketServer(
-  cubejsServer,
-  { processSubscriptionsInterval: 1 }
-);
-socketServer.initServer(server);
+```bash
+$ heroku container:login
+$ heroku container:push web --app real-time-dashboard-api
+$ heroku container:release web --app real-time-dashboard-api
+```
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(serveStatic(path.join(__dirname, 'dashboard-app/build')));
+Let's also provision a free Redis server provided by Heroku:
+
+```bash
+$ heroku addons:create heroku-redis:hobby-dev --app real-time-dashboard-api
+```
+
+Great! You can run the `heroku open --app real-time-dashboard-api` command to open your Cube.js API and see this message in your browser:
+
+```
+Cube.js server is running in production mode.
+```
+
+## Dashboard App Deployment
+
+The dashboard app should be deployed as a static website.
+
+To do so on Heroku, we need to create the second Heroku app. Run the following command inside the `dashboard-app` folder:
+
+```bash
+$ heroku create real-time-dashboard-web
+```
+
+Then, enable the static website build pack:
+
+```bash
+$ heroku buildpacks:set https://github.com/heroku/heroku-buildpack-static.git
+```
+
+Next, we need to create the `static.json` file under the `dashboard-app` folder with the following contents:
+
+```json
+{
+  "root": "build/"
 }
-
-const port = process.env.PORT || 4000;
-server.listen(port, () => {
-  console.log(`🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`);
-});
 ```
 
-Add a `start` command to your `package.json` to tell Heroku how to start up the
-application.
+Also, we need to set Cube.js API URL to the newly created Heroku app URL. In the `src/App.js` file, change this line:
 
 ```diff
-   "scripts": {
--    "dev": "./node_modules/.bin/cubejs-dev-server"
-+    "dev": "./node_modules/.bin/cubejs-dev-server",
-+    "start": "node index.js"
-   },
+- const API_URL = "http://localhost:4000";
++ const API_URL = "https://real-time-dashboard-api.herokuapp.com";
 ```
 
-Finally, we need to run the `npm build` command inside the `dashboard-app` folder
-and make sure the build folder is tracked by Git. By default, `.gitignore`
+Finally, we need to run the `npm run build` command
+and make sure the `build` folder is tracked by Git. By default, `.gitignore`
 excludes that folder, so you need to remove it from `.gitignore`.
 
 Once done, commit your changes and push to Heroku. 🚀
@@ -96,7 +113,7 @@ $ git commit -am "Initial"
 $ git push heroku master
 ```
 
-That’s it! You can run the `heroku open` command to open your dashboard.
+That's it! You can run the `heroku open` command to open your dashboard application in your browser and see it working with Cube.js.
 
 Congratulations on completing this guide! 🎉
 

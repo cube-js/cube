@@ -1,6 +1,6 @@
 ---
 order: 2
-title: "Cube.js Backend with MongoDB"
+title: "Cube.js API with MongoDB"
 ---
 
 _Feel free to jump to the [next part](cube-js-backend-with-big-query) if you want to use BigQuery instead of
@@ -50,17 +50,10 @@ Please make sure to restart the MongoDB BI connector instance in order to genera
 
 ## Creating Cube.js Application
 
-We are going to use Cube.js CLI to create our backend application; let's first
-install it.
+We are going to use Cube.js CLI to create our new Cube.js application with the MongoBI driver:
 
 ```bash
-$ npm install -g cubejs-cli
-```
-
-Next, create a new Cube.js application with the MongoBI driver.
-
-```bash
-$ cubejs create real-time-dashboard -d mongobi
+$ npx cubejs-cli create real-time-dashboard -d mongobi
 ```
 
 Go to the just created `real-time-dashboard` folder and update the `.env` file with your
