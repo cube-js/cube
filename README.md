@@ -30,8 +30,7 @@ Cube.js has necessary infrastructure for every analytic application that heavily
 
 - [Documentation](https://cube.dev/docs)
 - [Getting Started](https://cube.dev/docs/getting-started)
-- [Tutorials](https://cube.dev/docs/tutorials)
-- [Examples](#https://cube.dev/docs/examples)
+- [Examples & Tutorials](#https://cube.dev/docs/examples)
 - [Architecture](https://cube.dev/docs/cubejs-introduction#architecture)
 
 ## Community
