@@ -28,17 +28,12 @@ $ heroku config:set \
   CUBEJS_DB_HOST=<YOUR-DB-HOST> \
   CUBEJS_DB_NAME=<YOUR-DB-NAME> \
   CUBEJS_DB_USER=<YOUR-DB-USER> \
-  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
+  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD> \
+  CUBEJS_API_SECRET=<YOUR-SECRET> \
+  --app real-time-dashboard-api
 ```
 
-Then, we need to create two files:
-
-```bash
-$ touch Dockerfile
-$ touch .dockerignore
-```
-
-The first file, `Dockerfile`, describes how to build a Docker image. Add these contents:
+Then, we need to create two files for Docker. The first file, `Dockerfile`, describes how to build a Docker image. Add these contents:
 
 ```dockerfile
 FROM cubejs/cube:latest
@@ -59,23 +54,33 @@ Now we need to build the image, push it to the Heroku Container Registry, and re
 
 ```bash
 $ heroku container:login
-$ heroku container:push web -a cubejs-heroku-api
-$ heroku container:release web -a cubejs-heroku-api
+$ heroku container:push web --app real-time-dashboard-api
+$ heroku container:release web --app real-time-dashboard-api
 ```
 
 Let's also provision a free Redis server provided by Heroku:
 
 ```bash
-$ heroku addons:create heroku-redis:hobby-dev -a cubejs-heroku-api
+$ heroku addons:create heroku-redis:hobby-dev --app real-time-dashboard-api
 ```
 
-Great! You can run the `heroku open` command to open your Cube.js API and see the message that Cube.js is running in production mode in your browser.
+Great! You can run the `heroku open --app real-time-dashboard-api` command to open your Cube.js API and see this message in your browser:
+
+```
+Cube.js server is running in production mode.
+```
 
 ## Dashboard App Deployment
 
 The dashboard app should be deployed as a static website.
 
-To do so on Heroku, we need to ebable the static websites build pack:
+To do so on Heroku, we need to create the second Heroku app. Run the following command inside the `dashboard-app` folder:
+
+```bash
+$ heroku create real-time-dashboard-web
+```
+
+Then, enable the static website build pack:
 
 ```bash
 $ heroku buildpacks:set https://github.com/heroku/heroku-buildpack-static.git
@@ -89,7 +94,14 @@ Next, we need to create the `static.json` file under the `dashboard-app` folder 
 }
 ```
 
-Finally, we need to run the `npm build` command inside the `dashboard-app` folder
+Also, we need to set Cube.js API URL to the newly created Heroku app URL. In the `src/App.js` file, change this line:
+
+```diff
+- const API_URL = "http://localhost:4000";
++ const API_URL = "https://real-time-dashboard-api.herokuapp.com";
+```
+
+Finally, we need to run the `npm run build` command
 and make sure the `build` folder is tracked by Git. By default, `.gitignore`
 excludes that folder, so you need to remove it from `.gitignore`.
 
