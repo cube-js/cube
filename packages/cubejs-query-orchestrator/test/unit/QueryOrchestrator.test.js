@@ -20,6 +20,10 @@ class MockDriver {
       promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 800)));
     }
 
+    if (query.match(/^SELECT NOW\(\)$/)) {
+      promise = promise.then(() => new Date().toJSON());
+    }
+
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
       promise = promise.then(res => res.concat({ tableReady: true }));
     }
@@ -31,7 +35,14 @@ class MockDriver {
   }
 
   async getTablesQuery(schema) {
+    if (this.tablesQueryDelay) {
+      await this.delay(this.tablesQueryDelay);
+    }
     return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
+  }
+
+  delay(timeout) {
+    return new Promise(resolve => setTimeout(() => resolve(), timeout));
   }
 
   async createSchemaIfNotExists(schema) {
@@ -58,7 +69,7 @@ describe('QueryOrchestrator', () => {
   const queryOrchestrator = new QueryOrchestrator(
     'TEST',
     async () => mockDriver,
-    (msg, params) => console.log(msg, params), {
+    (msg, params) => console.log(new Date().toJSON(), msg, params), {
       preAggregationsOptions: {
         queueOptions: {
           executionTimeout: 1
@@ -297,5 +308,66 @@ describe('QueryOrchestrator', () => {
     console.log(res);
 
     expect(res.data).toContainEqual(expect.objectContaining({ tableReady: true }));
+  });
+
+  test('continue serve old tables cache without resetting it', async () => {
+    mockDriver.tablesQueryDelay = 300;
+    const requestId = 'continue serve old tables cache without resetting it';
+    const baseQuery = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d20181103',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 1,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d20181103',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20181103 AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT NOW()', []]],
+        refreshKeyRenewalThresholds: [0.001]
+      }]
+    };
+
+    // create from scratch
+    await queryOrchestrator.fetchQuery({
+      ...baseQuery,
+      requestId: `${requestId}: create from scratch`
+    });
+
+    // start renew refresh as scheduled refresh does
+    const refresh = queryOrchestrator.fetchQuery({
+      ...baseQuery,
+      renewQuery: true,
+      requestId: `${requestId}: start refresh`
+    });
+
+    await mockDriver.delay(100);
+
+    let firstResolve = null;
+
+    console.log('Starting race');
+
+    // If database has a significant delay for pre-aggregations tables fetch we should continue serve rollup cache
+    // instead of waiting tables fetch query to complete.
+    await Promise.all([
+      queryOrchestrator.fetchQuery({
+        ...baseQuery,
+        requestId: `${requestId}: race`
+      }).then(() => {
+        if (!firstResolve) {
+          firstResolve = 'query';
+        }
+      }),
+      mockDriver.delay(150).then(() => {
+        if (!firstResolve) {
+          firstResolve = 'delay';
+        }
+      })
+    ]);
+
+    await refresh;
+
+    expect(firstResolve).toBe('query');
   });
 });

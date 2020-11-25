@@ -366,3 +366,34 @@ $ heroku config:set REDIS_URL=<YOUR-REDIS-URL> -a cubejs-heroku-demo
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis
 server. Please [setup connection pool](deployment#production-mode-redis-pool)
 according to your Redis server's maximum connections.
+
+### Building Docker Images with Heroku
+
+Create a `heroku.yml` file in your application’s root directory:
+
+```yaml
+build:
+  docker:
+    web: Dockerfile
+```
+
+Commit the file to your repo:
+
+```sh
+$ git add heroku.yml
+$ git commit -m "Add heroku.yml"
+```
+
+Set the stack of your app to `container`:
+
+```sh
+$ heroku stack:set container
+```
+
+Push your app to Heroku:
+
+```sh
+$ git push heroku master
+```
+
+For more details, take a look at the [official documentation from Heroku](https://devcenter.heroku.com/articles/build-docker-images-heroku-yml).

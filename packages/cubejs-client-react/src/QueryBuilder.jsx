@@ -142,11 +142,16 @@ export default class QueryBuilder extends React.Component {
 
   prepareRenderProps(queryRendererProps) {
     const getName = (member) => member.name;
-    const toTimeDimension = (member) => ({
-      dimension: member.dimension.name,
-      granularity: member.granularity,
-      dateRange: member.dateRange
-    });
+    const toTimeDimension = (member) => {
+      const rangeSelection = member.compareDateRange
+        ? { compareDateRange: member.compareDateRange }
+        : { dateRange: member.dateRange };
+      return {
+        dimension: member.dimension.name,
+        granularity: member.granularity,
+        ...rangeSelection
+      };
+    };
     const toFilter = (member) => ({
       dimension: member.dimension.name,
       operator: member.operator,

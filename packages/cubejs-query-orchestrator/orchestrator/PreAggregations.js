@@ -178,10 +178,10 @@ class PreAggregationLoadCache {
   }
 
   async reset(preAggregation) {
+    await this.tablesFromCache(preAggregation, true);
     this.tables = undefined;
     this.queryStageState = undefined;
     this.versionEntries = undefined;
-    await this.cacheDriver.remove(this.tablesRedisKey(preAggregation));
   }
 }
 
@@ -506,9 +506,9 @@ class PreAggregationLoader {
       this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry)
     ));
     await this.createIndexes(client, newVersionEntry, saveCancelFn);
-    await this.loadCache.reset(this.preAggregation);
+    await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(client, targetTableName, saveCancelFn);
-    await this.loadCache.reset(this.preAggregation);
+    await this.loadCache.fetchTables(this.preAggregation);
   }
 
   async refreshImplTempTableExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
@@ -530,7 +530,7 @@ class PreAggregationLoader {
     ));
     const tableData = await this.downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn);
     await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
-    await this.loadCache.reset(this.preAggregation);
+    await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(client, targetTableName, saveCancelFn);
   }
 
@@ -552,7 +552,7 @@ class PreAggregationLoader {
       this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry)
     ));
     await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
-    await this.loadCache.reset(this.preAggregation);
+    await this.loadCache.fetchTables(this.preAggregation);
   }
 
   async downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn) {
@@ -581,7 +581,7 @@ class PreAggregationLoader {
     });
     await saveCancelFn(externalDriver.uploadTable(table, tableData.types, tableData));
     await this.createIndexes(externalDriver, newVersionEntry, saveCancelFn);
-    await this.loadCache.reset(this.preAggregation);
+    await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn);
   }
 

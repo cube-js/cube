@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "./node_modules/.bin/cubejs-server dev-server"
+    "dev": "./node_modules/.bin/cubejs-server"
   },
   "dependencies": {
     "express-session": "^1.17.0",
@@ -13,6 +13,6 @@
   "devDependencies": {
     "@cubejs-backend/athena-driver": "^0.23.6",
     "@cubejs-backend/cubestore-driver": "^0.23.6",
-    "@cubejs-backend/server": "^0.23.6"
+    "@cubejs-backend/server": "^0.23.14"
   }
 }

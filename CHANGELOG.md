@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.14](https://github.com/cube-js/cube.js/compare/v0.23.13...v0.23.14) (2020-11-22)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/query-orchestrator:** Intermittent lags when pre-aggregation tables are refreshed ([4efe1fc](https://github.com/cube-js/cube.js/commit/4efe1fc006282d87ab2718918d1bdd174baa6be3))
+* **@cubejs-backend/snowflake-driver:** Add keepConnectionAlive and release ([#1379](https://github.com/cube-js/cube.js/issues/1379)) ([f1acae5](https://github.com/cube-js/cube.js/commit/f1acae5e00e37ba1ab2c9fab0f5f94f8e7d20283))
+* **@cubejs-client/core:** propagate segments to drillDown queries ([#1406](https://github.com/cube-js/cube.js/issues/1406)) ([d4ceb65](https://github.com/cube-js/cube.js/commit/d4ceb6502db9c62c0cf95f1e48879f95ea4544d7))
+* **cubestore:** Error reporting in docker ([cba3c50](https://github.com/cube-js/cube.js/commit/cba3c50a9856e1fe6893e5e2a2c14f89ebc2ce41))
+* **cubestore:** Tables are imported without location ([5e8cffb](https://github.com/cube-js/cube.js/commit/5e8cffb5cc5b0123157086b206cb565b0dca5bac))
+* **examples:** Add deprecation warnings to Slack Vibe ([98783c6](https://github.com/cube-js/cube.js/commit/98783c6d0658e136912bbaf9d3c6da5385085738))
+* **examples:** e-commerce backend 💸 ([dab7301](https://github.com/cube-js/cube.js/commit/dab7301b01eefd7d1c5c8cbf1f233ae9cc5cc4c8))
+* **examples:** External Rollups 🗞 ([86172b7](https://github.com/cube-js/cube.js/commit/86172b752c18f0a785558aa5f4710d9155593208))
+* **examples:** Migration to Netlify ([ad582a1](https://github.com/cube-js/cube.js/commit/ad582a144c3cc7d64ae55ff45bc684c8d967e98e))
+* **examples:** React Dashboard ⚛️ ([eccae84](https://github.com/cube-js/cube.js/commit/eccae84bb8b76a3ee138445a2c648eeda11b3774))
+
+
+### Features
+
+* **cubestore:** Collect backtraces in docker ([d97bcb9](https://github.com/cube-js/cube.js/commit/d97bcb9f9b4d035d15192ba5bc559478cd850ff0))
+* **cubestore:** Error reporting ([99ede83](https://github.com/cube-js/cube.js/commit/99ede8388699298c4bbe89462a1c1737a324ce53))
+* **cubestore:** Table location support ([6b63ef8](https://github.com/cube-js/cube.js/commit/6b63ef8ac109cca40cca5d2787bc342938c56d7a))
+* **docker:** Introduce alpine images ([#1413](https://github.com/cube-js/cube.js/issues/1413)) ([972c700](https://github.com/cube-js/cube.js/commit/972c7008c3dcf1febfdcb66af0dd674bedb04752))
+* **docs-build:** add `gatsby-redirect-from` to allow redirects with SEO ([f3e680a](https://github.com/cube-js/cube.js/commit/f3e680a9542370a1efa126a85b86e8c425fcc8a3)), closes [#1395](https://github.com/cube-js/cube.js/issues/1395)
+* Allow to run docker image without config file ([#1409](https://github.com/cube-js/cube.js/issues/1409)) ([bc53cd1](https://github.com/cube-js/cube.js/commit/bc53cd17296ea4fa53940b74eaa9e3c7823d1603))
+
+
+
+
+
 ## [0.23.13](https://github.com/cube-js/cube.js/compare/v0.23.12...v0.23.13) (2020-11-17)
 
 

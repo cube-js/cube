@@ -5,9 +5,9 @@ We're very welcoming community and while it's very much appreciated if you follo
 
 ## Code of Conduct
 This project and everyone participating in it is governed by the [Cube.js Code of Conduct](./CODE_OF_CONDUCT.md).
-By participating, you are expected to uphold this code. Please report unacceptable behavior to info@statsbot.co.
+By participating, you are expected to uphold this code. Please report unacceptable behavior to conduct@cube.dev.
 
-# Contributing Code Changes
+## Contributing Code Changes
 
 Please review the preceding section before proposing a code change. This section documents how to do so.
 

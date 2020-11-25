@@ -15,7 +15,7 @@ disabled. Running Cube.js in development mode in a production environment can
 lead to security vulnerabilities. You can read more on the differences between
 [production and development mode here][link-cubejs-dev-vs-prod].
 
-[link-cubejs-dev-vs-prod]: /configuration/overview#development-vs-production
+[link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
 
 [[info | Note]]
 | Development mode is disabled by default.
