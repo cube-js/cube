@@ -5,7 +5,7 @@ on:
       - '.github/workflows/guide-web-analytics.yml'
       - 'guides/web-analytics/**'
     branches:
-      - '**'
+      - master
 
 jobs:
   deploy-web-analytics:
