@@ -5,6 +5,14 @@ category: Authentication & Authorization
 menuOrder: 1
 ---
 
+In Cube.js, access control or authorization is based on the **security context**. The diagram below shows how it works during the request processing in Cube.js:
+
+SCHEMA
+
+Authentication is handled outside of Cube.js. Your auth server issues JWTs to your client app, which, when sent as part of the request, are verified and decoded by the Cube.js to get security context claims to evaluate access control rules.
+
+For access control or authorization, Cube.js allows you to define granular access control rules for evey cube in your data schema. Cube.js uses request and the security context claims in the JWT token to generate a SQL query, which includes row-level constraints from the access control rules.
+
 Cube.js uses [JSON Web Tokens (JWT)][link-jwt] which should be passed in the
 `Authorization` header to authenticate requests. JWTs can also be used for
 passing additional information about the user, which can be accessed in the
@@ -63,23 +71,6 @@ life time of your public tokens. [Learn more at JWT docs][link-jwt-docs]._
 
 [link-jwt-docs]:
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
-
-### Using the CLI
-
-You can use the Cube.js CLI [`token`][link-cubejs-cli-token-ref] command to
-generate an API token.
-
-[link-cubejs-cli-token-ref]: /reference#token
-
-```bash
-$ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
-```
-
-It is helpful to be able to create an API token with the CLI command for testing
-and development purposes, but we strongly recommend programmatically generating
-tokens in production.
-
-### Programmatically
 
 You can find a library for JWT generation for your programming language
 [here](https://jwt.io/#libraries-io).
