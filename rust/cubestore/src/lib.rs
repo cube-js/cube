@@ -19,6 +19,8 @@ use core::fmt;
 use smallvec::alloc::fmt::{Formatter, Debug};
 use arrow::error::ArrowError;
 use serde_derive::{Deserialize, Serialize};
+use std::num::ParseIntError;
+use log::SetLoggerError;
 
 pub mod http;
 pub mod remotefs;
@@ -32,6 +34,7 @@ pub mod cluster;
 pub mod queryplanner;
 pub mod import;
 pub mod config;
+pub mod telemetry;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,6 +247,24 @@ impl From<Box<bincode::ErrorKind>> for CubeError {
 
 impl From<tokio::sync::watch::error::SendError<bool>> for CubeError {
     fn from(v: tokio::sync::watch::error::SendError<bool>) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<ParseIntError> for CubeError {
+    fn from(v: ParseIntError) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<reqwest::Error> for CubeError {
+    fn from(v: reqwest::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<SetLoggerError> for CubeError {
+    fn from(v: SetLoggerError) -> Self {
         CubeError::from_error(v)
     }
 }

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "0.23.6",
+  "version": "0.23.14",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -15,7 +15,8 @@
     "test": "npm run unit && npm run integration",
     "unit": "jest --runInBand --verbose test/unit",
     "integration": "jest --runInBand --verbose test/integration",
-    "lint": "eslint orchestrator/*.js driver/*.js"
+    "integration:redis": "jest --runInBand --verbose test/integration",
+    "lint": "eslint orchestrator/*.js driver/*.js test/**/*.js"
   },
   "dependencies": {
     "generic-pool": "^3.7.1",

@@ -1,8 +1,10 @@
 ---
 title: Deployment Guide
-permalink: /deployment
+permalink: /deployment/guide
 category: Deployment
 menuOrder: 1
+redirect_from:
+  - /deployment/
 ---
 
 This section contains guides, best practices and advices related to deploying
@@ -10,7 +12,7 @@ and managing Cube.js in production.
 
 If you are moving Cube.js to production, check this guide:
 
-[Production Checklist](production-checklist)
+[Production Checklist](/deployment/production-checklist)
 
 &nbsp;
 
@@ -337,10 +339,12 @@ $ heroku container:release web -a cubejs-heroku-demo
 
 ```bash
 $ heroku config:set -a cubejs-heroku-demo \
+  CUBEJS_DB_TYPE=<YOUR-DB-TYPE> \
   CUBEJS_DB_HOST=<YOUR-DB-HOST> \
   CUBEJS_DB_NAME=<YOUR-DB-NAME> \
   CUBEJS_DB_USER=<YOUR-DB-USER> \
-  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD>
+  CUBEJS_DB_PASS=<YOUR-DB-PASSWORD> \
+  CUBEJS_API_SECRET=<RANDOM_B64_STRING_FROM_ENV_FILE>
 ```
 
 ### Provision Redis
@@ -362,3 +366,34 @@ $ heroku config:set REDIS_URL=<YOUR-REDIS-URL> -a cubejs-heroku-demo
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis
 server. Please [setup connection pool](deployment#production-mode-redis-pool)
 according to your Redis server's maximum connections.
+
+### Building Docker Images with Heroku
+
+Create a `heroku.yml` file in your application’s root directory:
+
+```yaml
+build:
+  docker:
+    web: Dockerfile
+```
+
+Commit the file to your repo:
+
+```sh
+$ git add heroku.yml
+$ git commit -m "Add heroku.yml"
+```
+
+Set the stack of your app to `container`:
+
+```sh
+$ heroku stack:set container
+```
+
+Push your app to Heroku:
+
+```sh
+$ git push heroku master
+```
+
+For more details, take a look at the [official documentation from Heroku](https://devcenter.heroku.com/articles/build-docker-images-heroku-yml).

@@ -5,12 +5,10 @@ import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
 import Header from './components/Header';
 
-const API_URL = 'http://localhost:4000';
-const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MDI3NzI0NTUsImV4cCI6MTYwMjg1ODg1NX0.wbsfpkQUIYev_s83VanR4f1YRWUCmUIST3SHd22o5Ug';
-const cubejsApi = cubejs(CUBEJS_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
+const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
+  apiUrl: process.env.REACT_APP_API_URL
 });
+
 const useStyles = makeStyles(() => ({
   root: {
     flexGrow: 1,

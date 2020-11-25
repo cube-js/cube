@@ -19,8 +19,18 @@ docker build -t cubejs/cubestore:latest .
 ```
 
 ```
-docker run --rm cubejs/cubestore:latest cubestored
+docker run --rm cubejs/cubestore:latest
 ```
+
+## Development
+
+Check out https://github.com/cube-js/arrow/tree/cubestore-2020-11-06 and put **.cargo/config.toml** in the current directory with following contents:
+
+```
+paths = ["../../arrow/rust"]
+```
+
+It should point to checked out Apache Arrow fork and it'll allow you to build project against locally modified sources.
 
 ## License
 

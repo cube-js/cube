@@ -158,6 +158,7 @@ class ResultSet {
     return {
       ...measures[measureName].drillMembersGrouped,
       filters,
+      ...(segments.length > 0 ? { segments } : {}),
       timeDimensions,
       segments,
       timezone: this.loadResponses[0].query.timezone

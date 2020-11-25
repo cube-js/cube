@@ -4,6 +4,8 @@ use serde::{Deserialize, Deserializer};
 use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, WAL, TableId};
 use crate::metastore::{MetaStoreEvent, IdRow};
 use crate::rocks_table_impl;
+use crate::base_rocks_secondary_index;
+use byteorder::{WriteBytesExt, BigEndian};
 
 impl WAL {
     pub fn new(table_id: u64, row_count: usize) -> WAL {
@@ -44,15 +46,28 @@ rocks_table_impl!(
     DeleteWal
 );
 
-impl RocksSecondaryIndex<WAL, String> for WALRocksIndex {
-    fn typed_key_by(&self, row: &WAL) -> String {
+#[derive(Hash, Clone, Debug)]
+pub enum WALIndexKey {
+    ByTable(u64)
+}
+
+base_rocks_secondary_index!(WAL, WALRocksIndex);
+
+impl RocksSecondaryIndex<WAL, WALIndexKey> for WALRocksIndex {
+    fn typed_key_by(&self, row: &WAL) -> WALIndexKey {
         match self {
-            WALRocksIndex::TableID => row.table_id.to_string()
+            WALRocksIndex::TableID => WALIndexKey::ByTable(row.table_id)
         }
     }
 
-    fn key_to_bytes(&self, key: &String) -> Vec<u8> {
-        key.as_bytes().to_vec()
+    fn key_to_bytes(&self, key: &WALIndexKey) -> Vec<u8> {
+        match key {
+            WALIndexKey::ByTable(table_id) => {
+                let mut buf = Vec::new();
+                buf.write_u64::<BigEndian>(*table_id).unwrap();
+                buf
+            }
+        }
     }
 
     fn is_unique(&self) -> bool {

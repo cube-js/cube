@@ -42,27 +42,6 @@ Create app called `demo-app` using `serverless` template and `athena` database:
 $ cubejs create demo-app -d athena -t serverless
 ```
 
-## dev-server
-
-[[warning | Note]]
-| To define configuration you should use `cube.js` configuration file. See [available options](https://cube.dev/docs/@cubejs-backend-server-core#options-reference).
-
-The `dev-server` command starts Cube.js in development mode.
-
-### Usage
-
-Default start:
-
-```bash
-$ cubejs dev-server
-```
-
-With debug information:
-
-```sh
-$ cubejs dev-server --debug
-```
-
 ## server
 
 [[warning | Note]]

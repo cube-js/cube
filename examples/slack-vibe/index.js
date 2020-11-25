@@ -1,5 +1,5 @@
 require('dotenv').config();
-const CubejsServerCore = require('@cubejs-backend/server-core');
+const CubejsServerCore = require('@cubejs-backend/server-core'); // Deprecated
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
@@ -21,7 +21,19 @@ const { tryInitDatabase, tryImportSlackArchive } = require('./import');
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(cors());
 
-  const cubejsServer = CubejsServerCore.create();
+  // DEPRECATION WARNING
+  //
+  // As of November 2020, embedding Cube.js into Express application
+  // is strongly discouraged due to performance and reliability considerations.
+  //
+  // Please check the deployment guide to learn more about running a standalone
+  // Cube.js installation in a Docker container, as a serverless function, and more:
+  // https://cube.dev/docs/deployment/guide
+  //
+  // Please check the Getting Started page to learn more about creating your first
+  // Cube.js application: https://cube.dev/docs/getting-started
+
+  const cubejsServer = CubejsServerCore.create(); // Deprecated
 
   if (process.env.NODE_ENV === 'production') {
     app.use(serveStatic(path.join(__dirname, './frontend/build')));
@@ -43,7 +55,7 @@ const { tryInitDatabase, tryImportSlackArchive } = require('./import');
     res.status(200);
   });
 
-  cubejsServer.initApp(app);
+  cubejsServer.initApp(app); // Deprecated
 
   const port = process.env.PORT || 4000;
   const server = http.createServer({}, app);

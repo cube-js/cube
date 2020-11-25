@@ -1,5 +1,5 @@
 {
-  "name": "dashboard-app",
+  "name": "material-ui-dashboard",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -27,13 +27,17 @@
     "react-dom": "^16.13.1",
     "react-router": "^5.2.0",
     "react-router-dom": "^5.2.0",
-    "react-scripts": "3.4.1"
+    "react-scripts": "3.4.4"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.2"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "cross-env NODE_ENV=production SKIP_PREFLIGHT_CHECK=true react-scripts start",
+    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

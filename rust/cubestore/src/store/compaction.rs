@@ -117,7 +117,7 @@ mod tests {
         let (remote_fs, metastore) = RocksMetaStore::prepare_test_metastore("compaction");
         let mut chunk_store = MockChunkDataStore::new();
         let mut config = MockConfigObj::new();
-        metastore.create_schema("foo".to_string()).await.unwrap();
+        metastore.create_schema("foo".to_string(), false).await.unwrap();
         let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
         metastore.create_table(
             "foo".to_string(),

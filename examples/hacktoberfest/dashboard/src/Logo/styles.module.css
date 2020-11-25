@@ -1,0 +1,62 @@
+.root {
+    margin: auto;
+    max-width: 1000px;
+}
+
+.header {
+    align-items: end;
+    display: grid;
+    grid-template-columns: min-content auto;
+    grid-gap: 50px;
+}
+
+.image {
+    background: url('./Icon.png') no-repeat 50% 50%;
+    background-size: contain;
+    height: 200px;
+    width: 200px;
+}
+
+.root h1 {
+    white-space: nowrap;
+}
+
+.small {
+    font-size: 32px !important;
+}
+
+.sponsors {
+    background: url('./logotypes.png') no-repeat 0 0;
+    background-size: 100%;
+    display: block;
+    margin-top: 20px;
+    margin-left: 20px;
+    opacity: 0.5;
+    height: 66px;
+    width: 526px;
+}
+
+@media only screen and (max-width: 500px) {
+    .header {
+        display: block;
+        text-align: center;
+    }
+
+    .image {
+        display: none;
+    }
+
+    .root h1 {
+        font-size: 32px;
+        line-height: 1.4;
+        white-space: normal;
+    }
+
+    .small {
+        font-size: 24px !important;
+    }
+
+    .sponsors {
+        display: none;
+    }
+}

@@ -3,21 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cubejs-client/core": "^0.10.15",
-    "@cubejs-client/react": "^0.10.15",
+    "@cubejs-client/core": "^0.23.6",
+    "@cubejs-client/react": "^0.23.6",
     "antd": "^3.20.3",
     "bizcharts": "^3.5.4",
     "moment": "^2.24.0",
     "numeral": "^2.0.6",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
-    "react-scripts": "3.0.1"
+    "react-scripts": "3.4.4"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.2"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
+    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

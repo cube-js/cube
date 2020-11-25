@@ -8,15 +8,22 @@ menuOrder: 2
 This is a checklist for configuring and securing Cube.js for a production
 deployment.
 
-## Enable Production Mode
+## Disable Development Mode
 
-When running Cube.js in production, make sure `NODE_ENV` is set to `production`.
-Some platforms, such as Heroku, do it by default.
+When running Cube.js in production environments, make sure development mode is
+disabled. Running Cube.js in development mode in a production environment can
+lead to security vulnerabilities. You can read more on the differences between
+[production and development mode here][link-cubejs-dev-vs-prod].
 
-In this mode, the insecure development server and Playground will be disabled
-by default because there's a security risk serving those in production
-environments. Production Cube.js servers can only be accessed through the
-[REST API](rest-api) and Cube.js frontend libraries.
+[link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
+
+[[info | Note]]
+| Development mode is disabled by default.
+
+```bash
+# Set this to false or leave unset to disable development mode
+CUBEJS_DEV_MODE=false
+```
 
 ## Set up Redis
 
@@ -65,7 +72,7 @@ If you want to run Cube.js in production without Redis, you can use
 If you are using [external pre-aggregations][link-pre-aggregations], you need
 to set up and configure external pre-aggregations storage.
 
-[link-pre-aggregations]: pre-aggregations#external-pre-aggregations
+[link-pre-aggregations]: /pre-aggregations#external-pre-aggregations
 
 Currently, we recommend using MySQL for external pre-aggregations storage.
 There is some additional MySQL configuration required to optimize for
@@ -79,7 +86,7 @@ recommend running a separate Cube.js worker instance to refresh scheduled
 pre-aggregations in the background. This allows your main Cube.js instance
 to continue to serve requests with high availability.
 
-[link-scheduled-refresh]: pre-aggregations#scheduled-refresh
+[link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
 
 ```bash
 # Set to true so a Cube.js instance acts as a refresh worker

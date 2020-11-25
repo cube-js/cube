@@ -195,13 +195,9 @@ const lineRender = ({ resultSet, yFormatter }) => (
   </Chart>
 );
 
-const API_HOST = process.env.NODE_ENV === 'production' ? "" : "http://localhost:4000";
-const cubejsApi = cubejs(
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1Njc3MzQwMDR9.t9QdhSxC4vuJUOzH87pmgykjastR5fhbmkE7UP7tr6k",
-  {
-    apiUrl: API_HOST + "/cubejs-api/v1"
-  }
-);
+const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
+  apiUrl: process.env.REACT_APP_API_URL
+});
 
 const renderChart = (Component, options = {}) => ({ resultSet, error }) =>
   (resultSet && <Component resultSet={resultSet} {...options} />) ||
@@ -371,7 +367,7 @@ class App extends React.Component {
               height={300}
               title={[
                 "Story Average Score",
-                <Radio.Group 
+                <Radio.Group
                     defaultValue="week"
                     onChange={(e) => this.setState({ averageScoreGranularity: e.target.value })}
                     style={{ float: "right" }}

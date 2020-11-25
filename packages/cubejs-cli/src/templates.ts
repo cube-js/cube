@@ -14,7 +14,8 @@ const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 `;
 
 // Shared environment variables, across all DB types
-const sharedDotEnvVars = env => `CUBEJS_DB_TYPE=${env.dbType}
+const sharedDotEnvVars = env => `CUBEJS_DEV_MODE=true
+CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}`;
 
 const defaultDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
@@ -219,11 +220,9 @@ services:
 
   cube:
     image: cubejs/cube:latest
-    depends_on:
-      - redis
+    #depends_on:
     #  - postgres
-    links:
-      - redis
+    #links:
     #  - postgres
     ports:
       # It's better to use random port binding for 4000/3000 ports
@@ -241,19 +240,12 @@ services:
       - ./dashboard-app:/cube/conf/dashboard-app
       - ./cube.js:/cube/conf/cube.js
       - ./schema:/cube/conf/schema
-    # Remove this line for production, dev-server must be used only during development
-    entrypoint: cubejs dev-server
-
-  redis:
-    image: redis:6
-    restart: always
-
 `;
 
 const templates = {
   docker: {
     scripts: {
-      dev: './node_modules/.bin/cubejs-server dev-server',
+      dev: './node_modules/.bin/cubejs-server',
     },
     files: {
       'cube.js': () => cubeJs,

@@ -1,9 +1,49 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+# Angular Dashboard with Material
 
-[Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
+Example: https://angular-dashboard-demo.cube.dev
 
-# D3 Dashboard Guide
-You will learn how to build a D3 dashboard with React, Material UI and Cube.js.  The guide covers setting up dashboard with Postgres, Cube.js, React and D3.js.
-You can also check out a [live demo here](https://d3-dashboard-demo.cube.dev/).
+Guide: https://angular-dashboard.cube.dev
 
-[The guide is available here.](https://d3-dashboard.cube.dev/)
+Angular Material UI dashboard with Cube.js
+
+## Run Project
+
+### Setup a Demo Backend
+
+if you already have Cube.js Backend up and running you can skip this step.
+
+Let's start by setting up a database with some sample data. We'll use PostgresQL and our example e-commerce dataset for this tutorial. You can download and import it by running the following commands.
+
+```
+$ curl http://cube.dev/downloads/ecom-dump.sql > ecom-dump.sql
+$ createdb ecom
+$ psql --dbname ecom -f ecom-dump.sql
+```
+
+Cube.js uses environment variables for configuration. It uses environment variables starting with `CUBEJS_`. To configure the connection to our database, we need to specify the DB type and name. In the Cube.js project folder create the .env file with the following:
+
+```
+CUBEJS_DB_NAME=ecom
+CUBEJS_DB_TYPE=postgres
+CUBEJS_API_SECRET=SECRET
+```
+
+### Backend run
+To start frontend application use this commands
+```
+$ yarn
+$ yarn dev
+```
+
+### Frontend run
+To start frontend application use this commands
+```
+$ cd dashboard-app
+$ ng serve
+```
+
+### Frontend build
+To build frontend application use this commands
+```
+$ ng build --prod
+```

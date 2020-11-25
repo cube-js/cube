@@ -1,13 +1,14 @@
 {
-  "name": "Angular Dashboard with Material",
+  "name": "angular-dashboard-with-material",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true ng serve",
+    "build": "SKIP_PREFLIGHT_CHECK=true ng build --prod",
     "test": "ng test",
     "lint": "ng lint",
-    "e2e": "ng e2e"
+    "e2e": "ng e2e",
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist/dashboard-app"
   },
   "private": true,
   "dependencies": {
@@ -31,6 +32,7 @@
     "zone.js": "~0.10.2"
   },
   "devDependencies": {
+    "cross-env": "^7.0.2",
     "@angular-devkit/build-angular": "~0.1001.6",
     "@angular/cli": "~10.1.6",
     "@angular/compiler-cli": "~10.1.5",

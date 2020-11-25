@@ -81,6 +81,12 @@ class PrestodbQuery extends BaseQuery {
     return 120;
   }
 
+  defaultEveryRefreshKey() {
+    return {
+      every: '2 minutes'
+    };
+  }
+
   hllInit(sql) {
     return `cast(approx_set(${sql}) as varbinary)`;
   }

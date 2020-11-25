@@ -2,3 +2,5 @@ target
 Dockerfile
 .cubestore
 upstream
+cubestore/.cubestore
+cubestore/upstream

@@ -1,7 +1,7 @@
 const config = {
-  siteTitle: "Material UI Dashboard with Angular", // Site title.
-  siteTitleShort: "Material UI Dashboard with Angular", // Short site title for homescreen (PWA). Preferably should be under 12 characters to prevent truncation.
-  siteTitleAlt: "Material UI Dashboard with Angular", // Alternative site title for SEO.
+  siteTitle: "Angular Dashboard with Material", // Site title.
+  siteTitleShort: "Angular Dashboard with Material", // Short site title for homescreen (PWA). Preferably should be under 12 characters to prevent truncation.
+  siteTitleAlt: "Angular Dashboard with Material", // Alternative site title for SEO.
   siteLogo: "/logos/icon.png", // Logo used for SEO and manifest.
   previewImage: "/logos/preview.png",
   siteUrl: "https://angular-dashboard.cube.dev", // Domain of your website without pathPrefix.

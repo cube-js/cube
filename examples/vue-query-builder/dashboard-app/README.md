@@ -1,6 +1,6 @@
 # Vue Query Builder
 
-Example: https://vue-query-builder.cubecloudapp.dev/
+Example: https://vue-query-builder-demo.cube.dev/
 
 Query builder component uses scoped slots technique and let developers implement their render logic. This way it gives maximum flexibility to building a custom-tailored UI with a minimal API. Below you can see the demo of the query builder component with Vuetify.
 

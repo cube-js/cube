@@ -27,6 +27,12 @@ class SnowflakeQuery extends BaseQuery {
     return 120;
   }
 
+  defaultEveryRefreshKey() {
+    return {
+      every: '2 minutes'
+    };
+  }
+
   nowTimestampSql() {
     return `CURRENT_TIMESTAMP`;
   }

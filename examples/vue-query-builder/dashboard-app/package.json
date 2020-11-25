@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "serve": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true vue-cli-service serve",
+    "build": "SKIP_PREFLIGHT_CHECK=true vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist"
   },
   "dependencies": {
     "@cubejs-client/vue": "^0.19.43",
@@ -16,6 +17,7 @@
     "vuetify": "^2.2.11"
   },
   "devDependencies": {
+    "cross-env": "^7.0.2",
     "@vue/cli-plugin-babel": "~4.4.0",
     "@vue/cli-plugin-eslint": "~4.4.0",
     "@vue/cli-service": "~4.4.0",
