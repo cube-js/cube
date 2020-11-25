@@ -64,7 +64,7 @@ CUBEJS_API_SECRET=SECRET
 
 ### Network config for Linux Users
 
-For Linux add the following line to your `docker-compose.yml` 
+For Linux, add the following line to your `docker-compose.yml` 
 
 ```yaml
 network_mode: "host"
