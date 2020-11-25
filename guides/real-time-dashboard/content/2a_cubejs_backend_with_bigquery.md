@@ -1,6 +1,6 @@
 ---
 order: 3
-title: "Cube.js Backend with BigQuery"
+title: "Cube.js API with BigQuery"
 ---
 
 Google BigQuery is a serverless and highly scalable data warehouse. It is
@@ -22,16 +22,10 @@ As a dataset, we'll use a sample public events dataset—`cubejs-examples.stats.
 
 ## Creating a Cube.js Application
 
-We are going to use Cube.js CLI to create our backend application; let's first install it.
+We are going to use Cube.js CLI to create our new Cube.js application with the BigQuery driver:
 
 ```bash
-$ npm install -g cubejs-cli
-```
-
-Next, create a new Cube.js application with the BigQuery driver.
-
-```bash
-$ cubejs create real-time-dashboard -d bigquery
+$ npx cubejs-cli create real-time-dashboard -d bigquery
 ```
 
 Now, we need to configure credentials to access BigQuery. Cube.js uses
