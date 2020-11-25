@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.23.15](https://github.com/cube-js/cube.js/compare/v0.23.14...v0.23.15) (2020-11-25)
+
+
+### Bug Fixes
+
+* Error: Cannot find module 'antlr4/index' ([0d2e330](https://github.com/cube-js/cube.js/commit/0d2e33040dfea3fb80df2a1af2ccff46db0f8673))
+* **@cubejs-backend/server-core:** Correct type for orchestratorOptions ([#1422](https://github.com/cube-js/cube.js/issues/1422)) ([96c1691](https://github.com/cube-js/cube.js/commit/96c169150ccf2197812dafdebce8194dd2cf6294))
+
+
+### Features
+
+* **@cubejs-backend/postgres-driver:** Support CUBEJS_DB_SSL_KEY ([e6291fc](https://github.com/cube-js/cube.js/commit/e6291fcda283aa6ee22badec339a600db02a1ce9))
+* **@cubejs-client/react:** support 'compareDateRange' when updating 'timeDimensions' ([#1426](https://github.com/cube-js/cube.js/issues/1426)). Thanks to @BeAnMo! ([6446a58](https://github.com/cube-js/cube.js/commit/6446a58c5d6c983f045dc2062732aacfd69d908a))
+
+
+
+
+
 ## [0.23.14](https://github.com/cube-js/cube.js/compare/v0.23.13...v0.23.14) (2020-11-22)
 
 
