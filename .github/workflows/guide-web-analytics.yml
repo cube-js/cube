@@ -1,0 +1,47 @@
+name: web-analytics Guide
+on:
+  push:
+    paths:
+      - '.github/workflows/guide-web-analytics.yml'
+      - 'guides/web-analytics/**'
+    branches:
+      - master
+
+jobs:
+  deploy-web-analytics:
+    name: Deploy web-analytics Guide
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Use Node.js 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: Yarn install
+        run: yarn install
+        working-directory: guides/guides-base
+      - name: Yarn link guides-base
+        run: yarn link
+        working-directory: guides/guides-base
+      - name: Yarn install
+        run: yarn install
+        working-directory: guides/web-analytics
+      - name: Link guides-base
+        run: yarn link guides-base
+        working-directory: guides/web-analytics
+      - name: Link styled-components
+        run: ln -s ../../web-analytics/node_modules/styled-components styled-components
+        working-directory: guides/guides-base/node_modules
+      - name: Yarn build
+        run: yarn build
+        working-directory: guides/web-analytics
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
+      - name: Deploy to Netlify
+        run: netlify deploy --dir=public --prod
+        working-directory: guides/web-analytics
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
