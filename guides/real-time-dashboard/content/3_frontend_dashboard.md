@@ -8,10 +8,10 @@ In the previous part we've successfully configured a database, [BigQuery](cube-j
 Cube.js Playground can generate a boilerplate frontend app. It is
 a convenient way to start developing a dashboard or analytics application. You can
 select your favorite frontend framework and charting library and Playground will
-generate a new application and wire all things together to work with the Cube.js backend API.
+generate a new application and wire all things together to work with the Cube.js API.
 
 We'll use React and Chart.js in our tutorial. To generate a new application,
-navigate to "Dashboard App,” select "React Antd Static" with "Chart.js," and click on the “Create dashboard app” button.
+navigate to "Dashboard App,” select "React Antd Static" with "Chart.js", turn on the "Web Socket Transport (Real-time)" switch, and click on the “Create dashboard app” button.
 
 
 ![](/images/4-screenshot-1.png)
@@ -28,10 +28,10 @@ To add a chart on the dashboard, you can either edit the `dashboard-app/src/page
 
 ### Configure Cube.js for Real-Time Data Fetch
 
-We need to do a few things for real-time support in Cube.js. First, let's
-enable WebSockets transport on the backend by setting the `CUBEJS_WEB_SOCKETS` environment variable.
+We need to do a few things for real-time support in Cube.js. First,
+WebSockets transport should be enabled by setting the `CUBEJS_WEB_SOCKETS` environment variable to `true`.
 
-Add the following line to the `.env` file.
+Check that the following line is present in the `.env` file:
 
 ```bash
 CUBEJS_WEB_SOCKETS=true
@@ -44,16 +44,16 @@ Update the content of the `cube.js` file the following.
 
 ```javascript
 module.exports = {
+  processSubscriptionsInterval: 1,
   orchestratorOptions: {
     queryCacheOptions: {
       refreshKeyRenewalThreshold: 1,
     }
   },
-  processSubscriptionsInterval: 1,
 };
 ```
 
-We have passed two configuration options to the Cube.js backend. The first,
+We have passed two configuration options to Cube.js. The first,
 `processSubscriptionsInterval`, controls the polling interval. The default value
 is 5 seconds; we are setting it to 1 second to make it slightly more real-time.
 
@@ -62,45 +62,40 @@ executed. The default value of this option is 120, which is 2 minutes. In the pr
 invalidate the `refreshKey` result itself, that’s why we are changing it to 1 second
 as well.
 
-That is all the updates we need to make on the backend part. Now, let's update the
-code of our dashboard app. First, let's install the `@cubejs-client/ws-transport`
-package. It provides a WebSocket transport to work with the Cube.js real-time API.
+These are all the updates we need to make on the backend part. Now, let's update the
+code of our dashboard app. First, let's check that the `@cubejs-client/ws-transport`
+package is installed in the `package.json` file in the `dashboard-app` folder. It provides a WebSocket transport to work with the Cube.js real-time API:
 
-Run the following command in your terminal.
+```json
+{
+  "name": "dashboard-app",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
 
+    // ...
+
+    "@cubejs-client/ws-transport": "^0.23.11",
+
+    // ...
 ```
-$ cd dashboard-app
-$ npm install -s @cubejs-client/ws-transport
-```
 
-Next, update the `src/App.js` file to use real-time transport to work with the Cube.js
-API.
+Now, we need to update how we request a query itself in the `src/components/ChartRenderer.js`. Make the following changes:
 
 ```diff
--const API_URL = "http://localhost:4000";
-+import WebSocketTransport from '@cubejs-client/ws-transport';
- const CUBEJS_TOKEN = "SECRET";
--const cubejsApi = cubejs(CUBEJS_TOKEN, {
--  apiUrl: `${API_URL}/cubejs-api/v1`
-+const cubejsApi = cubejs({
-+  transport: new WebSocketTransport({
-+    authorization: CUBEJS_TOKEN,
-+    apiUrl: 'ws://localhost:4000/'
-+  })
- });
-```
-
-Now, we need to update how we request a query itself in the `src/components/ChartRenderer.js`. Make the following changes.
-
-```diff
--const ChartRenderer = ({ vizState }) => {
-+const ChartRenderer = ({ vizState, cubejsApi }) => {
-   const { query, chartType } = vizState;
-   const component = TypeToMemoChartComponent[chartType];
--  const renderProps = useCubeQuery(query);
-+  const renderProps = useCubeQuery(query, { subscribe: true, cubejsApi });;
-   return component && renderChart(component)(renderProps);
- };
+  const ChartRenderer = ({
+-   vizState
++   vizState, cubejsApi
+  }) => {
+    const {
+      query,
+      chartType
+    } = vizState;
+    const component = TypeToMemoChartComponent[chartType];
+-   const renderProps = useCubeQuery(query);
++   const renderProps = useCubeQuery(query, { subscribe: true, cubejsApi });
+    return component && renderChart(component)(renderProps);
+  };
 ```
 
 That's it! Now you can add more charts to your dashboard, perform changes in the
