@@ -50,7 +50,7 @@ const config = {
       resolve: 'gatsby-source-filesystem',
       options: {
         name: 'cubejs-docs',
-        path: `${__dirname}/../docs/`,
+        path: `${__dirname}/content/`,
       },
     },
     {

@@ -3,7 +3,6 @@ on:
   push:
     paths:
       - '.github/workflows/docs.yml'
-      - 'docs-build/**'
       - 'docs-gen/**'
       - 'docs/**'
     branches:
@@ -14,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./docs-build
+        working-directory: ./docs
     steps:
       - name: Checkout
         uses: actions/checkout@v2
