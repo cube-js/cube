@@ -296,18 +296,13 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<DataFrame, 
 }
 
 fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableValue, CubeError> {
-    let d = if let Expr::Value(v) = cell {
-        v
-    } else {
-        return Err(CubeError::user(format!("Value is expected but {:?} found", cell)));
-    };
-    if let Value::Null = d {
+    if let Expr::Value(Value::Null) = cell {
         return Ok(TableValue::Null);
     }
     let res = {
         match column[i].get_column_type() {
             ColumnType::String => {
-                let val = if let Value::SingleQuotedString(v) = d {
+                let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
                     v
                 } else {
                     return Err(CubeError::user(format!("Single quoted string is expected but {:?} found", cell)));
@@ -315,21 +310,26 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 TableValue::String(val.to_string())
             }
             ColumnType::Int => {
-                let val = if let Value::Number(v) | Value::SingleQuotedString(v) = d {
-                    v
-                } else {
-                    return Err(CubeError::user(format!("Can't parse int from, {:?}", d)));
+                let val_int = match cell {
+                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => v.parse::<i64>(),
+                    Expr::UnaryOp { op: UnaryOperator::Minus, expr } => {
+                        if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+                            v.parse::<i64>().map(|v| v * -1)
+                        } else {
+                            return Err(CubeError::user(format!("Can't parse int from, {:?}", cell)))
+                        }
+                    },
+                    _ => return Err(CubeError::user(format!("Can't parse int from, {:?}", cell)))
                 };
-                let val_int = val.parse::<i64>();
                 if let Err(e) = val_int {
-                    return Err(CubeError::user(format!("Can't parse int from, {:?}: {}", d, e)));
+                    return Err(CubeError::user(format!("Can't parse int from, {:?}: {}", cell, e)));
                 }
                 TableValue::Int(val_int.unwrap())
             }
             ColumnType::Decimal => { return Err(CubeError::user("Decimal type not implemented.".to_string())); }
             ColumnType::Bytes => {
                 // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
-                let val = if let Value::Number(v) = d {
+                let val = if let Expr::Value(Value::Number(v)) = cell {
                     v
                 } else {
                     return Err(CubeError::user("Corrupted data in query.".to_string()));
@@ -340,19 +340,19 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 TableValue::Bytes(main_vec)
             }
             ColumnType::Timestamp => {
-                match d {
-                    Value::SingleQuotedString(v) => {
+                match cell {
+                    Expr::Value(Value::SingleQuotedString(v)) => {
                         TableValue::Timestamp(TimestampValue::new(string_to_timestamp_nanos(v)?))
                     },
                     x => return Err(CubeError::user(format!("Can't parse timestamp from, {:?}", x)))
                 }
             }
             ColumnType::Boolean => {
-                match d {
-                    Value::SingleQuotedString(v) => {
+                match cell {
+                    Expr::Value(Value::SingleQuotedString(v)) => {
                         TableValue::Boolean(v.to_lowercase() == "true")
                     },
-                    Value::Boolean(b) => TableValue::Boolean(*b),
+                    Expr::Value(Value::Boolean(b)) => TableValue::Boolean(*b),
                     x => return Err(CubeError::user(format!("Can't parse boolean from, {:?}", x)))
                 }
             }
@@ -517,6 +517,27 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(22)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(23)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn negative_numbers() {
+        Config::run_test("negative_numbers", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query(
+                "CREATE TABLE foo.values (int_value int)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.values (int_value) VALUES (-153)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT * from foo.values").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
         }).await;
     }
 
