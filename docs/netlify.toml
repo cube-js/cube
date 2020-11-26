@@ -1,0 +1,39 @@
+[build]
+publish = "public/"
+command = "./build-netlify.sh"
+
+[[redirects]]
+from = "/favicons/*"
+to = "/favicons/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/fonts/*"
+to = "/fonts/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/icons/*"
+to = "/icons/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/scripts/*"
+to = "/scripts/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/styles/*"
+to = "/styles/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+force = false
