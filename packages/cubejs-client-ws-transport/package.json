@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "0.23.11",
+  "version": "0.24.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -33,7 +33,7 @@
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
     "@babel/preset-typescript": "^7.12.1",
-    "@cubejs-backend/linter": "^0.23.0",
+    "@cubejs-backend/linter": "^0.24.0",
     "babel-jest": "^24.1.0",
     "jest": "^24.1.0",
     "typescript": "^4.0.5"
