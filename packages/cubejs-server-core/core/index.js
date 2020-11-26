@@ -1,6 +1,6 @@
 /* eslint-disable global-require */
 const { ApiGateway } = require('@cubejs-backend/api-gateway');
-const { track } = require('@cubejs-backend/shared');
+const { track, isDockerImage, resolveBuiltInPackageVersion } = require('@cubejs-backend/shared');
 
 const crypto = require('crypto');
 const fs = require('fs-extra');
@@ -279,23 +279,41 @@ class CubejsServerCore {
         return;
       }
 
-      try {
-        if (!this.projectFingerprint) {
-          try {
-            this.projectFingerprint =
-              crypto.createHash('md5').update(JSON.stringify(await fs.readJson('package.json'))).digest('hex');
-            const coreServerJson = await fs.readJson(path.join(__dirname, '..', 'package.json'));
-            this.coreServerVersion = coreServerJson.version;
-          } catch (e) {
-            // console.error(e);
-          }
+      if (!this.projectFingerprint) {
+        try {
+          this.projectFingerprint = crypto.createHash('md5')
+            .update(JSON.stringify(await fs.readJson('package.json')))
+            .digest('hex');
+        } catch (e) {
+          // console.error(e);
         }
+      }
 
+      if (!this.coreServerVersion) {
+        try {
+          const coreServerJson = await fs.readJson(path.join(__dirname, '..', 'package.json'));
+          this.coreServerVersion = coreServerJson.version;
+        } catch (e) {
+          // console.error(e);
+        }
+      }
+
+      if (!this.dockerVersion && isDockerImage()) {
+        try {
+          this.dockerVersion = await resolveBuiltInPackageVersion(
+            '@cubejs-backend/docker',
+          );
+        } catch (e) {
+          // console.error(e);
+        }
+      }
+
+      try {
         await track({
           event: name,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
-          imageTag: process.env.CUBEJS_DOCKER_IMAGE_TAG,
+          dockerVersion: this.dockerVersion,
           ...props
         });
       } catch (e) {

@@ -1,5 +1,11 @@
 import { CreateOptions } from '@cubejs-backend/server-core';
-import { requireFromPackage, isDockerImage, packageExists, PackageManifest } from '@cubejs-backend/shared';
+import {
+  requireFromPackage,
+  isDockerImage,
+  packageExists,
+  PackageManifest,
+  resolveUserPackageVersion, resolveBuiltInPackageVersion,
+} from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
@@ -8,6 +14,14 @@ import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import { getMajorityVersion, isCubeNotServerPackage, isDevPackage, isSimilarPackageRelease } from './utils';
 import { CubejsServer } from '../server';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
+
+function safetyParseSemver(version: string|null) {
+  if (version) {
+    return semverParse(version);
+  }
+
+  return null;
+}
 
 export class ServerContainer {
   public constructor(
@@ -25,43 +39,6 @@ export class ServerContainer {
 
     throw new Error(
       'Typescript dependency not found. Please run this command from project directory.'
-    );
-  }
-
-  protected async resolvePackageVersion(basePath: string, pkgName: string) {
-    const resolvedManifest = await requireFromPackage<PackageManifest|null>(
-      path.join(pkgName, 'package.json'),
-      {
-        basePath,
-        relative: false,
-        silent: true,
-      },
-    );
-    if (resolvedManifest) {
-      return semverParse(resolvedManifest.version);
-    }
-
-    if (this.configuration.debug) {
-      console.log(
-        `[resolvePackageVersion] Unable to resolve version for ${pkgName} by ${basePath} prefix`
-      );
-    }
-
-    return null;
-  }
-
-  protected async resolveBuiltInPackageVersion(pkgName: string) {
-    return this.resolvePackageVersion(
-      '/cube',
-      pkgName,
-    );
-  }
-
-  protected async resolveUserPackageVersion(pkgName: string) {
-    return this.resolvePackageVersion(
-      // In the official docker image, it will be resolved to /cube/conf
-      process.cwd(),
-      pkgName,
     );
   }
 
@@ -96,18 +73,25 @@ export class ServerContainer {
       console.log('[runProjectDockerDiagnostics] do');
     }
 
-    const builtInCoreVersion = await this.resolveBuiltInPackageVersion(
-      '@cubejs-backend/server',
+    const builtInCoreVersion = safetyParseSemver(
+      await resolveBuiltInPackageVersion(
+        '@cubejs-backend/server',
+      )
     );
     if (!builtInCoreVersion) {
       return;
     }
 
-    const userCoreVersion = await this.resolveUserPackageVersion(
-      '@cubejs-backend/server',
+    const userCoreVersion = safetyParseSemver(
+      await resolveUserPackageVersion(
+        '@cubejs-backend/server',
+      )
     );
     if (userCoreVersion) {
-      this.compareBuiltInAndUserVersions(builtInCoreVersion, userCoreVersion);
+      this.compareBuiltInAndUserVersions(
+        builtInCoreVersion,
+        userCoreVersion
+      );
 
       return;
     }
@@ -121,8 +105,10 @@ export class ServerContainer {
     );
     // eslint-disable-next-line no-restricted-syntax
     for (const pkgName of depsToCompareVersions) {
-      const pkgVersion = await this.resolveUserPackageVersion(
-        pkgName,
+      const pkgVersion = safetyParseSemver(
+        await resolveUserPackageVersion(
+          pkgName,
+        )
       );
       if (pkgVersion) {
         this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
@@ -165,8 +151,10 @@ export class ServerContainer {
           }
         }
 
-        const coreVersion = await this.resolveUserPackageVersion(
-          '@cubejs-backend/server',
+        const coreVersion = safetyParseSemver(
+          await resolveUserPackageVersion(
+            '@cubejs-backend/server',
+          )
         );
         if (coreVersion) {
           const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
@@ -174,8 +162,10 @@ export class ServerContainer {
           );
           // eslint-disable-next-line no-restricted-syntax
           for (const pkgName of depsToCompareVersions) {
-            const pkgVersion = await this.resolveUserPackageVersion(
-              pkgName,
+            const pkgVersion = safetyParseSemver(
+              await resolveUserPackageVersion(
+                pkgName,
+              )
             );
             if (pkgVersion && !isSimilarPackageRelease(pkgVersion, coreVersion)) {
               console.log(

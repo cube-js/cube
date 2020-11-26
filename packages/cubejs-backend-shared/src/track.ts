@@ -11,6 +11,7 @@ export type Event = BaseEvent & {
   id: string,
   clientTimestamp: string,
   anonymousId: string,
+  platform: string,
   nodeVersion: string,
 };
 
@@ -67,6 +68,7 @@ export async function track(opts: BaseEvent) {
     ...opts,
     id: crypto.randomBytes(16).toString('hex'),
     clientTimestamp: new Date().toJSON(),
+    platform: process.platform,
     nodeVersion: process.version,
     anonymousId,
   });

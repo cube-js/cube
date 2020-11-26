@@ -79,3 +79,34 @@ export function isFilePath(fp: string): boolean {
 
   return false;
 }
+
+export async function resolvePackageVersion(basePath: string, pkgName: string) {
+  const resolvedManifest = await requireFromPackage<PackageManifest|null>(
+    path.join(pkgName, 'package.json'),
+    {
+      basePath,
+      relative: false,
+      silent: true,
+    },
+  );
+  if (resolvedManifest) {
+    return resolvedManifest.version;
+  }
+
+  return null;
+}
+
+export async function resolveBuiltInPackageVersion(pkgName: string) {
+  return resolvePackageVersion(
+    '/cube',
+    pkgName,
+  );
+}
+
+export async function resolveUserPackageVersion(pkgName: string) {
+  return resolvePackageVersion(
+    // In the official docker image, it will be resolved to /cube/conf
+    process.cwd(),
+    pkgName,
+  );
+}
