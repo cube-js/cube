@@ -106,6 +106,15 @@ functions:
       - http:
           path: /{proxy+}
           method: ANY
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+              - X-Request-Id
+              - X-Amz-Date
+              - X-Amz-Security-Token
+              - X-Api-Key
   cubejsProcess:
     handler: index.process
     timeout: 630
