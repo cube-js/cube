@@ -1,7 +1,8 @@
 import chalk from 'chalk';
 import jwt from 'jsonwebtoken';
 import type { CommanderStatic } from 'commander';
-import { displayError, event, isDockerImage, requireFromPackage } from '../utils';
+
+import { displayError, isDockerImage, requireFromPackage, event } from '../utils';
 
 export const defaultExpiry = '30 days';
 
@@ -25,7 +26,9 @@ type TokenOptions = {
 };
 
 export const token = async (options: TokenOptions) => {
-  event('Generate Token');
+  event({
+    name: 'Generate Token'
+  });
 
   const relativeResolution = isDockerImage();
 
@@ -60,7 +63,11 @@ export const token = async (options: TokenOptions) => {
 
   const signedToken = jwt.sign(payload, secret, extraOptions);
   console.log(`Token: ${chalk.green(signedToken)}`);
-  await event('Generate Token Success');
+
+  await event({
+    name: 'Generate Token Success'
+  });
+
   return signedToken;
 };
 

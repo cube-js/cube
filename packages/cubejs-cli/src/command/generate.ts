@@ -1,7 +1,8 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
-import { displayError, event, isDockerImage, packageExists, requireFromPackage } from '../utils';
+
+import { displayError, isDockerImage, packageExists, requireFromPackage, event } from '../utils';
 
 // @todo There is another function with similar name inside utils, but without analytics
 const logStage = (stage) => {
@@ -10,7 +11,12 @@ const logStage = (stage) => {
 
 const generate = async (options) => {
   const generateSchemaOptions = { tables: options.tables };
-  event('Generate Schema', generateSchemaOptions);
+
+  event({
+    name: 'Generate Schema',
+    ...generateSchemaOptions,
+  });
+
   if (!options.tables) {
     await displayError([
       'You must pass table names to generate schema from (-t).',
@@ -49,7 +55,11 @@ const generate = async (options) => {
   const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
   await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 
-  await event('Generate Schema Success', generateSchemaOptions);
+  await event({
+    name: 'Generate Schema Success',
+    ...generateSchemaOptions
+  });
+
   logStage(`Schema for ${options.tables.join(', ')} was successfully generated 🎉`);
 };
 

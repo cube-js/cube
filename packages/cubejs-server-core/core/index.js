@@ -1,5 +1,7 @@
 /* eslint-disable global-require */
 const { ApiGateway } = require('@cubejs-backend/api-gateway');
+const { track } = require('@cubejs-backend/shared');
+
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
@@ -11,7 +13,6 @@ const OrchestratorApi = require('./OrchestratorApi');
 const RefreshScheduler = require('./RefreshScheduler');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
-const track = require('./track');
 const agentCollect = require('./agentCollect');
 const { version } = require('../package.json');
 const DriverDependencies = require('./DriverDependencies');
@@ -273,18 +274,11 @@ class CubejsServerCore {
       );
     }
 
-    const { machineIdSync } = require('node-machine-id');
-    let anonymousId = 'unknown';
-    try {
-      anonymousId = machineIdSync();
-    } catch (e) {
-      // console.error(e);
-    }
-    this.anonymousId = anonymousId;
     this.event = async (name, props) => {
       if (!options.telemetry) {
         return;
       }
+
       try {
         if (!this.projectFingerprint) {
           try {
@@ -296,13 +290,12 @@ class CubejsServerCore {
             // console.error(e);
           }
         }
+
         await track({
           event: name,
-          anonymousId,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
           imageTag: process.env.CUBEJS_DOCKER_IMAGE_TAG,
-          nodeVersion: process.version,
           ...props
         });
       } catch (e) {

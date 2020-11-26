@@ -3,6 +3,8 @@
 const fs = require('fs-extra');
 const path = require('path');
 const spawn = require('cross-spawn');
+const { getAnonymousId } = require('@cubejs-backend/shared');
+
 const AppContainer = require('../dev/AppContainer');
 const DependencyTree = require('../dev/DependencyTree');
 const PackageFetcher = require('../dev/PackageFetcher');
@@ -47,7 +49,7 @@ class DevServer {
       res.json({
         cubejsToken: jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }),
         apiUrl: process.env.CUBEJS_API_URL,
-        anonymousId: this.cubejsServer.anonymousId,
+        anonymousId: getAnonymousId(),
         coreServerVersion: this.cubejsServer.coreServerVersion,
         projectFingerprint: this.cubejsServer.projectFingerprint
       });
