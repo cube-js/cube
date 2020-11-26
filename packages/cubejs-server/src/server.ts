@@ -11,7 +11,7 @@ import https from 'https';
 import http from 'http';
 import util from 'util';
 import bodyParser from 'body-parser';
-import cors from 'cors';
+import cors, { CorsOptions } from 'cors';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
 
@@ -21,17 +21,26 @@ dotenv.config();
 
 export type InitAppFn = (app: express.Application) => void | Promise<void>;
 
+interface HttpOptions {
+  cors?: CorsOptions;
+}
+
 export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions {
   webSockets?: boolean;
   initApp?: InitAppFn;
+  http?: HttpOptions;
+}
+
+type RequireOne<T, K extends keyof T> = {
+  [X in Exclude<keyof T, K>]?: T[X]
+} & {
+  [P in K]-?: T[P]
 }
 
 export class CubejsServer {
   protected readonly core: CubejsServerCore;
 
-  protected readonly initApp?: InitAppFn;
-
-  protected readonly webSockets?: boolean;
+  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http'>;
 
   protected redirector: http.Server | null = null;
 
@@ -39,15 +48,22 @@ export class CubejsServer {
 
   protected socketServer: WebSocketServer | null = null;
 
-  public constructor(config: CreateOptions) {
-    config = config || {};
-    config.webSockets = config.webSockets || getEnv('webSockets');
+  public constructor(config: CreateOptions = {}) {
+    this.config = {
+      ...config,
+      webSockets: config.webSockets || getEnv('webSockets'),
+      http: {
+        ...config.http,
+        cors: {
+          allowedHeaders: 'authorization,x-request-id',
+          ...config.http?.cors
+        }
+      }
+    };
 
     this.core = CubeCore.create(config);
-    this.webSockets = config.webSockets;
     this.redirector = null;
     this.server = null;
-    this.initApp = config.initApp;
   }
 
   public async listen(options: https.ServerOptions | http.ServerOptions = {}) {
@@ -58,11 +74,11 @@ export class CubejsServer {
 
       const app = express();
 
-      app.use(cors());
+      app.use(cors(this.config.http.cors));
       app.use(bodyParser.json({ limit: '50mb' }));
 
-      if (this.initApp) {
-        await this.initApp(app);
+      if (this.config.initApp) {
+        await this.config.initApp(app);
       }
 
       await this.core.initApp(app);
@@ -107,7 +123,7 @@ export class CubejsServer {
         }
       }
 
-      if (this.webSockets) {
+      if (this.config.webSockets) {
         this.socketServer = new WebSocketServer(this.core, this.core.options);
         this.socketServer.initServer(this.server);
       }
