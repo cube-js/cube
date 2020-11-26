@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.24.0](https://github.com/cube-js/cube.js/compare/v0.23.15...v0.24.0) (2020-11-26)
+
+
+### Bug Fixes
+
+* Error: Type must be provided for null values. -- `null` parameter values are passed to BigQuery when used for dimensions that contain `?` ([6417e7d](https://github.com/cube-js/cube.js/commit/6417e7d120a95c4792557a4c4a0d6abb7c483db9))
+* **cubejs-cli:** template/serverless - iamRoleStatements.Resource[0] unsupported configuration format ([9fbe683](https://github.com/cube-js/cube.js/commit/9fbe683d3d1464ab453d354331033775fe707dec))
+
+
+### Features
+
+* Make default refreshKey to be `every 10 seconds` and enable scheduled refresh in dev mode by default ([221003a](https://github.com/cube-js/cube.js/commit/221003aa73aa1ece3d649de9164a7379a4a690be))
+
+
+### BREAKING CHANGES
+
+* `every 10 seconds` refreshKey becomes a default refreshKey for all cubes.
+
+
+
+
+
 ## [0.23.15](https://github.com/cube-js/cube.js/compare/v0.23.14...v0.23.15) (2020-11-25)
 
 

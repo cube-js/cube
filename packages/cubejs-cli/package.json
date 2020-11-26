@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
-  "version": "0.23.14",
+  "version": "0.24.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -46,7 +46,7 @@
     "source-map-support": "^0.5.19"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.23.7",
+    "@cubejs-backend/linter": "^0.24.0",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue",
-  "version": "0.23.6",
+  "version": "0.24.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",

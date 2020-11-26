@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.23.14",
+  "version": "0.24.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "driver/SnowflakeDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.23.14",
+    "@cubejs-backend/query-orchestrator": "^0.24.0",
     "snowflake-sdk": "^1.1.15"
   },
   "license": "Apache-2.0",

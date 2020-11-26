@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/jdbc-driver",
   "description": "Cube.js JDBC database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.23.14",
+  "version": "0.24.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "driver/JDBCDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.23.14",
+    "@cubejs-backend/query-orchestrator": "^0.24.0",
     "generic-pool": "^3.1.7",
     "sqlstring": "^2.3.0"
   },
