@@ -13,8 +13,8 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ClickHouseFilter extends BaseFilter {
-  likeIgnoreCase(column, not) {
-    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('%', lower(?), '%')`;
+  likeIgnoreCase(column, not, param) {
+    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('%', lower(${this.allocateParam(param)}), '%')`;
   }
 
   castParameter() {

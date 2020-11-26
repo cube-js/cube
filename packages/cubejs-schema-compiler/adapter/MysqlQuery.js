@@ -15,8 +15,8 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class MysqlFilter extends BaseFilter {
-  likeIgnoreCase(column, not) {
-    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ?, '%')`;
+  likeIgnoreCase(column, not, param) {
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
   }
 }
 

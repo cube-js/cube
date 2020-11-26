@@ -43,8 +43,8 @@ class MssqlFilter extends BaseFilter {
     return typeof param === 'string' ? param.replace(/([_%])/gi, '[$1]') : param;
   }
 
-  likeIgnoreCase(column, not) {
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(?) ,'%')`;
+  likeIgnoreCase(column, not, param) {
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(${this.allocateParam(param)}) ,'%')`;
   }
 }
 

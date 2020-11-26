@@ -48,8 +48,16 @@ class BaseFilter extends BaseDimension {
       /[A-Z]/,
       (c) => (c != null ? c : '').toLowerCase()
     )}Where`;
-    const sql = this[operatorMethod](columnSql);
-    return this.query.paramAllocator.allocateParamsForQuestionString(sql, this.filterParams());
+
+    let sql = this[operatorMethod](columnSql);
+    if (sql.match(this.query.paramAllocator.paramsMatchRegex)) {
+      return sql;
+    }
+    // TODO DEPRECATED: remove and replace with error
+    // columnSql can contain `?` so allocate params first and then substitute columnSql
+    // fallback implementation for drivers that still use `?` substitution
+    sql = this[operatorMethod]('$$$COLUMN$$$');
+    return this.query.paramAllocator.allocateParamsForQuestionString(sql, this.filterParams()).replace(/\$\$\$COLUMN\$\$\$/g, columnSql);
   }
 
   measureDefinition() {
@@ -107,6 +115,30 @@ class BaseFilter extends BaseDimension {
     return '?';
   }
 
+  firstParameter() {
+    const params = this.filterParams();
+    if (!params[0]) {
+      throw new Error('Expected one parameter but nothing found');
+    }
+    return this.allocateCastParam(params[0]);
+  }
+
+  allocateCastParam(param) {
+    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(), [param]);
+  }
+
+  allocateTimestampParam(param) {
+    return this.query.paramAllocator.allocateParamsForQuestionString(this.query.timeStampParam(this), [param]);
+  }
+
+  allocateTimestampParams() {
+    return this.filterParams().map(p => this.allocateTimestampParam(p));
+  }
+
+  allParamsRepeat(basePart) {
+    return this.filterParams().map(p => this.query.paramAllocator.allocateParamsForQuestionString(basePart, [p]));
+  }
+
   isArrayValues() {
     return Array.isArray(this.values) && this.values.length > 1;
   }
@@ -120,8 +152,7 @@ class BaseFilter extends BaseDimension {
   }
 
   likeOr(column, not) {
-    const basePart = this.likeIgnoreCase(column, not);
-    return `${join(not ? ' AND ' : ' OR ', repeat(basePart, this.filterParams().length))}${this.orIsNullCheck(column, not)}`;
+    return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(p => this.likeIgnoreCase(column, not, p)))}${this.orIsNullCheck(column, not)}`;
   }
 
   orIsNullCheck(column, not) {
@@ -132,8 +163,12 @@ class BaseFilter extends BaseDimension {
     return not ? !this.valuesContainNull() : this.valuesContainNull();
   }
 
-  likeIgnoreCase(column, not) {
-    return `${column}${not ? ' NOT' : ''} ILIKE '%' || ? || '%'`;
+  likeIgnoreCase(column, not, param) {
+    return `${column}${not ? ' NOT' : ''} ILIKE '%' || ${this.allocateParam(param)} || '%'`;
+  }
+
+  allocateParam(param) {
+    return this.query.paramAllocator.allocateParam(param);
   }
 
   equalsWhere(column) {
@@ -145,11 +180,11 @@ class BaseFilter extends BaseDimension {
       return this.notSetWhere(column);
     }
 
-    return `${column} = ${this.castParameter()}${this.orIsNullCheck(column, false)}`;
+    return `${column} = ${this.firstParameter()}${this.orIsNullCheck(column, false)}`;
   }
 
   inPlaceholders() {
-    return `(${join(', ', repeat(this.castParameter(), this.filterParams().length || 1))})`;
+    return `(${join(', ', this.filterParams().map(p => this.allocateCastParam(p)))})`;
   }
 
   inWhere(column) {
@@ -165,7 +200,7 @@ class BaseFilter extends BaseDimension {
       return this.setWhere(column);
     }
 
-    return `${column} <> ${this.castParameter()}${this.orIsNullCheck(column, true)}`;
+    return `${column} <> ${this.firstParameter()}${this.orIsNullCheck(column, true)}`;
   }
 
   notInWhere(column) {
@@ -181,19 +216,19 @@ class BaseFilter extends BaseDimension {
   }
 
   gtWhere(column) {
-    return `${column} > ${this.castParameter()}`;
+    return `${column} > ${this.firstParameter()}`;
   }
 
   gteWhere(column) {
-    return `${column} >= ${this.castParameter()}`;
+    return `${column} >= ${this.firstParameter()}`;
   }
 
   ltWhere(column) {
-    return `${column} < ${this.castParameter()}`;
+    return `${column} < ${this.firstParameter()}`;
   }
 
   lteWhere(column) {
-    return `${column} <= ${this.castParameter()}`;
+    return `${column} <= ${this.firstParameter()}`;
   }
 
   expressionEqualsWhere(column) {
@@ -201,23 +236,28 @@ class BaseFilter extends BaseDimension {
   }
 
   inDateRangeWhere(column) {
-    return this.query.timeRangeFilter(column, this.query.timeStampParam(this), this.query.timeStampParam(this));
+    const [from, to] = this.allocateTimestampParams();
+    return this.query.timeRangeFilter(column, from, to);
   }
 
   notInDateRangeWhere(column) {
-    return this.query.timeNotInRangeFilter(column, this.query.timeStampParam(this), this.query.timeStampParam(this));
+    const [from, to] = this.allocateTimestampParams();
+    return this.query.timeNotInRangeFilter(column, from, to);
   }
 
   onTheDateWhere(column) {
-    return this.query.timeRangeFilter(column, this.query.timeStampParam(this), this.query.timeStampParam(this));
+    const [from, to] = this.allocateTimestampParams();
+    return this.query.timeRangeFilter(column, from, to);
   }
 
   beforeDateWhere(column) {
-    return this.query.beforeDateFilter(column, this.query.timeStampParam(this));
+    const [before] = this.allocateTimestampParams();
+    return this.query.beforeDateFilter(column, before);
   }
 
   afterDateWhere(column) {
-    return this.query.afterDateFilter(column, this.query.timeStampParam(this));
+    const [after] = this.allocateTimestampParams();
+    return this.query.afterDateFilter(column, after);
   }
 
   formatFromDate(date) {
