@@ -66,7 +66,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: guides/angular-dashboard
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -127,7 +127,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: guides/d3-dashboard
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -188,7 +188,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: guides/material-ui-dashboard
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -249,7 +249,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: guides/react-dashboard
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -310,7 +310,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: guides/real-time-dashboard
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -371,7 +371,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: guides/web-analytics
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
