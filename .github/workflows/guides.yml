@@ -1,0 +1,377 @@
+name: Guides
+
+on:
+  push:
+    paths:
+      - '.github/workflows/guides.yml'
+      - 'guides/**'
+    branches:
+      - master
+
+jobs:
+
+  deploy-angular-dashboard:
+    name: Deploy angular-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,guides/angular-dashboard/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/guides-base
+
+      - name: Yarn link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link
+        working-directory: guides/guides-base
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/angular-dashboard
+
+      - name: Link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link guides-base
+        working-directory: guides/angular-dashboard
+
+      - name: Link styled-components
+        if: steps.modified.outputs.modified
+        run: ln -s ../../angular-dashboard/node_modules/styled-components styled-components
+        working-directory: guides/guides-base/node_modules
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: guides/angular-dashboard
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
+        working-directory: guides/angular-dashboard
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-d3-dashboard:
+    name: Deploy d3-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,guides/d3-dashboard/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/guides-base
+
+      - name: Yarn link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link
+        working-directory: guides/guides-base
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/d3-dashboard
+
+      - name: Link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link guides-base
+        working-directory: guides/d3-dashboard
+
+      - name: Link styled-components
+        if: steps.modified.outputs.modified
+        run: ln -s ../../d3-dashboard/node_modules/styled-components styled-components
+        working-directory: guides/guides-base/node_modules
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: guides/d3-dashboard
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
+        working-directory: guides/d3-dashboard
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-material-ui-dashboard:
+    name: Deploy material-ui-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,guides/material-ui-dashboard/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/guides-base
+
+      - name: Yarn link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link
+        working-directory: guides/guides-base
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/material-ui-dashboard
+
+      - name: Link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link guides-base
+        working-directory: guides/material-ui-dashboard
+
+      - name: Link styled-components
+        if: steps.modified.outputs.modified
+        run: ln -s ../../material-ui-dashboard/node_modules/styled-components styled-components
+        working-directory: guides/guides-base/node_modules
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: guides/material-ui-dashboard
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
+        working-directory: guides/material-ui-dashboard
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-react-dashboard:
+    name: Deploy react-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,guides/react-dashboard/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/guides-base
+
+      - name: Yarn link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link
+        working-directory: guides/guides-base
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/react-dashboard
+
+      - name: Link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link guides-base
+        working-directory: guides/react-dashboard
+
+      - name: Link styled-components
+        if: steps.modified.outputs.modified
+        run: ln -s ../../react-dashboard/node_modules/styled-components styled-components
+        working-directory: guides/guides-base/node_modules
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: guides/react-dashboard
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
+        working-directory: guides/react-dashboard
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-real-time-dashboard:
+    name: Deploy real-time-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,guides/real-time-dashboard/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/guides-base
+
+      - name: Yarn link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link
+        working-directory: guides/guides-base
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/real-time-dashboard
+
+      - name: Link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link guides-base
+        working-directory: guides/real-time-dashboard
+
+      - name: Link styled-components
+        if: steps.modified.outputs.modified
+        run: ln -s ../../real-time-dashboard/node_modules/styled-components styled-components
+        working-directory: guides/guides-base/node_modules
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: guides/real-time-dashboard
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
+        working-directory: guides/real-time-dashboard
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-web-analytics:
+    name: Deploy web-analytics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,guides/web-analytics/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/guides-base
+
+      - name: Yarn link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link
+        working-directory: guides/guides-base
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: guides/web-analytics
+
+      - name: Link guides-base
+        if: steps.modified.outputs.modified
+        run: yarn link guides-base
+        working-directory: guides/web-analytics
+
+      - name: Link styled-components
+        if: steps.modified.outputs.modified
+        run: ln -s ../../web-analytics/node_modules/styled-components styled-components
+        working-directory: guides/guides-base/node_modules
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: guides/web-analytics
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
+        working-directory: guides/web-analytics
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}

@@ -16,6 +16,7 @@ Once run, this command will create a new directory that contains the scaffolding
 To configure the connection to Athena, edit the `.env` file in the `react-dashboard` folder and specify the AWS access and secret keys with the access necessary to run Athena queries, and the target AWS region and S3 output location where query results are stored.
 
 ```
+CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=athena
 CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>

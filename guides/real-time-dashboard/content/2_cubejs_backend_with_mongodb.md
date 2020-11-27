@@ -65,6 +65,7 @@ CUBEJS_DB_NAME=stats
 CUBEJS_DB_PORT=3307
 CUBEJS_DB_TYPE=mongobi
 CUBEJS_API_SECRET=SECRET
+CUBEJS_DEV_MODE=true
 ```
 
 Now let's start a Cube.js development server.

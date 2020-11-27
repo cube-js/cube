@@ -7,7 +7,7 @@ Now, let's deploy our Cube.js API and the dashboard application. In this tutoria
 
 ## Cube.js API Deployment
 
-There are multiple ways you can deploy a Cube.js API microservice; you can learn more about them [here in the docs](https://cube.dev/docs/deployment/).
+There are multiple ways you can deploy a Cube.js API; you can learn more about them [here in the docs](https://cube.dev/docs/deployment/).
 
 The tutorial assumes that you have a free [Heroku account](https://signup.heroku.com/signup/dc). You'd also need a Heroku CLI; you can [learn how to install it here](https://devcenter.heroku.com/articles/heroku-cli).
 
