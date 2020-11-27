@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "lib": ["es2017"],
+    "target": "es2017",
+    "module": "commonjs",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+  }
+}
