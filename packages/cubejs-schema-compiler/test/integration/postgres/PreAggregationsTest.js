@@ -138,6 +138,14 @@ describe('PreAggregations', function test() {
           granularity: 'hour',
           partitionGranularity: 'hour'
         },
+        partitionedHourlyForRange: {
+          type: 'rollup',
+          measureReferences: [checkinsTotal],
+          dimensionReferences: [source, createdAt],
+          timeDimensionReference: createdAt,
+          granularity: 'hour',
+          partitionGranularity: 'hour'
+        },
         ratio: {
           type: 'rollup',
           measureReferences: [checkinsTotal, uniqueSourceCount],
@@ -789,6 +797,54 @@ describe('PreAggregations', function test() {
             'visitors__source': 'google',
             'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
             'visitors__checkins_total': '1'
+          }
+        ]
+      );
+    });
+  }));
+
+  it('partitioned inDateRange', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.checkinsTotal'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      filters: [{
+        member: 'visitors.createdAt',
+        operator: 'inDateRange',
+        values: ['2016-12-30', '2017-01-05']
+      }],
+      order: [{
+        id: 'visitors.checkinsTotal'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    const queries = tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.testQueries(
+      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 12342))
+    ).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [
+          {
+            'visitors__source': 'google',
+            'visitors__checkins_total': '1'
+          },
+          {
+            'visitors__source': 'some',
+            'visitors__checkins_total': '5'
           }
         ]
       );
