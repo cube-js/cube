@@ -55,9 +55,14 @@ jobs:
         run: yarn install
         working-directory: examples/drill-downs/dashboard-app
 
-      - name: Deploy Static
+      - name: Yarn build
         if: steps.modified.outputs.modified
-        run: yarn deploy
+        run: yarn build
+        working-directory: examples/drill-downs/dashboard-app
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
         working-directory: examples/drill-downs/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -106,10 +111,15 @@ jobs:
         if: steps.modified.outputs.modified
         run: yarn install
         working-directory: examples/highcharts/dashboard-app
-        
-      - name: Deploy Static
+
+      - name: Yarn build
         if: steps.modified.outputs.modified
-        run: yarn deploy
+        run: yarn build
+        working-directory: examples/highcharts/dashboard-app
+        
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
         working-directory: examples/highcharts/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -158,10 +168,15 @@ jobs:
         if: steps.modified.outputs.modified
         run: yarn install
         working-directory: examples/react-dashboard/dashboard-app
-        
-      - name: Deploy Static
+
+      - name: Yarn build
         if: steps.modified.outputs.modified
-        run: yarn deploy
+        run: yarn build
+        working-directory: examples/react-dashboard/dashboard-app
+        
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
         working-directory: examples/react-dashboard/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -210,10 +225,15 @@ jobs:
         if: steps.modified.outputs.modified
         run: yarn install
         working-directory: examples/real-time-dashboard/dashboard-app
-        
-      - name: Deploy Static
+
+      - name: Yarn build
         if: steps.modified.outputs.modified
-        run: yarn deploy
+        run: yarn build
+        working-directory: examples/real-time-dashboard/dashboard-app
+        
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
         working-directory: examples/real-time-dashboard/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -262,10 +282,15 @@ jobs:
         if: steps.modified.outputs.modified
         run: yarn install
         working-directory: examples/web-analytics/dashboard-app
-        
-      - name: Deploy Static
+
+      - name: Yarn build
         if: steps.modified.outputs.modified
-        run: yarn deploy
+        run: yarn build
+        working-directory: examples/web-analytics/dashboard-app
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=public --prod
         working-directory: examples/web-analytics/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
