@@ -1,6 +1,6 @@
 ---
 order: 1
-title: "Overview" 😀
+title: "Overview"
 ---
 
 A real-time dashboard is a dashboard that contains charts that are automatically updated with the most current data available. The typical use case is to load a chart with some historical data first and then live update it as new data comes in. In this tutorial, you will learn how to build such real-time dashboards with only open-source tools and without any third-party services.
