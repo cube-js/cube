@@ -26,13 +26,6 @@ describe('index.test', () => {
       .toThrowError(/"dbType" must be one of/);
   });
 
-  test('Should throw error, unknown options property', () => {
-    const options = { dbType: 'mysql', unknown: 'some-value' };
-
-    expect(() => { new CubejsServerCore(options); })
-      .toThrowError(/"unknown" is not allowed/);
-  });
-
   test('Should throw error, invalid options', () => {
     const options = {
       dbType: 'mysql',
