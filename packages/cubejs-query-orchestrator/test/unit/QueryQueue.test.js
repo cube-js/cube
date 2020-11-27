@@ -1,5 +1,5 @@
 /* globals describe, test, expect, afterAll */
-const QueryQueue = require('../../orchestrator/QueryQueue');
+import { QueryQueue } from '../../src/orchestrator/QueryQueue';
 
 const QueryQueueTest = (name, options) => {
   describe(`QueryQueue${name}`, () => {

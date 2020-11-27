@@ -1,6 +1,6 @@
 /* eslint-disable global-require,no-unused-vars */
 /* globals describe, jest, beforeEach, test, expect */
-const R = require('ramda');
+import R from 'ramda';
 
 class MockDriver {
   constructor() {
@@ -106,11 +106,12 @@ describe('PreAggregations', () => {
     };
 
     jest.resetModules();
-    const QueryCache = require('../../orchestrator/QueryCache');
+    const { QueryCache } = require('../../src/orchestrator/QueryCache');
     queryCache = new QueryCache(
       'TEST',
       mockDriverFactory,
-      (msg, params) => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      () => {},
       {
         queueOptions: {
           executionTimeout: 1
@@ -123,11 +124,12 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -147,11 +149,12 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -172,11 +175,12 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverReadOnlyFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -197,11 +201,12 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -227,11 +232,12 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const PreAggregations = require('../../orchestrator/PreAggregations');
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         () => { throw new Error('The source database factory should never be called when externalRefresh is true, as it will trigger testConnection'); },
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -256,14 +262,14 @@ describe('PreAggregations', () => {
 
   describe('naming_version tests', () => {
     let preAggregations = null;
-    let PreAggregations = null;
 
     beforeEach(async () => {
-      PreAggregations = require('../../orchestrator/PreAggregations');
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -280,6 +286,7 @@ describe('PreAggregations', () => {
     });
 
     test('test for function targetTableName', () => {
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       let result = PreAggregations.targetTableName({
         table_name: 'orders_number_and_count20191101',
         content_version: 'kjypcoio',
@@ -306,14 +313,14 @@ describe('PreAggregations', () => {
 
   describe('naming_version sort tests', () => {
     let preAggregations = null;
-    let PreAggregations = null;
 
     beforeEach(async () => {
-      PreAggregations = require('../../orchestrator/PreAggregations');
+      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
