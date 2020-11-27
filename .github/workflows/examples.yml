@@ -11,7 +11,7 @@ on:
 jobs:
 
   deploy-drill-downs:
-    name: Deploy Drill Downs
+    name: Deploy drill-downs
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -63,7 +63,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   deploy-highcharts:
-    name: Deploy Highcharts
+    name: Deploy highcharts
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -115,7 +115,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   deploy-react-dashboard:
-    name: Deploy React Dashboard
+    name: Deploy react-dashboard
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -167,7 +167,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   deploy-real-time-dashboard:
-    name: Deploy Real-Time Dashboard
+    name: Deploy real-time-dashboard
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -219,7 +219,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   deploy-web-analytics:
-    name: Deploy Web Analytics
+    name: Deploy web-analytics
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
