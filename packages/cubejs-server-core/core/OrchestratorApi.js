@@ -1,7 +1,6 @@
 /* eslint-disable no-throw-literal */
 const pt = require('promise-timeout');
-const QueryOrchestrator = require('@cubejs-backend/query-orchestrator/orchestrator/QueryOrchestrator');
-const ContinueWaitError = require('@cubejs-backend/query-orchestrator/orchestrator/ContinueWaitError');
+const { QueryOrchestrator, ContinueWaitError } = require('@cubejs-backend/query-orchestrator');
 
 class OrchestratorApi {
   constructor(driverFactory, logger, options) {

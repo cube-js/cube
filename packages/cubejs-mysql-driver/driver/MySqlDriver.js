@@ -1,7 +1,7 @@
 const mysql = require('mysql');
 const genericPool = require('generic-pool');
 const { promisify } = require('util');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const crypto = require('crypto');
 const fs = require('fs');
 
