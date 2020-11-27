@@ -86,7 +86,7 @@ class Handlers {
     if (!this.apiHandler) {
       const app = express();
       app.use(cors({
-        allowedHeaders: 'authorization,x-request-id',
+        allowedHeaders: 'authorization,content-type,x-request-id',
       }));
 
       this.serverCore.initApp(app);
