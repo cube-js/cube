@@ -3,7 +3,7 @@ order: 1
 title: "Overview"
 ---
 
-In this tutorial, I’ll cover building a basic dashboard application with Cube.js and the most popular library for visualizing data—D3.js. Although Cube.js doesn’t provide a visualization layer itself, it is very easy to integrate with any existing charting library. Additionally, you can use [Cube.js Templates](https://cube.dev/templates/) to scaffold a frontend application with your favorite charting library, frontend framework, and UI kit. The scaffolding engine will wire it all together and configure it to work with the Cube.js backend.
+In this tutorial, I’ll cover building a basic dashboard application with Cube.js and the most popular library for visualizing data—D3.js. Although Cube.js doesn’t provide a visualization layer itself, it is very easy to integrate with any existing charting library.
 
 You can check [the online demo of this dashboard here](http://d3-dashboard-demo.cube.dev/) and [the complete source code of the example app is available on Github](https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard).
 
