@@ -6,7 +6,7 @@ on:
       - '.github/workflows/guides.yml'
       - 'guides/**'
     branches:
-      - '**'
+      - master
 
 jobs:
 
