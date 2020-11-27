@@ -12,7 +12,7 @@ Cube.js supports [all popular databases](https://cube.dev/docs/getting-started#2
 **To create the API, we run this command:**
 
 ```bash
-$ npx cubejs-cli create material-ui-dashboard -d postgres
+$ npx cubejs-cli create angular-dashboard -d postgres
 ```
 
 Now we can download and import a sample e-commerce dataset for PostgreSQL:
@@ -23,7 +23,7 @@ $ createdb ecom
 $ psql --dbname ecom -f ecom-dump.sql
 ```
 
-Once the database is ready, the API can be [configured to connect to the database](https://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps). To do so, we provide a few options via the `.env` file in the root of the Cube.js project folder (`material-ui-dashboard`):
+Once the database is ready, the API can be [configured to connect to the database](https://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps). To do so, we provide a few options via the `.env` file in the root of the Cube.js project folder (`angular-dashboard`):
 
 ```
 CUBEJS_DB_NAME=ecom
@@ -47,8 +47,8 @@ Next, open [http://localhost:4000](http://localhost:4000/) in your browser.
 **We'll use the Cube.js Playground to create a data schema.** It's essentially a JavaScript code that declaratively describes the data, defines analytical entities like measures and dimensions, and maps them to SQL queries. Here is an example of the schema which can be used to describe users’ data.
 
 ```jsx
-cube(`Users`, {
-  sql: `SELECT * FROM users`,
+cube('Users', {
+  sql: 'SELECT * FROM users',
 
   measures: {
     count: {
