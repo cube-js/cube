@@ -1,7 +1,7 @@
 const R = require('ramda');
-const BaseQueueDriver = require('./BaseQueueDriver');
+const { BaseQueueDriver } = require('./BaseQueueDriver');
 
-class LocalQueueDriverConnection {
+export class LocalQueueDriverConnection {
   constructor(driver, options) {
     this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
@@ -223,7 +223,7 @@ const heartBeat = {};
 const processingCounters = {};
 const processingLocks = {};
 
-class LocalQueueDriver extends BaseQueueDriver {
+export class LocalQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();
     this.options = options;
@@ -255,5 +255,3 @@ class LocalQueueDriver extends BaseQueueDriver {
     client.release();
   }
 }
-
-module.exports = LocalQueueDriver;

@@ -1,7 +1,7 @@
-const redis = require('redis');
-const { promisify } = require('util');
+import redis from 'redis';
+import { promisify } from 'util';
 
-module.exports = function createRedisClient(url) {
+export function createRedisClient(url) {
   redis.Multi.prototype.execAsync = function execAsync() {
     return new Promise((resolve, reject) => this.exec((err, res) => (
       err ? reject(err) : resolve(res)

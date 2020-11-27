@@ -1,9 +1,10 @@
-const R = require('ramda');
-const QueryCache = require('./QueryCache');
-const PreAggregations = require('./PreAggregations');
-const RedisPool = require('./RedisPool');
+import R from 'ramda';
 
-class QueryOrchestrator {
+import { QueryCache } from './QueryCache';
+import { PreAggregations } from './PreAggregations';
+import { RedisPool } from './RedisPool';
+
+export class QueryOrchestrator {
   constructor(redisPrefix, driverFactory, logger, options) {
     options = options || {};
     this.redisPrefix = redisPrefix;
@@ -99,5 +100,3 @@ class QueryOrchestrator {
     }
   }
 }
-
-module.exports = QueryOrchestrator;

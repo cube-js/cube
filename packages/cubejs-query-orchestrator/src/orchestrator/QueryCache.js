@@ -1,10 +1,11 @@
-const crypto = require('crypto');
-const QueryQueue = require('./QueryQueue');
-const ContinueWaitError = require('./ContinueWaitError');
-const RedisCacheDriver = require('./RedisCacheDriver');
-const LocalCacheDriver = require('./LocalCacheDriver');
+import crypto from 'crypto';
 
-class QueryCache {
+import { QueryQueue } from './QueryQueue';
+import { ContinueWaitError } from './ContinueWaitError';
+import { RedisCacheDriver } from './RedisCacheDriver';
+import { LocalCacheDriver } from './LocalCacheDriver';
+
+export class QueryCache {
   constructor(redisPrefix, clientFactory, logger, options) {
     this.options = options || {};
     this.redisPrefix = redisPrefix;
@@ -380,5 +381,3 @@ class QueryCache {
     return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest('hex')}`;
   }
 }
-
-module.exports = QueryCache;
