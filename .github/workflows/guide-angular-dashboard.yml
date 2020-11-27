@@ -5,7 +5,7 @@ on:
       - '.github/workflows/guide-angular-dashboard.yml'
       - 'guides/angular-dashboard/**'
     branches:
-      - master
+      - '**'
 
 jobs:
   deploy-angular-dashboard:
