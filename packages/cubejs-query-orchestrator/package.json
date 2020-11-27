@@ -11,16 +11,16 @@
   "engines": {
     "node": ">=8.11.1"
   },
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --verbose test/unit",
+    "unit": "jest --runInBand --verbose dist/test/unit",
     "integration": "npm run integration:redis",
-    "integration:redis": "jest --runInBand --verbose test/integration",
+    "integration:redis": "jest --runInBand --verbose dist/test/integration",
     "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* test/* --ext .ts,.js",
     "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* test/* --ext .ts,.js"
   },
@@ -28,7 +28,7 @@
     "README.md",
     "driver/*",
     "orchestrator/*",
-    "dist/*"
+    "dist/src/*"
   ],
   "dependencies": {
     "generic-pool": "^3.7.1",
@@ -43,28 +43,9 @@
     "@types/ramda": "^0.27.32",
     "@types/redis": "^2.8.28",
     "jest": "^26.6.3",
-    "ts-jest": "^26.4.4",
     "typescript": "^4.0.5"
   },
   "license": "Apache-2.0",
-  "jest": {
-    "transform": {
-      ".(ts|tsx)": "<rootDir>/node_modules/ts-jest/preprocessor.js"
-    },
-    "testEnvironment": "node",
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "json"
-    ],
-    "testPathIgnorePatterns": [
-      "<rootDir>/node_modules/",
-      "<rootDir>/dist/",
-      "<rootDir>/lib/"
-    ],
-    "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$"
-  },
   "eslintConfig": {
     "extends": "../cubejs-linter"
   }
