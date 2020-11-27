@@ -733,21 +733,26 @@ export class PreAggregations {
 
   getLoadCacheQueue() {
     if (!this.loadCacheQueue) {
-      this.loadCacheQueue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}`, () => {}, (_, q) => {
-        const {
-          preAggregation,
-          requestId
-        } = q;
-        const loadCache = new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this,
-          { requestId });
-        return loadCache.fetchTables(preAggregation);
-      }, {
-        concurrency: 4,
-        logger: this.logger,
-        cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-        redisPool: this.options.redisPool,
-        ...this.options.loadCacheQueueOptions
-      });
+      this.loadCacheQueue = QueryCache.createQueue(
+        `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}`,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        (_, q) => {
+          const {
+            preAggregation,
+            requestId
+          } = q;
+          const loadCache = new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this,
+            { requestId });
+          return loadCache.fetchTables(preAggregation);
+        }, {
+          concurrency: 4,
+          logger: this.logger,
+          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          redisPool: this.options.redisPool,
+          ...this.options.loadCacheQueueOptions
+        }
+      );
     }
     return this.loadCacheQueue;
   }

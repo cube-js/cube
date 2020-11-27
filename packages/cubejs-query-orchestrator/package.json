@@ -21,8 +21,8 @@
     "unit": "jest --runInBand --verbose dist/test/unit",
     "integration": "npm run integration:redis",
     "integration:redis": "jest --runInBand --verbose dist/test/integration",
-    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* test/* --ext .ts,.js",
-    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* test/* --ext .ts,.js"
+    "lint": "./node_modules/@cubejs-backend/linter/node_modules/.bin/eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/.bin/eslint --fix src/* test/* --ext .ts,.js"
   },
   "files": [
     "README.md",
