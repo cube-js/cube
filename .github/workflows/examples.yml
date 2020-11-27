@@ -6,7 +6,7 @@ on:
       - '.github/workflows/examples.yml'
       - 'examples/**'
     branches:
-      - master
+      - '**'
 
 jobs:
 
