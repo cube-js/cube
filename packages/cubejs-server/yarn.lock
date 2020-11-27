@@ -856,10 +856,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.23.6":
-  version "0.23.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.23.6.tgz#316d4cc911f2e9b2c3b3f2ae8876d33ee8b3e154"
-  integrity sha512-SBQ3HCaQaYHjYldKOVIXrcQbsoIjv2DwvmX68PfWkNk1mWMs0qpSJr8FcFlz+8ThhKtgAcEeFM9DQKBTVc3Nzg==
+"@cubejs-backend/api-gateway@^0.24.0":
+  version "0.24.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.24.0.tgz#0c4de3c762efbe941286e0abe456db501529a358"
+  integrity sha512-4Ycf/47Qbl0fg2KJjcn4bHQMbLVz3Lm6oIKYSbYmNZI/3vR8Gz+LDwW2CKhT6zwIULDyVO9xBJYryMbcTSkioA==
   dependencies:
     "@hapi/joi" "^15.1.1"
     body-parser "^1.19.0"
@@ -871,10 +871,10 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/linter@^0.23.7":
-  version "0.23.7"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.23.7.tgz#ceeb6746a8592fc085aac0a9c99a205381a183a3"
-  integrity sha512-vtO2b5jgKv4xhPBWGZN2rBwqv6B/sLMKZVkFVrpYPmjMrxMYM4CZOPRYe2SPT2UBTL4FhByZCbPL6N7BbUIEuA==
+"@cubejs-backend/linter@^0.24.0":
+  version "0.24.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.24.0.tgz#c8e4e5a5fe8051d5c86f4cd696aaa4e5af672fa3"
+  integrity sha512-mrtQaCRD5bPRYuLZhzoAng8e19Sgy17giH3OB2V0GgDzXwcOqedOMD9yMIjmh2D8LLc/y5AvAZFgkZdOOT/G1g==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.1.1"
     "@typescript-eslint/parser" "^4.1.1"
@@ -883,19 +883,19 @@
     eslint-plugin-import "^2.22.0"
     eslint-plugin-node "^6.0.1"
 
-"@cubejs-backend/query-orchestrator@^0.23.6":
-  version "0.23.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.23.6.tgz#56355d1584c6561a8b63f0b1e0b9a04017c9fb61"
-  integrity sha512-L7gV0UNjpG8HmmcH/4GFVunh+g/77CwyuHRyZK5C1+nmyAbNAcswud8SkPdIRlfjnIIPcldFXKlaDAJSvkbVXw==
+"@cubejs-backend/query-orchestrator@^0.24.0":
+  version "0.24.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.0.tgz#b732a7640b19f018d63152ac377a67931ad2ee7d"
+  integrity sha512-3Ns6ONTnaK8Fl/CK+Xl+jKCl+mWS5wz0KtY/3Z25QoX04LvAatvrQsJyaZSfrjxOClvx3ZlW/M5fIKW5GUTDPA==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.23.11":
-  version "0.23.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.11.tgz#49a97745d364ceee32d1865e3986d469d84d8390"
-  integrity sha512-SWtu8nzYOdWwSyTtgGuhYvDYm62fM75GYOzGuyP0YpaYxFhUGYa561AWQ0uOCDowRszuRgbca/3VS3Y6V+UerQ==
+"@cubejs-backend/schema-compiler@^0.24.1":
+  version "0.24.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.24.1.tgz#8884446b72f3e810b8ffa27e924eae3a940963b8"
+  integrity sha512-vLQWH+KHg3wt2Ig40zNWIKdjAN+ZHApz0xyGbpxyi8X52AmmdL8il0/UaL/iE06eqiwyj/k9G2e6pRSeOvdf6w==
   dependencies:
     "@babel/core" "^7.4.0"
     "@babel/generator" "^7.4.0"
@@ -905,7 +905,7 @@
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
     "@hapi/joi" "^15.1.1"
-    antlr4 "^4.8.0"
+    antlr4 "4.8.0"
     cron-parser "^2.16.3"
     humps "^2.0.1"
     inflection "^1.12.0"
@@ -916,14 +916,14 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.23.11":
-  version "0.23.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.23.11.tgz#1f9af5bcff3ec6a2f30397ebfe628983e0bbe1e2"
-  integrity sha512-iYGLCr+DVI0kQgDcVqBHz5rMh/Cr16RFrO4XkbRWW5jk820Xb7w2IEzHJhyXzX2WJ1jy+vg/q6cSWOWjWexFgQ==
+"@cubejs-backend/server-core@^0.24.1":
+  version "0.24.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.24.1.tgz#e20bec7db46cee1cde3a24a2ad711f4c62c0f3eb"
+  integrity sha512-1iN6aYedkt91RGvw6zEVXWrdHxXxhTdB0lQI0wHzDi7BOYhqSUyGSRWroujrKrVlVYTf9EMPSZkH21Rfn6OaDw==
   dependencies:
-    "@cubejs-backend/api-gateway" "^0.23.6"
-    "@cubejs-backend/query-orchestrator" "^0.23.6"
-    "@cubejs-backend/schema-compiler" "^0.23.11"
+    "@cubejs-backend/api-gateway" "^0.24.0"
+    "@cubejs-backend/query-orchestrator" "^0.24.0"
+    "@cubejs-backend/schema-compiler" "^0.24.1"
     "@hapi/joi" "^15.1.1"
     codesandbox-import-utils "^2.1.12"
     cross-spawn "^7.0.1"
@@ -944,10 +944,10 @@
     sqlstring "^2.3.1"
     uuid "^3.3.3"
 
-"@cubejs-backend/shared@^0.23.12":
-  version "0.23.12"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.23.12.tgz#74cb8467018097196497b4a446c5d1de7d98b481"
-  integrity sha512-TFGyEpu5Mp4DNt2D2gg3KshzqeVgUsNJjkGUAdsXjBAvv61OUVrRYnj+ymHiH+6ezcH7FDqF4AJ05dpMy0OVWQ==
+"@cubejs-backend/shared@^0.24.0":
+  version "0.24.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.0.tgz#b4d278de11f2d55b27becf7bdd1e6cfe66157cf0"
+  integrity sha512-7+s4Pqq3Oj+TZnF6gQlhLsIuO0GYudN2koVDcqi2Tojyj0Ck5FL3c/kKTebT987eDZrDAVoQllfSXSoO9qyzWg==
   dependencies:
     env-var "^6.3.0"
 
@@ -1725,7 +1725,7 @@ ansicolors@~0.3.2:
   resolved "https://registry.yarnpkg.com/ansicolors/-/ansicolors-0.3.2.tgz#665597de86a9ffe3aa9bfbe6cae5c6ea426b4979"
   integrity sha1-ZlWX3oap/+Oqm/vmyuXG6kJrSXk=
 
-antlr4@^4.8.0:
+antlr4@4.8.0:
   version "4.8.0"
   resolved "https://registry.yarnpkg.com/antlr4/-/antlr4-4.8.0.tgz#f938ec171be7fc2855cd3a533e87647185b32b6a"
   integrity sha512-en/MxQ4OkPgGJQ3wD/muzj1uDnFSzdFIhc2+c6bHZokWkuBb6RRvFjpWhPxWLbgQvaEzldJZ0GSQpfSAaE3hqg==
@@ -6837,10 +6837,10 @@ typedarray-to-buffer@^3.1.5:
   dependencies:
     is-typedarray "^1.0.0"
 
-typescript@^4.0.3:
-  version "4.0.5"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.0.5.tgz#ae9dddfd1069f1cb5beb3ef3b2170dd7c1332389"
-  integrity sha512-ywmr/VrTVCmNTJ6iV2LwIrfG1P+lv6luD8sUJs+2eI9NLGigaN+nUQc13iHqisq7bra9lnmUSYqbJvegraBOPQ==
+typescript@^4.1.2:
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.1.2.tgz#6369ef22516fe5e10304aae5a5c4862db55380e9"
+  integrity sha512-thGloWsGH3SOxv1SoY7QojKi0tc+8FnOmiarEGMbd/lar7QOEd3hvlx3Fp5y6FlDUGl9L+pd4n2e+oToGMmhRQ==
 
 unbzip2-stream@^1.0.9:
   version "1.4.3"

@@ -197,10 +197,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/linter@^0.23.7":
-  version "0.23.7"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.23.7.tgz#ceeb6746a8592fc085aac0a9c99a205381a183a3"
-  integrity sha512-vtO2b5jgKv4xhPBWGZN2rBwqv6B/sLMKZVkFVrpYPmjMrxMYM4CZOPRYe2SPT2UBTL4FhByZCbPL6N7BbUIEuA==
+"@cubejs-backend/linter@^0.24.0":
+  version "0.24.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.24.0.tgz#c8e4e5a5fe8051d5c86f4cd696aaa4e5af672fa3"
+  integrity sha512-mrtQaCRD5bPRYuLZhzoAng8e19Sgy17giH3OB2V0GgDzXwcOqedOMD9yMIjmh2D8LLc/y5AvAZFgkZdOOT/G1g==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.1.1"
     "@typescript-eslint/parser" "^4.1.1"
@@ -4838,10 +4838,10 @@ type-fest@^0.8.1:
   resolved "https://registry.yarnpkg.com/type-fest/-/type-fest-0.8.1.tgz#09e249ebde851d3b1e48d27c105444667f17b83d"
   integrity sha512-4dbzIzqvjtgiM5rw1k5rEHtBANKmdudhGyBEajN01fEyhaAIhsoKNy6y7+IN93IfpFtwY9iqi7kD+xwKhQsNJA==
 
-typescript@^4.0.3:
-  version "4.0.5"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.0.5.tgz#ae9dddfd1069f1cb5beb3ef3b2170dd7c1332389"
-  integrity sha512-ywmr/VrTVCmNTJ6iV2LwIrfG1P+lv6luD8sUJs+2eI9NLGigaN+nUQc13iHqisq7bra9lnmUSYqbJvegraBOPQ==
+typescript@^4.1.2:
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.1.2.tgz#6369ef22516fe5e10304aae5a5c4862db55380e9"
+  integrity sha512-thGloWsGH3SOxv1SoY7QojKi0tc+8FnOmiarEGMbd/lar7QOEd3hvlx3Fp5y6FlDUGl9L+pd4n2e+oToGMmhRQ==
 
 union-value@^1.0.0:
   version "1.0.1"
