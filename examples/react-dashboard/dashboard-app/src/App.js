@@ -1,15 +1,10 @@
 import React from "react";
 import { withRouter } from "react-router";
 import { Layout } from "antd";
-import { InMemoryCache } from "apollo-cache-inmemory";
 import { ApolloProvider as ApolloHooksProvider } from "@apollo/react-hooks";
 import { ApolloProvider } from "react-apollo";
-// import AWSAppSyncClient, { AUTH_TYPE } from "aws-appsync";
-import { Rehydrated } from "aws-appsync-react";
 import cubejs from "@cubejs-client/core";
 import { CubeProvider } from "@cubejs-client/react";
-import { withAuthenticator } from "aws-amplify-react";
-import Amplify, { Auth, Hub } from 'aws-amplify';
 import client from "./graphql/client";
 
 import Header from './components/Header';

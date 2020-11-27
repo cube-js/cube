@@ -1,5 +1,4 @@
 import React from "react";
-import { SignOut } from "aws-amplify-react";
 import { Layout, Menu } from "antd";
 import { Link } from "react-router-dom";
 import styled from 'styled-components';
@@ -67,21 +66,10 @@ const Button = styled.a`
   }
 `
 
-const signOutStyles = {
-  navButton: {
-    color: "white",
-    background: "none",
-    textTransform: "none",
-    fontSize: "13px",
-    fontWeight: "bold",
-    minWidth: 0
-  }
-}
-
 const Header = ({ location }) => (
   <StyledHeader >
     <Logo>
-      <img src={logo} />
+      <img src={logo} alt='logo' />
     </Logo>
     <StyledMenu
       mode="horizontal"
