@@ -12,7 +12,7 @@ export const isDockerImage = () => Boolean(process.env.CUBEJS_DOCKER_IMAGE_TAG);
 export const executeCommand = (command: string, args: string[]) => {
   const child = spawn(command, args, { stdio: 'inherit' });
 
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     child.on('close', (code: number) => {
       if (code !== 0) {
         reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));

@@ -6,7 +6,11 @@
     "build": "rollup -c",
     "watch": "rollup -c -w",
     "example": "http-server",
-    "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w"
+    "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w",
+    "lint": "lerna run lint",
+    "lint:fix": "lerna run lint:fix",
+    "tsc": "lerna run tsc",
+    "tsc:watch": "lerna run watch"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
