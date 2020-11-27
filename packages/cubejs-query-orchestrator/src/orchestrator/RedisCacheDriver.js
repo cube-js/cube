@@ -1,4 +1,4 @@
-class RedisCacheDriver {
+export class RedisCacheDriver {
   constructor({ pool }) {
     this.redisPool = pool;
   }
@@ -44,5 +44,3 @@ class RedisCacheDriver {
     }
   }
 }
-
-module.exports = RedisCacheDriver;

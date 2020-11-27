@@ -1,7 +1,7 @@
-const genericPool = require('generic-pool');
-const createRedisClient = require('./RedisFactory');
+import genericPool from 'generic-pool';
+import { createRedisClient } from './RedisFactory';
 
-class RedisPool {
+export class RedisPool {
   constructor(options) {
     options = options || {};
     const defaultMin = process.env.CUBEJS_REDIS_POOL_MIN ? parseInt(process.env.CUBEJS_REDIS_POOL_MIN, 10) : 2;
@@ -48,5 +48,3 @@ class RedisPool {
     }
   }
 }
-
-module.exports = RedisPool;

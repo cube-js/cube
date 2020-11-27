@@ -1,11 +1,11 @@
-const crypto = require('crypto');
-const R = require('ramda');
-const { cancelCombinator } = require('../driver/utils');
-const RedisCacheDriver = require('./RedisCacheDriver');
-const LocalCacheDriver = require('./LocalCacheDriver');
+import crypto from 'crypto';
+import R from 'ramda';
 
-const QueryCache = require('./QueryCache');
-const ContinueWaitError = require('./ContinueWaitError');
+import { cancelCombinator } from '../driver/utils';
+import { RedisCacheDriver } from './RedisCacheDriver';
+import { LocalCacheDriver } from './LocalCacheDriver';
+import { QueryCache } from './QueryCache';
+import { ContinueWaitError } from './ContinueWaitError';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
@@ -52,7 +52,7 @@ const tablesToVersionEntries = (schema, tables) => R.sortBy(
       content_version: match[2],
       structure_version: match[3]
     };
-    
+
     if (match[4].length < 13) {
       entity.last_updated_at = parseInt(match[4], 32) * 1000;
       entity.naming_version = 2;
@@ -647,7 +647,7 @@ class PreAggregationLoader {
   }
 }
 
-class PreAggregations {
+export class PreAggregations {
   constructor(redisPrefix, clientFactory, logger, queryCache, options) {
     this.options = options || {};
     this.redisPrefix = redisPrefix;
@@ -760,9 +760,7 @@ class PreAggregations {
     if (versionEntry.naming_version === 2) {
       return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
     }
-    
+
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 }
-
-module.exports = PreAggregations;

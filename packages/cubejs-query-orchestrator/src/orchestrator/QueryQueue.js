@@ -1,10 +1,11 @@
-const R = require('ramda');
-const TimeoutError = require('./TimeoutError');
-const ContinueWaitError = require('./ContinueWaitError');
-const RedisQueueDriver = require('./RedisQueueDriver');
-const LocalQueueDriver = require('./LocalQueueDriver');
+import R from 'ramda';
 
-class QueryQueue {
+import { TimeoutError } from './TimeoutError';
+import { ContinueWaitError } from './ContinueWaitError';
+import { RedisQueueDriver } from './RedisQueueDriver';
+import { LocalQueueDriver } from './LocalQueueDriver';
+
+export class QueryQueue {
   constructor(redisQueuePrefix, options) {
     this.redisQueuePrefix = redisQueuePrefix;
     this.concurrency = options.concurrency || 2;
@@ -377,5 +378,3 @@ class QueryQueue {
     return this.queueDriver.redisHash(queryKey);
   }
 }
-
-module.exports = QueryQueue;

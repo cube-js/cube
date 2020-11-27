@@ -1,5 +1,6 @@
-const { reduce } = require('ramda');
-const { cancelCombinator } = require('./utils');
+import { reduce } from 'ramda';
+
+import { cancelCombinator } from './utils';
 
 const sortByKeys = (unordered) => {
   const ordered = {};
@@ -38,7 +39,7 @@ const DbTypeValueMatcher = {
   text: () => true
 };
 
-class BaseDriver {
+export class BaseDriver {
   informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
@@ -54,7 +55,7 @@ class BaseDriver {
     throw new Error('Not implemented');
   }
 
-  query() {
+  query(query, values) {
     throw new Error('Not implemented');
   }
 
@@ -220,5 +221,3 @@ class BaseDriver {
     }
   }
 }
-
-module.exports = BaseDriver;

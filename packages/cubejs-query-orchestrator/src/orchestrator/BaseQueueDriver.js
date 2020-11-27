@@ -1,11 +1,9 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 
-class BaseQueueDriver {
+export class BaseQueueDriver {
   redisHash(queryKey) {
     return typeof queryKey === 'string' && queryKey.length < 256 ?
       queryKey :
       crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
   }
 }
-
-module.exports = BaseQueueDriver;
