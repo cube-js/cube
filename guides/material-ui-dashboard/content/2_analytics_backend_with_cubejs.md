@@ -1,23 +1,19 @@
 ---
 order: 2
-title: "Analytics Backend with Cube.js"
+title: "Analytics API with Cube.js"
 ---
 
-We're going to build the dashboard for an e-commerce company that wants to track its overall performance and orders' statuses. Let's assume that the company keeps its data in an SQL database. So, in order to display that data on a dashboard, we're going to create an analytics backend.
+We're going to build the dashboard for an e-commerce company that wants to track its overall performance and orders' statuses. Let's assume that the company keeps its data in an SQL database. So, in order to display that data on a dashboard, we're going to create an analytical API.
 
-**First, we need to install the Cube.js command-line utility (CLI).** For convenience, let's install it globally on our machine.
+For that, we'll use the Cube.js command-line utility (CLI).
 
-`$ npm install -g cubejs-cli`
+Cube.js supports [all popular databases](https://cube.dev/docs/getting-started#2-connect-to-your-database), and the API will be pre-configured to work with a particular database type. We’ll use a [PostgreSQL](https://www.postgresql.org/) database. Please make sure you have PostgreSQL installed.
 
-Then, with the CLI installed, we can create a basic backend by running a single command. Cube.js supports [all popular databases](https://cube.dev/docs/getting-started#2-connect-to-your-database), and the backend will be pre-configured to work with a particular database type:
+**To create the API, we run this command:**
 
-`$ cubejs create <project name> -d <database type>`
-
-We’ll use a [PostgreSQL](https://www.postgresql.org/) database. Please make sure you have PostgreSQL installed.
-
-**To create the backend, we run this command:**
-
-`$ cubejs create react-material-dashboard -d postgres`
+```bash
+$ npx cubejs-cli create material-ui-dashboard -d postgres
+```
 
 Now we can download and import a sample e-commerce dataset for PostgreSQL:
 
@@ -27,19 +23,20 @@ $ createdb ecom
 $ psql --dbname ecom -f ecom-dump.sql
 ```
 
-Once the database is ready, the backend can be [configured to connect to the database](https://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps). To do so, we provide a few options via the `.env` file in the root of the Cube.js project folder (`react-material-dashboard`):
+Once the database is ready, the API can be [configured to connect to the database](https://cube.dev/docs/connecting-to-the-database#configuring-connection-for-cube-js-cli-created-apps). To do so, we provide a few options via the `.env` file in the root of the Cube.js project folder (`material-ui-dashboard`):
 
 ```
 CUBEJS_DB_NAME=ecom
 CUBEJS_DB_TYPE=postgres
 CUBEJS_API_SECRET=secret
+CUBEJS_DEV_MODE=true
 ```
 
 ![](/images/start.gif)
 
-Now we can run the backend!
+Now we can run the API!
 
-**In development mode, the backend will also run the Cube.js Playground.** It's a time-saving web application that helps to create a data schema, test out the charts, and generate a React dashboard boilerplate. Run the following command in the Cube.js project folder:
+**In development mode, the API will also run the Cube.js Playground.** It's a time-saving web application that helps to create a data schema, test out the charts, and generate a React dashboard boilerplate. Run the following command in the Cube.js project folder:
 
 `$ node index.js`
 
@@ -81,12 +78,12 @@ cube(`Users`, {
 
 Cube.js can generate a simple data schema based on the database’s tables. If you already have a non-trivial set of tables in your database, consider using the data schema generation because it can save time.
 
-For our backend, we select the `line_items`, `orders`, `products`, and `users` tables and click “Generate Schema.” As the result, we'll have 4 generated files in the `schema` folder—one schema file per table.
+For our API, we select the `line_items`, `orders`, `products`, and `users` tables and click “Generate Schema.” As the result, we'll have 4 generated files in the `schema` folder—one schema file per table.
 
 ![](/images/image-37.png)
 
 **Once the schema is generated, we can build sample charts via web UI.** To do so, navigate to the “Build” tab and select some measures and dimensions from the schema.
 
-The "Build" tab is a place where you can build sample charts using different visualization libraries and inspect every aspect of how that chart was created, starting from the generated SQL all the way up to the JavaScript code to render the chart. You can also inspect the Cube.js query encoded with JSON which is sent to Cube.js backend.
+The "Build" tab is a place where you can build sample charts using different visualization libraries and inspect every aspect of how that chart was created, starting from the generated SQL all the way up to the JavaScript code to render the chart. You can also inspect the Cube.js query encoded with JSON which is sent to Cube.js API.
 
 ![](/images/image-05.png)
