@@ -55,7 +55,7 @@ export class CubejsServer {
       http: {
         ...config.http,
         cors: {
-          allowedHeaders: 'authorization,x-request-id',
+          allowedHeaders: 'authorization,content-type,x-request-id',
           ...config.http?.cors
         }
       }
