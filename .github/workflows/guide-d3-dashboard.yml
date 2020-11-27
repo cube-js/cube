@@ -5,7 +5,7 @@ on:
       - '.github/workflows/guide-d3-dashboard.yml'
       - 'guides/d3-dashboard/**'
     branches:
-      - master
+      - '**'
 
 jobs:
   deploy-d3-dashboard:
