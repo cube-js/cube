@@ -1,6 +1,6 @@
 ---
 order: 2
-title: "Analytic API with Cube.js"
+title: "Analytical API with Cube.js"
 ---
 
 We're going to build the dashboard for an e-commerce company that wants to track its overall performance and orders' statuses. Let's assume that the company keeps its data in an SQL database. So, in order to display that data on a dashboard, we're going to create an analytical API.
