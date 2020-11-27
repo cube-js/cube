@@ -1,5 +1,5 @@
 const sql = require('mssql');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
 class MSSqlDriver extends BaseDriver {
   constructor(config) {

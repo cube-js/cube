@@ -1,7 +1,7 @@
 const jshs2 = require('jshs2');
 const SqlString = require('sqlstring');
 const genericPool = require('generic-pool');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
 const {
   HS2Util, IDLContainer, HiveConnection, Configuration

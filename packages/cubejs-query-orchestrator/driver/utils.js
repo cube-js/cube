@@ -1,12 +1,8 @@
-exports.cancelCombinator = (fn) => {
-  const cancelFnArray = [];
-  const saveCancelFn = promise => {
-    if (promise.cancel) {
-      cancelFnArray.push(promise.cancel);
-    }
-    return promise;
-  };
-  const promise = fn(saveCancelFn);
-  promise.cancel = () => Promise.all(cancelFnArray.map(cancel => cancel()));
-  return promise;
-};
+const { cancelCombinator } = require('../dist/src/driver/utils');
+
+process.emitWarning(
+  'Using absolute import with @cubejs-backend/query-orchestrator is deprecated',
+  'DeprecationWarning'
+);
+
+module.exports = cancelCombinator;
