@@ -559,8 +559,8 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::Decimal),
-        DataType::Boolean
-        | DataType::Int8
+        DataType::Boolean => Ok(ColumnType::Boolean),
+        DataType::Int8
         | DataType::Int16
         | DataType::Int32
         | DataType::Int64
