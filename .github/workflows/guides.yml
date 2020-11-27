@@ -19,53 +19,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - uses: marceloprado/has-changed-path@v1
-        id: changed
+      - uses: pheel/path-watcher-action@v1
+        id: modified
         with:
-          paths: .github/workflows/guides.yml guides/angular-dashboard
+          paths: '.github/workflows/guides.yml,guides/angular-dashboard/**'
 
       - name: Use Node.js 14.x
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/guides-base
 
       - name: Yarn link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link
         working-directory: guides/guides-base
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/angular-dashboard
 
       - name: Link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link guides-base
         working-directory: guides/angular-dashboard
 
       - name: Link styled-components
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: ln -s ../../angular-dashboard/node_modules/styled-components styled-components
         working-directory: guides/guides-base/node_modules
 
       - name: Yarn build
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn build
         working-directory: guides/angular-dashboard
 
       - name: Install Netlify CLI
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: npm install -g netlify-cli
 
       - name: Deploy to Netlify
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: netlify deploy --dir=public --prod
         working-directory: guides/angular-dashboard
         env:
@@ -80,53 +80,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - uses: marceloprado/has-changed-path@v1
-        id: changed
+      - uses: pheel/path-watcher-action@v1
+        id: modified
         with:
-          paths: .github/workflows/guides.yml guides/d3-dashboard
+          paths: '.github/workflows/guides.yml,guides/d3-dashboard/**'
 
       - name: Use Node.js 14.x
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/guides-base
 
       - name: Yarn link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link
         working-directory: guides/guides-base
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/d3-dashboard
 
       - name: Link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link guides-base
         working-directory: guides/d3-dashboard
 
       - name: Link styled-components
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: ln -s ../../d3-dashboard/node_modules/styled-components styled-components
         working-directory: guides/guides-base/node_modules
 
       - name: Yarn build
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn build
         working-directory: guides/d3-dashboard
 
       - name: Install Netlify CLI
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: npm install -g netlify-cli
 
       - name: Deploy to Netlify
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: netlify deploy --dir=public --prod
         working-directory: guides/d3-dashboard
         env:
@@ -141,53 +141,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - uses: marceloprado/has-changed-path@v1
-        id: changed
+      - uses: pheel/path-watcher-action@v1
+        id: modified
         with:
-          paths: .github/workflows/guides.yml guides/material-ui-dashboard
+          paths: '.github/workflows/guides.yml,guides/material-ui-dashboard/**'
 
       - name: Use Node.js 14.x
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/guides-base
 
       - name: Yarn link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link
         working-directory: guides/guides-base
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/material-ui-dashboard
 
       - name: Link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link guides-base
         working-directory: guides/material-ui-dashboard
 
       - name: Link styled-components
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: ln -s ../../material-ui-dashboard/node_modules/styled-components styled-components
         working-directory: guides/guides-base/node_modules
 
       - name: Yarn build
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn build
         working-directory: guides/material-ui-dashboard
 
       - name: Install Netlify CLI
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: npm install -g netlify-cli
 
       - name: Deploy to Netlify
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: netlify deploy --dir=public --prod
         working-directory: guides/material-ui-dashboard
         env:
@@ -202,53 +202,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - uses: marceloprado/has-changed-path@v1
-        id: changed
+      - uses: pheel/path-watcher-action@v1
+        id: modified
         with:
-          paths: .github/workflows/guides.yml guides/react-dashboard
+          paths: '.github/workflows/guides.yml,guides/react-dashboard/**'
 
       - name: Use Node.js 14.x
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/guides-base
 
       - name: Yarn link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link
         working-directory: guides/guides-base
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/react-dashboard
 
       - name: Link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link guides-base
         working-directory: guides/react-dashboard
 
       - name: Link styled-components
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: ln -s ../../react-dashboard/node_modules/styled-components styled-components
         working-directory: guides/guides-base/node_modules
 
       - name: Yarn build
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn build
         working-directory: guides/react-dashboard
 
       - name: Install Netlify CLI
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: npm install -g netlify-cli
 
       - name: Deploy to Netlify
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: netlify deploy --dir=public --prod
         working-directory: guides/react-dashboard
         env:
@@ -263,53 +263,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - uses: marceloprado/has-changed-path@v1
-        id: changed
+      - uses: pheel/path-watcher-action@v1
+        id: modified
         with:
-          paths: .github/workflows/guides.yml guides/real-time-dashboard
+          paths: '.github/workflows/guides.yml,guides/real-time-dashboard/**'
 
       - name: Use Node.js 14.x
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/guides-base
 
       - name: Yarn link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link
         working-directory: guides/guides-base
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/real-time-dashboard
 
       - name: Link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link guides-base
         working-directory: guides/real-time-dashboard
 
       - name: Link styled-components
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: ln -s ../../real-time-dashboard/node_modules/styled-components styled-components
         working-directory: guides/guides-base/node_modules
 
       - name: Yarn build
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn build
         working-directory: guides/real-time-dashboard
 
       - name: Install Netlify CLI
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: npm install -g netlify-cli
 
       - name: Deploy to Netlify
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: netlify deploy --dir=public --prod
         working-directory: guides/real-time-dashboard
         env:
@@ -324,53 +324,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - uses: marceloprado/has-changed-path@v1
-        id: changed
+      - uses: pheel/path-watcher-action@v1
+        id: modified
         with:
-          paths: .github/workflows/guides.yml guides/web-analytics
+          paths: '.github/workflows/guides.yml,guides/web-analytics/**'
 
       - name: Use Node.js 14.x
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/guides-base
 
       - name: Yarn link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link
         working-directory: guides/guides-base
 
       - name: Yarn install
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn install
         working-directory: guides/web-analytics
 
       - name: Link guides-base
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn link guides-base
         working-directory: guides/web-analytics
 
       - name: Link styled-components
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: ln -s ../../web-analytics/node_modules/styled-components styled-components
         working-directory: guides/guides-base/node_modules
 
       - name: Yarn build
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: yarn build
         working-directory: guides/web-analytics
 
       - name: Install Netlify CLI
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: npm install -g netlify-cli
 
       - name: Deploy to Netlify
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.modified.outputs.modified
         run: netlify deploy --dir=public --prod
         working-directory: guides/web-analytics
         env:
