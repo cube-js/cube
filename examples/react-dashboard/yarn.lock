@@ -980,29 +980,29 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/postgres-driver@^0.23.8":
-  version "0.23.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/postgres-driver/-/postgres-driver-0.23.11.tgz#cb95891c681eb952886e326c3a08ffb106e6b8ae"
-  integrity sha512-q7jAr/Qis3m82M2r5mpWU+elKVGrcgD9e/PYLzfj7SQ9Z8DCF5qzV4GxgVh8Cie3k24d8lkFsa1le3sznnmOiw==
+"@cubejs-backend/postgres-driver@^0.23.11":
+  version "0.23.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/postgres-driver/-/postgres-driver-0.23.15.tgz#ada0b182ef27e3379f0be1610b42eedf3a32bdd6"
+  integrity sha512-iAgMOhris6OZ/GHwY6yN2v1fDtT35VtzBW8++cBN7ktzo+JjahxSB4P3iXv133im2/Ev+trOZTOLzua2XESOow==
   dependencies:
-    "@cubejs-backend/query-orchestrator" "^0.23.6"
+    "@cubejs-backend/query-orchestrator" "^0.23.14"
     "@types/pg" "^7.14.5"
     moment "^2.24.0"
     pg "^8.2.1"
 
-"@cubejs-backend/query-orchestrator@^0.23.6":
-  version "0.23.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.23.6.tgz#56355d1584c6561a8b63f0b1e0b9a04017c9fb61"
-  integrity sha512-L7gV0UNjpG8HmmcH/4GFVunh+g/77CwyuHRyZK5C1+nmyAbNAcswud8SkPdIRlfjnIIPcldFXKlaDAJSvkbVXw==
+"@cubejs-backend/query-orchestrator@^0.23.14":
+  version "0.23.14"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.23.14.tgz#5126524266554ca1748f536056eb9aec388984d5"
+  integrity sha512-KyAuI43CJp6SsXjuyLyv9L6OgjY/tUQR4z+TEYEt11mFdLn4sqMkHWz3fITsZEFK5wz3Mf7xPR+Ky4rB/ufrHw==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.23.11":
-  version "0.23.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.11.tgz#49a97745d364ceee32d1865e3986d469d84d8390"
-  integrity sha512-SWtu8nzYOdWwSyTtgGuhYvDYm62fM75GYOzGuyP0YpaYxFhUGYa561AWQ0uOCDowRszuRgbca/3VS3Y6V+UerQ==
+"@cubejs-backend/schema-compiler@^0.23.15":
+  version "0.23.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.15.tgz#35075e945ebe9432354ffb4762581051fe2328f2"
+  integrity sha512-Z1MvZvfIGjxxHJF2PpW0IsXEIj15tJeq42HP8kk3Rw8Hd7jyG7+vFl39M/W6ejpD9YpaZKF4X0nIjwNhCh5sQA==
   dependencies:
     "@babel/core" "^7.4.0"
     "@babel/generator" "^7.4.0"
@@ -1012,7 +1012,7 @@
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
     "@hapi/joi" "^15.1.1"
-    antlr4 "^4.8.0"
+    antlr4 "4.8.0"
     cron-parser "^2.16.3"
     humps "^2.0.1"
     inflection "^1.12.0"
@@ -1023,14 +1023,14 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.23.11":
-  version "0.23.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.23.11.tgz#1f9af5bcff3ec6a2f30397ebfe628983e0bbe1e2"
-  integrity sha512-iYGLCr+DVI0kQgDcVqBHz5rMh/Cr16RFrO4XkbRWW5jk820Xb7w2IEzHJhyXzX2WJ1jy+vg/q6cSWOWjWexFgQ==
+"@cubejs-backend/server-core@^0.23.15":
+  version "0.23.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.23.15.tgz#eefa468bb7f2d5ef0f9952f849ab8e70adfa16b0"
+  integrity sha512-7OeSynrtQzR+kFS4rPJEGEheOI1Gi2U+nThqpb/l0lF2yluJDe+6ojp6gVJrzChPcVgnhAqfYkaPgQOGtrpSdQ==
   dependencies:
     "@cubejs-backend/api-gateway" "^0.23.6"
-    "@cubejs-backend/query-orchestrator" "^0.23.6"
-    "@cubejs-backend/schema-compiler" "^0.23.11"
+    "@cubejs-backend/query-orchestrator" "^0.23.14"
+    "@cubejs-backend/schema-compiler" "^0.23.15"
     "@hapi/joi" "^15.1.1"
     codesandbox-import-utils "^2.1.12"
     cross-spawn "^7.0.1"
@@ -1051,16 +1051,17 @@
     sqlstring "^2.3.1"
     uuid "^3.3.3"
 
-"@cubejs-backend/server@^0.23.8":
-  version "0.23.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.23.11.tgz#3b043080659fb14d690d656c66d196231d03cf83"
-  integrity sha512-soXTF9XGEpVhR4gKhG9cZ8egFF+G8ewcWTU7VfHxLfs2MXcck/Fwd5imyU6PLRq/jvxkRKeyHhVAJdTBJiWFsQ==
+"@cubejs-backend/server@^0.23.12":
+  version "0.23.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.23.15.tgz#4e1776a0d16122d7dbe7e189bc3c9ec5d0d19f95"
+  integrity sha512-D1D53nUy/2sb8HnKQtkubgQ+W/X/C1nWR9pdwLyXfBR6GD6u+yxz/ZxFMXiAk9Sljetxv4lBNOsCXczMQ/OzqQ==
   dependencies:
-    "@cubejs-backend/server-core" "^0.23.11"
+    "@cubejs-backend/server-core" "^0.23.15"
+    "@cubejs-backend/shared" "^0.23.15"
     "@oclif/color" "^0.1.2"
     "@oclif/command" "^1.8.0"
     "@oclif/config" "^1.17.0"
-    "@oclif/errors" "^1.3.3"
+    "@oclif/errors" "^1.3.4"
     "@oclif/plugin-help" "^3.2.0"
     body-parser "^1.19.0"
     codesandbox-import-utils "^2.1.12"
@@ -1069,8 +1070,16 @@
     express "^4.17.1"
     jsonwebtoken "^8.4.0"
     node-machine-id "^1.1.10"
+    semver "^7.3.2"
     source-map-support "^0.5.19"
     ws "^7.1.2"
+
+"@cubejs-backend/shared@^0.23.15":
+  version "0.23.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.23.15.tgz#bb780783add268770b40d1da003d277b2b9d210b"
+  integrity sha512-9Px1UH2CT55aNAjJC7kUToXQ6eU9S647AT8zhXzdYNZEWUwVJUlnw7cKhuIIgMDfVn1scVCctlS/g07t2SN85w==
+  dependencies:
+    env-var "^6.3.0"
 
 "@hapi/address@2.x.x":
   version "2.1.4"
@@ -1165,7 +1174,7 @@
     is-wsl "^2.1.1"
     tslib "^2.0.0"
 
-"@oclif/errors@^1.2.2", "@oclif/errors@^1.3.3":
+"@oclif/errors@^1.2.2", "@oclif/errors@^1.3.3", "@oclif/errors@^1.3.4":
   version "1.3.4"
   resolved "https://registry.yarnpkg.com/@oclif/errors/-/errors-1.3.4.tgz#a96f94536b4e25caa72eff47e8b3ed04f6995f55"
   integrity sha512-pJKXyEqwdfRTUdM8n5FIHiQQHg5ETM0Wlso8bF9GodczO40mF5Z3HufnYWJE7z8sGKxOeJCdbAVZbS8Y+d5GCw==
@@ -1292,7 +1301,7 @@ ansi-styles@^4.0.0, ansi-styles@^4.1.0:
   dependencies:
     color-convert "^2.0.1"
 
-antlr4@^4.8.0:
+antlr4@4.8.0:
   version "4.8.0"
   resolved "https://registry.yarnpkg.com/antlr4/-/antlr4-4.8.0.tgz#f938ec171be7fc2855cd3a533e87647185b32b6a"
   integrity sha512-en/MxQ4OkPgGJQ3wD/muzj1uDnFSzdFIhc2+c6bHZokWkuBb6RRvFjpWhPxWLbgQvaEzldJZ0GSQpfSAaE3hqg==
@@ -1750,6 +1759,11 @@ end-of-stream@^1.0.0:
   integrity sha512-+uw1inIHVPQoaVuHzRyXd21icM+cnt4CzD5rW+NC1wjOUSTOs+Te7FOv7AhN7vS9x/oIyhLP5PR1H+phQAHu5Q==
   dependencies:
     once "^1.4.0"
+
+env-var@^6.3.0:
+  version "6.3.0"
+  resolved "https://registry.yarnpkg.com/env-var/-/env-var-6.3.0.tgz#b4ace5bcd1d293629a2c509ae7b46f8add2f8892"
+  integrity sha512-gaNzDZuVaJQJlP2SigAZLu/FieZN5MzdN7lgHNehESwlRanHwGQ/WUtJ7q//dhrj3aGBZM45yEaKOuvSJaf4mA==
 
 errlop@^2.0.0:
   version "2.2.0"
