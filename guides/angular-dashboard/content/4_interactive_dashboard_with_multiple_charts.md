@@ -3,7 +3,7 @@ order: 4
 title: "Interactive Dashboard with Multiple Charts"
 ---
 
-In the previous part, we've created an analytical backend and a basic dashboard with the first chart. Now we're going to expand the dashboard so it provides the view of key performance indicators of our e-commerce company.
+In the previous part, we've created an analytical API and a basic dashboard with the first chart. Now we're going to expand the dashboard so it provides the view of key performance indicators of our e-commerce company.
 
 ## Custom Date Range
 

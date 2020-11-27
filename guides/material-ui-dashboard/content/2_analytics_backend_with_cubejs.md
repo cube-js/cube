@@ -1,6 +1,6 @@
 ---
 order: 2
-title: "Analytics API with Cube.js"
+title: "Analytical API with Cube.js"
 ---
 
 We're going to build the dashboard for an e-commerce company that wants to track its overall performance and orders' statuses. Let's assume that the company keeps its data in an SQL database. So, in order to display that data on a dashboard, we're going to create an analytical API.
@@ -38,7 +38,7 @@ Now we can run the API!
 
 **In development mode, the API will also run the Cube.js Playground.** It's a time-saving web application that helps to create a data schema, test out the charts, and generate a React dashboard boilerplate. Run the following command in the Cube.js project folder:
 
-`$ node index.js`
+`$ npm run dev`
 
 Next, open [http://localhost:4000](http://localhost:4000/) in your browser.
 
