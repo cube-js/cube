@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.1](https://github.com/cube-js/cube.js/compare/v0.24.0...v0.24.1) (2020-11-27)
+
+
+### Bug Fixes
+
+* Specifying `dateRange` in time dimension should produce same result as `inDateRange` in filter ([a7603d7](https://github.com/cube-js/cube.js/commit/a7603d724732a51301227f68c39ba699333c0e06)), closes [#962](https://github.com/cube-js/cube.js/issues/962)
+* **cubejs-cli:** template/serverless - specify CORS ([#1449](https://github.com/cube-js/cube.js/issues/1449)) ([f8064d2](https://github.com/cube-js/cube.js/commit/f8064d292570804fb8d2ef04708d2f5c4e563be2))
+* **cubestore:** Negative int insert support ([5f2ff55](https://github.com/cube-js/cube.js/commit/5f2ff552bc5042f4d0d87fc3678de8e21ff5424a))
+
+
+### Features
+
+* **cubestore:** Group by boolean ([fa1b1b2](https://github.com/cube-js/cube.js/commit/fa1b1b2a439d9dd98e3cbaf730a313033f39ad80))
+* **cubestore:** Group by boolean ([45fe036](https://github.com/cube-js/cube.js/commit/45fe03677beb09ef7d83065566d1e0536543fea2))
+* Specify CORS for server/serverless ([#1455](https://github.com/cube-js/cube.js/issues/1455)) ([8c371ad](https://github.com/cube-js/cube.js/commit/8c371add2821a851bc51e00fb24e7ad2d8620345))
+
+
+
+
+
 # [0.24.0](https://github.com/cube-js/cube.js/compare/v0.23.15...v0.24.0) (2020-11-26)
 
 
