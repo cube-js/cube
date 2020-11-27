@@ -110,7 +110,8 @@ describe('PreAggregations', () => {
     queryCache = new QueryCache(
       'TEST',
       mockDriverFactory,
-      (msg, params) => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      () => {},
       {
         queueOptions: {
           executionTimeout: 1
@@ -127,7 +128,8 @@ describe('PreAggregations', () => {
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -151,7 +153,8 @@ describe('PreAggregations', () => {
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -176,7 +179,8 @@ describe('PreAggregations', () => {
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverReadOnlyFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -201,7 +205,8 @@ describe('PreAggregations', () => {
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -231,7 +236,8 @@ describe('PreAggregations', () => {
       preAggregations = new PreAggregations(
         'TEST',
         () => { throw new Error('The source database factory should never be called when externalRefresh is true, as it will trigger testConnection'); },
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -262,7 +268,8 @@ describe('PreAggregations', () => {
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {
@@ -312,7 +319,8 @@ describe('PreAggregations', () => {
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
-        (msg, params) => {},
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
         queryCache,
         {
           queueOptions: {

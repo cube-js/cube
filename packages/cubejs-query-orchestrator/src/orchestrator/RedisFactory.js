@@ -45,4 +45,4 @@ export function createRedisClient(url) {
   );
 
   return client;
-};
+}
