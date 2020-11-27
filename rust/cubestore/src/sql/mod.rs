@@ -562,6 +562,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn pre_aggregated_date_select() {
+        Config::run_test("group_by_boolean", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.bool_group (bool_value boolean)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.bool_group (bool_value) VALUES (true), (false), (true), (false), (false)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT bool_value, count(*) from foo.bool_group GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(3)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn create_schema_if_not_exists() {
         Config::run_test("create_schema_if_not_exists", async move |services| {
             let service = services.sql_service;
