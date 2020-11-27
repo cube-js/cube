@@ -3,7 +3,7 @@ order: 4
 title: "Building a Frontend Dashboard"
 ---
 
-Now we are ready to build our frontend application. We’re going to use Cube.js Templates, which is a scaffolding engine for quickly creating frontend applications configured to work with the Cube.js backend. It provides a selection of different frontend frameworks, UI kits, and charting libraries to mix together. We’ll pick React, Material UI, and D3.js. Let’s navigate to the Dashboard App tab and create a new dashboard application.
+Now we are ready to build our frontend application. We’re going to use Cube.js Templates, which is a scaffolding engine for quickly creating frontend applications configured to work with the Cube.js API. It provides a selection of different frontend frameworks, UI kits, and charting libraries to mix together. We’ll pick React, Material UI, and D3.js. Let’s navigate to the Dashboard App tab and create a new dashboard application.
 
 ![](/images/4-screenshot-1.png)
 
@@ -13,7 +13,7 @@ It could take several minutes to generate an app and install all the dependencie
 $ npm start
 ```
 
-Make sure the Cube.js backend process is up and running since our frontend application uses its API. The frontend application is running on [http://localhost:3000](http://localhost:3000). If you open it in your browser, you should be able to see an empty dashboard.
+Make sure the Cube.js API is up and running since our frontend application uses it. The frontend application is running on [http://localhost:3000](http://localhost:3000). If you open it in your browser, you should be able to see an empty dashboard.
 
 ![](/images/4-screenshot-2.png)
 
