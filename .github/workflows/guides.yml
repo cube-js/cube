@@ -22,7 +22,7 @@ jobs:
       - uses: marceloprado/has-changed-path@v1
         id: changed
         with:
-          paths: '.github/workflows/guides.yml' 'guides/angular-dashboard/**'
+          paths: .github/workflows/guides.yml guides/angular-dashboard/**
 
       - name: Use Node.js 14.x
         if: steps.changed.outputs.changed == 'true'
@@ -83,7 +83,7 @@ jobs:
       - uses: marceloprado/has-changed-path@v1
         id: changed
         with:
-          paths: '.github/workflows/guides.yml' 'guides/d3-dashboard/**'
+          paths: .github/workflows/guides.yml guides/d3-dashboard/**
 
       - name: Use Node.js 14.x
         if: steps.changed.outputs.changed == 'true'
@@ -144,7 +144,7 @@ jobs:
       - uses: marceloprado/has-changed-path@v1
         id: changed
         with:
-          paths: '.github/workflows/guides.yml' 'guides/material-ui-dashboard/**'
+          paths: .github/workflows/guides.yml guides/material-ui-dashboard/**
 
       - name: Use Node.js 14.x
         if: steps.changed.outputs.changed == 'true'
@@ -205,7 +205,7 @@ jobs:
       - uses: marceloprado/has-changed-path@v1
         id: changed
         with:
-          paths: '.github/workflows/guides.yml' 'guides/react-dashboard/**'
+          paths: .github/workflows/guides.yml guides/react-dashboard/**
 
       - name: Use Node.js 14.x
         if: steps.changed.outputs.changed == 'true'
@@ -266,7 +266,7 @@ jobs:
       - uses: marceloprado/has-changed-path@v1
         id: changed
         with:
-          paths: '.github/workflows/guides.yml' 'guides/real-time-dashboard/**'
+          paths: .github/workflows/guides.yml guides/real-time-dashboard/**
 
       - name: Use Node.js 14.x
         if: steps.changed.outputs.changed == 'true'
@@ -327,7 +327,7 @@ jobs:
       - uses: marceloprado/has-changed-path@v1
         id: changed
         with:
-          paths: '.github/workflows/guides.yml' 'guides/web-analytics/**'
+          paths: .github/workflows/guides.yml guides/web-analytics/**
 
       - name: Use Node.js 14.x
         if: steps.changed.outputs.changed == 'true'
