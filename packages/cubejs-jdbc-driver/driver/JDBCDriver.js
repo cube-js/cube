@@ -1,4 +1,4 @@
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const SqlString = require('sqlstring');
 
 const applyParams = (query, params) => {
