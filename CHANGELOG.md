@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.2](https://github.com/cube-js/cube.js/compare/v0.24.1...v0.24.2) (2020-11-27)
+
+
+### Bug Fixes
+
+* add content-type to allowedHeaders ([d176269](https://github.com/cube-js/cube.js/commit/d176269fda12d7213c021026c02f7aec0df50ba6))
+* **@cubejs-backend/server-core:** Allow to pass unknown options (such as http) ([f1e9402](https://github.com/cube-js/cube.js/commit/f1e9402ee5c1fa6695d44f8750602d0a2ccedd5f))
+
+
+### Features
+
+* **@cubejs-backend/query-orchestrator:** Initial move to TypeScript ([#1462](https://github.com/cube-js/cube.js/issues/1462)) ([101e8dc](https://github.com/cube-js/cube.js/commit/101e8dc90d4b1266c0327adb86cab3e3caa8d4d0))
+
+
+
+
+
 ## [0.24.1](https://github.com/cube-js/cube.js/compare/v0.24.0...v0.24.1) (2020-11-27)
 
 
