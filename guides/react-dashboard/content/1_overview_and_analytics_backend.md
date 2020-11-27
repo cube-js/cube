@@ -1,5 +1,5 @@
 ---
-title: "Overview and Analytics Backend"
+title: "Overview and Analytics API"
 order: 1
 ---
 
@@ -17,12 +17,11 @@ Let’s go through the backend first -
 
 We're going to store our data for the dashboard in [PostgreSQL](https://www.postgresql.org/), a free and open-source relational database. For those who don’t have Postgres or would like to use a different database, I’ll put some useful links on how to do the same setup for different databases, such as MongoDB, later in this tutorial.
 
-Next, we’ll install [Cube.js](https://github.com/cube-js/cube.js) and connect it to the database. Cube.js is an open-source framework for building analytical web applications. It creates an analytics API on top of the database and handles things like SQL organization, caching, security, authentication, and much more. 
-For the sake of simplicity you can think of Cube.js as dashboard framework.
+Next, we’ll install [Cube.js](https://github.com/cube-js/cube.js) and connect it to the database. Cube.js is an open-source analytical API platform for building analytical applications. It creates an analytics API on top of the database and handles things like SQL generation, caching, security, authentication, and much more. 
 
 We’ll also use [AWS Cognito](https://aws.amazon.com/cognito/) for user registrations and sign-ins and [AWS AppSync](https://aws.amazon.com/appsync/) as a GraphQL backend. Optionally, you can use your own authentication service, as well as GraphQL backend. But to keep things simple, we’ll rely on AWS services for the purpose of this tutorial.
 
-The frontend is a React application. We’re going to use Cube.js playground to generate a React dashboard boilerplate with a report builder and a dashboard. It uses [Create React App](https://create-react-app.dev/) under the hood to create all the configuration and additionally wires together all the components to work with Cube.js API and a GraphQL backend. Finally, for the visualizations, we’ll use Recharts, a powerful and customizable React-based charting library.
+The frontend is a React application. We’re going to use Cube.js Playground to generate a React dashboard boilerplate with a report builder and a dashboard. It uses [Create React App](https://create-react-app.dev/) under the hood to create all the configuration and additionally wires together all the components to work with Cube.js API and a GraphQL backend. Finally, for the visualizations, we’ll use Recharts, a powerful and customizable React-based charting library.
 
 
 ## Setting up a Database and Cube.js
@@ -39,19 +38,19 @@ $ createdb ecom
 $ psql --dbname ecom -f ecom-dump.sql
 ```
 
-Now, let’s install Cube.js and create a backend service. Run the following commands in your terminal:
+Now, let’s create an analytical API with Cube.js. Run the following command in your terminal:
 
 ```bash
-$ npm install -g cubejs-cli
-$ cubejs create react-dashboard -d postgres
+$ npx cubejs-cli create react-dashboard -d postgres
 ```
 
 We’ve just created a new Cube.js service, configured to work with the Postgres database. Cube.js uses environment variables starting with `CUBEJS_` for configuration. To configure the connection to our database, we need to specify the DB type and name. In the Cube.js project folder replace the contents of `.env` with the following:
 
 ```bash
-CUBEJS_API_SECRET=SECRET
 CUBEJS_DB_TYPE=postgres
 CUBEJS_DB_NAME=ecom
+CUBEJS_API_SECRET=SECRET
+CUBEJS_DEV_MODE=true
 ```
 
 If you are using a different database, please refer to [this documentation](https://cube.dev/docs/connecting-to-the-database) on how to connect to a database of your choice.
@@ -59,7 +58,7 @@ If you are using a different database, please refer to [this documentation](http
 Now, let’s run Cube.js Playground. It will help us to build a simple data schema, test out the charts, and then generate a React dashboard boilerplate. Run the following command in the Cube.js project folder:
 
 ```bash
-$ node index.js
+$ npm run dev
 ```
 
 Next, open http://localhost:4000 in your browser to create a Cube.js data schema.

@@ -12,7 +12,8 @@ Create React App provides a fully configured environment and a default configura
 `eject` is irreversible. You need to commit your changes before and then run `eject` in the `dashboard-app` folder.
 
 ```bash
-$ git commit -a
+$ git add -A
+$ git commit -m "Initial"
 $ yarn eject
 ```
 
@@ -32,16 +33,29 @@ Find the `cssRegex` constant and change it:
 +const cssRegex = /\.(?:le|c)ss$/;
 ```
 
-Then, find the `getStyleLoaders` function. On the `use` array, **after** the `css-loader` object, add:
+Then, find the `getStyleLoaders` function. On the `loaders` array, **after** the `css-loader`, add the LESS loader. Make sure your code looks like this:
 
 ```javascript
-{
-  loader: require.resolve('less-loader'),
-  options: {
-    importLoaders: 1,
-    javascriptEnabled: true,
-  }
-}
+// common function to get style loaders
+const getStyleLoaders = (cssOptions, preProcessor) => {
+    const loaders = [
+
+      // ...
+
+      {
+        loader: require.resolve('css-loader'),
+        options: cssOptions,
+      },
+      {
+        loader: require.resolve('less-loader'),
+        options: {
+          lessOptions: {
+            javascriptEnabled: true,
+          },
+        }
+      },
+
+      // ...
 ```
 
 That’s it! With this in place, we are ready to override some of the `antd`’s default variables and styles. We are going to customize some variables according to the `antd`’s [Customize Theme](https://ant.design/docs/react/customize-theme) guide.
@@ -120,11 +134,15 @@ Next, let’s create a `index.less` file, which will be imported in `index.js`. 
 }
 ```
 
-The last thing is to import `index.less` in our `index.js`. Replace the old import of `index.css` and feel free to delete this old file as well.
+The last thing is to import `index.less` in our `index.js`. Add this import to the file
 
 ```diff
--import "./index.css";
-+import "./index.less";
+  // ...
+
+  import App from './App';
++ import "./index.less";
+
+  // ...
 ```
 
 The styles above customize our design globally, changing the look of some components. But to customize some specific components, like the top menu, we are going to use Styled Components.

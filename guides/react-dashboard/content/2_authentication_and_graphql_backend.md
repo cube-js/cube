@@ -92,7 +92,7 @@ The command above will configure and deploy the Cognito Users Pool and the AppSy
 
 After everything is deployed and set up, the identifiers for each resource are automatically added to a local `aws_exports.js` file that is used by AWS Amplify to reference the specific Auth and API cloud backend resources.
 
-## Cube.js Backend Authentication
+## Cube.js API Authentication
 
 We're going to use Cognito's identity tokens to manage access to Cube.js and the
 underlying analytics data. Cube.js comes with a flexible [security
@@ -146,30 +146,25 @@ following command in your project root folder.
 $ npm install -s jsonwebtoken jwk-to-pem lodash
 ```
 
-Now, we need to update the `index.js` file, which starts a Cube.js Backend. Replace
-the content of the `index.js` file with the following. Make sure to make these
+Now, we need to update the `cube.js` file, which is just another way to configure Cube.js. Replace
+the content of the `cube.js` file with the following. Make sure to make these
 changes in the Cube.js root folder and not in the `dashboard-app` folder.
 
 ```javascript
-const CubejsServer = require("@cubejs-backend/server");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const jwkToPem = require("jwk-to-pem");
 const jwks = JSON.parse(fs.readFileSync("jwks.json"));
 const _ = require("lodash");
 
-const server = new CubejsServer({
+module.exports = {
   checkAuth: async (req, auth) => {
     const decoded = jwt.decode(auth, { complete: true });
     const jwk = _.find(jwks.keys, x => x.kid === decoded.header.kid);
     const pem = jwkToPem(jwk);
     req.authInfo = jwt.verify(auth, pem);
   }
-});
-
-server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-});
+};
 ```
 
 Here we first decode the incoming JWT token to find its `kid`. Then, based on
