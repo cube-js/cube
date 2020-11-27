@@ -246,11 +246,9 @@ services:
       - 3000:3000
     env_file: .env
     volumes:
-      # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
-      # - .:/cube/conf
-      - ./dashboard-app:/cube/conf/dashboard-app
-      - ./cube.js:/cube/conf/cube.js
-      - ./schema:/cube/conf/schema
+      - .:/cube/conf
+      # We ignore Cube.js deps, because they are built-in inside the official Docker image
+      - .empty:/cube/conf/node_modules/@cubejs-backend/
 `;
 
 const templates: Record<string, Template> = {
