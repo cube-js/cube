@@ -62,7 +62,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: examples/drill-downs/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -119,7 +119,7 @@ jobs:
         
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: examples/highcharts/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -176,7 +176,7 @@ jobs:
         
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: examples/react-dashboard/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -233,7 +233,7 @@ jobs:
         
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: examples/real-time-dashboard/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -290,7 +290,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=public --prod
+        run: netlify deploy --dir=build --prod
         working-directory: examples/web-analytics/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
