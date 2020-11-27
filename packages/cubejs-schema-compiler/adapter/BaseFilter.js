@@ -132,7 +132,14 @@ class BaseFilter extends BaseDimension {
   }
 
   allocateTimestampParams() {
-    return this.filterParams().map(p => this.allocateTimestampParam(p));
+    return this.filterParams().map((p, i) => {
+      if (i > 1) {
+        throw new Error(`Expected only 2 parameters for timestamp filter but got: ${this.filterParams()}`);
+      }
+      return this.allocateTimestampParam(
+        i === 0 ? this.inDbTimeZoneDateFrom(p) : this.inDbTimeZoneDateTo(p)
+      );
+    });
   }
 
   allParamsRepeat(basePart) {
