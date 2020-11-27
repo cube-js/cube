@@ -11,7 +11,7 @@ import Header from './components/Header';
 // import aws_exports from './aws-exports';
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: 'https://react-dashboard-demo.cubecloudapp.dev/cubejs-api/v1'
+  apiUrl: 'https://react-dashboard.cubecloudapp.dev/cubejs-api/v1'
 });
 
 // Amplify.configure(aws_exports);
