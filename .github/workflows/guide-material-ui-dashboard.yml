@@ -5,7 +5,7 @@ on:
       - '.github/workflows/guide-material-ui-dashboard.yml'
       - 'guides/material-ui-dashboard/**'
     branches:
-      - master
+      - '**'
 
 jobs:
   deploy-material-ui-dashboard:
