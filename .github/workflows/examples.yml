@@ -62,7 +62,7 @@ jobs:
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=build --prod
+        run: netlify deploy --dir=dist/dashboard-app --prod
         working-directory: examples/angular-dashboard-with-material-ui/dashboard-app
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
