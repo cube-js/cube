@@ -68,7 +68,6 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   deploy-compare-date-range:
-    name: Deploy compare-date-range
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
