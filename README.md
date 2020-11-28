@@ -1,6 +1,6 @@
 <p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
-[Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Examples](#examples) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
+[Website](https://cube.dev) • [Getting Started](https://cube.dev/docs/getting-started) • [Docs](https://cube.dev/docs) • [Examples](https://cube.dev/docs/examples) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
@@ -25,6 +25,18 @@ If you are building your own business intelligence tool or customer-facing analy
 Cube.js has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
 
 ![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/old-was-vs-cubejs-way.png)
+
+## Getting Started 🚀
+
+There're two ways to create a Cube.js application.
+
+If you have Node.js installed, run this command and follow with the [Getting Started](https://cube.dev/docs/getting-started) guide.
+
+```
+$ npx cubejs-cli create hello-world
+```
+
+In case you don't have Node.js, or you'd like to run Cube.js with Docker, have a look at the [Getting started with Docker](https://cube.dev/docs/getting-started-docker) guide.
 
 ## Resources
 
