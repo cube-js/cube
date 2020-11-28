@@ -44,7 +44,7 @@ fn main() {
         let services = config.configure().await;
         services.start_processing_loops().await.unwrap();
 
-        track_event("Cubestore Start".to_string(), HashMap::new()).await;
+        track_event("Cube Store Start".to_string(), HashMap::new()).await;
 
         MySqlServer::listen("0.0.0.0:3306".to_string(), services.sql_service.clone()).await.unwrap();
     });

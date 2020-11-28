@@ -7,7 +7,7 @@
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
 
-Cubestore
+Cube Store
 ==========
 
 Cube.js pre-aggregation storage layer.
@@ -34,4 +34,4 @@ It should point to checked out Apache Arrow fork and it'll allow you to build pr
 
 ## License
 
-Cubestore is [Apache 2.0 licensed](./cubestore/LICENSE).
+Cube Store is [Apache 2.0 licensed](./cubestore/LICENSE).
