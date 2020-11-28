@@ -268,3 +268,9 @@ impl From<SetLoggerError> for CubeError {
         CubeError::from_error(v)
     }
 }
+
+impl From<serde_json::Error> for CubeError {
+    fn from(v: serde_json::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}

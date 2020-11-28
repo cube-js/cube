@@ -78,7 +78,7 @@ pub struct ClusterImpl {
     query_executor: Arc<dyn QueryExecutor>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum WorkerMessage {
     Select(SerializedPlan, HashMap<String, String>)
 }

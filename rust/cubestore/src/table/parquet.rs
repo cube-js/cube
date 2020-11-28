@@ -7,7 +7,6 @@ use parquet::file::reader::{SerializedFileReader, FileReader};
 use parquet::data_type::*;
 use parquet::column::reader::ColumnReader;
 use crate::metastore::{ColumnType, Column, Index};
-use std::rc::Rc;
 use parquet::schema::types;
 use parquet::file::writer::{SerializedFileWriter, FileWriter};
 use std::cmp::{min, max};
@@ -360,11 +359,11 @@ impl RowParquetWriter {
 
         let mut fields = table.get_columns().iter().map(|column| {
             // TODO pass nullable columns
-            Rc::new(parquet::schema::types::Type::from(column))
+            Arc::new(parquet::schema::types::Type::from(column))
         }
         ).collect();
 
-        let schema = Rc::new(
+        let schema = Arc::new(
             types::Type::group_type_builder("schema")
                 .with_fields(&mut fields)
                 .build().unwrap(),
@@ -512,8 +511,8 @@ impl RowParquetWriter {
         Ok(())
     }
 
-    fn writer_props() -> Rc<WriterProperties> {
-        Rc::new(
+    fn writer_props() -> Arc<WriterProperties> {
+        Arc::new(
             WriterProperties::builder()
                 // .set_key_value_metadata(Some(vec![KeyValue::new(
                 //     "key".to_string(),
