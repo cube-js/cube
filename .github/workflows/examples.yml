@@ -8,13 +8,11 @@ on:
     branches:
       - '**'
 
-defaults:
-  runs-on: ubuntu-latest
-  timeout-minutes: 30
-
 jobs:
 
   deploy-angular-dashboard-with-material-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v2
       - uses: ./github/actions/deploy-example
