@@ -1,0 +1,296 @@
+name: Examples
+
+on:
+  push:
+    paths:
+      - '.github/workflows/examples.yml'
+      - 'examples/**'
+    branches:
+      - master
+
+jobs:
+
+  deploy-drill-downs:
+    name: Deploy drill-downs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,examples/drill-downs/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Install Cube.js CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g cubejs-cli
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/drill-downs
+
+      - name: Deploy to Cube Cloud
+        if: steps.modified.outputs.modified
+        run: cubejs deploy
+        working-directory: examples/drill-downs
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/drill-downs/dashboard-app
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: examples/drill-downs/dashboard-app
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=build --prod
+        working-directory: examples/drill-downs/dashboard-app
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-highcharts:
+    name: Deploy highcharts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,examples/highcharts/**'
+        
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+          
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+        
+      - name: Install Cube.js CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g cubejs-cli
+        
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/highcharts
+        
+      - name: Deploy to Cube Cloud
+        if: steps.modified.outputs.modified
+        run: cubejs deploy
+        working-directory: examples/highcharts
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/highcharts/dashboard-app
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: examples/highcharts/dashboard-app
+        
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=build --prod
+        working-directory: examples/highcharts/dashboard-app
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-react-dashboard:
+    name: Deploy react-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,examples/react-dashboard/**'
+        
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+          
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+        
+      - name: Install Cube.js CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g cubejs-cli
+        
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/react-dashboard
+        
+      - name: Deploy to Cube Cloud
+        if: steps.modified.outputs.modified
+        run: cubejs deploy
+        working-directory: examples/react-dashboard
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/react-dashboard/dashboard-app
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: examples/react-dashboard/dashboard-app
+        
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=build --prod
+        working-directory: examples/react-dashboard/dashboard-app
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-real-time-dashboard:
+    name: Deploy real-time-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,examples/real-time-dashboard/**'
+        
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+          
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+        
+      - name: Install Cube.js CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g cubejs-cli
+        
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/real-time-dashboard
+        
+      - name: Deploy to Cube Cloud
+        if: steps.modified.outputs.modified
+        run: cubejs deploy
+        working-directory: examples/real-time-dashboard
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/real-time-dashboard/dashboard-app
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: examples/real-time-dashboard/dashboard-app
+        
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=build --prod
+        working-directory: examples/real-time-dashboard/dashboard-app
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-web-analytics:
+    name: Deploy web-analytics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,examples/web-analytics/**'
+        
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+          
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+        
+      - name: Install Cube.js CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g cubejs-cli
+        
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/web-analytics
+        
+      - name: Deploy to Cube Cloud
+        if: steps.modified.outputs.modified
+        run: cubejs deploy
+        working-directory: examples/web-analytics
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/web-analytics/dashboard-app
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: examples/web-analytics/dashboard-app
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=build --prod
+        working-directory: examples/web-analytics/dashboard-app
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}

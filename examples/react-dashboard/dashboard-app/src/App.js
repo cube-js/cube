@@ -1,22 +1,19 @@
 import React from "react";
 import { withRouter } from "react-router";
 import { Layout } from "antd";
-import { InMemoryCache } from "apollo-cache-inmemory";
 import { ApolloProvider as ApolloHooksProvider } from "@apollo/react-hooks";
 import { ApolloProvider } from "react-apollo";
-// import AWSAppSyncClient, { AUTH_TYPE } from "aws-appsync";
-import { Rehydrated } from "aws-appsync-react";
 import cubejs from "@cubejs-client/core";
 import { CubeProvider } from "@cubejs-client/react";
-import { withAuthenticator } from "aws-amplify-react";
-import Amplify, { Auth, Hub } from 'aws-amplify';
 import client from "./graphql/client";
 
 import Header from './components/Header';
 // import aws_exports from './aws-exports';
 
-const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
-  apiUrl: 'https://react-dashboard-demo.cubecloudapp.dev/cubejs-api/v1'
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MDY1OTA0NjEsImV4cCI6MTkyMjE2NjQ2MX0.DdY7GaiHsQWyTH_xkslHb17Cbc3yLFfMFwoEpx89JiA'
+
+const cubejsApi = cubejs(token, {
+  apiUrl: 'https://aquamarine-galliform.aws-us-east-2.cubecloudapp.dev/cubejs-api/v1'
 });
 
 // Amplify.configure(aws_exports);

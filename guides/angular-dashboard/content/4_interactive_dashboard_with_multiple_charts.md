@@ -41,7 +41,7 @@ export class DashboardPageComponent implements OnInit {
 }
 ```
 
-And another one to the `dashobard-page.component.html` file:
+And another one to the `dashboard-page.component.html` file:
 
 ```diff
 <div class="grid-container">
