@@ -10,17 +10,8 @@ on:
 
 jobs:
 
-  deploy-angular-dashboard:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v2
-      - uses: ./.github/actions/deploy-example
-        with:
-          slug: angular-dashboard-with-material-ui
-
-  deploy-compare-date-range:
-    name: Deploy compare-date-range
+  deploy-angular-dashboard-with-material-ui:
+    name: Deploy angular-dashboard-with-material-ui
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -31,7 +22,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/compare-date-range/**'
+          paths: '.github/workflows/examples.yml,examples/angular-dashboard-with-material-ui/**'
 
       - name: Use Node.js 14.x
         if: steps.modified.outputs.modified
@@ -50,30 +41,55 @@ jobs:
       - name: Yarn install
         if: steps.modified.outputs.modified
         run: yarn install
-        working-directory: examples/compare-date-range
+        working-directory: examples/angular-dashboard-with-material-ui
 
       - name: Deploy to Cube Cloud
         if: steps.modified.outputs.modified
         run: cubejs deploy
-        working-directory: examples/compare-date-range
+        working-directory: examples/angular-dashboard-with-material-ui
         env:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
 
       - name: Yarn install
         if: steps.modified.outputs.modified
         run: yarn install
-        working-directory: examples/compare-date-range/dashboard-app
+        working-directory: examples/angular-dashboard-with-material-ui/dashboard-app
 
       - name: Yarn build
         if: steps.modified.outputs.modified
         run: yarn build
-        working-directory: examples/compare-date-range/dashboard-app
+        working-directory: examples/angular-dashboard-with-material-ui/dashboard-app
 
       - name: Deploy to Netlify
         if: steps.modified.outputs.modified
-        run: netlify deploy --dir=build --prod
-        working-directory: examples/compare-date-range/dashboard-app
+        run: netlify deploy --dir=dist/dashboard-app --prod
+        working-directory: examples/angular-dashboard-with-material-ui/dashboard-app
         env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deploy-compare-date-range:
+    name: Deploy compare-date-range
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,examples/compare-date-range/**'
+
+      - uses: actions/setup-node@v1
+        if: steps.modified.outputs.modified
+        with:
+          node-version: 14.x
+
+      - name: Run deploy script
+        if: steps.modified.outputs.modified
+        run: ./.github/actions/deploy-example.sh examples/compare-date-range
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   deploy-drill-downs:
