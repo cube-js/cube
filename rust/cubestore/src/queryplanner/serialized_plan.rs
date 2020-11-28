@@ -11,12 +11,13 @@ use itertools::Itertools;
 use futures::future::BoxFuture;
 use crate::CubeError;
 use futures::FutureExt;
+use std::collections::HashSet;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializedPlan {
     logical_plan: Arc<SerializedLogicalPlan>,
     schema_snapshot: Arc<SchemaSnapshot>,
-    partition_id_to_execute: Option<u64>
+    partition_ids_to_execute: HashSet<u64>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -255,20 +256,20 @@ impl SerializedPlan {
             schema_snapshot: Arc::new(SchemaSnapshot {
                 index_snapshots
             }),
-            partition_id_to_execute: None
+            partition_ids_to_execute: HashSet::new()
         })
     }
 
-    pub fn with_partition_id_to_execute(&self, partition_id_to_execute: u64) -> Self {
+    pub fn with_partition_id_to_execute(&self, partition_ids_to_execute: HashSet<u64>) -> Self {
         Self {
             logical_plan: self.logical_plan.clone(),
             schema_snapshot: self.schema_snapshot.clone(),
-            partition_id_to_execute: Some(partition_id_to_execute)
+            partition_ids_to_execute
         }
     }
 
-    pub fn partition_id_to_execute(&self) -> Option<u64> {
-        self.partition_id_to_execute.clone()
+    pub fn partition_ids_to_execute(&self) -> HashSet<u64> {
+        self.partition_ids_to_execute.clone()
     }
 
     pub fn logical_plan(&self) -> LogicalPlan {

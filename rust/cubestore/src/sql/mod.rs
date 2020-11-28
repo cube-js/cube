@@ -562,6 +562,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn join() {
+        Config::run_test("join", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.orders (customer_id text, amount int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.customers (id text, city text, state text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (customer_id, amount) VALUES ('a', 10), ('b', 2), ('b', 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT city, sum(amount) from foo.orders o JOIN foo.customers c ON o.customer_id = id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::Int(10)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("New York".to_string()), TableValue::Int(5)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn create_schema_if_not_exists() {
         Config::run_test("create_schema_if_not_exists", async move |services| {
             let service = services.sql_service;
