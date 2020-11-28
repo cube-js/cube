@@ -2,7 +2,7 @@ import { BrowserModule } from "@angular/platform-browser";
 import { BrowserAnimationsModule } from "@angular/platform-browser/animations";
 import { NgModule } from "@angular/core";
 import { CubejsClientModule } from "@cubejs-client/ngx";
-import { MatCardModule } from "@angular/material/Card";
+import { MatCardModule } from "@angular/material/card";
 
 import { AppComponent } from "./app.component";
 import { ChartsModule } from "ng2-charts";
