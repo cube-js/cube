@@ -78,14 +78,14 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/compare-date-range/**'
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/compare-date-range/**'
 
       - uses: actions/setup-node@v1
         if: steps.modified.outputs.modified
         with:
           node-version: 14.x
 
-      - name: Run deploy script
+      - name: Run deploy script 123
         if: steps.modified.outputs.modified
         run: ./.github/actions/deploy-example.sh examples/compare-date-range
         env:
