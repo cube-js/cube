@@ -1,73 +1,42 @@
-name: Examples
+name: Deploy Examples
 
 on:
   push:
     paths:
       - '.github/workflows/examples.yml'
+      - '.github/actions/deploy-example.sh'
       - 'examples/**'
     branches:
       - '**'
 
 jobs:
 
-  deploy-angular-dashboard-with-material-ui:
-    name: Deploy angular-dashboard-with-material-ui
+  angular-dashboard-with-material-ui:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/angular-dashboard-with-material-ui/**'
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/angular-dashboard-with-material-ui/**'
 
-      - name: Use Node.js 14.x
-        if: steps.modified.outputs.modified
+      - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
-      - name: Install Netlify CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g netlify-cli
-
-      - name: Install Cube.js CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g cubejs-cli
-
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/angular-dashboard-with-material-ui
-
-      - name: Deploy to Cube Cloud
-        if: steps.modified.outputs.modified
-        run: cubejs deploy
-        working-directory: examples/angular-dashboard-with-material-ui
+      - if: steps.modified.outputs.modified
+        run: ./.github/actions/deploy-example.sh
+          working-directory: examples/angular-dashboard-with-material-ui
         env:
+          FRONTEND_DEPLOY_SUBDIRECTORY: dist/dashboard-app
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
-
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/angular-dashboard-with-material-ui/dashboard-app
-
-      - name: Yarn build
-        if: steps.modified.outputs.modified
-        run: yarn build
-        working-directory: examples/angular-dashboard-with-material-ui/dashboard-app
-
-      - name: Deploy to Netlify
-        if: steps.modified.outputs.modified
-        run: netlify deploy --dir=dist/dashboard-app --prod
-        working-directory: examples/angular-dashboard-with-material-ui/dashboard-app
-        env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-compare-date-range:
+  compare-date-range:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -79,20 +48,19 @@ jobs:
         with:
           paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/compare-date-range/**'
 
-      - uses: actions/setup-node@v1
-        if: steps.modified.outputs.modified
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
-      - name: Run deploy script 123
-        if: steps.modified.outputs.modified
-        run: ./.github/actions/deploy-example.sh examples/compare-date-range
+      - if: steps.modified.outputs.modified
+        run: ./.github/actions/deploy-example.sh
+        working-directory: examples/compare-date-range
         env:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-drill-downs:
-    name: Deploy drill-downs
+  drill-downs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -148,8 +116,7 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-highcharts:
-    name: Deploy highcharts
+  highcharts:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -205,8 +172,7 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-react-dashboard:
-    name: Deploy react-dashboard
+  react-dashboard:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -262,8 +228,7 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-real-time-dashboard:
-    name: Deploy real-time-dashboard
+  real-time-dashboard:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -319,8 +284,7 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-web-analytics:
-    name: Deploy web-analytics
+  web-analytics:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
