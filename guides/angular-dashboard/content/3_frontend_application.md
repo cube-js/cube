@@ -252,7 +252,7 @@ So, now we have a folder with the `dashboard-page` component. Open `app.componen
 <app-dashboard-page></app-dashboard-page>
 ```
 
-Now it's time to open `dashboard-page/dashobard-page.component.html` and add our component like this:
+Now it's time to open `dashboard-page/dashboard-page.component.html` and add our component like this:
 
 ```diff
 <div class="grid-container">
