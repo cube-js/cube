@@ -30,7 +30,7 @@ jobs:
 
       - if: steps.modified.outputs.modified
         run: ./.github/actions/deploy-example.sh
-          working-directory: examples/angular-dashboard-with-material-ui
+        working-directory: examples/angular-dashboard-with-material-ui
         env:
           FRONTEND_DEPLOY_SUBDIRECTORY: dist/dashboard-app
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
