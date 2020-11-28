@@ -2,7 +2,7 @@ use arrow::datatypes::{SchemaRef, DataType};
 use std::sync::Arc;
 use datafusion::scalar::ScalarValue;
 use datafusion::physical_plan::{functions, aggregates};
-use datafusion::logical_plan::{Operator, LogicalPlan, TableSource, Expr};
+use datafusion::logical_plan::{Operator, LogicalPlan, TableSource, Expr, JoinType};
 use serde_derive::{Deserialize, Serialize};
 use crate::metastore::{Index, IdRow, Partition, Chunk, MetaStore};
 use crate::metastore::table::{TablePath, Table};
@@ -91,6 +91,13 @@ pub enum SerializedLogicalPlan {
         schema: SchemaRef,
         alias: Option<String>,
     },
+    Join {
+        left: Arc<SerializedLogicalPlan>,
+        right: Arc<SerializedLogicalPlan>,
+        on: Vec<(String, String)>,
+        join_type: JoinType,
+        schema: SchemaRef,
+    },
     TableScan {
         schema_name: String,
         source: SerializedTableSource,
@@ -100,6 +107,7 @@ pub enum SerializedLogicalPlan {
         alias: Option<String>,
     },
     EmptyRelation {
+        produce_one_row: bool,
         schema: SchemaRef,
     },
     Limit {
@@ -145,10 +153,17 @@ impl SerializedLogicalPlan {
                 projected_schema: projected_schema.clone(),
                 alias: alias.clone()
             },
-            SerializedLogicalPlan::EmptyRelation { schema } => LogicalPlan::EmptyRelation { schema: schema.clone() },
+            SerializedLogicalPlan::EmptyRelation { produce_one_row, schema } => LogicalPlan::EmptyRelation { produce_one_row: *produce_one_row, schema: schema.clone() },
             SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
                 n: *n,
                 input: Arc::new(input.logical_plan()),
+            },
+            SerializedLogicalPlan::Join { left, right, on, join_type, schema } => LogicalPlan::Join {
+                left: Arc::new(left.logical_plan()),
+                right: Arc::new(right.logical_plan()),
+                on: on.clone(),
+                join_type: join_type.clone(),
+                schema: schema.clone()
             }
         }
     }
@@ -165,10 +180,17 @@ pub enum SerializedExpr {
         op: Operator,
         right: Box<SerializedExpr>,
     },
-    Nested(Box<SerializedExpr>),
     Not(Box<SerializedExpr>),
     IsNotNull(Box<SerializedExpr>),
     IsNull(Box<SerializedExpr>),
+    Case {
+        /// Optional base expression that can be compared to literal values in the "when" expressions
+        expr: Option<Box<SerializedExpr>>,
+        /// One or more when/then expressions
+        when_then_expr: Vec<(Box<SerializedExpr>, Box<SerializedExpr>)>,
+        /// Optional "else" expression
+        else_expr: Option<Box<SerializedExpr>>,
+    },
     Cast {
         expr: Box<SerializedExpr>,
         data_type: DataType,
@@ -202,7 +224,6 @@ impl SerializedExpr {
                 op: op.clone(),
                 right: Box::new(right.expr())
             },
-            SerializedExpr::Nested(e) => Expr::Nested(Box::new(e.expr())),
             SerializedExpr::Not(e) => Expr::Not(Box::new(e.expr())),
             SerializedExpr::IsNotNull(e) => Expr::IsNotNull(Box::new(e.expr())),
             SerializedExpr::IsNull(e) => Expr::IsNull(Box::new(e.expr())),
@@ -210,6 +231,11 @@ impl SerializedExpr {
             SerializedExpr::Sort { expr, asc, nulls_first } => Expr::Sort { expr: Box::new(expr.expr()), asc: *asc, nulls_first: *nulls_first },
             SerializedExpr::ScalarFunction { fun, args } => Expr::ScalarFunction { fun: fun.clone(), args: args.iter().map(|e| e.expr()).collect() },
             SerializedExpr::AggregateFunction { fun, args, distinct } => Expr::AggregateFunction { fun: fun.clone(), args: args.iter().map(|e| e.expr()).collect(), distinct: *distinct },
+            SerializedExpr::Case { expr, else_expr, when_then_expr } => Expr::Case {
+                expr: expr.as_ref().map(|e| Box::new(e.expr())),
+                else_expr: else_expr.as_ref().map(|e| Box::new(e.expr())),
+                when_then_expr: when_then_expr.iter().map(|(w, t)| (Box::new(w.expr()), Box::new(t.expr()))).collect()
+            },
             SerializedExpr::Wildcard => Expr::Wildcard
         }
     }
@@ -347,6 +373,13 @@ impl SerializedPlan {
                 }
                 Ok(snapshots)
             }
+            LogicalPlan::Join { left, right, .. } => {
+                let mut snapshots = index_snapshots;
+                for i in vec![left, right].into_iter() {
+                    snapshots = Self::index_snapshots_from_plan_boxed(i.clone(), meta_store.clone(), snapshots).await?;
+                }
+                Ok(snapshots)
+            }
         }
     }
 
@@ -378,12 +411,15 @@ impl SerializedPlan {
                 }
                 snapshots
             }
+            LogicalPlan::Join { left, right, .. } => {
+                Self::is_data_select_query(left) || Self::is_data_select_query(right)
+            }
         }
     }
 
     fn serialized_logical_plan(plan: &LogicalPlan) -> SerializedLogicalPlan {
         match plan {
-            LogicalPlan::EmptyRelation { schema } => SerializedLogicalPlan::EmptyRelation { schema: schema.clone() },
+            LogicalPlan::EmptyRelation { produce_one_row, schema } => SerializedLogicalPlan::EmptyRelation { produce_one_row: *produce_one_row, schema: schema.clone() },
             LogicalPlan::InMemoryScan { .. } => unimplemented!(),
             LogicalPlan::CsvScan { .. } => unimplemented!(),
             LogicalPlan::ParquetScan { .. } => unimplemented!(),
@@ -430,6 +466,13 @@ impl SerializedPlan {
                 inputs: inputs.iter().map(|input| Arc::new(Self::serialized_logical_plan(&input))).collect::<Vec<_>>(),
                 schema: schema.clone(),
                 alias: alias.clone()
+            },
+            LogicalPlan::Join { left, right, on, join_type, schema } => SerializedLogicalPlan::Join {
+                left: Arc::new(Self::serialized_logical_plan(&left)),
+                right: Arc::new(Self::serialized_logical_plan(&right)),
+                on: on.clone(),
+                join_type: join_type.clone(),
+                schema: schema.clone(),
             }
         }
     }
@@ -445,7 +488,6 @@ impl SerializedPlan {
                 op: op.clone(),
                 right: Box::new(Self::serialized_expr(right)),
             },
-            Expr::Nested(e) => SerializedExpr::Nested(Box::new(Self::serialized_expr(&e))),
             Expr::Not(e) => SerializedExpr::Not(Box::new(Self::serialized_expr(&e))),
             Expr::IsNotNull(e) => SerializedExpr::IsNotNull(Box::new(Self::serialized_expr(&e))),
             Expr::IsNull(e) => SerializedExpr::IsNull(Box::new(Self::serialized_expr(&e))),
@@ -455,6 +497,11 @@ impl SerializedPlan {
             Expr::ScalarUDF { .. } => unimplemented!(),
             Expr::AggregateFunction { fun, args, distinct } => SerializedExpr::AggregateFunction { fun: fun.clone(), args: args.iter().map(|e| Self::serialized_expr(&e)).collect(), distinct: *distinct },
             Expr::AggregateUDF { .. } => unimplemented!(),
+            Expr::Case { expr, when_then_expr, else_expr } => SerializedExpr::Case {
+                expr: expr.as_ref().map(|e| Box::new(Self::serialized_expr(&e))),
+                else_expr: else_expr.as_ref().map(|e| Box::new(Self::serialized_expr(&e))),
+                when_then_expr: when_then_expr.iter().map(|(w, t)| (Box::new(Self::serialized_expr(&w)), Box::new(Self::serialized_expr(&t)))).collect()
+            },
             Expr::Wildcard => SerializedExpr::Wildcard
         }
     }

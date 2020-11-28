@@ -241,7 +241,7 @@ impl QueryExecutorImpl {
             ));
             Ok(execution_plan.with_new_children(vec![Arc::new(MergeExec::new(cluster_exec))])?)
         } else {
-            Ok(execution_plan.with_new_children(vec![Arc::new(EmptyExec::new(children[0].schema()))])?)
+            Ok(execution_plan.with_new_children(vec![Arc::new(EmptyExec::new(false, children[0].schema()))])?)
         }
     }
 
@@ -326,7 +326,7 @@ impl CubeTable {
         }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(EmptyExec::new(self.schema.clone())));
+            partition_execs.push(Arc::new(EmptyExec::new(false, self.schema.clone())));
         }
 
         let plan = Arc::new(MergeExec::new(Arc::new(
