@@ -1,6 +1,5 @@
 use procspawn::JoinHandle;
 use deadqueue::unlimited;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 use tokio::sync::oneshot::Sender;
@@ -11,9 +10,12 @@ use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcSender, IpcReceiver};
 use log::{error};
 use std::time::Duration;
+use std::panic;
+use std::fmt::Debug;
+use serde::{Serialize};
 
 pub struct WorkerPool<
-    T: Serialize + DeserializeOwned + Sync + Send + 'static,
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static
 > {
@@ -25,7 +27,7 @@ pub struct WorkerPool<
 }
 
 pub struct Message<
-    T: Serialize + DeserializeOwned + Sync + Send + 'static,
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static
 > {
     message: T,
@@ -33,14 +35,14 @@ pub struct Message<
 }
 
 pub trait MessageProcessor<
-    T: Serialize + DeserializeOwned + Sync + Send + 'static,
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static
 > {
     fn process(args: T) -> Result<R, CubeError>;
 }
 
 impl<
-    T: Serialize + DeserializeOwned + Sync + Send + 'static,
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static
 > WorkerPool<T, R, P> {
@@ -88,7 +90,7 @@ impl<
 }
 
 pub struct WorkerProcess<
-    T: Serialize + DeserializeOwned + Sync + Send + 'static,
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static
 > {
@@ -100,7 +102,7 @@ pub struct WorkerProcess<
 }
 
 impl<
-    T: Serialize + DeserializeOwned + Sync + Send + 'static,
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static
 > WorkerProcess<T, R, P> {
@@ -191,9 +193,20 @@ impl<
         let (args_tx, args_rx) = ipc::channel()?;
         let (res_tx, res_rx) = ipc::channel()?;
         let handle = procspawn::spawn((args_rx, res_tx), |(rx, tx)| {
-            while let Ok(args) = rx.recv() {
-                if tx.send(P::process(args)).is_err() {
-                    return;
+            loop {
+                let res = rx.recv();
+                match res {
+                    Ok(args) => {
+                        let send_res = tx.send(P::process(args));
+                        if let Err(e) = send_res {
+                            error!("Worker message send error: {:?}", e);
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Worker message receive error: {:?}", e);
+                        return;
+                    }
                 }
             }
         });
@@ -206,11 +219,14 @@ impl<
 mod tests {
     use std::thread;
     use std::time::Duration;
-    use serde_derive::{Deserialize, Serialize};
 
     use procspawn::{self};
     use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
     use crate::CubeError;
+    use crate::queryplanner::serialized_plan::{SerializedLogicalPlan};
+    use arrow::datatypes::{Schema, Field, DataType};
+    use std::sync::Arc;
+    use serde::{Serialize, Deserialize};
 
     procspawn::enable_test_support!();
 
@@ -274,5 +290,19 @@ mod tests {
             }
         }
         pool.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn serialize_plan() {
+        let schema = Schema::new(vec![
+            Field::new("c1", DataType::Int64, false),
+            Field::new("c2", DataType::Utf8, false),
+        ]);
+        let plan = SerializedLogicalPlan::EmptyRelation {
+            produce_one_row: false,
+            schema: Arc::new(schema)
+        };
+        let bytes = bincode::serialize(&plan).unwrap();
+        bincode::deserialize::<SerializedLogicalPlan>(bytes.as_slice()).unwrap();
     }
 }
