@@ -20,7 +20,9 @@ export default (oldState, newState) => {
       }
 
       if (
+        // eslint-disable-next-line no-mixed-operators
         (oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0
+        // eslint-disable-next-line no-mixed-operators
         || (
           (oldQuery.measures || []).length === 1
           && (newQuery.measures || []).length === 1
