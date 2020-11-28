@@ -67,6 +67,63 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
+  deploy-compare-date-range:
+    name: Deploy compare-date-range
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,examples/compare-date-range/**'
+
+      - name: Use Node.js 14.x
+        if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Install Netlify CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g netlify-cli
+
+      - name: Install Cube.js CLI
+        if: steps.modified.outputs.modified
+        run: npm install -g cubejs-cli
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/compare-date-range
+
+      - name: Deploy to Cube Cloud
+        if: steps.modified.outputs.modified
+        run: cubejs deploy
+        working-directory: examples/compare-date-range
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+
+      - name: Yarn install
+        if: steps.modified.outputs.modified
+        run: yarn install
+        working-directory: examples/compare-date-range/dashboard-app
+
+      - name: Yarn build
+        if: steps.modified.outputs.modified
+        run: yarn build
+        working-directory: examples/compare-date-range/dashboard-app
+
+      - name: Deploy to Netlify
+        if: steps.modified.outputs.modified
+        run: netlify deploy --dir=build --prod
+        working-directory: examples/compare-date-range/dashboard-app
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
   deploy-drill-downs:
     name: Deploy drill-downs
     runs-on: ubuntu-latest
