@@ -40,7 +40,7 @@ export default () => {
           stack: 'common',
         },
       ];
-      result.tablePivot().map((item) => {
+      result.tablePivot().forEach((item) => {
         temp[0].data.push(parseFloat(item['AllSales.onlineRevenuePercentage']));
         temp[1].data.push(
           parseFloat(item['AllSales.offlineRevenuePercentage'])
