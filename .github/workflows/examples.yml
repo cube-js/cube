@@ -1,4 +1,4 @@
-name: Deploy Examples
+name: Examples
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
 
-  angular-dashboard-with-material-ui:
+  angular-dashboard:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -29,7 +29,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: ./.github/actions/deploy-example.sh
+        run: ../../.github/actions/deploy-example.sh
         working-directory: examples/angular-dashboard-with-material-ui
         env:
           FRONTEND_DEPLOY_SUBDIRECTORY: dist/dashboard-app
@@ -54,7 +54,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: ./.github/actions/deploy-example.sh
+        run: ../../.github/actions/deploy-example.sh
         working-directory: examples/compare-date-range
         env:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
