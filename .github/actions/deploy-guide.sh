@@ -8,7 +8,7 @@ npm config set loglevel error
 # Required environment variable
 GUIDE_SLUG=${GUIDE_SLUG}
 
-GUIDE_DIRECTORY=guides/
+GUIDE_DIRECTORY=guides/${GUIDE_SLUG}
 
 cd guides/guides-base
 yarn install
