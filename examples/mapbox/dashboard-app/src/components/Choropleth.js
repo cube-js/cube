@@ -60,7 +60,7 @@ export default () => {
     resultSet
       .tablePivot()
       .filter((item) => item['MapboxCoords.coordinates'] != null)
-      .map((item) => {
+      .forEach((item) => {
         data['features'].push({
           type: 'Feature',
           properties: {

@@ -2,7 +2,7 @@ import { useCubeQuery } from '@cubejs-client/react'
 import React, { useState, useEffect } from 'react'
 import moment from 'moment'
 import Chart from './index'
-import { formatNumber, getMedian, withFilters } from '../util'
+import { getMedian, withFilters } from '../util'
 
 export default function PrsChart({ filters }) {
   const queries = withFilters(filters, {
