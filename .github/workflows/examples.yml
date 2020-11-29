@@ -167,7 +167,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/external-rollupsd/**'
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/external-rollups/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
