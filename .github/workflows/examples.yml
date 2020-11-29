@@ -371,6 +371,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: vue-query-builder
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
@@ -395,6 +396,5 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: web-analytics
-          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
