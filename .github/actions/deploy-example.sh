@@ -18,11 +18,7 @@ yarn install
 npm install -g cubejs-cli
 cubejs deploy
 
-echo "==="
-echo "$EXAMPLE_FRONTEND_SKIP"
-echo "==="
-
-if [ "$EXAMPLE_FRONTEND_SKIP" -ne 0 ]
+if [ "$EXAMPLE_FRONTEND_SKIP" -eq 0 ]
 then
   cd "$EXAMPLE_FRONTEND_SUBDIRECTORY"
   yarn install
