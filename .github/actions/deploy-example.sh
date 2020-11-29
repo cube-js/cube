@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo 123
+
 # Exit on first error
 set -e
 
