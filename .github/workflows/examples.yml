@@ -153,7 +153,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: ecom-backend
-          EXAMPLE_FRONTEND_SKIP: true
+          EXAMPLE_FRONTEND_SKIP: 1
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
