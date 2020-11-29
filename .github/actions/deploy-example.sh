@@ -1,7 +1,5 @@
 #!/bin/sh
 
-echo 123
-
 # Exit on first error
 set -e
 
@@ -20,7 +18,7 @@ yarn install
 npm install -g cubejs-cli
 cubejs deploy
 
-if ![[ $EXAMPLE_FRONTEND_SKIP ]]]; then
+if [[ ! $EXAMPLE_FRONTEND_SKIP ]]]; then
   cd $EXAMPLE_FRONTEND_SUBDIRECTORY
   yarn install
   yarn build
