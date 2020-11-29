@@ -18,8 +18,10 @@ yarn install
 npm install -g cubejs-cli
 cubejs deploy
 
-cd $EXAMPLE_FRONTEND_SUBDIRECTORY
-yarn install
-yarn build
-npm install -g netlify-cli
-netlify deploy --dir=$EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY --prod
+if ![[ $EXAMPLE_FRONTEND_SKIP ]]]; then
+  cd $EXAMPLE_FRONTEND_SUBDIRECTORY
+  yarn install
+  yarn build
+  npm install -g netlify-cli
+  netlify deploy --dir=$EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY --prod
+fi
