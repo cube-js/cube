@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useCubeQuery } from "@cubejs-client/react";
 import MapGL, { Source, Layer, Popup, NavigationControl } from 'react-map-gl';
 import { Radio, Spin } from "antd";
@@ -62,7 +62,7 @@ export default () => {
 
 
   if (questionsSet) {
-    questionsSet.tablePivot().map((item) => {
+    questionsSet.tablePivot().forEach((item) => {
       dataQuestions['features'].push({
         type: 'Feature',
         properties: {
@@ -76,7 +76,7 @@ export default () => {
   }
 
   if (answersSet) {
-    answersSet.tablePivot().map((item) => {
+    answersSet.tablePivot().forEach((item) => {
       dataAnswers['features'].push({
         type: 'Feature',
         geometry: JSON.parse(item['Users.geometry']),
@@ -124,7 +124,7 @@ export default () => {
     setSelectedPoint(null);
     if (typeof event.features != 'undefined') {
       const feature = event.features.find(
-        (f) => f.layer.id == 'questions-point'
+        (f) => f.layer.id === 'questions-point'
       );
       if (feature) {
         setSelectedPoint(feature.properties.geometry);
@@ -161,7 +161,7 @@ export default () => {
           <Layer {...{
             id: 'answers-point',
             type: 'circle',
-            filter: (mode != 'qu') ? ['!', ['has', ' ']] : ['has', ['get', 'id']],
+            filter: (mode !== 'qu') ? ['!', ['has', ' ']] : ['has', ['get', 'id']],
             paint: {
               'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 8],
               'circle-stroke-width': 0,
@@ -174,7 +174,7 @@ export default () => {
           <Layer {...{
             id: 'questions-point',
             type: 'circle',
-            filter: (mode != 'ans') ? ['!', ['has', ' ']] : ['has', ['get', 'id']],
+            filter: (mode !== 'ans') ? ['!', ['has', ' ']] : ['has', ['get', 'id']],
             paint: {
               'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 15],
               'circle-stroke-width': 0,
