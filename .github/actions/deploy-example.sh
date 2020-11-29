@@ -3,7 +3,7 @@
 FRONTEND_SUBDIRECTORY=${FRONTEND_SUBDIRECTORY:-dashboard-app}
 FRONTEND_DEPLOY_SUBDIRECTORY=${FRONTEND_DEPLOY_SUBDIRECTORY:-build}
 
-npm config set loglevel warn
+npm config set loglevel error
 
 yarn install
 npm install -g cubejs-cli
