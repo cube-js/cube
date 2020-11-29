@@ -1,5 +1,4 @@
 import React from "react";
-import logo from "./logo.svg";
 import "./App.css";
 import {
   Row,
@@ -8,9 +7,7 @@ import {
   Layout,
   Spin,
   Statistic,
-  Table,
   DatePicker,
-  Checkbox,
   Radio,
   Switch,
   Menu,
