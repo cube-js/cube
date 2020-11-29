@@ -89,7 +89,7 @@ export default () => {
   };
 
   if (resultSet) {
-    resultSet.tablePivot().map((item) => {
+    resultSet.tablePivot().forEach((item) => {
       data['features'].push({
         type: 'Feature',
         properties: {
@@ -101,7 +101,7 @@ export default () => {
   }
 
   const renderButtons = sample.map((item, i) => (
-    <Button key={i} className={colorState == i ? 'mapbox__sample__button mapbox__sample__button--active' : 'mapbox__sample__button'} onClick={() => { setColorState(i) }}>
+    <Button key={i} className={colorState === i ? 'mapbox__sample__button mapbox__sample__button--active' : 'mapbox__sample__button'} onClick={() => { setColorState(i) }}>
       <span style={{ background: `linear-gradient(90deg, ${item[3]['color']} 0%, ${item[2]['color']} 50%,${item[1]['color']} 100%)` }}></span>
     </Button>
   ));

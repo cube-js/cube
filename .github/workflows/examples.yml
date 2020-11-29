@@ -4,293 +4,397 @@ on:
   push:
     paths:
       - '.github/workflows/examples.yml'
+      - '.github/actions/deploy-example.sh'
       - 'examples/**'
     branches:
       - master
 
 jobs:
 
-  deploy-drill-downs:
-    name: Deploy drill-downs
+  angular-dashboard:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/drill-downs/**'
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/angular-dashboard-with-material-ui/**'
 
-      - name: Use Node.js 14.x
-        if: steps.modified.outputs.modified
+      - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
 
-      - name: Install Netlify CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g netlify-cli
-
-      - name: Install Cube.js CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g cubejs-cli
-
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/drill-downs
-
-      - name: Deploy to Cube Cloud
-        if: steps.modified.outputs.modified
-        run: cubejs deploy
-        working-directory: examples/drill-downs
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
         env:
+          EXAMPLE_SLUG: angular-dashboard-with-material-ui
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/dashboard-app
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
-
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/drill-downs/dashboard-app
-
-      - name: Yarn build
-        if: steps.modified.outputs.modified
-        run: yarn build
-        working-directory: examples/drill-downs/dashboard-app
-
-      - name: Deploy to Netlify
-        if: steps.modified.outputs.modified
-        run: netlify deploy --dir=build --prod
-        working-directory: examples/drill-downs/dashboard-app
-        env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-highcharts:
-    name: Deploy highcharts
+  compare-date-range:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/highcharts/**'
-        
-      - name: Use Node.js 14.x
-        if: steps.modified.outputs.modified
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/compare-date-range/**'
+
+      - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
-          
-      - name: Install Netlify CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g netlify-cli
-        
-      - name: Install Cube.js CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g cubejs-cli
-        
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/highcharts
-        
-      - name: Deploy to Cube Cloud
-        if: steps.modified.outputs.modified
-        run: cubejs deploy
-        working-directory: examples/highcharts
-        env:
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
-          
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/highcharts/dashboard-app
 
-      - name: Yarn build
-        if: steps.modified.outputs.modified
-        run: yarn build
-        working-directory: examples/highcharts/dashboard-app
-        
-      - name: Deploy to Netlify
-        if: steps.modified.outputs.modified
-        run: netlify deploy --dir=build --prod
-        working-directory: examples/highcharts/dashboard-app
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
         env:
+          EXAMPLE_SLUG: compare-date-range
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-react-dashboard:
-    name: Deploy react-dashboard
+  d3-dashboard:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/react-dashboard/**'
-        
-      - name: Use Node.js 14.x
-        if: steps.modified.outputs.modified
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/d3-dashboard/**'
+
+      - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
-          
-      - name: Install Netlify CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g netlify-cli
-        
-      - name: Install Cube.js CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g cubejs-cli
-        
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/react-dashboard
-        
-      - name: Deploy to Cube Cloud
-        if: steps.modified.outputs.modified
-        run: cubejs deploy
-        working-directory: examples/react-dashboard
-        env:
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
-          
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/react-dashboard/dashboard-app
 
-      - name: Yarn build
-        if: steps.modified.outputs.modified
-        run: yarn build
-        working-directory: examples/react-dashboard/dashboard-app
-        
-      - name: Deploy to Netlify
-        if: steps.modified.outputs.modified
-        run: netlify deploy --dir=build --prod
-        working-directory: examples/react-dashboard/dashboard-app
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
         env:
+          EXAMPLE_SLUG: d3-dashboard
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-real-time-dashboard:
-    name: Deploy real-time-dashboard
+  data-blending:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/real-time-dashboard/**'
-        
-      - name: Use Node.js 14.x
-        if: steps.modified.outputs.modified
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/data-blending/**'
+
+      - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
-          
-      - name: Install Netlify CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g netlify-cli
-        
-      - name: Install Cube.js CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g cubejs-cli
-        
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/real-time-dashboard
-        
-      - name: Deploy to Cube Cloud
-        if: steps.modified.outputs.modified
-        run: cubejs deploy
-        working-directory: examples/real-time-dashboard
-        env:
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
-          
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/real-time-dashboard/dashboard-app
 
-      - name: Yarn build
-        if: steps.modified.outputs.modified
-        run: yarn build
-        working-directory: examples/real-time-dashboard/dashboard-app
-        
-      - name: Deploy to Netlify
-        if: steps.modified.outputs.modified
-        run: netlify deploy --dir=build --prod
-        working-directory: examples/real-time-dashboard/dashboard-app
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
         env:
+          EXAMPLE_SLUG: data-blending
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  deploy-web-analytics:
-    name: Deploy web-analytics
+  drill-downs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,examples/web-analytics/**'
-        
-      - name: Use Node.js 14.x
-        if: steps.modified.outputs.modified
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/drill-downs/**'
+
+      - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
-          
-      - name: Install Netlify CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g netlify-cli
-        
-      - name: Install Cube.js CLI
-        if: steps.modified.outputs.modified
-        run: npm install -g cubejs-cli
-        
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/web-analytics
-        
-      - name: Deploy to Cube Cloud
-        if: steps.modified.outputs.modified
-        run: cubejs deploy
-        working-directory: examples/web-analytics
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
         env:
+          EXAMPLE_SLUG: drill-downs
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
-          
-      - name: Yarn install
-        if: steps.modified.outputs.modified
-        run: yarn install
-        working-directory: examples/web-analytics/dashboard-app
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-      - name: Yarn build
-        if: steps.modified.outputs.modified
-        run: yarn build
-        working-directory: examples/web-analytics/dashboard-app
+  ecom-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
-      - name: Deploy to Netlify
-        if: steps.modified.outputs.modified
-        run: netlify deploy --dir=build --prod
-        working-directory: examples/web-analytics/dashboard-app
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/ecom-backend/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
         env:
+          EXAMPLE_SLUG: ecom-backend
+          EXAMPLE_FRONTEND_SKIP: 1
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  external-rollups:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/external-rollups/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: external-rollups
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  hacktoberfest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/hacktoberfest/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: hacktoberfest
+          EXAMPLE_FRONTEND_SUBDIRECTORY: dashboard
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  highcharts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/highcharts/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: highcharts
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  mapbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/mapbox/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: mapbox
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  material-ui-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/material-ui-dashboard/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: material-ui-dashboard
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  react-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/react-dashboard/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: react-dashboard
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  react-data-table:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/react-data-table/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: react-data-table
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  real-time-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/real-time-dashboard/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: real-time-dashboard
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  vue-query-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/vue-query-builder/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: vue-query-builder
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  web-analytics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/web-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: web-analytics
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}

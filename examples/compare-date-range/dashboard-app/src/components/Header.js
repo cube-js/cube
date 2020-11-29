@@ -7,7 +7,7 @@ const Header = () => (
   <Layout.Header className='example__header'>
     <div className='examples__nav'>
       <div className='examples__title'>
-        <a href='//cube.dev' target='_blank'>
+        <a href='//cube.dev' target='_blank' rel='noopener noreferrer'>
           <img src={logo} alt='Cube.js' />
         </a>
         <h1>compareDateRange example</h1>
