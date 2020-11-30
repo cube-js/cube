@@ -15,13 +15,13 @@
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "scripts": {
+    "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
     "integration": "mocha dist/test/*.js",
     "integration:druid": "mocha dist/test/*.js",
-    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts",
-    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts",
-    "build": "rm -rf dist && npm run tsc"
+    "lint": "linter src/* --ext .ts",
+    "lint:fix": "linter --fix src/* --ext .ts"
   },
   "files": [
     "README.md",
