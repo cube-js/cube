@@ -15,6 +15,7 @@ WORKDIR /cubejs
 COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
+COPY tsconfig.base.json .
 COPY packages/cubejs-linter packages/cubejs-linter
 
 # There is a problem with release process.
