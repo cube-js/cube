@@ -1,5 +1,6 @@
 **
 !package.json
+!tsconfig.base.json
 !yarn.lock
 !lerna.json
 !packages/

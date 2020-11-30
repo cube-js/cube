@@ -27,7 +27,7 @@ class PrestoDriver extends BaseDriver {
   }
 
   testConnection() {
-    const query = SqlString.format(`show catalogs like ?`, [`%${this.catalog}%`]);
+    const query = SqlString.format('show catalogs like ?', [`%${this.catalog}%`]);
 
     return this.queryPromised(query)
       .then(catalogs => {
