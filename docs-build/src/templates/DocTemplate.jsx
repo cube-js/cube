@@ -88,6 +88,12 @@ class DocTemplate extends Component {
     rawNodes.forEach(item => {
       let linkedHTag;
 
+      // This skips over any inline-comments in the Markdown source, such as
+      // `<!-- prettier-ignore-start -->`
+      if (!item) {
+        return;
+      }
+
       if (item.type === 'p' && item.props.children.length === 1 && item.props.children[0].type === 'a') {
         item = <div
           id={`${item.key}:block-link`}
