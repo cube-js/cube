@@ -7,7 +7,7 @@ on:
       - '.github/actions/deploy-example.sh'
       - 'examples/**'
     branches:
-      - '**'
+      - master
 
 jobs:
 
