@@ -1,0 +1,7 @@
+help-wanted:
+    comment: |
+        If you are interested in working on this issue, please leave a comment below and we will be happy to assign the issue to you.
+        If this is the first time you are contributing a Pull Request to Cube.js, please check our [contribution guidelines](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md).
+        You can also post any questions while contributing in the #contributors channel in the [Cube.js Slack](https://slack.cube.dev/).
+    labels:
+        - "help wanted"
