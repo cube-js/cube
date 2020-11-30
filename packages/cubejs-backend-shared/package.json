@@ -7,8 +7,8 @@
   "scripts": {
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts",
-    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts",
+    "lint": "linter src/* --ext .ts",
+    "lint:fix": "linter --fix src/* --ext .ts",
     "build": "rm -rf dist && npm run tsc"
   },
   "files": [

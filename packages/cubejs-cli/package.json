@@ -20,8 +20,8 @@
     "build": "tsc",
     "test": "npm run unit",
     "unit": "jest dist",
-    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts,.js",
-    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts,.js"
+    "lint": "linter src/* --ext .ts,.js",
+    "lint:fix": "linter --fix src/* --ext .ts,.js"
   },
   "files": [
     "dist",
