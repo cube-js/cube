@@ -1,30 +1,29 @@
-
 export interface QueryFilter {
   member: string;
   operator:
-    | "equals"
-    | "notEquals"
-    | "contains"
-    | "notContains"
-    | "gt"
-    | "gte"
-    | "lt"
-    | "lte"
-    | "set"
-    | "notSet"
-    | "inDateRange"
-    | "notInDateRange"
-    | "beforeDate"
-    | "afterDate";
+    | 'equals'
+    | 'notEquals'
+    | 'contains'
+    | 'notContains'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'set'
+    | 'notSet'
+    | 'inDateRange'
+    | 'notInDateRange'
+    | 'beforeDate'
+    | 'afterDate';
   values?: string[];
 }
 
 export type QueryTimeDimensionGranularity =
-  | "hour"
-  | "day"
-  | "week"
-  | "month"
-  | "year";
+  | 'hour'
+  | 'day'
+  | 'week'
+  | 'month'
+  | 'year';
 
 export interface QueryTimeDimension {
   dimension: string;
@@ -40,7 +39,7 @@ export interface Query {
   segments?: string[];
   limit?: number;
   offset?: number;
-  order?: "asc" | "desc";
+  order?: 'asc' | 'desc';
   timezone?: string;
   renewQuery?: boolean;
   ungrouped?: boolean;
@@ -54,4 +53,3 @@ export interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: number;
 }
-

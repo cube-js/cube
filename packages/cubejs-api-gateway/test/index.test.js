@@ -1,8 +1,8 @@
 /* globals describe,test,expect,jest */
+import express from 'express';
+import request from 'supertest';
 
-const request = require('supertest');
-const express = require('express');
-const ApiGateway = require('../src');
+import { ApiGateway } from '../src';
 
 const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
@@ -48,14 +48,14 @@ const adapterApi = jest.fn().mockImplementation(() => ({
 }));
 const logger = (type, message) => console.log({ type, ...message });
 
-describe(`API Gateway`, () => {
+describe('API Gateway', () => {
   process.env.NODE_ENV = 'production';
   const apiGateway = new ApiGateway('secret', compilerApi, adapterApi, logger);
   process.env.NODE_ENV = null;
   const app = express();
   apiGateway.initApp(app);
 
-  test(`working token`, async () => {
+  test('working token', async () => {
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
       .set('Authorization', 'foo')
@@ -63,12 +63,12 @@ describe(`API Gateway`, () => {
     expect(res.body && res.body.error).toStrictEqual('Invalid token');
   });
 
-  test(`requires auth`, async () => {
+  test('requires auth', async () => {
     const res = await request(app).get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}').expect(403);
-    expect(res.body && res.body.error).toStrictEqual("Authorization header isn't set");
+    expect(res.body && res.body.error).toStrictEqual('Authorization header isn\'t set');
   });
 
-  test(`passes correct token`, async () => {
+  test('passes correct token', async () => {
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={}')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
@@ -78,7 +78,7 @@ describe(`API Gateway`, () => {
     );
   });
 
-  test(`null filter values`, async () => {
+  test('null filter values', async () => {
     const res = await request(app)
       .get(
         '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
@@ -89,7 +89,7 @@ describe(`API Gateway`, () => {
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
   });
 
-  test(`date range padding`, async () => {
+  test('date range padding', async () => {
     const res = await request(app)
       .get(
         '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"timeDimensions":[{"dimension":"Foo.time","granularity":"hour","dateRange":["2020-01-01","2020-01-01"]}]}'
@@ -103,7 +103,7 @@ describe(`API Gateway`, () => {
     ]);
   });
 
-  test(`order support object format`, async () => {
+  test('order support object format', async () => {
     const query = {
       measures: ['Foo.bar'],
       order: {
@@ -118,7 +118,7 @@ describe(`API Gateway`, () => {
     expect(res.body.query.order).toStrictEqual([{ id: 'Foo.bar', desc: false }]);
   });
 
-  test(`order support array of tuples`, async () => {
+  test('order support array of tuples', async () => {
     const query = {
       measures: ['Foo.bar'],
       order: [
@@ -137,7 +137,7 @@ describe(`API Gateway`, () => {
     ]);
   });
 
-  test(`post http method for load route`, async () => {
+  test('post http method for load route', async () => {
     const query = {
       measures: ['Foo.bar'],
       order: [
@@ -146,7 +146,7 @@ describe(`API Gateway`, () => {
       ],
     };
     const res = await request(app)
-      .post(`/cubejs-api/v1/load`)
+      .post('/cubejs-api/v1/load')
       .set('Content-type', 'application/json')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .send({ query })

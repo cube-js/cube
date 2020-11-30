@@ -1,4 +1,4 @@
-module.exports = (req, res) => {
+export function requestParser(req, res) {
   const path = req.originalUrl || req.path || req.url;
   const httpHeader = req.header && req.header('x-forwarded-for');
   const ip = req.ip || httpHeader || req.connection.remoteAddress;
@@ -16,4 +16,4 @@ module.exports = (req, res) => {
   }
 
   return requestData;
-};
+}

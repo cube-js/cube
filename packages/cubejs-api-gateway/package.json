@@ -15,7 +15,7 @@
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "test": "npm run unit",
-    "unit": "jest",
+    "unit": "jest dist/test",
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "linter src/* test/* --ext .ts,.js",
@@ -42,7 +42,6 @@
     "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^25.2.3",
     "@types/jsonwebtoken": "^8.5.0",
-    "@types/moment": "^2.13.0",
     "@types/ramda": "^0.27.32",
     "@types/supertest": "^2.0.10",
     "express": "^4.17.1",

@@ -5,12 +5,12 @@ import moment from 'moment';
 import uuid from 'uuid/v4';
 import bodyParser from 'body-parser';
 
-const dateParser = require('./dateParser');
-const requestParser = require('./requestParser');
-const UserError = require('./UserError');
-const CubejsHandlerError = require('./CubejsHandlerError');
-const SubscriptionServer = require('./SubscriptionServer');
-const LocalSubscriptionStore = require('./LocalSubscriptionStore');
+import { dateParser } from './dateParser';
+import { requestParser } from './requestParser';
+import { UserError } from './UserError';
+import { CubejsHandlerError } from './CubejsHandlerError';
+import { SubscriptionServer } from './SubscriptionServer';
+import { LocalSubscriptionStore } from './LocalSubscriptionStore';
 
 const QUERY_TYPE = {
   REGULAR_QUERY: 'regularQuery',
@@ -300,9 +300,9 @@ const normalizeQuery = (query) => {
         member: member || dimension
       };
 
-      Object.defineProperty(normalizedFlter, "dimension", {
+      Object.defineProperty(normalizedFlter, 'dimension', {
         get() {
-          console.warn("Warning: Attribute `filter.dimension` is deprecated. Please use 'member' instead of 'dimension'.");
+          console.warn('Warning: Attribute `filter.dimension` is deprecated. Please use \'member\' instead of \'dimension\'.');
           return this.member;
         }
       });
@@ -352,7 +352,7 @@ export class ApiGateway {
     this.refreshScheduler = options.refreshScheduler;
     this.logger = logger;
     this.basePath = options.basePath || '/cubejs-api';
-    // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
     this.queryTransformer = options.queryTransformer || (async (query, context) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
@@ -709,7 +709,7 @@ export class ApiGateway {
 
   parseQueryParam(query) {
     if (!query || query === 'undefined') {
-      throw new UserError(`query param is required`);
+      throw new UserError('query param is required');
     }
     if (typeof query === 'string') {
       query = JSON.parse(query);
@@ -814,7 +814,7 @@ export class ApiGateway {
         }
       }
     } else if (this.enforceSecurityChecks) {
-      throw new UserError("Authorization header isn't set");
+      throw new UserError('Authorization header isn\'t set');
     }
   }
 
@@ -878,6 +878,7 @@ export class ApiGateway {
       ...R.clone(query),
       timeDimensions: query.timeDimensions.map((td, index) => {
         if (compareDateRangeTDIndex === index) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { compareDateRange, ...timeDimension } = td;
           return {
             ...timeDimension,
