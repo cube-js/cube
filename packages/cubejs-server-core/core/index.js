@@ -1,5 +1,5 @@
 /* eslint-disable global-require */
-const ApiGateway = require('@cubejs-backend/api-gateway');
+const { ApiGateway } = require('@cubejs-backend/api-gateway');
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');

@@ -1,4 +1,4 @@
-class LocalSubscriptionStore {
+export class LocalSubscriptionStore {
   constructor(options) {
     options = options || {};
     this.connections = {};
@@ -58,5 +58,3 @@ class LocalSubscriptionStore {
     return this.connections[connectionId];
   }
 }
-
-module.exports = LocalSubscriptionStore;

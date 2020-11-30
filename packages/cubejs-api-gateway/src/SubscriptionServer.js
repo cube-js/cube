@@ -1,5 +1,6 @@
-const uuid = require('uuid/v4');
-const UserError = require('./UserError');
+import uuid from 'uuid/v4';
+
+import { UserError } from './UserError';
 
 const methodParams = {
   load: ['query', 'queryType'],
@@ -9,7 +10,7 @@ const methodParams = {
   unsubscribe: []
 };
 
-class SubscriptionServer {
+export class SubscriptionServer {
   constructor(apiGateway, sendMessage, subscriptionStore) {
     this.apiGateway = apiGateway;
     this.sendMessage = sendMessage;
@@ -41,7 +42,7 @@ class SubscriptionServer {
       }
 
       if (!message.messageId) {
-        throw new UserError(`messageId is required`);
+        throw new UserError('messageId is required');
       }
 
       authContext = await this.subscriptionStore.getAuthContext(connectionId);
@@ -106,5 +107,3 @@ class SubscriptionServer {
     await this.subscriptionStore.cleanupSubscriptions(connectionId);
   }
 }
-
-module.exports = SubscriptionServer;

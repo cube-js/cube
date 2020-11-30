@@ -1,6 +1,7 @@
-const chrono = require('chrono-node');
-const moment = require('moment-timezone');
-const UserError = require('./UserError');
+import moment from 'moment-timezone';
+import chrono from 'chrono-node';
+
+import { UserError } from './UserError';
 
 const momentFromResult = (result, timezone) => {
   const dateMoment = moment().tz(timezone);
@@ -16,7 +17,7 @@ const momentFromResult = (result, timezone) => {
   return dateMoment;
 };
 
-module.exports = (dateString, timezone, now = new Date()) => {
+export function dateParser(dateString, timezone, now = new Date()) {
   let momentRange;
   dateString = dateString.toLowerCase();
 
@@ -45,7 +46,7 @@ module.exports = (dateString, timezone, now = new Date()) => {
       moment.tz(timezone).endOf('day').add(-1, 'day')
     ];
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
-    // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
     const [all, from, to] = dateString.match(/^from (.*) to (.*)$/);
 
     const current = moment(now).tz(timezone);
@@ -84,4 +85,4 @@ module.exports = (dateString, timezone, now = new Date()) => {
   }
 
   return momentRange.map(d => d.format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
-};
+}
