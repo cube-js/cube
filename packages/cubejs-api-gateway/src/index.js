@@ -1,9 +1,9 @@
-const jwt = require('jsonwebtoken');
-const R = require('ramda');
-const Joi = require('@hapi/joi');
-const moment = require('moment');
-const uuid = require('uuid/v4');
-const bodyParser = require('body-parser');
+import jwt from 'jsonwebtoken';
+import R from 'ramda';
+import Joi from '@hapi/joi';
+import moment from 'moment';
+import uuid from 'uuid/v4';
+import bodyParser from 'body-parser';
 
 const dateParser = require('./dateParser');
 const requestParser = require('./requestParser');
@@ -79,16 +79,16 @@ const getQueryGranularity = (queries) => R.pipe(
 
 const getPivotQuery = (queryType, queries) => {
   let [pivotQuery] = queries;
-  
+
   if (queryType === QUERY_TYPE.BLENDING_QUERY) {
     pivotQuery = R.fromPairs(
       ['measures', 'dimensions'].map(
         (key) => [key, R.uniq(queries.reduce((memo, q) => memo.concat(q[key]), []))]
       )
     );
-    
+
     const [granularity] = getQueryGranularity(queries);
-    
+
     pivotQuery.timeDimensions = [{
       dimension: 'time',
       granularity
@@ -96,9 +96,9 @@ const getPivotQuery = (queryType, queries) => {
   } else if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
     pivotQuery.dimensions = ['compareDateRange'].concat(pivotQuery.dimensions || []);
   }
-  
+
   pivotQuery.queryType = queryType;
-  
+
   return pivotQuery;
 };
 
@@ -144,9 +144,9 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
     R.unnest,
     R.fromPairs
   )(r);
-  
+
   const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
-  
+
   if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
     return {
       ...row,
@@ -158,7 +158,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
       [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
     };
   }
-  
+
   return row;
 }));
 
@@ -257,7 +257,7 @@ const checkQueryFilters = (filter) => {
     if (operators.indexOf(f.operator) === -1) {
       throw new UserError(`Operator ${f.operator} not supported for filter: ${JSON.stringify(f)}`);
     }
-      
+
     if (!f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
       throw new UserError(`Values required for filter: ${JSON.stringify(f)}`);
     }
@@ -282,7 +282,7 @@ const normalizeQuery = (query) => {
   }
 
   checkQueryFilters(query.filters || []);
-  
+
   const regularToTimeDimension = (query.dimensions || []).filter(d => d.split('.').length === 3).map(d => ({
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
@@ -311,9 +311,9 @@ const normalizeQuery = (query) => {
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
-      
+
       const compareDateRange = td.compareDateRange ? td.compareDateRange.map((currentDateRange) => (typeof currentDateRange === 'string' ? dateParser(currentDateRange, timezone) : currentDateRange)) : null;
-      
+
       if (typeof td.dateRange === 'string') {
         dateRange = dateParser(td.dateRange, timezone);
       } else {
@@ -343,7 +343,7 @@ const coerceForSqlQuery = (query, context) => ({
   requestId: context.requestId
 });
 
-class ApiGateway {
+export class ApiGateway {
   constructor(apiSecret, compilerApi, adapterApi, logger, options) {
     options = options || {};
     this.apiSecret = apiSecret;
@@ -465,11 +465,11 @@ class ApiGateway {
       });
     }
   }
-  
+
   async getNormalizedQueries(query, context) {
     query = this.parseQueryParam(query);
     let queryType = QUERY_TYPE.REGULAR_QUERY;
-    
+
     if (!Array.isArray(query)) {
       query = this.compareDateRangeTransformer(query);
       if (Array.isArray(query)) {
@@ -478,19 +478,19 @@ class ApiGateway {
     } else {
       queryType = QUERY_TYPE.BLENDING_QUERY;
     }
-    
+
     const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
       queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
     );
-    
+
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
-    
+
     if (queryType === QUERY_TYPE.BLENDING_QUERY) {
       const queryGranularity = getQueryGranularity(normalizedQueries);
-      
+
       if (queryGranularity.length > 1) {
         throw new UserError('Data blending query granularities must match');
       }
@@ -498,24 +498,24 @@ class ApiGateway {
         throw new UserError('Data blending query without granularity is not supported');
       }
     }
-    
+
     return [queryType, normalizedQueries];
   }
-  
+
   async sql({ query, context, res }) {
     const requestStarted = new Date();
-    
+
     try {
       query = this.parseQueryParam(query);
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
-      
+
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           coerceForSqlQuery(normalizedQuery, context),
           { includeDebugInfo: process.env.NODE_ENV !== 'production' }
         ))
       );
-      
+
       const toQuery = (sqlQuery) => ({
         ...sqlQuery,
         order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
@@ -530,13 +530,13 @@ class ApiGateway {
       });
     }
   }
-  
+
   async dryRun({ query, context, res }) {
     const requestStarted = new Date();
-    
+
     try {
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
-      
+
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           coerceForSqlQuery(normalizedQuery, context),
@@ -561,7 +561,7 @@ class ApiGateway {
 
   async load({ query, context, res, ...props }) {
     const requestStarted = new Date();
-    
+
     try {
       query = this.parseQueryParam(query);
       this.log(context, {
@@ -569,7 +569,7 @@ class ApiGateway {
         query
       });
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
-      
+
       const [metaConfigResult, ...sqlQueries] = await Promise.all(
         [
           this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
@@ -577,24 +577,24 @@ class ApiGateway {
           async (normalizedQuery, index) => {
             const loadRequestSQLStarted = new Date();
             const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
-            
+
             this.log(context, {
               type: 'Load Request SQL',
               duration: this.duration(loadRequestSQLStarted),
               query: normalizedQueries[index],
               sqlQuery
             });
-            
+
             return sqlQuery;
           }
         ))
       );
-      
+
       const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
         const sqlQuery = sqlQueries[index];
         const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
         const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
-        
+
         const toExecute = {
           ...sqlQuery,
           query: sqlQuery.sql[0],
@@ -603,18 +603,18 @@ class ApiGateway {
           renewQuery: normalizedQuery.renewQuery,
           requestId: context.requestId
         };
-        
+
         const response = await this.getAdapterApi({
           ...context,
           dataSource: sqlQuery.dataSource
         }).executeQuery(toExecute);
-  
+
         const flattenAnnotation = {
           ...annotation.measures,
           ...annotation.dimensions,
           ...annotation.timeDimensions
         };
-  
+
         return {
           query: normalizedQuery,
           data: transformData(
@@ -638,11 +638,11 @@ class ApiGateway {
         query,
         duration: this.duration(requestStarted)
       });
-      
+
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
       }
-      
+
       if (props.queryType === 'multi') {
         res({
           queryType,
@@ -858,22 +858,22 @@ class ApiGateway {
   compareDateRangeTransformer(query) {
     let queryCompareDateRange;
     let compareDateRangeTDIndex;
-    
+
     (query.timeDimensions || []).forEach((td, index) => {
       if (td.compareDateRange != null) {
         if (queryCompareDateRange != null) {
           throw new UserError('compareDateRange can only exist for one timeDimension');
         }
-        
+
         queryCompareDateRange = td.compareDateRange;
         compareDateRangeTDIndex = index;
       }
     });
-    
+
     if (queryCompareDateRange == null) {
       return query;
     }
-    
+
     return queryCompareDateRange.map((dateRange) => ({
       ...R.clone(query),
       timeDimensions: query.timeDimensions.map((td, index) => {
@@ -884,7 +884,7 @@ class ApiGateway {
             dateRange
           };
         }
-          
+
         return td;
       })
     }));
@@ -899,5 +899,3 @@ class ApiGateway {
     });
   }
 }
-
-module.exports = ApiGateway;

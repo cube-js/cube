@@ -2,7 +2,7 @@
 
 const request = require('supertest');
 const express = require('express');
-const ApiGateway = require('./index');
+const ApiGateway = require('../src');
 
 const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
