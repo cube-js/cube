@@ -22,7 +22,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.24.2",
-    "typescript": "^4.0.5"
+    "typescript": "~4.1.2"
   },
   "dependencies": {
     "env-var": "^6.3.0"
