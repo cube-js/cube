@@ -81,7 +81,12 @@ pub struct MySqlServer;
 
 impl MySqlServer {
     pub async fn listen(address: String, sql_service: Arc<dyn SqlService>) -> Result<(), CubeError> {
-        let mut listener = TcpListener::bind(address.clone()).await?;
+        let listener = TcpListener::bind(address.clone()).await;
+
+        let mut listener = match listener {
+            Ok(listener) => listener,
+            Err(error) => return Err(CubeError::internal(format!("Not able to bind MySQL port: {:?}", error)))
+        };
 
         info!("MySQL port open on {}", address);
 
