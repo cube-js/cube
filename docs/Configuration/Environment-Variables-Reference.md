@@ -6,8 +6,9 @@ subCategory: Reference
 menuOrder: 4
 ---
 
-Cube.js defines a number of environment variables that can be used to change behavior. Some of these variables can also
-be set via [configuration options][link-config].
+Cube.js defines a number of environment variables that can be used to change
+behavior. Some of these variables can also be set via [configuration
+options][link-config].
 
 [link-config]: /config
 
@@ -37,7 +38,8 @@ be set via [configuration options][link-config].
 
 ## Database Connection
 
-The following environment variables are used to provide credentials for Cube.js to connect to the databases. You can
+The following environment variables are used to provide credentials for Cube.js
+to connect to the databases. You can
 [learn more about connecting to the databases in this guide.](connecting-to-the-database)
 
 | Environment variable                            | Used With            | Description                                                                                                                                                                                       | Possible Values                                                  |
@@ -87,12 +89,18 @@ The following environment variables are used to provide credentials for Cube.js 
 | `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`                 | Snowflake            | The Snowflake warehouse to use when connecting to the database                                                                                                                                    | A valid Snowflake warehouse for the account                      |
 | `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE` | Snowflake            | If `true`, (keep the Snowflake connection alive indefinitely)[link-snowflake-connection-options]                                                                                                  | `true`, `false`                                                  |
 
-[link-aws-regions]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[link-aws-regions]:
+  https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
 [link-cubejs-databases]: /connecting-to-the-database
-[link-nodejs-tls-options]: https://nodejs.org/docs/latest-v12.x/api/tls.html#tls_tls_createsecurecontext_options
-[link-nodejs-tls-ciphers]: https://nodejs.org/docs/latest-v12.x/api/tls.html#tls_modifying_the_default_tls_cipher_suite
-[link-hive-cdh-versions]: https://docs.cloudera.com/documentation/enterprise/6/release-notes/topics/rg_cdh_6_download.html
+[link-nodejs-tls-options]:
+  https://nodejs.org/docs/latest-v12.x/api/tls.html#tls_tls_createsecurecontext_options
+[link-nodejs-tls-ciphers]:
+  https://nodejs.org/docs/latest-v12.x/api/tls.html#tls_modifying_the_default_tls_cipher_suite
+[link-hive-cdh-versions]:
+  https://docs.cloudera.com/documentation/enterprise/6/release-notes/topics/rg_cdh_6_download.html
 [link-hive-thrift-versions]: https://github.com/apache/thrift/releases
 [link-hive-versions]: https://hive.apache.org/downloads.html
-[link-snowflake-regions]: https://docs.snowflake.com/en/user-guide/intro-regions.html
-[link-snowflake-connection-options]: https://docs.snowflake.com/en/user-guide/nodejs-driver-use.html#additional-connection-options
+[link-snowflake-regions]:
+  https://docs.snowflake.com/en/user-guide/intro-regions.html
+[link-snowflake-connection-options]:
+  https://docs.snowflake.com/en/user-guide/nodejs-driver-use.html#additional-connection-options
