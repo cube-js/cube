@@ -587,6 +587,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn timestamp_select() {
+        Config::run_test("timestamp_select", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.timestamps (t timestamp)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.timestamps (t) VALUES ('2020-01-01T00:00:00.000Z'), ('2020-01-02T00:00:00.000Z'), ('2020-01-03T00:00:00.000Z')"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn create_schema_if_not_exists() {
         Config::run_test("create_schema_if_not_exists", async move |services| {
             let service = services.sql_service;
