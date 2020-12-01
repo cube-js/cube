@@ -1,6 +1,6 @@
 use sqlparser::dialect::Dialect;
 use sqlparser::ast::{ObjectName, Statement as SQLStatement};
-use sqlparser::parser::{Parser, ParserError};
+use sqlparser::parser::{Parser, ParserError, IsOptional};
 use sqlparser::tokenizer::{Tokenizer, Token};
 use sqlparser::dialect::keywords::Keyword;
 
@@ -28,6 +28,7 @@ impl Dialect for MySqlDialectWithBackTicks {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Statement(SQLStatement),
+    CreateTable { create_table: SQLStatement, indexes: Vec<SQLStatement> },
     CreateSchema { schema_name: ObjectName, if_not_exists: bool },
 }
 
@@ -81,27 +82,48 @@ impl CubeStoreParser {
             without_rowid,
             ..
         } = statement {
+            let mut indexes = Vec::new();
+
+            while self.parser.parse_keyword(Keyword::INDEX) {
+                indexes.push(self.parse_with_index(name.clone())?);
+            }
+
             let location = if self.parser.parse_keyword(Keyword::LOCATION) {
                 Some(self.parser.parse_literal_string()?)
             } else {
                 None
             };
 
-            Ok(Statement::Statement(SQLStatement::CreateTable {
-                name,
-                columns,
-                constraints,
-                with_options,
-                if_not_exists,
-                external: location.is_some(),
-                file_format,
-                location,
-                query,
-                without_rowid,
-            }))
+            Ok(Statement::CreateTable {
+                create_table: SQLStatement::CreateTable {
+                    name,
+                    columns,
+                    constraints,
+                    with_options,
+                    if_not_exists,
+                    external: location.is_some(),
+                    file_format,
+                    location,
+                    query,
+                    without_rowid,
+                },
+                indexes
+            })
         } else {
             Ok(Statement::Statement(statement))
         }
+    }
+
+    pub fn parse_with_index(&mut self, table_name: ObjectName) -> Result<SQLStatement, ParserError> {
+        let index_name = self.parser.parse_object_name()?;
+        let columns = self.parser.parse_parenthesized_column_list(IsOptional::Mandatory)?;
+        Ok(SQLStatement::CreateIndex {
+            name: index_name,
+            table_name,
+            columns,
+            unique: false,
+            if_not_exists: false,
+        })
     }
 
     fn parse_create_schema(&mut self) -> Result<Statement, ParserError> {

@@ -130,7 +130,7 @@ impl Cluster for ClusterImpl {
     async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError> {
         if self.server_name == node_name {
             // TODO timeout config
-            timeout(Duration::from_secs(60), self.run_local_select(plan_node)).await?
+            timeout(Duration::from_secs(600), self.run_local_select(plan_node)).await?
         } else {
             unimplemented!()
         }
@@ -191,7 +191,7 @@ impl JobRunner {
                 _ = self.notify.notified().fuse() => {
                     self.fetch_and_process().await
                 }
-                _ = time::delay_for(Duration::from_secs(60)) => {
+                _ = time::delay_for(Duration::from_secs(5)) => {
                     self.fetch_and_process().await
                 }
             };
@@ -322,7 +322,7 @@ impl ClusterImpl {
     pub async fn start_processing_loops(&self) {
         if self.config_obj.select_worker_pool_size() > 0 {
             let mut pool = self.select_process_pool.write().await;
-            *pool = Some(Arc::new(WorkerPool::new(self.config_obj.select_worker_pool_size(), Duration::from_secs(60))));
+            *pool = Some(Arc::new(WorkerPool::new(self.config_obj.select_worker_pool_size(), Duration::from_secs(600))));
         }
         for _ in 0..4 { // TODO number of job event loops
             let job_runner = JobRunner {
