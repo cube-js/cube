@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.3](https://github.com/cube-js/cube.js/compare/v0.24.2...v0.24.3) (2020-12-01)
+
+
+### Bug Fixes
+
+* **cubestore:** Merge join support: not implemented: Merge join is not supported for data type Timestamp(Microsecond, None) ([6e3ebfc](https://github.com/cube-js/cube.js/commit/6e3ebfc10c87b7ff23901949f1caa0a6021202e2))
+* **cubestore:** Unsupported data type Boolean. ([b286182](https://github.com/cube-js/cube.js/commit/b28618204b4e07507e5df0e822607900a3439ca4))
+
+
+### Features
+
+* **cubestore:** Hash join support ([8b1a5da](https://github.com/cube-js/cube.js/commit/8b1a5da50992fa784aa2da8bd0dd092162b5b853))
+* **cubestore:** Merge join support ([d08d8e3](https://github.com/cube-js/cube.js/commit/d08d8e357ca7baeb113fb0a003f76e519162c3ee))
+* **cubestore:** Update datafusion upstream to the version of 2020-11-27 ([b4685dd](https://github.com/cube-js/cube.js/commit/b4685dd5556f5a1448ef0bfbcae841fd7905f372))
+
+
+
+
+
 ## [0.24.2](https://github.com/cube-js/cube.js/compare/v0.24.1...v0.24.2) (2020-11-27)
 
 
