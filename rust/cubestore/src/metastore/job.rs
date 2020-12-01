@@ -1,20 +1,20 @@
-use rocksdb::DB;
-use std::sync::Arc;
-use serde::{Serialize, Deserialize, Deserializer};
-use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, TableId};
-use byteorder::{BigEndian, WriteBytesExt};
-use std::io::{Cursor, Write};
-use crate::metastore::{RowKey, MetaStoreEvent, IdRow};
+use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
 use crate::base_rocks_secondary_index;
+use crate::metastore::{IdRow, MetaStoreEvent, RowKey};
 use crate::rocks_table_impl;
+use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
+use rocksdb::DB;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::io::{Cursor, Write};
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum JobType {
     WalPartitioning = 1,
     PartitionCompaction,
     TableImport,
-    Repartition
+    Repartition,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]
@@ -23,7 +23,7 @@ pub enum JobStatus {
     ProcessingBy(String),
     Completed,
     Timeout,
-    Error(String)
+    Error(String),
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]
@@ -31,7 +31,7 @@ pub struct Job {
     row_reference: RowKey,
     job_type: JobType,
     last_heart_beat: DateTime<Utc>,
-    status: JobStatus
+    status: JobStatus,
 }
 
 impl Job {
@@ -40,7 +40,7 @@ impl Job {
             row_reference,
             job_type,
             last_heart_beat: Utc::now(),
-            status: JobStatus::Scheduled(shard)
+            status: JobStatus::Scheduled(shard),
         }
     }
 
@@ -65,7 +65,7 @@ impl Job {
             row_reference: self.row_reference.clone(),
             job_type: self.job_type.clone(),
             last_heart_beat: Utc::now(),
-            status
+            status,
         }
     }
 
@@ -85,7 +85,7 @@ impl Job {
 #[derive(Clone, Copy, Debug)]
 pub enum JobRocksIndex {
     RowReference = 1,
-    ByShard
+    ByShard,
 }
 
 base_rocks_secondary_index!(Job, JobRocksIndex);
@@ -97,7 +97,7 @@ rocks_table_impl!(
     {
         vec![
             Box::new(JobRocksIndex::RowReference),
-            Box::new(JobRocksIndex::ByShard)
+            Box::new(JobRocksIndex::ByShard),
         ]
     },
     DeleteJob
@@ -106,18 +106,20 @@ rocks_table_impl!(
 #[derive(Hash, Clone, Debug)]
 pub enum JobIndexKey {
     RowReference(RowKey, JobType),
-    ScheduledByShard(Option<String>)
+    ScheduledByShard(Option<String>),
 }
 
 impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
     fn typed_key_by(&self, row: &Job) -> JobIndexKey {
         match self {
-            JobRocksIndex::RowReference => JobIndexKey::RowReference(row.row_reference.clone(), row.job_type.clone()),
-            JobRocksIndex::ByShard => {
-                match &row.status {
-                    JobStatus::Scheduled(shard) => JobIndexKey::ScheduledByShard(Some(shard.to_string())),
-                    _ => JobIndexKey::ScheduledByShard(None),
+            JobRocksIndex::RowReference => {
+                JobIndexKey::RowReference(row.row_reference.clone(), row.job_type.clone())
+            }
+            JobRocksIndex::ByShard => match &row.status {
+                JobStatus::Scheduled(shard) => {
+                    JobIndexKey::ScheduledByShard(Some(shard.to_string()))
                 }
+                _ => JobIndexKey::ScheduledByShard(None),
             },
         }
     }
@@ -129,10 +131,11 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
                 buf.write_all(row_key.to_bytes().as_slice()).unwrap();
                 buf.write_u32::<BigEndian>(job_type.clone() as u32).unwrap();
                 buf.into_inner()
-            },
+            }
             JobIndexKey::ScheduledByShard(shard) => {
                 let mut buf = Cursor::new(Vec::new());
-                buf.write_u32::<BigEndian>(shard.as_ref().map(|s| s.len() as u32).unwrap_or(0)).unwrap();
+                buf.write_u32::<BigEndian>(shard.as_ref().map(|s| s.len() as u32).unwrap_or(0))
+                    .unwrap();
                 if let Some(v) = shard {
                     buf.write_all(v.as_bytes()).unwrap();
                 }
@@ -144,7 +147,7 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
     fn is_unique(&self) -> bool {
         match self {
             JobRocksIndex::RowReference => true,
-            JobRocksIndex::ByShard => false
+            JobRocksIndex::ByShard => false,
         }
     }
 

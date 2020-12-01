@@ -1,39 +1,31 @@
-pub mod serialized_plan;
 pub mod query_executor;
+pub mod serialized_plan;
 
+use crate::metastore::table::TablePath;
+use crate::metastore::MetaStore;
+use crate::queryplanner::query_executor::batch_to_dataframe;
+use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::store::DataFrame;
 use crate::CubeError;
-use crate::{
-    metastore::{MetaStore},
-};
-use arrow::{array::{StringArray}};
-use arrow::{
-    array::Array,
-    datatypes::Schema, datatypes::SchemaRef,
-};
+use arrow::array::StringArray;
+use arrow::datatypes::Field;
+use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
-use datafusion::{error::{DataFusionError}};
-use datafusion::physical_plan::{ExecutionPlan};
-use datafusion::{
-    datasource::MemTable, datasource::TableProvider,
-    prelude::ExecutionContext,
-};
-use std::{sync::{Arc}};
-use datafusion::sql::parser::Statement;
-use datafusion::sql::planner::{SqlToRel, SchemaProvider};
-use mockall::automock;
-use tokio::runtime::Handle;
-use arrow::datatypes::{Field};
-use crate::queryplanner::serialized_plan::{SerializedPlan};
-use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use std::collections::HashMap;
-use crate::metastore::table::TablePath;
+use datafusion::error::DataFusionError;
 use datafusion::logical_plan::LogicalPlan;
-use crate::store::DataFrame;
+use datafusion::physical_plan::udaf::AggregateUDF;
+use datafusion::physical_plan::udf::ScalarUDF;
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::sql::parser::Statement;
+use datafusion::sql::planner::{SchemaProvider, SqlToRel};
+use datafusion::{datasource::MemTable, datasource::TableProvider, prelude::ExecutionContext};
+use log::debug;
+use mockall::automock;
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::SystemTime;
-use crate::queryplanner::query_executor::batch_to_dataframe;
-use log::{debug};
+use tokio::runtime::Handle;
 
 #[automock]
 #[async_trait]
@@ -48,7 +40,7 @@ pub struct QueryPlannerImpl {
 
 pub enum QueryPlan {
     Meta(LogicalPlan),
-    Select(SerializedPlan)
+    Select(SerializedPlan),
 }
 
 #[async_trait]
@@ -56,7 +48,10 @@ impl QueryPlanner for QueryPlannerImpl {
     async fn logical_plan(&self, statement: Statement) -> Result<QueryPlan, CubeError> {
         let ctx = self.execution_context().await?;
 
-        let schema_provider = MetaStoreSchemaProvider::new(self.meta_store.get_tables_with_path().await?, ctx.clone());
+        let schema_provider = MetaStoreSchemaProvider::new(
+            self.meta_store.get_tables_with_path().await?,
+            ctx.clone(),
+        );
 
         let query_planner = SqlToRel::new(&schema_provider);
         let mut logical_plan = query_planner.statement_to_plan(&statement)?;
@@ -77,24 +72,24 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let plan_ctx = ctx.clone();
         let plan_to_move = plan.clone();
-        let physical_plan = tokio::task::spawn_blocking(move || {
-            plan_ctx.create_physical_plan(&plan_to_move)
-        }).await??;
+        let physical_plan =
+            tokio::task::spawn_blocking(move || plan_ctx.create_physical_plan(&plan_to_move))
+                .await??;
 
         let execution_time = SystemTime::now();
         let results = ctx.collect(physical_plan).await?;
-        debug!("Meta query data processing time: {:?}", execution_time.elapsed()?);
+        debug!(
+            "Meta query data processing time: {:?}",
+            execution_time.elapsed()?
+        );
         let data_frame = batch_to_dataframe(&results)?;
         Ok(data_frame)
     }
 }
 
-
 impl QueryPlannerImpl {
     pub fn new(meta_store: Arc<dyn MetaStore>) -> Arc<QueryPlannerImpl> {
-        Arc::new(QueryPlannerImpl {
-            meta_store,
-        })
+        Arc::new(QueryPlannerImpl { meta_store })
     }
 }
 
@@ -104,12 +99,18 @@ impl QueryPlannerImpl {
 
         ctx.register_table(
             "information_schema.tables",
-            Box::new(InfoSchemaTableProvider::new(self.meta_store.clone(), InfoSchemaTable::Tables))
+            Box::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::Tables,
+            )),
         );
 
         ctx.register_table(
             "information_schema.schemata",
-            Box::new(InfoSchemaTableProvider::new(self.meta_store.clone(), InfoSchemaTable::Schemata))
+            Box::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::Schemata,
+            )),
         );
 
         Ok(Arc::new(ctx))
@@ -118,14 +119,14 @@ impl QueryPlannerImpl {
 
 struct MetaStoreSchemaProvider {
     tables: HashMap<String, TablePath>,
-    information_schema_context: Arc<ExecutionContext>
+    information_schema_context: Arc<ExecutionContext>,
 }
 
 impl MetaStoreSchemaProvider {
     pub fn new(tables: Vec<TablePath>, information_schema_context: Arc<ExecutionContext>) -> Self {
         Self {
-            tables: tables.into_iter().map(|t| { (t.table_name(), t) }).collect(),
-            information_schema_context
+            tables: tables.into_iter().map(|t| (t.table_name(), t)).collect(),
+            information_schema_context,
         }
     }
 }
@@ -133,7 +134,15 @@ impl MetaStoreSchemaProvider {
 impl SchemaProvider for MetaStoreSchemaProvider {
     fn get_table_meta(&self, name: &str) -> Option<SchemaRef> {
         let res = self.tables.get(name).map(|table| {
-            Arc::new(Schema::new(table.table.get_row().get_columns().iter().map(|c| c.clone().into()).collect::<Vec<_>>()))
+            Arc::new(Schema::new(
+                table
+                    .table
+                    .get_row()
+                    .get_columns()
+                    .iter()
+                    .map(|c| c.clone().into())
+                    .collect::<Vec<_>>(),
+            ))
         });
         res.or_else(|| self.information_schema_context.state.get_table_meta(name))
     }
@@ -149,27 +158,21 @@ impl SchemaProvider for MetaStoreSchemaProvider {
 
 pub enum InfoSchemaTable {
     Tables,
-    Schemata
+    Schemata,
 }
 
 impl InfoSchemaTable {
     fn schema(&self) -> SchemaRef {
         match self {
-            InfoSchemaTable::Tables => {
-                Arc::new(Schema::new(
-                    vec![
-                        Field::new("table_schema", DataType::Utf8, false),
-                        Field::new("table_name", DataType::Utf8, false)
-                    ]
-                ))
-            }
-            InfoSchemaTable::Schemata => {
-                Arc::new(Schema::new(
-                    vec![
-                        Field::new("schema_name", DataType::Utf8, false),
-                    ]
-                ))
-            }
+            InfoSchemaTable::Tables => Arc::new(Schema::new(vec![
+                Field::new("table_schema", DataType::Utf8, false),
+                Field::new("table_name", DataType::Utf8, false),
+            ])),
+            InfoSchemaTable::Schemata => Arc::new(Schema::new(vec![Field::new(
+                "schema_name",
+                DataType::Utf8,
+                false,
+            )])),
         }
     }
 
@@ -179,17 +182,30 @@ impl InfoSchemaTable {
                 let tables = meta_store.get_tables_with_path().await?;
                 let schema = self.schema();
                 let columns: Vec<Arc<dyn Array>> = vec![
-                    Arc::new(StringArray::from(tables.iter().map(|row| row.schema.get_row().get_name().as_str()).collect::<Vec<_>>())),
-                    Arc::new(StringArray::from(tables.iter().map(|row| row.table.get_row().get_table_name().as_str()).collect::<Vec<_>>())),
+                    Arc::new(StringArray::from(
+                        tables
+                            .iter()
+                            .map(|row| row.schema.get_row().get_name().as_str())
+                            .collect::<Vec<_>>(),
+                    )),
+                    Arc::new(StringArray::from(
+                        tables
+                            .iter()
+                            .map(|row| row.table.get_row().get_table_name().as_str())
+                            .collect::<Vec<_>>(),
+                    )),
                 ];
                 Ok(RecordBatch::try_new(schema, columns)?)
             }
             InfoSchemaTable::Schemata => {
                 let schemas = meta_store.schemas_table().all_rows().await?;
                 let schema = self.schema();
-                let columns: Vec<Arc<dyn Array>> = vec![
-                    Arc::new(StringArray::from(schemas.iter().map(|row| row.get_row().get_name().as_str()).collect::<Vec<_>>())),
-                ];
+                let columns: Vec<Arc<dyn Array>> = vec![Arc::new(StringArray::from(
+                    schemas
+                        .iter()
+                        .map(|row| row.get_row().get_name().as_str())
+                        .collect::<Vec<_>>(),
+                ))];
                 Ok(RecordBatch::try_new(schema, columns)?)
             }
         }
@@ -198,7 +214,7 @@ impl InfoSchemaTable {
 
 pub struct InfoSchemaTableProvider {
     meta_store: Arc<dyn MetaStore>,
-    table: InfoSchemaTable
+    table: InfoSchemaTable,
 }
 
 impl InfoSchemaTableProvider {
@@ -217,7 +233,11 @@ impl TableProvider for InfoSchemaTableProvider {
         self.table.schema()
     }
 
-    fn scan(&self, projection: &Option<Vec<usize>>, batch_size: usize) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    fn scan(
+        &self,
+        projection: &Option<Vec<usize>>,
+        batch_size: usize,
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let handle = Handle::current();
         let mem_table = handle.block_on(async move { self.mem_table().await })?;
         mem_table.scan(projection, batch_size)

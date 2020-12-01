@@ -1,17 +1,19 @@
-use rocksdb::DB;
-use std::sync::Arc;
-use serde::{Deserialize, Serialize, Deserializer};
-use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, TableId, Column, ColumnType};
-use crate::metastore::{ImportFormat, MetaStoreEvent, IdRow, Schema};
+use super::{
+    BaseRocksSecondaryIndex, Column, ColumnType, IndexId, RocksSecondaryIndex, RocksTable, TableId,
+};
+use super::{DataFrameValue, TableValue};
 use crate::base_rocks_secondary_index;
-use crate::rocks_table_impl;
 use crate::data_frame_from;
 use crate::format_table_value;
-use super::{DataFrameValue, TableValue};
-use crate::table::Row;
+use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
+use crate::rocks_table_impl;
 use crate::store::DataFrame;
-use byteorder::{WriteBytesExt, BigEndian};
+use crate::table::Row;
+use byteorder::{BigEndian, WriteBytesExt};
+use rocksdb::DB;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
+use std::sync::Arc;
 
 data_frame_from! {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
@@ -27,7 +29,7 @@ pub struct Table {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TablePath {
     pub table: IdRow<Table>,
-    pub schema: Arc<IdRow<Schema>>
+    pub schema: Arc<IdRow<Schema>>,
 }
 
 impl TablePath {
@@ -51,7 +53,7 @@ impl Table {
             schema_id,
             columns,
             location,
-            import_format
+            import_format,
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -77,7 +79,11 @@ impl Table {
 
 impl Column {
     pub fn new(name: String, column_type: ColumnType, column_index: usize) -> Column {
-        Column { name, column_type, column_index }
+        Column {
+            name,
+            column_type,
+            column_index,
+        }
     }
     pub fn get_name(&self) -> &String {
         &self.name
@@ -95,7 +101,7 @@ impl Column {
         Column {
             name: self.name.clone(),
             column_type: self.column_type.clone(),
-            column_index
+            column_index,
         }
     }
 }
@@ -104,7 +110,7 @@ rocks_table_impl!(
     Table,
     TableRocksTable,
     TableId::Tables,
-    { vec![Box::new(TableRocksIndex::Name)]},
+    { vec![Box::new(TableRocksIndex::Name)] },
     DeleteTable
 );
 
@@ -115,7 +121,7 @@ pub(crate) enum TableRocksIndex {
 
 #[derive(Hash, Clone, Debug)]
 pub enum TableIndexKey {
-    ByName(u64, String)
+    ByName(u64, String),
 }
 
 base_rocks_secondary_index!(Table, TableRocksIndex);
@@ -123,7 +129,9 @@ base_rocks_secondary_index!(Table, TableRocksIndex);
 impl RocksSecondaryIndex<Table, TableIndexKey> for TableRocksIndex {
     fn typed_key_by(&self, row: &Table) -> TableIndexKey {
         match self {
-            TableRocksIndex::Name => TableIndexKey::ByName(row.schema_id, row.table_name.to_string()),
+            TableRocksIndex::Name => {
+                TableIndexKey::ByName(row.schema_id, row.table_name.to_string())
+            }
         }
     }
 

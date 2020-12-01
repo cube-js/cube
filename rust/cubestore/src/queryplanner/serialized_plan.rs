@@ -1,28 +1,28 @@
-use arrow::datatypes::{SchemaRef, DataType};
-use std::sync::Arc;
-use datafusion::scalar::ScalarValue;
-use datafusion::physical_plan::{functions, aggregates};
-use datafusion::logical_plan::{Operator, LogicalPlan, TableSource, Expr, JoinType};
-use serde_derive::{Deserialize, Serialize};
-use crate::metastore::{Index, IdRow, Partition, Chunk, MetaStore};
-use crate::metastore::table::{TablePath, Table};
+use crate::metastore::table::{Table, TablePath};
+use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition};
 use crate::queryplanner::query_executor::CubeTable;
-use itertools::Itertools;
-use futures::future::BoxFuture;
 use crate::CubeError;
+use arrow::datatypes::{DataType, SchemaRef};
+use datafusion::logical_plan::{Expr, JoinType, LogicalPlan, Operator, TableSource};
+use datafusion::physical_plan::{aggregates, functions};
+use datafusion::scalar::ScalarValue;
+use futures::future::BoxFuture;
 use futures::FutureExt;
+use itertools::Itertools;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::sync::Arc;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializedPlan {
     logical_plan: Arc<SerializedLogicalPlan>,
     schema_snapshot: Arc<SchemaSnapshot>,
-    partition_ids_to_execute: HashSet<u64>
+    partition_ids_to_execute: HashSet<u64>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SchemaSnapshot {
-    index_snapshots: Vec<IndexSnapshot>
+    index_snapshots: Vec<IndexSnapshot>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -120,52 +120,84 @@ pub enum SerializedLogicalPlan {
 impl SerializedLogicalPlan {
     fn logical_plan(&self) -> LogicalPlan {
         match self {
-            SerializedLogicalPlan::Projection { expr, input, schema } => LogicalPlan::Projection {
+            SerializedLogicalPlan::Projection {
+                expr,
+                input,
+                schema,
+            } => LogicalPlan::Projection {
                 expr: expr.iter().map(|e| e.expr()).collect(),
                 input: Arc::new(input.logical_plan()),
-                schema: schema.clone()
+                schema: schema.clone(),
             },
             SerializedLogicalPlan::Filter { predicate, input } => LogicalPlan::Filter {
                 predicate: predicate.expr(),
                 input: Arc::new(input.logical_plan()),
             },
-            SerializedLogicalPlan::Aggregate { input, group_expr, aggr_expr, schema } => LogicalPlan::Aggregate {
+            SerializedLogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                schema,
+            } => LogicalPlan::Aggregate {
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggr_expr: aggr_expr.iter().map(|e| e.expr()).collect(),
                 input: Arc::new(input.logical_plan()),
-                schema: schema.clone()
+                schema: schema.clone(),
             },
             SerializedLogicalPlan::Sort { expr, input } => LogicalPlan::Sort {
                 expr: expr.iter().map(|e| e.expr()).collect(),
                 input: Arc::new(input.logical_plan()),
             },
-            SerializedLogicalPlan::Union { inputs, schema, alias } => LogicalPlan::Union {
+            SerializedLogicalPlan::Union {
+                inputs,
+                schema,
+                alias,
+            } => LogicalPlan::Union {
                 inputs: inputs.iter().map(|p| Arc::new(p.logical_plan())).collect(),
                 schema: schema.clone(),
                 alias: alias.clone(),
             },
-            SerializedLogicalPlan::TableScan { schema_name, source, table_schema, projection, projected_schema, alias } => LogicalPlan::TableScan {
+            SerializedLogicalPlan::TableScan {
+                schema_name,
+                source,
+                table_schema,
+                projection,
+                projected_schema,
+                alias,
+            } => LogicalPlan::TableScan {
                 schema_name: schema_name.clone(),
                 source: match source {
-                    SerializedTableSource::FromContext(v) => TableSource::FromContext(v.clone())
+                    SerializedTableSource::FromContext(v) => TableSource::FromContext(v.clone()),
                 },
                 table_schema: table_schema.clone(),
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
-                alias: alias.clone()
+                alias: alias.clone(),
             },
-            SerializedLogicalPlan::EmptyRelation { produce_one_row, schema } => LogicalPlan::EmptyRelation { produce_one_row: *produce_one_row, schema: schema.clone() },
+            SerializedLogicalPlan::EmptyRelation {
+                produce_one_row,
+                schema,
+            } => LogicalPlan::EmptyRelation {
+                produce_one_row: *produce_one_row,
+                schema: schema.clone(),
+            },
             SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
                 n: *n,
                 input: Arc::new(input.logical_plan()),
             },
-            SerializedLogicalPlan::Join { left, right, on, join_type, schema } => LogicalPlan::Join {
+            SerializedLogicalPlan::Join {
+                left,
+                right,
+                on,
+                join_type,
+                schema,
+            } => LogicalPlan::Join {
                 left: Arc::new(left.logical_plan()),
                 right: Arc::new(right.logical_plan()),
                 on: on.clone(),
                 join_type: join_type.clone(),
-                schema: schema.clone()
-            }
+                schema: schema.clone(),
+            },
         }
     }
 }
@@ -223,21 +255,50 @@ impl SerializedExpr {
             SerializedExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
                 left: Box::new(left.expr()),
                 op: op.clone(),
-                right: Box::new(right.expr())
+                right: Box::new(right.expr()),
             },
             SerializedExpr::Not(e) => Expr::Not(Box::new(e.expr())),
             SerializedExpr::IsNotNull(e) => Expr::IsNotNull(Box::new(e.expr())),
             SerializedExpr::IsNull(e) => Expr::IsNull(Box::new(e.expr())),
-            SerializedExpr::Cast { expr, data_type } => Expr::Cast { expr: Box::new(expr.expr()), data_type: data_type.clone() },
-            SerializedExpr::Sort { expr, asc, nulls_first } => Expr::Sort { expr: Box::new(expr.expr()), asc: *asc, nulls_first: *nulls_first },
-            SerializedExpr::ScalarFunction { fun, args } => Expr::ScalarFunction { fun: fun.clone(), args: args.iter().map(|e| e.expr()).collect() },
-            SerializedExpr::AggregateFunction { fun, args, distinct } => Expr::AggregateFunction { fun: fun.clone(), args: args.iter().map(|e| e.expr()).collect(), distinct: *distinct },
-            SerializedExpr::Case { expr, else_expr, when_then_expr } => Expr::Case {
+            SerializedExpr::Cast { expr, data_type } => Expr::Cast {
+                expr: Box::new(expr.expr()),
+                data_type: data_type.clone(),
+            },
+            SerializedExpr::Sort {
+                expr,
+                asc,
+                nulls_first,
+            } => Expr::Sort {
+                expr: Box::new(expr.expr()),
+                asc: *asc,
+                nulls_first: *nulls_first,
+            },
+            SerializedExpr::ScalarFunction { fun, args } => Expr::ScalarFunction {
+                fun: fun.clone(),
+                args: args.iter().map(|e| e.expr()).collect(),
+            },
+            SerializedExpr::AggregateFunction {
+                fun,
+                args,
+                distinct,
+            } => Expr::AggregateFunction {
+                fun: fun.clone(),
+                args: args.iter().map(|e| e.expr()).collect(),
+                distinct: *distinct,
+            },
+            SerializedExpr::Case {
+                expr,
+                else_expr,
+                when_then_expr,
+            } => Expr::Case {
                 expr: expr.as_ref().map(|e| Box::new(e.expr())),
                 else_expr: else_expr.as_ref().map(|e| Box::new(e.expr())),
-                when_then_expr: when_then_expr.iter().map(|(w, t)| (Box::new(w.expr()), Box::new(t.expr()))).collect()
+                when_then_expr: when_then_expr
+                    .iter()
+                    .map(|(w, t)| (Box::new(w.expr()), Box::new(t.expr())))
+                    .collect(),
             },
-            SerializedExpr::Wildcard => Expr::Wildcard
+            SerializedExpr::Wildcard => Expr::Wildcard,
         }
     }
 }
@@ -248,15 +309,17 @@ pub enum SerializedTableSource {
 }
 
 impl SerializedPlan {
-    pub async fn try_new(plan: LogicalPlan, meta_store: Arc<dyn MetaStore>) -> Result<Self, CubeError> {
+    pub async fn try_new(
+        plan: LogicalPlan,
+        meta_store: Arc<dyn MetaStore>,
+    ) -> Result<Self, CubeError> {
         let serialized_logical_plan = Self::serialized_logical_plan(&plan);
-        let index_snapshots = Self::index_snapshots_from_plan(Arc::new(plan), meta_store, Vec::new()).await?;
+        let index_snapshots =
+            Self::index_snapshots_from_plan(Arc::new(plan), meta_store, Vec::new()).await?;
         Ok(SerializedPlan {
             logical_plan: Arc::new(serialized_logical_plan),
-            schema_snapshot: Arc::new(SchemaSnapshot {
-                index_snapshots
-            }),
-            partition_ids_to_execute: HashSet::new()
+            schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
+            partition_ids_to_execute: HashSet::new(),
         })
     }
 
@@ -264,7 +327,7 @@ impl SerializedPlan {
         Self {
             logical_plan: self.logical_plan.clone(),
             schema_snapshot: self.schema_snapshot.clone(),
-            partition_ids_to_execute
+            partition_ids_to_execute,
         }
     }
 
@@ -287,7 +350,11 @@ impl SerializedPlan {
 
         for index in indexes.iter() {
             for partition in index.partitions() {
-                if let Some(file) = partition.partition.get_row().get_full_name(partition.partition.get_id()) {
+                if let Some(file) = partition
+                    .partition
+                    .get_row()
+                    .get_full_name(partition.partition.get_id())
+                {
                     files.push(file);
                 }
 
@@ -300,36 +367,55 @@ impl SerializedPlan {
         files
     }
 
-    fn index_snapshots_from_plan_boxed(plan: Arc<LogicalPlan>, meta_store: Arc<dyn MetaStore>, index_snapshots: Vec<IndexSnapshot>) -> BoxFuture<'static, Result<Vec<IndexSnapshot>, CubeError>> {
-        async move {
-            Self::index_snapshots_from_plan(plan, meta_store, index_snapshots).await
-        }.boxed()
+    fn index_snapshots_from_plan_boxed(
+        plan: Arc<LogicalPlan>,
+        meta_store: Arc<dyn MetaStore>,
+        index_snapshots: Vec<IndexSnapshot>,
+    ) -> BoxFuture<'static, Result<Vec<IndexSnapshot>, CubeError>> {
+        async move { Self::index_snapshots_from_plan(plan, meta_store, index_snapshots).await }
+            .boxed()
     }
 
-    async fn index_snapshots_from_plan(plan: Arc<LogicalPlan>, meta_store: Arc<dyn MetaStore>, mut index_snapshots: Vec<IndexSnapshot>) -> Result<Vec<IndexSnapshot>, CubeError> {
+    async fn index_snapshots_from_plan(
+        plan: Arc<LogicalPlan>,
+        meta_store: Arc<dyn MetaStore>,
+        mut index_snapshots: Vec<IndexSnapshot>,
+    ) -> Result<Vec<IndexSnapshot>, CubeError> {
         match plan.as_ref() {
             LogicalPlan::EmptyRelation { .. } => Ok(index_snapshots),
             LogicalPlan::InMemoryScan { .. } => Ok(index_snapshots),
             LogicalPlan::CsvScan { .. } => Ok(index_snapshots),
             LogicalPlan::ParquetScan { .. } => Ok(index_snapshots),
-            LogicalPlan::TableScan { source, projection, .. } => {
+            LogicalPlan::TableScan {
+                source, projection, ..
+            } => {
                 let name_split = match source {
                     TableSource::FromContext(name) => name.split(".").collect::<Vec<_>>(),
-                    TableSource::FromProvider(_) => unimplemented!()
+                    TableSource::FromProvider(_) => unimplemented!(),
                 };
-                let table = meta_store.get_table(name_split[0].to_string(), name_split[1].to_string()).await?;
-                let schema = meta_store.get_schema_by_id(table.get_row().get_schema_id()).await?;
+                let table = meta_store
+                    .get_table(name_split[0].to_string(), name_split[1].to_string())
+                    .await?;
+                let schema = meta_store
+                    .get_schema_by_id(table.get_row().get_schema_id())
+                    .await?;
                 let default_index = meta_store.get_default_index(table.get_id()).await?;
                 let index = if let Some(projection_column_indices) = projection {
-                    let projection_columns = CubeTable::project_to_table(&table, &projection_column_indices);
+                    let projection_columns =
+                        CubeTable::project_to_table(&table, &projection_column_indices);
                     let indexes = meta_store.get_table_indexes(table.get_id()).await?;
-                    if let Some((index, _)) = indexes.into_iter().filter_map(
-                        |i| {
-                            let projected_index_positions = CubeTable::project_to_index_positions(&projection_columns, &i);
-                            let score = projected_index_positions.into_iter().fold_options(0, |a, b| a + b);
+                    if let Some((index, _)) = indexes
+                        .into_iter()
+                        .filter_map(|i| {
+                            let projected_index_positions =
+                                CubeTable::project_to_index_positions(&projection_columns, &i);
+                            let score = projected_index_positions
+                                .into_iter()
+                                .fold_options(0, |a, b| a + b);
                             score.map(|s| (i, s))
-                        }
-                    ).min_by_key(|(_, s)| *s) {
+                        })
+                        .min_by_key(|(_, s)| *s)
+                    {
                         index
                     } else {
                         default_index
@@ -338,7 +424,9 @@ impl SerializedPlan {
                     default_index
                 };
 
-                let partitions = meta_store.get_active_partitions_by_index_id(index.get_id()).await?;
+                let partitions = meta_store
+                    .get_active_partitions_by_index_id(index.get_id())
+                    .await?;
 
                 let meta_store_to_move = meta_store.clone();
 
@@ -346,38 +434,69 @@ impl SerializedPlan {
 
                 for partition in partitions.into_iter() {
                     partition_snapshots.push(PartitionSnapshot {
-                        chunks: meta_store_to_move.clone().get_chunks_by_partition(partition.get_id()).await?,
-                        partition
+                        chunks: meta_store_to_move
+                            .clone()
+                            .get_chunks_by_partition(partition.get_id())
+                            .await?,
+                        partition,
                     });
                 }
 
                 index_snapshots.push(IndexSnapshot {
                     index,
                     partitions: partition_snapshots,
-                    table_path: TablePath { table, schema: Arc::new(schema) }
+                    table_path: TablePath {
+                        table,
+                        schema: Arc::new(schema),
+                    },
                 });
 
                 Ok(index_snapshots)
             }
-            LogicalPlan::Projection { input, .. } => Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots).await,
-            LogicalPlan::Filter { input, .. } => Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots).await,
-            LogicalPlan::Aggregate { input, .. } => Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots).await,
-            LogicalPlan::Sort { input, .. } => Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots).await,
-            LogicalPlan::Limit { input, .. } => Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots).await,
+            LogicalPlan::Projection { input, .. } => {
+                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
+                    .await
+            }
+            LogicalPlan::Filter { input, .. } => {
+                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
+                    .await
+            }
+            LogicalPlan::Aggregate { input, .. } => {
+                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
+                    .await
+            }
+            LogicalPlan::Sort { input, .. } => {
+                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
+                    .await
+            }
+            LogicalPlan::Limit { input, .. } => {
+                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
+                    .await
+            }
             LogicalPlan::CreateExternalTable { .. } => Ok(index_snapshots),
             LogicalPlan::Explain { .. } => Ok(index_snapshots),
             LogicalPlan::Extension { .. } => Ok(index_snapshots),
             LogicalPlan::Union { inputs, .. } => {
                 let mut snapshots = index_snapshots;
                 for i in inputs.iter() {
-                    snapshots = Self::index_snapshots_from_plan_boxed(i.clone(), meta_store.clone(), snapshots).await?;
+                    snapshots = Self::index_snapshots_from_plan_boxed(
+                        i.clone(),
+                        meta_store.clone(),
+                        snapshots,
+                    )
+                    .await?;
                 }
                 Ok(snapshots)
             }
             LogicalPlan::Join { left, right, .. } => {
                 let mut snapshots = index_snapshots;
                 for i in vec![left, right].into_iter() {
-                    snapshots = Self::index_snapshots_from_plan_boxed(i.clone(), meta_store.clone(), snapshots).await?;
+                    snapshots = Self::index_snapshots_from_plan_boxed(
+                        i.clone(),
+                        meta_store.clone(),
+                        snapshots,
+                    )
+                    .await?;
                 }
                 Ok(snapshots)
             }
@@ -393,7 +512,7 @@ impl SerializedPlan {
             LogicalPlan::TableScan { source, .. } => {
                 let name_split = match source {
                     TableSource::FromContext(name) => name.split(".").collect::<Vec<_>>(),
-                    TableSource::FromProvider(_) => unimplemented!()
+                    TableSource::FromProvider(_) => unimplemented!(),
                 };
                 name_split[0].to_string() != "information_schema"
             }
@@ -420,37 +539,62 @@ impl SerializedPlan {
 
     fn serialized_logical_plan(plan: &LogicalPlan) -> SerializedLogicalPlan {
         match plan {
-            LogicalPlan::EmptyRelation { produce_one_row, schema } => SerializedLogicalPlan::EmptyRelation { produce_one_row: *produce_one_row, schema: schema.clone() },
+            LogicalPlan::EmptyRelation {
+                produce_one_row,
+                schema,
+            } => SerializedLogicalPlan::EmptyRelation {
+                produce_one_row: *produce_one_row,
+                schema: schema.clone(),
+            },
             LogicalPlan::InMemoryScan { .. } => unimplemented!(),
             LogicalPlan::CsvScan { .. } => unimplemented!(),
             LogicalPlan::ParquetScan { .. } => unimplemented!(),
-            LogicalPlan::TableScan { schema_name, source, alias, projected_schema, table_schema, projection } => {
-                SerializedLogicalPlan::TableScan {
-                    schema_name: schema_name.clone(),
-                    source: match source {
-                        TableSource::FromContext(name) => SerializedTableSource::FromContext(name.to_string()),
-                        TableSource::FromProvider(_) => unimplemented!()
-                    },
-                    alias: alias.clone(),
-                    projected_schema: projected_schema.clone(),
-                    table_schema: table_schema.clone(),
-                    projection: projection.clone(),
-                }
-            }
-            LogicalPlan::Projection { input, expr, schema } => SerializedLogicalPlan::Projection {
+            LogicalPlan::TableScan {
+                schema_name,
+                source,
+                alias,
+                projected_schema,
+                table_schema,
+                projection,
+            } => SerializedLogicalPlan::TableScan {
+                schema_name: schema_name.clone(),
+                source: match source {
+                    TableSource::FromContext(name) => {
+                        SerializedTableSource::FromContext(name.to_string())
+                    }
+                    TableSource::FromProvider(_) => unimplemented!(),
+                },
+                alias: alias.clone(),
+                projected_schema: projected_schema.clone(),
+                table_schema: table_schema.clone(),
+                projection: projection.clone(),
+            },
+            LogicalPlan::Projection {
+                input,
+                expr,
+                schema,
+            } => SerializedLogicalPlan::Projection {
                 input: Arc::new(Self::serialized_logical_plan(input)),
                 expr: expr.iter().map(|e| Self::serialized_expr(e)).collect(),
-                schema: schema.clone()
+                schema: schema.clone(),
             },
-            LogicalPlan::Filter { predicate, input,  } => SerializedLogicalPlan::Filter {
+            LogicalPlan::Filter { predicate, input } => SerializedLogicalPlan::Filter {
                 input: Arc::new(Self::serialized_logical_plan(input)),
-                predicate: Self::serialized_expr(predicate)
+                predicate: Self::serialized_expr(predicate),
             },
-            LogicalPlan::Aggregate { input, group_expr, aggr_expr, schema } => SerializedLogicalPlan::Aggregate {
+            LogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                schema,
+            } => SerializedLogicalPlan::Aggregate {
                 input: Arc::new(Self::serialized_logical_plan(input)),
-                group_expr: group_expr.iter().map(|e| Self::serialized_expr(e)).collect(),
+                group_expr: group_expr
+                    .iter()
+                    .map(|e| Self::serialized_expr(e))
+                    .collect(),
                 aggr_expr: aggr_expr.iter().map(|e| Self::serialized_expr(e)).collect(),
-                schema: schema.clone()
+                schema: schema.clone(),
             },
             LogicalPlan::Sort { expr, input } => SerializedLogicalPlan::Sort {
                 input: Arc::new(Self::serialized_logical_plan(input)),
@@ -458,29 +602,44 @@ impl SerializedPlan {
             },
             LogicalPlan::Limit { n, input } => SerializedLogicalPlan::Limit {
                 input: Arc::new(Self::serialized_logical_plan(input)),
-                n: *n
+                n: *n,
             },
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
             LogicalPlan::Explain { .. } => unimplemented!(),
             LogicalPlan::Extension { .. } => unimplemented!(),
-            LogicalPlan::Union { inputs, schema, alias } => SerializedLogicalPlan::Union {
-                inputs: inputs.iter().map(|input| Arc::new(Self::serialized_logical_plan(&input))).collect::<Vec<_>>(),
+            LogicalPlan::Union {
+                inputs,
+                schema,
+                alias,
+            } => SerializedLogicalPlan::Union {
+                inputs: inputs
+                    .iter()
+                    .map(|input| Arc::new(Self::serialized_logical_plan(&input)))
+                    .collect::<Vec<_>>(),
                 schema: schema.clone(),
-                alias: alias.clone()
+                alias: alias.clone(),
             },
-            LogicalPlan::Join { left, right, on, join_type, schema } => SerializedLogicalPlan::Join {
+            LogicalPlan::Join {
+                left,
+                right,
+                on,
+                join_type,
+                schema,
+            } => SerializedLogicalPlan::Join {
                 left: Arc::new(Self::serialized_logical_plan(&left)),
                 right: Arc::new(Self::serialized_logical_plan(&right)),
                 on: on.clone(),
                 join_type: join_type.clone(),
                 schema: schema.clone(),
-            }
+            },
         }
     }
 
     fn serialized_expr(expr: &Expr) -> SerializedExpr {
         match expr {
-            Expr::Alias(expr, alias) => SerializedExpr::Alias(Box::new(Self::serialized_expr(expr)), alias.to_string()),
+            Expr::Alias(expr, alias) => {
+                SerializedExpr::Alias(Box::new(Self::serialized_expr(expr)), alias.to_string())
+            }
             Expr::Column(c) => SerializedExpr::Column(c.to_string()),
             Expr::ScalarVariable(v) => SerializedExpr::ScalarVariable(v.clone()),
             Expr::Literal(v) => SerializedExpr::Literal(v.clone()),
@@ -492,18 +651,54 @@ impl SerializedPlan {
             Expr::Not(e) => SerializedExpr::Not(Box::new(Self::serialized_expr(&e))),
             Expr::IsNotNull(e) => SerializedExpr::IsNotNull(Box::new(Self::serialized_expr(&e))),
             Expr::IsNull(e) => SerializedExpr::IsNull(Box::new(Self::serialized_expr(&e))),
-            Expr::Cast { expr, data_type } => SerializedExpr::Cast { expr: Box::new(Self::serialized_expr(&expr)), data_type: data_type.clone() },
-            Expr::Sort { expr, asc, nulls_first } => SerializedExpr::Sort { expr: Box::new(Self::serialized_expr(&expr)), asc: *asc, nulls_first: *nulls_first },
-            Expr::ScalarFunction { fun, args } => SerializedExpr::ScalarFunction { fun: fun.clone(), args: args.iter().map(|e| Self::serialized_expr(&e)).collect() },
-            Expr::ScalarUDF { .. } => unimplemented!(),
-            Expr::AggregateFunction { fun, args, distinct } => SerializedExpr::AggregateFunction { fun: fun.clone(), args: args.iter().map(|e| Self::serialized_expr(&e)).collect(), distinct: *distinct },
-            Expr::AggregateUDF { .. } => unimplemented!(),
-            Expr::Case { expr, when_then_expr, else_expr } => SerializedExpr::Case {
-                expr: expr.as_ref().map(|e| Box::new(Self::serialized_expr(&e))),
-                else_expr: else_expr.as_ref().map(|e| Box::new(Self::serialized_expr(&e))),
-                when_then_expr: when_then_expr.iter().map(|(w, t)| (Box::new(Self::serialized_expr(&w)), Box::new(Self::serialized_expr(&t)))).collect()
+            Expr::Cast { expr, data_type } => SerializedExpr::Cast {
+                expr: Box::new(Self::serialized_expr(&expr)),
+                data_type: data_type.clone(),
             },
-            Expr::Wildcard => SerializedExpr::Wildcard
+            Expr::Sort {
+                expr,
+                asc,
+                nulls_first,
+            } => SerializedExpr::Sort {
+                expr: Box::new(Self::serialized_expr(&expr)),
+                asc: *asc,
+                nulls_first: *nulls_first,
+            },
+            Expr::ScalarFunction { fun, args } => SerializedExpr::ScalarFunction {
+                fun: fun.clone(),
+                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
+            },
+            Expr::ScalarUDF { .. } => unimplemented!(),
+            Expr::AggregateFunction {
+                fun,
+                args,
+                distinct,
+            } => SerializedExpr::AggregateFunction {
+                fun: fun.clone(),
+                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
+                distinct: *distinct,
+            },
+            Expr::AggregateUDF { .. } => unimplemented!(),
+            Expr::Case {
+                expr,
+                when_then_expr,
+                else_expr,
+            } => SerializedExpr::Case {
+                expr: expr.as_ref().map(|e| Box::new(Self::serialized_expr(&e))),
+                else_expr: else_expr
+                    .as_ref()
+                    .map(|e| Box::new(Self::serialized_expr(&e))),
+                when_then_expr: when_then_expr
+                    .iter()
+                    .map(|(w, t)| {
+                        (
+                            Box::new(Self::serialized_expr(&w)),
+                            Box::new(Self::serialized_expr(&t)),
+                        )
+                    })
+                    .collect(),
+            },
+            Expr::Wildcard => SerializedExpr::Wildcard,
         }
     }
 }

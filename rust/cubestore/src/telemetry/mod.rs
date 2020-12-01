@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use core::mem;
-use tokio::sync::{Mutex, Notify, RwLock};
-use std::sync::Arc;
-use nanoid::nanoid;
-use chrono::{Utc, SecondsFormat};
 use crate::CubeError;
-use log::{Log, Metadata, Record, LevelFilter, Level};
+use chrono::{SecondsFormat, Utc};
+use core::mem;
+use log::{Level, LevelFilter, Log, Metadata, Record};
+use nanoid::nanoid;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{Mutex, Notify, RwLock};
 
 lazy_static! {
     pub static ref SENDER: Arc<EventSender> = Arc::new(EventSender::new());
@@ -14,7 +14,7 @@ lazy_static! {
 pub struct EventSender {
     events: Mutex<Vec<HashMap<String, String>>>,
     notify: Arc<Notify>,
-    stopped: RwLock<bool>
+    stopped: RwLock<bool>,
 }
 
 impl EventSender {
@@ -22,7 +22,7 @@ impl EventSender {
         EventSender {
             events: Mutex::new(Vec::new()),
             notify: Arc::new(Notify::new()),
-            stopped: RwLock::new(false)
+            stopped: RwLock::new(false),
         }
     }
 
@@ -30,7 +30,10 @@ impl EventSender {
         properties.insert("event".to_string(), event);
         properties.insert("id".to_string(), nanoid!(16));
         properties.insert("anonymousId".to_string(), "cubestore".to_string());
-        properties.insert("clientTimestamp".to_string(), Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
+        properties.insert(
+            "clientTimestamp".to_string(),
+            Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        );
         self.events.lock().await.push(properties);
         self.notify.notify();
     }
@@ -61,14 +64,19 @@ impl EventSender {
     async fn send_events(mut to_send: Vec<HashMap<String, String>>) -> Result<(), CubeError> {
         let max_retries = 10usize;
         for retry in 0..max_retries {
-            let client = reqwest::ClientBuilder::new().use_rustls_tls().user_agent("cubestore").build().unwrap();
+            let client = reqwest::ClientBuilder::new()
+                .use_rustls_tls()
+                .user_agent("cubestore")
+                .build()
+                .unwrap();
 
             let sent_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
             for event in to_send.iter_mut() {
                 event.insert("sentAt".to_string(), sent_at.to_string());
             }
 
-            let res = client.post("https://track.cube.dev/track")
+            let res = client
+                .post("https://track.cube.dev/track")
                 .json(&to_send)
                 .send()
                 .await?;
@@ -76,13 +84,18 @@ impl EventSender {
                 if retry < max_retries - 1 {
                     continue;
                 } else {
-                    return Err(CubeError::internal(format!("Send events error: {}", res.text().await?)))
+                    return Err(CubeError::internal(format!(
+                        "Send events error: {}",
+                        res.text().await?
+                    )));
                 }
             } else {
                 return Ok(());
             }
         }
-        Err(CubeError::internal(format!("Send events error: shouldn't get there")))
+        Err(CubeError::internal(format!(
+            "Send events error: shouldn't get there"
+        )))
     }
 }
 
@@ -104,14 +117,12 @@ pub async fn stop_track_event_loop() {
 }
 
 pub struct ReportingLogger {
-    logger: Box<dyn Log>
+    logger: Box<dyn Log>,
 }
 
 impl ReportingLogger {
     pub fn init(logger: Box<dyn Log>, max_level: LevelFilter) -> Result<(), CubeError> {
-        let reporting_logger = Self {
-            logger
-        };
+        let reporting_logger = Self { logger };
         log::set_boxed_logger(Box::new(reporting_logger))?;
         log::set_max_level(max_level);
         Ok(())
@@ -127,9 +138,9 @@ impl Log for ReportingLogger {
         if let Level::Error = record.metadata().level() {
             track_event_spawn(
                 "Cube Store Error".to_string(),
-                vec![
-                    ("error".to_string(), format!("{}", record.args()))
-                ].into_iter().collect()
+                vec![("error".to_string(), format!("{}", record.args()))]
+                    .into_iter()
+                    .collect(),
             )
         }
         self.logger.log(record)

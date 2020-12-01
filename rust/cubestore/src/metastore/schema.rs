@@ -1,9 +1,9 @@
-use rocksdb::DB;
-use std::sync::Arc;
-use serde::{Deserialize, Deserializer};
-use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, TableId, Schema};
-use crate::metastore::{MetaStoreEvent, IdRow};
+use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, Schema, TableId};
+use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
+use rocksdb::DB;
+use serde::{Deserialize, Deserializer};
+use std::sync::Arc;
 
 impl Schema {
     pub fn get_name(&self) -> &String {
@@ -16,8 +16,8 @@ impl Schema {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub (crate) enum SchemaRocksIndex {
-    Name = 1
+pub(crate) enum SchemaRocksIndex {
+    Name = 1,
 }
 
 rocks_table_impl!(
@@ -31,7 +31,7 @@ rocks_table_impl!(
 impl RocksSecondaryIndex<Schema, String> for SchemaRocksIndex {
     fn typed_key_by(&self, row: &Schema) -> String {
         match self {
-            SchemaRocksIndex::Name => row.name.to_string()
+            SchemaRocksIndex::Name => row.name.to_string(),
         }
     }
 
@@ -41,7 +41,7 @@ impl RocksSecondaryIndex<Schema, String> for SchemaRocksIndex {
 
     fn is_unique(&self) -> bool {
         match self {
-            SchemaRocksIndex::Name => true
+            SchemaRocksIndex::Name => true,
         }
     }
 

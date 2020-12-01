@@ -1,28 +1,32 @@
 mod parser;
 
-use log::{trace};
+use log::trace;
 
-use sqlparser::dialect::{Dialect};
-use sqlparser::ast::*;
 use async_trait::async_trait;
+use sqlparser::ast::*;
+use sqlparser::dialect::Dialect;
 
-
-use crate::table::{TableValue, Row, TimestampValue};
+use crate::metastore::{
+    table::Table, IdRow, ImportFormat, Index, IndexDef, RowKey, Schema, TableId,
+};
+use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
-use crate::{store::{DataFrame, WALDataStore}, metastore::{MetaStore, Column, ColumnType}};
+use crate::{
+    metastore::{Column, ColumnType, MetaStore},
+    store::{DataFrame, WALDataStore},
+};
 use std::sync::Arc;
-use crate::metastore::{IdRow, Schema, table::Table, ImportFormat, Index, IndexDef, TableId, RowKey};
 
-use crate::queryplanner::{QueryPlanner, QueryPlan};
+use crate::queryplanner::{QueryPlan, QueryPlanner};
 
 use crate::cluster::{Cluster, JobEvent};
 
-use parser::{Statement as CubeStoreStatement};
-use datafusion::sql::parser::{Statement as DFStatement};
 use crate::metastore::job::JobType;
-use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use crate::queryplanner::query_executor::QueryExecutor;
 use crate::sql::parser::CubeStoreParser;
+use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
+use datafusion::sql::parser::Statement as DFStatement;
+use parser::Statement as CubeStoreStatement;
 
 #[async_trait]
 pub trait SqlService: Send + Sync {
@@ -43,30 +47,77 @@ impl SqlServiceImpl {
         wal_store: Arc<dyn WALDataStore>,
         query_planner: Arc<dyn QueryPlanner>,
         query_executor: Arc<dyn QueryExecutor>,
-        cluster: Arc<dyn Cluster>
+        cluster: Arc<dyn Cluster>,
     ) -> Arc<SqlServiceImpl> {
-        Arc::new(SqlServiceImpl { db, wal_store, query_planner, query_executor, cluster })
+        Arc::new(SqlServiceImpl {
+            db,
+            wal_store,
+            query_planner,
+            query_executor,
+            cluster,
+        })
     }
 
-    async fn create_schema(&self, name: String, if_not_exists: bool) -> Result<IdRow<Schema>, CubeError> {
+    async fn create_schema(
+        &self,
+        name: String,
+        if_not_exists: bool,
+    ) -> Result<IdRow<Schema>, CubeError> {
         self.db.create_schema(name, if_not_exists).await
     }
 
-    async fn create_table(&self, schema_name: String, table_name: String, columns: &Vec<ColumnDef>, external: bool, location: Option<String>, indexes: Vec<Statement>) -> Result<IdRow<Table>, CubeError> {
+    async fn create_table(
+        &self,
+        schema_name: String,
+        table_name: String,
+        columns: &Vec<ColumnDef>,
+        external: bool,
+        location: Option<String>,
+        indexes: Vec<Statement>,
+    ) -> Result<IdRow<Table>, CubeError> {
         let columns_to_set = convert_columns_type(columns)?;
         let mut indexes_to_create = Vec::new();
         for index in indexes.iter() {
             if let Statement::CreateIndex { name, columns, .. } = index {
-                indexes_to_create.push(IndexDef { name: name.to_string(), columns: columns.iter().map(|c| c.to_string()).collect::<Vec<_>>() });
+                indexes_to_create.push(IndexDef {
+                    name: name.to_string(),
+                    columns: columns.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
+                });
             }
         }
         if external {
             let listener = self.cluster.job_result_listener();
-            let table = self.db.create_table(schema_name, table_name, columns_to_set, location, Some(ImportFormat::CSV), indexes_to_create).await?;
-            listener.wait_for_job_result(RowKey::Table(TableId::Tables, table.get_id()), JobType::TableImport).await?;
+            let table = self
+                .db
+                .create_table(
+                    schema_name,
+                    table_name,
+                    columns_to_set,
+                    location,
+                    Some(ImportFormat::CSV),
+                    indexes_to_create,
+                )
+                .await?;
+            listener
+                .wait_for_job_result(
+                    RowKey::Table(TableId::Tables, table.get_id()),
+                    JobType::TableImport,
+                )
+                .await?;
             let wal_listener = self.cluster.job_result_listener();
             let wals = self.db.get_wals_for_table(table.get_id()).await?;
-            let events = wal_listener.wait_for_job_results(wals.into_iter().map(|wal| (RowKey::Table(TableId::WALs, wal.get_id()), JobType::WalPartitioning)).collect()).await?;
+            let events = wal_listener
+                .wait_for_job_results(
+                    wals.into_iter()
+                        .map(|wal| {
+                            (
+                                RowKey::Table(TableId::WALs, wal.get_id()),
+                                JobType::WalPartitioning,
+                            )
+                        })
+                        .collect(),
+                )
+                .await?;
 
             for v in events {
                 if let JobEvent::Error(_, _, e) = v {
@@ -76,43 +127,92 @@ impl SqlServiceImpl {
 
             Ok(table)
         } else {
-            self.db.create_table(schema_name, table_name, columns_to_set, None, None, indexes_to_create).await
+            self.db
+                .create_table(
+                    schema_name,
+                    table_name,
+                    columns_to_set,
+                    None,
+                    None,
+                    indexes_to_create,
+                )
+                .await
         }
     }
 
-    async fn _create_index(&self, schema_name: String, table_name: String, name: String, columns: &Vec<Ident>) -> Result<IdRow<Index>, CubeError> {
-        let table = self.db.get_table(schema_name.clone(), table_name.clone()).await?;
-        let columns_to_write = columns.iter().enumerate().map(
-            |(i, c)| table.get_row().get_columns().iter().find(|tc| tc.get_name() == &c.value).map(|c| c.replace_index(i))
-                .ok_or(CubeError::user(format!("Column '{}' is not found in {}.{}", c.value, schema_name, table_name)))
-        ).collect::<Vec<_>>();
+    async fn _create_index(
+        &self,
+        schema_name: String,
+        table_name: String,
+        name: String,
+        columns: &Vec<Ident>,
+    ) -> Result<IdRow<Index>, CubeError> {
+        let table = self
+            .db
+            .get_table(schema_name.clone(), table_name.clone())
+            .await?;
+        let columns_to_write = columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| {
+                table
+                    .get_row()
+                    .get_columns()
+                    .iter()
+                    .find(|tc| tc.get_name() == &c.value)
+                    .map(|c| c.replace_index(i))
+                    .ok_or(CubeError::user(format!(
+                        "Column '{}' is not found in {}.{}",
+                        c.value, schema_name, table_name
+                    )))
+            })
+            .collect::<Vec<_>>();
         if let Some(Err(e)) = columns_to_write.iter().find(|r| r.is_err()) {
             return Err(e.clone());
         }
-        Ok(self.db.index_table().insert_row(Index::new(
-            name,
-            table.get_id(),
-            columns_to_write.into_iter().map(|c| c.unwrap().clone()).collect::<Vec<_>>(),
-            columns.len() as u64)).await?
-        )
+        Ok(self
+            .db
+            .index_table()
+            .insert_row(Index::new(
+                name,
+                table.get_id(),
+                columns_to_write
+                    .into_iter()
+                    .map(|c| c.unwrap().clone())
+                    .collect::<Vec<_>>(),
+                columns.len() as u64,
+            ))
+            .await?)
     }
 
-    async fn insert_data<'a>(&'a self, schema_name: String, table_name: String, columns: &'a Vec<Ident>, data: &'a Vec<Vec<Expr>>) -> Result<u64, CubeError> {
-        let table = self.db.get_table(schema_name.clone(), table_name.clone()).await?;
+    async fn insert_data<'a>(
+        &'a self,
+        schema_name: String,
+        table_name: String,
+        columns: &'a Vec<Ident>,
+        data: &'a Vec<Vec<Expr>>,
+    ) -> Result<u64, CubeError> {
+        let table = self
+            .db
+            .get_table(schema_name.clone(), table_name.clone())
+            .await?;
         let table_columns = table.get_row().clone();
         let table_columns = table_columns.get_columns();
         let mut real_col: Vec<&Column> = Vec::new();
         for column in columns {
             let c = if let Some(item) = table_columns
                 .iter()
-                .find(|voc| *voc.get_name() == column.value) {
+                .find(|voc| *voc.get_name() == column.value)
+            {
                 item
             } else {
-                return Err(CubeError::user(format!("Column {} does noot present in table {}.{}.", column.value, schema_name, table_name)));
+                return Err(CubeError::user(format!(
+                    "Column {} does noot present in table {}.{}.",
+                    column.value, schema_name, table_name
+                )));
             };
             real_col.push(c);
-        };
-
+        }
 
         let chunk_len = self.wal_store.get_wal_chunk_size();
 
@@ -121,12 +221,22 @@ impl SqlServiceImpl {
         let listener = self.cluster.job_result_listener();
         for rows_chunk in data.chunks(chunk_len) {
             let data_frame = parse_chunk(rows_chunk, &real_col)?;
-            wal_ids.push(self.wal_store.add_wal(table.clone(), data_frame).await?.get_id());
+            wal_ids.push(
+                self.wal_store
+                    .add_wal(table.clone(), data_frame)
+                    .await?
+                    .get_id(),
+            );
         }
 
-        let res = listener.wait_for_job_results(
-            wal_ids.into_iter().map(|id| (RowKey::Table(TableId::WALs, id), JobType::WalPartitioning)).collect()
-        ).await?;
+        let res = listener
+            .wait_for_job_results(
+                wal_ids
+                    .into_iter()
+                    .map(|id| (RowKey::Table(TableId::WALs, id), JobType::WalPartitioning))
+                    .collect(),
+            )
+            .await?;
 
         for v in res {
             if let JobEvent::Error(_, _, e) = v {
@@ -178,21 +288,40 @@ impl SqlService for SqlServiceImpl {
                 match variable.value.to_lowercase() {
                     s if s == "schemas" => Ok(DataFrame::from(self.db.get_schemas().await?)),
                     s if s == "tables" => Ok(DataFrame::from(self.db.get_tables().await?)),
-                    s if s == "chunks" => Ok(DataFrame::from(self.db.chunks_table().all_rows().await?)),
-                    s if s == "indexes" => Ok(DataFrame::from(self.db.index_table().all_rows().await?)),
-                    s if s == "partitions" => Ok(DataFrame::from(self.db.partition_table().all_rows().await?)),
-                    x => Err(CubeError::user(format!("Unknown SHOW: {}", x)))
+                    s if s == "chunks" => {
+                        Ok(DataFrame::from(self.db.chunks_table().all_rows().await?))
+                    }
+                    s if s == "indexes" => {
+                        Ok(DataFrame::from(self.db.index_table().all_rows().await?))
+                    }
+                    s if s == "partitions" => {
+                        Ok(DataFrame::from(self.db.partition_table().all_rows().await?))
+                    }
+                    x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(DataFrame::new(vec![], vec![]))
             }
-            CubeStoreStatement::CreateSchema { schema_name, if_not_exists } => {
+            CubeStoreStatement::CreateSchema {
+                schema_name,
+                if_not_exists,
+            } => {
                 let name = schema_name.to_string();
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(DataFrame::from(vec![res]))
             }
-            CubeStoreStatement::CreateTable { create_table: Statement::CreateTable { name, columns, external, location, .. }, indexes } => {
+            CubeStoreStatement::CreateTable {
+                create_table:
+                    Statement::CreateTable {
+                        name,
+                        columns,
+                        external,
+                        location,
+                        ..
+                    },
+                indexes,
+            } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
@@ -200,27 +329,48 @@ impl SqlService for SqlServiceImpl {
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
 
-                let res = self.create_table(schema_name.clone(), table_name.clone(), &columns, external, location, indexes).await?;
+                let res = self
+                    .create_table(
+                        schema_name.clone(),
+                        table_name.clone(),
+                        &columns,
+                        external,
+                        location,
+                        indexes,
+                    )
+                    .await?;
                 Ok(DataFrame::from(vec![res]))
             }
-            CubeStoreStatement::Statement(Statement::Drop { object_type, names, .. }) => {
+            CubeStoreStatement::Statement(Statement::Drop {
+                object_type, names, ..
+            }) => {
                 match object_type {
                     ObjectType::Schema => {
                         self.db.delete_schema(names[0].to_string()).await?;
                     }
                     ObjectType::Table => {
-                        let table = self.db.get_table(names[0].0[0].to_string(), names[0].0[1].to_string()).await?;
+                        let table = self
+                            .db
+                            .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
+                            .await?;
                         self.db.drop_table(table.get_id()).await?;
                     }
-                    _ => return Err(CubeError::user("Unsupported drop operation".to_string()))
+                    _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
                 }
                 Ok(DataFrame::new(vec![], vec![]))
             }
-            CubeStoreStatement::Statement(Statement::Insert { table_name, columns, source }) => {
+            CubeStoreStatement::Statement(Statement::Insert {
+                table_name,
+                columns,
+                source,
+            }) => {
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
                 } else {
-                    return Err(CubeError::user(format!("Data should be present in query. Your query was '{}'", q)));
+                    return Err(CubeError::user(format!(
+                        "Data should be present in query. Your query was '{}'",
+                        q
+                    )));
                 };
 
                 let nv = &table_name.0;
@@ -230,53 +380,72 @@ impl SqlService for SqlServiceImpl {
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
 
-                self.insert_data(schema_name.clone(), table_name.clone(), &columns, data).await?;
+                self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
+                    .await?;
                 Ok(DataFrame::new(vec![], vec![]))
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
-                let logical_plan = self.query_planner.logical_plan(DFStatement::Statement(Statement::Query(q))).await?;
+                let logical_plan = self
+                    .query_planner
+                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .await?;
                 // TODO distribute and combine
                 let res = match logical_plan {
-                    QueryPlan::Meta(logical_plan) => self.query_planner.execute_meta_plan(logical_plan).await?,
-                    QueryPlan::Select(serialized) => self.query_executor.execute_router_plan(serialized, self.cluster.clone()).await?
+                    QueryPlan::Meta(logical_plan) => {
+                        self.query_planner.execute_meta_plan(logical_plan).await?
+                    }
+                    QueryPlan::Select(serialized) => {
+                        self.query_executor
+                            .execute_router_plan(serialized, self.cluster.clone())
+                            .await?
+                    }
                 };
                 Ok(res)
             }
-            _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", q)))
+            _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", q))),
         }
     }
 }
-
 
 fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeError> {
     let mut rolupdb_columns = Vec::new();
 
     for (i, col) in columns.iter().enumerate() {
-        let cube_col = Column::new(col.name.value.clone(),
-                                   match &col.data_type {
-                                           DataType::Date | DataType::Time | DataType::Char(_)
-                                           | DataType::Varchar(_) | DataType::Clob(_)
-                                           | DataType::Text => { ColumnType::String }
-                                           DataType::Uuid | DataType::Binary(_)
-                                           | DataType::Varbinary(_) | DataType::Blob(_)
-                                           | DataType::Bytea
-                                           | DataType::Array(_) => { ColumnType::Bytes }
-                                           DataType::Decimal(_, _) => { ColumnType::Int }
-                                           DataType::SmallInt | DataType::Int
-                                           | DataType::BigInt
-                                           | DataType::Interval => { ColumnType::Int }
-                                           DataType::Boolean => ColumnType::Boolean,
-                                           DataType::Float(_) | DataType::Real
-                                           | DataType::Double => { ColumnType::Decimal }
-                                           DataType::Timestamp => { ColumnType::Timestamp }
-                                           DataType::Custom(custom) => {
-                                               return Err(CubeError::user(format!("Custom type '{}' is not supported", custom)));
-                                           }
-                                           DataType::Regclass => {
-                                               return Err(CubeError::user("Type 'RegClass' is not suppored.".to_string()));
-                                           }
-                                       },
-                                   i,
+        let cube_col = Column::new(
+            col.name.value.clone(),
+            match &col.data_type {
+                DataType::Date
+                | DataType::Time
+                | DataType::Char(_)
+                | DataType::Varchar(_)
+                | DataType::Clob(_)
+                | DataType::Text => ColumnType::String,
+                DataType::Uuid
+                | DataType::Binary(_)
+                | DataType::Varbinary(_)
+                | DataType::Blob(_)
+                | DataType::Bytea
+                | DataType::Array(_) => ColumnType::Bytes,
+                DataType::Decimal(_, _) => ColumnType::Int,
+                DataType::SmallInt | DataType::Int | DataType::BigInt | DataType::Interval => {
+                    ColumnType::Int
+                }
+                DataType::Boolean => ColumnType::Boolean,
+                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Decimal,
+                DataType::Timestamp => ColumnType::Timestamp,
+                DataType::Custom(custom) => {
+                    return Err(CubeError::user(format!(
+                        "Custom type '{}' is not supported",
+                        custom
+                    )));
+                }
+                DataType::Regclass => {
+                    return Err(CubeError::user(
+                        "Type 'RegClass' is not suppored.".to_string(),
+                    ));
+                }
+            },
+            i,
         );
         rolupdb_columns.push(cube_col);
     }
@@ -292,7 +461,10 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<DataFrame, 
         }
         res.push(Row::new(row));
     }
-    Ok(DataFrame::new(column.iter().map(|c| (*c).clone()).collect::<Vec<Column>>(), res))
+    Ok(DataFrame::new(
+        column.iter().map(|c| (*c).clone()).collect::<Vec<Column>>(),
+        res,
+    ))
 }
 
 fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableValue, CubeError> {
@@ -305,28 +477,44 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
                     v
                 } else {
-                    return Err(CubeError::user(format!("Single quoted string is expected but {:?} found", cell)));
+                    return Err(CubeError::user(format!(
+                        "Single quoted string is expected but {:?} found",
+                        cell
+                    )));
                 };
                 TableValue::String(val.to_string())
             }
             ColumnType::Int => {
                 let val_int = match cell {
-                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => v.parse::<i64>(),
-                    Expr::UnaryOp { op: UnaryOperator::Minus, expr } => {
+                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
+                        v.parse::<i64>()
+                    }
+                    Expr::UnaryOp {
+                        op: UnaryOperator::Minus,
+                        expr,
+                    } => {
                         if let Expr::Value(Value::Number(v)) = expr.as_ref() {
                             v.parse::<i64>().map(|v| v * -1)
                         } else {
-                            return Err(CubeError::user(format!("Can't parse int from, {:?}", cell)))
+                            return Err(CubeError::user(format!(
+                                "Can't parse int from, {:?}",
+                                cell
+                            )));
                         }
-                    },
-                    _ => return Err(CubeError::user(format!("Can't parse int from, {:?}", cell)))
+                    }
+                    _ => return Err(CubeError::user(format!("Can't parse int from, {:?}", cell))),
                 };
                 if let Err(e) = val_int {
-                    return Err(CubeError::user(format!("Can't parse int from, {:?}: {}", cell, e)));
+                    return Err(CubeError::user(format!(
+                        "Can't parse int from, {:?}: {}",
+                        cell, e
+                    )));
                 }
                 TableValue::Int(val_int.unwrap())
             }
-            ColumnType::Decimal => { return Err(CubeError::user("Decimal type not implemented.".to_string())); }
+            ColumnType::Decimal => {
+                return Err(CubeError::user("Decimal type not implemented.".to_string()));
+            }
             ColumnType::Bytes => {
                 // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
                 let val = if let Expr::Value(Value::Number(v)) = cell {
@@ -334,49 +522,55 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 } else {
                     return Err(CubeError::user("Corrupted data in query.".to_string()));
                 };
-                let main_vec: Vec<u8> = val.split("") // split string into words by whitespace
+                let main_vec: Vec<u8> = val
+                    .split("") // split string into words by whitespace
                     .filter_map(|w| w.parse::<u8>().ok()) // calling ok() turns Result to Option so that filter_map can discard None values
                     .collect();
                 TableValue::Bytes(main_vec)
             }
-            ColumnType::Timestamp => {
-                match cell {
-                    Expr::Value(Value::SingleQuotedString(v)) => {
-                        TableValue::Timestamp(TimestampValue::new(string_to_timestamp_nanos(v)?))
-                    },
-                    x => return Err(CubeError::user(format!("Can't parse timestamp from, {:?}", x)))
+            ColumnType::Timestamp => match cell {
+                Expr::Value(Value::SingleQuotedString(v)) => {
+                    TableValue::Timestamp(TimestampValue::new(string_to_timestamp_nanos(v)?))
                 }
-            }
-            ColumnType::Boolean => {
-                match cell {
-                    Expr::Value(Value::SingleQuotedString(v)) => {
-                        TableValue::Boolean(v.to_lowercase() == "true")
-                    },
-                    Expr::Value(Value::Boolean(b)) => TableValue::Boolean(*b),
-                    x => return Err(CubeError::user(format!("Can't parse boolean from, {:?}", x)))
+                x => {
+                    return Err(CubeError::user(format!(
+                        "Can't parse timestamp from, {:?}",
+                        x
+                    )))
                 }
-            }
+            },
+            ColumnType::Boolean => match cell {
+                Expr::Value(Value::SingleQuotedString(v)) => {
+                    TableValue::Boolean(v.to_lowercase() == "true")
+                }
+                Expr::Value(Value::Boolean(b)) => TableValue::Boolean(*b),
+                x => {
+                    return Err(CubeError::user(format!(
+                        "Can't parse boolean from, {:?}",
+                        x
+                    )))
+                }
+            },
         }
     };
     Ok(res)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rocksdb::{DB, Options};
-    use crate::remotefs::LocalDirRemoteFs;
-    use std::path::PathBuf;
-    use crate::queryplanner::MockQueryPlanner;
-    use crate::queryplanner::query_executor::MockQueryExecutor;
-    use crate::config::Config;
-    use crate::metastore::{RocksMetaStore};
     use crate::cluster::MockCluster;
-    use std::{fs, env};
+    use crate::config::Config;
+    use crate::metastore::RocksMetaStore;
+    use crate::queryplanner::query_executor::MockQueryExecutor;
+    use crate::queryplanner::MockQueryPlanner;
+    use crate::remotefs::LocalDirRemoteFs;
     use crate::store::WALStore;
+    use rocksdb::{Options, DB};
     use std::fs::File;
     use std::io::Write;
+    use std::path::PathBuf;
+    use std::{env, fs};
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -388,7 +582,10 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
         {
-            let remote_fs = LocalDirRemoteFs::new(PathBuf::from(store_path.clone()), PathBuf::from(remote_store_path.clone()));
+            let remote_fs = LocalDirRemoteFs::new(
+                PathBuf::from(store_path.clone()),
+                PathBuf::from(remote_store_path.clone()),
+            );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone());
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let service = SqlServiceImpl::new(
@@ -399,7 +596,13 @@ mod tests {
                 Arc::new(MockCluster::new()),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
-            assert_eq!(i.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::String("foo".to_string())]));
+            assert_eq!(
+                i.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Int(1),
+                    TableValue::String("foo".to_string())
+                ])
+            );
         }
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
@@ -415,12 +618,27 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         {
-            let remote_fs = LocalDirRemoteFs::new(PathBuf::from(store_path.clone()), PathBuf::from(remote_store_path.clone()));
+            let remote_fs = LocalDirRemoteFs::new(
+                PathBuf::from(store_path.clone()),
+                PathBuf::from(remote_store_path.clone()),
+            );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone());
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
-            let service = SqlServiceImpl::new(meta_store, store, Arc::new(MockQueryPlanner::new()), Arc::new(MockQueryExecutor::new()), Arc::new(MockCluster::new()));
+            let service = SqlServiceImpl::new(
+                meta_store,
+                store,
+                Arc::new(MockQueryPlanner::new()),
+                Arc::new(MockQueryExecutor::new()),
+                Arc::new(MockCluster::new()),
+            );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
-            assert_eq!(i.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::String("Foo".to_string())]));
+            assert_eq!(
+                i.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Int(1),
+                    TableValue::String("Foo".to_string())
+                ])
+            );
             let query = "CREATE TABLE Foo.Persons (
                                 PersonID int,
                                 LastName varchar(255),
@@ -491,33 +709,43 @@ mod tests {
     #[tokio::test]
     async fn select_test() {
         Config::run_test("select", async move |services| {
-           let service = services.sql_service;
+            let service = services.sql_service;
 
             let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
 
-            let _ = service.exec_query(
-                "CREATE TABLE Foo.Persons (
+            let _ = service
+                .exec_query(
+                    "CREATE TABLE Foo.Persons (
                                 PersonID int,
                                 LastName varchar(255),
                                 FirstName varchar(255),
                                 Address varchar(255),
                                 City varchar(255)
-                              );"
-            ).await.unwrap();
+                              );",
+                )
+                .await
+                .unwrap();
 
-            service.exec_query(
-                "INSERT INTO Foo.Persons
+            service
+                .exec_query(
+                    "INSERT INTO Foo.Persons
                 (LastName, PersonID, FirstName, Address, City)
                 VALUES
                 ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'),
-                ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');"
-            ).await.unwrap();
+                ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');",
+                )
+                .await
+                .unwrap();
 
-            let result = service.exec_query("SELECT PersonID person_id from Foo.Persons").await.unwrap();
+            let result = service
+                .exec_query("SELECT PersonID person_id from Foo.Persons")
+                .await
+                .unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(22)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(23)]));
-        }).await;
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -527,18 +755,24 @@ mod tests {
 
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
-            let _ = service.exec_query(
-                "CREATE TABLE foo.values (int_value int)"
-            ).await.unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE foo.values (int_value int)")
+                .await
+                .unwrap();
 
-            service.exec_query(
-                "INSERT INTO foo.values (int_value) VALUES (-153)"
-            ).await.unwrap();
+            service
+                .exec_query("INSERT INTO foo.values (int_value) VALUES (-153)")
+                .await
+                .unwrap();
 
-            let result = service.exec_query("SELECT * from foo.values").await.unwrap();
+            let result = service
+                .exec_query("SELECT * from foo.values")
+                .await
+                .unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
-        }).await;
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -599,9 +833,13 @@ mod tests {
                 "INSERT INTO foo.timestamps (t) VALUES ('2020-01-01T00:00:00.000Z'), ('2020-01-02T00:00:00.000Z'), ('2020-01-03T00:00:00.000Z')"
             ).await.unwrap();
 
+            service.exec_query(
+                "INSERT INTO foo.timestamps (t) VALUES ('2020-01-01T00:00:00.000Z'), ('2020-01-02T00:00:00.000Z'), ('2020-01-03T00:00:00.000Z')"
+            ).await.unwrap();
+
             let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
         }).await;
     }
 
@@ -610,9 +848,16 @@ mod tests {
         Config::run_test("create_schema_if_not_exists", async move |services| {
             let service = services.sql_service;
 
-            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-        }).await;
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS Foo")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS Foo")
+                .await
+                .unwrap();
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -647,83 +892,62 @@ impl SqlServiceImpl {
             return Some(DataFrame::new(
                 vec![
                     Column::new("Variable_name".to_string(), ColumnType::String, 0),
-                    Column::new("Value".to_string(), ColumnType::String, 1)
+                    Column::new("Value".to_string(), ColumnType::String, 1),
                 ],
-                vec![
-                    Row::new(vec![
-                        TableValue::String("lower_case_table_names".to_string()),
-                        TableValue::String("2".to_string())
-                    ])
-                ],
+                vec![Row::new(vec![
+                    TableValue::String("lower_case_table_names".to_string()),
+                    TableValue::String("2".to_string()),
+                ])],
             ));
         }
         if q == "SHOW SESSION VARIABLES LIKE 'sql_mode'" {
             return Some(DataFrame::new(
                 vec![
                     Column::new("Variable_name".to_string(), ColumnType::String, 0),
-                    Column::new("Value".to_string(), ColumnType::String, 1)
+                    Column::new("Value".to_string(), ColumnType::String, 1),
                 ],
-                vec![
-                    Row::new(vec![
-                        TableValue::String("sql_mode".to_string()),
-                        TableValue::String("TRADITIONAL".to_string())
-                    ])
-                ],
+                vec![Row::new(vec![
+                    TableValue::String("sql_mode".to_string()),
+                    TableValue::String("TRADITIONAL".to_string()),
+                ])],
             ));
         }
         if q.to_lowercase() == "select current_user()" {
             return Some(DataFrame::new(
-                vec![
-                    Column::new("user".to_string(), ColumnType::String, 0),
-                ],
-                vec![
-                    Row::new(vec![
-                        TableValue::String("root".to_string()),
-                    ])
-                ],
+                vec![Column::new("user".to_string(), ColumnType::String, 0)],
+                vec![Row::new(vec![TableValue::String("root".to_string())])],
             ));
         }
-        if q.to_lowercase() == "select connection_id()" { // TODO
+        if q.to_lowercase() == "select connection_id()" {
+            // TODO
             return Some(DataFrame::new(
-                vec![
-                    Column::new("connection_id".to_string(), ColumnType::String, 0),
-                ],
-                vec![
-                    Row::new(vec![
-                        TableValue::String("1".to_string()),
-                    ])
-                ],
+                vec![Column::new(
+                    "connection_id".to_string(),
+                    ColumnType::String,
+                    0,
+                )],
+                vec![Row::new(vec![TableValue::String("1".to_string())])],
             ));
         }
-        if q.to_lowercase() == "select connection_id() as connectionid" { // TODO
+        if q.to_lowercase() == "select connection_id() as connectionid" {
+            // TODO
             return Some(DataFrame::new(
-                vec![
-                    Column::new("connectionId".to_string(), ColumnType::String, 0),
-                ],
-                vec![
-                    Row::new(vec![
-                        TableValue::String("1".to_string()),
-                    ])
-                ],
+                vec![Column::new(
+                    "connectionId".to_string(),
+                    ColumnType::String,
+                    0,
+                )],
+                vec![Row::new(vec![TableValue::String("1".to_string())])],
             ));
         }
         if q.to_lowercase() == "set character set utf8" {
-            return Some(DataFrame::new(
-                vec![],
-                vec![],
-            ));
+            return Some(DataFrame::new(vec![], vec![]));
         }
         if q.to_lowercase() == "set names utf8" {
-            return Some(DataFrame::new(
-                vec![],
-                vec![],
-            ));
+            return Some(DataFrame::new(vec![], vec![]));
         }
         if q.to_lowercase() == "show character set where charset = 'utf8mb4'" {
-            return Some(DataFrame::new(
-                vec![],
-                vec![],
-            ));
+            return Some(DataFrame::new(vec![], vec![]));
         }
         None
     }
