@@ -61,13 +61,15 @@ cube(`Users`, {
     usersMeasures: {
       type: `rollup`,
       measureReferences: [Users.avg, Users.total],
-      dimensionReferences: [MapboxCoords.coordinates, Users.country]
+      dimensionReferences: [MapboxCoords.coordinates, Users.country],
+      external: true
     },
 
     usersRating: {
       type: `rollup`,
       measureReferences: [Users.max],
-      dimensionReferences: [Users.geometry, Users.value]
+      dimensionReferences: [Users.geometry, Users.value],
+      external: true
     }
   }
 });

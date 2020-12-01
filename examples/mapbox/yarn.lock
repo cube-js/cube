@@ -956,10 +956,10 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
-"@cubejs-backend/api-gateway@^0.23.6":
-  version "0.23.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.23.6.tgz#316d4cc911f2e9b2c3b3f2ae8876d33ee8b3e154"
-  integrity sha512-SBQ3HCaQaYHjYldKOVIXrcQbsoIjv2DwvmX68PfWkNk1mWMs0qpSJr8FcFlz+8ThhKtgAcEeFM9DQKBTVc3Nzg==
+"@cubejs-backend/api-gateway@^0.24.0":
+  version "0.24.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.24.0.tgz#0c4de3c762efbe941286e0abe456db501529a358"
+  integrity sha512-4Ycf/47Qbl0fg2KJjcn4bHQMbLVz3Lm6oIKYSbYmNZI/3vR8Gz+LDwW2CKhT6zwIULDyVO9xBJYryMbcTSkioA==
   dependencies:
     "@hapi/joi" "^15.1.1"
     body-parser "^1.19.0"
@@ -971,38 +971,49 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/bigquery-driver@^0.23.8":
-  version "0.23.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/bigquery-driver/-/bigquery-driver-0.23.14.tgz#120024be02655e652763bb0b14881c575a9ab47a"
-  integrity sha512-KfOMCTB3b8SeKUQMnDRACL/nYrM+dQ9kqeT9tcU3qg6Wiy8vLekEFy1wXkxHTnzFt9ld8Kkvj8ZMfXosfJftLw==
+"@cubejs-backend/bigquery-driver@^0.24.2":
+  version "0.24.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/bigquery-driver/-/bigquery-driver-0.24.2.tgz#e9363c9343bf7097a0aa21fc65d2670928240152"
+  integrity sha512-VWHpcVs4beFohLd7dCNoANGR/MX4whk76zuu6CLOvTfHdN5Gja3UZ69zoUs3tQxHdyNt07fuCqSMYJUgvFHcmw==
   dependencies:
-    "@cubejs-backend/query-orchestrator" "^0.23.14"
+    "@cubejs-backend/query-orchestrator" "^0.24.2"
     "@google-cloud/bigquery" "^4.1.4"
     ramda "^0.27.0"
 
-"@cubejs-backend/postgres-driver@^0.23.8":
-  version "0.23.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/postgres-driver/-/postgres-driver-0.23.14.tgz#a5e0acad5dad8ba5c3ab2a39f7dde24dbb6810c9"
-  integrity sha512-mGPcSIfsvfHJf8BQEruM8pQplSxoEuwhK53U7o6ZBKiXFWnyIkJf2XeIhYpxlBaTb9XFj/HuwkWGmD2f0K+grw==
+"@cubejs-backend/cubestore-driver@^0.24.2":
+  version "0.24.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore-driver/-/cubestore-driver-0.24.2.tgz#6d7aad8a195acf54474a7fc131b37810fd2c375a"
+  integrity sha512-FcPweElEkx2F2SXd1kmMvkLv3AB1t/LeUmMpek5MhQR/tMqzyOtUTN9+WO/SHog7+nfzJYcbfJ0+TNGU4eY+/A==
   dependencies:
-    "@cubejs-backend/query-orchestrator" "^0.23.14"
+    "@cubejs-backend/query-orchestrator" "^0.24.2"
+    "@cubejs-backend/schema-compiler" "^0.24.1"
+    generic-pool "^3.6.0"
+    moment-timezone "^0.5.31"
+    mysql "^2.16.0"
+
+"@cubejs-backend/postgres-driver@^0.24.2":
+  version "0.24.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/postgres-driver/-/postgres-driver-0.24.2.tgz#61cdd3439eb58eb33787563547864c4bc92dea80"
+  integrity sha512-iv5ASm4Uv2b5OJruc29fBykD01j33RQkDUe3sBm+U47wjL5CyDwIoepZmMqNrb1d9MZ5KCGiAHOkk+hrmPBpMQ==
+  dependencies:
+    "@cubejs-backend/query-orchestrator" "^0.24.2"
     "@types/pg" "^7.14.5"
     moment "^2.24.0"
     pg "^8.2.1"
 
-"@cubejs-backend/query-orchestrator@^0.23.14":
-  version "0.23.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.23.14.tgz#5126524266554ca1748f536056eb9aec388984d5"
-  integrity sha512-KyAuI43CJp6SsXjuyLyv9L6OgjY/tUQR4z+TEYEt11mFdLn4sqMkHWz3fITsZEFK5wz3Mf7xPR+Ky4rB/ufrHw==
+"@cubejs-backend/query-orchestrator@^0.24.2":
+  version "0.24.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.2.tgz#74758c9467cc5b7a81840366ba822701186883fd"
+  integrity sha512-GHgQVqO9wLQVItDXj4XLTK1iR9RayVx286Gv1XR3xK1Z3voYrwxugeITFhipyrKvYFMX2uHxU/WfK6Xyryxg0A==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.23.11":
-  version "0.23.11"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.23.11.tgz#49a97745d364ceee32d1865e3986d469d84d8390"
-  integrity sha512-SWtu8nzYOdWwSyTtgGuhYvDYm62fM75GYOzGuyP0YpaYxFhUGYa561AWQ0uOCDowRszuRgbca/3VS3Y6V+UerQ==
+"@cubejs-backend/schema-compiler@^0.24.1":
+  version "0.24.1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.24.1.tgz#8884446b72f3e810b8ffa27e924eae3a940963b8"
+  integrity sha512-vLQWH+KHg3wt2Ig40zNWIKdjAN+ZHApz0xyGbpxyi8X52AmmdL8il0/UaL/iE06eqiwyj/k9G2e6pRSeOvdf6w==
   dependencies:
     "@babel/core" "^7.4.0"
     "@babel/generator" "^7.4.0"
@@ -1012,7 +1023,7 @@
     "@babel/traverse" "^7.4.0"
     "@babel/types" "^7.4.0"
     "@hapi/joi" "^15.1.1"
-    antlr4 "^4.8.0"
+    antlr4 "4.8.0"
     cron-parser "^2.16.3"
     humps "^2.0.1"
     inflection "^1.12.0"
@@ -1023,14 +1034,14 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.23.14":
-  version "0.23.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.23.14.tgz#b67b4a266f442eacba04261bf0b2e9f50c33b2a9"
-  integrity sha512-y1MH2V0ikzSnaCuyeLwJkrHZH4JzBHtLcH4372/7+pPSpzqF2OMSqJQe4GwlSjozp+V29fr66ia4xTOB7805LQ==
+"@cubejs-backend/server-core@^0.24.2":
+  version "0.24.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.24.2.tgz#bac563e39099dc3f796e3bfb3c8f6813d85aad42"
+  integrity sha512-R5SwPE88bXHkfDRB2lKuap8W2iuBKqwCElj9UT2KVYJ+FzEhpdRBXu+J+IfGg3cMEIX/f8meGm6yoXN55WdESQ==
   dependencies:
-    "@cubejs-backend/api-gateway" "^0.23.6"
-    "@cubejs-backend/query-orchestrator" "^0.23.14"
-    "@cubejs-backend/schema-compiler" "^0.23.11"
+    "@cubejs-backend/api-gateway" "^0.24.0"
+    "@cubejs-backend/query-orchestrator" "^0.24.2"
+    "@cubejs-backend/schema-compiler" "^0.24.1"
     "@hapi/joi" "^15.1.1"
     codesandbox-import-utils "^2.1.12"
     cross-spawn "^7.0.1"
@@ -1051,13 +1062,13 @@
     sqlstring "^2.3.1"
     uuid "^3.3.3"
 
-"@cubejs-backend/server@^0.23.14":
-  version "0.23.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.23.14.tgz#ef78e272c0e5843a5a3f6e9745c9e6b0e758fa12"
-  integrity sha512-yW3Bxa1YjbvMpo+6eQkrKd2UFMEULKKDTDTfWbhrlpq/pt/h9IsL53wDR4T1JRy/FNQcKhfPJ5kl3i8s/YdVWQ==
+"@cubejs-backend/server@^0.24.2":
+  version "0.24.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.24.2.tgz#eac8136dd02d4ede99b6e496f950e2213194bb58"
+  integrity sha512-tVGUrTNERwNAhu/YCePiIFqy3TNT8bZ9pmgeSmpqznw6rbA13QQjn/U3JVe1uQLoC9Cwp0h1vSrxcCO77glBcQ==
   dependencies:
-    "@cubejs-backend/server-core" "^0.23.14"
-    "@cubejs-backend/shared" "^0.23.14"
+    "@cubejs-backend/server-core" "^0.24.2"
+    "@cubejs-backend/shared" "^0.24.2"
     "@oclif/color" "^0.1.2"
     "@oclif/command" "^1.8.0"
     "@oclif/config" "^1.17.0"
@@ -1074,10 +1085,10 @@
     source-map-support "^0.5.19"
     ws "^7.1.2"
 
-"@cubejs-backend/shared@^0.23.14":
-  version "0.23.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.23.14.tgz#b5fdca80d37de03cab9884bdf7d783f8a6413f97"
-  integrity sha512-TyuvmYcpACaF90uQI2sQSdbwHhb3EkzvfP2M0zZKp0IjYZZ7ocSdbMv1XlJ3iqTFhNROV5jpO8FwJTzPmvFmDQ==
+"@cubejs-backend/shared@^0.24.2":
+  version "0.24.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.2.tgz#4da9b8a4fd86fe62345510ab27f77efc396da7e8"
+  integrity sha512-nMVflymKXryuZSu7MQ2jkOzzWF3JWaDnrmYlY45rUs0ClMhaXGNZkOHBg3qHowbUG3iLvbUKMZWQFz5a73Js+A==
   dependencies:
     env-var "^6.3.0"
 
@@ -1366,7 +1377,7 @@ ansi-styles@^4.1.0:
     "@types/color-name" "^1.1.1"
     color-convert "^2.0.1"
 
-antlr4@^4.8.0:
+antlr4@4.8.0:
   version "4.8.0"
   resolved "https://registry.yarnpkg.com/antlr4/-/antlr4-4.8.0.tgz#f938ec171be7fc2855cd3a533e87647185b32b6a"
   integrity sha512-en/MxQ4OkPgGJQ3wD/muzj1uDnFSzdFIhc2+c6bHZokWkuBb6RRvFjpWhPxWLbgQvaEzldJZ0GSQpfSAaE3hqg==
@@ -1407,6 +1418,11 @@ big.js@^5.2.2:
   version "5.2.2"
   resolved "https://registry.yarnpkg.com/big.js/-/big.js-5.2.2.tgz#65f0af382f578bcdc742bd9c281e9cb2d7768328"
   integrity sha512-vyL2OymJxmarO8gxMr0mhChsO9QGwhynfuu4+MHTAW6czfq9humCB7rKpUjDd9YUiDPU4mzpyupFSvOClAwbmQ==
+
+bignumber.js@9.0.0:
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/bignumber.js/-/bignumber.js-9.0.0.tgz#805880f84a329b5eac6e7cb6f8274b6d82bdf075"
+  integrity sha512-t/OYhhJ2SD+YGBQcjY8GzzDHEk9f3nerxjtfa6tlMXfe7frs/WozhvCNoGvpM0P3bNf3Gq5ZRMlGr5f3r4/N8A==
 
 bignumber.js@^7.0.0:
   version "7.2.1"
@@ -2081,7 +2097,7 @@ gcp-metadata@^3.4.0:
     gaxios "^2.1.0"
     json-bigint "^0.3.0"
 
-generic-pool@^3.7.1:
+generic-pool@^3.6.0, generic-pool@^3.7.1:
   version "3.7.1"
   resolved "https://registry.yarnpkg.com/generic-pool/-/generic-pool-3.7.1.tgz#36fe5bb83e7e0e032e5d32cd05dc00f5ff119aa8"
   integrity sha512-ug6DAZoNgWm6q5KhPFA+hzXfBLFQu5sTXxPpv44DmE0A2g+CiHoq9LTVdkXpZMkYVMoGw83F6W+WT0h0MFMK/w==
@@ -2632,6 +2648,16 @@ ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
   integrity sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==
 
+mysql@^2.16.0:
+  version "2.18.1"
+  resolved "https://registry.yarnpkg.com/mysql/-/mysql-2.18.1.tgz#2254143855c5a8c73825e4522baf2ea021766717"
+  integrity sha512-Bca+gk2YWmqp2Uf6k5NFEurwY/0td0cpebAucFpY/3jhrwrVGuxU2uQFCHjU19SJfje0yQvi+rVWdq78hR5lig==
+  dependencies:
+    bignumber.js "9.0.0"
+    readable-stream "2.3.7"
+    safe-buffer "5.1.2"
+    sqlstring "2.3.1"
+
 negotiator@0.6.2:
   version "0.6.2"
   resolved "https://registry.yarnpkg.com/negotiator/-/negotiator-0.6.2.tgz#feacf7ccf525a77ae9634436a64883ffeca346fb"
@@ -2904,7 +2930,7 @@ raw-body@2.4.0:
     string_decoder "^1.1.1"
     util-deprecate "^1.0.1"
 
-readable-stream@^2.0.0, readable-stream@^2.3.0, readable-stream@^2.3.5:
+readable-stream@2.3.7, readable-stream@^2.0.0, readable-stream@^2.3.0, readable-stream@^2.3.5:
   version "2.3.7"
   resolved "https://registry.yarnpkg.com/readable-stream/-/readable-stream-2.3.7.tgz#1eca1cf711aef814c04f62252a36a62f6cb23b57"
   integrity sha512-Ebho8K4jIbHAxnuxi7o42OrZgF/ZTNcsZj6nRKyUmkhLFq8CHItp/fy6hQZuZmP/n3yZ9VBUbp4zz/mX8hmYPw==
@@ -3152,6 +3178,11 @@ split@^1.0.0:
   integrity sha512-mTyOoPbrivtXnwnIxZRFYRrPNtEFKlpB2fvjSnCQUiAA6qAZzqwna5envK4uk6OIeP17CsdF3rSBGYVBsU0Tkg==
   dependencies:
     through "2"
+
+sqlstring@2.3.1:
+  version "2.3.1"
+  resolved "https://registry.yarnpkg.com/sqlstring/-/sqlstring-2.3.1.tgz#475393ff9e91479aea62dcaf0ca3d14983a7fb40"
+  integrity sha1-R1OT/56RR5rqYtyvDKPRSYOn+0A=
 
 sqlstring@^2.3.1:
   version "2.3.2"

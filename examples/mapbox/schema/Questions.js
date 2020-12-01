@@ -34,7 +34,8 @@ cube(`Questions`, {
   preAggregations: {
     questions: {
       type: `rollup`,
-      dimensionReferences: [Questions.id, Questions.tags, Questions.title, Questions.views, Users.geometry]
+      dimensionReferences: [Questions.id, Questions.tags, Questions.title, Questions.views, Users.geometry],
+      external: true
     }
   }
 });
