@@ -788,10 +788,20 @@ mod tests {
                 "INSERT INTO foo.bool_group (bool_value) VALUES (true), (false), (true), (false), (false)"
             ).await.unwrap();
 
+            service.exec_query(
+                "INSERT INTO foo.bool_group (bool_value) VALUES (true), (false), (true), (false), (false)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.bool_group").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(10)]));
+
+            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
+
             let result = service.exec_query("SELECT bool_value, count(*) from foo.bool_group GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(3)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(2)]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(6)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(4)]));
         }).await;
     }
 
