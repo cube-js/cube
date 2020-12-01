@@ -192,7 +192,7 @@ impl SqlService for SqlServiceImpl {
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(DataFrame::from(vec![res]))
             }
-            CubeStoreStatement::Statement(Statement::CreateTable { name, columns, external, location, .. }) => {
+            CubeStoreStatement::CreateTable { create_table: Statement::CreateTable { name, columns, external, location, .. }, indexes } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
@@ -200,7 +200,7 @@ impl SqlService for SqlServiceImpl {
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
 
-                let res = self.create_table(schema_name.clone(), table_name.clone(), &columns, external, location, vec![]).await?;
+                let res = self.create_table(schema_name.clone(), table_name.clone(), &columns, external, location, indexes).await?;
                 Ok(DataFrame::from(vec![res]))
             }
             CubeStoreStatement::Statement(Statement::Drop { object_type, names, .. }) => {
@@ -614,7 +614,7 @@ mod tests {
             };
 
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
+            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text) INDEX persons_city (city, id) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));

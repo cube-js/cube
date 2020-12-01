@@ -38,6 +38,8 @@ use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
+use datafusion::physical_plan::merge_join::MergeJoinExec;
+use datafusion::physical_plan::merge_sort::MergeSortExec;
 
 #[automock]
 #[async_trait]
@@ -334,9 +336,18 @@ impl CubeTable {
             self.schema.clone()
         };
 
-        let plan = Arc::new(MergeExec::new(Arc::new(
-            CubeTableExec { schema: projected_schema, partition_execs, index_snapshot: self.index_snapshot.clone() }
-        )));
+        let index = self.index_snapshot.index().get_row();
+        let sort_columns = (0..(index.sort_key_size() as usize)).map(|c| index.columns()[c].get_name().to_string()).take(projected_schema.fields().len()).collect::<Vec<_>>();
+        let plan: Arc<dyn ExecutionPlan> = if sort_columns.iter().all(|sort_column| projected_schema.index_of(sort_column).is_ok()) {
+            Arc::new(MergeSortExec::try_new(
+                Arc::new(CubeTableExec { schema: projected_schema, partition_execs, index_snapshot: self.index_snapshot.clone() }),
+                sort_columns
+            )?)
+        } else {
+            Arc::new(MergeExec::new(
+                Arc::new(CubeTableExec { schema: projected_schema, partition_execs, index_snapshot: self.index_snapshot.clone() })
+            ))
+        };
 
         Ok(plan)
     }
