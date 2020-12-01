@@ -1,16 +1,21 @@
-use rocksdb::DB;
-use std::sync::Arc;
-use serde::{Deserialize, Deserializer};
-use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, Chunk, TableId};
-use std::io::Cursor;
-use byteorder::{BigEndian, WriteBytesExt};
+use super::{BaseRocksSecondaryIndex, Chunk, IndexId, RocksSecondaryIndex, RocksTable, TableId};
 use crate::base_rocks_secondary_index;
+use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
-use crate::metastore::{MetaStoreEvent, IdRow};
+use byteorder::{BigEndian, WriteBytesExt};
+use rocksdb::DB;
+use serde::{Deserialize, Deserializer};
+use std::io::Cursor;
+use std::sync::Arc;
 
 impl Chunk {
     pub fn new(partition_id: u64, row_count: usize) -> Chunk {
-        Chunk { partition_id, row_count: row_count as u64, uploaded: false, active: false }
+        Chunk {
+            partition_id,
+            row_count: row_count as u64,
+            uploaded: false,
+            active: false,
+        }
     }
 
     pub fn get_row_count(&self) -> u64 {
@@ -26,11 +31,21 @@ impl Chunk {
     }
 
     pub fn set_uploaded(&self, uploaded: bool) -> Chunk {
-        Chunk { partition_id: self.partition_id, row_count: self.row_count, uploaded, active: uploaded }
+        Chunk {
+            partition_id: self.partition_id,
+            row_count: self.row_count,
+            uploaded,
+            active: uploaded,
+        }
     }
 
     pub fn deactivate(&self) -> Chunk {
-        Chunk { partition_id: self.partition_id, row_count: self.row_count, uploaded: self.uploaded, active: false }
+        Chunk {
+            partition_id: self.partition_id,
+            row_count: self.row_count,
+            uploaded: self.uploaded,
+            active: false,
+        }
     }
 
     pub fn uploaded(&self) -> bool {
@@ -40,12 +55,11 @@ impl Chunk {
     pub fn active(&self) -> bool {
         self.active
     }
-
 }
 
 #[derive(Clone, Copy, Debug)]
-pub (crate) enum ChunkRocksIndex {
-    PartitionId = 1
+pub(crate) enum ChunkRocksIndex {
+    PartitionId = 1,
 }
 
 rocks_table_impl!(
@@ -60,13 +74,13 @@ base_rocks_secondary_index!(Chunk, ChunkRocksIndex);
 
 #[derive(Hash, Clone, Debug)]
 pub enum ChunkIndexKey {
-    ByPartitionId(u64)
+    ByPartitionId(u64),
 }
 
 impl RocksSecondaryIndex<Chunk, ChunkIndexKey> for ChunkRocksIndex {
     fn typed_key_by(&self, row: &Chunk) -> ChunkIndexKey {
         match self {
-            ChunkRocksIndex::PartitionId => ChunkIndexKey::ByPartitionId(row.partition_id)
+            ChunkRocksIndex::PartitionId => ChunkIndexKey::ByPartitionId(row.partition_id),
         }
     }
 
@@ -82,7 +96,7 @@ impl RocksSecondaryIndex<Chunk, ChunkIndexKey> for ChunkRocksIndex {
 
     fn is_unique(&self) -> bool {
         match self {
-            ChunkRocksIndex::PartitionId => false
+            ChunkRocksIndex::PartitionId => false,
         }
     }
 

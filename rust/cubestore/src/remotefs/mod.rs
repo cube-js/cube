@@ -1,20 +1,20 @@
 pub mod s3;
 
-use async_trait::async_trait;
 use crate::CubeError;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use std::path::PathBuf;
-use tokio::fs;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use log::debug;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::fs;
 use tokio::sync::RwLock;
-use log::{debug};
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
     remote_path: String,
-    updated: DateTime<Utc>
+    updated: DateTime<Utc>,
 }
 
 impl RemoteFile {
@@ -46,12 +46,15 @@ pub trait RemoteFs: Send + Sync {
 
 pub struct LocalDirRemoteFs {
     remote_dir: RwLock<PathBuf>,
-    dir: RwLock<PathBuf>
+    dir: RwLock<PathBuf>,
 }
 
 impl LocalDirRemoteFs {
     pub fn new(remote_dir: PathBuf, dir: PathBuf) -> Arc<LocalDirRemoteFs> {
-        Arc::new(LocalDirRemoteFs { remote_dir: RwLock::new(remote_dir), dir: RwLock::new(dir) })
+        Arc::new(LocalDirRemoteFs {
+            remote_dir: RwLock::new(remote_dir),
+            dir: RwLock::new(dir),
+        })
     }
 
     pub async fn drop_local_path(&self) -> Result<(), CubeError> {
@@ -67,10 +70,7 @@ impl RemoteFs for LocalDirRemoteFs {
         let dest = remote_dir.as_path().join(remote_path);
         fs::create_dir_all(dest.parent().unwrap()).await?;
         let dir = self.dir.read().await;
-        fs::copy(
-            dir.as_path().join(remote_path),
-            dest.clone()
-        ).await?;
+        fs::copy(dir.as_path().join(remote_path), dest.clone()).await?;
         Ok(())
     }
 
@@ -82,12 +82,14 @@ impl RemoteFs for LocalDirRemoteFs {
         if !local.exists() {
             debug!("Downloading {}", remote_path);
             let remote_dir = self.remote_dir.read().await;
-            fs::copy(
-                remote_dir.as_path().join(remote_path),
-                local
-            ).await.map_err(
-                |e| CubeError::internal(format!("Error during downloading of {}: {}", remote_path, e))
-            )?;
+            fs::copy(remote_dir.as_path().join(remote_path), local)
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Error during downloading of {}: {}",
+                        remote_path, e
+                    ))
+                })?;
         }
         Ok(path)
     }
@@ -108,12 +110,22 @@ impl RemoteFs for LocalDirRemoteFs {
     }
 
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
-        Ok(self.list_with_metadata(remote_prefix).await?.into_iter().map(|f| f.remote_path).collect::<Vec<_>>())
+        Ok(self
+            .list_with_metadata(remote_prefix)
+            .await?
+            .into_iter()
+            .map(|f| f.remote_path)
+            .collect::<Vec<_>>())
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let remote_dir = self.remote_dir.read().await;
-        let result = Self::list_recursive(remote_dir.clone(), remote_prefix.to_string(), remote_dir.clone()).await?;
+        let result = Self::list_recursive(
+            remote_dir.clone(),
+            remote_prefix.to_string(),
+            remote_dir.clone(),
+        )
+        .await?;
         Ok(result)
     }
 
@@ -131,10 +143,11 @@ impl RemoteFs for LocalDirRemoteFs {
 }
 
 impl LocalDirRemoteFs {
-    fn remove_empty_paths_boxed(root: PathBuf, path: PathBuf) -> BoxFuture<'static, Result<(), CubeError>> {
-        async move {
-            Self::remove_empty_paths(root, path).await
-        }.boxed()
+    fn remove_empty_paths_boxed(
+        root: PathBuf,
+        path: PathBuf,
+    ) -> BoxFuture<'static, Result<(), CubeError>> {
+        async move { Self::remove_empty_paths(root, path).await }.boxed()
     }
 
     async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
@@ -150,13 +163,19 @@ impl LocalDirRemoteFs {
         Ok(())
     }
 
-    fn list_recursive_boxed(remote_dir: PathBuf, remote_prefix: String, dir: PathBuf) -> BoxFuture<'static, Result<Vec<RemoteFile>, CubeError>> {
-        async move {
-            Self::list_recursive(remote_dir, remote_prefix, dir).await
-        }.boxed()
+    fn list_recursive_boxed(
+        remote_dir: PathBuf,
+        remote_prefix: String,
+        dir: PathBuf,
+    ) -> BoxFuture<'static, Result<Vec<RemoteFile>, CubeError>> {
+        async move { Self::list_recursive(remote_dir, remote_prefix, dir).await }.boxed()
     }
 
-    async fn list_recursive(remote_dir: PathBuf, remote_prefix: String, dir: PathBuf) -> Result<Vec<RemoteFile>, CubeError> {
+    async fn list_recursive(
+        remote_dir: PathBuf,
+        remote_prefix: String,
+        dir: PathBuf,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
         let mut result = Vec::new();
         if fs::metadata(dir.clone()).await.is_err() {
             return Ok(vec![]);
@@ -164,9 +183,17 @@ impl LocalDirRemoteFs {
         let mut dir = fs::read_dir(dir).await?;
         while let Some(file) = dir.next_entry().await? {
             if file.file_type().await?.is_dir() {
-                result.append(&mut Self::list_recursive_boxed(remote_dir.clone(), remote_prefix.to_string(), file.path()).await?);
+                result.append(
+                    &mut Self::list_recursive_boxed(
+                        remote_dir.clone(),
+                        remote_prefix.to_string(),
+                        file.path(),
+                    )
+                    .await?,
+                );
             } else {
-                let relative_name = file.path()
+                let relative_name = file
+                    .path()
                     .to_str()
                     .unwrap()
                     .to_string()
@@ -176,7 +203,7 @@ impl LocalDirRemoteFs {
                 if relative_name.starts_with(&remote_prefix) {
                     result.push(RemoteFile {
                         remote_path: relative_name.to_string(),
-                        updated: DateTime::from(file.metadata().await?.modified()?)
+                        updated: DateTime::from(file.metadata().await?.modified()?),
                     });
                 }
             }

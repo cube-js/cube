@@ -1,11 +1,11 @@
+use crate::metastore::Column;
 use crate::CubeError;
+use ::parquet::file::metadata::RowGroupMetaData;
+use chrono::{SecondsFormat, TimeZone, Utc};
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::sync::Arc;
-use crate::metastore::Column;
-use ::parquet::file::metadata::RowGroupMetaData;
-use chrono::{Utc, SecondsFormat, TimeZone};
 
 pub(crate) mod parquet;
 
@@ -22,7 +22,7 @@ pub enum TableValue {
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct TimestampValue {
-    unix_nano: i64
+    unix_nano: i64,
 }
 
 impl TimestampValue {
@@ -37,18 +37,19 @@ impl TimestampValue {
 
 impl ToString for TimestampValue {
     fn to_string(&self) -> String {
-        Utc.timestamp_nanos(self.unix_nano).to_rfc3339_opts(SecondsFormat::Millis, true)
+        Utc.timestamp_nanos(self.unix_nano)
+            .to_rfc3339_opts(SecondsFormat::Millis, true)
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Row {
-    values: Vec<TableValue>
+    values: Vec<TableValue>,
 }
 
 pub struct RowSortKey<'a> {
     row: &'a Row,
-    sort_key_size: usize
+    sort_key_size: usize,
 }
 
 impl Row {
@@ -59,11 +60,11 @@ impl Row {
     pub fn sort_key(&self, sort_key_size: u64) -> RowSortKey {
         RowSortKey {
             row: self,
-            sort_key_size: sort_key_size as usize
+            sort_key_size: sort_key_size as usize,
         }
     }
 
-    pub fn push(& mut self, val: TableValue) {
+    pub fn push(&mut self, val: TableValue) {
         &self.values.push(val);
     }
 
@@ -113,11 +114,27 @@ impl<'a> Ord for RowSortKey<'a> {
 }
 
 pub trait TableStore {
-    fn merge_rows<'a>(&'a self, source_file: Option<&'a str>, dest_files: Vec<String>, rows: Vec<Row>, sort_key_size: u64) -> Result<Vec<(u64, (Row, Row))>, CubeError>;
+    fn merge_rows<'a>(
+        &'a self,
+        source_file: Option<&'a str>,
+        dest_files: Vec<String>,
+        rows: Vec<Row>,
+        sort_key_size: u64,
+    ) -> Result<Vec<(u64, (Row, Row))>, CubeError>;
 
     fn read_rows(&self, file: &str) -> Result<Vec<Row>, CubeError>;
 
-    fn read_filtered_rows(&self, file: &str, columns: &Vec<crate::metastore::Column>, limit: usize) -> Result<Vec<Row>, CubeError>;
+    fn read_filtered_rows(
+        &self,
+        file: &str,
+        columns: &Vec<crate::metastore::Column>,
+        limit: usize,
+    ) -> Result<Vec<Row>, CubeError>;
 
-    fn scan_node(&self, file: &str, columns: &Vec<Column>, row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError>;
+    fn scan_node(
+        &self,
+        file: &str,
+        columns: &Vec<Column>,
+        row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
+    ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError>;
 }

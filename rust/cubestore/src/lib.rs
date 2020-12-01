@@ -10,69 +10,70 @@
 #[macro_use]
 extern crate lazy_static;
 
-use flexbuffers::DeserializationError;
-use sqlparser::parser::ParserError;
-use parquet::errors::ParquetError;
-use tokio::sync::mpsc::error::SendError;
-use std::backtrace::Backtrace;
-use core::fmt;
-use smallvec::alloc::fmt::{Formatter, Debug};
 use arrow::error::ArrowError;
-use serde_derive::{Deserialize, Serialize};
-use std::num::ParseIntError;
+use core::fmt;
+use flexbuffers::DeserializationError;
 use log::SetLoggerError;
+use parquet::errors::ParquetError;
+use serde_derive::{Deserialize, Serialize};
+use smallvec::alloc::fmt::{Debug, Formatter};
+use sqlparser::parser::ParserError;
+use std::backtrace::Backtrace;
+use std::num::ParseIntError;
+use tokio::sync::mpsc::error::SendError;
 
-pub mod http;
-pub mod remotefs;
-pub mod table;
-pub mod metastore;
-pub mod sql;
-pub mod mysql;
-pub mod store;
-pub mod scheduler;
 pub mod cluster;
-pub mod queryplanner;
-pub mod import;
 pub mod config;
+pub mod http;
+pub mod import;
+pub mod metastore;
+pub mod mysql;
+pub mod queryplanner;
+pub mod remotefs;
+pub mod scheduler;
+pub mod sql;
+pub mod store;
+pub mod table;
 pub mod telemetry;
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
     message: String,
-    cause: CubeErrorCauseType
+    cause: CubeErrorCauseType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CubeErrorCauseType {
     User,
-    Internal
+    Internal,
 }
 
 impl CubeError {
     fn user(message: String) -> CubeError {
         CubeError {
-            message, cause: CubeErrorCauseType::User
+            message,
+            cause: CubeErrorCauseType::User,
         }
     }
 
     fn internal(message: String) -> CubeError {
         CubeError {
-            message, cause: CubeErrorCauseType::Internal
+            message,
+            cause: CubeErrorCauseType::Internal,
         }
     }
 
     fn from_error<E: fmt::Display>(error: E) -> CubeError {
         CubeError {
             message: format!("{}\n{}", error, Backtrace::capture()),
-            cause: CubeErrorCauseType::Internal
+            cause: CubeErrorCauseType::Internal,
         }
     }
 
     fn from_debug_error<E: Debug>(error: E) -> CubeError {
         CubeError {
             message: format!("{:?}\n{}", error, Backtrace::capture()),
-            cause: CubeErrorCauseType::Internal
+            cause: CubeErrorCauseType::Internal,
         }
     }
 }
@@ -108,7 +109,8 @@ impl From<ParserError> for CubeError {
 }
 
 impl From<CubeError> for warp::reject::Rejection {
-    fn from(_: CubeError) -> Self { // TODO
+    fn from(_: CubeError) -> Self {
+        // TODO
         warp::reject()
     }
 }

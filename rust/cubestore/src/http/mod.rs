@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use warp::{Filter, Rejection};
-use serde_derive::Deserialize;
 use log::debug;
+use serde_derive::Deserialize;
+use warp::{Filter, Rejection};
 
-use crate::{CubeError};
-use crate::sql::{SqlService};
+use crate::sql::SqlService;
+use crate::CubeError;
 
 #[derive(Deserialize, Debug)]
 pub struct SqlQueryBody {
-    query: String
+    query: String,
 }
 
 pub async fn run_server(sql_service: Arc<dyn SqlService>) -> Result<(), CubeError> {
@@ -25,15 +25,19 @@ pub async fn run_server(sql_service: Arc<dyn SqlService>) -> Result<(), CubeErro
     //     .and_then(post_insert);
 
     warp::serve(
-        query_route
-            // .or(import_route)
-    ).run(([127, 0, 0, 1], 3030)).await;
+        query_route, // .or(import_route)
+    )
+    .run(([127, 0, 0, 1], 3030))
+    .await;
 
     Ok(())
 }
 
 // curl -X POST  -d '{"query":"create schema boo"}' -H "Content-Type: application/json" http://127.0.0.1:3030/query
-pub async fn post_query(query_body: SqlQueryBody, sql_service: Arc<dyn SqlService>) -> Result<String, Rejection> {
+pub async fn post_query(
+    query_body: SqlQueryBody,
+    sql_service: Arc<dyn SqlService>,
+) -> Result<String, Rejection> {
     let res = sql_service.exec_query(&query_body.query).await?;
     debug!("Query result is {:?}", res);
     debug!("Post query: {:?}", query_body);

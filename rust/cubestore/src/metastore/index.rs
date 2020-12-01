@@ -1,15 +1,22 @@
-use rocksdb::DB;
-use std::sync::Arc;
-use serde::{Deserialize, Deserializer};
-use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, TableId, Index, Column};
-use byteorder::{BigEndian, WriteBytesExt};
-use std::io::{Cursor, Write};
-use crate::metastore::{MetaStoreEvent, IdRow};
+use super::{
+    BaseRocksSecondaryIndex, Column, Index, IndexId, RocksSecondaryIndex, RocksTable, TableId,
+};
+use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
+use byteorder::{BigEndian, WriteBytesExt};
+use rocksdb::DB;
+use serde::{Deserialize, Deserializer};
+use std::io::{Cursor, Write};
+use std::sync::Arc;
 
 impl Index {
     pub fn new(name: String, table_id: u64, columns: Vec<Column>, sort_key_size: u64) -> Index {
-        Index{ name, table_id, columns, sort_key_size }
+        Index {
+            name,
+            table_id,
+            columns,
+            sort_key_size,
+        }
     }
 
     pub fn get_name(&self) -> &String {
@@ -31,9 +38,9 @@ impl Index {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub (crate) enum IndexRocksIndex {
+pub(crate) enum IndexRocksIndex {
     Name = 1,
-    TableID
+    TableID,
 }
 
 impl BaseRocksSecondaryIndex<Index> for IndexRocksIndex {
@@ -54,21 +61,26 @@ rocks_table_impl!(
     Index,
     IndexRocksTable,
     TableId::Indexes,
-    { vec![Box::new(IndexRocksIndex::TableID), Box::new(IndexRocksIndex::Name)] },
+    {
+        vec![
+            Box::new(IndexRocksIndex::TableID),
+            Box::new(IndexRocksIndex::Name),
+        ]
+    },
     DeleteIndex
 );
 
 #[derive(Hash, Clone, Debug)]
 pub enum IndexIndexKey {
     TableId(u64),
-    Name(u64, String)
+    Name(u64, String),
 }
 
 impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
     fn typed_key_by(&self, row: &Index) -> IndexIndexKey {
         match self {
             IndexRocksIndex::TableID => IndexIndexKey::TableId(row.table_id),
-            IndexRocksIndex::Name => IndexIndexKey::Name(row.table_id, row.name.to_string())
+            IndexRocksIndex::Name => IndexIndexKey::Name(row.table_id, row.name.to_string()),
         }
     }
 
@@ -78,7 +90,7 @@ impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
                 let mut buf = Vec::with_capacity(8);
                 buf.write_u64::<BigEndian>(*table_id).unwrap();
                 buf
-            },
+            }
             IndexIndexKey::Name(table_id, name) => {
                 let bytes = name.as_bytes();
                 let mut buf = Cursor::new(Vec::with_capacity(8 + bytes.len()));
@@ -92,7 +104,7 @@ impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
     fn is_unique(&self) -> bool {
         match self {
             IndexRocksIndex::TableID => false,
-            IndexRocksIndex::Name => true
+            IndexRocksIndex::Name => true,
         }
     }
 

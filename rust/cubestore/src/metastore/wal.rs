@@ -1,15 +1,19 @@
-use rocksdb::DB;
-use std::sync::Arc;
-use serde::{Deserialize, Deserializer};
-use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, WAL, TableId};
-use crate::metastore::{MetaStoreEvent, IdRow};
-use crate::rocks_table_impl;
+use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId, WAL};
 use crate::base_rocks_secondary_index;
-use byteorder::{WriteBytesExt, BigEndian};
+use crate::metastore::{IdRow, MetaStoreEvent};
+use crate::rocks_table_impl;
+use byteorder::{BigEndian, WriteBytesExt};
+use rocksdb::DB;
+use serde::{Deserialize, Deserializer};
+use std::sync::Arc;
 
 impl WAL {
     pub fn new(table_id: u64, row_count: usize) -> WAL {
-        WAL { table_id, row_count: row_count as u64, uploaded: false }
+        WAL {
+            table_id,
+            row_count: row_count as u64,
+            uploaded: false,
+        }
     }
 
     pub fn get_row_count(&self) -> u64 {
@@ -21,7 +25,11 @@ impl WAL {
     }
 
     pub fn set_uploaded(&self, uploaded: bool) -> WAL {
-        WAL { table_id: self.table_id, row_count: self.row_count, uploaded }
+        WAL {
+            table_id: self.table_id,
+            row_count: self.row_count,
+            uploaded,
+        }
     }
 
     pub fn table_id(&self) -> u64 {
@@ -35,7 +43,7 @@ impl WAL {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum WALRocksIndex {
-    TableID = 1
+    TableID = 1,
 }
 
 rocks_table_impl!(
@@ -48,7 +56,7 @@ rocks_table_impl!(
 
 #[derive(Hash, Clone, Debug)]
 pub enum WALIndexKey {
-    ByTable(u64)
+    ByTable(u64),
 }
 
 base_rocks_secondary_index!(WAL, WALRocksIndex);
@@ -56,7 +64,7 @@ base_rocks_secondary_index!(WAL, WALRocksIndex);
 impl RocksSecondaryIndex<WAL, WALIndexKey> for WALRocksIndex {
     fn typed_key_by(&self, row: &WAL) -> WALIndexKey {
         match self {
-            WALRocksIndex::TableID => WALIndexKey::ByTable(row.table_id)
+            WALRocksIndex::TableID => WALIndexKey::ByTable(row.table_id),
         }
     }
 
@@ -72,7 +80,7 @@ impl RocksSecondaryIndex<WAL, WALIndexKey> for WALRocksIndex {
 
     fn is_unique(&self) -> bool {
         match self {
-            WALRocksIndex::TableID => false
+            WALRocksIndex::TableID => false,
         }
     }
 

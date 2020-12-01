@@ -1,21 +1,25 @@
-use cubestore::mysql::MySqlServer;
 use cubestore::config::Config;
-use simple_logger::SimpleLogger;
+use cubestore::mysql::MySqlServer;
+use cubestore::telemetry::{track_event, ReportingLogger};
+use log::debug;
 use log::Level;
+use simple_logger::SimpleLogger;
+use std::collections::HashMap;
 use std::env;
 use tokio::runtime::Builder;
-use log::{debug};
-use cubestore::telemetry::{track_event, ReportingLogger};
-use std::collections::HashMap;
 
 fn main() {
-    let log_level = match env::var("CUBESTORE_LOG_LEVEL").unwrap_or("info".to_string()).to_lowercase().as_str() {
+    let log_level = match env::var("CUBESTORE_LOG_LEVEL")
+        .unwrap_or("info".to_string())
+        .to_lowercase()
+        .as_str()
+    {
         "error" => Level::Error,
         "warn" => Level::Warn,
         "info" => Level::Info,
         "debug" => Level::Debug,
         "trace" => Level::Trace,
-        x => panic!("Unrecognized log level: {}", x)
+        x => panic!("Unrecognized log level: {}", x),
     };
 
     let logger = SimpleLogger::new()
@@ -28,7 +32,6 @@ fn main() {
         .threaded_scheduler()
         .build()
         .unwrap();
-
 
     let config = Config::default();
 
@@ -46,6 +49,8 @@ fn main() {
 
         track_event("Cube Store Start".to_string(), HashMap::new()).await;
 
-        MySqlServer::listen("0.0.0.0:3306".to_string(), services.sql_service.clone()).await.unwrap();
+        MySqlServer::listen("0.0.0.0:3306".to_string(), services.sql_service.clone())
+            .await
+            .unwrap();
     });
 }

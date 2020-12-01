@@ -1,47 +1,51 @@
 pub mod worker_pool;
 
-use crate::CubeError;
-use tokio::net::TcpStream;
-use futures::future::join_all;
-use tokio::time::{timeout};
-use crate::remotefs::RemoteFs;
-use std::sync::Arc;
-use async_trait::async_trait;
-use chrono::{Utc};
-use crate::metastore::job::{Job, JobType, JobStatus};
-use regex::Regex;
-use std::collections::{HashSet, HashMap};
-use tokio::fs::File;
-use std::path::Path;
-use tokio::io::AsyncWriteExt;
-use std::time::{SystemTime};
-use tokio::{fs, time};
-use crate::store::{ChunkDataStore};
-use crate::metastore::{RowKey, TableId, MetaStore, IdRow};
-use log::{info, error, debug};
-use crate::store::compaction::CompactionService;
-use tokio::sync::{Notify, oneshot, broadcast, RwLock};
-use core::mem;
-use std::time::Duration;
-use futures::{FutureExt};
-use crate::import::ImportService;
-use mockall::automock;
-use tokio::sync::broadcast::{Sender, Receiver};
-use serde::{Deserialize, Serialize};
-use tokio::runtime::Handle;
-use crate::queryplanner::serialized_plan::{SerializedPlan};
+use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
 use crate::config::{Config, ConfigObj};
+use crate::import::ImportService;
+use crate::metastore::job::{Job, JobStatus, JobType};
+use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
-use crate::cluster::worker_pool::{WorkerPool, MessageProcessor};
+use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::remotefs::RemoteFs;
+use crate::store::compaction::CompactionService;
+use crate::store::ChunkDataStore;
+use crate::CubeError;
 use arrow::record_batch::RecordBatch;
+use async_trait::async_trait;
+use chrono::Utc;
+use core::mem;
+use futures::future::join_all;
+use futures::FutureExt;
 use itertools::Itertools;
+use log::{debug, error, info};
+use mockall::automock;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use std::time::SystemTime;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio::runtime::Handle;
+use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{broadcast, oneshot, Notify, RwLock};
+use tokio::time::timeout;
+use tokio::{fs, time};
 
 #[automock]
 #[async_trait]
 pub trait Cluster: Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
 
-    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError>;
+    async fn run_select(
+        &self,
+        node_name: String,
+        plan_node: SerializedPlan,
+    ) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn available_nodes(&self) -> Result<Vec<String>, CubeError>;
 
@@ -56,7 +60,7 @@ pub trait Cluster: Send + Sync {
 pub enum JobEvent {
     Started(RowKey, JobType),
     Success(RowKey, JobType),
-    Error(RowKey, JobType, String)
+    Error(RowKey, JobType, String),
 }
 
 pub struct ClusterImpl {
@@ -73,14 +77,16 @@ pub struct ClusterImpl {
     jobs_enabled: Arc<RwLock<bool>>,
     // used just to hold a reference so event_sender won't be collected
     _receiver: Receiver<JobEvent>,
-    select_process_pool: RwLock<Option<Arc<WorkerPool<WorkerMessage, SerializedRecordBatchStream, WorkerProcessor>>>>,
+    select_process_pool: RwLock<
+        Option<Arc<WorkerPool<WorkerMessage, SerializedRecordBatchStream, WorkerProcessor>>>,
+    >,
     config_obj: Arc<dyn ConfigObj>,
     query_executor: Arc<dyn QueryExecutor>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WorkerMessage {
-    Select(SerializedPlan, HashMap<String, String>)
+    Select(SerializedPlan, HashMap<String, String>),
 }
 
 pub struct WorkerProcessor;
@@ -92,7 +98,12 @@ impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProc
                 debug!("Running select in worker started: {:?}", plan_node);
                 let handle = Handle::current();
                 let plan_node_to_send = plan_node.clone();
-                let res = handle.block_on(async move { Config::current_worker_services().query_executor.execute_worker_plan(plan_node_to_send, remote_to_local_names).await });
+                let res = handle.block_on(async move {
+                    Config::current_worker_services()
+                        .query_executor
+                        .execute_worker_plan(plan_node_to_send, remote_to_local_names)
+                        .await
+                });
                 debug!("Running select in worker completed: {:?}", plan_node);
                 SerializedRecordBatchStream::write(res?)
             }
@@ -108,7 +119,7 @@ pub struct JobRunner {
     server_name: String,
     notify: Arc<Notify>,
     event_sender: Sender<JobEvent>,
-    jobs_enabled: Arc<RwLock<bool>>
+    jobs_enabled: Arc<RwLock<bool>>,
 }
 
 lazy_static! {
@@ -127,7 +138,11 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn run_select(&self, node_name: String, plan_node: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError> {
+    async fn run_select(
+        &self,
+        node_name: String,
+        plan_node: SerializedPlan,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         if self.server_name == node_name {
             // TODO timeout config
             timeout(Duration::from_secs(600), self.run_local_select(plan_node)).await?
@@ -150,7 +165,7 @@ impl Cluster for ClusterImpl {
 
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
-            receiver: self.event_sender.subscribe()
+            receiver: self.event_sender.subscribe(),
         }
     }
 }
@@ -160,11 +175,23 @@ pub struct JobResultListener {
 }
 
 impl JobResultListener {
-    pub async fn wait_for_job_result(self, row_key: RowKey, job_type: JobType) -> Result<JobEvent, CubeError> {
-        Ok(self.wait_for_job_results(vec![(row_key, job_type)]).await?.into_iter().nth(0).unwrap())
+    pub async fn wait_for_job_result(
+        self,
+        row_key: RowKey,
+        job_type: JobType,
+    ) -> Result<JobEvent, CubeError> {
+        Ok(self
+            .wait_for_job_results(vec![(row_key, job_type)])
+            .await?
+            .into_iter()
+            .nth(0)
+            .unwrap())
     }
 
-    pub async fn wait_for_job_results(mut self, mut results: Vec<(RowKey, JobType)>) -> Result<Vec<JobEvent>, CubeError> {
+    pub async fn wait_for_job_results(
+        mut self,
+        mut results: Vec<(RowKey, JobType)>,
+    ) -> Result<Vec<JobEvent>, CubeError> {
         let mut res = Vec::new();
         loop {
             if results.len() == 0 {
@@ -172,7 +199,10 @@ impl JobResultListener {
             }
             let event = self.receiver.recv().await?;
             if let JobEvent::Success(k, t) | JobEvent::Error(k, t, _) = &event {
-                if let Some((index, _)) = results.iter().find_position(|(row_key, job_type)| k == row_key && t == job_type) {
+                if let Some((index, _)) = results
+                    .iter()
+                    .find_position(|(row_key, job_type)| k == row_key && t == job_type)
+                {
                     res.push(event);
                     results.remove(index);
                 }
@@ -202,7 +232,10 @@ impl JobRunner {
     }
 
     async fn fetch_and_process(&self) -> Result<(), CubeError> {
-        let job = self.meta_store.start_processing_job(self.server_name.to_string()).await?;
+        let job = self
+            .meta_store
+            .start_processing_job(self.server_name.to_string())
+            .await?;
         if let Some(to_process) = job {
             self.run_local(to_process).await?;
         }
@@ -227,22 +260,52 @@ impl JobRunner {
             }
         });
         debug!("Running job: {:?}", job);
-        self.event_sender.send(JobEvent::Started(job.get_row().row_reference().clone(), job.get_row().job_type().clone()))?;
+        self.event_sender.send(JobEvent::Started(
+            job.get_row().row_reference().clone(),
+            job.get_row().job_type().clone(),
+        ))?;
         let res = timeout(Duration::from_secs(300), self.route_job(job.get_row())).await;
         mem::drop(rx);
         heart_beat_timer.await?;
         if let Err(timeout_err) = res {
-            self.meta_store.update_status(job_id, JobStatus::Timeout).await?;
-            error!("Running job timed out ({:?}): {:?}", start.elapsed()?, self.meta_store.get_job(job_id).await?);
-            self.event_sender.send(JobEvent::Error(job.get_row().row_reference().clone(), job.get_row().job_type().clone(), timeout_err.to_string()))?;
+            self.meta_store
+                .update_status(job_id, JobStatus::Timeout)
+                .await?;
+            error!(
+                "Running job timed out ({:?}): {:?}",
+                start.elapsed()?,
+                self.meta_store.get_job(job_id).await?
+            );
+            self.event_sender.send(JobEvent::Error(
+                job.get_row().row_reference().clone(),
+                job.get_row().job_type().clone(),
+                timeout_err.to_string(),
+            ))?;
         } else if let Ok(Err(cube_err)) = res {
-            self.meta_store.update_status(job_id, JobStatus::Error(cube_err.to_string())).await?;
-            error!("Running job error ({:?}): {:?}", start.elapsed()?, self.meta_store.get_job(job_id).await?);
-            self.event_sender.send(JobEvent::Error(job.get_row().row_reference().clone(), job.get_row().job_type().clone(), cube_err.to_string()))?;
+            self.meta_store
+                .update_status(job_id, JobStatus::Error(cube_err.to_string()))
+                .await?;
+            error!(
+                "Running job error ({:?}): {:?}",
+                start.elapsed()?,
+                self.meta_store.get_job(job_id).await?
+            );
+            self.event_sender.send(JobEvent::Error(
+                job.get_row().row_reference().clone(),
+                job.get_row().job_type().clone(),
+                cube_err.to_string(),
+            ))?;
         } else {
             let deleted_job = self.meta_store.delete_job(job_id).await?;
-            debug!("Running job completed ({:?}): {:?}", start.elapsed()?, deleted_job);
-            self.event_sender.send(JobEvent::Success(job.get_row().row_reference().clone(), job.get_row().job_type().clone()))?;
+            debug!(
+                "Running job completed ({:?}): {:?}",
+                start.elapsed()?,
+                deleted_job
+            );
+            self.event_sender.send(JobEvent::Success(
+                job.get_row().row_reference().clone(),
+                job.get_row().job_type().clone(),
+            ))?;
         }
         Ok(())
     }
@@ -315,16 +378,20 @@ impl ClusterImpl {
             _receiver: receiver,
             select_process_pool: RwLock::new(None),
             config_obj,
-            query_executor
+            query_executor,
         })
     }
 
     pub async fn start_processing_loops(&self) {
         if self.config_obj.select_worker_pool_size() > 0 {
             let mut pool = self.select_process_pool.write().await;
-            *pool = Some(Arc::new(WorkerPool::new(self.config_obj.select_worker_pool_size(), Duration::from_secs(600))));
+            *pool = Some(Arc::new(WorkerPool::new(
+                self.config_obj.select_worker_pool_size(),
+                Duration::from_secs(600),
+            )));
         }
-        for _ in 0..4 { // TODO number of job event loops
+        for _ in 0..4 {
+            // TODO number of job event loops
             let job_runner = JobRunner {
                 meta_store: self.meta_store.clone(),
                 chunk_store: self.chunk_store.clone(),
@@ -333,7 +400,7 @@ impl ClusterImpl {
                 server_name: self.server_name.clone(),
                 notify: self.job_notify.clone(),
                 event_sender: self.event_sender.clone(),
-                jobs_enabled: self.jobs_enabled.clone()
+                jobs_enabled: self.jobs_enabled.clone(),
             };
             tokio::spawn(async move {
                 job_runner.processing_loop().await;
@@ -344,7 +411,8 @@ impl ClusterImpl {
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
         let mut jobs_enabled = self.jobs_enabled.write().await;
         *jobs_enabled = false;
-        for _ in 0..4 { // TODO number of job event loops
+        for _ in 0..4 {
+            // TODO number of job event loops
             self.job_notify.notify();
         }
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
@@ -353,30 +421,53 @@ impl ClusterImpl {
         Ok(())
     }
 
-    async fn run_local_select(&self, plan_node: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError> {
+    async fn run_local_select(
+        &self,
+        plan_node: SerializedPlan,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         let start = SystemTime::now();
         debug!("Running select: {:?}", plan_node);
         let to_download = plan_node.files_to_download();
-        let file_futures = to_download.iter().map(|remote| {
-            self.remote_fs.download_file(remote)
-        }).collect::<Vec<_>>();
-        let remote_to_local_names = to_download.clone().into_iter().zip(join_all(file_futures).await
-            .into_iter().collect::<Result<Vec<_>, _>>()?.into_iter())
+        let file_futures = to_download
+            .iter()
+            .map(|remote| self.remote_fs.download_file(remote))
+            .collect::<Vec<_>>();
+        let remote_to_local_names = to_download
+            .clone()
+            .into_iter()
+            .zip(
+                join_all(file_futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter(),
+            )
             .collect::<HashMap<_, _>>();
         let pool_option = self.select_process_pool.read().await.clone();
         let res = if let Some(pool) = pool_option {
             let serialized_plan_node = plan_node.clone();
-            pool.process(WorkerMessage::Select(serialized_plan_node, remote_to_local_names)).await
+            pool.process(WorkerMessage::Select(
+                serialized_plan_node,
+                remote_to_local_names,
+            ))
+            .await
         } else {
             // TODO optimize for no double conversion
-            SerializedRecordBatchStream::write(self.query_executor.execute_worker_plan(plan_node.clone(), remote_to_local_names).await?)
+            SerializedRecordBatchStream::write(
+                self.query_executor
+                    .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                    .await?,
+            )
         };
         info!("Running select completed ({:?})", start.elapsed()?);
         res?.read()
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {
-        let streams = self.server_addresses.iter().filter(|a| *a != &self.server_name)
+        let streams = self
+            .server_addresses
+            .iter()
+            .filter(|a| *a != &self.server_name)
             .map(|a| timeout(self.connect_timeout, TcpStream::connect(a)))
             .collect::<Vec<_>>();
         let _ = join_all(streams).await;
@@ -385,20 +476,21 @@ impl ClusterImpl {
     }
 
     pub async fn elect_leader(&self) -> Result<String, CubeError> {
-        let heart_beats_dir = Path::new(self.remote_fs.local_path().await.as_str())
-            .join("node-heart-beats");
+        let heart_beats_dir =
+            Path::new(self.remote_fs.local_path().await.as_str()).join("node-heart-beats");
 
         fs::create_dir_all(heart_beats_dir.clone()).await?;
 
-        let heart_beat_path = heart_beats_dir
-            .join(&self.server_name);
+        let heart_beat_path = heart_beats_dir.join(&self.server_name);
 
         {
-            let mut heart_beat_file = File::create(
-                heart_beat_path.clone()
-            ).await?;
+            let mut heart_beat_file = File::create(heart_beat_path.clone()).await?;
 
-            heart_beat_file.write_u64(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs());
+            heart_beat_file.write_u64(
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_secs(),
+            );
             heart_beat_file.flush().await?;
         }
 
@@ -410,44 +502,60 @@ impl ClusterImpl {
             .trim_start_matches("/")
             .to_string();
 
-        self.remote_fs.upload_file(
-            &to_upload
-        ).await?;
+        self.remote_fs.upload_file(&to_upload).await?;
 
-        let heart_beats = self.remote_fs.list_with_metadata("node-heart-beats/").await?;
-        let leader_paths = heart_beats.iter()
-            .filter(|f| f.updated().clone() + chrono::Duration::from_std(self.connect_timeout).unwrap() * 4 >= Utc::now())
-            .flat_map(|f|
+        let heart_beats = self
+            .remote_fs
+            .list_with_metadata("node-heart-beats/")
+            .await?;
+        let leader_paths = heart_beats
+            .iter()
+            .filter(|f| {
+                f.updated().clone() + chrono::Duration::from_std(self.connect_timeout).unwrap() * 4
+                    >= Utc::now()
+            })
+            .flat_map(|f| {
                 HEART_BEAT_NODE_REGEX
                     .captures(f.remote_path())
                     .and_then(|v| v.name("node"))
                     .map(|v| v.as_str().to_string())
-            ).collect::<HashSet<_>>();
+            })
+            .collect::<HashSet<_>>();
 
-        if let Some(leader) = self.server_addresses.iter().find(|a| leader_paths.contains(*a)) {
+        if let Some(leader) = self
+            .server_addresses
+            .iter()
+            .find(|a| leader_paths.contains(*a))
+        {
             return Ok(leader.to_string());
         }
 
-        Err(CubeError::internal("No leader has been elected".to_string()))
+        Err(CubeError::internal(
+            "No leader has been elected".to_string(),
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::remotefs::LocalDirRemoteFs;
-    use std::{env, fs};
-    use crate::store::{DataFrame, WALDataStore};
-    use crate::metastore::{WAL, table::Table, IdRow, Chunk, RocksMetaStore};
-    use async_trait::async_trait;
     use crate::import::MockImportService;
+    use crate::metastore::{table::Table, Chunk, IdRow, RocksMetaStore, WAL};
     use crate::queryplanner::query_executor::QueryExecutorImpl;
+    use crate::remotefs::LocalDirRemoteFs;
+    use crate::store::{DataFrame, WALDataStore};
+    use async_trait::async_trait;
+    use std::{env, fs};
 
     struct MockWalStore;
 
     #[async_trait]
     impl WALDataStore for MockWalStore {
-        async fn add_wal(&self, _table: IdRow<Table>, _data: DataFrame) -> Result<IdRow<WAL>, CubeError> {
+        async fn add_wal(
+            &self,
+            _table: IdRow<Table>,
+            _data: DataFrame,
+        ) -> Result<IdRow<WAL>, CubeError> {
             unimplemented!()
         }
 
@@ -498,7 +606,6 @@ mod tests {
         }
     }
 
-
     #[actix_rt::test]
     async fn elect_leader() {
         let config = Config::test("leader");
@@ -517,7 +624,10 @@ mod tests {
         let remote_fs = LocalDirRemoteFs::new(remote, local);
         let chunk_store = Arc::new(MockChunkStore);
         let compaction = Arc::new(MockCompaction);
-        let meta_store = RocksMetaStore::new(&remote_fs.local_file("meta").await.unwrap(), remote_fs.clone());
+        let meta_store = RocksMetaStore::new(
+            &remote_fs.local_file("meta").await.unwrap(),
+            remote_fs.clone(),
+        );
 
         let foo = ClusterImpl::new(
             "foo".to_string(),
@@ -529,7 +639,7 @@ mod tests {
             meta_store.clone(),
             Arc::new(MockImportService::new()),
             config.config_obj(),
-            Arc::new(QueryExecutorImpl)
+            Arc::new(QueryExecutorImpl),
         );
 
         let bar = ClusterImpl::new(
@@ -542,7 +652,7 @@ mod tests {
             meta_store.clone(),
             Arc::new(MockImportService::new()),
             config.config_obj(),
-            Arc::new(QueryExecutorImpl)
+            Arc::new(QueryExecutorImpl),
         );
 
         remote_fs.drop_local_path().await.unwrap();

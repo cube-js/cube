@@ -1,22 +1,22 @@
-use datafusion::physical_plan::ExecutionPlan;
-use datafusion::physical_plan::parquet::ParquetExec;
-use crate::table::{TableStore, Row, TableValue};
-use crate::CubeError;
-use std::fs::File;
-use parquet::file::reader::{SerializedFileReader, FileReader};
-use parquet::data_type::*;
-use parquet::column::reader::ColumnReader;
-use crate::metastore::{ColumnType, Column, Index};
-use parquet::schema::types;
-use parquet::file::writer::{SerializedFileWriter, FileWriter};
-use std::cmp::{min, max};
-use parquet::column::writer::ColumnWriter;
-use parquet::file::properties::WriterProperties;
 use super::TimestampValue;
+use crate::metastore::{Column, ColumnType, Index};
+use crate::table::{Row, TableStore, TableValue};
+use crate::CubeError;
+use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::ExecutionPlan;
+use parquet::column::reader::ColumnReader;
+use parquet::column::writer::ColumnWriter;
+use parquet::data_type::*;
+use parquet::file::properties::WriterProperties;
+use parquet::file::reader::{FileReader, SerializedFileReader};
+use parquet::file::writer::{FileWriter, SerializedFileWriter};
+use parquet::schema::types;
+use std::cmp::{max, min};
+use std::fs::File;
 
-use std::sync::Arc;
-use parquet::file::metadata::RowGroupMetaData;
 use num::integer::div_ceil;
+use parquet::file::metadata::RowGroupMetaData;
+use std::sync::Arc;
 
 pub struct ParquetTableStore {
     table: Index,
@@ -43,10 +43,21 @@ pub struct RowParquetReader<'a> {
 }
 
 impl TableStore for ParquetTableStore {
-    fn merge_rows<'a>(&'a self, source_file: Option<&'a str>, dest_files: Vec<String>, rows: Vec<Row>, sort_key_size: u64) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
+    fn merge_rows<'a>(
+        &'a self,
+        source_file: Option<&'a str>,
+        dest_files: Vec<String>,
+        rows: Vec<Row>,
+        sort_key_size: u64,
+    ) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
         let mut writers = Vec::new();
         for f in dest_files.iter() {
-            writers.push(RowParquetWriter::open(&self.table, f, self.row_group_size, sort_key_size)?);
+            writers.push(RowParquetWriter::open(
+                &self.table,
+                f,
+                self.row_group_size,
+                sort_key_size,
+            )?);
         }
         if source_file.is_none() {
             let mut split_writer = SplitRowParquetWriter::new(writers, rows.len());
@@ -56,17 +67,14 @@ impl TableStore for ParquetTableStore {
 
         let mut reader = RowParquetReader::open(&self.table, source_file.unwrap(), None)?;
         let mut right_position = 0;
-        let total_row_number = reader.parquet_reader.metadata().file_metadata().num_rows() as usize + rows.len();
+        let total_row_number =
+            reader.parquet_reader.metadata().file_metadata().num_rows() as usize + rows.len();
         let mut split_writer = SplitRowParquetWriter::new(writers, total_row_number);
 
         for row_group_index in 0..reader.parquet_reader.num_row_groups() {
             let read_rows = reader.read_rows(row_group_index)?;
-            let (new_pos, to_write) = ParquetTableStore::merge_sort(
-                read_rows,
-                &rows,
-                right_position,
-                sort_key_size,
-            );
+            let (new_pos, to_write) =
+                ParquetTableStore::merge_sort(read_rows, &rows, right_position, sort_key_size);
             split_writer.write_rows(to_write.as_slice())?;
             right_position = new_pos;
         }
@@ -88,20 +96,32 @@ impl TableStore for ParquetTableStore {
         Ok(result)
     }
 
-    fn read_filtered_rows(&self, file: &str, columns: &Vec<Column>, limit: usize) -> Result<Vec<Row>, CubeError> {
+    fn read_filtered_rows(
+        &self,
+        file: &str,
+        columns: &Vec<Column>,
+        limit: usize,
+    ) -> Result<Vec<Row>, CubeError> {
         let mut result = Vec::<Row>::new();
         let mut reader = RowParquetReader::open(&self.table, file, Some(columns))?;
         'outer: for row_group_index in 0..reader.parquet_reader.num_row_groups() {
             let row_group = reader.read_rows(row_group_index)?;
             for row in &row_group {
-                if result.len() >= limit { break 'outer; }
+                if result.len() >= limit {
+                    break 'outer;
+                }
                 result.push(row.clone());
             }
         }
         Ok(result)
     }
 
-    fn scan_node(&self, file: &str, columns: &Vec<Column>, row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError> {
+    fn scan_node(
+        &self,
+        file: &str,
+        columns: &Vec<Column>,
+        row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
+    ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError> {
         Ok(Arc::new(ParquetExec::try_new_with_filter(
             file,
             Some(columns.iter().map(|c| c.get_index()).collect::<Vec<_>>()),
@@ -119,8 +139,16 @@ impl ParquetTableStore {
         }
     }
 
-    fn merge_sort(left: Vec<Row>, right: &Vec<Row>, initial_right_pos: usize, sort_key_size: u64) -> (usize, Vec<Row>) {
-        if right.len() == initial_right_pos || left[left.len() - 1].sort_key(sort_key_size) <= right[initial_right_pos].sort_key(sort_key_size) {
+    fn merge_sort(
+        left: Vec<Row>,
+        right: &Vec<Row>,
+        initial_right_pos: usize,
+        sort_key_size: u64,
+    ) -> (usize, Vec<Row>) {
+        if right.len() == initial_right_pos
+            || left[left.len() - 1].sort_key(sort_key_size)
+                <= right[initial_right_pos].sort_key(sort_key_size)
+        {
             return (initial_right_pos, left);
         }
         let mut result = Vec::with_capacity(left.len());
@@ -149,24 +177,33 @@ impl ParquetTableStore {
 }
 
 impl<'a> RowParquetReader<'a> {
-    fn open(table: &'a Index, file: &'a str, columns_to_read: Option<&'a Vec<Column>>) -> Result<RowParquetReader<'a>, CubeError> {
+    fn open(
+        table: &'a Index,
+        file: &'a str,
+        columns_to_read: Option<&'a Vec<Column>>,
+    ) -> Result<RowParquetReader<'a>, CubeError> {
         let file = File::open(file)?;
         let parquet_reader = SerializedFileReader::new(file)?;
 
-        let column_with_buffer = columns_to_read.unwrap_or(table.get_columns()).iter()
-            .map(|c| (
-                c,
-                c.get_index(),
-                match c.get_column_type() {
-                    ColumnType::String => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
-                    ColumnType::Bytes => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
-                    ColumnType::Int => ColumnAccessor::Int(vec![0; 16384]),
-                    ColumnType::Timestamp => ColumnAccessor::Int(vec![0; 16384]),
-                    ColumnType::Boolean => ColumnAccessor::Boolean(vec![false; 16384]),
-                    x => panic!("Column type is not supported: {:?}", x)
-                },
-                Some(vec![0; 16384])
-            )).collect::<Vec<_>>();
+        let column_with_buffer = columns_to_read
+            .unwrap_or(table.get_columns())
+            .iter()
+            .map(|c| {
+                (
+                    c,
+                    c.get_index(),
+                    match c.get_column_type() {
+                        ColumnType::String => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
+                        ColumnType::Bytes => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
+                        ColumnType::Int => ColumnAccessor::Int(vec![0; 16384]),
+                        ColumnType::Timestamp => ColumnAccessor::Int(vec![0; 16384]),
+                        ColumnType::Boolean => ColumnAccessor::Boolean(vec![false; 16384]),
+                        x => panic!("Column type is not supported: {:?}", x),
+                    },
+                    Some(vec![0; 16384]),
+                )
+            })
+            .collect::<Vec<_>>();
 
         Ok(RowParquetReader {
             parquet_reader,
@@ -182,17 +219,47 @@ impl<'a> RowParquetReader<'a> {
             match column_accessor {
                 ColumnAccessor::Bytes(buffer) => {
                     if let ColumnReader::ByteArrayColumnReader(ref mut reader) = col_reader {
-                        values_read = max(values_read, reader.read_batch(buffer.len(), def_levels.as_mut().map(|l| l.as_mut_slice()), None, buffer.as_mut_slice())?.1);
+                        values_read = max(
+                            values_read,
+                            reader
+                                .read_batch(
+                                    buffer.len(),
+                                    def_levels.as_mut().map(|l| l.as_mut_slice()),
+                                    None,
+                                    buffer.as_mut_slice(),
+                                )?
+                                .1,
+                        );
                     }
                 }
                 ColumnAccessor::Int(buffer) => {
                     if let ColumnReader::Int64ColumnReader(ref mut reader) = col_reader {
-                        values_read = max(values_read, reader.read_batch(buffer.len(), def_levels.as_mut().map(|l| l.as_mut_slice()), None, buffer.as_mut_slice())?.1);
+                        values_read = max(
+                            values_read,
+                            reader
+                                .read_batch(
+                                    buffer.len(),
+                                    def_levels.as_mut().map(|l| l.as_mut_slice()),
+                                    None,
+                                    buffer.as_mut_slice(),
+                                )?
+                                .1,
+                        );
                     }
                 }
                 ColumnAccessor::Boolean(buffer) => {
                     if let ColumnReader::BoolColumnReader(ref mut reader) = col_reader {
-                        values_read = max(values_read, reader.read_batch(buffer.len(), def_levels.as_mut().map(|l| l.as_mut_slice()), None, buffer.as_mut_slice())?.1);
+                        values_read = max(
+                            values_read,
+                            reader
+                                .read_batch(
+                                    buffer.len(),
+                                    def_levels.as_mut().map(|l| l.as_mut_slice()),
+                                    None,
+                                    buffer.as_mut_slice(),
+                                )?
+                                .1,
+                        );
                     }
                 }
             };
@@ -255,7 +322,9 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Timestamp(TimestampValue::new(value * 1000 as i64)));
+                                        vec_result[i].push(TableValue::Timestamp(
+                                            TimestampValue::new(value * 1000 as i64),
+                                        ));
                                         cur_value_index += 1;
                                     } else {
                                         vec_result[i].push(TableValue::Null);
@@ -276,10 +345,10 @@ impl<'a> RowParquetReader<'a> {
                                 }
                             }
                         }
-                        x => panic!("Unsupported value: {:?}", x)
+                        x => panic!("Unsupported value: {:?}", x),
                     };
                 }
-                x => panic!("Unsupported value: {:?}", x)
+                x => panic!("Unsupported value: {:?}", x),
             }
         }
         Ok(vec_result)
@@ -320,12 +389,23 @@ impl SplitRowParquetWriter {
             self.first_row = Some(rows[0].clone());
         }
         let mut remaining_slice = rows;
-        while remaining_slice.len() + self.rows_written > (self.current_writer + 1) * self.chunk_size {
+        while remaining_slice.len() + self.rows_written
+            > (self.current_writer + 1) * self.chunk_size
+        {
             let split_at = (self.current_writer + 1) * self.chunk_size - self.rows_written;
             self.writers[self.current_writer].write_rows(&remaining_slice[0..split_at])?;
             self.rows_written += split_at;
             self.rows_written_current_file += split_at as u64;
-            self.min_max_rows.push((self.rows_written_current_file, (self.first_row.as_ref().unwrap_or(&remaining_slice[0]).clone(), remaining_slice[split_at - 1].clone())));
+            self.min_max_rows.push((
+                self.rows_written_current_file,
+                (
+                    self.first_row
+                        .as_ref()
+                        .unwrap_or(&remaining_slice[0])
+                        .clone(),
+                    remaining_slice[split_at - 1].clone(),
+                ),
+            ));
             self.rows_written_current_file = 0;
             self.first_row = None;
             self.current_writer += 1;
@@ -343,7 +423,13 @@ impl SplitRowParquetWriter {
 
     fn close(mut self) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
         if self.first_row.is_some() && self.last_row.is_some() {
-            self.min_max_rows.push((self.rows_written_current_file, (self.first_row.as_ref().unwrap().clone(), self.last_row.as_ref().unwrap().clone())));
+            self.min_max_rows.push((
+                self.rows_written_current_file,
+                (
+                    self.first_row.as_ref().unwrap().clone(),
+                    self.last_row.as_ref().unwrap().clone(),
+                ),
+            ));
             self.rows_written_current_file = 0;
         }
         for w in self.writers.into_iter() {
@@ -354,24 +440,32 @@ impl SplitRowParquetWriter {
 }
 
 impl RowParquetWriter {
-    fn open(table: &'a Index, file: &'a str, row_group_size: usize, sort_key_size: u64) -> Result<RowParquetWriter, CubeError> {
+    fn open(
+        table: &'a Index,
+        file: &'a str,
+        row_group_size: usize,
+        sort_key_size: u64,
+    ) -> Result<RowParquetWriter, CubeError> {
         let file = File::create(file)?;
 
-        let mut fields = table.get_columns().iter().map(|column| {
-            // TODO pass nullable columns
-            Arc::new(parquet::schema::types::Type::from(column))
-        }
-        ).collect();
+        let mut fields = table
+            .get_columns()
+            .iter()
+            .map(|column| {
+                // TODO pass nullable columns
+                Arc::new(parquet::schema::types::Type::from(column))
+            })
+            .collect();
 
         let schema = Arc::new(
             types::Type::group_type_builder("schema")
                 .with_fields(&mut fields)
-                .build().unwrap(),
+                .build()
+                .unwrap(),
         );
 
         let props = Self::writer_props();
-        let parquet_writer =
-            SerializedFileWriter::new(file.try_clone()?, schema, props)?;
+        let parquet_writer = SerializedFileWriter::new(file.try_clone()?, schema, props)?;
 
         Ok(RowParquetWriter {
             parquet_writer,
@@ -405,77 +499,154 @@ impl RowParquetWriter {
                 // TODO types
                 match col_writer {
                     ColumnWriter::Int64ColumnWriter(ref mut typed) => {
-                        let column_values = (0..rows_in_group).filter(|row_index| &self.buffer[row_batch_index * batch_size + row_index].values[column_index] != &TableValue::Null).map(
-                            |row_index| {
+                        let column_values = (0..rows_in_group)
+                            .filter(|row_index| {
+                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                    != &TableValue::Null
+                            })
+                            .map(|row_index| {
                                 // TODO types
-                                match &self.buffer[row_batch_index * batch_size + row_index].values[column_index] {
+                                match &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                {
                                     TableValue::Int(val) => i64::from(val.clone()),
-                                    TableValue::Timestamp(t) => i64::from(t.clone().get_time_stamp() / 1000),
-                                    x => panic!("Unsupported value: {:?}", x)
+                                    TableValue::Timestamp(t) => {
+                                        i64::from(t.clone().get_time_stamp() / 1000)
+                                    }
+                                    x => panic!("Unsupported value: {:?}", x),
                                 }
-                            }
-                        ).collect::<Vec<i64>>();
-                        let min = if self.sort_key_size >= column_index as u64 && column_values.len() > 0 {
+                            })
+                            .collect::<Vec<i64>>();
+                        let min = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
                             Some(column_values[0].clone())
                         } else {
                             None
                         };
-                        let max = if self.sort_key_size >= column_index as u64 && column_values.len() > 0 {
+                        let max = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
                             Some(column_values[column_values.len() - 1].clone())
                         } else {
                             None
                         };
-                        let def_levels = self.get_def_levels(batch_size, row_batch_index, column_index, rows_in_group, column_values.len());
-                        typed.write_batch_with_statistics(&column_values, def_levels.as_ref().map(|b| b.as_slice()), None, &min, &max, None, None)?;
+                        let def_levels = self.get_def_levels(
+                            batch_size,
+                            row_batch_index,
+                            column_index,
+                            rows_in_group,
+                            column_values.len(),
+                        );
+                        typed.write_batch_with_statistics(
+                            &column_values,
+                            def_levels.as_ref().map(|b| b.as_slice()),
+                            None,
+                            &min,
+                            &max,
+                            None,
+                            None,
+                        )?;
                     }
                     ColumnWriter::ByteArrayColumnWriter(ref mut typed) => {
-                        let column_values = (0..rows_in_group).filter(|row_index| &self.buffer[row_batch_index * batch_size + row_index].values[column_index] != &TableValue::Null).map(
-                            |row_index| {
+                        let column_values = (0..rows_in_group)
+                            .filter(|row_index| {
+                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                    != &TableValue::Null
+                            })
+                            .map(|row_index| {
                                 // TODO types
-                                match &self.buffer[row_batch_index * batch_size + row_index].values[column_index] {
+                                match &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                {
                                     TableValue::String(str) => ByteArray::from(str.as_str()),
                                     TableValue::Bytes(bytes) => ByteArray::from(bytes.clone()),
-                                    x => panic!("Unsupported value: {:?}", x)
+                                    x => panic!("Unsupported value: {:?}", x),
                                 }
-                            }
-                        ).collect::<Vec<ByteArray>>();
-                        let min = if self.sort_key_size >= column_index as u64 && column_values.len() > 0 {
+                            })
+                            .collect::<Vec<ByteArray>>();
+                        let min = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
                             Some(column_values[0].clone())
                         } else {
                             None
                         };
-                        let max = if self.sort_key_size >= column_index as u64 && column_values.len() > 0 {
+                        let max = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
                             Some(column_values[column_values.len() - 1].clone())
                         } else {
                             None
                         };
-                        let def_levels = self.get_def_levels(batch_size, row_batch_index, column_index, rows_in_group, column_values.len());
-                        typed.write_batch_with_statistics(&column_values, def_levels.as_ref().map(|b| b.as_slice()), None, &min, &max, None, None)?;
+                        let def_levels = self.get_def_levels(
+                            batch_size,
+                            row_batch_index,
+                            column_index,
+                            rows_in_group,
+                            column_values.len(),
+                        );
+                        typed.write_batch_with_statistics(
+                            &column_values,
+                            def_levels.as_ref().map(|b| b.as_slice()),
+                            None,
+                            &min,
+                            &max,
+                            None,
+                            None,
+                        )?;
                     }
                     ColumnWriter::BoolColumnWriter(ref mut typed) => {
-                        let column_values = (0..rows_in_group).filter(|row_index| &self.buffer[row_batch_index * batch_size + row_index].values[column_index] != &TableValue::Null).map(
-                            |row_index| {
+                        let column_values = (0..rows_in_group)
+                            .filter(|row_index| {
+                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                    != &TableValue::Null
+                            })
+                            .map(|row_index| {
                                 // TODO types
-                                match &self.buffer[row_batch_index * batch_size + row_index].values[column_index] {
+                                match &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                {
                                     TableValue::Boolean(b) => *b,
-                                    x => panic!("Unsupported value: {:?}", x)
+                                    x => panic!("Unsupported value: {:?}", x),
                                 }
-                            }
-                        ).collect::<Vec<bool>>();
-                        let min = if self.sort_key_size >= column_index as u64 && column_values.len() > 0 {
+                            })
+                            .collect::<Vec<bool>>();
+                        let min = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
                             Some(column_values[0].clone())
                         } else {
                             None
                         };
-                        let max = if self.sort_key_size >= column_index as u64 && column_values.len() > 0 {
+                        let max = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
                             Some(column_values[column_values.len() - 1].clone())
                         } else {
                             None
                         };
-                        let def_levels = self.get_def_levels(batch_size, row_batch_index, column_index, rows_in_group, column_values.len());
-                        typed.write_batch_with_statistics(&column_values, def_levels.as_ref().map(|b| b.as_slice()), None, &min, &max, None, None)?;
+                        let def_levels = self.get_def_levels(
+                            batch_size,
+                            row_batch_index,
+                            column_index,
+                            rows_in_group,
+                            column_values.len(),
+                        );
+                        typed.write_batch_with_statistics(
+                            &column_values,
+                            def_levels.as_ref().map(|b| b.as_slice()),
+                            None,
+                            &min,
+                            &max,
+                            None,
+                            None,
+                        )?;
                     }
-                    _ => panic!("Unsupported writer")
+                    _ => panic!("Unsupported writer"),
                 };
 
                 row_group_writer.close_column(col_writer)?;
@@ -493,16 +664,27 @@ impl RowParquetWriter {
         Ok(())
     }
 
-    fn get_def_levels(&self, batch_size: usize, row_batch_index: usize, column_index: usize, rows_in_group: usize, _column_values_len: usize) -> Option<Vec<i16>> {
-        Some((0..rows_in_group).map(
-            |row_index| {
-                // TODO types
-                match &self.buffer[row_batch_index * batch_size + row_index].values[column_index] {
-                    TableValue::Null => 0,
-                    _ => 1
-                }
-            }
-        ).collect::<Vec<i16>>())
+    fn get_def_levels(
+        &self,
+        batch_size: usize,
+        row_batch_index: usize,
+        column_index: usize,
+        rows_in_group: usize,
+        _column_values_len: usize,
+    ) -> Option<Vec<i16>> {
+        Some(
+            (0..rows_in_group)
+                .map(|row_index| {
+                    // TODO types
+                    match &self.buffer[row_batch_index * batch_size + row_index].values
+                        [column_index]
+                    {
+                        TableValue::Null => 0,
+                        _ => 1,
+                    }
+                })
+                .collect::<Vec<i16>>(),
+        )
     }
 
     fn close(mut self) -> Result<(), CubeError> {
@@ -528,54 +710,69 @@ impl RowParquetWriter {
 
 #[cfg(test)]
 mod tests {
-    use crate::table::parquet::{ParquetTableStore, RowParquetReader, ColumnAccessor};
-    use crate::metastore::{Index, Column, ColumnType};
-    use crate::table::{TableStore, Row, TableValue};
+    use crate::metastore::{Column, ColumnType, Index};
+    use crate::table::parquet::{ColumnAccessor, ParquetTableStore, RowParquetReader};
+    use crate::table::{Row, TableStore, TableValue};
     use std::{fs, io};
 
     extern crate test;
 
-    use test::Bencher;
-    use csv::ReaderBuilder;
-    use std::fs::File;
-    use std::mem::swap;
-    use parquet::file::reader::FileReader;
-    use std::io::BufReader;
-    use std::time::SystemTime;
-    use parquet::file::statistics::Statistics;
-    use datafusion::physical_plan::hash_aggregate::{HashAggregateExec, AggregateMode};
-    use datafusion::physical_plan::expressions::{Count, binary, Literal};
-    use datafusion::physical_plan::{expressions, ExecutionPlan};
+    use arrow::array::UInt64Array;
     use arrow::datatypes::DataType;
-    use std::sync::Arc;
-    use arrow::array::{UInt64Array};
-    use datafusion::physical_plan::filter::FilterExec;
+    use csv::ReaderBuilder;
     use datafusion::logical_plan::Operator;
+    use datafusion::physical_plan::expressions::{binary, Count, Literal};
+    use datafusion::physical_plan::filter::FilterExec;
+    use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
+    use datafusion::physical_plan::{expressions, ExecutionPlan};
     use datafusion::scalar::ScalarValue;
     use futures::executor::block_on;
     use futures::StreamExt;
+    use parquet::file::reader::FileReader;
+    use parquet::file::statistics::Statistics;
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::mem::swap;
+    use std::sync::Arc;
+    use std::time::SystemTime;
+    use test::Bencher;
 
     #[test]
     fn gutter() {
         let store = ParquetTableStore {
-            table: Index::new("foo".to_string(), 1, vec![
-                Column::new("foo_int".to_string(), ColumnType::Int, 0),
-                Column::new("foo".to_string(), ColumnType::String, 1),
-                Column::new("boo".to_string(), ColumnType::String, 2),
-                Column::new("bool".to_string(), ColumnType::Boolean, 3),
-            ], 3),
+            table: Index::new(
+                "foo".to_string(),
+                1,
+                vec![
+                    Column::new("foo_int".to_string(), ColumnType::Int, 0),
+                    Column::new("foo".to_string(), ColumnType::String, 1),
+                    Column::new("boo".to_string(), ColumnType::String, 2),
+                    Column::new("bool".to_string(), ColumnType::Boolean, 3),
+                ],
+                3,
+            ),
             row_group_size: 7,
         };
         let file_name = "foo.parquet";
 
-        let mut first_rows = (0..40).map(|i| Row::new(vec![
-            TableValue::Int(i),
-            TableValue::String(format!("Foo {}", i)),
-            if i % 7 == 0 { TableValue::Null } else { TableValue::String(format!("Boo {}", i)) },
-            TableValue::Boolean(i % 5 == 0)
-        ])).collect::<Vec<_>>();
+        let mut first_rows = (0..40)
+            .map(|i| {
+                Row::new(vec![
+                    TableValue::Int(i),
+                    TableValue::String(format!("Foo {}", i)),
+                    if i % 7 == 0 {
+                        TableValue::Null
+                    } else {
+                        TableValue::String(format!("Boo {}", i))
+                    },
+                    TableValue::Boolean(i % 5 == 0),
+                ])
+            })
+            .collect::<Vec<_>>();
         first_rows.sort_by(|a, b| a.sort_key(3).cmp(&b.sort_key(3)));
-        store.merge_rows(None, vec![file_name.to_string()], first_rows.clone(), 3).unwrap();
+        store
+            .merge_rows(None, vec![file_name.to_string()], first_rows.clone(), 3)
+            .unwrap();
         let read_rows = store.read_rows(file_name).unwrap();
         assert_eq!(read_rows.len(), first_rows.len());
         for (read, expected) in read_rows.iter().zip(first_rows.clone()) {
@@ -583,15 +780,25 @@ mod tests {
         }
 
         let next_file = "foo-2.parquet";
-        let mut next_rows = (40..100).map(|i| Row::new(
-            vec![
-                TableValue::Int(i),
-                TableValue::String(format!("Foo {}", i)),
-                TableValue::String(format!("Boo {}", i)),
-                TableValue::Boolean(false)
-            ])).collect::<Vec<_>>();
+        let mut next_rows = (40..100)
+            .map(|i| {
+                Row::new(vec![
+                    TableValue::Int(i),
+                    TableValue::String(format!("Foo {}", i)),
+                    TableValue::String(format!("Boo {}", i)),
+                    TableValue::Boolean(false),
+                ])
+            })
+            .collect::<Vec<_>>();
         next_rows.sort_by(|a, b| a.sort_key(3).cmp(&b.sort_key(3)));
-        store.merge_rows(Some(file_name), vec![next_file.to_string()], next_rows.clone(), 3).unwrap();
+        store
+            .merge_rows(
+                Some(file_name),
+                vec![next_file.to_string()],
+                next_rows.clone(),
+                3,
+            )
+            .unwrap();
 
         let mut resulting = first_rows.clone();
         resulting.append(&mut next_rows);
@@ -609,14 +816,25 @@ mod tests {
 
         let split_1 = "foo-3-1.parquet";
         let split_2 = "foo-3-2.parquet";
-        let mut next_rows = (100..150).map(|i| Row::new(vec![
-            TableValue::Int(i),
-            TableValue::String(format!("Foo {}", i)),
-            TableValue::String(format!("Boo {}", i)),
-            TableValue::Boolean(false)
-        ])).collect::<Vec<_>>();
+        let mut next_rows = (100..150)
+            .map(|i| {
+                Row::new(vec![
+                    TableValue::Int(i),
+                    TableValue::String(format!("Foo {}", i)),
+                    TableValue::String(format!("Boo {}", i)),
+                    TableValue::Boolean(false),
+                ])
+            })
+            .collect::<Vec<_>>();
         next_rows.sort_by(|a, b| a.sort_key(3).cmp(&b.sort_key(3)));
-        let min_max = store.merge_rows(Some(next_file), vec![split_1.to_string(), split_2.to_string()], next_rows.clone(), 3).unwrap();
+        let min_max = store
+            .merge_rows(
+                Some(next_file),
+                vec![split_1.to_string(), split_2.to_string()],
+                next_rows.clone(),
+                3,
+            )
+            .unwrap();
 
         resulting.append(&mut next_rows);
         resulting.sort_by(|a, b| a.sort_key(3).cmp(&b.sort_key(3)));
@@ -631,16 +849,45 @@ mod tests {
             assert_eq!(read, expected);
         }
 
-        assert_eq!(min_max, vec![
-            (75, (
-                Row::new(vec![TableValue::Int(0), TableValue::String(format!("Foo {}", 0)), TableValue::Null, TableValue::Boolean(true)]),
-                Row::new(vec![TableValue::Int(74), TableValue::String(format!("Foo {}", 74)), TableValue::String(format!("Boo {}", 74)), TableValue::Boolean(false)])
-            )),
-            (75, (
-                Row::new(vec![TableValue::Int(75), TableValue::String(format!("Foo {}", 75)), TableValue::String(format!("Boo {}", 75)), TableValue::Boolean(false)]),
-                Row::new(vec![TableValue::Int(149), TableValue::String(format!("Foo {}", 149)), TableValue::String(format!("Boo {}", 149)), TableValue::Boolean(false)])
-            ))
-        ]);
+        assert_eq!(
+            min_max,
+            vec![
+                (
+                    75,
+                    (
+                        Row::new(vec![
+                            TableValue::Int(0),
+                            TableValue::String(format!("Foo {}", 0)),
+                            TableValue::Null,
+                            TableValue::Boolean(true)
+                        ]),
+                        Row::new(vec![
+                            TableValue::Int(74),
+                            TableValue::String(format!("Foo {}", 74)),
+                            TableValue::String(format!("Boo {}", 74)),
+                            TableValue::Boolean(false)
+                        ])
+                    )
+                ),
+                (
+                    75,
+                    (
+                        Row::new(vec![
+                            TableValue::Int(75),
+                            TableValue::String(format!("Foo {}", 75)),
+                            TableValue::String(format!("Boo {}", 75)),
+                            TableValue::Boolean(false)
+                        ]),
+                        Row::new(vec![
+                            TableValue::Int(149),
+                            TableValue::String(format!("Foo {}", 149)),
+                            TableValue::String(format!("Boo {}", 149)),
+                            TableValue::Boolean(false)
+                        ])
+                    )
+                )
+            ]
+        );
 
         fs::remove_file(file_name).unwrap();
         fs::remove_file(next_file).unwrap();
@@ -651,7 +898,9 @@ mod tests {
     #[bench]
     fn filter_count(b: &mut Bencher) {
         if let Ok((store, columns_to_read)) = prepare_donors() {
-            let mut reader = RowParquetReader::open(&store.table, "Donors.parquet", Some(&columns_to_read)).unwrap();
+            let mut reader =
+                RowParquetReader::open(&store.table, "Donors.parquet", Some(&columns_to_read))
+                    .unwrap();
 
             b.iter(|| {
                 let start = SystemTime::now();
@@ -659,7 +908,14 @@ mod tests {
                 for row_group in 0..reader.parquet_reader.num_row_groups() {
                     {
                         let (_, index, _, _) = &reader.column_with_buffer[0];
-                        if let Some(Statistics::ByteArray(stats)) = reader.parquet_reader.get_row_group(row_group).unwrap().metadata().column(*index).statistics() {
+                        if let Some(Statistics::ByteArray(stats)) = reader
+                            .parquet_reader
+                            .get_row_group(row_group)
+                            .unwrap()
+                            .metadata()
+                            .column(*index)
+                            .statistics()
+                        {
                             let min = stats.min().as_utf8().unwrap();
                             let max = stats.max().as_utf8().unwrap();
                             println!("Min: {}, Max: {}", min, max);
@@ -678,7 +934,11 @@ mod tests {
                         }
                     }
                 }
-                println!("San Francisco count ({:?}): {}", start.elapsed().unwrap(), counter);
+                println!(
+                    "San Francisco count ({:?}): {}",
+                    start.elapsed().unwrap(),
+                    counter
+                );
             });
         }
     }
@@ -688,59 +948,89 @@ mod tests {
         if let Ok((store, columns_to_read)) = prepare_donors() {
             b.iter(|| {
                 let start = SystemTime::now();
-                let reader = store.scan_node(
-                    "Donors.parquet",
-                    &columns_to_read,
-                    Some(Arc::new(|group| {
-                        if let Some(Statistics::ByteArray(stats)) = group.column(0).statistics() {
-                            let min = stats.min().as_utf8().unwrap();
-                            let max = stats.max().as_utf8().unwrap();
-                            println!("Min: {}, Max: {}", min, max);
-                            min <= "San Francisco" && "San Francisco" <= max
-                        } else {
-                            false
-                        }
-                    })),
-                ).unwrap();
+                let reader = store
+                    .scan_node(
+                        "Donors.parquet",
+                        &columns_to_read,
+                        Some(Arc::new(|group| {
+                            if let Some(Statistics::ByteArray(stats)) = group.column(0).statistics()
+                            {
+                                let min = stats.min().as_utf8().unwrap();
+                                let max = stats.max().as_utf8().unwrap();
+                                println!("Min: {}, Max: {}", min, max);
+                                min <= "San Francisco" && "San Francisco" <= max
+                            } else {
+                                false
+                            }
+                        })),
+                    )
+                    .unwrap();
                 let filter_expr = binary(
                     Arc::new(expressions::Column::new("Donor City")),
                     Operator::Eq,
-                    Arc::new(Literal::new(ScalarValue::Utf8(Some("San Francisco".to_string())))),
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(
+                        "San Francisco".to_string(),
+                    )))),
                     reader.schema().as_ref(),
-                ).unwrap();
+                )
+                .unwrap();
                 let filter = Arc::new(FilterExec::try_new(filter_expr, reader).unwrap());
                 let aggregate = HashAggregateExec::try_new(
                     AggregateMode::Partial,
                     vec![],
                     vec![Arc::new(Count::new(
-                        Arc::new(expressions::Column::new("Donor City")), "count".to_string(), DataType::UInt64)
-                    )],
+                        Arc::new(expressions::Column::new("Donor City")),
+                        "count".to_string(),
+                        DataType::UInt64,
+                    ))],
                     filter,
-                ).unwrap();
-                let batch = block_on(async { aggregate.execute(0).await.unwrap().next().await.unwrap().unwrap() });
-                let result = batch.column(0).as_any().downcast_ref::<UInt64Array>().unwrap();
-                println!("San Francisco count ({:?}): {}", start.elapsed().unwrap(), result.value(0));
+                )
+                .unwrap();
+                let batch = block_on(async {
+                    aggregate
+                        .execute(0)
+                        .await
+                        .unwrap()
+                        .next()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                });
+                let result = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .unwrap();
+                println!(
+                    "San Francisco count ({:?}): {}",
+                    start.elapsed().unwrap(),
+                    result.value(0)
+                );
             });
         }
     }
 
     fn prepare_donors() -> Result<(ParquetTableStore, Vec<Column>), io::Error> {
         let store = ParquetTableStore {
-            table: Index::new("donors".to_string(), 1, vec![
-                Column::new("Donor City".to_string(), ColumnType::String, 0),
-                Column::new("Donor ID".to_string(), ColumnType::String, 1),
-                Column::new("Donor State".to_string(), ColumnType::String, 2),
-                Column::new("Donor Is Teacher".to_string(), ColumnType::String, 3),
-                Column::new("Donor Zip".to_string(), ColumnType::String, 4),
-            ], 6),
+            table: Index::new(
+                "donors".to_string(),
+                1,
+                vec![
+                    Column::new("Donor City".to_string(), ColumnType::String, 0),
+                    Column::new("Donor ID".to_string(), ColumnType::String, 1),
+                    Column::new("Donor State".to_string(), ColumnType::String, 2),
+                    Column::new("Donor Is Teacher".to_string(), ColumnType::String, 3),
+                    Column::new("Donor Zip".to_string(), ColumnType::String, 4),
+                ],
+                6,
+            ),
             row_group_size: 16384,
         };
 
         let column_mapping = vec![1, 0, 2, 3, 4];
 
         let donors = File::open("Donors.csv")?;
-        let mut rdr = ReaderBuilder::new()
-            .from_reader(BufReader::new(donors));
+        let mut rdr = ReaderBuilder::new().from_reader(BufReader::new(donors));
 
         let mut index = 0;
         let mut to_merge = Vec::new();
@@ -752,12 +1042,15 @@ mod tests {
                 let r = record.unwrap();
                 let mut values = Vec::with_capacity(column_count);
                 for c in store.table.get_columns() {
-                    values.push(TableValue::String(r[column_mapping[c.get_index()]].to_string()));
+                    values.push(TableValue::String(
+                        r[column_mapping[c.get_index()]].to_string(),
+                    ));
                 }
                 to_merge.push(Row::new(values));
                 index += 1;
                 if index % 500000 == 0 {
-                    current_file = merge_for_bench(&store, &mut index, &mut to_merge, &current_file);
+                    current_file =
+                        merge_for_bench(&store, &mut index, &mut to_merge, &current_file);
                 }
             }
 
@@ -768,13 +1061,28 @@ mod tests {
         Ok((store, columns_to_read))
     }
 
-    fn merge_for_bench(store: &ParquetTableStore, index: &mut i32, mut to_merge: &mut Vec<Row>, current_file: &Option<String>) -> Option<String> {
+    fn merge_for_bench(
+        store: &ParquetTableStore,
+        index: &mut i32,
+        mut to_merge: &mut Vec<Row>,
+        current_file: &Option<String>,
+    ) -> Option<String> {
         println!("Merging {}", index);
-        let dest_file = current_file.as_ref().map(|f| format!("{}.new", f)).unwrap_or("Donors.parquet".to_string());
+        let dest_file = current_file
+            .as_ref()
+            .map(|f| format!("{}.new", f))
+            .unwrap_or("Donors.parquet".to_string());
         let mut tmp = Vec::new();
         swap(&mut tmp, &mut to_merge);
         tmp.sort_by(|a, b| a.sort_key(2).cmp(&b.sort_key(2)));
-        store.merge_rows(current_file.as_ref().map(|s| s.as_str()), vec![dest_file], tmp, 2).unwrap();
+        store
+            .merge_rows(
+                current_file.as_ref().map(|s| s.as_str()),
+                vec![dest_file],
+                tmp,
+                2,
+            )
+            .unwrap();
         fs::rename("Donors.parquet.new", "Donors.parquet").unwrap();
         Some("Donors.parquet".to_string())
     }
