@@ -93,9 +93,9 @@ to connect to the databases. You can
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
 [link-cubejs-databases]: /connecting-to-the-database
 [link-nodejs-tls-options]:
-  https://nodejs.org/docs/latest-v12.x/api/tls.html#tls_tls_createsecurecontext_options
+  https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [link-nodejs-tls-ciphers]:
-  https://nodejs.org/docs/latest-v12.x/api/tls.html#tls_modifying_the_default_tls_cipher_suite
+  https://nodejs.org/docs/latest/api/tls.html#tls_modifying_the_default_tls_cipher_suite
 [link-hive-cdh-versions]:
   https://docs.cloudera.com/documentation/enterprise/6/release-notes/topics/rg_cdh_6_download.html
 [link-hive-thrift-versions]: https://github.com/apache/thrift/releases
