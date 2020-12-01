@@ -22,6 +22,7 @@ Cube.js currently provides connectors to the following databases:
 | Hive / SparkSQL (thrift)               | `hive`          |
 | Oracle                                 | `oracle`        |
 | Apache Druid                           | `druid`         |
+| SQLite                                 | `sqlite`        |
 
 <!-- prettier-ignore-start -->
 [[info | ]]
@@ -64,6 +65,7 @@ databases:
 | Snowflake                                                          | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 | Presto                                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                 |
 | Druid                                                              | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                                                             |
+| SQLite                                                             | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
 
 ## External Pre-aggregations Database
 
