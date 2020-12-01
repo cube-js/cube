@@ -5,7 +5,6 @@ import path from 'path';
 import crypto from 'crypto';
 import { CommanderStatic } from 'commander';
 import { requireFromPackage, requirePackageManifest } from '@cubejs-backend/shared';
-import { parse as semverParse, compare as semverCompare, SemVer } from 'semver';
 
 import {
   displayError,
