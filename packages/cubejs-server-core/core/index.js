@@ -1,6 +1,6 @@
 /* eslint-disable global-require */
 const { ApiGateway } = require('@cubejs-backend/api-gateway');
-const { track, isDockerImage, resolveBuiltInPackageVersion } = require('@cubejs-backend/shared');
+const { track, isDockerImage, resolveBuiltInPackageVersion, internalExceptions } = require('@cubejs-backend/shared');
 
 const crypto = require('crypto');
 const fs = require('fs-extra');
@@ -239,15 +239,19 @@ class CubejsServerCore {
     )) {
       this.scheduledRefreshTimer = parseInt(this.scheduledRefreshTimer, 10) * 1000;
     }
+
     if (this.scheduledRefreshTimer && typeof this.scheduledRefreshTimer === 'string') {
       this.scheduledRefreshTimer = this.scheduledRefreshTimer.toLowerCase() === 'true';
     }
+
     if (this.scheduledRefreshTimer == null) {
       this.scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
     }
+
     if (typeof this.scheduledRefreshTimer === 'boolean' && this.scheduledRefreshTimer) {
       this.scheduledRefreshTimer = 5000;
     }
+
     if (
       this.scheduledRefreshTimer
     ) {
@@ -285,7 +289,7 @@ class CubejsServerCore {
             .update(JSON.stringify(await fs.readJson('package.json')))
             .digest('hex');
         } catch (e) {
-          // console.error(e);
+          internalExceptions(e);
         }
       }
 
@@ -294,7 +298,7 @@ class CubejsServerCore {
           const coreServerJson = await fs.readJson(path.join(__dirname, '..', 'package.json'));
           this.coreServerVersion = coreServerJson.version;
         } catch (e) {
-          // console.error(e);
+          internalExceptions(e);
         }
       }
 
@@ -304,7 +308,7 @@ class CubejsServerCore {
             '@cubejs-backend/docker',
           );
         } catch (e) {
-          // console.error(e);
+          internalExceptions(e);
         }
       }
 
@@ -317,7 +321,7 @@ class CubejsServerCore {
           ...props
         });
       } catch (e) {
-        // console.error(e);
+        internalExceptions(e);
       }
     };
 

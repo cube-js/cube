@@ -2,7 +2,7 @@ import os from 'os';
 import { spawn } from 'cross-spawn';
 import fs from 'fs-extra';
 import chalk from 'chalk';
-import { track, BaseEvent } from '@cubejs-backend/shared';
+import { track, BaseEvent, internalExceptions } from '@cubejs-backend/shared';
 import { compare as semverCompare, parse as semverParse, SemVer } from 'semver';
 
 export const executeCommand = (command: string, args: string[]) => {
@@ -90,6 +90,6 @@ export async function event(opts: BaseEvent) {
       cliVersion: loadCliManifest().version,
     });
   } catch (e) {
-    // console.error(e);
+    internalExceptions(e);
   }
 }

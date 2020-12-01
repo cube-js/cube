@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fetch from 'node-fetch';
 import { machineIdSync } from 'node-machine-id';
+import { internalExceptions } from './errors';
 
 export type BaseEvent = {
   name: string,
@@ -47,7 +48,8 @@ async function flush(toFlush?: Array<Event>, retries: number = 10): Promise<any>
       // eslint-disable-next-line consistent-return
       return flush(toFlush, retries - 1);
     }
-    // console.log(e);
+
+    internalExceptions(e);
   }
 }
 
@@ -56,7 +58,7 @@ let anonymousId: string = 'unknown';
 try {
   anonymousId = machineIdSync();
 } catch (e) {
-  // console.error(e);
+  internalExceptions(e);
 }
 
 export function getAnonymousId() {

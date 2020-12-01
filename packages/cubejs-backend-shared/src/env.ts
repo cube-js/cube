@@ -18,6 +18,10 @@ const variables = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
+  // It's only excepted for CI, nothing else.
+  internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
+    .default('false')
+    .asEnum(['exit', 'log', 'false'])
 };
 
 type Vars = typeof variables;
