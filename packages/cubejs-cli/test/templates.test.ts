@@ -1,12 +1,15 @@
-/*
-global test expect
-*/
-import templates from './templates';
+import templates from '../src/templates';
 
 const dotEnv = templates.express.files['.env'];
 
 const secret = 123;
-const generateTestEnv = (apiSecret, dbType) => ({ apiSecret, dbType });
+
+const generateTestEnv = (apiSecret, dbType) => ({
+  apiSecret,
+  dbType,
+  dockerVersion: 'latest',
+  projectName: 'test',
+});
 
 test('dotEnv should return default env vars for mysql DB type', () => {
   const dbType = 'mysql';

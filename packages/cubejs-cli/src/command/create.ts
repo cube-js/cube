@@ -4,13 +4,14 @@ import inquirer from 'inquirer';
 import path from 'path';
 import crypto from 'crypto';
 import { CommanderStatic } from 'commander';
+import { requireFromPackage, requirePackageManifest } from '@cubejs-backend/shared';
+import { parse as semverParse, compare as semverCompare, SemVer } from 'semver';
 
 import {
   displayError,
-  executeCommand,
+  executeCommand, findMaxVersion,
   loadCliManifest,
   npmInstall,
-  requireFromPackage,
   writePackageJson,
   event,
 } from '../utils';
@@ -66,7 +67,7 @@ const create = async (projectName, options) => {
   await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
 
   if (!options.dbType) {
-    const Drivers = await requireFromPackage('@cubejs-backend/server-core/core/DriverDependencies.js');
+    const Drivers = await requireFromPackage<any>('@cubejs-backend/server-core/core/DriverDependencies.js');
     const prompt = await inquirer.prompt([{
       type: 'list',
       name: 'dbType',
@@ -78,7 +79,8 @@ const create = async (projectName, options) => {
   }
 
   logStage('Installing DB driver dependencies');
-  const CubejsServer = await requireFromPackage('@cubejs-backend/server');
+  const CubejsServer = await requireFromPackage<any>('@cubejs-backend/server');
+
   let driverDependencies = CubejsServer.driverDependencies(options.dbType);
   if (!driverDependencies) {
     await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
@@ -116,14 +118,26 @@ const create = async (projectName, options) => {
 
   logStage('Writing files from template');
 
-  const driverClass = await requireFromPackage(driverDependencies[0]);
+  const driverClass = await requireFromPackage<any>(driverDependencies[0]);
+
+  const driverPackageManifest = await requirePackageManifest(driverDependencies[0]);
+  const serverCorePackageManifest = await requirePackageManifest('@cubejs-backend/server-core');
+  const serverPackageManifest = await requirePackageManifest('@cubejs-backend/server');
+
+  const dockerVersion = findMaxVersion([
+    serverPackageManifest.version,
+    serverCorePackageManifest.version,
+    driverPackageManifest.version
+  ]);
 
   const env = {
     dbType: options.dbType,
     apiSecret: crypto.randomBytes(64).toString('hex'),
     projectName,
+    dockerVersion: `v${dockerVersion.version}`,
     driverEnvVariables: driverClass.driverEnvVariables && driverClass.driverEnvVariables()
   };
+
   await Promise.all(Object.keys(templateConfig.files).map(async fileName => {
     await fs.ensureDir(path.dirname(fileName));
     await fs.writeFile(fileName, templateConfig.files[fileName](env));

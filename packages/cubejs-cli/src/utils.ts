@@ -1,11 +1,9 @@
 import os from 'os';
 import { spawn } from 'cross-spawn';
 import fs from 'fs-extra';
-import path from 'path';
 import chalk from 'chalk';
 import { track, BaseEvent } from '@cubejs-backend/shared';
-
-export const isDockerImage = () => Boolean(process.env.CUBEJS_DOCKER_IMAGE_TAG);
+import { compare as semverCompare, parse as semverParse, SemVer } from 'semver';
 
 export const executeCommand = (command: string, args: string[]) => {
   const child = spawn(command, args, { stdio: 'inherit' });
@@ -63,44 +61,6 @@ export const displayError = async (text: string|string[], options = {}) => {
   process.exit(1);
 };
 
-export const packageExists = (moduleName: string, relative: boolean = false) => {
-  if (relative) {
-    try {
-      // eslint-disable-next-line global-require,import/no-dynamic-require
-      require.resolve(`${moduleName}`);
-
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
-  return fs.pathExistsSync(modulePath);
-};
-
-const requiredPackageExists = async (moduleName: string, relative: boolean = false) => {
-  if (!packageExists(moduleName, relative)) {
-    await displayError(
-      `${moduleName} dependency not found. Please run this command from project directory.`
-    );
-  }
-};
-
-export const requireFromPackage = async <T = any>(moduleName: string, relative: boolean = false): Promise<T> => {
-  await requiredPackageExists(moduleName, relative);
-
-  if (relative) {
-    const resolvePath = require.resolve(`${moduleName}`);
-
-    // eslint-disable-next-line global-require,import/no-dynamic-require
-    return require(resolvePath);
-  }
-
-  // eslint-disable-next-line global-require,import/no-dynamic-require
-  return require(path.join(process.cwd(), 'node_modules', moduleName));
-};
-
 export const logStage = async (stage: string, eventName: string, props?: any) => {
   console.log(`- ${stage}`);
 
@@ -112,9 +72,15 @@ export const logStage = async (stage: string, eventName: string, props?: any) =>
   }
 };
 
+export function findMaxVersion(versions: string[]): SemVer {
+  return versions
+    .map((v) => <SemVer>semverParse(v))
+    .reduce((a, b) => (semverCompare(a, b) === 1 ? a : b));
+}
+
 export function loadCliManifest() {
   // eslint-disable-next-line global-require
-  return require('../package.json');
+  return require('../../package.json');
 }
 
 export async function event(opts: BaseEvent) {

@@ -1,3 +1,18 @@
+export type TemplateFileContext = {
+  dbType: string,
+  apiSecret: string,
+  projectName: string,
+  dockerVersion: string,
+  driverEnvVariables?: string[],
+};
+
+export type Template = {
+  scripts: Record<string, string>,
+  files: Record<string, (ctx: TemplateFileContext) => string>,
+  dependencies?: string[],
+  devDependencies?: string[],
+};
+
 const indexJs = `const CubejsServer = require('@cubejs-backend/server');
 
 const server = new CubejsServer();
@@ -214,12 +229,12 @@ module.exports = {
 };
 `;
 
-const dockerCompose = `
+const dockerCompose = (ctx: TemplateFileContext) => `
 version: '2.2'
 
 services:
   cube:
-    image: cubejs/cube:latest
+    image: cubejs/cube:${ctx.dockerVersion}
     ports:
       # It's better to use random port binding for 4000/3000 ports
       # without it you will not able to start multiple projects inside docker
@@ -238,14 +253,14 @@ services:
       - ./schema:/cube/conf/schema
 `;
 
-const templates = {
+const templates: Record<string, Template> = {
   docker: {
     scripts: {
       dev: './node_modules/.bin/cubejs-server',
     },
     files: {
       'cube.js': () => cubeJs,
-      'docker-compose.yml': () => dockerCompose,
+      'docker-compose.yml': dockerCompose,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
       'schema/Orders.js': () => ordersJs
