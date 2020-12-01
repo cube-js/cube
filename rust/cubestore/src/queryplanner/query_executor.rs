@@ -37,8 +37,6 @@ use std::fmt::Formatter;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
-use datafusion::physical_plan::hash_join::HashJoinExec;
-use datafusion::physical_plan::merge_join::MergeJoinExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 
 #[automock]
