@@ -161,11 +161,11 @@ export class QueryCache {
           });
           return client.query(q.query, q.values, q);
         }, {
-        logger: this.logger,
-        cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-        redisPool: this.options.redisPool,
-        ...this.options.queueOptions
-      }
+          logger: this.logger,
+          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          redisPool: this.options.redisPool,
+          ...this.options.queueOptions
+        }
       );
     }
     return this.queue;
