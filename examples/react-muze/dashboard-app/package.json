@@ -1,0 +1,45 @@
+{
+  "name": "dashboard-app",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@chartshq/muze": "^2.0.0",
+    "@chartshq/react-muze": "^1.0.1",
+    "@cubejs-client/core": "^0.24.0",
+    "@cubejs-client/react": "^0.24.0",
+    "@testing-library/jest-dom": "^5.11.6",
+    "@testing-library/react": "^11.2.2",
+    "@testing-library/user-event": "^12.3.0",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
+    "react-scripts": "4.0.1",
+    "web-vitals": "^0.2.4"
+  },
+  "scripts": {
+    "start": "react-app-rewired start",
+    "build": "react-app-rewired build",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "copy-webpack-plugin": "^6.3.2",
+    "react-app-rewired": "^2.1.6"
+  }
+}

@@ -325,6 +325,30 @@ jobs:
           EXAMPLE_SLUG: react-data-table
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  
+  react-muze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/react-muze/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: react-muze
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   real-time-dashboard:
     runs-on: ubuntu-latest
