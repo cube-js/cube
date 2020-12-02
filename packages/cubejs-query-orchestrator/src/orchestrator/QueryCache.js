@@ -4,6 +4,7 @@ import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
+import { DynamoDBCacheDriver } from './DynamoDBCacheDriver';
 
 export class QueryCache {
   constructor(redisPrefix, clientFactory, logger, options) {
@@ -12,9 +13,23 @@ export class QueryCache {
     this.driverFactory = clientFactory;
     this.externalDriverFactory = options.externalDriverFactory;
     this.logger = logger;
-    this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver({ pool: options.redisPool }) :
-      new LocalCacheDriver();
+
+    console.log('setting up the stuff');
+    console.log('DRIVER:', options.cacheAndQueueDriver);
+
+    switch(options.cacheAndQueueDriver) {
+      case 'redis':
+        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
+        break;
+      case 'dynamodb':
+        this.cacheDriver = new DynamoDBCacheDriver({ tableName: options.tableName });
+        break;
+      case 'memory':
+        this.cacheDriver = new LocalCacheDriver();
+        break;
+      default:
+        throw new Error('Cache Not Specified')
+    }
   }
 
   async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {

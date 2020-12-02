@@ -1,5 +1,6 @@
 export * from './BaseQueueDriver';
 export * from './ContinueWaitError';
+export * from './DynamoDBCacheDriver';
 export * from './LocalCacheDriver';
 export * from './LocalQueueDriver';
 export * from './PreAggregations';

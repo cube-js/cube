@@ -14,8 +14,8 @@ export class QueryOrchestrator {
     const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
       process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
     );
-    if (cacheAndQueueDriver !== 'redis' && cacheAndQueueDriver !== 'memory') {
-      throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
+    if (cacheAndQueueDriver !== 'redis' && cacheAndQueueDriver !== 'memory' && cacheAndQueueDriver !== 'dynamodb') {
+      throw new Error('Only \'redis\', \'memory\', or \'dynamodb\' are supported for cacheAndQueueDriver option');
     }
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool() : undefined;
 
