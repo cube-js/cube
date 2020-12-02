@@ -6,8 +6,8 @@ menuOrder: 1
 ---
 
 Cube.js is designed to work with different configuration sources. There are two
-main ways you can set configuration options; via [a configuration
-file][link-config], commonly known as the `cube.js` file, and [environment
+ways you can set configuration options; via [a configuration file][link-config],
+commonly known as the `cube.js` file, and [environment
 variables][link-env-vars].
 
 [link-config]: /config
