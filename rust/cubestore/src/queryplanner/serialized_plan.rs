@@ -205,7 +205,7 @@ impl SerializedLogicalPlan {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedExpr {
     Alias(Box<SerializedExpr>, String),
-    Column(String),
+    Column(String, Option<String>),
     ScalarVariable(Vec<String>),
     Literal(ScalarValue),
     BinaryExpr {
@@ -249,7 +249,7 @@ impl SerializedExpr {
     fn expr(&self) -> Expr {
         match self {
             SerializedExpr::Alias(e, a) => Expr::Alias(Box::new(e.expr()), a.to_string()),
-            SerializedExpr::Column(c) => Expr::Column(c.clone()),
+            SerializedExpr::Column(c, a) => Expr::Column(c.clone(), a.clone()),
             SerializedExpr::ScalarVariable(v) => Expr::ScalarVariable(v.clone()),
             SerializedExpr::Literal(v) => Expr::Literal(v.clone()),
             SerializedExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
@@ -640,7 +640,7 @@ impl SerializedPlan {
             Expr::Alias(expr, alias) => {
                 SerializedExpr::Alias(Box::new(Self::serialized_expr(expr)), alias.to_string())
             }
-            Expr::Column(c) => SerializedExpr::Column(c.to_string()),
+            Expr::Column(c, a) => SerializedExpr::Column(c.to_string(), a.clone()),
             Expr::ScalarVariable(v) => SerializedExpr::ScalarVariable(v.clone()),
             Expr::Literal(v) => SerializedExpr::Literal(v.clone()),
             Expr::BinaryExpr { left, op, right } => SerializedExpr::BinaryExpr {

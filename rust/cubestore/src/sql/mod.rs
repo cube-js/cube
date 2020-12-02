@@ -798,7 +798,7 @@ mod tests {
             let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
 
-            let result = service.exec_query("SELECT bool_value, count(*) from foo.bool_group GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+            let result = service.exec_query("SELECT g.bool_value, count(*) from foo.bool_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(6)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(4)]));
@@ -823,10 +823,36 @@ mod tests {
                 "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
             ).await.unwrap();
 
-            let result = service.exec_query("SELECT city, sum(amount) from foo.orders o JOIN foo.customers c ON o.customer_id = id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+            let result = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON o.customer_id = c.id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::Int(10)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("New York".to_string()), TableValue::Int(5)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn union() {
+        Config::run_test("union", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.orders1 (customer_id text, amount int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.orders2 (customer_id text, amount int)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders1 (customer_id, amount) VALUES ('a', 10), ('b', 2), ('b', 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders2 (customer_id, amount) VALUES ('b', 20), ('c', 20), ('b', 30)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT u.customer_id, sum(u.amount) from (select * from foo.orders1 union all select * from foo.orders2) u GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("b".to_string()), TableValue::Int(55)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("c".to_string()), TableValue::Int(20)]));
+            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::String("a".to_string()), TableValue::Int(10)]));
         }).await;
     }
 

@@ -30,7 +30,7 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream};
 use itertools::Itertools;
-use log::{debug, trace, warn};
+use log::{debug, trace, warn, error};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
@@ -127,7 +127,7 @@ impl QueryExecutor for QueryExecutorImpl {
         )?;
 
         let execution_time = SystemTime::now();
-        let results = ctx.collect(split_plan.clone()).await?;
+        let results = ctx.collect(split_plan.clone()).await;
         debug!(
             "Query data processing time: {:?}",
             execution_time.elapsed()?
@@ -150,7 +150,19 @@ impl QueryExecutor for QueryExecutorImpl {
                 &split_plan
             );
         }
-        let data_frame = batch_to_dataframe(&results)?;
+        if results.is_err() {
+            error!(
+                "Error Query ({:?}):\n{:#?}",
+                execution_time.elapsed()?,
+                serialized_plan.logical_plan()
+            );
+            error!(
+                "Error Query Physical Plan ({:?}): {:#?}",
+                execution_time.elapsed()?,
+                &split_plan
+            );
+        }
+        let data_frame = batch_to_dataframe(&results?)?;
         Ok(data_frame)
     }
 
@@ -185,6 +197,18 @@ impl QueryExecutor for QueryExecutorImpl {
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {:#?}",
+                execution_time.elapsed()?,
+                &worker_plan
+            );
+        }
+        if results.is_err() {
+            error!(
+                "Error Partition Query ({:?}):\n{:#?}",
+                execution_time.elapsed()?,
+                plan.logical_plan()
+            );
+            error!(
+                "Error Partition Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &worker_plan
             );

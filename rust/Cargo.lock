@@ -63,12 +63,13 @@ checksum = "e8fd72866655d1904d6b0997d0b07ba561047d070fbe29de039031c641b61217"
 
 [[package]]
 name = "ahash"
-version = "0.5.7"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad4243ec6feddc812c0f442d9765374d250aba94e10ecf8b632e1b1c118547e8"
+checksum = "865f8b0b3fced577b7df82e9b0eb7609595d7209c0b39e78d0646672e244b1b1"
 dependencies = [
  "getrandom 0.2.0",
  "lazy_static",
+ "version_check",
 ]
 
 [[package]]
@@ -125,7 +126,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-27#7f35607c0e8ba6cbc13176f6d52a78a6ab0a0f05"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#9fc17c1d4b82e7f1fb638f9c5b8f36e8670d0d26"
 dependencies = [
  "chrono",
  "csv",
@@ -147,7 +148,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-27#7f35607c0e8ba6cbc13176f6d52a78a6ab0a0f05"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#9fc17c1d4b82e7f1fb638f9c5b8f36e8670d0d26"
 dependencies = [
  "arrow",
  "bytes",
@@ -1032,9 +1033,9 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-27#7f35607c0e8ba6cbc13176f6d52a78a6ab0a0f05"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#9fc17c1d4b82e7f1fb638f9c5b8f36e8670d0d26"
 dependencies = [
- "ahash 0.5.7",
+ "ahash 0.6.1",
  "arrow",
  "async-trait",
  "chrono",
@@ -2096,9 +2097,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.6.22"
+version = "0.6.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fce347092656428bc8eaf6201042cb551b8d67855af7374542a92a0fbfcac430"
+checksum = "4afd66f5b91bf2a3bc13fad0e21caedac168ca4c707504e75585648ae80e4cc4"
 dependencies = [
  "cfg-if 0.1.10",
  "fuchsia-zircon",
@@ -2579,7 +2580,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-11-27#7f35607c0e8ba6cbc13176f6d52a78a6ab0a0f05"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#9fc17c1d4b82e7f1fb638f9c5b8f36e8670d0d26"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3130,9 +3131,9 @@ dependencies = [
 
 [[package]]
 name = "ring"
-version = "0.16.18"
+version = "0.16.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70017ed5c555d79ee3538fc63ca09c70ad8f317dcadc1adc2c496b60c22bb24f"
+checksum = "024a1e66fea74c66c66624ee5622a7ff0e4b73a13b4f5c326ddb50c708944226"
 dependencies = [
  "cc",
  "libc",
@@ -3366,9 +3367,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.59"
+version = "1.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcac07dbffa1c65e7f816ab9eba78eb142c6d44410f4eeba1e26e4f5dfa56b95"
+checksum = "1500e84d27fe482ed1dc791a56eddc2f230046a040fa908c08bda1d9fb615779"
 dependencies = [
  "indexmap",
  "itoa",
@@ -4428,9 +4429,9 @@ dependencies = [
 
 [[package]]
 name = "webpki"
-version = "0.21.3"
+version = "0.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab146130f5f790d45f82aeeb09e55a256573373ec64409fc19a6fb82fb1032ae"
+checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
 dependencies = [
  "ring",
  "untrusted",
