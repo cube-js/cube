@@ -2,7 +2,7 @@ import React from 'react';
 import * as PropTypes from 'prop-types';
 import { Row, Col, Divider, Card } from 'antd';
 import { QueryBuilder } from '@cubejs-client/react';
-import ChartRenderer from '../ChartRenderer';
+// import ChartRenderer from '../ChartRenderer';
 import MemberGroup from './MemberGroup';
 import FilterGroup from './FilterGroup';
 import TimeGroup from './TimeGroup';
@@ -116,10 +116,11 @@ const ExploreQueryBuilder = ({
         <Col span={24}>
           {isQueryPresent ? (
             <Card style={{ minHeight: 420 }} extra={chartExtra}>
-              <ChartRenderer
+              <p>todo: ChartRenderer</p>
+              {/* <ChartRenderer
                 vizState={{ query: validatedQuery, chartType }}
                 cubejsApi={cubejsApi}
-              />
+              /> */}
             </Card>
           ) : (
             <h2 style={{ textAlign: 'center' }}>

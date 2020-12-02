@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
 import { QueryBuilder } from '@cubejs-client/react';
@@ -25,12 +25,14 @@ const Section = styled.div`
   }
 `;
 
-export function dispatchChartEvent(detail) {
-  const event = new CustomEvent('cubejs', {
-    detail,
+export function dispatchChartEvent(document, detail) {
+  const myEvent = new CustomEvent('cubejs', {
+    bubbles: true,
+    composed: true,
+    detail
   });
-  event.initEvent('cubejs', true);
-  document.body.dispatchEvent(event);
+
+  document.dispatchEvent(myEvent);
 }
 
 const chartLibraries = [
@@ -87,7 +89,10 @@ export default function PlaygroundQueryBuilder({
   dashboardSource,
   setQuery,
 }) {
-  const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
+  const ref = useRef(null);
+  const [chartingLibrary, setChartingLibrary] = useState('angular-ng2-charts');
+  const [isChartRendererReady, setChartRendererReady] = useState(false);
+  // const [isChartRendererReady, setChartRendererReady] = useState(false);
 
   return (
     <QueryBuilder
@@ -120,7 +125,6 @@ export default function PlaygroundQueryBuilder({
         updatePivotConfig,
       }) => {
         let parsedDateRange = null;
-
         // if (resultSet) {
         //   const { timeDimensions = [] } =
         //   resultSet.pivotQuery() || resultSet.query() || {};
@@ -248,6 +252,8 @@ export default function PlaygroundQueryBuilder({
               >
                 {isQueryPresent ? (
                   <ChartContainer
+                    iframeRef={ref}
+                    isChartRendererReady={isChartRendererReady}
                     query={query}
                     error={error}
                     chartType={chartType}
@@ -264,11 +270,14 @@ export default function PlaygroundQueryBuilder({
                     render={({ framework }) => {
                       return (
                         <ChartRenderer
+                          isChartRendererReady={isChartRendererReady}
                           framework={framework}
                           chartingLibrary={chartingLibrary}
                           chartType={chartType}
                           query={query}
                           pivotConfig={pivotConfig}
+                          iframeRef={ref}
+                          onChartRendererReady={setChartRendererReady}
                         />
                       );
                     }}

@@ -1,84 +1,94 @@
-import React, { useEffect, useState } from 'react';
-import { Helmet } from 'react-helmet';
+import React, { useEffect, useRef, useState } from 'react';
+
 import { dispatchChartEvent } from '../../PlaygroundQueryBuilder';
 import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
 
-const buildPath = '/chart-renderers/react';
+// const buildPath = '/chart-renderers/react';
 
-async function getEmbeds() {
-  try {
-    const html = await (await fetch(`${buildPath}/index.html`)).text();
-    const styles = [];
+// async function getEmbeds() {
+//   try {
+//     const html = await (await fetch(`${buildPath}/index.html`)).text();
+//     const styles = [];
 
-    const reg = /<script src="([^"]*)"/g;
-    const scripts = (html.match(reg) || []).map((e) => ({
-      src: buildPath + e.replace(reg, '$1').replace(/^\.\//, '/'),
-    }));
-    const [, body] = html.match(/<script>(.*?)<\/script>/);
-    scripts.push({
-      body: body.replace(/\.\/static/, `${buildPath}/static`),
-    });
+//     const reg = /<script src="([^"]*)"/g;
+//     const scripts = (html.match(reg) || []).map((e) => ({
+//       src: buildPath + e.replace(reg, '$1').replace(/^\.\//, '/'),
+//     }));
+//     const [, body] = html.match(/<script>(.*?)<\/script>/);
+//     scripts.push({
+//       body: body.replace(/\.\/static/, `${buildPath}/static`),
+//     });
 
-    return {
-      scripts,
-      styles,
-    };
-  } catch (error) {
-    console.error(error);
-    return {};
-  }
-}
+//     return {
+//       scripts,
+//       styles,
+//     };
+//   } catch (error) {
+//     console.error(error);
+//     return {};
+//   }
+// }
 
 export default function ChartRenderer({
+  iframeRef,
   framework,
+  isChartRendererReady,
   chartingLibrary,
   chartType,
   query,
   pivotConfig,
+  onChartRendererReady
 }) {
-  const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [embeds, setEmbeds] = useState({});
+  // const iframeRef = useRef();
+  // const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    getEmbeds().then((embeds) => {
-      setEmbeds(embeds);
-      setLoading(false);
-    });
-
-    document.body.addEventListener('cubejsChartReady', async () => {
-      console.log('READY!');
-      setReady(true);
-    });
-  }, []);
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow.addEventListener('cubejsChartReady', () => {
+        console.log('onChartRendererReady >>> ready!!!');
+        // setReady(true);
+        onChartRendererReady(true);
+      });
+    }
+  }, [iframeRef]);
 
   useEffect(() => {
-    if (ready) {
-      dispatchChartEvent({
+    if (isChartRendererReady && iframeRef.current) {
+      dispatchChartEvent(iframeRef.current.contentDocument, {
         pivotConfig,
         query,
         chartType,
         chartingLibrary,
       });
     }
-  }, useDeepCompareMemoize([ready, pivotConfig, query, chartType]));
+  }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType]));
 
   return (
     <>
-      <div id="root">
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <Helmet>
-            {embeds.scripts.map(({ body }) =>
-              body ? <script>{body}</script> : null
-            )}
-            {embeds.scripts.map(({ src }) =>
-              src ? <script src={src} /> : null
-            )}
-          </Helmet>
-        )}
-      </div>
+      <button onClick={() => console.log(new Date())}>console</button>
+      <button
+        onClick={() => {
+          dispatchChartEvent(iframeRef.current?.contentDocument, {
+            pivotConfig,
+            query,
+            chartType,
+            chartingLibrary,
+          });
+        }}
+      >
+        displatch
+      </button>
+
+      <iframe
+        ref={iframeRef}
+        style={{
+          width: '100%',
+          minHeight: 400,
+          border: 'none',
+        }}
+        title="Angular Charts"
+        src="./chart-renderers/angular/index.html"
+      />
     </>
   );
 }

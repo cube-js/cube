@@ -21,6 +21,39 @@ import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
+import { codeSandboxDefinition } from './utils';
+
+const frameworkToTemplate = {
+  'react': 'create-react-app',
+  'angular': 'angular-cli',
+  'vue': 'vue-cli',
+};
+
+const p = getParameters({
+  files: {
+    'index.js': {
+      content: `
+      import ReactDOM from 'react-dom';
+      function App() { return <p>Hello, World!</p> }
+      
+      ReactDOM.render(document.getElementById('root'), <App />);
+      `
+      
+    },
+    'package.json': {
+      content: {
+        dependencies: {
+          // '@angular/core': 'latest'
+          'react-dom': 'latest',
+        }
+      }
+    }
+  },
+  template: 'create-react-app'
+});
+
+console.log('link >>>', `https://codesandbox.io/api/v1/sandboxes/define?parameters=${p}`);
+
 
 const StyledCard = styled(Card)`
   .ant-card-head {
@@ -51,7 +84,8 @@ export const frameworks = [
   {
     id: 'angular',
     title: 'Angular',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
+    supported: true,
+    // docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
     scaffoldingSupported: true,
   },
   {
@@ -63,11 +97,17 @@ export const frameworks = [
 
 class ChartContainer extends React.Component {
   static getDerivedStateFromProps(props, state) {
-    if (state.isChartRendererReady) {
+    // console.log('props.isChartRendererReady', props.isChartRendererReady, props.iframeRef.current);
+    // console.log('>>', window.__cubejs);
+    
+    if (props.isChartRendererReady && props.iframeRef.current != null) {
+      const { __cubejs } = props.iframeRef.current.contentWindow;
+      
       return {
         ...state,
-        dependencies: window.__cubejs.dependencies(props.chartingLibrary),
-        codeExample: window.__cubejs.codegen(props.chartingLibrary, {
+        dependencies: __cubejs.getDependencies(props.chartingLibrary),
+        codeExample: '@deprecated: do not use!',
+        codesandboxFiles: __cubejs.getCodesandboxFiles(props.chartingLibrary, {
           query: props.query,
           chartType: props.chartType,
           pivotConfig: props.pivotConfig,
@@ -81,53 +121,31 @@ class ChartContainer extends React.Component {
     super(props);
     this.state = {
       showCode: false,
-      framework: 'react',
+      framework: 'angular',
       isChartRendererReady: false,
     };
   }
 
   async componentDidMount() {
-    document.body.addEventListener('cubejsChartReady', () => {
-      this.setState({
-        isChartRendererReady: true,
-      });
-    });
-  }
-
-  codeSandboxDefinition(codeSandboxSource, dependencies = []) {
-    return {
-      files: {
-        ...(typeof codeSandboxSource === 'string'
-          ? {
-              'index.js': {
-                content: codeSandboxSource,
-              },
-            }
-          : codeSandboxSource),
-        'package.json': {
-          content: {
-            dependencies: {
-              'react-dom': 'latest',
-              ...dependencies.reduce((memo, d) => ({ ...memo, [d]: 'latest' }), {}),
-            },
-          },
-        },
-      },
-      template: 'create-react-app',
-    };
+    // document.body.addEventListener('cubejsChartReady', () => {
+    //   this.setState({
+    //     isChartRendererReady: true,
+    //   });
+    // });
   }
 
   render() {
     const {
       codeExample,
+      codesandboxFiles,
       dependencies,
       redirectToDashboard,
       showCode,
       addingToDashboard,
       framework,
-      isChartRendererReady,
     } = this.state;
     const {
+      isChartRendererReady,
       resultSet,
       error,
       render,
@@ -144,10 +162,12 @@ class ChartContainer extends React.Component {
     if (redirectToDashboard) {
       return <Redirect to="/dashboard" />;
     }
-
+    
     const parameters = isChartRendererReady
-      ? getParameters(this.codeSandboxDefinition(codeExample, dependencies))
+      ? getParameters(codeSandboxDefinition(frameworkToTemplate[framework], codesandboxFiles, dependencies))
       : null;
+      
+      console.log('params', parameters);
 
     const chartLibrariesMenu = (
       <Menu

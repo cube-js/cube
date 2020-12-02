@@ -5,10 +5,13 @@ import { Col, Row, Spin, Typography } from 'antd';
 import { Redirect, withRouter } from 'react-router-dom';
 import DashboardSource from '../DashboardSource';
 import { frameworks } from '../ChartContainer';
-import { chartLibraries } from '../ChartRenderer';
+// import { chartLibraries } from '../ChartRenderer';
 import { Button, Card } from '../components';
 import { ReactComponent as PlusSVG } from './plus.svg';
 import CreateOwnModal from './CreateOwnModal';
+
+// todo: !
+const chartLibraries = [];
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>
