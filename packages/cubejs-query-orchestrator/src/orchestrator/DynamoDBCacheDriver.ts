@@ -17,7 +17,7 @@ export class DynamoDBCacheDriver {
       // Specify table name (used by DynamoDB)
       name: tableName ?? process.env.CUBEJS_CACHE_TABLE,
 
-      // Define partition and sort keys
+      // Define partition key
       partitionKey: 'key',
 
       // Add the DocumentClient
@@ -55,10 +55,9 @@ export class DynamoDBCacheDriver {
     const item = {
       key,
       value: JSON.stringify(value),
-      [`${TTL_KEY}`]: new Date().getTime() + expiration
+      [`${TTL_KEY}`]: (new Date().getTime() + expiration) / 1000 // needs to be in seconds
     }
 
-    // Use the 'put' method of this.cache
     await this.cache.put(item)
   }
 
@@ -77,6 +76,7 @@ export class DynamoDBCacheDriver {
       ], 
     })
 
+    // TODO: fix this
     console.log('### KEYS STARTING WITH RESULT');
     console.log(result);
     return result;
