@@ -272,10 +272,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/query-orchestrator@^0.23.6":
-  version "0.23.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.23.6.tgz#56355d1584c6561a8b63f0b1e0b9a04017c9fb61"
-  integrity sha512-L7gV0UNjpG8HmmcH/4GFVunh+g/77CwyuHRyZK5C1+nmyAbNAcswud8SkPdIRlfjnIIPcldFXKlaDAJSvkbVXw==
+"@cubejs-backend/query-orchestrator@^0.24.3":
+  version "0.24.3"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.3.tgz#dcfdf3a415dc99a4799daa697dc7cdfbb54762bc"
+  integrity sha512-9xoXcqImifbnMmH/bMWiVen3BZQSLgnL+/oytKLJbdYRsTBD8bMB7q3vuazs5Tf2NYnxwZyhXm4NZOqMTp8wUg==
   dependencies:
     generic-pool "^3.7.1"
     ramda "^0.27.0"
@@ -565,6 +565,21 @@
   version "1.19.1"
   resolved "https://registry.yarnpkg.com/@types/prettier/-/prettier-1.19.1.tgz#33509849f8e679e4add158959fdb086440e9553f"
   integrity sha512-5qOlnZscTn4xxM5MeGXAMOsIOIKIbh9e85zJWfBRVPlRMEVawzoPhINYbRGkBZCI8LxvBe7tJCdWiarA99OZfQ==
+
+"@types/ssh2-streams@*":
+  version "0.1.7"
+  resolved "https://registry.yarnpkg.com/@types/ssh2-streams/-/ssh2-streams-0.1.7.tgz#bf79349ec85a4dfb5b3fd9f4a05af729121f07e6"
+  integrity sha512-cQNV72C+BOG7G8WNGarTQdB2Ii37cJlWatSpx5zTYxtI2ZvUt2lbq6Nc2XZ4kbge28V7Xe5KYYr82d96/rDMnQ==
+  dependencies:
+    "@types/node" "*"
+
+"@types/ssh2@^0.5.45":
+  version "0.5.45"
+  resolved "https://registry.yarnpkg.com/@types/ssh2/-/ssh2-0.5.45.tgz#14e293ec2a4d4c8a5434a7989a676b87340aa870"
+  integrity sha512-SAQITTyO/jOoskSAw2T/9sveX4lhTzx7zdeYR0t04RMhZQrEIzvrAoCStSxYwvwZ5ofek1JWeW9x2yOK3GOUlg==
+  dependencies:
+    "@types/node" "*"
+    "@types/ssh2-streams" "*"
 
 "@types/stack-utils@^1.0.1":
   version "1.0.1"
@@ -4004,6 +4019,14 @@ sqlstring@^2.3.1:
   resolved "https://registry.yarnpkg.com/sqlstring/-/sqlstring-2.3.2.tgz#cdae7169389a1375b18e885f2e60b3e460809514"
   integrity sha512-vF4ZbYdKS8OnoJAWBmMxCQDkiEBkGQYU7UZPtL8flbDRSNkhaXvRJ279ZtI6M+zDaQovVU4tuRgzK5fVhvFAhg==
 
+ssh-remote-port-forward@^1.0.3:
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/ssh-remote-port-forward/-/ssh-remote-port-forward-1.0.3.tgz#074cebed6d54a42ce4659d6aa24987e433ff5fef"
+  integrity sha512-PJ6qGFmB6n0iMCQIp+qzx8qVUE5cgacopvEh63t3NJjEQHOaza/JT9zywmmVlaol/eGtCmpvBXx2A03ih1Y+xg==
+  dependencies:
+    "@types/ssh2" "^0.5.45"
+    ssh2 "^0.8.9"
+
 ssh2-streams@~0.4.10:
   version "0.4.10"
   resolved "https://registry.yarnpkg.com/ssh2-streams/-/ssh2-streams-0.4.10.tgz#48ef7e8a0e39d8f2921c30521d56dacb31d23a34"
@@ -4013,7 +4036,7 @@ ssh2-streams@~0.4.10:
     bcrypt-pbkdf "^1.0.2"
     streamsearch "~0.1.2"
 
-ssh2@^0.8.7:
+ssh2@^0.8.7, ssh2@^0.8.9:
   version "0.8.9"
   resolved "https://registry.yarnpkg.com/ssh2/-/ssh2-0.8.9.tgz#54da3a6c4ba3daf0d8477a538a481326091815f3"
   integrity sha512-GmoNPxWDMkVpMFa9LVVzQZHF6EW3WKmBwL+4/GeILf2hFmix5Isxm7Amamo8o7bHiU0tC+wXsGcUXOxp8ChPaw==
@@ -4239,9 +4262,9 @@ test-exclude@^6.0.0:
     minimatch "^3.0.4"
 
 testcontainers@^6.0.0:
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-6.0.0.tgz#0e9bb7ba37cddf24ca615e0d1d19187cc8b9fe69"
-  integrity sha512-CtpEMc2bs4sWrxeuhyGeMVpT6piIP+HYnjv4a74XSRk/tAPlxKM6Q6tVj0n+4JF6qUOCoutwXcQdBIyFrNTcXw==
+  version "6.3.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-6.3.0.tgz#75ed96bf121dbf39a03d0369628fc6c5b33595d8"
+  integrity sha512-mVoi6nn0DFYnpVU0aYU/226+rYyFHbixKckIRGYfaohKMUZs3kMH5d+D5ijQorUhpYSLoPd4gPmVRy25VWmkww==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
@@ -4251,6 +4274,7 @@ testcontainers@^6.0.0:
     get-port "^5.1.1"
     glob "^7.1.6"
     slash "^3.0.0"
+    ssh-remote-port-forward "^1.0.3"
     stream-to-array "^2.3.0"
     tar-fs "^2.1.0"
 

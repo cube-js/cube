@@ -950,6 +950,21 @@
     "@types/node" "*"
     safe-buffer "*"
 
+"@types/ssh2-streams@*":
+  version "0.1.7"
+  resolved "https://registry.yarnpkg.com/@types/ssh2-streams/-/ssh2-streams-0.1.7.tgz#bf79349ec85a4dfb5b3fd9f4a05af729121f07e6"
+  integrity sha512-cQNV72C+BOG7G8WNGarTQdB2Ii37cJlWatSpx5zTYxtI2ZvUt2lbq6Nc2XZ4kbge28V7Xe5KYYr82d96/rDMnQ==
+  dependencies:
+    "@types/node" "*"
+
+"@types/ssh2@^0.5.45":
+  version "0.5.45"
+  resolved "https://registry.yarnpkg.com/@types/ssh2/-/ssh2-0.5.45.tgz#14e293ec2a4d4c8a5434a7989a676b87340aa870"
+  integrity sha512-SAQITTyO/jOoskSAw2T/9sveX4lhTzx7zdeYR0t04RMhZQrEIzvrAoCStSxYwvwZ5ofek1JWeW9x2yOK3GOUlg==
+  dependencies:
+    "@types/node" "*"
+    "@types/ssh2-streams" "*"
+
 "@types/tunnel@0.0.0":
   version "0.0.0"
   resolved "https://registry.yarnpkg.com/@types/tunnel/-/tunnel-0.0.0.tgz#c2a42943ee63c90652a5557b8c4e56cda77f944e"
@@ -1610,7 +1625,7 @@ docker-modem@^2.1.0:
     split-ca "^1.0.1"
     ssh2 "^0.8.7"
 
-dockerode@^3.2.0:
+dockerode@^3.2.1:
   version "3.2.1"
   resolved "https://registry.yarnpkg.com/dockerode/-/dockerode-3.2.1.tgz#4a2222e3e1df536bf595e78e76d3cfbf6d4d93b9"
   integrity sha512-XsSVB5Wu5HWMg1aelV5hFSqFJaKS5x1aiV/+sT7YOzOq1IRl49I/UwV8Pe4x6t0iF9kiGkWu5jwfvbkcFVupBw==
@@ -2939,11 +2954,6 @@ node-dijkstra@^2.5.0:
   resolved "https://registry.yarnpkg.com/node-dijkstra/-/node-dijkstra-2.5.0.tgz#0feb76c5a05f35b56e786de6df4d3364af28d4e8"
   integrity sha1-D+t2xaBfNbVueG3m300zZK8o1Og=
 
-node-duration@^1.0.4:
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/node-duration/-/node-duration-1.0.4.tgz#3e94ecc0e473691c89c4560074503362071cecac"
-  integrity sha512-eUXYNSY7DL53vqfTosggWkvyIW3bhAcqBDIlolgNYlZhianXTrCL50rlUJWD1eRqkIxMppXTfiFbp+9SjpPrgA==
-
 node-preload@^0.2.1:
   version "0.2.1"
   resolved "https://registry.yarnpkg.com/node-preload/-/node-preload-0.2.1.tgz#c03043bb327f417a18fee7ab7ee57b408a144301"
@@ -3733,6 +3743,11 @@ signal-exit@^3.0.2:
   resolved "https://registry.yarnpkg.com/signal-exit/-/signal-exit-3.0.3.tgz#a1410c2edd8f077b08b4e253c8eacfcaf057461c"
   integrity sha512-VUJ49FC8U1OxwZLxIbTTrDvLnf/6TDgxZcK8wxR8zs13xpx7xbG60ndBlhNrFi2EMuFRoeDoJO7wthSLq42EjA==
 
+slash@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/slash/-/slash-3.0.0.tgz#6539be870c165adbd5240220dbe361f1bc4d4634"
+  integrity sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==
+
 slice-ansi@^2.1.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/slice-ansi/-/slice-ansi-2.1.0.tgz#cacd7693461a637a5788d92a7dd4fba068e81636"
@@ -3834,6 +3849,14 @@ sqlstring@^2.3.1:
   resolved "https://registry.yarnpkg.com/sqlstring/-/sqlstring-2.3.2.tgz#cdae7169389a1375b18e885f2e60b3e460809514"
   integrity sha512-vF4ZbYdKS8OnoJAWBmMxCQDkiEBkGQYU7UZPtL8flbDRSNkhaXvRJ279ZtI6M+zDaQovVU4tuRgzK5fVhvFAhg==
 
+ssh-remote-port-forward@^1.0.3:
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/ssh-remote-port-forward/-/ssh-remote-port-forward-1.0.3.tgz#074cebed6d54a42ce4659d6aa24987e433ff5fef"
+  integrity sha512-PJ6qGFmB6n0iMCQIp+qzx8qVUE5cgacopvEh63t3NJjEQHOaza/JT9zywmmVlaol/eGtCmpvBXx2A03ih1Y+xg==
+  dependencies:
+    "@types/ssh2" "^0.5.45"
+    ssh2 "^0.8.9"
+
 ssh2-streams@~0.4.10:
   version "0.4.10"
   resolved "https://registry.yarnpkg.com/ssh2-streams/-/ssh2-streams-0.4.10.tgz#48ef7e8a0e39d8f2921c30521d56dacb31d23a34"
@@ -3843,7 +3866,7 @@ ssh2-streams@~0.4.10:
     bcrypt-pbkdf "^1.0.2"
     streamsearch "~0.1.2"
 
-ssh2@^0.8.7:
+ssh2@^0.8.7, ssh2@^0.8.9:
   version "0.8.9"
   resolved "https://registry.yarnpkg.com/ssh2/-/ssh2-0.8.9.tgz#54da3a6c4ba3daf0d8477a538a481326091815f3"
   integrity sha512-GmoNPxWDMkVpMFa9LVVzQZHF6EW3WKmBwL+4/GeILf2hFmix5Isxm7Amamo8o7bHiU0tC+wXsGcUXOxp8ChPaw==
@@ -4074,19 +4097,20 @@ test-exclude@^6.0.0:
     glob "^7.1.4"
     minimatch "^3.0.4"
 
-testcontainers@^2.4.0:
-  version "2.20.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-2.20.0.tgz#1d3977346e5724fc6f88e543774101d8529001a6"
-  integrity sha512-kq3oOf/ayA8qo9aqChcmBNB/Yjd5LBH17FsiD7zqlpXktXCQMrWJfM3qD82RwpHrPDobhLiopwTcBhIkJuMXJg==
+testcontainers@^6.3.0:
+  version "6.3.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-6.3.0.tgz#75ed96bf121dbf39a03d0369628fc6c5b33595d8"
+  integrity sha512-mVoi6nn0DFYnpVU0aYU/226+rYyFHbixKckIRGYfaohKMUZs3kMH5d+D5ijQorUhpYSLoPd4gPmVRy25VWmkww==
   dependencies:
     "@types/dockerode" "^2.5.34"
     byline "^5.0.0"
     debug "^4.1.1"
     docker-compose "^0.23.5"
-    dockerode "^3.2.0"
+    dockerode "^3.2.1"
     get-port "^5.1.1"
     glob "^7.1.6"
-    node-duration "^1.0.4"
+    slash "^3.0.0"
+    ssh-remote-port-forward "^1.0.3"
     stream-to-array "^2.3.0"
     tar-fs "^2.1.0"
 

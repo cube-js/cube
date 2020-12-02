@@ -28,7 +28,7 @@
     "eslint-plugin-node": "^5.2.1",
     "mocha": "^8.0.1",
     "should": "^13.2.3",
-    "testcontainers": "^2.4.0"
+    "testcontainers": "^6.3.0"
   },
   "publishConfig": {
     "access": "public"
