@@ -15,16 +15,15 @@ export class QueryCache {
     this.logger = logger;
 
     switch (options.cacheAndQueueDriver) {
+      case 'redis':
+        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
+        break;
       case 'dynamodb':
         this.cacheDriver = new DynamoDBCacheDriver({ tableName: options.tableName });
         break;
       case 'memory':
-        this.cacheDriver = new LocalCacheDriver();
-        break;
-      case 'redis':
-        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
       default:
-        throw new Error('Cache Not Specified')
+        this.cacheDriver = new LocalCacheDriver();
     }
   }
 

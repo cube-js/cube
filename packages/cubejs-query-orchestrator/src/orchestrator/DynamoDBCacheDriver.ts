@@ -66,7 +66,6 @@ export class DynamoDBCacheDriver {
   }
 
   async keysStartingWith(prefix) {
-
     const result = await this.table.scan({
       limit: 100, // limit to 100 items
       capacity: 'indexes', // return the total capacity consumed by the indexes
@@ -79,6 +78,7 @@ export class DynamoDBCacheDriver {
     // TODO: fix this
     console.log('### KEYS STARTING WITH RESULT');
     console.log(result);
+    
     return result;
   }
 }
