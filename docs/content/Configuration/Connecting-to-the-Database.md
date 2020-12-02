@@ -166,6 +166,14 @@ You can learn more about acquiring Google BigQuery credentials
 [link-bigquery-credentials]:
   https://console.cloud.google.com/apis/credentials/serviceaccountkey
 
+### Google Cloud SQL Postgres
+
+You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
+`true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how you
+are [connecting to Cloud SQL][link-cloud-sql-connect].
+
+[link-cloud-sql-connect]: https://cloud.google.com/sql/docs/postgres/connect-functions#connecting_to
+
 ### MySQL
 
 To connect to a local MySQL database using a UNIX socket use
