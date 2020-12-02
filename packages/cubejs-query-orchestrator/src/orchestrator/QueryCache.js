@@ -14,19 +14,15 @@ export class QueryCache {
     this.externalDriverFactory = options.externalDriverFactory;
     this.logger = logger;
 
-    console.log('setting up the stuff');
-    console.log('DRIVER:', options.cacheAndQueueDriver);
-
-    switch(options.cacheAndQueueDriver) {
-      case 'redis':
-        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
-        break;
+    switch (options.cacheAndQueueDriver) {
       case 'dynamodb':
         this.cacheDriver = new DynamoDBCacheDriver({ tableName: options.tableName });
         break;
       case 'memory':
         this.cacheDriver = new LocalCacheDriver();
         break;
+      case 'redis':
+        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
       default:
         throw new Error('Cache Not Specified')
     }
@@ -166,11 +162,11 @@ export class QueryCache {
           });
           return client.query(q.query, q.values, q);
         }, {
-          logger: this.logger,
-          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-          redisPool: this.options.redisPool,
-          ...this.options.queueOptions
-        }
+        logger: this.logger,
+        cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+        redisPool: this.options.redisPool,
+        ...this.options.queueOptions
+      }
       );
     }
     return this.queue;
