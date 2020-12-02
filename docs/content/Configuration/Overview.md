@@ -35,14 +35,9 @@ mode does the following:
 
 ## Configuring CORS
 
-The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) through the
-[Express CORS middleware][link-express-cors]. The middleware can be configured
-by setting [relevant options][link-express-cors-opts] in the `cube.js`
-configuration file:
-
-[link-express-cors]: https://expressjs.com/en/resources/middleware/cors.html
-[link-express-cors-opts]:
-  https://expressjs.com/en/resources/middleware/cors.html#configuration-options
+The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API requests.
+By default, the middleware allows requests from any origin (`*`). To change the allowed
+domain, you can do the following:
 
 ```javascript
 module.exports = {
@@ -53,6 +48,10 @@ module.exports = {
   },
 };
 ```
+
+Please consult the Configuration Reference [for more options][link-config-cors-opts].
+
+[link-config-cors-opts]: /config#options-reference-http
 
 ## Migrating from Express to Docker
 
