@@ -32,6 +32,7 @@ class PostgresDriver extends BaseDriver {
       { name: 'key', value: 'CUBEJS_DB_SSL_KEY' },
       { name: 'ciphers', value: 'CUBEJS_DB_SSL_CIPHERS' },
       { name: 'passphrase', value: 'CUBEJS_DB_SSL_PASSPHRASE' },
+      { name: 'servername', value: 'CUBEJS_DB_SSL_SERVERNAME' },
     ];
 
     if (
