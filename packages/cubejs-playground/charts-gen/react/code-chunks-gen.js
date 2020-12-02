@@ -5,15 +5,15 @@ const generator = require('@babel/generator').default;
 
 function generateCodeChunks(chartRendererCode) {
   const ts = new TargetSource('', chartRendererCode);
-  
-  const imports = ts.imports.map(({node}) => generator(node, {}).code);
-  
+
+  const imports = ts.imports.map(({ node }) => generator(node, {}).code);
+
   const chartComponents = getChartComponents(ts).map(({ key, code }) => {
     return `
       if (chartType === '${key}') {
         return \`${TargetSource.formatCode(code)}\`;
       }
-    `
+    `;
   });
 
   traverse(ts.ast, {
@@ -32,8 +32,10 @@ function generateCodeChunks(chartRendererCode) {
       }
     },
   });
-  
+
   return `
+    const imports = ${JSON.stringify(imports)};
+    
     export function getChartComponent(chartType) {
       ${chartComponents.join('\n')}
     }
@@ -43,7 +45,7 @@ function generateCodeChunks(chartRendererCode) {
     }
     
     export function getImports() {
-      return [${imports.length ? `"${imports.join('",\n"')}"` : ``}];
+      return imports;
     }
   `;
 }
@@ -63,34 +65,37 @@ function getChartComponents(ts) {
     },
   });
 
-  anchor && traverse(
-    anchor.node,
-    {
-      ObjectProperty(path) {
-        if (path.parent.type === 'ObjectExpression') {
-          let code = '';
+  anchor &&
+    traverse(
+      anchor.node,
+      {
+        ObjectProperty(path) {
+          if (path.parent.type === 'ObjectExpression') {
+            let code = '';
 
-          if (Array.isArray(path.node.value.body && path.node.value.body.body)) {
-            code = generator(t.program(path.node.value.body.body), {}).code;
-          } else {
-            code = generator(path.node.value.body, {}).code;
+            if (
+              Array.isArray(path.node.value.body && path.node.value.body.body)
+            ) {
+              code = generator(t.program(path.node.value.body.body), {}).code;
+            } else {
+              code = generator(path.node.value.body, {}).code;
+            }
+
+            codeChunks.push({
+              key: path.node.key.name,
+              code,
+            });
           }
-          
-          codeChunks.push({
-            key: path.node.key.name,
-            code
-          });
-        }
+        },
       },
-    },
-    anchor.scope,
-    anchor.state,
-    anchor.parentPath
-  );
+      anchor.scope,
+      anchor.state,
+      anchor.parentPath
+    );
 
   return codeChunks;
 }
 
 module.exports = {
-  generateCodeChunks
-}
+  generateCodeChunks,
+};

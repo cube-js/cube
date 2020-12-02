@@ -87,7 +87,8 @@ export default function ChartRenderer({
           border: 'none',
         }}
         title="Angular Charts"
-        src="./chart-renderers/angular/index.html"
+        // src="./chart-renderers/angular/index.html"
+        src="./chart-renderers/react/index.html"
       />
     </>
   );

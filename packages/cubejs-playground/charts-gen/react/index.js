@@ -155,5 +155,3 @@ const packages = [
   );
   await appContainer.ensureDependencies();
 })();
-
-// ln -s /Users/alex/Projects/cubejs-playground-templates /Users/alex/Projects/cube.js/packages/cubejs-playground/charts-gen/node_modules/.tmp/cubejs-playground-templates

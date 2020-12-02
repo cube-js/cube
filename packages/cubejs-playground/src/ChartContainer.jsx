@@ -24,36 +24,35 @@ import { playgroundAction } from './events';
 import { codeSandboxDefinition } from './utils';
 
 const frameworkToTemplate = {
-  'react': 'create-react-app',
-  'angular': 'angular-cli',
-  'vue': 'vue-cli',
+  react: 'create-react-app',
+  angular: 'angular-cli',
+  vue: 'vue-cli',
 };
 
-const p = getParameters({
-  files: {
-    'index.js': {
-      content: `
-      import ReactDOM from 'react-dom';
-      function App() { return <p>Hello, World!</p> }
-      
-      ReactDOM.render(document.getElementById('root'), <App />);
-      `
-      
-    },
-    'package.json': {
-      content: {
-        dependencies: {
-          // '@angular/core': 'latest'
-          'react-dom': 'latest',
-        }
-      }
-    }
-  },
-  template: 'create-react-app'
-});
+// const p = getParameters({
+//   files: {
+//     // 'index.js': {
+//     //   content: `
+//     //   import ReactDOM from 'react-dom';
+//     //   function App() { return <p>Hello, World!</p> }
 
-console.log('link >>>', `https://codesandbox.io/api/v1/sandboxes/define?parameters=${p}`);
+//     //   ReactDOM.render(document.getElementById('root'), <App />);
+//     //   `
 
+//     // },
+//     'package.json': {
+//       content: {
+//         dependencies: {
+//           '@angular/core': 'latest'
+//           // 'react-dom': 'latest',
+//         }
+//       }
+//     }
+//   },
+//   template: 'angular-cli'
+// });
+
+// console.log('link >>>', `https://codesandbox.io/api/v1/sandboxes/define?parameters=${p}`);
 
 const StyledCard = styled(Card)`
   .ant-card-head {
@@ -99,10 +98,10 @@ class ChartContainer extends React.Component {
   static getDerivedStateFromProps(props, state) {
     // console.log('props.isChartRendererReady', props.isChartRendererReady, props.iframeRef.current);
     // console.log('>>', window.__cubejs);
-    
+
     if (props.isChartRendererReady && props.iframeRef.current != null) {
       const { __cubejs } = props.iframeRef.current.contentWindow;
-      
+
       return {
         ...state,
         dependencies: __cubejs.getDependencies(props.chartingLibrary),
@@ -121,17 +120,9 @@ class ChartContainer extends React.Component {
     super(props);
     this.state = {
       showCode: false,
-      framework: 'angular',
+      framework: 'react',
       isChartRendererReady: false,
     };
-  }
-
-  async componentDidMount() {
-    // document.body.addEventListener('cubejsChartReady', () => {
-    //   this.setState({
-    //     isChartRendererReady: true,
-    //   });
-    // });
   }
 
   render() {
@@ -162,12 +153,18 @@ class ChartContainer extends React.Component {
     if (redirectToDashboard) {
       return <Redirect to="/dashboard" />;
     }
-    
+
     const parameters = isChartRendererReady
-      ? getParameters(codeSandboxDefinition(frameworkToTemplate[framework], codesandboxFiles, dependencies))
+      ? getParameters(
+          codeSandboxDefinition(
+            frameworkToTemplate[framework],
+            codesandboxFiles,
+            dependencies
+          )
+        )
       : null;
-      
-      console.log('params', parameters);
+
+    console.log('params', parameters);
 
     const chartLibrariesMenu = (
       <Menu
@@ -176,7 +173,7 @@ class ChartContainer extends React.Component {
           setChartLibrary(e.key);
         }}
       >
-        {chartLibraries.map((library) => (
+        {chartLibraries[framework].map((library) => (
           <Menu.Item key={library.value}>{library.title}</Menu.Item>
         ))}
       </Menu>
@@ -187,6 +184,7 @@ class ChartContainer extends React.Component {
         onClick={(e) => {
           playgroundAction('Set Framework', { framework: e.key });
           this.setState({ framework: e.key });
+          setChartLibrary(chartLibraries[e.key][0].value);
         }}
       >
         {frameworks.map((f) => (
@@ -195,7 +193,7 @@ class ChartContainer extends React.Component {
       </Menu>
     );
 
-    const currentLibraryItem = chartLibraries.find(
+    const currentLibraryItem = chartLibraries[framework].find(
       (m) => m.value === chartingLibrary
     );
     const frameworkItem = frameworks.find((m) => m.id === framework);
@@ -485,7 +483,6 @@ ChartContainer.propTypes = {
   history: PropTypes.object.isRequired,
   chartingLibrary: PropTypes.string.isRequired,
   setChartLibrary: PropTypes.func.isRequired,
-  chartLibraries: PropTypes.array.isRequired,
 };
 
 ChartContainer.defaultProps = {
