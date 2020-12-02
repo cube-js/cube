@@ -65,6 +65,7 @@ to connect to the databases. You can
 | `CUBEJS_DB_SSL_CERT`                            | General              | The contents of an SSL certificate in PEM format. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][link-nodejs-tls-options]         | A valid SSL certificate                                          |
 | `CUBEJS_DB_SSL_KEY`                             | General              | The contents of a private key in PEM format. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][link-nodejs-tls-options]               | A valid number of connections                                    |
 | `CUBEJS_DB_SSL_CIPHERS`                         | General              | The ciphers used by the SSL certificate. For more information, check the `options.ciphers` property for TLS Secure Contexts [in the Node.js documentation][link-nodejs-tls-options]               | [Any valid SSL cipher(s)][link-nodejs-tls-ciphers]               |
+| `CUBEJS_DB_SSL_SERVERNAME`                      | General              | The server name for the SNI TLS extension. For more information, check the `options.servername` property for TLS Connections [in the Node.js documentation][link-nodejs-tls-connect-opts]         | A valid SNI TLS extension                                        |
 | `CUBEJS_DB_SSL_PASSPHRASE`                      | General              | The passphrase used to encrypt the SSL private key. For more information, check the `options.passphrase` property for TLS Secure Contexts [in the Node.js documentation][link-nodejs-tls-options] | A valid passphrase                                               |
 | `CUBEJS_DB_TYPE`                                | General              | A database type supported by Cube.js                                                                                                                                                              | [A valid database supported by Cube.js][link-cubejs-databases]   |
 | `CUBEJS_DB_USER`                                | General              | The username used to connect to the database                                                                                                                                                      | A valid database username                                        |
@@ -94,6 +95,8 @@ to connect to the databases. You can
 [link-cubejs-databases]: /connecting-to-the-database
 [link-nodejs-tls-options]:
   https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+[link-nodejs-tls-connect-opts]:
+  https://nodejs.org/docs/latest/api/tls.html#tls_tls_connect_options_callback
 [link-nodejs-tls-ciphers]:
   https://nodejs.org/docs/latest/api/tls.html#tls_modifying_the_default_tls_cipher_suite
 [link-hive-cdh-versions]:
