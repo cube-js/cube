@@ -35,28 +35,36 @@ export function dispatchChartEvent(document, detail) {
   document.dispatchEvent(myEvent);
 }
 
-const chartLibraries = [
-  {
-    key: 'bizcharts',
-    value: 'bizcharts',
-    title: 'Bizcharts',
-  },
-  {
-    key: 'recharts',
-    value: 'recharts',
-    title: 'Recharts',
-  },
-  {
-    key: 'd3',
-    value: 'd3',
-    title: 'D3',
-  },
-  {
-    key: 'chartjs',
-    value: 'chartjs',
-    title: 'Chart.js',
-  },
-];
+const frameworkChartLibraries = {
+  react: [
+    {
+      value: 'bizcharts',
+      title: 'Bizcharts',
+    },
+    {
+      value: 'recharts',
+      title: 'Recharts',
+    },
+    {
+      value: 'd3',
+      title: 'D3',
+    },
+    {
+      value: 'chartjs',
+      title: 'Chart.js',
+    },
+  ],
+  angular: [
+    {
+      value: 'angular-ng2-charts',
+      title: 'ng2',
+    },
+    {
+      value: 'angular-test-charts',
+      title: 'test',
+    },
+  ]
+};
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>
   Object.keys(updateMethods)
@@ -260,12 +268,14 @@ export default function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     chartingLibrary={chartingLibrary}
                     setChartLibrary={(value) => {
-                      dispatchChartEvent({
-                        chartingLibrary: value,
-                      });
-                      setChartingLibrary(value);
+                      if (ref.current) {
+                        dispatchChartEvent(ref.current.contentDocument, {
+                          chartingLibrary: value,
+                        });
+                        setChartingLibrary(value);
+                      }
                     }}
-                    chartLibraries={chartLibraries}
+                    chartLibraries={frameworkChartLibraries}
                     cubejsApi={cubejsApi}
                     render={({ framework }) => {
                       return (

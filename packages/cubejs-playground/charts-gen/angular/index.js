@@ -1,8 +1,5 @@
 const fs = require('fs-extra');
-const {
-  TargetSource,
-  utils,
-} = require('@cubejs-templates/core');
+const { TargetSource, utils } = require('@cubejs-templates/core');
 const { pascalCase, paramCase } = require('change-case');
 
 const DependencTree = require('../dev/DependencyTree');
@@ -72,12 +69,21 @@ const angularChartsPath = `${distPath}/angular-charts`;
           .map(({ content, fileName }) => {
             let code = content;
             if (fileName.includes('chart-renderer.component.ts')) {
-              code =content.replace('class ChartRendererComponent', `class ${pascalCase(key)}`)
-              code = code.replace(`selector: 'chart-renderer'`, `selector: '${paramCase(key)}'`);
-              
-              fs.writeFileSync(`${angularChartsPath}/src/app/${key}/chart-renderer.component.ts`, code);
+              code = content.replace(
+                'class ChartRendererComponent',
+                `class ${pascalCase(key)}`
+              );
+              code = code.replace(
+                `selector: 'chart-renderer'`,
+                `selector: '${paramCase(key)}'`
+              );
+
+              fs.writeFileSync(
+                `${angularChartsPath}/src/app/${key}/chart-renderer.component.ts`,
+                code
+              );
             }
-            
+
             const ts = new TargetSource(fileName, code);
             return ts.getImportDependencies();
           })
@@ -90,7 +96,7 @@ const angularChartsPath = `${distPath}/angular-charts`;
   } catch (error) {
     console.log(error);
   }
-  
+
   const codeChunks = generateCodeChunks({
     chartingLibraryDependencies,
     chartingLibraries: chartingLibraryTemplates,

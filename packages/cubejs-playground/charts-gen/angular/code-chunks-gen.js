@@ -10,7 +10,7 @@ const generator = require('@babel/generator').default;
 // ];
 
 const commonFiles = {
-  '/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';
+  'src/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
 import { CubejsClientModule } from '@cubejs-client/ngx';
 import { ChartsModule } from 'ng2-charts';
@@ -41,7 +41,7 @@ const cubejsOptions = {
   bootstrap: [AppComponent],
 })
 export class AppModule {}`,
-  '/app/app.component.ts': `import { Component, OnInit } from '@angular/core';
+  'src/app/app.component.ts': `import { Component, OnInit } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 
 @Component({
@@ -61,7 +61,7 @@ export class AppComponent implements OnInit {
   }
 }
 `,
-  '/app/app.component.html': '<p>to do...</p>',
+  'src/app/app.component.html': '<p>to do...</p>',
 };
 
 function generateCodeChunks(
@@ -78,10 +78,6 @@ function generateCodeChunks(
     })
     .reduce((a, b) => [...a, ...b], []);
 
-  // const allDependencies = [
-    // ...commonDependencies,
-    // ...chartingLibraryDependencies,
-  // ];
 
   const chartingLibraryFiles = {};
 
@@ -97,12 +93,10 @@ function generateCodeChunks(
     }
     
     export function getCodesandboxFiles(chartingLibrary, props) {
-      let files = {
+      return {
         ...getFiles(props),
         ...chartingLibraryFiles[chartingLibrary]
       };
-      
-      return files;
     }
     
     const commonDependencies = ${JSON.stringify(commonDependencies)};
