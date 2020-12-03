@@ -1,6 +1,7 @@
 FROM node:12.19
 
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
+ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
