@@ -2,7 +2,7 @@
 
 We want to make it easeir for everyone to Cube.js, and we are adopting the Deveopler's Certificate or Origin (DCO) for contributions. Unlike Contributor License Agreement (CLA), we believe that the DCO is a lot more developer friendly as it doesn't require lengthy legal reviews. 
 
-The DCO indicates that contributors are responsible for the code that they contribute and that they understand that the contribution is under the terms of the [Cube.js project license](https://github.com/cube-js/cube.js/blob/master/README.md#license)
+The DCO indicates that contributors are responsible for the code that they contribute and that they understand that the contribution is under the terms of the [Cube.js project license](https://github.com/cube-js/cube.js/blob/master/README.md#license). 
 
 # Developer's Certificate of Origin
 
