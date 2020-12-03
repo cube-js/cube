@@ -12,7 +12,8 @@ const suffixTableRegex = /^(.*?)([0-9_]+)$/;
 class BigQueryDriver extends BaseDriver {
   constructor(config) {
     super();
-    const options = {
+
+    this.options = {
       scopes: ['https://www.googleapis.com/auth/bigquery', 'https://www.googleapis.com/auth/drive'],
       projectId: process.env.CUBEJS_DB_BQ_PROJECT_ID,
       keyFilename: process.env.CUBEJS_DB_BQ_KEY_FILE,
@@ -21,7 +22,8 @@ class BigQueryDriver extends BaseDriver {
         undefined,
       ...config
     };
-    this.bigquery = new BigQuery(options);
+
+    this.bigquery = new BigQuery(this.options);
 
     this.mapFieldsRecursive = this.mapFieldsRecursive.bind(this);
     this.tablesSchema = this.tablesSchema.bind(this);
@@ -39,6 +41,10 @@ class BigQueryDriver extends BaseDriver {
     return this.bigquery.query({
       query: 'SELECT ? AS number', params: ['1']
     });
+  }
+
+  readOnly() {
+    return !!this.options.readOnly;
   }
 
   async query(query, values, options) {
