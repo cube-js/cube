@@ -1,12 +1,12 @@
-export function codeSandboxDefinition(template, files, dependencies = []) {
-  return {
+const bootstrapDefinition = {
+  'angular-cli': {
     files: {
       'src/polyfills.ts': {
-        content: `import 'zone.js/dist/zone';`,
+        content: `import 'core-js/proposals/reflect-metadata';
+import 'zone.js/dist/zone`,
       },
       'src/main.ts': {
-        content: `import { enableProdMode } from '@angular/core';
-import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+        content: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 
 import { AppModule } from './app/app.module';
 
@@ -44,22 +44,34 @@ platformBrowserDynamic().bootstrapModule(AppModule)
           ]
         }`,
       },
+    },
+    dependencies: {
+      'zone.js': 'latest',
+      '@angular/platform-browser-dynamic': 'latest',
+      '@angular/platform-browser': 'latest',
+      '@angular/compiler': 'latest',
+      rxjs: 'latest',
+      '@angular/common': 'latest',
+    },
+  },
+  'create-react-app': {
+    dependencies: {
+      'react-dom': 'latest',
+    },
+  },
+};
 
+export function codeSandboxDefinition(template, files, dependencies = []) {
+  return {
+    files: {
+      ...bootstrapDefinition[template]?.files,
       ...Object.entries(files)
         .map(([fileName, content]) => ({ [fileName]: { content } }))
         .reduce((a, b) => ({ ...a, ...b }), {}),
       'package.json': {
         content: {
           dependencies: {
-            // 'react-dom': 'latest',
-
-            'zone.js': 'latest',
-            '@angular/platform-browser-dynamic': 'latest',
-            '@angular/platform-browser': 'latest',
-            '@angular/compiler': 'latest',
-            rxjs: 'latest',
-            '@angular/common': 'latest',
-
+            ...bootstrapDefinition[template]?.dependencies,
             ...dependencies.reduce(
               (memo, d) => ({ ...memo, [d]: 'latest' }),
               {}
@@ -68,6 +80,16 @@ platformBrowserDynamic().bootstrapModule(AppModule)
         },
       },
     },
-    template: 'angular-cli',
+    template,
   };
+}
+
+export function dispatchChartEvent(document, detail) {
+  const myEvent = new CustomEvent('cubejs', {
+    bubbles: true,
+    composed: true,
+    detail,
+  });
+
+  document.dispatchEvent(myEvent);
 }

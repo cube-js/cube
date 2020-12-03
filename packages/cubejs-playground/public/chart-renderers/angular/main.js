@@ -12,9 +12,123 @@ module.exports = __webpack_require__(/*! /Users/alex/Projects/cube.js/packages/c
 
 /***/ }),
 
-/***/ "21Z3":
+/***/ "6WBr":
+/*!****************************!*\
+  !*** ./src/code-chunks.ts ***!
+  \****************************/
+/*! exports provided: getCodesandboxFiles, getDependencies */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getCodesandboxFiles", function() { return getCodesandboxFiles; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getDependencies", function() { return getDependencies; });
+const chartingLibraryFiles = { "angular-ng2-charts": { "src/app/query-renderer/query-renderer.component.html": "<div *ngIf=\"isQueryPresent\">\n  <div *ngIf=\"chartType !== 'table'\" class=\"chart-container\">\n    <canvas\n      *ngIf=\"chartType === 'line'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"noFillChartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'area'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'bar'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"bar\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'pie'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"pie\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n  </div>\n\n  <table\n    *ngIf=\"chartType === 'table'\"\n    mat-table\n    [dataSource]=\"tableData\"\n    style=\"width: 100%;\"\n  >\n    <ng-container\n      *ngFor=\"let column of displayedColumns; let index = index\"\n      [matColumnDef]=\"column\"\n    >\n      <th mat-header-cell *matHeaderCellDef>\n        {{ columnTitles[index] }}\n      </th>\n      <td mat-cell *matCellDef=\"let element\">{{ element[column] }}</td>\n    </ng-container>\n\n    <tr mat-header-row *matHeaderRowDef=\"displayedColumns\"></tr>\n    <tr mat-row *matRowDef=\"let row; columns: displayedColumns\"></tr>\n  </table>\n</div>\n", "src/app/query-renderer/query-renderer.component.ts": "import { Component, Input } from '@angular/core';\nimport { isQueryPresent, ResultSet } from '@cubejs-client/core';\nimport { CubejsClient, TChartType } from '@cubejs-client/ngx';\nimport { BehaviorSubject, combineLatest, of } from 'rxjs';\nimport { catchError, switchMap } from 'rxjs/operators';\nimport { ChartDataSets, ChartOptions } from 'chart.js';\nimport { Label } from 'ng2-charts';\nimport { getDisplayedColumns, flattenColumns } from './utils';\n\n@Component({\n  selector: 'query-renderer',\n  templateUrl: './query-renderer.component.html',\n  styles: [\n    `.chart-container {\n      position: relative;\n      height: calc(100% - 52px);\n      min-height: 400px;\n    }\n    \n    :host {\n      position: absolute;\n      top: 0;\n      bottom: 0;\n      left: 0;\n      right: 0;\n    }`\n  ],\n})\nexport class QueryRendererComponent {\n  @Input('cubeQuery')\n  cubeQuery$: BehaviorSubject<any>;\n\n  @Input('pivotConfig')\n  pivotConfig$: any;\n\n  @Input('chartType')\n  chartType$: any;\n\n  chartType: any = null;\n  isQueryPresent = false;\n\n  displayedColumns: string[] = [];\n  tableData: any[] = [];\n  columnTitles: string[] = [];\n  chartData: ChartDataSets[] = [];\n  chartLabels: Label[] = [];\n  chartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n  };\n  noFillChartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n    elements: {\n      line: {\n        fill: false,\n      },\n    },\n  };\n\n  constructor(private cubejsClient: CubejsClient) {}\n\n  ngOnInit() {\n    combineLatest([\n      this.cubeQuery$.pipe(\n        switchMap((cubeQuery) => {\n          if (!isQueryPresent(cubeQuery || {})) {\n            return of(null);\n          }\n          return this.cubejsClient.load(cubeQuery).pipe(\n            catchError((error) => {\n              console.error(error);\n              return of(null);\n            })\n          );\n        })\n      ),\n      this.pivotConfig$,\n      this.chartType$,\n    ]).subscribe(\n      ([resultSet, pivotConfig, chartType]: [ResultSet, any, TChartType]) => {\n        this.chartType = chartType;\n        this.isQueryPresent = resultSet != null;\n        \n        if (this.chartType === 'table') {\n          this.updateTableData(resultSet, pivotConfig);\n        } else {\n          this.updateChartData(resultSet, pivotConfig); \n        }\n      }\n    );\n  }\n\n  updateChartData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n\n    this.chartData = resultSet.series(pivotConfig).map((item) => {\n      return {\n        label: item.title,\n        data: item.series.map(({ value }) => value),\n        stack: 'a',\n      };\n    });\n    this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);\n  }\n  \n  updateTableData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n    \n    this.tableData = resultSet.tablePivot(pivotConfig);\n    this.displayedColumns = getDisplayedColumns(\n      resultSet.tableColumns(pivotConfig)\n    );\n    this.columnTitles = flattenColumns(resultSet.tableColumns(pivotConfig));\n  }\n}\n", "src/app/query-renderer/utils.ts": "import { TableColumn } from '@cubejs-client/core';\n\nexport function getDisplayedColumns(tableColumns: TableColumn[]): string[] {\n  const queue = tableColumns;\n  const columns = [];\n\n  while (queue.length) {\n    const column = queue.shift();\n    if (column.dataIndex) {\n      columns.push(column.dataIndex);\n    }\n    if ((column.children || []).length) {\n      column.children.map((child) => queue.push(child));\n    }\n  }\n\n  return columns;\n}\n\nexport function flattenColumns(columns: TableColumn[] = []) {\n  return columns.reduce((memo, column) => {\n    const titles = flattenColumns(column.children);\n    return [\n      ...memo,\n      ...(titles.length\n        ? titles.map((title) => column.shortTitle + ', ' + title)\n        : [column.shortTitle]),\n    ];\n  }, []);\n}\n" }, "angular-test-charts": { "src/app/query-renderer/query-renderer.component.html": "<div>TEEEEEEST</div>\n\n<div *ngIf=\"isQueryPresent\">\n  <div *ngIf=\"chartType !== 'table'\" class=\"chart-container\">\n    <canvas\n      *ngIf=\"chartType === 'line'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"noFillChartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'area'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'bar'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"bar\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'pie'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"pie\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n  </div>\n\n  <table\n    *ngIf=\"chartType === 'table'\"\n    mat-table\n    [dataSource]=\"tableData\"\n    style=\"width: 100%;\"\n  >\n    <ng-container\n      *ngFor=\"let column of displayedColumns; let index = index\"\n      [matColumnDef]=\"column\"\n    >\n      <th mat-header-cell *matHeaderCellDef>\n        {{ columnTitles[index] }}\n      </th>\n      <td mat-cell *matCellDef=\"let element\">{{ element[column] }}</td>\n    </ng-container>\n\n    <tr mat-header-row *matHeaderRowDef=\"displayedColumns\"></tr>\n    <tr mat-row *matRowDef=\"let row; columns: displayedColumns\"></tr>\n  </table>\n</div>\n", "src/app/query-renderer/query-renderer.component.ts": "import { Component, Input } from '@angular/core';\nimport { CubejsClient } from '@cubejs-client/ngx';\nimport { ChartDataSets, ChartOptions } from 'chart.js';\nimport { Label } from 'ng2-charts';\nimport { BehaviorSubject } from 'rxjs';\n\n@Component({\n  selector: 'query-renderer',\n  templateUrl: './query-renderer.component.html',\n  styles: [],\n})\nexport class QueryRendererComponent {\n  @Input('cubeQuery')\n  cubeQuery$: BehaviorSubject<any>;\n\n  @Input('pivotConfig')\n  pivotConfig$: any;\n\n  @Input('chartType')\n  chartType$: any;\n\n  chartType: any = null;\n  isQueryPresent = false;\n\n  displayedColumns: string[] = [];\n  tableData: any[] = [];\n  columnTitles: string[] = [];\n  chartData: ChartDataSets[] = [];\n  chartLabels: Label[] = [];\n  chartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n  };\n  noFillChartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n    elements: {\n      line: {\n        fill: false,\n      },\n    },\n  };\n\n  constructor(private cubejsClient: CubejsClient) {}\n\n  ngOnInit() {}\n\n  updateChartData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n  }\n}\n" } };
+function getFiles(props) {
+    return {
+        'src/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';
+import { NgModule } from '@angular/core';
+import { MatTableModule } from '@angular/material/table';
+import { CubejsClientModule } from '@cubejs-client/ngx';
+import { ChartsModule } from 'ng2-charts';
+
+import { AppComponent } from './app.component';
+import { QueryRendererComponent } from './query-renderer/query-renderer.component';
+
+const cubejsOptions = {
+  token: '${props.cubejsToken}',
+  options: {
+    apiUrl: '${props.apiUrl}',
+  },
+};
+
+@NgModule({
+  declarations: [
+    AppComponent,
+    QueryRendererComponent,
+  ],
+  imports: [
+    BrowserModule,
+    MatTableModule,
+    CubejsClientModule.forRoot(cubejsOptions),
+    ChartsModule,
+  ],
+  providers: [],
+  bootstrap: [AppComponent],
+})
+export class AppModule {}`, 'src/app/app.component.ts': `import { Component, OnInit } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
+
+@Component({
+  selector: 'app-root',
+  template: \`
+    <query-renderer
+      [chartType]="chartType.asObservable()"
+      [cubeQuery]="cubeQuery.asObservable()"
+      [pivotConfig]="pivotConfig.asObservable()"
+    >\`,
+  styles: [],
+})
+export class AppComponent implements OnInit {
+  cubeQuery = new BehaviorSubject(null);
+  chartType = new BehaviorSubject(null);
+  pivotConfig = new BehaviorSubject(null);
+
+  ngOnInit() {    
+    this.cubeQuery.next(${props.query});
+    this.chartType.next('${props.chartType}');
+    this.pivotConfig.next(${props.pivotConfig});
+  }
+}
+`
+    };
+}
+function getCodesandboxFiles(chartingLibrary, props) {
+    return Object.assign(Object.assign({}, getFiles(props)), chartingLibraryFiles[chartingLibrary]);
+}
+const commonDependencies = ["@angular/platform-browser", "@angular/core", "@angular/material", "@cubejs-client/ngx", "ng2-charts", "@angular/core", "rxjs", "@angular/cdk", "@angular/material", "@angular/animations"];
+const chartingLibraryDependencies = { "angular-ng2-charts": ["@angular/core", "@cubejs-client/core", "@cubejs-client/ngx", "rxjs", "rxjs", "chart.js", "ng2-charts", "@cubejs-client/core"], "angular-test-charts": ["@angular/core", "@cubejs-client/ngx", "chart.js", "ng2-charts", "rxjs"] };
+function getDependencies(chartingLibrary) {
+    return Array.from(new Set([
+        ...commonDependencies,
+        ...(chartingLibraryDependencies[chartingLibrary] || [])
+    ]));
+}
+
+
+/***/ }),
+
+/***/ "AytR":
+/*!*****************************************!*\
+  !*** ./src/environments/environment.ts ***!
+  \*****************************************/
+/*! exports provided: environment */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "environment", function() { return environment; });
+// This file can be replaced during build by using the `fileReplacements` array.
+// `ng build --prod` replaces `environment.ts` with `environment.prod.ts`.
+// The list of file replacements can be found in `angular.json`.
+const environment = {
+    production: false,
+};
+/*
+ * For easier debugging in development mode, you can import the following file
+ * to ignore zone related error stack frames such as `zone.run`, `zoneDelegate.invokeTask`.
+ *
+ * This import should be commented out in production mode because it will have a negative impact
+ * on performance if an error is thrown.
+ */
+// import 'zone.js/dist/zone-error';  // Included with Angular CLI.
+
+
+/***/ }),
+
+/***/ "CflG":
 /*!*****************************************************************!*\
-  !*** ./src/app/angular-test-charts/chart-renderer.component.ts ***!
+  !*** ./src/app/angular-test-charts/query-renderer.component.ts ***!
   \*****************************************************************/
 /*! exports provided: AngularTestCharts */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -162,8 +276,7 @@ class AngularTestCharts {
             },
         };
     }
-    ngOnInit() {
-    }
+    ngOnInit() { }
     updateChartData(resultSet, pivotConfig) {
         if (!resultSet) {
             return;
@@ -184,7 +297,7 @@ AngularTestCharts.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefine
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"],
         args: [{
                 selector: 'angular-test-charts',
-                templateUrl: './chart-renderer.component.html',
+                templateUrl: './query-renderer.component.html',
                 styles: [],
             }]
     }], function () { return [{ type: _cubejs_client_ngx__WEBPACK_IMPORTED_MODULE_1__["CubejsClient"] }]; }, { cubeQuery$: [{
@@ -201,158 +314,9 @@ AngularTestCharts.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefine
 
 /***/ }),
 
-/***/ "6WBr":
-/*!****************************!*\
-  !*** ./src/code-chunks.ts ***!
-  \****************************/
-/*! exports provided: getCodesandboxFiles, getDependencies */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getCodesandboxFiles", function() { return getCodesandboxFiles; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getDependencies", function() { return getDependencies; });
-const chartingLibraryFiles = {};
-function getFiles(props) {
-    return {
-        '/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';
-import { NgModule } from '@angular/core';
-import { CubejsClientModule } from '@cubejs-client/ngx';
-import { ChartsModule } from 'ng2-charts';
-
-import { AppComponent } from './app.component';
-import { AngularNg2Charts } from './angular-ng2-charts/chart-renderer.component';
-import { AngularTestCharts } from './angular-test-charts/chart-renderer.component';
-
-const cubejsOptions = {
-  token: '${props.token}',
-  options: {
-    apiUrl: '${props.apiUrl}',
-  },
-};
-
-@NgModule({
-  declarations: [
-    AppComponent,
-    AngularNg2Charts,
-    AngularTestCharts,
-  ],
-  imports: [
-    BrowserModule,
-    CubejsClientModule.forRoot(cubejsOptions),
-    ChartsModule,
-  ],
-  providers: [],
-  bootstrap: [AppComponent],
-})
-export class AppModule {}`, '/app/app.component.ts': `import { Component, OnInit } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
-
-@Component({
-  selector: 'app',
-  templateUrl: './app.component.html',
-  styles: [],
-})
-export class AppComponent implements OnInit {
-  cubeQuery = new BehaviorSubject(null);
-  chartType = new BehaviorSubject(null);
-  pivotConfig = new BehaviorSubject(null);
-
-  ngOnInit() {    
-    this.cubeQuery.next(${props.query});
-    this.chartType.next(${props.chartType});
-    this.pivotConfig.next(${props.pivotConfig});
-  }
-}
-`, '/app/app.component.html': `<p>to do...</p>`
-    };
-}
-function getCodesandboxFiles(chartingLibrary, props) {
-    return Object.assign(Object.assign({}, getFiles(props)), chartingLibraryFiles[chartingLibrary]);
-}
-const commonDependencies = ["@angular/platform-browser", "@angular/core", "@cubejs-client/ngx", "ng2-charts", "@angular/core", "rxjs"];
-const chartingLibraryDependencies = { "angular-ng2-charts": ["@angular/core", "@cubejs-client/core", "@cubejs-client/ngx", "rxjs", "rxjs", "chart.js", "ng2-charts", "@cubejs-client/core"], "angular-test-charts": ["@angular/core", "@cubejs-client/ngx", "chart.js", "ng2-charts", "rxjs"] };
-function getDependencies(chartingLibrary) {
-    return Array.from(new Set([
-        ...commonDependencies,
-        ...(chartingLibraryDependencies[chartingLibrary] || [])
-    ]));
-}
-
-
-/***/ }),
-
-/***/ "AytR":
-/*!*****************************************!*\
-  !*** ./src/environments/environment.ts ***!
-  \*****************************************/
-/*! exports provided: environment */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "environment", function() { return environment; });
-// This file can be replaced during build by using the `fileReplacements` array.
-// `ng build --prod` replaces `environment.ts` with `environment.prod.ts`.
-// The list of file replacements can be found in `angular.json`.
-const environment = {
-    production: false,
-};
-/*
- * For easier debugging in development mode, you can import the following file
- * to ignore zone related error stack frames such as `zone.run`, `zoneDelegate.invokeTask`.
- *
- * This import should be commented out in production mode because it will have a negative impact
- * on performance if an error is thrown.
- */
-// import 'zone.js/dist/zone-error';  // Included with Angular CLI.
-
-
-/***/ }),
-
-/***/ "Hpwl":
-/*!*********************************************!*\
-  !*** ./src/app/angular-ng2-charts/utils.ts ***!
-  \*********************************************/
-/*! exports provided: getDisplayedColumns, flattenColumns */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getDisplayedColumns", function() { return getDisplayedColumns; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "flattenColumns", function() { return flattenColumns; });
-function getDisplayedColumns(tableColumns) {
-    const queue = tableColumns;
-    const columns = [];
-    while (queue.length) {
-        const column = queue.shift();
-        if (column.dataIndex) {
-            columns.push(column.dataIndex);
-        }
-        if ((column.children || []).length) {
-            column.children.map((child) => queue.push(child));
-        }
-    }
-    return columns;
-}
-function flattenColumns(columns = []) {
-    return columns.reduce((memo, column) => {
-        const titles = flattenColumns(column.children);
-        return [
-            ...memo,
-            ...(titles.length
-                ? titles.map((title) => column.shortTitle + ', ' + title)
-                : [column.shortTitle]),
-        ];
-    }, []);
-}
-
-
-/***/ }),
-
-/***/ "Muxa":
+/***/ "DSVJ":
 /*!****************************************************************!*\
-  !*** ./src/app/angular-ng2-charts/chart-renderer.component.ts ***!
+  !*** ./src/app/angular-ng2-charts/query-renderer.component.ts ***!
   \****************************************************************/
 /*! exports provided: AngularNg2Charts */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -525,28 +489,34 @@ class AngularNg2Charts {
         ]).subscribe(([resultSet, pivotConfig, chartType]) => {
             this.chartType = chartType;
             this.isQueryPresent = resultSet != null;
-            this.updateChartData(resultSet, pivotConfig);
+            if (this.chartType === 'table') {
+                this.updateTableData(resultSet, pivotConfig);
+            }
+            else {
+                this.updateChartData(resultSet, pivotConfig);
+            }
         });
     }
     updateChartData(resultSet, pivotConfig) {
         if (!resultSet) {
             return;
         }
-        if (this.chartType === 'table') {
-            this.tableData = resultSet.tablePivot(pivotConfig);
-            this.displayedColumns = Object(_utils__WEBPACK_IMPORTED_MODULE_4__["getDisplayedColumns"])(resultSet.tableColumns(pivotConfig));
-            this.columnTitles = Object(_utils__WEBPACK_IMPORTED_MODULE_4__["flattenColumns"])(resultSet.tableColumns(pivotConfig));
+        this.chartData = resultSet.series(pivotConfig).map((item) => {
+            return {
+                label: item.title,
+                data: item.series.map(({ value }) => value),
+                stack: 'a',
+            };
+        });
+        this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);
+    }
+    updateTableData(resultSet, pivotConfig) {
+        if (!resultSet) {
+            return;
         }
-        else {
-            this.chartData = resultSet.series(pivotConfig).map((item) => {
-                return {
-                    label: item.title,
-                    data: item.series.map(({ value }) => value),
-                    stack: 'a',
-                };
-            });
-            this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);
-        }
+        this.tableData = resultSet.tablePivot(pivotConfig);
+        this.displayedColumns = Object(_utils__WEBPACK_IMPORTED_MODULE_4__["getDisplayedColumns"])(resultSet.tableColumns(pivotConfig));
+        this.columnTitles = Object(_utils__WEBPACK_IMPORTED_MODULE_4__["flattenColumns"])(resultSet.tableColumns(pivotConfig));
     }
 }
 AngularNg2Charts.ɵfac = function AngularNg2Charts_Factory(t) { return new (t || AngularNg2Charts)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_cubejs_client_ngx__WEBPACK_IMPORTED_MODULE_5__["CubejsClient"])); };
@@ -554,13 +524,27 @@ AngularNg2Charts.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineC
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](0, AngularNg2Charts_div_0_Template, 3, 2, "div", 0);
     } if (rf & 2) {
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx.isQueryPresent);
-    } }, directives: [_angular_common__WEBPACK_IMPORTED_MODULE_6__["NgIf"], ng2_charts__WEBPACK_IMPORTED_MODULE_7__["BaseChartDirective"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatTable"], _angular_common__WEBPACK_IMPORTED_MODULE_6__["NgForOf"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderRowDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatRowDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatColumnDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderCellDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatCellDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderCell"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatCell"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderRow"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatRow"]], encapsulation: 2 });
+    } }, directives: [_angular_common__WEBPACK_IMPORTED_MODULE_6__["NgIf"], ng2_charts__WEBPACK_IMPORTED_MODULE_7__["BaseChartDirective"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatTable"], _angular_common__WEBPACK_IMPORTED_MODULE_6__["NgForOf"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderRowDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatRowDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatColumnDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderCellDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatCellDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderCell"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatCell"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatHeaderRow"], _angular_material_table__WEBPACK_IMPORTED_MODULE_8__["MatRow"]], styles: [".chart-container[_ngcontent-%COMP%] {\n      position: relative;\n      height: calc(100% - 52px);\n      min-height: 400px;\n    }\n    \n    [_nghost-%COMP%] {\n      position: absolute;\n      top: 0;\n      bottom: 0;\n      left: 0;\n      right: 0;\n    }"] });
 /*@__PURE__*/ (function () { _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](AngularNg2Charts, [{
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"],
         args: [{
                 selector: 'angular-ng2-charts',
-                templateUrl: './chart-renderer.component.html',
-                styles: [],
+                templateUrl: './query-renderer.component.html',
+                styles: [
+                    `.chart-container {
+      position: relative;
+      height: calc(100% - 52px);
+      min-height: 400px;
+    }
+    
+    :host {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }`
+                ],
             }]
     }], function () { return [{ type: _cubejs_client_ngx__WEBPACK_IMPORTED_MODULE_5__["CubejsClient"] }]; }, { cubeQuery$: [{
             type: _angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"],
@@ -572,6 +556,46 @@ AngularNg2Charts.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineC
             type: _angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"],
             args: ['chartType']
         }] }); })();
+
+
+/***/ }),
+
+/***/ "Hpwl":
+/*!*********************************************!*\
+  !*** ./src/app/angular-ng2-charts/utils.ts ***!
+  \*********************************************/
+/*! exports provided: getDisplayedColumns, flattenColumns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getDisplayedColumns", function() { return getDisplayedColumns; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "flattenColumns", function() { return flattenColumns; });
+function getDisplayedColumns(tableColumns) {
+    const queue = tableColumns;
+    const columns = [];
+    while (queue.length) {
+        const column = queue.shift();
+        if (column.dataIndex) {
+            columns.push(column.dataIndex);
+        }
+        if ((column.children || []).length) {
+            column.children.map((child) => queue.push(child));
+        }
+    }
+    return columns;
+}
+function flattenColumns(columns = []) {
+    return columns.reduce((memo, column) => {
+        const titles = flattenColumns(column.children);
+        return [
+            ...memo,
+            ...(titles.length
+                ? titles.map((title) => column.shortTitle + ', ' + title)
+                : [column.shortTitle]),
+        ];
+    }, []);
+}
 
 
 /***/ }),
@@ -990,8 +1014,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_material_table__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @angular/material/table */ "+0xr");
 /* harmony import */ var _main_main_component__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./main/main.component */ "wlho");
 /* harmony import */ var _app_component__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./app.component */ "Sy1n");
-/* harmony import */ var _angular_ng2_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./angular-ng2-charts/chart-renderer.component */ "Muxa");
-/* harmony import */ var _angular_test_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./angular-test-charts/chart-renderer.component */ "21Z3");
+/* harmony import */ var _angular_ng2_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./angular-ng2-charts/query-renderer.component */ "DSVJ");
+/* harmony import */ var _angular_test_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./angular-test-charts/query-renderer.component */ "CflG");
 
 
 
@@ -1020,8 +1044,8 @@ AppModule.ɵinj = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjector
         ]] });
 (function () { (typeof ngJitMode === "undefined" || ngJitMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵsetNgModuleScope"](AppModule, { declarations: [_main_main_component__WEBPACK_IMPORTED_MODULE_5__["MainComponent"],
         _app_component__WEBPACK_IMPORTED_MODULE_6__["AppComponent"],
-        _angular_ng2_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_7__["AngularNg2Charts"],
-        _angular_test_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_8__["AngularTestCharts"]], imports: [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_0__["BrowserModule"], _cubejs_client_ngx__WEBPACK_IMPORTED_MODULE_2__["CubejsClientModule"], ng2_charts__WEBPACK_IMPORTED_MODULE_3__["ChartsModule"],
+        _angular_ng2_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_7__["AngularNg2Charts"],
+        _angular_test_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_8__["AngularTestCharts"]], imports: [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_0__["BrowserModule"], _cubejs_client_ngx__WEBPACK_IMPORTED_MODULE_2__["CubejsClientModule"], ng2_charts__WEBPACK_IMPORTED_MODULE_3__["ChartsModule"],
         _angular_material_table__WEBPACK_IMPORTED_MODULE_4__["MatTableModule"]] }); })();
 /*@__PURE__*/ (function () { _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](AppModule, [{
         type: _angular_core__WEBPACK_IMPORTED_MODULE_1__["NgModule"],
@@ -1029,8 +1053,8 @@ AppModule.ɵinj = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjector
                 declarations: [
                     _main_main_component__WEBPACK_IMPORTED_MODULE_5__["MainComponent"],
                     _app_component__WEBPACK_IMPORTED_MODULE_6__["AppComponent"],
-                    _angular_ng2_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_7__["AngularNg2Charts"],
-                    _angular_test_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_8__["AngularTestCharts"],
+                    _angular_ng2_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_7__["AngularNg2Charts"],
+                    _angular_test_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_8__["AngularTestCharts"],
                 ],
                 imports: [
                     _angular_platform_browser__WEBPACK_IMPORTED_MODULE_0__["BrowserModule"],
@@ -1060,8 +1084,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! rxjs */ "qCKp");
 /* harmony import */ var _code_chunks__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../code-chunks */ "6WBr");
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/common */ "ofXK");
-/* harmony import */ var _angular_ng2_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../angular-ng2-charts/chart-renderer.component */ "Muxa");
-/* harmony import */ var _angular_test_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../angular-test-charts/chart-renderer.component */ "21Z3");
+/* harmony import */ var _angular_ng2_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../angular-ng2-charts/query-renderer.component */ "DSVJ");
+/* harmony import */ var _angular_test_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../angular-test-charts/query-renderer.component */ "CflG");
 
 
 
@@ -1083,12 +1107,8 @@ function MainComponent_angular_test_charts_1_Template(rf, ctx) { if (rf & 1) {
 } }
 class MainComponent {
     constructor() {
-        this.detail = '';
-        this.chartingLibrary = 'ng2';
-        this.query$ = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"]({
-            measures: ['Sales.count'],
-            dimensions: ['Sales.ts.day'],
-        });
+        this.chartingLibrary = null;
+        this.query$ = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"]({});
         this.pivotConfig$ = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.chartType$ = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"]('line');
         window['__cubejs'] = {
@@ -1097,12 +1117,9 @@ class MainComponent {
         };
     }
     ngOnInit() {
-        console.log('displatched: cubejsChartReady');
         window.dispatchEvent(new CustomEvent('cubejsChartReady'));
     }
     onCubejsEvent(event) {
-        console.log('Event:', event.detail);
-        this.detail = JSON.stringify(event.detail);
         const { query, pivotConfig, chartType, chartingLibrary } = event.detail;
         if (query !== undefined) {
             this.query$.next(query);
@@ -1117,16 +1134,6 @@ class MainComponent {
             this.chartingLibrary = chartingLibrary;
         }
     }
-    changeQuery() {
-        this.query$.next({
-            measures: ['Sales.amount'],
-            dimensions: ['Sales.ts.month'],
-        });
-    }
-    changeLibrary() {
-        this.chartingLibrary =
-            this.chartingLibrary === 'recharts' ? 'ng2' : 'recharts';
-    }
 }
 MainComponent.ɵfac = function MainComponent_Factory(t) { return new (t || MainComponent)(); };
 MainComponent.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineComponent"]({ type: MainComponent, selectors: [["app-root"]], hostBindings: function MainComponent_HostBindings(rf, ctx) { if (rf & 1) {
@@ -1138,7 +1145,7 @@ MainComponent.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineComp
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx.chartingLibrary === "angular-ng2-charts");
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx.chartingLibrary === "angular-test-charts");
-    } }, directives: [_angular_common__WEBPACK_IMPORTED_MODULE_3__["NgIf"], _angular_ng2_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_4__["AngularNg2Charts"], _angular_test_charts_chart_renderer_component__WEBPACK_IMPORTED_MODULE_5__["AngularTestCharts"]], encapsulation: 2 });
+    } }, directives: [_angular_common__WEBPACK_IMPORTED_MODULE_3__["NgIf"], _angular_ng2_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_4__["AngularNg2Charts"], _angular_test_charts_query_renderer_component__WEBPACK_IMPORTED_MODULE_5__["AngularTestCharts"]], encapsulation: 2 });
 /*@__PURE__*/ (function () { _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](MainComponent, [{
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"],
         args: [{

@@ -2,17 +2,18 @@ import React, { useState, useRef } from 'react';
 import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
 import { QueryBuilder } from '@cubejs-client/react';
+
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
 import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
-
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { Card, SectionHeader, SectionRow } from './components';
 import styled from 'styled-components';
 import ChartContainer from './ChartContainer';
+import { dispatchChartEvent } from './utils';
 
 const Section = styled.div`
   display: flex;
@@ -24,16 +25,6 @@ const Section = styled.div`
     margin-bottom: 8px;
   }
 `;
-
-export function dispatchChartEvent(document, detail) {
-  const myEvent = new CustomEvent('cubejs', {
-    bubbles: true,
-    composed: true,
-    detail
-  });
-
-  document.dispatchEvent(myEvent);
-}
 
 const frameworkChartLibraries = {
   react: [
@@ -59,11 +50,7 @@ const frameworkChartLibraries = {
       value: 'angular-ng2-charts',
       title: 'ng2',
     },
-    {
-      value: 'angular-test-charts',
-      title: 'test',
-    },
-  ]
+  ],
 };
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>
@@ -92,15 +79,14 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
 export default function PlaygroundQueryBuilder({
   query = {},
   cubejsApi,
-  apiUrl = '/cubejs-api/v1',
+  apiUrl,
   cubejsToken,
   dashboardSource,
   setQuery,
 }) {
   const ref = useRef(null);
-  const [chartingLibrary, setChartingLibrary] = useState('angular-ng2-charts');
+  const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
-  // const [isChartRendererReady, setChartRendererReady] = useState(false);
 
   return (
     <QueryBuilder
@@ -249,7 +235,10 @@ export default function PlaygroundQueryBuilder({
               justify="space-around"
               align="top"
               gutter={24}
-              style={{ marginRight: 0, marginLeft: 0 }}
+              style={{
+                marginRight: 0,
+                marginLeft: 0,
+              }}
             >
               <Col
                 span={24}
@@ -260,6 +249,8 @@ export default function PlaygroundQueryBuilder({
               >
                 {isQueryPresent ? (
                   <ChartContainer
+                    apiUrl={apiUrl}
+                    cubejsToken={cubejsToken}
                     iframeRef={ref}
                     isChartRendererReady={isChartRendererReady}
                     query={query}
@@ -272,8 +263,8 @@ export default function PlaygroundQueryBuilder({
                         dispatchChartEvent(ref.current.contentDocument, {
                           chartingLibrary: value,
                         });
-                        setChartingLibrary(value);
                       }
+                      setChartingLibrary(value);
                     }}
                     chartLibraries={frameworkChartLibraries}
                     cubejsApi={cubejsApi}
@@ -287,10 +278,11 @@ export default function PlaygroundQueryBuilder({
                           query={query}
                           pivotConfig={pivotConfig}
                           iframeRef={ref}
-                          onChartRendererReady={setChartRendererReady}
+                          onChartRendererReadyChange={setChartRendererReady}
                         />
                       );
                     }}
+                    onChartRendererReadyChange={setChartRendererReady}
                   />
                 ) : (
                   <h2 style={{ textAlign: 'center' }}>

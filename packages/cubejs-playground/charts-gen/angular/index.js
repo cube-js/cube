@@ -51,35 +51,41 @@ const angularChartsPath = `${distPath}/angular-charts`;
 
   let dependencies = [];
   const chartingLibraryDependencies = {};
+  const chartingLibraryFiles = {};
 
   try {
     await Promise.all(
       chartingLibraryTemplates.map(async (key) => {
         await executeCommand('cp', [
           '-R',
-          `${packagesPath}/${key}/scaffolding/app/chart-renderer`,
+          `${packagesPath}/${key}/scaffolding/app/query-renderer`,
           `${angularChartsPath}/src/app/${key}`,
         ]);
 
         const fileContents = await utils.fileContentsRecursive(
           `${angularChartsPath}/src/app/${key}`
         );
+        chartingLibraryFiles[key] = fileContents
+          .map(({ fileName, content }) => ({
+            [`src/app/query-renderer${fileName}`]: content,
+          }))
+          .reduce((a, b) => ({ ...a, ...b }), {});
 
         const currentDependencies = fileContents
           .map(({ content, fileName }) => {
             let code = content;
-            if (fileName.includes('chart-renderer.component.ts')) {
+            if (fileName.includes('query-renderer.component.ts')) {
               code = content.replace(
-                'class ChartRendererComponent',
+                'class QueryRendererComponent',
                 `class ${pascalCase(key)}`
               );
               code = code.replace(
-                `selector: 'chart-renderer'`,
+                `selector: 'query-renderer'`,
                 `selector: '${paramCase(key)}'`
               );
 
               fs.writeFileSync(
-                `${angularChartsPath}/src/app/${key}/chart-renderer.component.ts`,
+                `${angularChartsPath}/src/app/${key}/query-renderer.component.ts`,
                 code
               );
             }
@@ -99,7 +105,7 @@ const angularChartsPath = `${distPath}/angular-charts`;
 
   const codeChunks = generateCodeChunks({
     chartingLibraryDependencies,
-    chartingLibraries: chartingLibraryTemplates,
+    chartingLibraryFiles,
   });
 
   fs.writeFileSync(`${angularChartsPath}/src/code-chunks.ts`, codeChunks);
@@ -112,4 +118,3 @@ const angularChartsPath = `${distPath}/angular-charts`;
   await appContainer.ensureDependencies();
 })();
 
-// ln -s /Users/alex/Projects/cubejs-playground-templates /Users/alex/Projects/cube.js/packages/cubejs-playground/charts-gen/node_modules/.tmp/cubejs-playground-templates
