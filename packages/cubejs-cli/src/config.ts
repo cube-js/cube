@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 import path from 'path';
 import os from 'os';
 import dotenv from 'dotenv';
+import { isFilePath } from '@cubejs-backend/shared';
+import { displayWarning } from './utils';
 
 type ConfigurationFull = {
   auth: {
@@ -42,7 +44,29 @@ export class Config {
 
   public async envFile(envFile: string) {
     if (await fs.pathExists(envFile)) {
-      return dotenv.config({ path: envFile }).parsed;
+      const env = dotenv.config({ path: envFile }).parsed;
+      if (env) {
+        const resolvePossibleFiles = [
+          'CUBEJS_DB_SSL_CA',
+          'CUBEJS_DB_SSL_CERT',
+          'CUBEJS_DB_SSL_KEY',
+        ];
+
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [key, value] of Object.entries(env)) {
+          if (resolvePossibleFiles.includes(key) && isFilePath(value)) {
+            if (fs.existsSync(value)) {
+              env[key] = fs.readFileSync(value, 'ascii');
+            } else {
+              displayWarning(`Unable to resolve file "${value}" from ${key}`);
+
+              env[key] = '';
+            }
+          }
+        }
+
+        return env;
+      }
     }
 
     return {};
