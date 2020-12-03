@@ -10,6 +10,11 @@ import { useFrameworkOfChoice } from '../../stores/frameworkOfChoice';
 
 const { SubMenu } = Menu;
 
+const menuOrderCloud = [
+  "Quickstart",
+  "Configuring Cube Cloud"
+];
+
 const menuOrder = [
   'Getting Started',
   'Cube.js Introduction',
@@ -42,6 +47,8 @@ const nodeParser = ({ frontmatter = {} }) => frontmatterItem(frontmatter);
 const MainMenu = props => {
   const menuProps = omit(props, ['mobileMode', 'scope']);
   const [frameworkOfChoice] = useFrameworkOfChoice();
+  const isCloudDocs = (props.selectedKeys || []).filter(e => e.match(/^cloud/)).length > 0
+  const menuOrderResolved = isCloudDocs ? menuOrderCloud : menuOrder;
 
   return (
     <Col
@@ -53,9 +60,9 @@ const MainMenu = props => {
     >
       <div className={styles.menuWrapper}>
         <Menu {...menuProps} className={styles.antMenu}>
-          <MenuItem to="/" title="Home" />
+          <MenuItem to={isCloudDocs ? '/cloud' : '/'} title="Home" />
           {
-            menuOrder.map(item => {
+            menuOrderResolved.map(item => {
               const subCategories = Object.keys(props.items[item]);
               if (subCategories.length === 1 && props.items[item][subCategories[0]].length === 1) {
                 return nodeParser(props.items[item][subCategories[0]][0]);
