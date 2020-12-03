@@ -1,6 +1,6 @@
 cube(`Orders`, {
   sql: `select * from public.orders`,
-  
+
   joins: {
     Products: {
       relationship: `belongsTo`,
@@ -96,7 +96,8 @@ cube(`Orders`, {
       type: `rollup`,
       measureReferences: [totalAmount, count],
       timeDimensionReference: completedAt,
-      granularity: `day`
+      granularity: `day`,
+      external: true
     },
     /*main: {
      type: `originalSql`
