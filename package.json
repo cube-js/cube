@@ -10,7 +10,8 @@
     "lint": "lerna run lint",
     "lint:fix": "lerna run lint:fix",
     "tsc": "lerna run tsc",
-    "tsc:watch": "lerna run watch"
+    "tsc:watch": "lerna run watch",
+    "postinstall": "is-ci || husky install"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
@@ -51,6 +52,8 @@
     "eslint-plugin-react-hooks": "^4.0.7",
     "flush-promises": "^1.0.2",
     "http-server": "^0.12.1",
+    "husky": "^5.0.4",
+    "is-ci": "^2.0.0",
     "lerna": "^3.13.1",
     "prettier": "^2.0.5",
     "rollup": "^2.25.0",
