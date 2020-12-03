@@ -1,6 +1,17 @@
 {
-  "name": "docs",
+  "name": "@cubejs-docs/site",
   "version": "1.0.0",
+  "keywords": [],
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "GATSBY_ENV=production gatsby build",
+    "dev": "GATSBY_ENV=development gatsby develop",
+    "deploy": "gatsby-plugin-s3 deploy",
+    "lint:markdown": "markdownlint-cli2 content/**/*.md",
+    "lint:text": "textlint content/**/*.md",
+    "lint": "echo 'Happy linting one day!!'"
+  },
   "dependencies": {
     "antd": "^3.3.3",
     "classnames": "^2.2.6",
@@ -40,16 +51,14 @@
     "remark-custom-blocks": "^2.5.0",
     "sharp": "^0.26.0"
   },
-  "keywords": [],
-  "license": "MIT",
-  "scripts": {
-    "precommit": "lint-staged",
-    "build": "GATSBY_ENV=production gatsby build",
-    "dev": "GATSBY_ENV=development gatsby develop",
-    "deploy": "gatsby-plugin-s3 deploy"
-  },
-  "private": true,
   "devDependencies": {
-    "lint-staged": "^10.5.2"
+    "lint-staged": "^10.5.2",
+    "markdownlint-cli2": "^0.0.11",
+    "prettier": "^2.1.2",
+    "textlint": "^11.7.6",
+    "textlint-rule-alex": "^3.0.0",
+    "textlint-rule-diacritics": "^1.0.0",
+    "textlint-rule-no-todo": "^2.0.1",
+    "textlint-rule-stop-words": "^2.0.7"
   }
 }

@@ -1,5 +1,7 @@
 {
   "*.md": [
+    "markdownlint-cli2",
+    "prettier --write"
   ],
   "*.scss": [
   ],
