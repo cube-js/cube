@@ -1,6 +1,7 @@
 [build]
 publish = "public/"
 command = "./build-netlify.sh"
+ignore = "cd .. && git diff --quiet HEAD^ HEAD -- docs/"
 
 [[redirects]]
 from = "/favicons/*"
