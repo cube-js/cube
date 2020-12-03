@@ -102,7 +102,7 @@ This way, Refresh Scheduler will keep the `refreshKey` result up-to-date so quer
 The **pre-aggregation** engine builds a layer of aggregated data in your database during runtime and maintains it to be up-to-date.
 
 <img
-src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/pre-aggregations-schema.png"
+src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/pre-aggregations-schema.png"
 style="border: none"
 />
 
