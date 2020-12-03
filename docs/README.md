@@ -1,40 +1,55 @@
 # Cube.js Docs
 
-This repository contains Gatsby.js powered Cube.js Docs:
-[cube.dev/docs](https://cube.dev/docs)
+This repository contains the [Gatsby][link-gatsby]-powered Cube.js
+Documentation: [cube.dev/docs][link-docs-live]
 
-Docs are markdown files located in the main Cube.js repository in the `docs/`
-folder: https://github.com/cube-js/cube.js/tree/master/docs
+Docs are Markdown files located in the main Cube.js repository in
+[`docs/content`][link-docs-content]. The build process uses the Gatsby CLI to
+scan the `docs/content/` folder and generate a static HTML site.
 
-The build process pulls the Cube.js repo and generate docs.
+[link-gatsby]: https://www.gatsbyjs.com/
+[link-docs-live]: https://cube.dev/docs
+[link-docs-content]: https://github.com/cube-js/cube.js/tree/master/docs/content
+
+## Development
+
+To start the project in development mode, run the following:
+
+```bash
+yarn dev
+```
+
+To build a production-ready version of the site, run the following:
+
+```bash
+source .env.production
+yarn build --prefix-paths
+```
+
+## Indexing
+
+The search functionality is powered by [DocSearch by Algolia][link-docsearch].
+The configuration file can be [found here][link-docsearch-config].
+
+[link-docsearch]: https://docsearch.algolia.com/
+[link-docsearch-config]:
+  https://github.com/algolia/docsearch-configs/blob/master/configs/cubejs.json
 
 ## Deployment
 
-You need to have [AWS Command Line Interface](https://aws.amazon.com/cli/) installed and configured to deploy both staging and production.
-
-Generate your AWS credentials and use the following command to configure the
-CLI.
-
-```
-$ aws configure
-```
-
-Read more on [Configuring AWS CLI here](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
-
 ### Staging
 
-The staging URL is [http://cubejs-docs-staging.s3-website-us-east-1.amazonaws.com/docs/](http://cubejs-docs-staging.s3-website-us-east-1.amazonaws.com/docs/)
+[Netlify][link-netlify] is used for staging and pull request previews. The
+staging URL is [cubejs-docs-staging.netlify.app][link-docs-staging].
 
-To deploy staging run the following command inside the repository's root folder:
+[link-netlify]: https://www.netlify.com/
+[link-docs-staging]: https://cubejs-docs-staging.netlify.app
 
-```bash
-$ ./deploy-staging.sh
-```
+PRs automatically generate [Deploy Previews] with unique URLs that can be found
+in the status checks for a PR.
 
 ### Production
 
-To deploy production run the following command inside the repository's root folder:
+Deployment is handled via a [GitHub action][link-gh-docs-workflow].
 
-```bash
-$ ./deploy-production.sh
-```
+[link-gh-docs-workflow]: /.github/workflows/docs.yml
