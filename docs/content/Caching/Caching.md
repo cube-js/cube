@@ -51,7 +51,7 @@ cube(`Orders`, {
 });
 ```
 
-By default, Cube.js will refresh the cache in the background in the [development mode][link-development-mode]. When development mode is disabled you need to explicitly activate background refresh by setting the corresponding environment variable `CUBEJS_SCHEDULED_REFRESH_TIMER=true`.
+By default, Cube.js will refresh the cache in the background when in [development mode][link-development-mode]. When development mode is disabled, background refreshing can be enabled by setting `CUBEJS_SCHEDULED_REFRESH_TIMER` to `true`.
 
  We recommend to run background refresh in the separate worker for production deployments. Please consult the [production checklist][link-production-checklist] for more information.
 
