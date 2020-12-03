@@ -3,6 +3,102 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.3](https://github.com/cube-js/cube.js/compare/v0.24.2...v0.24.3) (2020-12-01)
+
+
+### Bug Fixes
+
+* **cubestore:** Merge join support: not implemented: Merge join is not supported for data type Timestamp(Microsecond, None) ([6e3ebfc](https://github.com/cube-js/cube.js/commit/6e3ebfc10c87b7ff23901949f1caa0a6021202e2))
+* **cubestore:** Unsupported data type Boolean. ([b286182](https://github.com/cube-js/cube.js/commit/b28618204b4e07507e5df0e822607900a3439ca4))
+
+
+### Features
+
+* **cubestore:** Hash join support ([8b1a5da](https://github.com/cube-js/cube.js/commit/8b1a5da50992fa784aa2da8bd0dd092162b5b853))
+* **cubestore:** Merge join support ([d08d8e3](https://github.com/cube-js/cube.js/commit/d08d8e357ca7baeb113fb0a003f76e519162c3ee))
+* **cubestore:** Update datafusion upstream to the version of 2020-11-27 ([b4685dd](https://github.com/cube-js/cube.js/commit/b4685dd5556f5a1448ef0bfbcae841fd7905f372))
+
+
+
+
+
+## [0.24.2](https://github.com/cube-js/cube.js/compare/v0.24.1...v0.24.2) (2020-11-27)
+
+
+### Bug Fixes
+
+* add content-type to allowedHeaders ([d176269](https://github.com/cube-js/cube.js/commit/d176269fda12d7213c021026c02f7aec0df50ba6))
+* **@cubejs-backend/server-core:** Allow to pass unknown options (such as http) ([f1e9402](https://github.com/cube-js/cube.js/commit/f1e9402ee5c1fa6695d44f8750602d0a2ccedd5f))
+
+
+### Features
+
+* **@cubejs-backend/query-orchestrator:** Initial move to TypeScript ([#1462](https://github.com/cube-js/cube.js/issues/1462)) ([101e8dc](https://github.com/cube-js/cube.js/commit/101e8dc90d4b1266c0327adb86cab3e3caa8d4d0))
+
+
+
+
+
+## [0.24.1](https://github.com/cube-js/cube.js/compare/v0.24.0...v0.24.1) (2020-11-27)
+
+
+### Bug Fixes
+
+* Specifying `dateRange` in time dimension should produce same result as `inDateRange` in filter ([a7603d7](https://github.com/cube-js/cube.js/commit/a7603d724732a51301227f68c39ba699333c0e06)), closes [#962](https://github.com/cube-js/cube.js/issues/962)
+* **cubejs-cli:** template/serverless - specify CORS ([#1449](https://github.com/cube-js/cube.js/issues/1449)) ([f8064d2](https://github.com/cube-js/cube.js/commit/f8064d292570804fb8d2ef04708d2f5c4e563be2))
+* **cubestore:** Negative int insert support ([5f2ff55](https://github.com/cube-js/cube.js/commit/5f2ff552bc5042f4d0d87fc3678de8e21ff5424a))
+
+
+### Features
+
+* **cubestore:** Group by boolean ([fa1b1b2](https://github.com/cube-js/cube.js/commit/fa1b1b2a439d9dd98e3cbaf730a313033f39ad80))
+* **cubestore:** Group by boolean ([45fe036](https://github.com/cube-js/cube.js/commit/45fe03677beb09ef7d83065566d1e0536543fea2))
+* Specify CORS for server/serverless ([#1455](https://github.com/cube-js/cube.js/issues/1455)) ([8c371ad](https://github.com/cube-js/cube.js/commit/8c371add2821a851bc51e00fb24e7ad2d8620345))
+
+
+
+
+
+# [0.24.0](https://github.com/cube-js/cube.js/compare/v0.23.15...v0.24.0) (2020-11-26)
+
+
+### Bug Fixes
+
+* Error: Type must be provided for null values. -- `null` parameter values are passed to BigQuery when used for dimensions that contain `?` ([6417e7d](https://github.com/cube-js/cube.js/commit/6417e7d120a95c4792557a4c4a0d6abb7c483db9))
+* **cubejs-cli:** template/serverless - iamRoleStatements.Resource[0] unsupported configuration format ([9fbe683](https://github.com/cube-js/cube.js/commit/9fbe683d3d1464ab453d354331033775fe707dec))
+
+
+### Features
+
+* Make default refreshKey to be `every 10 seconds` and enable scheduled refresh in dev mode by default ([221003a](https://github.com/cube-js/cube.js/commit/221003aa73aa1ece3d649de9164a7379a4a690be))
+
+
+### BREAKING CHANGES
+
+* `every 10 seconds` refreshKey becomes a default refreshKey for all cubes.
+
+
+
+
+
+## [0.23.15](https://github.com/cube-js/cube.js/compare/v0.23.14...v0.23.15) (2020-11-25)
+
+
+### Bug Fixes
+
+* Error: Cannot find module 'antlr4/index' ([0d2e330](https://github.com/cube-js/cube.js/commit/0d2e33040dfea3fb80df2a1af2ccff46db0f8673))
+* **@cubejs-backend/server-core:** Correct type for orchestratorOptions ([#1422](https://github.com/cube-js/cube.js/issues/1422)) ([96c1691](https://github.com/cube-js/cube.js/commit/96c169150ccf2197812dafdebce8194dd2cf6294))
+
+
+### Features
+
+* **@cubejs-backend/postgres-driver:** Support CUBEJS_DB_SSL_KEY ([e6291fc](https://github.com/cube-js/cube.js/commit/e6291fcda283aa6ee22badec339a600db02a1ce9))
+* **@cubejs-client/react:** support 'compareDateRange' when updating 'timeDimensions' ([#1426](https://github.com/cube-js/cube.js/issues/1426)). Thanks to @BeAnMo! ([6446a58](https://github.com/cube-js/cube.js/commit/6446a58c5d6c983f045dc2062732aacfd69d908a))
+
+
+
+
+
 ## [0.23.14](https://github.com/cube-js/cube.js/compare/v0.23.13...v0.23.14) (2020-11-22)
 
 

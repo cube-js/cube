@@ -12,8 +12,8 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class PrestodbFilter extends BaseFilter {
-  likeIgnoreCase(column, not) {
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(?) ,'%') ESCAPE '\\'`;
+  likeIgnoreCase(column, not, param) {
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(${this.allocateParam(param)}) ,'%') ESCAPE '\\'`;
   }
 
   castParameter() {
@@ -79,6 +79,12 @@ class PrestodbQuery extends BaseQuery {
 
   defaultRefreshKeyRenewalThreshold() {
     return 120;
+  }
+
+  defaultEveryRefreshKey() {
+    return {
+      every: '2 minutes'
+    };
   }
 
   hllInit(sql) {

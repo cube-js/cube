@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "0.23.14",
+  "version": "0.24.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -11,24 +11,42 @@
   "engines": {
     "node": ">=8.11.1"
   },
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --verbose test/unit",
-    "integration": "jest --runInBand --verbose test/integration",
-    "integration:redis": "jest --runInBand --verbose test/integration",
-    "lint": "eslint orchestrator/*.js driver/*.js test/**/*.js"
+    "unit": "jest --runInBand --verbose dist/test/unit",
+    "integration": "npm run integration:redis",
+    "integration:redis": "jest --runInBand --verbose dist/test/integration",
+    "lint": "linter src/* test/* --ext .ts,.js",
+    "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
   },
+  "files": [
+    "README.md",
+    "driver/*",
+    "orchestrator/*",
+    "dist/src/*"
+  ],
   "dependencies": {
     "generic-pool": "^3.7.1",
     "ramda": "^0.27.0",
     "redis": "^3.0.2"
   },
   "devDependencies": {
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
-    "jest": "^25.1.0"
+    "@cubejs-backend/linter": "^0.24.3",
+    "@types/generic-pool": "^3.1.9",
+    "@types/jest": "^26.0.15",
+    "@types/node": "^8.10.66",
+    "@types/ramda": "^0.27.32",
+    "@types/redis": "^2.8.28",
+    "jest": "^26.6.3",
+    "typescript": "~4.1.2"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
 }

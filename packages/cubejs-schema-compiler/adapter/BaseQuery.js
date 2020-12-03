@@ -1666,25 +1666,7 @@ class BaseQuery {
         }
       }
       refreshKeyAllSetManually = false;
-      const timeDimensions =
-        !(cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) ?
-          this.cubeEvaluator.timeDimensionPathsForCube(cube) :
-          [];
-      if (timeDimensions.length) {
-        const dimension = timeDimensions.filter(f => f.toLowerCase().indexOf('update') !== -1)[0] || timeDimensions[0];
-        const foundMainTimeDimension = this.newTimeDimension({ dimension });
-        const aggSelect = this.evaluateSymbolSqlWithContext(
-          () => this.aggSelectForDimension(cube, foundMainTimeDimension, 'max'),
-          { preAggregationQuery: true }
-        );
-        if (aggSelect) {
-          return aggSelect;
-        }
-      }
-      return this.evaluateSymbolSqlWithContext(
-        () => `select count(*) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`,
-        { preAggregationQuery: true }
-      );
+      return `SELECT ${this.everyRefreshKeySql(this.defaultEveryRefreshKey())}`;
     };
     const queries = cubes
       .map(cube => [cube, refreshKeyQueryByCube(cube)])
@@ -1967,6 +1949,12 @@ class BaseQuery {
     return 10;
   }
 
+  defaultEveryRefreshKey() {
+    return {
+      every: '10 seconds'
+    };
+  }
+
   preAggregationInvalidateKeyQueries(cube, preAggregation) {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
@@ -2027,10 +2015,9 @@ class BaseQuery {
                 if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
                   return `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`;
                 } else if (!cubeFromPath.refreshKey) {
-                  // TODO handle WHERE while generating originalRefreshKey
-                  return refreshKeyCube === preAggregationQueryForSql.timeDimensions[0].path()[0] ?
-                    `${originalRefreshKey} WHERE ${preAggregationQueryForSql.timeDimensions[0].filterToWhere()}` :
-                    originalRefreshKey;
+                  return `SELECT ${this.everyRefreshKeySql({
+                    every: '1 hour'
+                  })}`;
                 }
                 return originalRefreshKey;
               }

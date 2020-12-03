@@ -1,16 +1,25 @@
-use rocksdb::DB;
-use std::sync::Arc;
-use serde::{Deserialize, Deserializer};
-use super::{BaseRocksSecondaryIndex, RocksTable, IndexId, RocksSecondaryIndex, Partition, TableId};
-use byteorder::{WriteBytesExt, BigEndian};
+use super::{
+    BaseRocksSecondaryIndex, IndexId, Partition, RocksSecondaryIndex, RocksTable, TableId,
+};
 use crate::base_rocks_secondary_index;
+use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::table::Row;
-use crate::metastore::{MetaStoreEvent, IdRow};
+use byteorder::{BigEndian, WriteBytesExt};
+use rocksdb::DB;
+use serde::{Deserialize, Deserializer};
+use std::sync::Arc;
 
 impl Partition {
     pub fn new(index_id: u64, min_value: Option<Row>, max_value: Option<Row>) -> Partition {
-        Partition{ index_id, min_value, max_value, parent_partition_id: None, active: true, main_table_row_count: 0 }
+        Partition {
+            index_id,
+            min_value,
+            max_value,
+            parent_partition_id: None,
+            active: true,
+            main_table_row_count: 0,
+        }
     }
 
     pub fn child(&self, id: u64) -> Partition {
@@ -20,7 +29,7 @@ impl Partition {
             max_value: None,
             parent_partition_id: Some(id),
             active: false,
-            main_table_row_count: 0
+            main_table_row_count: 0,
         }
     }
 
@@ -33,7 +42,8 @@ impl Partition {
     }
 
     pub fn get_full_name(&self, partition_id: u64) -> Option<String> {
-        self.parent_partition_id.and(Some(format!("{}.parquet", partition_id)))
+        self.parent_partition_id
+            .and(Some(format!("{}.parquet", partition_id)))
     }
 
     pub fn to_active(&self, active: bool) -> Partition {
@@ -47,7 +57,12 @@ impl Partition {
         }
     }
 
-    pub fn update_min_max_and_row_count(&self, min_value: Option<Row>, max_value: Option<Row>, main_table_row_count: u64) -> Partition {
+    pub fn update_min_max_and_row_count(
+        &self,
+        min_value: Option<Row>,
+        max_value: Option<Row>,
+        main_table_row_count: u64,
+    ) -> Partition {
         Partition {
             index_id: self.index_id,
             min_value,
@@ -66,7 +81,9 @@ impl Partition {
         &self.parent_partition_id
     }
 
-    pub fn is_active(&self) -> bool { self.active }
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
 
     pub fn main_table_row_count(&self) -> u64 {
         self.main_table_row_count
@@ -74,8 +91,8 @@ impl Partition {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub (crate) enum PartitionRocksIndex {
-    IndexId = 1
+pub(crate) enum PartitionRocksIndex {
+    IndexId = 1,
 }
 
 rocks_table_impl!(
@@ -88,7 +105,7 @@ rocks_table_impl!(
 
 #[derive(Hash, Clone, Debug)]
 pub enum PartitionIndexKey {
-    ByIndexId(u64)
+    ByIndexId(u64),
 }
 
 base_rocks_secondary_index!(Partition, PartitionRocksIndex);
@@ -96,7 +113,7 @@ base_rocks_secondary_index!(Partition, PartitionRocksIndex);
 impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
     fn typed_key_by(&self, row: &Partition) -> PartitionIndexKey {
         match self {
-            PartitionRocksIndex::IndexId => PartitionIndexKey::ByIndexId(row.index_id)
+            PartitionRocksIndex::IndexId => PartitionIndexKey::ByIndexId(row.index_id),
         }
     }
 
@@ -112,7 +129,7 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
 
     fn is_unique(&self) -> bool {
         match self {
-            PartitionRocksIndex::IndexId => false
+            PartitionRocksIndex::IndexId => false,
         }
     }
 

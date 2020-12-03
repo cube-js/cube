@@ -1,11 +1,8 @@
-const crypto = require('crypto');
+const { BaseQueueDriver } = require('../dist/src/orchestrator/BaseQueueDriver');
 
-class BaseQueueDriver {
-  redisHash(queryKey) {
-    return typeof queryKey === 'string' && queryKey.length < 256 ?
-      queryKey :
-      crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
-  }
-}
+process.emitWarning(
+  'Using absolute import with @cubejs-backend/query-orchestrator is deprecated',
+  'DeprecationWarning'
+);
 
 module.exports = BaseQueueDriver;

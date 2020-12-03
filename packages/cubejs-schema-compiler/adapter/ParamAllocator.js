@@ -1,6 +1,7 @@
 class ParamAllocator {
   constructor() {
     this.params = [];
+    this.paramsMatchRegex = /\$(\d+)\$/g;
   }
 
   allocateParam(param) {
@@ -16,7 +17,7 @@ class ParamAllocator {
 
   buildSqlAndParams(annotatedSql) {
     const paramsInSqlOrder = [];
-    return [annotatedSql.replace(/\$(\d+)\$/g, (match, paramIndex) => {
+    return [annotatedSql.replace(this.paramsMatchRegex, (match, paramIndex) => {
       paramsInSqlOrder.push(this.params[paramIndex]);
       return this.paramPlaceHolder(paramsInSqlOrder.length - 1);
     }), paramsInSqlOrder];

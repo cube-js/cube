@@ -5,12 +5,12 @@
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
-# Cube.js store Driver
+# Cube Store Driver
 
-MySQL protocol based cubestore driver.
+MySQL protocol based Cube Store driver.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 
-Cube.js store Driver is [Apache 2.0 licensed](./LICENSE).
+Cube Store driver is [Apache 2.0 licensed](./LICENSE).

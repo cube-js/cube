@@ -1,38 +1,38 @@
-use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-use std::{env, fs};
-use crate::metastore::RocksMetaStore;
-use std::sync::Arc;
-use crate::store::{WALStore, ChunkStore};
-use crate::store::compaction::CompactionServiceImpl;
-use crate::import::ImportServiceImpl;
 use crate::cluster::ClusterImpl;
-use tokio::time::Duration;
-use crate::queryplanner::QueryPlannerImpl;
-use crate::sql::{SqlServiceImpl, SqlService};
-use crate::scheduler::SchedulerImpl;
-use std::path::PathBuf;
-use mockall::automock;
-use tokio::sync::broadcast;
-use crate::CubeError;
-use crate::remotefs::s3::S3RemoteFs;
+use crate::import::ImportServiceImpl;
+use crate::metastore::RocksMetaStore;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
-use rocksdb::{DB, Options};
-use std::future::Future;
-use simple_logger::SimpleLogger;
-use log::{Level};
+use crate::queryplanner::QueryPlannerImpl;
+use crate::remotefs::s3::S3RemoteFs;
+use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+use crate::scheduler::SchedulerImpl;
+use crate::sql::{SqlService, SqlServiceImpl};
+use crate::store::compaction::CompactionServiceImpl;
+use crate::store::{ChunkStore, WALStore};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
+use crate::CubeError;
+use log::Level;
+use mockall::automock;
+use rocksdb::{Options, DB};
+use simple_logger::SimpleLogger;
+use std::future::Future;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::{env, fs};
+use tokio::sync::broadcast;
+use tokio::time::Duration;
 
 #[derive(Clone)]
 pub struct CubeServices {
     pub sql_service: Arc<dyn SqlService>,
     pub scheduler: Arc<SchedulerImpl>,
     pub meta_store: Arc<RocksMetaStore>,
-    pub cluster: Arc<ClusterImpl>
+    pub cluster: Arc<ClusterImpl>,
 }
 
 #[derive(Clone)]
 pub struct WorkerServices {
-    pub query_executor: Arc<dyn QueryExecutor>
+    pub query_executor: Arc<dyn QueryExecutor>,
 }
 
 impl CubeServices {
@@ -45,7 +45,6 @@ impl CubeServices {
         start_track_event_loop().await;
         Ok(())
     }
-
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
         self.cluster.stop_processing_loops().await?;
@@ -60,11 +59,11 @@ impl CubeServices {
 pub enum FileStoreProvider {
     Local,
     Filesystem { remote_dir: PathBuf },
-    S3 { region: String, bucket_name: String }
+    S3 { region: String, bucket_name: String },
 }
 
 pub struct Config {
-    config_obj: Arc<ConfigObjImpl>
+    config_obj: Arc<ConfigObjImpl>,
 }
 
 #[automock]
@@ -78,7 +77,7 @@ pub struct ConfigObjImpl {
     partition_split_threshold: u64,
     data_dir: PathBuf,
     store_provider: FileStoreProvider,
-    select_worker_pool_size: usize
+    select_worker_pool_size: usize,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -92,11 +91,13 @@ impl ConfigObj for ConfigObjImpl {
 }
 
 lazy_static! {
-    pub static ref WORKER_SERVICES: std::sync::RwLock<Option<WorkerServices>> = std::sync::RwLock::new(None);
+    pub static ref WORKER_SERVICES: std::sync::RwLock<Option<WorkerServices>> =
+        std::sync::RwLock::new(None);
 }
 
 lazy_static! {
-    pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> = tokio::sync::RwLock::new(false);
+    pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
+        tokio::sync::RwLock::new(false);
 }
 
 impl Config {
@@ -107,31 +108,45 @@ impl Config {
                 partition_split_threshold: 1000000,
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
-                        FileStoreProvider::S3 { bucket_name, region: env::var("CUBESTORE_S3_REGION").unwrap() }
+                        FileStoreProvider::S3 {
+                            bucket_name,
+                            region: env::var("CUBESTORE_S3_REGION").unwrap(),
+                        }
                     } else {
-                        FileStoreProvider::Filesystem { remote_dir: env::current_dir().unwrap().join("upstream") }
+                        FileStoreProvider::Filesystem {
+                            remote_dir: env::current_dir().unwrap().join("upstream"),
+                        }
                     }
                 },
-                select_worker_pool_size: env::var("CUBESTORE_SELECT_WORKERS").ok().map(|v| v.parse::<usize>().unwrap()).unwrap_or(4)
-            })
+                select_worker_pool_size: env::var("CUBESTORE_SELECT_WORKERS")
+                    .ok()
+                    .map(|v| v.parse::<usize>().unwrap())
+                    .unwrap_or(4),
+            }),
         }
     }
 
     pub fn test(name: &str) -> Config {
         Config {
             config_obj: Arc::new(ConfigObjImpl {
-                data_dir: env::current_dir().unwrap().join(format!("{}-local-store", name)),
+                data_dir: env::current_dir()
+                    .unwrap()
+                    .join(format!("{}-local-store", name)),
                 partition_split_threshold: 20,
-                store_provider: FileStoreProvider::Filesystem { remote_dir: env::current_dir().unwrap().join(format!("{}-upstream", name)) },
-                select_worker_pool_size: 0
-            })
+                store_provider: FileStoreProvider::Filesystem {
+                    remote_dir: env::current_dir()
+                        .unwrap()
+                        .join(format!("{}-upstream", name)),
+                },
+                select_worker_pool_size: 0,
+            }),
         }
     }
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-    T: Future + Send + 'static,
-    T::Output: Send + 'static
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -139,7 +154,8 @@ impl Config {
                 SimpleLogger::new()
                     .with_level(Level::Error.to_level_filter())
                     .with_module_level("cubestore", Level::Trace.to_level_filter())
-                    .init().unwrap();
+                    .init()
+                    .unwrap();
             }
             *initialized = true;
         }
@@ -173,7 +189,7 @@ impl Config {
     pub fn remote_dir(&self) -> &PathBuf {
         match &self.config_obj.store_provider {
             FileStoreProvider::Filesystem { remote_dir } => remote_dir,
-            x => panic!("Remote dir called on {:?}", x)
+            x => panic!("Remote dir called on {:?}", x),
         }
     }
 
@@ -183,11 +199,13 @@ impl Config {
 
     fn remote_fs(&self) -> Result<Arc<dyn RemoteFs>, CubeError> {
         Ok(match &self.config_obj.store_provider {
-            FileStoreProvider::Filesystem { remote_dir } => LocalDirRemoteFs::new(
-                remote_dir.clone(),
-                self.config_obj.data_dir.clone(),
-            ),
-            FileStoreProvider::S3 { region, bucket_name } => S3RemoteFs::new(
+            FileStoreProvider::Filesystem { remote_dir } => {
+                LocalDirRemoteFs::new(remote_dir.clone(), self.config_obj.data_dir.clone())
+            }
+            FileStoreProvider::S3 {
+                region,
+                bucket_name,
+            } => S3RemoteFs::new(
                 self.config_obj.data_dir.clone(),
                 region.to_string(),
                 bucket_name.to_string(),
@@ -200,11 +218,26 @@ impl Config {
         let remote_fs = self.remote_fs().unwrap();
         let (event_sender, event_receiver) = broadcast::channel(10000); // TODO config
 
-        let meta_store = RocksMetaStore::load_from_remote(self.meta_store_path().to_str().unwrap(), remote_fs.clone()).await.unwrap();
+        let meta_store = RocksMetaStore::load_from_remote(
+            self.meta_store_path().to_str().unwrap(),
+            remote_fs.clone(),
+        )
+        .await
+        .unwrap();
         meta_store.add_listener(event_sender).await;
         let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 500000);
-        let chunk_store = ChunkStore::new(meta_store.clone(), remote_fs.clone(), wal_store.clone(), 262144);
-        let compaction_service = CompactionServiceImpl::new(meta_store.clone(), chunk_store.clone(), remote_fs.clone(), self.config_obj.clone());
+        let chunk_store = ChunkStore::new(
+            meta_store.clone(),
+            remote_fs.clone(),
+            wal_store.clone(),
+            262144,
+        );
+        let compaction_service = CompactionServiceImpl::new(
+            meta_store.clone(),
+            chunk_store.clone(),
+            remote_fs.clone(),
+            self.config_obj.clone(),
+        );
         let import_service = ImportServiceImpl::new(meta_store.clone(), wal_store.clone());
         let query_planner = QueryPlannerImpl::new(meta_store.clone());
         let query_executor = Arc::new(QueryExecutorImpl);
@@ -218,29 +251,39 @@ impl Config {
             meta_store.clone(),
             import_service.clone(),
             self.config_obj.clone(),
-            query_executor.clone()
+            query_executor.clone(),
         );
 
-        let sql_service = SqlServiceImpl::new(meta_store.clone(), wal_store.clone(), query_planner.clone(), query_executor.clone(), cluster.clone());
-        let scheduler = SchedulerImpl::new(meta_store.clone(), cluster.clone(), remote_fs.clone(), event_receiver);
+        let sql_service = SqlServiceImpl::new(
+            meta_store.clone(),
+            wal_store.clone(),
+            query_planner.clone(),
+            query_executor.clone(),
+            cluster.clone(),
+        );
+        let scheduler = SchedulerImpl::new(
+            meta_store.clone(),
+            cluster.clone(),
+            remote_fs.clone(),
+            event_receiver,
+        );
 
         CubeServices {
             sql_service,
             scheduler: Arc::new(scheduler),
             meta_store,
-            cluster
+            cluster,
         }
     }
 
     pub fn configure_worker(&self) {
         let mut services = WORKER_SERVICES.write().unwrap();
         *services = Some(WorkerServices {
-            query_executor: Arc::new(QueryExecutorImpl)
+            query_executor: Arc::new(QueryExecutorImpl),
         })
     }
 
     pub fn current_worker_services() -> WorkerServices {
         WORKER_SERVICES.read().unwrap().as_ref().unwrap().clone()
     }
-
 }

@@ -1,8 +1,8 @@
-use sqlparser::dialect::Dialect;
 use sqlparser::ast::{ObjectName, Statement as SQLStatement};
-use sqlparser::parser::{Parser, ParserError};
-use sqlparser::tokenizer::{Tokenizer, Token};
 use sqlparser::dialect::keywords::Keyword;
+use sqlparser::dialect::Dialect;
+use sqlparser::parser::{IsOptional, Parser, ParserError};
+use sqlparser::tokenizer::{Token, Tokenizer};
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
@@ -28,7 +28,14 @@ impl Dialect for MySqlDialectWithBackTicks {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Statement(SQLStatement),
-    CreateSchema { schema_name: ObjectName, if_not_exists: bool },
+    CreateTable {
+        create_table: SQLStatement,
+        indexes: Vec<SQLStatement>,
+    },
+    CreateSchema {
+        schema_name: ObjectName,
+        if_not_exists: bool,
+    },
 }
 
 pub struct CubeStoreParser {
@@ -52,9 +59,9 @@ impl CubeStoreParser {
                     self.parser.next_token();
                     self.parse_create()
                 }
-                _ => Ok(Statement::Statement(self.parser.parse_statement()?))
+                _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
             },
-            _ => Ok(Statement::Statement(self.parser.parse_statement()?))
+            _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
         }
     }
 
@@ -80,38 +87,65 @@ impl CubeStoreParser {
             query,
             without_rowid,
             ..
-        } = statement {
+        } = statement
+        {
+            let mut indexes = Vec::new();
+
+            while self.parser.parse_keyword(Keyword::INDEX) {
+                indexes.push(self.parse_with_index(name.clone())?);
+            }
+
             let location = if self.parser.parse_keyword(Keyword::LOCATION) {
                 Some(self.parser.parse_literal_string()?)
             } else {
                 None
             };
 
-            Ok(Statement::Statement(SQLStatement::CreateTable {
-                name,
-                columns,
-                constraints,
-                with_options,
-                if_not_exists,
-                external: location.is_some(),
-                file_format,
-                location,
-                query,
-                without_rowid,
-            }))
+            Ok(Statement::CreateTable {
+                create_table: SQLStatement::CreateTable {
+                    name,
+                    columns,
+                    constraints,
+                    with_options,
+                    if_not_exists,
+                    external: location.is_some(),
+                    file_format,
+                    location,
+                    query,
+                    without_rowid,
+                },
+                indexes,
+            })
         } else {
             Ok(Statement::Statement(statement))
         }
     }
 
-    fn parse_create_schema(&mut self) -> Result<Statement, ParserError> {
-        let if_not_exists = self
+    pub fn parse_with_index(
+        &mut self,
+        table_name: ObjectName,
+    ) -> Result<SQLStatement, ParserError> {
+        let index_name = self.parser.parse_object_name()?;
+        let columns = self
             .parser
-            .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
+            .parse_parenthesized_column_list(IsOptional::Mandatory)?;
+        Ok(SQLStatement::CreateIndex {
+            name: index_name,
+            table_name,
+            columns,
+            unique: false,
+            if_not_exists: false,
+        })
+    }
+
+    fn parse_create_schema(&mut self) -> Result<Statement, ParserError> {
+        let if_not_exists =
+            self.parser
+                .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
         let schema_name = self.parser.parse_object_name()?;
         Ok(Statement::CreateSchema {
             schema_name,
-            if_not_exists
+            if_not_exists,
         })
     }
 }

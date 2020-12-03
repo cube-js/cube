@@ -1,6 +1,6 @@
 const AWS = require('aws-sdk');
 const { promisify } = require('util');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const SqlString = require('sqlstring');
 
 const applyParams = (query, params) => SqlString.format(query, params);

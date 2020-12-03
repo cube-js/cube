@@ -1,5 +1,5 @@
 const snowflake = require('snowflake-sdk');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
 class SnowflakeDriver extends BaseDriver {
   constructor(config) {

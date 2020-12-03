@@ -85,7 +85,10 @@ class Handlers {
   getApiHandler() {
     if (!this.apiHandler) {
       const app = express();
-      app.use(cors());
+      app.use(cors({
+        allowedHeaders: 'authorization,content-type,x-request-id',
+      }));
+
       this.serverCore.initApp(app);
       this.apiHandler = handler(app);
     }

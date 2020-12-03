@@ -72,6 +72,12 @@ const schemaOptions = Joi.object().keys({
 });
 
 module.exports = (options) => {
-  const { error } = Joi.validate(options, schemaOptions, { abortEarly: false });
-  if (error) throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
+  const { error } = Joi.validate(options, schemaOptions, {
+    abortEarly: false,
+    // http configuration from server is not a part of server-core, we dont needed to get an error
+    allowUnknown: true,
+  });
+  if (error) {
+    throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
+  }
 };

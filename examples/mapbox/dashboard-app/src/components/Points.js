@@ -60,7 +60,7 @@ export default () => {
   }, [sliderInitQuery]);
 
   if (points) {
-    points.tablePivot().map((item) => {
+    points.tablePivot().forEach((item) => {
       data['features'].push({
         type: 'Feature',
         properties: {

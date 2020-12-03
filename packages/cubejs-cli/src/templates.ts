@@ -72,8 +72,7 @@ provider:
 #        - "athena:*"
 #        - "s3:*"
 #        - "glue:*"
-      Resource:
-        - "*"
+      Resource: '*'
 # When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12
 #  vpc:
 #    securityGroupIds:
@@ -107,6 +106,15 @@ functions:
       - http:
           path: /{proxy+}
           method: ANY
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+              - X-Request-Id
+              - X-Amz-Date
+              - X-Amz-Security-Token
+              - X-Api-Key
   cubejsProcess:
     handler: index.process
     timeout: 630

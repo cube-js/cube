@@ -1,14 +1,14 @@
-use async_trait::async_trait;
-use crate::remotefs::{RemoteFs, RemoteFile, LocalDirRemoteFs};
+use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::CubeError;
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use log::debug;
+use regex::{NoExpand, Regex};
+use s3::creds::Credentials;
+use s3::Bucket;
 use std::path::PathBuf;
 use std::sync::Arc;
-use s3::Bucket;
-use s3::creds::Credentials;
-use chrono::{Utc, DateTime};
 use tokio::fs;
-use regex::{Regex, NoExpand};
-use log::{debug};
 use tokio::sync::RwLock;
 
 pub struct S3RemoteFs {
@@ -20,7 +20,10 @@ impl S3RemoteFs {
     pub fn new(dir: PathBuf, region: String, bucket_name: String) -> Result<Arc<Self>, CubeError> {
         let credentials = Credentials::default()?;
         let bucket = Bucket::new(&bucket_name, region.parse()?, credentials)?;
-        Ok(Arc::new(Self { dir: RwLock::new(dir), bucket }))
+        Ok(Arc::new(Self {
+            dir: RwLock::new(dir),
+            bucket,
+        }))
     }
 }
 
@@ -28,9 +31,18 @@ impl S3RemoteFs {
 impl RemoteFs for S3RemoteFs {
     async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
         debug!("Uploading {}", remote_path);
-        let status_code = self.bucket.put_object_stream(self.dir.read().await.as_path().join(remote_path), format!("/{}", remote_path)).await?;
+        let status_code = self
+            .bucket
+            .put_object_stream(
+                self.dir.read().await.as_path().join(remote_path),
+                format!("/{}", remote_path),
+            )
+            .await?;
         if status_code != 200 {
-            return Err(CubeError::user(format!("S3 upload returned non OK status: {}", status_code)));
+            return Err(CubeError::user(format!(
+                "S3 upload returned non OK status: {}",
+                status_code
+            )));
         }
         Ok(())
     }
@@ -42,9 +54,15 @@ impl RemoteFs for S3RemoteFs {
         if !local.exists() {
             debug!("Downloading {}", remote_path);
             let mut output_file = std::fs::File::create(path.as_str())?;
-            let status_code = self.bucket.get_object_stream(S3RemoteFs::s3_path(remote_path), &mut output_file).await?;
+            let status_code = self
+                .bucket
+                .get_object_stream(S3RemoteFs::s3_path(remote_path), &mut output_file)
+                .await?;
             if status_code != 200 {
-                return Err(CubeError::user(format!("S3 download returned non OK status: {}", status_code)));
+                return Err(CubeError::user(format!(
+                    "S3 download returned non OK status: {}",
+                    status_code
+                )));
             }
         }
         Ok(path)
@@ -52,34 +70,54 @@ impl RemoteFs for S3RemoteFs {
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
         debug!("Deleting {}", remote_path);
-        let (_, status_code) = self.bucket.delete_object(S3RemoteFs::s3_path(remote_path)).await?;
+        let (_, status_code) = self
+            .bucket
+            .delete_object(S3RemoteFs::s3_path(remote_path))
+            .await?;
         if status_code != 204 {
-            return Err(CubeError::user(format!("S3 delete returned non OK status: {}", status_code)));
+            return Err(CubeError::user(format!(
+                "S3 delete returned non OK status: {}",
+                status_code
+            )));
         }
 
         let dir = self.dir.write().await;
         let local = dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
-            LocalDirRemoteFs::remove_empty_paths(dir.as_path().to_path_buf(), local.clone()).await?;
+            LocalDirRemoteFs::remove_empty_paths(dir.as_path().to_path_buf(), local.clone())
+                .await?;
         }
 
         Ok(())
     }
 
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
-        Ok(self.list_with_metadata(remote_prefix).await?.into_iter().map(|f| f.remote_path).collect::<Vec<_>>())
+        Ok(self
+            .list_with_metadata(remote_prefix)
+            .await?
+            .into_iter()
+            .map(|f| f.remote_path)
+            .collect::<Vec<_>>())
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let list = self.bucket.list(remote_prefix.to_string(), None).await?;
         let leading_slash = Regex::new(r"^/").unwrap();
-        let result = list.iter().flat_map(|res| res.contents.iter().map(|o| -> Result<RemoteFile, CubeError> {
-            Ok(RemoteFile {
-                remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
-                updated: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc),
+        let result = list
+            .iter()
+            .flat_map(|res| {
+                res.contents
+                    .iter()
+                    .map(|o| -> Result<RemoteFile, CubeError> {
+                        Ok(RemoteFile {
+                            remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
+                            updated: DateTime::parse_from_rfc3339(&o.last_modified)?
+                                .with_timezone(&Utc),
+                        })
+                    })
             })
-        })).collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(result)
     }
 

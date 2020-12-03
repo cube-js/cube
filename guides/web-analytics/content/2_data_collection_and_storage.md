@@ -7,7 +7,7 @@ We're going to use Snowplow for data collection, S3 for storage, and Athena to q
 
 ## Data Collection with Snowplow
 
-Snowplow is an analytics platform to collect, enrich, and store data. We'll use the Snowplow Javascript tracker on our website, which generates event-data and send it to the Snowplow Collector to load to S3.
+Snowplow is an analytics platform to collect, enrich, and store data. We'll use the Snowplow Javascript tracker on our website, which generates event-data and sends it to the Snowplow Collector to load to S3.
 
 Before loading the data, we'll use Enricher to turn IP addresses into coordinates. We'll use AWS Kinesis to manage data streams for collection, enrichment, and then finally loading into S3. The schema below illustrates the whole process.
 
@@ -40,10 +40,10 @@ For more details about setting up the tracker, please refer to the [official Sno
 To collect the data from the tracker, we need to setup Snowplow Collector. We'll use Scala Stream Collector. [Here the detailed guide](https://github.com/snowplow/snowplow/wiki/Setting-up-the-Scala-Stream-Collector) on how to install and configure it. [This repository with the Docker images](https://github.com/snowplow/snowplow-docker) for the Snowplow components is very helpful if you plan to deploy Snowplow with Docker.
 
 Next, we need to install Snowplow Stream Enrich. Same as for collector, I
-recommend following the official guide here and use these Docker images.
+recommend following the [official guide](https://docs.snowplowanalytics.com/docs/pipeline-components-and-applications/enrichment-components/stream-enrich/install-stream-enrich/).
 
 Finally, we need to have S3 Loader installed and configured to consume records
-from AWS Kinesis and writes them to S3. You can follow [this guide](https://github.com/snowplow/snowplow/wiki/snowplow-s3-loader-setup) to set it up it.
+from AWS Kinesis and writes them to S3. You can follow [this guide](https://github.com/snowplow/snowplow/wiki/snowplow-s3-loader-setup) to set it up.
 
 ## Query S3 with Athena
 

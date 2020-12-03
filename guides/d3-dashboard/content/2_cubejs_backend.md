@@ -13,25 +13,23 @@ $ createdb ecom
 $ psql --dbname ecom -f ecom-dump.sql
 ```
 
-Now, as we have data in the database, we’re ready to create the Cube.js Backend service. Run the following commands in your terminal:
+Now, as we have data in the database, we’re ready to create the Cube.js API service. Run the following command in your terminal to create a new service, configured to work with a Postgres database:
 
 ```bash
-$ npm install -g cubejs-cli
-$ cubejs create d3-dashboard -d postgres
+$ npx cubejs-cli create d3-dashboard -d postgres
 ```
 
-The commands above install Cube.js CLI and create a new service, configured to work with a Postgres database.
-
-Cube.js uses environment variables for configuration. It uses environment variables starting with `CUBEJS_`. To configure the connection to our database, we need to specify the DB type and name. In the Cube.js project folder, replace the contents of .env with the following:
+Cube.js uses environment variables for configuration. To configure the connection to our database, we need to specify the DB type and name. In the Cube.js project folder, replace the contents of the `.env` file with the following:
 
 ```bash
 CUBEJS_API_SECRET=SECRET
 CUBEJS_DB_TYPE=postgres
 CUBEJS_DB_NAME=ecom
 CUBEJS_WEB_SOCKETS=true
+CUBEJS_DEV_MODE=true
 ```
 
-Now let’s start the server and open the developer playground at [http://localhost:4000](http://localhost:4000).
+Now let’s start the server and open the Developer Playground at [http://localhost:4000](http://localhost:4000).
 
 ```bash
 $ npm run dev
@@ -95,4 +93,4 @@ priceRange: {
 
 Let’s try our newly created dimension! Go to the Build page in the playground, select the Orders count measure with the Orders price range dimension. You can always check the generated SQL by clicking the **SQL** button on the control bar.
 
-That’s it for the backend part. In the next chapter, we’ll look closer at how to render the results of our queries with D3.
+That’s it for the API part. In the next chapter, we’ll look closer at how to render the results of our queries with D3.

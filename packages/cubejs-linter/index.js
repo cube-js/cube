@@ -48,14 +48,12 @@ module.exports = {
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': 'warn',
     '@typescript-eslint/prefer-as-const': 'error',
-    // TypeScript Additional
-    '@typescript-eslint/explicit-member-accessibility': 'warn',
   },
-  // https://github.com/typescript-eslint/typescript-eslint/blob/master/packages/eslint-plugin/src/configs/eslint-recommended.ts
   overrides: [
     {
       files: ['*.ts', '*.tsx'],
       rules: {
+        // https://github.com/typescript-eslint/typescript-eslint/blob/master/packages/eslint-plugin/src/configs/eslint-recommended.ts
         'constructor-super': 'off', // ts(2335) & ts(2377)
         'getter-return': 'off', // ts(2378)
         'no-const-assign': 'off', // ts(2588)
@@ -77,6 +75,8 @@ module.exports = {
         'prefer-rest-params': 'error', // ts provides better types with rest args over arguments
         'prefer-spread': 'error', // ts transpiles spread to apply, so no need for manual apply
         'valid-typeof': 'off', // ts(2367)
+        // TypeScript Additional
+        '@typescript-eslint/explicit-member-accessibility': 'warn',
       },
     },
   ],

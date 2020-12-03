@@ -12,8 +12,8 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class BigqueryFilter extends BaseFilter {
-  likeIgnoreCase(column, not) {
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(?) ,'%')`;
+  likeIgnoreCase(column, not, param) {
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(${this.allocateParam(param)}) ,'%')`;
   }
 
   castParameter() {
@@ -132,6 +132,12 @@ class BigqueryQuery extends BaseQuery {
 
   defaultRefreshKeyRenewalThreshold() {
     return 120;
+  }
+
+  defaultEveryRefreshKey() {
+    return {
+      every: '2 minutes'
+    };
   }
 }
 

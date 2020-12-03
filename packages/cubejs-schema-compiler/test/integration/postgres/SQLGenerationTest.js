@@ -164,6 +164,10 @@ describe('SQL Generation', function test() {
           type: \`geo\`,
           latitude: { sql: \`latitude\` },
           longitude: { sql: \`longitude\` }
+        },
+        questionMark: {
+          sql: \`replace('some string question string???', 'string', 'with some ???')\`,
+          type: \`string\`
         }
       }
     })
@@ -1643,6 +1647,34 @@ describe('SQL Generation', function test() {
       order: []
     }, [
       { 'visitors__foo': '6' }
+    ])
+  );
+
+  it(
+    'question mark filter',
+    () => runQueryTest({
+      measures: ['visitors.visitor_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [{
+          member: 'visitors.questionMark',
+          operator: 'contains',
+          values: ['with some']
+        }, {
+          member: 'visitors.questionMark',
+          operator: 'equals',
+          values: [null]
+        }, {
+          member: 'visitors.questionMark',
+          operator: 'equals',
+          values: [null, 'with some']
+        }]
+      }],
+      order: []
+    }, [
+      { 'visitors__visitor_count': '6' }
     ])
   );
 

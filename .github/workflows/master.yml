@@ -10,8 +10,8 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-build/**'
       - 'docs-gen/**'
+      - 'docs/**'
     branches:
       - master
 jobs:

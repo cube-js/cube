@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 const { BigQuery } = require('@google-cloud/bigquery');
 const R = require('ramda');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
 function pause(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));

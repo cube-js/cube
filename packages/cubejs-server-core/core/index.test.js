@@ -26,13 +26,6 @@ describe('index.test', () => {
       .toThrowError(/"dbType" must be one of/);
   });
 
-  test('Should throw error, unknown options property', () => {
-    const options = { dbType: 'mysql', unknown: 'some-value' };
-
-    expect(() => { new CubejsServerCore(options); })
-      .toThrowError(/"unknown" is not allowed/);
-  });
-
   test('Should throw error, invalid options', () => {
     const options = {
       dbType: 'mysql',
@@ -55,7 +48,7 @@ describe('index.test', () => {
       .toBeInstanceOf(CubejsServerCore);
   });
 
-  test('Should create instance of CubejsServerCore, pass all options', () => {
+  test('Should create instance of CubejsServerCore, pass all options', async () => {
     const queueOptions = {
       concurrency: 3,
       continueWaitTimeout: 5,
@@ -112,8 +105,10 @@ describe('index.test', () => {
       allowJsDuplicatePropsInSchema: true
     };
 
-    expect(new CubejsServerCore(options))
+    const cubejsServerCore = new CubejsServerCore(options);
+    expect(cubejsServerCore)
       .toBeInstanceOf(CubejsServerCore);
+    await cubejsServerCore.releaseConnections();
   });
 
   test('Should create instance of CubejsServerCore, dbType from process.env.CUBEJS_DB_TYPE', () => {
@@ -129,4 +124,30 @@ describe('index.test', () => {
     expect(() => { new CubejsServerCore({}); })
       .toThrowError(/driverFactory, apiSecret, dbType are required options/);
   });
+
+  const expectRefreshTimerOption = (input, output, setProduction) => {
+    test(`scheduledRefreshTimer option ${input}`, async () => {
+      if (setProduction) {
+        process.env.NODE_ENV = 'production';
+      }
+      const cubejsServerCore = new CubejsServerCore({
+        dbType: 'mysql',
+        apiSecret: 'secret',
+        scheduledRefreshTimer: input
+      });
+      expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+      expect(cubejsServerCore.scheduledRefreshTimer).toBe(output);
+
+      await cubejsServerCore.releaseConnections();
+      delete process.env.NODE_ENV;
+    });
+  };
+
+  expectRefreshTimerOption(10, 10000);
+  expectRefreshTimerOption('9', 9000);
+  expectRefreshTimerOption(true, 5000);
+  expectRefreshTimerOption(false, false);
+  expectRefreshTimerOption('false', false);
+  expectRefreshTimerOption(undefined, 5000);
+  expectRefreshTimerOption(undefined, false, true);
 });

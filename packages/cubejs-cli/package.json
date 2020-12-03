@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
-  "version": "0.23.14",
+  "version": "0.24.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -20,8 +20,8 @@
     "build": "tsc",
     "test": "npm run unit",
     "unit": "jest dist",
-    "lint": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js src/* --ext .ts,.js",
-    "lint:fix": "./node_modules/@cubejs-backend/linter/node_modules/eslint/bin/eslint.js --fix src/* --ext .ts,.js"
+    "lint": "linter src/* --ext .ts,.js",
+    "lint:fix": "linter --fix src/* --ext .ts,.js"
   },
   "files": [
     "dist",
@@ -46,7 +46,7 @@
     "source-map-support": "^0.5.19"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.23.7",
+    "@cubejs-backend/linter": "^0.24.3",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
@@ -60,7 +60,7 @@
     "jest": "^24.8.0",
     "mocha": "^8.0.1",
     "should": "^13.2.3",
-    "typescript": "^4.0.3"
+    "typescript": "~4.1.2"
   },
   "license": "Apache-2.0",
   "eslintConfig": {

@@ -45,7 +45,7 @@ const App = () => (
             bordered={false}
             className="mapbox__card"
           >
-            <p>Learn how to visualize different types of data with <a href="//mapbox.com" target="_blank">Mapbox</a>, <a href="//cube.dev" target="_blank">Cube.js</a> and explore <a href="//console.cloud.google.com/marketplace/details/stack-exchange/stack-overflow" target="_blank">Stackoverflow</a> audience.</p>
+            <p>Learn how to visualize different types of data with <a href="//mapbox.com" target="_blank" rel="noopener noreferrer">Mapbox</a>, <a href="//cube.dev" target="_blank" rel="noopener noreferrer">Cube.js</a> and explore <a href="//console.cloud.google.com/marketplace/details/stack-exchange/stack-overflow" target="_blank" rel="noopener noreferrer">Stackoverflow</a> audience.</p>
           </Card>
           <Card
             title='Links'
@@ -53,22 +53,22 @@ const App = () => (
           >
             <ul className='useful-links'>
               <li>
-                <a href='/' target='_blank'>
+                <a href='/' target='_blank' rel="noopener noreferrer">
                   Tutorial at Cube.JS
                   </a>
               </li>
               <li>
-                <a href='//github.com/cube-js/cube.js/tree/master/examples/mapbox' target='_blank'>
+                <a href='//github.com/cube-js/cube.js/tree/master/examples/mapbox' target='_blank' rel="noopener noreferrer">
                   View source
                   </a>
               </li>
               <li>
-                <a href='//cube.dev/docs/' target='_blank'>
+                <a href='//cube.dev/docs/' target='_blank' rel="noopener noreferrer">
                   Cube.JS docs
                   </a>
               </li>
               <li>
-                <a href='//docs.mapbox.com/' target='_blank'>
+                <a href='//docs.mapbox.com/' target='_blank' rel="noopener noreferrer">
                   Mapbox docs
                   </a>
               </li>
@@ -76,6 +76,7 @@ const App = () => (
                 <a
                   href='//docs.mapbox.com/mapbox-gl-js/example/updating-choropleth/'
                   target='_blank'
+                  rel="noopener noreferrer"
                 >
                   Mapbox Choropleth example
                   </a>
@@ -84,6 +85,7 @@ const App = () => (
                 <a
                   href='//docs.mapbox.com/mapbox-gl-js/example/heatmap-layer/'
                   target='_blank'
+                  rel="noopener noreferrer"
                 >
                   Mapbox Heatmap example
                   </a>
@@ -92,12 +94,13 @@ const App = () => (
                 <a
                   href='//docs.mapbox.com/mapbox-gl-js/example/cluster/'
                   target='_blank'
+                  rel="noopener noreferrer"
                 >
                   Mapbox Cluster example
                   </a>
               </li>
               <li>
-                <a href='//visgl.github.io/react-map-gl/' target='_blank'>
+                <a href='//visgl.github.io/react-map-gl/' target='_blank' rel="noopener noreferrer">
                   React Mapbox wrapper
                   </a>
               </li>
@@ -113,7 +116,7 @@ const App = () => (
           >
             <p>
               For help please use our&nbsp;
-                <a href='//slack.cube.dev' target='_blank'>
+                <a href='//slack.cube.dev' target='_blank' rel="noopener noreferrer">
                 Slack
                 </a>
                 &nbsp;channel.

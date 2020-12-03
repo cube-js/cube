@@ -24,6 +24,20 @@ const GlobalStyles = createGlobalStyle`
     border-radius: 3px;
   }
   
+  .ant-dropdown-menu::-webkit-scrollbar-track {
+    background: var(--light-color);
+  }
+  
+  .ant-dropdown-menu::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: var(--dark-03-color);
+  }
+  
+  .ant-dropdown-menu::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  } 
+  
   .schema-sidebar .ant-tabs-top-bar {
     padding: 0 16px;
   }

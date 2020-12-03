@@ -2,7 +2,7 @@ const presto = require('presto-client');
 const {
   map, zipObj, prop, concat
 } = require('ramda');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const SqlString = require('sqlstring');
 
 class PrestoDriver extends BaseDriver {
@@ -27,7 +27,7 @@ class PrestoDriver extends BaseDriver {
   }
 
   testConnection() {
-    const query = SqlString.format(`show catalogs like ?`, [`%${this.catalog}%`]);
+    const query = SqlString.format('show catalogs like ?', [`%${this.catalog}%`]);
 
     return this.queryPromised(query)
       .then(catalogs => {
