@@ -53,23 +53,23 @@ cube(`Orders`, {
 
 By default, Cube.js will refresh the cache in the background when in [development mode][link-development-mode]. When development mode is disabled, background refreshing can be enabled by setting `CUBEJS_SCHEDULED_REFRESH_TIMER` to `true`.
 
- We recommend to run background refresh in the separate worker for production deployments. Please consult the [production checklist][link-production-checklist] for more information.
+We recommend enabling background refresh in a separate Cube.js worker for production deployments. Please consult the [Production Checklist][link-production-checklist] for more information.
 
 
 [link-development-mode]: /configuration/overview#development-mode
 [link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
 
-If the background refresh is disabled Cube.js will refresh the cache during the
-query time. Since it could lead to delays in the query processing for end users
-we recommend to always refresh the cache in the background.
+If background refresh is disabled, Cube.js will refresh the cache during query
+execution. Since this could lead to delays in responding to end-users, we
+recommend always enabling background refresh.
 
 ### Default Refresh Keys
 
-The default values for the `refreshKey` are
+The default values for `refreshKey` are
  * `every: '2 minute'` for BigQuery, Athena, Snowflake, and Presto.
  * `every: '10 second'` for all other databases.
 
-You can set up a custom refresh check SQL by changing [refreshKey](cube#parameters-refresh-key) property in a cube's Data Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a metadata table for whatever system is managing the data to see when it last ran.
++You can use a custom SQL query for checking if a refresh is required by changing the [`refreshKey`](/cube#parameters-refresh-key) property in a cube's Data Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a metadata table for whatever system is managing the data to see when it last ran.
 
 
 ### How to disable the cache?
@@ -121,7 +121,7 @@ cube(`Orders`, {
 
 Refresh strategy can be customized by setting the [refreshKey](pre-aggregations#refresh-key) property for the pre-aggregation.
 
-The default value of the `refreshKey` is `every: '1 hour'`. It can be redefined either by providing SQL:
+The default value of `refreshKey` is `every: '1 hour'`. It can be redefined either by providing SQL:
 
 ```javascript
 cube(`Orders`, {
@@ -163,14 +163,14 @@ cube(`Orders`, {
 
 ### Background Refresh
 
-You can refresh the pre-aggregations in the background by setting
+You can refresh pre-aggregations in the background by setting
 `scheduledRefresh: true`.
 
-In the development mode, Cube.js runs the background refresh by default and will
-refresh all the pre-aggregations marked with [`scheduledRefresh`](pre-aggregations#scheduled-refresh) parameter.
+In development mode, Cube.js enables background refresh by default and will
+refresh all pre-aggregations marked with the [`scheduledRefresh`](pre-aggregations#scheduled-refresh) parameter.
 
-Please consult [production checklist][link-production-checklist-refresh] for best practices on running background
-refresh in the production.
+Please consult the [Production Checklist][link-production-checklist-refresh] for best practices on running background
+refresh in production environments.
 
 
 ```js

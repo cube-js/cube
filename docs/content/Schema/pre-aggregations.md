@@ -309,7 +309,7 @@ const options = {
 
 Cube.js also takes care of keeping pre-aggregations up to date.
 
-The default value of the `refreshKey` is `every: '1 hour'`.
+The default value of `refreshKey` is `every: '1 hour'`.
 
 You can set up a custom refresh check strategy by using `refreshKey`:
 
@@ -464,7 +464,7 @@ To keep pre-aggregations always up-to-date you can mark them as `scheduledRefres
 `refreshKey` is used to determine if there's a need to update specific pre-aggregation on each scheduled refresh run.
 For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReference` are fetched to determine range for refresh.
 
-In the development mode, Cube.js runs the background refresh by default and will
+In development mode, Cube.js runs the background refresh by default and will
 refresh all the pre-aggregations marked with `scheduledRefresh` parameter.
 
 Please consult [production checklist][link-production-checklist-refresh] for best practices on running background
@@ -575,4 +575,3 @@ It allows to seamlessly hot swap tables transparently for users for any database
 It leads to orphaned tables which need to be collected over time though.
 By default Cube.js will store all content versions for 10 minutes and all structure versions for 7 days. 
 Then it'll retain only the most recent ones and orphaned tables are dropped from database.
-

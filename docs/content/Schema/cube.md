@@ -219,7 +219,7 @@ Cube.js caching layer uses `refreshKey` queries to get the current version of co
 If a query result changes, Cube.js will invalidate all queries that rely on that cube.
 
 
-The default values for the `refreshKey` are
+The default values for `refreshKey` are
  * `every: '2 minute'` for BigQuery, Athena, Snowflake, and Presto.
  * `every: '10 second'` for all other databases.
 
