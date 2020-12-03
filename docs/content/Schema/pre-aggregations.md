@@ -309,7 +309,7 @@ const options = {
 
 Cube.js also takes care of keeping pre-aggregations up to date.
 
-By default pre-aggregations use same `refreshKey` as it's cube defines.
+The default value of the `refreshKey` is `every: '1 hour'`.
 
 You can set up a custom refresh check strategy by using `refreshKey`:
 
@@ -460,14 +460,17 @@ cube(`Orders`, {
 
 ## scheduledRefresh
 
-To keep pre-aggregations always up-to-date you can mark them as `scheduledRefresh: true`.
-This instructs `RefreshScheduler` to refresh this pre-aggregation every time it's run.
-Without this flag pre-aggregations are always built on-demand.
+To keep pre-aggregations always up-to-date you can mark them as `scheduledRefresh: true`.Without this flag pre-aggregations are always built on-demand.
 `refreshKey` is used to determine if there's a need to update specific pre-aggregation on each scheduled refresh run.
 For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReference` are fetched to determine range for refresh.
 
-[[warning | Note]]
-| Refresh Scheduler isn't enabled by default. You should trigger it externally. [Learn how to do it here](caching#keeping-cache-up-to-date).
+In the development mode, Cube.js runs the background refresh by default and will
+refresh all the pre-aggregations marked with `scheduledRefresh` parameter.
+
+Please consult [production checklist][link-production-checklist-refresh] for best practices on running background
+refresh in the production.
+
+[link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
 
 Example usage:
 ```javascript

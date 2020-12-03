@@ -27,11 +27,15 @@ Cube.js can be run in an insecure, development mode by setting the
 mode does the following:
 
 - Disables authentication checks
+- Enables background refresh for in-memory cache and [scheduled
+  pre-aggregations][link-scheduled-refresh]
 - Allows another log level to be set (`trace`)
 - Enables the Playground on `http://localhost:4000`
 - Uses `memory` instead of `redis` as the default cache/queue engine
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors
+
+[link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
 
 ## Configuring CORS
 
