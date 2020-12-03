@@ -434,10 +434,16 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Decimal,
                 DataType::Timestamp => ColumnType::Timestamp,
                 DataType::Custom(custom) => {
-                    return Err(CubeError::user(format!(
-                        "Custom type '{}' is not supported",
-                        custom
-                    )));
+                    let custom_type_name = custom.to_string().to_lowercase();
+                    if custom_type_name == "mediumint" {
+                        ColumnType::Int
+                    } else {
+                        return Err(CubeError::user(format!(
+                            "Custom type '{}' is not supported",
+                            custom
+                        )));
+                    }
+
                 }
                 DataType::Regclass => {
                     return Err(CubeError::user(
@@ -773,6 +779,25 @@ mod tests {
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn custom_types() {
+        Config::run_test("custom_types", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.values (int_value mediumint)")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("INSERT INTO foo.values (int_value) VALUES (-153)")
+                .await
+                .unwrap();
+        }).await;
     }
 
     #[tokio::test]
