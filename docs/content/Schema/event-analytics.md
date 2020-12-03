@@ -25,7 +25,7 @@ We’ll explore the subject using the data from [Segment.com](https://segment.co
 
 A session is defined as a group of interactions one user takes within a given time frame on your app. Usually that time frame defaults to 30 minutes, meaning that whatever a user does on your app (e.g. browses pages, downloads resources, purchases products) before they leave equals one session.
 
-<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/Schema/session-schema.png" width="100%" />
+<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Schema/session-schema.png" width="100%" />
 
 ## Unify events and page views into single cube
 
@@ -390,7 +390,7 @@ repeatPercent: {
 
 ### Filter Sessions, where user performs specific event
 
-Often, you want to select specific sessions where a user performed some important action. 
+Often, you want to select specific sessions where a user performed some important action.
 In the example below, we’ll filter out sessions where the `form_submitted` event happened.
 To do that, we need to follow 3 steps:
 
