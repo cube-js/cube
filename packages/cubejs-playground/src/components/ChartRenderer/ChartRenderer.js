@@ -1,33 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect } from 'react';
+import { Spin } from 'antd';
 
-import { dispatchChartEvent } from '../../PlaygroundQueryBuilder';
+import { dispatchChartEvent } from '../../utils';
 import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
-
-// const buildPath = '/chart-renderers/react';
-
-// async function getEmbeds() {
-//   try {
-//     const html = await (await fetch(`${buildPath}/index.html`)).text();
-//     const styles = [];
-
-//     const reg = /<script src="([^"]*)"/g;
-//     const scripts = (html.match(reg) || []).map((e) => ({
-//       src: buildPath + e.replace(reg, '$1').replace(/^\.\//, '/'),
-//     }));
-//     const [, body] = html.match(/<script>(.*?)<\/script>/);
-//     scripts.push({
-//       body: body.replace(/\.\/static/, `${buildPath}/static`),
-//     });
-
-//     return {
-//       scripts,
-//       styles,
-//     };
-//   } catch (error) {
-//     console.error(error);
-//     return {};
-//   }
-// }
 
 export default function ChartRenderer({
   iframeRef,
@@ -37,17 +12,18 @@ export default function ChartRenderer({
   chartType,
   query,
   pivotConfig,
-  onChartRendererReady
+  onChartRendererReadyChange,
 }) {
-  // const iframeRef = useRef();
-  // const [ready, setReady] = useState(false);
+  useEffect(() => {
+    return () => {
+      onChartRendererReadyChange(false);
+    };
+  }, []);
 
   useEffect(() => {
     if (iframeRef.current) {
-      iframeRef.current.contentWindow.addEventListener('cubejsChartReady', () => {
-        console.log('onChartRendererReady >>> ready!!!');
-        // setReady(true);
-        onChartRendererReady(true);
+      iframeRef.current.addEventListener('load', () => {
+        onChartRendererReadyChange(true);
       });
     }
   }, [iframeRef]);
@@ -64,20 +40,8 @@ export default function ChartRenderer({
   }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType]));
 
   return (
-    <>
-      <button onClick={() => console.log(new Date())}>console</button>
-      <button
-        onClick={() => {
-          dispatchChartEvent(iframeRef.current?.contentDocument, {
-            pivotConfig,
-            query,
-            chartType,
-            chartingLibrary,
-          });
-        }}
-      >
-        displatch
-      </button>
+    <div>
+      {!isChartRendererReady ? <Spin /> : null}
 
       <iframe
         ref={iframeRef}
@@ -85,11 +49,11 @@ export default function ChartRenderer({
           width: '100%',
           minHeight: 400,
           border: 'none',
+          visibility: isChartRendererReady ? 'visible' : 'hidden',
         }}
-        title="Angular Charts"
-        // src="./chart-renderers/angular/index.html"
-        src="./chart-renderers/react/index.html"
+        title="Chart renderer"
+        src={`./chart-renderers/${framework}/index.html`}
       />
-    </>
+    </div>
   );
 }

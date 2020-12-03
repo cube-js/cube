@@ -74,8 +74,7 @@ const packages = [
     {
       credentials: {
         apiUrl: 'http://localhost:4000/cubejs-api/v1',
-        cubejsToken:
-          'secret',
+        cubejsToken: 'secret',
       },
     }
   );

@@ -29,31 +29,6 @@ const frameworkToTemplate = {
   vue: 'vue-cli',
 };
 
-// const p = getParameters({
-//   files: {
-//     // 'index.js': {
-//     //   content: `
-//     //   import ReactDOM from 'react-dom';
-//     //   function App() { return <p>Hello, World!</p> }
-
-//     //   ReactDOM.render(document.getElementById('root'), <App />);
-//     //   `
-
-//     // },
-//     'package.json': {
-//       content: {
-//         dependencies: {
-//           '@angular/core': 'latest'
-//           // 'react-dom': 'latest',
-//         }
-//       }
-//     }
-//   },
-//   template: 'angular-cli'
-// });
-
-// console.log('link >>>', `https://codesandbox.io/api/v1/sandboxes/define?parameters=${p}`);
-
 const StyledCard = styled(Card)`
   .ant-card-head {
     position: sticky;
@@ -84,7 +59,6 @@ export const frameworks = [
     id: 'angular',
     title: 'Angular',
     supported: true,
-    // docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
     scaffoldingSupported: true,
   },
   {
@@ -96,21 +70,36 @@ export const frameworks = [
 
 class ChartContainer extends React.Component {
   static getDerivedStateFromProps(props, state) {
-    // console.log('props.isChartRendererReady', props.isChartRendererReady, props.iframeRef.current);
-    // console.log('>>', window.__cubejs);
-
-    if (props.isChartRendererReady && props.iframeRef.current != null) {
+    if (
+      props.isChartRendererReady &&
+      props.iframeRef.current != null &&
+      props.chartingLibrary
+    ) {
       const { __cubejs } = props.iframeRef.current.contentWindow;
+
+      const codesandboxFiles = __cubejs.getCodesandboxFiles(
+        props.chartingLibrary,
+        {
+          chartType: props.chartType,
+          query: JSON.stringify(props.query, null, 2),
+          pivotConfig: JSON.stringify(props.pivotConfig, null, 2),
+          apiUrl: `${props.apiUrl}/cubejs-api/v1`,
+          cubejsToken: props.cubejsToken
+        }
+      );
+      let codeExample = '';
+      
+      if (state.framework === 'react') {
+        codeExample = codesandboxFiles['index.js'];
+      } else if (state.framework === 'angular') {
+        codeExample = codesandboxFiles['src/app/query-renderer/query-renderer.component.ts'];
+      }
 
       return {
         ...state,
         dependencies: __cubejs.getDependencies(props.chartingLibrary),
-        codeExample: '@deprecated: do not use!',
-        codesandboxFiles: __cubejs.getCodesandboxFiles(props.chartingLibrary, {
-          query: props.query,
-          chartType: props.chartType,
-          pivotConfig: props.pivotConfig,
-        }),
+        codeExample,
+        codesandboxFiles,
       };
     }
     return state;
@@ -121,7 +110,6 @@ class ChartContainer extends React.Component {
     this.state = {
       showCode: false,
       framework: 'react',
-      isChartRendererReady: false,
     };
   }
 
@@ -148,6 +136,7 @@ class ChartContainer extends React.Component {
       setChartLibrary,
       chartLibraries,
       history,
+      onChartRendererReadyChange,
     } = this.props;
 
     if (redirectToDashboard) {
@@ -164,27 +153,27 @@ class ChartContainer extends React.Component {
         )
       : null;
 
-    console.log('params', parameters);
-
-    const chartLibrariesMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Chart Library', { chartingLibrary: e.key });
-          setChartLibrary(e.key);
-        }}
-      >
-        {chartLibraries[framework].map((library) => (
-          <Menu.Item key={library.value}>{library.title}</Menu.Item>
-        ))}
-      </Menu>
-    );
+    const chartLibrariesMenu =
+      (chartLibraries[framework] || []).length > 0 ? (
+        <Menu
+          onClick={(e) => {
+            playgroundAction('Set Chart Library', { chartingLibrary: e.key });
+            setChartLibrary(e.key);
+          }}
+        >
+          {(chartLibraries[framework] || []).map((library) => (
+            <Menu.Item key={library.value}>{library.title}</Menu.Item>
+          ))}
+        </Menu>
+      ) : null;
 
     const frameworkMenu = (
       <Menu
         onClick={(e) => {
           playgroundAction('Set Framework', { framework: e.key });
           this.setState({ framework: e.key });
-          setChartLibrary(chartLibraries[e.key][0].value);
+          onChartRendererReadyChange(false);
+          setChartLibrary(chartLibraries[e.key]?.[0]?.value || null);
         }}
       >
         {frameworks.map((f) => (
@@ -193,9 +182,10 @@ class ChartContainer extends React.Component {
       </Menu>
     );
 
-    const currentLibraryItem = chartLibraries[framework].find(
+    const currentLibraryItem = (chartLibraries[framework] || []).find(
       (m) => m.value === chartingLibrary
     );
+
     const frameworkItem = frameworks.find((m) => m.id === framework);
     const extra = (
       <form
@@ -210,19 +200,21 @@ class ChartContainer extends React.Component {
           <Button.Group>
             <Dropdown overlay={frameworkMenu}>
               <Button size="small">
-                {frameworkItem && frameworkItem.title}
+                {frameworkItem?.title}
                 <DownOutlined />
               </Button>
             </Dropdown>
-            <Dropdown
-              overlay={chartLibrariesMenu}
-              disabled={!frameworkItem.supported}
-            >
-              <Button size="small">
-                {currentLibraryItem && currentLibraryItem.title}
-                <DownOutlined />
-              </Button>
-            </Dropdown>
+            {chartLibrariesMenu ? (
+              <Dropdown
+                overlay={chartLibrariesMenu}
+                disabled={!frameworkItem.supported}
+              >
+                <Button size="small">
+                  {currentLibraryItem?.title}
+                  <DownOutlined />
+                </Button>
+              </Dropdown>
+            ) : null}
           </Button.Group>
           <Button.Group>
             <Button

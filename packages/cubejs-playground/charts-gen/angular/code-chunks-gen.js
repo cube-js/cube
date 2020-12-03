@@ -1,26 +1,20 @@
 const { TargetSource } = require('@cubejs-templates/core');
-const t = require('@babel/types');
-const traverse = require('@babel/traverse').default;
-const generator = require('@babel/generator').default;
-
-// const codesandboxFiles = [
-//   /\/app\/app\.module\.ts/,
-//   /\/app\/app\.component\.ts/,
-//   /\/app\/app\.component\.html/,
-// ];
+// const t = require('@babel/types');
+// const traverse = require('@babel/traverse').default;
+// const generator = require('@babel/generator').default;
 
 const commonFiles = {
   'src/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
+import { MatTableModule } from '@angular/material/table';
 import { CubejsClientModule } from '@cubejs-client/ngx';
 import { ChartsModule } from 'ng2-charts';
 
 import { AppComponent } from './app.component';
-import { AngularNg2Charts } from './angular-ng2-charts/chart-renderer.component';
-import { AngularTestCharts } from './angular-test-charts/chart-renderer.component';
+import { QueryRendererComponent } from './query-renderer/query-renderer.component';
 
 const cubejsOptions = {
-  token: '\${props.token}',
+  token: '\${props.cubejsToken}',
   options: {
     apiUrl: '\${props.apiUrl}',
   },
@@ -29,11 +23,11 @@ const cubejsOptions = {
 @NgModule({
   declarations: [
     AppComponent,
-    AngularNg2Charts,
-    AngularTestCharts,
+    QueryRendererComponent,
   ],
   imports: [
     BrowserModule,
+    MatTableModule,
     CubejsClientModule.forRoot(cubejsOptions),
     ChartsModule,
   ],
@@ -45,8 +39,13 @@ export class AppModule {}`,
 import { BehaviorSubject } from 'rxjs';
 
 @Component({
-  selector: 'app',
-  templateUrl: './app.component.html',
+  selector: 'app-root',
+  template: \\\`
+    <query-renderer
+      [chartType]="chartType.asObservable()"
+      [cubeQuery]="cubeQuery.asObservable()"
+      [pivotConfig]="pivotConfig.asObservable()"
+    >\\\`,
   styles: [],
 })
 export class AppComponent implements OnInit {
@@ -56,18 +55,17 @@ export class AppComponent implements OnInit {
 
   ngOnInit() {    
     this.cubeQuery.next(\${props.query});
-    this.chartType.next(\${props.chartType});
+    this.chartType.next('\${props.chartType}');
     this.pivotConfig.next(\${props.pivotConfig});
   }
 }
 `,
-  'src/app/app.component.html': '<p>to do...</p>',
 };
 
-function generateCodeChunks(
-  { chartingLibraries, chartingLibraryDependencies },
-  props
-) {
+function generateCodeChunks({
+  chartingLibraryDependencies,
+  chartingLibraryFiles,
+}) {
   const commonDependencies = Object.entries(commonFiles)
     .map(([fileName, content]) => {
       const ts = new TargetSource(
@@ -76,10 +74,8 @@ function generateCodeChunks(
       );
       return ts.getImportDependencies();
     })
-    .reduce((a, b) => [...a, ...b], []);
-
-
-  const chartingLibraryFiles = {};
+    .reduce((a, b) => [...a, ...b], [])
+    .concat(['@angular/cdk', '@angular/material', '@angular/animations']);
 
   return `
     const chartingLibraryFiles = ${JSON.stringify(chartingLibraryFiles)};
@@ -100,7 +96,9 @@ function generateCodeChunks(
     }
     
     const commonDependencies = ${JSON.stringify(commonDependencies)};
-    const chartingLibraryDependencies = ${JSON.stringify(chartingLibraryDependencies)};
+    const chartingLibraryDependencies = ${JSON.stringify(
+      chartingLibraryDependencies
+    )};
     
     export function getDependencies(chartingLibrary) {
       return Array.from(new Set([
