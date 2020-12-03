@@ -179,8 +179,8 @@ export class ServerContainer {
             );
             if (pkgVersion && !isSimilarPackageRelease(pkgVersion, coreVersion)) {
               console.log(
-                `${color.yellow('error')} "${pkgName}" (${getMajorityVersion(coreVersion)}) `
-                + `is using another release then @cubejs-backend/server (${getMajorityVersion(pkgVersion)}).`
+                `${color.yellow('error')} "${pkgName}" (${getMajorityVersion(pkgVersion)}) `
+                + `is using another release then @cubejs-backend/server (${getMajorityVersion(coreVersion)}).`
               );
             }
           }
