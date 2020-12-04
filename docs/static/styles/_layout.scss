@@ -349,8 +349,9 @@ span.group-header {
 }
 
 .menuWrapper {
-  padding-top: 48px;
-  padding-bottom: 48px;
+  height: 100%;
+  background: $sidebar-bg;
+  padding: 16px 24px;
   overflow-y: auto;
   overflow-x: hidden;
   position: fixed;

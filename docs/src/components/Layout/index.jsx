@@ -189,8 +189,7 @@ class AppLayout extends React.Component {
                 />
               </Header>
               <Col
-                md={{ span: 22, offset: 1 }}
-                xs={24}
+                md={24}
                 className={cx(styles.contentColumn, { fixed: this.state.mobileMode === 'menu' })}
               >
                 <MainMenu items={parseResults(data.allMarkdownRemark.edges)} {...menuProps} />
