@@ -7,7 +7,7 @@ const DynamoDB = require('aws-sdk/clients/dynamodb');
 const DocumentClient = new DynamoDB.DocumentClient();
 
 // Need to specify a value for the single table design and we want it static
-const QUEUE_SIZE_SORT_KEY = 0;
+const QUEUE_SIZE_SORT_KEY = 'empty';
 
 export class DynamoDBQueueDriverConnection {
   public readonly driver: DynamoDBQueueDriver;
@@ -17,15 +17,11 @@ export class DynamoDBQueueDriverConnection {
   public readonly heartBeatTimeout: number;
   public readonly concurrency: number;
 
-  public readonly tableName: string;
-  public readonly table: typeof Table;
+  private readonly tableName: string;
+  private readonly table: typeof Table;
 
-  // Contains QUEUE, RECENT, ACTIVE, HEART_BEAT, QUERIES, PROCESSING_COUNTER
-  public readonly queue: typeof Entity;
-  public readonly queueSize: typeof Entity;
-
-  // Contains RESULT, LOCK
-  public readonly query: typeof Entity;
+  private readonly queue: typeof Entity;
+  private readonly queueSize: typeof Entity; // TODO: Do we need this?
 
   constructor(driver: DynamoDBQueueDriver, options: any) {
     this.redisQueuePrefix = options.redisQueuePrefix;
@@ -47,7 +43,7 @@ export class DynamoDBQueueDriverConnection {
       sortKey: 'sk',
 
       indexes: {
-        GSI1: { partitionKey: 'GSI1pk', sortKey: 'GSI1sk' },
+        GSI1: { partitionKey: 'pk', sortKey: 'GSI1sk' },
       },
 
       // Add the DocumentClient
@@ -61,9 +57,12 @@ export class DynamoDBQueueDriverConnection {
       // Define attributes
       attributes: {
         key: { partitionKey: true }, // flag as partitionKey
-        inserted: { sortKey: true }, // flag as sortKey and mark hidden
+        sk: { hidden: true, sortKey: true }, // flag as sortKey and mark hidden since we use composite
+        queryKey: ['sk', 0], // composite key mapping 
+        order: ['sk', 1], // composite key mapping
+        inserted: { type: 'number', map: 'GSI1sk' },
         keyScore: { type: 'number' },
-        queryKey: { type: 'string' },
+        value: { type: 'string' }
       },
 
       // Assign it to our table
@@ -76,23 +75,12 @@ export class DynamoDBQueueDriverConnection {
 
       // Define attributes
       attributes: {
-        key: { partitionKey: true }, // flag as partitionKey
-        updated: { hidden: true, sortKey: true, type: 'number' },
-        size: { type: 'number' }, // set the attribute type to string
+        key: { partitionKey: true },
+        updated: { hidden: true, sortKey: true },
+        size: { type: 'number' },
       },
 
       // Assign it to our table
-      table: this.table
-    });
-
-    this.query = new Entity({
-      name: 'Query',
-      attributes: {
-        key: { partitionKey: true }, // flag as partitionKey
-        inserted: { sortKey: true, type: 'number' },
-        queryKey: { type: 'string' },
-        value: { type: 'string' }
-      },
       table: this.table
     });
   }
@@ -100,8 +88,17 @@ export class DynamoDBQueueDriverConnection {
   async getResultBlocking(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
 
+
+
+    // if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]))) {
+    //   return this.getResult(queryKey);
+    // }
+
+
     // Check if queryKey is active query
-    const exists = await this.query.get({ key: this.redisHash(queryKey) });
+    const exists = await this.queue.query(
+      this.queriesDefKey()
+    );
     if (!exists || !exists.Item) {
       return this.getResult(resultListKey);
     }
@@ -112,7 +109,7 @@ export class DynamoDBQueueDriverConnection {
     let result = undefined;
     let runs = this.concurrency;
     while (runs >= 0) {
-      result = await this.query.get({ key: resultListKey });
+      result = await this.queue.get({ key: resultListKey });
       if (result) { // Found the result
         // Do we need to push and pop?
         runs = 0;
@@ -134,12 +131,15 @@ export class DynamoDBQueueDriverConnection {
   }
 
   public async getResult(resultListKey: string) {
-    const result = await this.query.get({ key: resultListKey })
+    const result = await this.queue.get({ key: resultListKey })
     const data = result && result.Item && JSON.parse(result.Item.value);
 
     // We got our data so remove it
     if (result && result.Item) {
-      this.results.delete({ key: resultListKey });
+      this.queue.delete({
+        key: resultListKey,
+        inserted: result.Item.inserted
+      });
     }
 
     return data;
@@ -165,7 +165,7 @@ export class DynamoDBQueueDriverConnection {
           })
         },
         {
-          Update: this.query.updateParams({
+          Update: this.queue.updateParams({
             key: this.queriesDefKey() + this.redisHash(queryKey),
             inserted: time,
             queryKey: this.redisHash(queryKey),
@@ -213,57 +213,79 @@ export class DynamoDBQueueDriverConnection {
   }
 
   getActiveQueries() {
-    const activeQueriesResult = await this.active.query();
+    const activeQueriesResult = await this.queue.query(
+      this.activeRedisKey(), // partition key
+    );
     console.log(activeQueriesResult);
 
     return activeQueriesResult.Items;
   }
 
   async getQueryAndRemove(queryKey) {
-    const [query, ...restResult] = await this.redisClient.multi()
-      .hget([this.queriesDefKey(), this.redisHash(queryKey)])
-      .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
-      .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
-      .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
-      .del(this.queryProcessingLockKey(queryKey))
-      .execAsync();
-    return [JSON.parse(query), ...restResult];
+    return null;
+    // const [query, ...restResult] = await this.redisClient.multi()
+    //   .hget([this.queriesDefKey(), this.redisHash(queryKey)])
+    //   .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
+    //   .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
+    //   .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
+    //   .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
+    //   .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
+    //   .del(this.queryProcessingLockKey(queryKey))
+    //   .execAsync();
+    // return [JSON.parse(query), ...restResult];
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
-    try {
-      await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
-      const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
-      if (processingId !== currentProcessId) {
-        return false;
-      }
+    return null;
+    // try {
+    //   await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
+    //   const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
+    //   if (processingId !== currentProcessId) {
+    //     return false;
+    //   }
 
-      return this.redisClient.multi()
-        .lpush([this.resultListKey(queryKey), JSON.stringify(executionResult)])
-        .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
-        .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
-        .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
-        .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
-        .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
-        .del(this.queryProcessingLockKey(queryKey))
-        .execAsync();
-    } finally {
-      await this.redisClient.unwatchAsync();
-    }
+    //   return this.redisClient.multi()
+    //     .lpush([this.resultListKey(queryKey), JSON.stringify(executionResult)])
+    //     .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
+    //     .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
+    //     .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
+    //     .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
+    //     .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
+    //     .del(this.queryProcessingLockKey(queryKey))
+    //     .execAsync();
+    // } finally {
+    //   await this.redisClient.unwatchAsync();
+    // }
   }
 
   getOrphanedQueries() {
-    return this.redisClient.zrangebyscoreAsync(
-      [this.recentRedisKey(), 0, (new Date().getTime() - this.orphanedTimeout * 1000)]
-    );
+    const orphanedTime = new Date().getTime() - this.orphanedTimeout * 1000;
+    const orphanedQueriesResult = await this.queue.query(
+      this.recentRedisKey(),
+      {
+        limit: 100, // limit to 100 items - TODO: validate this number
+        index: 'GSI1', // query the GSI1 secondary index
+        lt: orphanedTime // GSI1sk (inserted) is less than orphaned time
+      }
+    )
+
+    // TODO: Sort by score?
+    return orphanedQueriesResult.Items;
   }
 
   getStalledQueries() {
-    return this.redisClient.zrangebyscoreAsync(
-      [this.heartBeatRedisKey(), 0, (new Date().getTime() - this.heartBeatTimeout * 1000)]
-    );
+    const stalledTime = new Date().getTime() - this.heartBeatTimeout * 1000;
+    const stalledQueriesResult = await this.queue.query(
+      this.heartBeatRedisKey(),
+      {
+        limit: 100, // limit to 100 items - TODO: validate this number
+        index: 'GSI1', // query the GSI1 secondary index
+        lt: stalledTime // GSI1sk (inserted) is less than stalled time
+      }
+    )
+
+    // TODO: Sort by score?
+    return stalledQueriesResult.Items;
   }
 
   async getQueryStageState(onlyKeys) {
@@ -278,6 +300,10 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async getQueryDef(queryKey) {
+    const queryDefResult = await this.queue.get({
+      key: this.queriesDefKey(),
+
+    })
     const query = await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]);
     return JSON.parse(query);
   }
