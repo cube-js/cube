@@ -22,8 +22,6 @@ import { renameCategory } from '../../../rename-category';
 // trim leading and trailing slashes
 export const trimSlashes = (str) => str.replace(/^\/|\/$/g, '');
 
-const { Content } = Layout;
-
 const MOBILE_MODE_SET = ['content', 'menu', 'search'];
 
 const pathname = location => {
@@ -205,11 +203,11 @@ class AppLayout extends React.Component {
                   {
                     pageFrameworkOfChoice && <FrameworkSwitcher value={pageFrameworkOfChoice} />
                   }
-                  <Content style={{ margin: '0 24px 100px 30px' }}>
+                  <Layout.Content className={styles.docContentWrapper} style={{ margin: '0 24px 100px 24px' }}>
                     {
                       childrenWithProps
                     }
-                  </Content>
+                  </Layout.Content>
                 </Col>
                 {!this.state.noscrollmenu && <ScrollMenu sections={this.state.sections} githubUrl={this.state.githubUrl} />}
               </Col>

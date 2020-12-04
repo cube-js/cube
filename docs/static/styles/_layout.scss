@@ -34,8 +34,19 @@ a {
   }
 }
 
+.docContentWrapper {
+  display: flex;
+  justify-content: center;
+
+  @media screen and (max-width: 576px) {
+    display: block;
+    justify-content: unset;
+  }
+}
+
 .docContent {
   @include body-text;
+  max-width: 920px;
 
   @media screen and (max-width: 576px) {
     font-size: 16px;
