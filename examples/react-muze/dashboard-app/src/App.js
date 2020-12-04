@@ -79,7 +79,7 @@ function App() {
   ) : (
     <Muze data={dataModel}>
       <Canvas
-        width={'1440px'}
+        width={'1200px'}
         height={'900px'}
         columns={['ProductCategories.name', 'Orders.createdAt.month']}
         rows={['Orders.count', 'Users.city']}
