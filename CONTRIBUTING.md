@@ -9,9 +9,16 @@ By participating, you are expected to uphold this code. Please report unacceptab
 
 ## Contributing Code Changes
 
-Please review the preceding section before proposing a code change. This section documents how to do so.
+Please review the following sections before proposing code changes. 
 
-**When you contribute code, you affirm that the contribution is your original work and that you license the work to the project under the project’s open source license. Whether or not you state this explicitly, by submitting any copyrighted material via pull request, email, or other means you agree to license the material under the project’s open source license and warrant that you have the legal authority to do so.**
+### License
+
+- Cube.js Client is [MIT licensed](./packages/cubejs-client-core/LICENSE).
+- Cube.js Backend is [Apache 2.0 licensed](./packages/cubejs-server/LICENSE).
+
+### Developer Certificate of Origin (DCO)
+
+By contributing to Cube Dev, Inc., You accept and agree to the terms and conditions in the [Developer Certificate of Origin](https://github.com/cube-js/cube.js/blob/master/dco.md) for Your present and future Contributions submitted to Cube Dev, Inc. Your contribution includes any submissions to the [Cube.js repository](https://github.com/cube-js) when you click on such buttons as `Propose changes` or `Create pull request`. Except for the licenses granted herein, You reserve all right, title, and interest in and to Your Contributions.
 
 ## Contribution Prerequisites
 
