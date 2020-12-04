@@ -26,9 +26,18 @@ export class QueryQueue {
       heartBeatTimeout: this.heartBeatInterval * 4,
       redisPool: options.redisPool
     };
-    this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisQueueDriver(queueDriverOptions) :
-      new LocalQueueDriver(queueDriverOptions);
+
+    switch (options.cacheAndQueueDriver) {
+      case 'redis':
+        this.queueDriver = new RedisQueueDriver(queueDriverOptions);
+        break;
+      case 'dynamodb':
+        this.queueDriver = new DynamoDBQueueDriver(queueDriverOptions);
+        break;
+      case 'memory':
+      default:
+        this.queueDriver = new LocalQueueDriver(queueDriverOptions);
+    } 
   }
 
   async executeInQueue(queryHandler, queryKey, query, priority, options) {

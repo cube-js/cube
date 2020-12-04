@@ -18,10 +18,11 @@ export class DynamoDBCacheDriver {
 
     this.table = new Table({
       // Specify table name (used by DynamoDB)
-      name: tableName ?? process.env.CUBEJS_CACHE_TABLE,
+      name: this.tableName,
 
       // Define partition key
-      partitionKey: 'key',
+      partitionKey: 'pk',
+      sortKey: 'sk',
 
       // Add the DocumentClient
       DocumentClient
@@ -45,12 +46,6 @@ export class DynamoDBCacheDriver {
 
   public async get(key: string) {
     const result = await this.cache.get({ key });
-
-    // Key is expired so delete it
-    if (result.exp < new Date().getTime()) {
-      this.cache.delete({ key });
-    }
-
     return result && result.Item && JSON.parse(result.Item.value);
   }
 
