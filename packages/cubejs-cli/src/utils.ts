@@ -47,6 +47,10 @@ export const event = async (name: string, props?: any) => {
   }
 };
 
+export const displayWarning = (message: string) => {
+  console.log(`${chalk.yellow('Warning.')} ${message}`);
+};
+
 export const displayError = async (text: string|string[], options = {}) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
