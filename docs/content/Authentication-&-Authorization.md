@@ -7,7 +7,16 @@ menuOrder: 1
 
 In Cube.js, access control or authorization is based on the **security context**. The diagram below shows how it works during the request processing in Cube.js:
 
-SCHEMA
+
+<p
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/authentication-overview.png"
+  style="border: none"
+  width="80%"
+  />
+</p>
 
 Authentication is handled outside of Cube.js. Your auth server issues JWTs to your client app, which, when sent as part of the request, are verified and decoded by the Cube.js to get security context claims to evaluate access control rules.
 
