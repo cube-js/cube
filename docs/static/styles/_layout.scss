@@ -519,8 +519,7 @@ span.group-header {
 }
 
 .scrollspy {
-  padding-top: 48px;
-  padding-bottom: 48px;
+  padding: 16px 0;
   overflow-y: auto;
   overflow-x: hidden;
   position: fixed;
@@ -874,12 +873,6 @@ section[type=h2] > :last-child :not(pre) {
 
 .editPage {
   max-height: 0;
-  //margin-bottom: -91px;
-  //margin-top: 58px;
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  text-align: right;
   padding: 0;
 
   a {

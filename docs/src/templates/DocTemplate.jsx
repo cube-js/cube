@@ -75,7 +75,6 @@ class DocTemplate extends Component {
         type: 'h1',
         className: styles.topSection,
         nodes: [
-          React.createElement('p', { key: 'edit-page', className: styles.editPage }, <a href={githubUrl}> <Icon type="github" width={20} height={20} /> Edit this page </a>),
           React.createElement('h1', { key: 'top', className: styles.topHeader }, title)
         ],
         title: title
@@ -170,7 +169,7 @@ class DocTemplate extends Component {
       }
 
       last(sectionTags).nodes.push(linkedHTag || item);
-    })
+    });
 
     const nodes = sectionTags.map(item => {
       return React.createElement('section', {
@@ -187,7 +186,7 @@ class DocTemplate extends Component {
       type: item.type
     }));
 
-    this.props.setScrollSections(sections);
+    this.props.setScrollSectionsAndGithubUrl(sections, githubUrl);
     this.setState({ nodes });
   }
 

@@ -83,7 +83,8 @@ const FrameworkChoiceFix = (props) => {
 class AppLayout extends React.Component {
   state = {
     sections: [],
-    mobileMode: 'content'
+    mobileMode: 'content',
+    githubUrl: '',
   }
 
   componentDidMount() {
@@ -120,9 +121,10 @@ class AppLayout extends React.Component {
     }
   }
 
-  setScrollSections = sections => {
+  setScrollSectionsAndGithubUrl = (sections, githubUrl) => {
     this.setState({
-      sections
+      sections,
+      githubUrl
     });
   }
 
@@ -143,7 +145,7 @@ class AppLayout extends React.Component {
       React.cloneElement(child, { ...this.props,
         layout: false,
         changePage: this.changePage,
-        setScrollSections: this.setScrollSections
+        setScrollSectionsAndGithubUrl: this.setScrollSectionsAndGithubUrl
       })
     );
 
@@ -209,7 +211,7 @@ class AppLayout extends React.Component {
                     }
                   </Content>
                 </Col>
-                {!this.state.noscrollmenu && <ScrollMenu sections={this.state.sections} />}
+                {!this.state.noscrollmenu && <ScrollMenu sections={this.state.sections} githubUrl={this.state.githubUrl} />}
               </Col>
               <MobileFooter
                 mobileMode={this.state.mobileMode}

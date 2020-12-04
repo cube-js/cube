@@ -1,5 +1,5 @@
 import React from 'react';
-import { Col } from 'antd';
+import { Col, Icon } from 'antd';
 import cx from 'classnames';
 import PropTypes from 'prop-types';
 
@@ -7,32 +7,50 @@ import ScrollLink from '../templates/ScrollSpyLink';
 
 import styles from '../../../static/styles/index.module.scss';
 
-const ScrollMenu = props => (
-  <Col
-    xxl={{ span: 3, offset: 1 }}
-    xl={{ span: 4, offset: 1 }}
-    xs={0}
-  >
-    <div className={styles.scrollspy}>
-      {props.sections.length > 1 && props.sections.map(s => 
-        <ScrollLink
-          activeClass={styles.scrollspyCurrent}
-          to={s.id}
-          key={s.id}
-          className={cx(styles.scrollspyLink, {
-            [styles.scrollspySubitem]: s.type === 'h3',
-            [styles.scrollspyTop]: s.id === 'top'
-          })}
-        >
-          {s.title}
-        </ScrollLink>
-      )}
+const EditPage = ({ githubUrl }) => {
+  return (
+    <div className={styles.scrollspyLinkWrapper}>
+      <p className={cx(styles.editPage, styles.scrollspyLink)}>
+        <a href={githubUrl}> <Icon type="github" width={20} height={20} /> Edit this page </a>
+      </p>
     </div>
-  </Col>
-);
+  );
+};
+
+const HeadingLink = ({ id, title, type }) => {
+  return (
+    <ScrollLink
+      activeClass={styles.scrollspyCurrent}
+      to={id}
+      key={id}
+      className={cx(styles.scrollspyLink, {
+        [styles.scrollspySubitem]: type === 'h3',
+        [styles.scrollspyTop]: id === 'top'
+      })}
+    >
+      {title}
+    </ScrollLink>
+  );
+};
+
+const ScrollMenu = props => {
+  return (
+    <Col
+      xxl={{ span: 3, offset: 1 }}
+      xl={{ span: 4, offset: 1 }}
+      xs={0}
+    >
+      <div className={styles.scrollspy}>
+        {props.sections.length > 1 && <EditPage githubUrl={props.githubUrl} />}
+        {props.sections.length > 1 && props.sections.map(HeadingLink)}
+      </div>
+    </Col>
+  );
+}
 
 ScrollMenu.propTypes = {
-  sections: PropTypes.array
+  githubUrl: PropTypes.string,
+  sections: PropTypes.array,
 }
 
 ScrollMenu.defaultProps = {

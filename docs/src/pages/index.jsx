@@ -14,7 +14,7 @@ import styles from '../../static/styles/index.module.scss';
 class IndexPage extends Component {
   componentWillMount() {
     this.props.changePage({ scope: 'default', category: 'Index' });
-    this.props.setScrollSections([]);
+    this.props.setScrollSectionsAndGithubUrl([], '');
   }
 
   render() {
