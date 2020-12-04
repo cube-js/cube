@@ -25,7 +25,7 @@ For access control or authorization, Cube.js allows you to define granular acces
 Cube.js uses [JSON Web Tokens (JWT)][link-jwt] which should be passed in the
 `Authorization: <JWT>` header to authenticate requests.
 
-JWTs can also be used to pass additional information about the user, known as a security context. It must be stored inside the **u** namespace. It will be accessible in the
+JWTs can also be used to pass additional information about the user, known as a [security context][link-security-context]. It must be stored inside the **u** namespace. It will be accessible in the
 [USER_CONTEXT][link-user-context] object in the Data Schema and in [authInfo][link-authinfo] variable which is used to support [Multitenancy][link-multitenancy].
 
 In the example
@@ -80,8 +80,8 @@ You can generate two types of tokens:
 - With security context, which will allow you to implement role-based security
   models where users will have different levels of access to data.
 
-_It is considered best practice to use an `exp` expiration claim to limit the
-life time of your public tokens. [Learn more at JWT docs][link-jwt-docs]._
+[[info | ]]
+| It is considered best practice to use an `exp` expiration claim to limit the life time of your public tokens. [Learn more at JWT docs][link-jwt-docs].
 
 [link-jwt-docs]:
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
@@ -149,7 +149,7 @@ can then use it to query the Cube.js API.
 ## Security Context
 
 A "security context" is a verified set of claims about the current user that the
-cube.js server can use to ensure that users only have access to the data that
+Cube.js server can use to ensure that users only have access to the data that
 they are authorized to access. You can provide a security context by passing the
 `u` param in the JSON payload that you pass to your JWT signing function. For
 example if you want to pass the user ID in the security context you could create
