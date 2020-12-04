@@ -1,3 +1,18 @@
+/**
+ * Uses single table design with the DynamoDBCacheDriver
+ * 
+ * Requires ENV VARs:
+ *   CUBEJS_CACHE_TABLE
+ * 
+ * Table needs to have:
+ * partitionKey: pk (string/hash)
+ * sortKey: sk (string/hash)
+ * Global secondary index
+ *   GSI1: 
+ *     partitionKey: pk (string/hash as above)
+ *     sortKey: sk (number/range)
+ */
+
 import R from 'ramda';
 import { BaseQueueDriver } from './BaseQueueDriver';
 
@@ -300,16 +315,25 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async getQueryDef(queryKey) {
-    const queryDefResult = await this.queue.get({
-      key: this.queriesDefKey(),
+    // Query complexity for one item is the same as getitem
+    // https://forums.aws.amazon.com/thread.jspa?threadID=93743
+    const queryDefResult = await this.queue.query(
+      this.queriesDefKey(),
+      {
+        beginsWith: this.redisHash(queryKey) // we have to use beginswith instead of get because of our composite key
+      }
+    )
 
-    })
-    const query = await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]);
-    return JSON.parse(query);
+    return queryDefResult && JSON.parse(queryDefResult.Item.value);
   }
 
   updateHeartBeat(queryKey) {
-    return this.redisClient.zaddAsync([this.heartBeatRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
+    // TODO: I think this needs fixed. Heartbeat may not need to be unique SK?
+    // Or we get the value and then update the value. Since SK is composite
+    return await this.queue.update({
+      key: this.heartBeatRedisKey(),
+      inserted: new Date().getTime()
+    });
   }
 
   async getNextProcessingId() {
