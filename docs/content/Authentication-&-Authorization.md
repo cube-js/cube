@@ -14,22 +14,32 @@ Authentication is handled outside of Cube.js. Your auth server issues JWTs to yo
 For access control or authorization, Cube.js allows you to define granular access control rules for evey cube in your data schema. Cube.js uses request and the security context claims in the JWT token to generate a SQL query, which includes row-level constraints from the access control rules.
 
 Cube.js uses [JSON Web Tokens (JWT)][link-jwt] which should be passed in the
-`Authorization` header to authenticate requests. JWTs can also be used for
-passing additional information about the user, which can be accessed in the
-[USER_CONTEXT][link-user-context] object in the Data Schema.
+`Authorization: <JWT>` header to authenticate requests.
+
+JWTs can also be used to pass additional information about the user, known as a security context. It must be stored inside the **u** namespace. It will be accessible in the
+[USER_CONTEXT][link-user-context] object in the Data Schema and in [authInfo][link-authinfo] variable which is used to support [Multitenancy][link-multitenancy].
+
+In the example
+below **user_id**, located inside the **u** namespace, will be passed inside the
+security context and will be accessible in the [USER_CONTEXT][link-user-context] object.
+
+```json
+{
+  "sub": "1234567890",
+  "iat": 1516239022,
+  "u": {
+    "user_id": 131
+  }
+}
+```
 
 [link-jwt]: https://jwt.io/
 [link-user-context]: /cube#context-variables-user-context
-
-The `Authorization` header is parsed and the JWT's contents set to the
-[authInfo][link-authinfo] variable which can be used to support
-[Multitenancy][link-multitenancy].
-
-[link-authinfo]: /@cubejs-backend-server-core#authinfo
+[link-authinfo]: /config#authinfo
 [link-multitenancy]: /multitenancy-setup
 
-Cube.js tokens are designed to work well in microservice-based environments. A
-typical use case would be:
+
+Authentication is handled outside of Cube.js. A typical use case would be:
 
 1. A web server serves an HTML page containing the Cube.js client, which needs
    to communicate securely with the Cube.js API.
@@ -40,16 +50,11 @@ typical use case would be:
 3. The JavaSript client is initialized using this token, and includes it in
    calls to the Cube.js API.
 
-If you are using the [REST API][link-rest-api] you must pass the API token via
-the Authorization Header. The Cube.js JavaScript client accepts an
-authentication token as the first argument to the
-[`cubejs(authToken, options)`][link-cubejs-client-core-ref] function.
-
 [link-rest-api]: /rest-api
 [link-cubejs-client-core-ref]: /@cubejs-client-core#cubejs
 
-**In development mode, the token is not required for authorization**, but you
-can still use it to [pass a security context][link-security-context].
+[[info | ]]
+| **In development mode, the token is not required for authorization**, but you can still use it to [pass a security context][link-security-context].
 
 [link-security-context]: /security#security-context
 
@@ -143,11 +148,11 @@ a token with this json structure:
 
 ```json
 {
-  "u": { "id": 42 }
+  "u": { "user_id": 42 }
 }
 ```
 
-In this case, the `{ "id": 42 }` object will be accessible as
+In this case, the `{ "user_id": 42 }` object will be accessible as
 [USER_CONTEXT][link-user-context] in the Cube.js Data Schema.
 
 [link-user-context]: /cube#context-variables-user-context
@@ -162,7 +167,7 @@ filter the results.
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM public.orders WHERE ${USER_CONTEXT.id.filter('user_id')}`,
+  sql: `SELECT * FROM public.orders WHERE ${USER_CONTEXT.user_id.filter('user_id')}`,
 
   measures: {
     count: {
@@ -179,7 +184,7 @@ ID:
 const jwt = require('jsonwebtoken');
 const CUBE_API_SECRET = 'secret';
 
-const cubejsToken = jwt.sign({ u: { id: 42 } }, CUBEJS_API_SECRET, {
+const cubejsToken = jwt.sign({ u: { user_id: 42 } }, CUBEJS_API_SECRET, {
   expiresIn: '30d',
 });
 ```
