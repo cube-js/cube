@@ -1,6 +1,5 @@
 {
   "packages": [
-    "docs",
     "packages/*"
   ],
   "command": {
