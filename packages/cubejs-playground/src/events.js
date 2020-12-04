@@ -59,7 +59,10 @@ const track = async (event) => {
 };
 
 export const setAnonymousId = (anonymousId, props) => {
-  baseProps = props;
+  baseProps = {
+    anonymousId,
+    props
+  };
   track({ event: 'identify', anonymousId, ...props });
 };
 
