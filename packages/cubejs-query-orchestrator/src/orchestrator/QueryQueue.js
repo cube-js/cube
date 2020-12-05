@@ -38,7 +38,7 @@ export class QueryQueue {
       case 'memory':
       default:
         this.queueDriver = new LocalQueueDriver(queueDriverOptions);
-    } 
+    }
   }
 
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
