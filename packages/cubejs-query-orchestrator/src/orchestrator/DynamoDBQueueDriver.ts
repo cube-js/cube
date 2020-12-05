@@ -37,6 +37,7 @@ export class DynamoDBQueueDriverConnection {
 
   private readonly queue: typeof Entity;
   private readonly queueSize: typeof Entity; // TODO: Do we need this?
+  private readonly processingCounter: typeof Entity;
 
   constructor(driver: DynamoDBQueueDriver, options: any) {
     this.redisQueuePrefix = options.redisQueuePrefix;
@@ -72,9 +73,7 @@ export class DynamoDBQueueDriverConnection {
       // Define attributes
       attributes: {
         key: { partitionKey: true }, // flag as partitionKey
-        sk: { hidden: true, sortKey: true }, // flag as sortKey and mark hidden since we use composite
-        queryKey: ['sk', 0], // composite key mapping 
-        order: ['sk', 1], // composite key mapping
+        queryKey: { sortKey: true, type: 'string' }, // flag as sortKey 
         inserted: { type: 'number', map: 'GSI1sk' },
         keyScore: { type: 'number' },
         value: { type: 'string' }
@@ -98,6 +97,21 @@ export class DynamoDBQueueDriverConnection {
       // Assign it to our table
       table: this.table
     });
+
+    this.processingCounter = new Entity({
+      // Specify entity name
+      name: 'Queue',
+
+      // Define attributes
+      attributes: {
+        key: { partitionKey: true }, // flag as partitionKey
+        updated: { hidden: true, sortKey: true, type: 'string' }, // flag as sortKey and mark hidden because we don't care
+        id: { type: 'number' }
+      },
+
+      // Assign it to our table
+      table: this.table
+    });
   }
 
   async getDynamoDBResultPromise(resultListKey) {
@@ -111,12 +125,10 @@ export class DynamoDBQueueDriverConnection {
     const resultListKey = this.resultListKey(queryKey);
 
     // Check if queryKey is active query
-    const exists = await this.queue.query(
-      this.queriesDefKey(),
-      {
-        beginsWith: this.redisHash(queryKey)
-      }
-    )
+    const exists = await this.queue.get({
+      key: this.queriesDefKey(),
+      queryKey: this.redisHash(queryKey)
+    })
 
     console.log('EXISTS');
     console.log(exists);
@@ -140,7 +152,7 @@ export class DynamoDBQueueDriverConnection {
       // TODO: This is wrong atm - figure out which keys to use
       this.queue.delete({
         key: resultListKey,
-        order: item.order
+        queryKey: queryKey
       });
     }
 
@@ -231,49 +243,125 @@ export class DynamoDBQueueDriverConnection {
   }
 
   getActiveQueries() {
-    const activeQueriesResult = await this.queue.query(
-      this.activeRedisKey(), // partition key
-    );
+    const activeQueriesResult = await this.queue.query(this.activeRedisKey());
     console.log(activeQueriesResult);
 
     return activeQueriesResult.Items;
   }
 
   async getQueryAndRemove(queryKey) {
-    return null;
-    // const [query, ...restResult] = await this.redisClient.multi()
-    //   .hget([this.queriesDefKey(), this.redisHash(queryKey)])
-    //   .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
-    //   .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
-    //   .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
-    //   .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
-    //   .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
-    //   .del(this.queryProcessingLockKey(queryKey))
-    //   .execAsync();
-    // return [JSON.parse(query), ...restResult];
+    const redisHash = this.redisHash(queryKey);
+
+    const getQueryResult = this.queue.get({
+      key: this.queriesDefKey(),
+      queryKey: redisHash
+    })
+
+    if (!getQueryResult || !getQueryResult.Item) return;
+
+    const transactionOptions = {
+      TransactItems: [
+        {
+          Delete: this.queue.deleteParams({
+            key: this.activeRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.heartBeatRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.toProcessRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.recentRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.queriesDefKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.queryProcessingLockKey(queryKey),
+            queryKey: redisHash
+          })
+        }
+      ]
+    }
+
+    const transactionResult = await this.executeTransactWrite(transactionOptions);
+
+    // TODO: Figure out what this data is
+    return [JSON.parse(getQueryResult.Item), 'something']
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
-    return null;
-    // try {
-    //   await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
-    //   const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
-    //   if (processingId !== currentProcessId) {
-    //     return false;
-    //   }
+    const redisHash = this.redisHash(queryKey);
 
-    //   return this.redisClient.multi()
-    //     .lpush([this.resultListKey(queryKey), JSON.stringify(executionResult)])
-    //     .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
-    //     .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
-    //     .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
-    //     .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
-    //     .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
-    //     .del(this.queryProcessingLockKey(queryKey))
-    //     .execAsync();
-    // } finally {
-    //   await this.redisClient.unwatchAsync();
-    // }
+    const transactionOptions = {
+      TransactItems: [
+        {
+          Put: this.queue.updateParams({
+            key: this.resultListKey(queryKey),
+            queryKey: redisHash,
+            inserted: new Date().getTime()
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.activeRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.heartBeatRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.toProcessRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.recentRedisKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.queriesDefKey(),
+            queryKey: redisHash
+          })
+        },
+        {
+          Delete: this.queue.deleteParams({
+            key: this.queryProcessingLockKey(queryKey),
+            queryKey: redisHash
+          })
+        }
+      ]
+    }
+
+    const result = await this.executeTransactWrite(transactionOptions);
+    console.log('Transaction result');
+    console.log(result);
+
+    return result;
   }
 
   getOrphanedQueries() {
@@ -307,40 +395,50 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async getQueryStageState(onlyKeys) {
-    let request = this.redisClient.multi()
-      .zrange([this.activeRedisKey(), 0, -1])
-      .zrange([this.toProcessRedisKey(), 0, -1]);
+    // DynamoDB does NOT support transactional queries
+    const activeResult = this.queue.query(this.activeRedisKey());
+    const active = activeResult ? activeResult.Items : [];
+
+    const toProcessResult = this.queue.query(this.toProcessRedisKey());
+    const toProcess = toProcessResult ? toProcessResult.Items : [];
+
+    let allQueryDefs = [];
     if (!onlyKeys) {
-      request = request.hgetall(this.queriesDefKey());
+      const queriesResult = this.queue.query(this.queriesDefKey());
+      allQueryDefs = queriesResult ? queriesResult.Items : [];
     }
-    const [active, toProcess, allQueryDefs] = await request.execAsync();
+
+    // const [active, toProcess, allQueryDefs] = await request.execAsync();
     return [active, toProcess, R.map(q => JSON.parse(q), allQueryDefs || {})];
   }
 
   async getQueryDef(queryKey) {
-    // Query complexity for one item is the same as getitem
-    // https://forums.aws.amazon.com/thread.jspa?threadID=93743
-    const queryDefResult = await this.queue.query(
-      this.queriesDefKey(),
-      {
-        beginsWith: this.redisHash(queryKey) // we have to use beginswith instead of get because of our composite key
-      }
-    )
+    const queryDefResult = await this.queue.get({
+      key: this.queriesDefKey(),
+      queryKey: this.redisHash(queryKey)
+    })
 
     return queryDefResult && JSON.parse(queryDefResult.Item.value);
   }
 
   updateHeartBeat(queryKey) {
-    // TODO: I think this needs fixed. Heartbeat may not need to be unique SK?
-    // Or we get the value and then update the value. Since SK is composite
     return await this.queue.update({
       key: this.heartBeatRedisKey(),
+      queryKey: this.redisHash(queryKey),
       inserted: new Date().getTime()
     });
   }
 
   async getNextProcessingId() {
-    const id = await this.redisClient.incrAsync(this.processingIdKey());
+    const updateResult = await this.processingCounter.update({
+      key: this.processingIdKey(),
+      updated: new Date().getTime().toString(),
+      id: { $add: 1 }, // increment id size by 1
+    }, {
+      returnValues: 'updated_new'
+    })
+
+    const id = updateResult.Attributes.value;
     return id && id.toString();
   }
 

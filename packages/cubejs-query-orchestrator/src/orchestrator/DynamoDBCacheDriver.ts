@@ -35,6 +35,7 @@ export class DynamoDBCacheDriver {
       // Define attributes
       attributes: {
         key: { partitionKey: true }, // flag as partitionKey
+        sk: { sortKey: true }, // flag as sortKey and mark hidden because we do not care about it?
         value: { type: 'string' }, // set the attribute type to string
         [`${TTL_KEY}`]: { type: 'number' } // set the attribute type to number for ttl
       },
@@ -52,6 +53,7 @@ export class DynamoDBCacheDriver {
   public async set(key: string, value: any, expiration: number) {
     const item = {
       key,
+      sk: key,
       value: JSON.stringify(value),
       [`${TTL_KEY}`]: (new Date().getTime() + expiration) / 1000 // needs to be in seconds
     };
