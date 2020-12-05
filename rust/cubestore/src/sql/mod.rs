@@ -173,7 +173,7 @@ impl SqlServiceImpl {
         Ok(self
             .db
             .index_table()
-            .insert_row(Index::new(
+            .insert_row(Index::try_new(
                 name,
                 table.get_id(),
                 columns_to_write
@@ -181,7 +181,7 @@ impl SqlServiceImpl {
                     .map(|c| c.unwrap().clone())
                     .collect::<Vec<_>>(),
                 columns.len() as u64,
-            ))
+            )?)
             .await?)
     }
 
@@ -426,12 +426,31 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 | DataType::Blob(_)
                 | DataType::Bytea
                 | DataType::Array(_) => ColumnType::Bytes,
-                DataType::Decimal(_, _) => ColumnType::Int,
+                DataType::Decimal(precision, scale) => {
+                    let mut precision = precision.unwrap_or(18);
+                    let mut scale = scale.unwrap_or(0);
+                    if precision > 18 {
+                        precision = 18;
+                    }
+                    if scale > 5 {
+                        scale = 10;
+                    }
+                    if scale > precision {
+                        precision = scale;
+                    }
+                    ColumnType::Decimal {
+                        precision: precision as i32,
+                        scale: scale as i32,
+                    }
+                }
                 DataType::SmallInt | DataType::Int | DataType::BigInt | DataType::Interval => {
                     ColumnType::Int
                 }
                 DataType::Boolean => ColumnType::Boolean,
-                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Decimal,
+                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Decimal {
+                    precision: 18,
+                    scale: 10,
+                },
                 DataType::Timestamp => ColumnType::Timestamp,
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
@@ -443,7 +462,6 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                             custom
                         )));
                     }
-
                 }
                 DataType::Regclass => {
                     return Err(CubeError::user(
@@ -518,8 +536,38 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 }
                 TableValue::Int(val_int.unwrap())
             }
-            ColumnType::Decimal => {
-                return Err(CubeError::user("Decimal type not implemented.".to_string()));
+            ColumnType::Decimal { .. } => {
+                let decimal_val = match cell {
+                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
+                        v.parse::<f64>()
+                    }
+                    Expr::UnaryOp {
+                        op: UnaryOperator::Minus,
+                        expr,
+                    } => {
+                        if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+                            v.parse::<f64>().map(|v| v * -1.0)
+                        } else {
+                            return Err(CubeError::user(format!(
+                                "Can't parse decimal from, {:?}",
+                                cell
+                            )));
+                        }
+                    }
+                    _ => {
+                        return Err(CubeError::user(format!(
+                            "Can't parse decimal from, {:?}",
+                            cell
+                        )))
+                    }
+                };
+                if let Err(e) = decimal_val {
+                    return Err(CubeError::user(format!(
+                        "Can't parse decimal from, {:?}: {}",
+                        cell, e
+                    )));
+                }
+                TableValue::Decimal(decimal_val.unwrap().to_string())
             }
             ColumnType::Bytes => {
                 // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
@@ -782,6 +830,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn decimal() {
+        Config::run_test("decimal", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal(2), dec_value_1 decimal(18, 2))")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("INSERT INTO foo.values (id, dec_value, dec_value_1) VALUES (1, -153, 1), (2, 20.01, 3.5), (3, 20.30, 12.3), (4, 120.30, 43.12)")
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) from foo.values")
+                .await
+                .unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("7".to_string()), TableValue::Decimal("59.92".to_string())]));
+
+            let result = service
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) from foo.values where dec_value > 10")
+                .await
+                .unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160".to_string()), TableValue::Decimal("58.92".to_string())]));
+
+            let result = service
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value > 10")
+                .await
+                .unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160".to_string()), TableValue::Decimal("5.892".to_string())]));
+        })
+            .await;
+    }
+
+    #[tokio::test]
     async fn custom_types() {
         Config::run_test("custom_types", async move |services| {
             let service = services.sql_service;
@@ -797,7 +886,8 @@ mod tests {
                 .exec_query("INSERT INTO foo.values (int_value) VALUES (-153)")
                 .await
                 .unwrap();
-        }).await;
+        })
+        .await;
     }
 
     #[tokio::test]
