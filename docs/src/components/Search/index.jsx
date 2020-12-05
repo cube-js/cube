@@ -73,7 +73,7 @@ export default class Search extends Component {
 
   render() {
     return (
-      <div>
+      <div className={styles.searchBoxWrapper}>
         {this.state.open &&
           <Helmet
             bodyAttributes={{ class: cx(styles.noscroll, {

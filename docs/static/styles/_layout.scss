@@ -46,7 +46,7 @@ a {
 
 .docContent {
   @include body-text;
-  max-width: 920px;
+  max-width: $content-max-width;
 
   @media screen and (max-width: 576px) {
     font-size: 16px;
@@ -82,9 +82,16 @@ a {
   margin-bottom: 200px;
 }
 
+.searchBoxWrapper {
+  display: flex;
+  justify-content: center;
+}
+
 .searchBox {
   display: flex;
   margin-top: 25px;
+  width: 100%;
+  max-width: $content-max-width;
 
   @media screen and (max-width: 576px) {
     margin: 20px;
@@ -120,7 +127,7 @@ a {
   padding-bottom: 0;
 
   box-shadow: none;
-  font-size: 1.7rem;
+  font-size: 1rem;
 
   @media screen and (max-width: 576px) {
     line-height: 33px;
