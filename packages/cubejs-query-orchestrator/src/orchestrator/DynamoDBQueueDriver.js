@@ -125,21 +125,14 @@ export class DynamoDBQueueDriverConnection {
   async getResultBlocking(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
 
-    console.log('## CHECK IF EXISTS');
-    console.log('## KEY:', this.queriesDefKey());
-    console.log('## QUERY KEY:', this.redisHash(queryKey));
-
     // Check if queryKey is active query
     const exists = await this.queue.get({
       key: this.queriesDefKey(),
       queryKey: this.redisHash(queryKey)
     })
 
-    console.log('EXISTS');
-    console.log(exists);
-
     if (!exists || !exists.Item) {
-      return this.getResult(queryKey);
+      return await this.getResult(queryKey);
     }
 
     // First attempt at redis brpop emulation with dynamodb (copied from LocalQueueDriver)
@@ -165,14 +158,15 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async getResult(queryKey) {
-    const result = await this.queue.get({ key: this.resultListKey(queryKey), queryKey: this.redisHash(queryKey) });
+    const resultListKey = this.resultListKey(queryKey);
+    const result = await this.queue.get({ key: resultListKey, queryKey: this.redisHash(queryKey) });
     const data = result && result.Item && JSON.parse(result.Item.value);
 
     // We got our data so remove it
     if (result && result.Item) {
       this.queue.delete({
         key: resultListKey,
-        inserted: result.Item.inserted
+        queryKey: this.redisHash(queryKey)
       });
     }
 
@@ -320,18 +314,25 @@ export class DynamoDBQueueDriverConnection {
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
     const redisHash = this.redisHash(queryKey);
 
-    // await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
-    //   const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
-    //   if (processingId !== currentProcessId) {
-    //     return false;
-    //   }
+    const lockResult = await this.queue.get({
+      key: this.queryProcessingLockKey(queryKey),
+      queryKey: this.redisHash(queryKey)
+    })
+
+    if (lockResult && lockResult.Item) {
+      const currentProcessId = lockResult.Item.value;
+      if (processingId !== currentProcessId.toString()) {
+        return false;
+      }
+    }
 
     const transactionOptions = {
       TransactItems: [
         {
-          Put: this.queue.updateParams({
+          Put: this.queue.putParams({
             key: this.resultListKey(queryKey),
             queryKey: redisHash,
+            value: JSON.stringify(executionResult),
             inserted: new Date().getTime()
           })
         },
@@ -547,8 +548,10 @@ export class DynamoDBQueueDriverConnection {
       inserted: new Date().getTime()
     })
 
+    const activeKeys = queryActiveResult && queryActiveResult.Items ? queryActiveResult.Items.map(query => query.queryKey) : [];
+
     return [
-      added, null, queryActiveResult.Items, queueSize, queryData, lockAcquired
+      added, null, activeKeys, queueSize, queryData, lockAcquired
     ]; // TODO nulls
   }
 
