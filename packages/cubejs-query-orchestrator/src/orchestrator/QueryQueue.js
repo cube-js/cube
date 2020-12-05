@@ -4,6 +4,7 @@ import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
+import { DynamoDBQueueDriver } from './DynamoDBQueueDriver';
 
 export class QueryQueue {
   constructor(redisQueuePrefix, options) {

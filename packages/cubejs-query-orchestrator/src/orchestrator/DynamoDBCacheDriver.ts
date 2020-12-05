@@ -35,7 +35,7 @@ export class DynamoDBCacheDriver {
       // Define attributes
       attributes: {
         key: { partitionKey: true }, // flag as partitionKey
-        sk: { sortKey: true }, // flag as sortKey and mark hidden because we do not care about it?
+        sk: { hidden: true, sortKey: true, type: 'string' }, // flag as sortKey and mark hidden because we do not care about it?
         value: { type: 'string' }, // set the attribute type to string
         [`${TTL_KEY}`]: { type: 'number' } // set the attribute type to number for ttl
       },
@@ -46,7 +46,7 @@ export class DynamoDBCacheDriver {
   }
 
   public async get(key: string) {
-    const result = await this.cache.get({ key });
+    const result = await this.cache.get({ key, sk: key });
     return result && result.Item && JSON.parse(result.Item.value);
   }
 
@@ -62,22 +62,20 @@ export class DynamoDBCacheDriver {
   }
 
   public async remove(key: string) {
-    await this.cache.delete({ key });
+    await this.cache.delete({ key, sk: key });
   }
 
   public async keysStartingWith(prefix) {
-    const result = await this.table.scan({
-      limit: 100, // limit to 100 items
-      capacity: 'indexes', // return the total capacity consumed by the indexes
-      filters: [
-        { attr: 'key', beginsWith: prefix },
-        { attr: TTL_KEY, lt: new Date().getTime() } // only return items with TLL less than now
-      ], 
-    });
-
     // TODO: fix this
     console.log('### KEYS STARTING WITH RESULT');
-    console.log(result);
+
+    const result = await this.table.scan({
+      limit: 100, // limit to 100 items
+      filters: [
+        { attr: 'key', beginsWith: prefix },
+        { attr: TTL_KEY, lt: new Date().getTime() } // only return items with TTL less than now
+      ], 
+    });
     
     return result;
   }
