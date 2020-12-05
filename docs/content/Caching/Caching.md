@@ -83,7 +83,8 @@ One of those load data calls can't be traced to specific clients, and as a conse
 Only Refresh Key freshness guarantees are provided in this case.
 
 For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately.
-For these situations, the `refreshKey` cache can effectively be disabled by setting the [refreshKey every](cube#parameters-refresh-key) parameter to something very low, like `1 second`.
+For these situations, the cache can effectively be disabled by setting the [`refreshKey.every`](cube#parameters-refresh-key) parameter to something very low, like `1 second`.
+``
 
 ## Pre-Aggregations
 

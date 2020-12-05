@@ -467,8 +467,8 @@ For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReferen
 In development mode, Cube.js runs the background refresh by default and will
 refresh all the pre-aggregations marked with `scheduledRefresh` parameter.
 
-Please consult [production checklist][link-production-checklist-refresh] for best practices on running background
-refresh in the production.
+Please consult [Production Checklist][link-production-checklist-refresh] for best practices on running background
+refresh in production environments.
 
 [link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
 
