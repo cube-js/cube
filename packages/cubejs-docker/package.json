@@ -22,6 +22,7 @@
     "@cubejs-backend/prestodb-driver": "^0.24.3",
     "@cubejs-backend/server": "^0.24.3",
     "@cubejs-backend/snowflake-driver": "^0.20.9",
+    "@cubejs-backend/sqlite-driver": "^0.24.3",
     "cubejs-cli": "^0.24.3",
     "typescript": "~4.1.2"
   }
