@@ -100,49 +100,51 @@ export class DynamoDBQueueDriverConnection {
     });
   }
 
+  async getDynamoDBResultPromise(resultListKey) {
+    return this.queue.query(resultListKey)
+      .then((res) => {
+        return res;
+      })
+  }
+
   async getResultBlocking(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
 
-
-
-    // if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]))) {
-    //   return this.getResult(queryKey);
-    // }
-
-
     // Check if queryKey is active query
     const exists = await this.queue.query(
-      this.queriesDefKey()
-    );
-    if (!exists || !exists.Item) {
+      this.queriesDefKey(),
+      {
+        beginsWith: this.redisHash(queryKey)
+      }
+    )
+
+    console.log('EXISTS');
+    console.log(exists);
+
+    if (!exists || !exists.Items || exists.Items.length < 1) {
       return this.getResult(resultListKey);
     }
 
-    // First attempt at redis brpop emulation with dynamodb
-    // Basically run once per second for this.concurrency seconds
+    // First attempt at redis brpop emulation with dynamodb (copied from LocalQueueDriver)
+    const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
+    let result = await Promise.race([
+      this.getDynamoDBResultPromise(resultListKey),
+      timeoutPromise(this.continueWaitTimeout * 1000),
+    ]);
 
-    let result = undefined;
-    let runs = this.concurrency;
-    while (runs >= 0) {
-      result = await this.queue.get({ key: resultListKey });
-      if (result) { // Found the result
-        // Do we need to push and pop?
-        runs = 0;
-      } else {
-        --runs;
+    // We got our data so remove it
+    if (result && result.Items && result.Items[0]) {
+      const item = result.Items[0];
+      result = JSON.parse(item.value);
 
-        // Sleep for 1000ms
-        await new Promise(r => setTimeout(r, 1000));
-      }
+      // TODO: This is wrong atm - figure out which keys to use
+      this.queue.delete({
+        key: resultListKey,
+        order: item.order
+      });
     }
 
-    // const result = await this.redisClient.brpopAsync([resultListKey, this.continueWaitTimeout]);
-    // if (result) {
-    //   await this.redisClient.lpushAsync([resultListKey, result[1]]);
-    //   await this.redisClient.rpopAsync(resultListKey);
-    // }
-
-    return result && JSON.parse(result[1]);
+    return result;
   }
 
   public async getResult(resultListKey: string) {
@@ -166,24 +168,25 @@ export class DynamoDBQueueDriverConnection {
         {
           Update: this.queue.updateParams({
             key: this.toProcessRedisKey() + this.redisHash(queryKey),
-            inserted: time,
-            keyScore,
-            queryKey: this.redisHash(queryKey)
+            queryKey: this.redisHash(queryKey),
+            order: keyScore,
+            inserted: time
           })
         },
         {
           Update: this.queue.updateParams({
             key: this.recentRedisKey() + this.redisHash(queryKey),
+            queryKey: this.redisHash(queryKey),
+            order: time,
             inserted: time,
-            keyScore,
-            queryKey: this.redisHash(queryKey)
           })
         },
         {
           Update: this.queue.updateParams({
             key: this.queriesDefKey() + this.redisHash(queryKey),
-            inserted: time,
             queryKey: this.redisHash(queryKey),
+            order: time,
+            inserted: time,
             value: JSON.stringify({
               queryHandler,
               query,
