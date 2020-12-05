@@ -6,17 +6,15 @@ import logo from '../../pages/images/Logo.png';
 
 import styles from '../../../static/styles/index.module.scss';
 
-const { Header: AntHeader } = Layout;
-
 const Header = props => (
-  <AntHeader className={props.className}>
+  <Layout.Header className={props.className}>
     <div className={styles.searchDimmer}></div>
     <Row>
       <Col
-        xxl={{ span: 4, offset: 1 }}
-        xl={{ span: 5, offset: 1 }}
-        lg={{ span: 7, offset: 1 }}
-        md={{ span: 9, offset: 1 }}
+        xxl={4}
+        xl={5}
+        lg={7}
+        md={4}
         xs={24}
       >
         <div className={styles.logoWrapper}>
@@ -30,10 +28,10 @@ const Header = props => (
         </div>
       </Col>
       <Col
-        xxl={15}
-        xl={13}
+        xxl={16}
+        xl={14}
         lg={10}
-        md={14}
+        md={16}
         xs={0}
       >
         {props.children}
@@ -41,10 +39,12 @@ const Header = props => (
       <Col
         xxl={4}
         xl={5}
-        lg={5}
+        lg={7}
+        md={4}
         xs={0}
+        style={{ height: 'inherit', textAlign: 'right' }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div className={styles.headerButtonWrapper}>
           {/*<Button href="https://github.com/statsbotco/cube.js#community" className={styles.headerButton}>*/}
           {/*  Community*/}
           {/*</Button>*/}
@@ -59,7 +59,7 @@ const Header = props => (
         </div>
       </Col>
     </Row>
-  </AntHeader>
+  </Layout.Header>
 );
 
 Header.propTypes = {

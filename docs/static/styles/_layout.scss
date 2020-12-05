@@ -375,7 +375,6 @@ span.group-header {
 
   @media screen and (max-width: 767px) {
     max-height: calc(100% - 48px); // footer is fixed on mobile screen
-    padding-top: 95px;
     min-width: 95%;
   }
 
@@ -603,14 +602,16 @@ span.group-header {
 }
 
 .logoWrapper {
+  display: flex;
+  justify-content: center;
+
   @media screen and (max-width: 767px) {
     text-align: center;
   }
 }
 
 .logoDocs {
-  position: absolute;
-  margin-left: 4px;
+  margin-left: 0.25em;
   font-size: 24px;
   font-weight: normal;
 }
@@ -655,25 +656,41 @@ span.group-header {
   position: fixed;
   z-index: 1;
   width: 100%;
-  //border-bottom: 1px solid rgb(236, 236, 240);
   filter: drop-shadow(0px 0px 15px rgba(67, 67, 107, 0.1));
-  height: auto;
-  min-height: 66px;
+  height: $header-max-height;
+
+  > :global.ant-row {
+    height: inherit;
+  }
 
   @media screen and (max-width: 767px) {
-    position: relative;
 
     &.fixed {
       position: fixed;
     }
   }
 
+  .headerButtonWrapper {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+
+    a:first-child {
+      margin-left: 0;
+    }
+
+    a:last-child {
+      margin-right: 0;
+    }
+  }
+
   .headerButton {
-    display: inline-grid;
+    display: inline-flex;
     grid-auto-flow: column;
     place-content: center stretch;
     place-items: center stretch;
-    margin: 14px 5px 0 5px;
+    margin: 0 5px;
     border-radius: 4px;
     border: 1px solid #D5D5E2;
     background-color: transparent;
@@ -717,10 +734,9 @@ span.group-header {
 }
 
 .contentColumn {
-  margin-top: 66px;
+  margin-top: 64px;
 
   @media screen and (max-width: 767px) {
-    margin-top: 0;
     overflow-x: hidden;
 
     &.fixed {
