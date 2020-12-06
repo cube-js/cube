@@ -5,6 +5,7 @@ const DocumentClient = new DynamoDB.DocumentClient();
 const { Table, Entity } = require('dynamodb-toolbox');
 
 const TTL_KEY = process.env.DYNAMODB_TTL_KEY ?? 'exp';
+const CACHE_TABLE_PRIMARY_KEY = `SQL_QUERY_RESULT_${process.env.CUBEJS_APP}`;
 
 export class DynamoDBCacheDriver {
   public readonly tableName: string;
@@ -34,8 +35,8 @@ export class DynamoDBCacheDriver {
 
       // Define attributes
       attributes: {
-        key: { partitionKey: true }, // flag as partitionKey
-        sk: { hidden: true, sortKey: true, type: 'string' }, // flag as sortKey and mark hidden because we do not care about it?
+        pk: { partitionKey: true }, // flag as partitionKey
+        key: { sortKey: true, type: 'string' }, // flag as sortKey and mark hidden because we do not care about it?
         value: { type: 'string' }, // set the attribute type to string
         [`${TTL_KEY}`]: { type: 'number' } // set the attribute type to number for ttl
       },
@@ -46,37 +47,32 @@ export class DynamoDBCacheDriver {
   }
 
   public async get(key: string) {
-    const result = await this.cache.get({ key, sk: key });
+    const result = await this.cache.get({ pk: CACHE_TABLE_PRIMARY_KEY, key });
     return result && result.Item && JSON.parse(result.Item.value);
   }
 
   public async set(key: string, value: any, expiration: number) {
-    const item = {
+    await this.cache.put({
+      pk: CACHE_TABLE_PRIMARY_KEY,
       key,
-      sk: key,
       value: JSON.stringify(value),
       [`${TTL_KEY}`]: (new Date().getTime() + expiration) / 1000 // needs to be in seconds
-    };
-
-    await this.cache.put(item);
+    });
   }
 
   public async remove(key: string) {
-    await this.cache.delete({ key, sk: key });
+    await this.cache.delete({ pk: CACHE_TABLE_PRIMARY_KEY, key });
   }
 
   public async keysStartingWith(prefix) {
-    // TODO: fix this
+    // TODO: validate this works
     console.log('### KEYS STARTING WITH RESULT');
 
-    const result = await this.table.scan({
-      limit: 100, // limit to 100 items
-      filters: [
-        { attr: 'key', beginsWith: prefix },
-        { attr: TTL_KEY, lt: new Date().getTime() } // only return items with TTL less than now
-      ], 
+    const result = await this.cache.query(CACHE_TABLE_PRIMARY_KEY, {
+      limit: 50, // limit to 50 items
+      beginsWith: prefix
     });
-    
+
     return result;
   }
 }
