@@ -1,25 +1,26 @@
+const { Table, Entity } = require('dynamodb-toolbox');
 const DynamoDB = require('aws-sdk/clients/dynamodb');
 
 const DocumentClient = new DynamoDB.DocumentClient();
 
-const { Table, Entity } = require('dynamodb-toolbox');
-
 const TTL_KEY = process.env.DYNAMODB_TTL_KEY ?? 'exp';
-const CACHE_TABLE_PRIMARY_KEY = `SQL_QUERY_RESULT_${process.env.CUBEJS_APP}`;
+const CACHE_TABLE_PRIMARY_KEY = `SQL_QUERY_RESULT_CACHE_${process.env.CUBEJS_APP || 'cubejs'}`;
 
 export class DynamoDBCacheDriver {
-  public readonly tableName: string;
+  /**
+   * The dynamo-toolbox table where cache will be written
+   */
+  table;
 
-  public readonly table: any;
+  /**
+   * The dynamo-toolbox cache entitity
+   */
+  cache;
 
-  public readonly cache: any;
-
-  constructor({ tableName }) {
-    this.tableName = tableName ?? process.env.CUBEJS_CACHE_TABLE;
-
+  constructor() {
     this.table = new Table({
       // Specify table name (used by DynamoDB)
-      name: this.tableName,
+      name: process.env.CUBEJS_CACHE_TABLE,
 
       // Define partition key
       partitionKey: 'pk',
@@ -46,12 +47,12 @@ export class DynamoDBCacheDriver {
     });
   }
 
-  public async get(key: string) {
+  async get(key) {
     const result = await this.cache.get({ pk: CACHE_TABLE_PRIMARY_KEY, key });
     return result && result.Item && JSON.parse(result.Item.value);
   }
 
-  public async set(key: string, value: any, expiration: number) {
+  async set(key, value, expiration) {
     await this.cache.put({
       pk: CACHE_TABLE_PRIMARY_KEY,
       key,
@@ -60,11 +61,11 @@ export class DynamoDBCacheDriver {
     });
   }
 
-  public async remove(key: string) {
+  async remove(key) {
     await this.cache.delete({ pk: CACHE_TABLE_PRIMARY_KEY, key });
   }
 
-  public async keysStartingWith(prefix) {
+  async keysStartingWith(prefix) {
     // TODO: validate this works
     console.log('### KEYS STARTING WITH RESULT');
 

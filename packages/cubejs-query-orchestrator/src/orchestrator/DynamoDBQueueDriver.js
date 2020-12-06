@@ -133,7 +133,7 @@ export class DynamoDBQueueDriverConnection {
     });
 
     if (!exists || !exists.Item) {
-      return await this.getResult(queryKey);
+      return this.getResult(queryKey);
     }
 
     // First attempt at redis brpop emulation with dynamodb (copied from LocalQueueDriver)
@@ -367,7 +367,7 @@ export class DynamoDBQueueDriverConnection {
       ]
     };
 
-    return await this.executeTransactWrite(transactionOptions);
+    return this.executeTransactWrite(transactionOptions);
   }
 
   async getOrphanedQueries() {
@@ -610,7 +610,6 @@ export class DynamoDBQueueDriverConnection {
     throw new Error(`Can't update ${queryKey} with ${JSON.stringify(toUpdate)}`);
   }
 
-  // https://github.com/aws/aws-sdk-js/issues/2464#issuecomment-503524701
   executeTransactWrite(params) {
     const transactionRequest = this.table.DocumentClient.transactWrite(params);
     return this.executeTransaction(transactionRequest);
@@ -621,6 +620,7 @@ export class DynamoDBQueueDriverConnection {
     return this.executeTransaction(transactionRequest);
   }
 
+  // https://github.com/aws/aws-sdk-js/issues/2464#issuecomment-503524701
   executeTransaction(transactionRequest) {
     let cancellationReasons;
     transactionRequest.on('extractError', (response) => {
@@ -634,7 +634,7 @@ export class DynamoDBQueueDriverConnection {
     return new Promise((resolve, reject) => {
       transactionRequest.send((err, response) => {
         if (err) {
-          // console.error('Error performing transaction', { cancellationReasons, err });
+          console.error('Error performing transaction', { cancellationReasons, err });
           return reject(err);
         }
         return resolve(response);
