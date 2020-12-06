@@ -6,5 +6,8 @@
   "*.scss": [
   ],
   "*.js?(x)": [
+  ],
+  "*.ts?(x)": [
+    "prettier --write"
   ]
 }
