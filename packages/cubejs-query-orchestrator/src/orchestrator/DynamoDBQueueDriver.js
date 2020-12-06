@@ -126,8 +126,6 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async getResultBlocking(queryKey) {
-    const resultListKey = this.resultListKey(queryKey);
-
     // Check if queryKey is active query
     const exists = await this.queue.get({
       key: this.queriesDefKey(),
@@ -135,10 +133,11 @@ export class DynamoDBQueueDriverConnection {
     });
 
     if (!exists || !exists.Item) {
-      return this.getResult(queryKey);
+      return await this.getResult(queryKey);
     }
 
     // First attempt at redis brpop emulation with dynamodb (copied from LocalQueueDriver)
+    const resultListKey = this.resultListKey(queryKey);
     const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
     let result = await Promise.race([
       this.getDynamoDBResultPromise(resultListKey),
@@ -150,8 +149,10 @@ export class DynamoDBQueueDriverConnection {
       const item = result.Items[0];
       result = JSON.parse(item.value);
 
-      // TODO: This is wrong atm - figure out which keys to use
-      this.queue.delete({
+      console.log('### WE GOT A RESULT???');
+      console.log(result);
+
+      await this.queue.delete({
         key: resultListKey,
         queryKey: this.redisHash(queryKey)
       });
@@ -167,7 +168,7 @@ export class DynamoDBQueueDriverConnection {
 
     // We got our data so remove it
     if (result && result.Item) {
-      this.queue.delete({
+      await this.queue.delete({
         key: resultListKey,
         queryKey: this.redisHash(queryKey)
       });
@@ -177,27 +178,29 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async addToQueue(keyScore, queryKey, time, queryHandler, query, priority, options) {
+    const redisHash = this.redisHash(queryKey);
+
     const transactionOptions = {
       TransactItems: [
         {
-          Update: this.queue.updateParams({
+          Put: this.queue.putParams({
             key: this.toProcessRedisKey(),
-            queryKey: this.redisHash(queryKey),
+            queryKey: redisHash,
             keyScore,
             inserted: time
           })
         },
         {
-          Update: this.queue.updateParams({
+          Put: this.queue.putParams({
             key: this.recentRedisKey(),
-            queryKey: this.redisHash(queryKey),
+            queryKey: redisHash,
             inserted: time,
           })
         },
         {
-          Update: this.queue.updateParams({
+          Put: this.queue.putParams({
             key: this.queriesDefKey(),
-            queryKey: this.redisHash(queryKey),
+            queryKey: redisHash,
             inserted: time,
             value: JSON.stringify({
               queryHandler,
@@ -220,7 +223,12 @@ export class DynamoDBQueueDriverConnection {
       ]
     };
 
-    await this.executeTransactWrite(transactionOptions);
+    try {
+      await this.executeTransactWrite(transactionOptions);
+    } catch (err) {
+      console.error('### ERROR IN ADD TO QUEUE TRANSACTION');
+      return [0, 0, 0, 0];
+    }
 
     let queueSize;
     const queueSizeResult = await this.queueSize.get({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY });
@@ -232,22 +240,17 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async getToProcessQueries() {
-    const queriesResult = await this.queue.query(
-      this.toProcessRedisKey(), // partition key
-    );
-    console.log(queriesResult);
-
-    return queriesResult.Items;
+    const queriesResult = await this.queue.query(this.toProcessRedisKey());
+    return queriesResult && queriesResult.Items ? queriesResult.Items.map(item => item.queryKey) : [];
   }
 
   async getActiveQueries() {
     const activeQueriesResult = await this.queue.query(this.activeRedisKey());
-    console.log(activeQueriesResult);
-
-    return activeQueriesResult.Items;
+    return activeQueriesResult && activeQueriesResult.Items ? activeQueriesResult.Items.map(item => item.queryKey) : [];
   }
 
   async getQueryAndRemove(queryKey) {
+    console.log('### GET QUERY AND REMOVE ###');
     const redisHash = this.redisHash(queryKey);
 
     const getQueryResult = await this.queue.get({
@@ -255,7 +258,10 @@ export class DynamoDBQueueDriverConnection {
       queryKey: redisHash
     });
 
-    if (!getQueryResult || !getQueryResult.Item) return;
+    console.log('### GET QUERY RESULT ###');
+    console.log(getQueryResult);
+
+    if (!getQueryResult || !getQueryResult.Item) return [];
 
     const transactionOptions = {
       TransactItems: [
@@ -298,10 +304,12 @@ export class DynamoDBQueueDriverConnection {
       ]
     };
 
+    // TODO: I removed the await here
     await this.executeTransactWrite(transactionOptions);
 
-    // TODO: Figure out what this data is
-    return [JSON.parse(getQueryResult.Item)];
+    console.log('### RETURNING FROM HERE ###');
+
+    return [JSON.parse(getQueryResult.Item.value), 'TODO - empty'];
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
@@ -309,8 +317,11 @@ export class DynamoDBQueueDriverConnection {
 
     const lockResult = await this.queue.get({
       key: this.queryProcessingLockKey(queryKey),
-      queryKey: this.redisHash(queryKey)
+      queryKey: redisHash
     });
+
+    console.log('### LOCK RESULT:');
+    console.log(lockResult);
 
     if (lockResult && lockResult.Item) {
       const currentProcessId = lockResult.Item.value;
@@ -368,7 +379,7 @@ export class DynamoDBQueueDriverConnection {
       ]
     };
 
-    return this.executeTransactWrite(transactionOptions);
+    return await this.executeTransactWrite(transactionOptions);
   }
 
   async getOrphanedQueries() {
@@ -425,7 +436,7 @@ export class DynamoDBQueueDriverConnection {
       queryKey: this.redisHash(queryKey)
     });
 
-    return queryDefResult && JSON.parse(queryDefResult.Item.value);
+    return queryDefResult && queryDefResult.Item && JSON.parse(queryDefResult.Item.value);
   }
 
   updateHeartBeat(queryKey) {
@@ -449,6 +460,9 @@ export class DynamoDBQueueDriverConnection {
     });
 
     const { id } = updateResult.Attributes;
+
+    console.log('### NEXT PROCESSING ID:', id);
+
     return id && id.toString();
   }
 
@@ -467,6 +481,8 @@ export class DynamoDBQueueDriverConnection {
         queryKey: this.redisHash(queryKey),
         value: processingId
       });
+
+      console.log('--- LOCK ACQUIRED:', this.redisHash(queryKey));
 
       lockAcquired = true;
     } else {
@@ -515,13 +531,10 @@ export class DynamoDBQueueDriverConnection {
     const added = 1;
 
     // Query active -> concurrency limit
-    const queryActiveResult = await this.queue.query(
-      this.activeRedisKey(),
-      {
-        limit: this.concurrency,
-        index: 'GSI1' // Orders by GSIsk which is inserted time
-      }
-    );
+    const queryActiveResult = await this.queue.query(this.activeRedisKey(), {
+      limit: this.concurrency,
+      index: 'GSI1' // Orders by GSIsk which is inserted time
+    });
 
     // Get number of members in toProcess (queueSize)
     // Get the query to process
@@ -533,8 +546,14 @@ export class DynamoDBQueueDriverConnection {
     };
 
     const getTransactionResult = await this.executeTransactGet(getItemsTransactionOptions);
+
+    console.log('### GET TRANSACTION RESULT:', this.redisHash(queryKey));
+    console.log(getTransactionResult.Responses);
+
     const queueSize = getTransactionResult.Responses[0].Item.size ?? undefined;
-    const queryData = JSON.parse(getTransactionResult.Responses[1].Item.value);
+    const queryData = getTransactionResult.Responses[1] && getTransactionResult.Responses[1].Item
+      ? JSON.parse(getTransactionResult.Responses[1].Item.value)
+      : undefined;
 
     // Add the heartbeat
     await this.queue.put({
@@ -553,11 +572,14 @@ export class DynamoDBQueueDriverConnection {
   }
 
   async freeProcessingLock(queryKey, processingId, activated) {
+    console.log('### FREE PROCESSING LOCK:', this.redisHash(queryKey));
     const lockKey = this.queryProcessingLockKey(queryKey);
     const currentProcessIdResult = await this.queue.get({
       key: lockKey,
       queryKey: this.redisHash(queryKey)
     });
+
+    console.log('### currentProcessIdResult:', currentProcessIdResult);
 
     if (currentProcessIdResult
       && currentProcessIdResult.Item
@@ -578,7 +600,7 @@ export class DynamoDBQueueDriverConnection {
       return null;
     }
 
-    return currentProcessIdResult.Item.value;
+    return currentProcessIdResult && currentProcessIdResult.Item && currentProcessIdResult.Item.value;
   }
 
   async optimisticQueryUpdate(queryKey, toUpdate, processingId) {
@@ -636,7 +658,7 @@ export class DynamoDBQueueDriverConnection {
     return new Promise((resolve, reject) => {
       transactionRequest.send((err, response) => {
         if (err) {
-          console.error('Error performing transactGet', { cancellationReasons, err });
+          // console.error('Error performing transaction', { cancellationReasons, err });
           return reject(err);
         }
         return resolve(response);

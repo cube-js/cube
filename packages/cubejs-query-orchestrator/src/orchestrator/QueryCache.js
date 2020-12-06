@@ -142,6 +142,7 @@ export class QueryCache {
     priority, cacheKey, external, requestId
   }) {
     const queue = external ? this.getExternalQueue() : this.getQueue();
+
     return queue.executeInQueue('query', cacheKey, {
       queryKey: cacheKey, query, values, requestId
     }, priority, {

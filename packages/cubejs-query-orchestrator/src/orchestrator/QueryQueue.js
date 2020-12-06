@@ -139,6 +139,8 @@ export class QueryQueue {
         await redisClient.getOrphanedQueries()
       );
 
+      console.log('### TO CANCEL:', toCancel);
+
       await Promise.all(toCancel.map(async queryKey => {
         const [query] = await redisClient.getQueryAndRemove(queryKey);
         if (query) {
@@ -236,6 +238,7 @@ export class QueryQueue {
       if (!query) {
         query = await redisClient.getQueryDef(this.redisHash(queryKey));
       }
+
       if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
         const startQueryTime = (new Date()).getTime();
@@ -248,6 +251,8 @@ export class QueryQueue {
           requestId: query.requestId,
           timeInQueue
         });
+        console.log('# ABOUT TO RUN OPTIMISTIC QUERY UPDATE:')
+        console.log(queryKey);
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
         const heartBeatTimer = setInterval(
