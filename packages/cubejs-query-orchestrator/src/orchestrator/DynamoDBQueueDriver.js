@@ -144,9 +144,6 @@ export class DynamoDBQueueDriverConnection {
       timeoutPromise(this.continueWaitTimeout * 1000),
     ]);
 
-    console.log('## WE GOT A RESULT???');
-    console.log(result);
-
     // We got our data so remove it
     if (result && result.Items && result.Items[0]) {
       const item = result.Items[0];
