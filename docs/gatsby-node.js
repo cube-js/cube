@@ -1,10 +1,10 @@
 const path = require('path');
-const { renameCategory } = require('./rename-category.js');
+const { renameCategory } = require('./src/rename-category.js');
 
 exports.createPages = ({ actions, graphql }) => {
   const { createPage } = actions;
 
-  const DocTemplate = path.resolve('src/templates/DocTemplate.jsx');
+  const DocTemplate = path.resolve('src/templates/DocTemplate.tsx');
 
   return graphql(`{
     allMarkdownRemark(

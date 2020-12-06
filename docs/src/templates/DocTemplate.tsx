@@ -9,7 +9,7 @@ import PropTypes from 'prop-types';
 import kebabCase from 'lodash/kebabCase';
 import get from 'lodash/get';
 import last from 'lodash/last';
-import { renameCategory } from '../../rename-category';
+import { renameCategory } from '../rename-category';
 
 import ScrollLink, { SCROLL_OFFSET } from '../components/templates/ScrollSpyLink';
 

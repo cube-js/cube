@@ -1,5 +1,5 @@
 import React from "react"
-import Head from './Head.jsx';
+import Head from './Head';
 
 class HTML extends React.Component {
   render() {

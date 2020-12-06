@@ -17,7 +17,7 @@ import FrameworkSwitcher from '../templates/FrameworkSwitcher';
 
 import styles from '../../../static/styles/index.module.scss';
 import '../../../static/styles/prism.scss';
-import { renameCategory } from '../../../rename-category';
+import { renameCategory } from '../../rename-category';
 
 // trim leading and trailing slashes
 export const trimSlashes = (str) => str.replace(/^\/|\/$/g, '');

@@ -37,7 +37,7 @@ const config = {
     {
       resolve: `gatsby-plugin-layout`,
       options: {
-        component: require.resolve(`./src/components/Layout/index.jsx`)
+        component: require.resolve(`./src/components/Layout/index.tsx`)
       }
     },
     {
@@ -51,6 +51,14 @@ const config = {
       options: {
         name: 'cubejs-docs',
         path: `${__dirname}/content/`,
+      },
+    },
+    {
+      resolve: 'gatsby-plugin-typescript',
+      options: {
+        isTSX: true, // defaults to false
+        jsxPragma: 'jsx', // defaults to "React"
+        allExtensions: true, // defaults to false
       },
     },
     {
