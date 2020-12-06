@@ -5,16 +5,24 @@ import Link from './Link';
 
 import { trimSlashes } from '../Layout';
 
-const MenuItem = props => (
+type Props = {
+  selectedKeys?: string[];
+  to: string;
+  title: string;
+};
+
+const MenuItem: React.FC<Props> = (props) => (
   <Menu.Item
     {...props}
     title={null}
-    className={cx({'ant-menu-item-selected': props.selectedKeys.includes(trimSlashes(props.to))})}
+    className={cx({
+      'ant-menu-item-selected': props.selectedKeys?.includes(
+        trimSlashes(props.to)
+      ),
+    })}
     key={trimSlashes(props.to)}
   >
-    <Link to={props.to}>
-      {props.title}
-    </Link>
+    <Link to={props.to}>{props.title}</Link>
   </Menu.Item>
 );
 

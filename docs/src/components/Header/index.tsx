@@ -1,19 +1,14 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 
 import Header from './Desktop';
 import MobileSearch from './MobileSearch';
 
-const HeaderWrapper = props => (
-  props.mobileSearch ? <MobileSearch {...props} /> : <Header {...props} />
-)
+type Props = {
+  className: string;
+  mobileSearch?: boolean;
+};
 
-HeaderWrapper.propTypes = {
-  mobileSearch: PropTypes.bool
-}
-
-HeaderWrapper.defaultProps = {
-  mobileSearch: false
-}
+const HeaderWrapper: React.FC<Props> = ({ mobileSearch = false, ...props }) =>
+  mobileSearch ? <MobileSearch {...props} /> : <Header {...props} />;
 
 export default HeaderWrapper;

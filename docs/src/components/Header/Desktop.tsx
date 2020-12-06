@@ -1,12 +1,15 @@
 import React from 'react';
 import { Layout, Row, Col, Button, Icon } from 'antd';
-import PropTypes from 'prop-types';
 
 import logo from '../../pages/images/Logo.png';
 
 import styles from '../../../static/styles/index.module.scss';
 
-const Header = props => (
+type Props = {
+  className?: string;
+};
+
+const Header: React.FC<Props> = (props) => (
   <Layout.Header className={props.className}>
     <div className={styles.searchDimmer}></div>
     <Row>
@@ -48,12 +51,20 @@ const Header = props => (
           {/*<Button href="https://github.com/statsbotco/cube.js#community" className={styles.headerButton}>*/}
           {/*  Community*/}
           {/*</Button>*/}
-          <Button href="https://cubejs-community.herokuapp.com/" target="_blank" className={styles.headerButton}>
-            <Icon style={{ fontSize: '22px' }} type="slack"/>
+          <Button
+            href="https://cubejs-community.herokuapp.com/"
+            target="_blank"
+            className={styles.headerButton}
+          >
+            <Icon style={{ fontSize: '22px' }} type="slack" />
             Slack
           </Button>
-          <Button href="https://github.com/cube-js/cube.js" target="_blank" className={styles.headerButton}>
-            <Icon style={{ fontSize: '22px' }} type="github"/>
+          <Button
+            href="https://github.com/cube-js/cube.js"
+            target="_blank"
+            className={styles.headerButton}
+          >
+            <Icon style={{ fontSize: '22px' }} type="github" />
             Github
           </Button>
         </div>
@@ -61,13 +72,5 @@ const Header = props => (
     </Row>
   </Layout.Header>
 );
-
-Header.propTypes = {
-  className: PropTypes.string
-}
-
-Header.defaultProps = {
-  className: ''
-}
 
 export default Header;

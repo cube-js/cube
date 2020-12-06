@@ -1,6 +1,6 @@
 declare module '*.scss' {
-  const src: string;
-  export default src;
+  const content: { [className: string]: string };
+  export default content;
 }
 
 declare module '*.png' {

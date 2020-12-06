@@ -5,9 +5,14 @@ import styles from '../../../static/styles/index.module.scss';
 export const SCROLL_OFFSET = -66;
 export const SCROLL_DURATION = 300;
 
+type Props = {
+  activeClass?: string;
+  className?: string;
+  to: string;
+};
 
-const ScrollLink = props => (
-  <div className={styles.scrollspyLinkWrapper} >
+const ScrollLink: React.FC<Props> = (props) => (
+  <div className={styles.scrollspyLinkWrapper}>
     <Link
       offset={SCROLL_OFFSET}
       smooth

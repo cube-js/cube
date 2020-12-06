@@ -10,24 +10,29 @@ import imgInsights from './images/insights.svg';
 import imgDashboards from './images/dashboards.svg';
 
 import styles from '../../static/styles/index.module.scss';
+import { Page, Scopes, SetScrollSectionsAndGithubUrlFunction } from '../types';
 
-class IndexPage extends Component {
+type Props = {
+  changePage(page: Page): void;
+  setScrollSectionsAndGithubUrl: SetScrollSectionsAndGithubUrlFunction;
+};
+
+class IndexPage extends Component<Props> {
   componentWillMount() {
-    this.props.changePage({ scope: 'default', category: 'Index' });
+    this.props.changePage({ scope: Scopes.DEFAULT, category: 'Index' });
     this.props.setScrollSectionsAndGithubUrl([], '');
   }
 
   render() {
     return (
       <div className={styles.docContent}>
-        <Helmet
-          title="Main | Cube.js Docs"
-        />
+        <Helmet title="Main | Cube.js Docs" />
         <h1>Documentation</h1>
         <Row>
           <Col span={24}>
             <p>
-              Read about major concepts, dive into technical details or follow practical examples to learn how Cube.js works.
+              Read about major concepts, dive into technical details or follow
+              practical examples to learn how Cube.js works.
             </p>
           </Col>
         </Row>

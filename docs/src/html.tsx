@@ -1,9 +1,18 @@
-import React from "react"
+import React from 'react';
 import Head from './Head';
 
-class HTML extends React.Component {
-  render() {
+export type HTMLProps = {
+  css?: any;
+  htmlAttributes: any;
+  headComponents: any;
+  bodyAttributes: any;
+  body: any;
+  preBodyComponents: any;
+  postBodyComponents: any;
+};
 
+class HTML extends React.Component<HTMLProps> {
+  render() {
     return (
       <html {...this.props.htmlAttributes}>
         <Head headComponents={this.props.headComponents} />
@@ -17,8 +26,8 @@ class HTML extends React.Component {
           {this.props.postBodyComponents}
         </body>
       </html>
-    )
+    );
   }
-};
+}
 
 export default HTML;
