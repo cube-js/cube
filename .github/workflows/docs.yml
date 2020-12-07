@@ -37,3 +37,5 @@ jobs:
         run: sh ./docs-gen.sh
       - name: Build Gatsby site
         run: sh ./deploy-production.sh
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
