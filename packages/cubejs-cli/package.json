@@ -15,9 +15,9 @@
     "cubejs": "dist/index.js"
   },
   "scripts": {
+    "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "build": "tsc",
     "test": "npm run unit",
     "unit": "jest dist",
     "lint": "linter src/* --ext .ts,.js",

@@ -46,7 +46,7 @@ jobs:
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-client/vue build
+        run: yarn lerna run --concurrency 1 build
       - name: Set NPM token
         run: echo //registry.npmjs.org/:_authToken=$NPM_TOKEN > ~/.npmrc
         env:
