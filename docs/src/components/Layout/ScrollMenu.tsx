@@ -48,7 +48,7 @@ const defaultProps: Partial<Props> = {
 const ScrollMenu: React.FC<Props> = (props) => {
   const mergedProps = { ...defaultProps, ...props };
   return (
-    <Col xxl={{ span: 3, offset: 1 }} xl={{ span: 4, offset: 1 }} xs={0}>
+    <Col xxl={4} xl={5} xs={0}>
       <div className={styles.scrollspy}>
         {mergedProps.sections.length > 1 && (
           <EditPage githubUrl={mergedProps.githubUrl} />
