@@ -55,7 +55,7 @@ impl CubeServices {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FileStoreProvider {
     Local,
     Filesystem { remote_dir: PathBuf },
@@ -70,19 +70,34 @@ pub struct Config {
 pub trait ConfigObj: Send + Sync {
     fn partition_split_threshold(&self) -> u64;
 
+    fn compaction_chunks_total_size_threshold(&self) -> u64;
+
+    fn compaction_chunks_count_threshold(&self) -> u64;
+
     fn select_worker_pool_size(&self) -> usize;
 }
 
+#[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
-    partition_split_threshold: u64,
-    data_dir: PathBuf,
-    store_provider: FileStoreProvider,
-    select_worker_pool_size: usize,
+    pub partition_split_threshold: u64,
+    pub compaction_chunks_total_size_threshold: u64,
+    pub compaction_chunks_count_threshold: u64,
+    pub data_dir: PathBuf,
+    pub store_provider: FileStoreProvider,
+    pub select_worker_pool_size: usize,
 }
 
 impl ConfigObj for ConfigObjImpl {
     fn partition_split_threshold(&self) -> u64 {
         self.partition_split_threshold
+    }
+
+    fn compaction_chunks_total_size_threshold(&self) -> u64 {
+        self.compaction_chunks_total_size_threshold
+    }
+
+    fn compaction_chunks_count_threshold(&self) -> u64 {
+        self.compaction_chunks_count_threshold
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -106,6 +121,8 @@ impl Config {
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::current_dir().unwrap().join(".cubestore").join("data"),
                 partition_split_threshold: 1000000,
+                compaction_chunks_count_threshold: 4,
+                compaction_chunks_total_size_threshold: 500000,
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -133,6 +150,8 @@ impl Config {
                     .unwrap()
                     .join(format!("{}-local-store", name)),
                 partition_split_threshold: 20,
+                compaction_chunks_count_threshold: 1,
+                compaction_chunks_total_size_threshold: 10,
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: env::current_dir()
                         .unwrap()
@@ -143,10 +162,17 @@ impl Config {
         }
     }
 
-    pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
-    where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+    pub fn update_config(&self, update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl) -> Config {
+        let new_config = self.config_obj.as_ref().clone();
+        Self {
+            config_obj: Arc::new(update_config(new_config))
+        }
+    }
+
+    pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
+        where
+            T: Future + Send + 'static,
+            T::Output: Send + 'static,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -159,23 +185,30 @@ impl Config {
             }
             *initialized = true;
         }
-        let config = Self::test(name);
 
-        let store_path = config.local_dir().clone();
-        let remote_store_path = config.remote_dir().clone();
+        let store_path = self.local_dir().clone();
+        let remote_store_path = self.remote_dir().clone();
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         {
-            let services = config.configure().await;
+            let services = self.configure().await;
             services.start_processing_loops().await.unwrap();
 
             test_fn(services.clone()).await;
 
             services.stop_processing_loops().await.unwrap();
         }
-        let _ = DB::destroy(&Options::default(), config.meta_store_path());
+        let _ = DB::destroy(&Options::default(), self.meta_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        Self::test(name).start_test(test_fn).await;
     }
 
     pub fn config_obj(&self) -> Arc<dyn ConfigObj> {
@@ -266,6 +299,7 @@ impl Config {
             cluster.clone(),
             remote_fs.clone(),
             event_receiver,
+            self.config_obj.clone()
         );
 
         CubeServices {

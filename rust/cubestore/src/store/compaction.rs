@@ -191,7 +191,7 @@ mod tests {
                     if i.get_id() == 1 {
                         10
                     } else {
-                        15
+                        16
                     }
                 })
                     .map(|i| Row::new(vec![TableValue::String(format!("foo{}", i))]))
@@ -213,13 +213,17 @@ mod tests {
         compaction_service.compact(1).await.unwrap();
         let partition_1 = metastore.get_partition(2).await.unwrap();
         assert_eq!(partition_1.get_row().get_min_val(), &None);
+        assert_eq!(partition_1.get_row().main_table_row_count(), 14);
         assert_eq!(
             partition_1.get_row().get_max_val(),
+            // 0, 0, 1, 1, 10, 11, 12, 13, 14, 15, 2, 2, 3, 3
             &Some(Row::new(vec![TableValue::String("foo3".to_string())]))
         );
         let partition_2 = metastore.get_partition(3).await.unwrap();
+        assert_eq!(partition_2.get_row().main_table_row_count(), 12);
         assert_eq!(
             partition_2.get_row().get_min_val(),
+            //  4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9
             &Some(Row::new(vec![TableValue::String("foo4".to_string())]))
         );
         assert_eq!(partition_2.get_row().get_max_val(), &None);

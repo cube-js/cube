@@ -831,7 +831,10 @@ mod tests {
 
     #[tokio::test]
     async fn decimal() {
-        Config::run_test("decimal", async move |services| {
+        Config::test("decimal").update_config(|mut c| {
+            c.partition_split_threshold = 2;
+            c
+        }).start_test(async move |services| {
             let service = services.sql_service;
 
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
@@ -842,7 +845,7 @@ mod tests {
                 .unwrap();
 
             service
-                .exec_query("INSERT INTO foo.values (id, dec_value, dec_value_1) VALUES (1, -153, 1), (2, 20.01, 3.5), (3, 20.30, 12.3), (4, 120.30, 43.12)")
+                .exec_query("INSERT INTO foo.values (id, dec_value, dec_value_1) VALUES (1, -153, 1), (2, 20.01, 3.5), (3, 20.30, 12.3), (4, 120.30, 43.12), (5, NULL, NULL), (6, NULL, NULL), (7, NULL, NULL), (NULL, NULL, NULL)")
                 .await
                 .unwrap();
 
@@ -866,6 +869,13 @@ mod tests {
                 .unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160".to_string()), TableValue::Decimal("5.892".to_string())]));
+
+            let result = service
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
+                .await
+                .unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-133".to_string()), TableValue::Decimal("0.45".to_string())]));
         })
             .await;
     }

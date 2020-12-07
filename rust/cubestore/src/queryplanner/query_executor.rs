@@ -130,6 +130,11 @@ impl QueryExecutor for QueryExecutorImpl {
             available_nodes,
         )?;
 
+        trace!(
+            "Router Query Physical Plan: {:#?}",
+            &split_plan
+        );
+
         let execution_time = SystemTime::now();
         let results = ctx.collect(split_plan.clone()).await;
         debug!(
@@ -144,12 +149,6 @@ impl QueryExecutor for QueryExecutorImpl {
             );
             debug!(
                 "Slow Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &split_plan
-            );
-        } else {
-            trace!(
-                "Router Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &split_plan
             );
@@ -187,6 +186,11 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let worker_plan = self.get_worker_split_plan(physical_plan);
 
+        trace!(
+            "Partition Query Physical Plan: {:#?}",
+            &worker_plan
+        );
+
         let execution_time = SystemTime::now();
         let results = ctx.collect(worker_plan.clone()).await;
         debug!(
@@ -201,12 +205,6 @@ impl QueryExecutor for QueryExecutorImpl {
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &worker_plan
-            );
-        } else {
-            trace!(
-                "Partition Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &worker_plan
             );
