@@ -34,9 +34,13 @@ a {
   }
 }
 
-.docContentWrapper {
+.contentWrapper {
   display: flex;
   justify-content: center;
+
+  > div {
+    width: 100%;
+  }
 
   @media screen and (max-width: 576px) {
     display: block;
@@ -44,8 +48,15 @@ a {
   }
 }
 
+.docContentWrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .docContent {
   @include body-text;
+  width: inherit;
   max-width: $content-max-width;
 
   @media screen and (max-width: 576px) {

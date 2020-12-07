@@ -246,7 +246,7 @@ class AppLayout extends React.Component<
                     <FrameworkSwitcher value={pageFrameworkOfChoice} />
                   )}
                   <Layout.Content
-                    className={styles.docContentWrapper}
+                    className={styles.contentWrapper}
                     style={{ margin: '0 24px 100px 24px' }}
                   >
                     {childrenWithProps}
