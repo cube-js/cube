@@ -6,6 +6,7 @@ import ScrollLink from '../templates/ScrollSpyLink';
 
 import styles from '../../../static/styles/index.module.scss';
 import { SectionWithoutNodes } from '../../types';
+import { layout } from '../../theme';
 
 const EditPage = ({ githubUrl }: { githubUrl: string }) => {
   return (
@@ -48,7 +49,7 @@ const defaultProps: Partial<Props> = {
 const ScrollMenu: React.FC<Props> = (props) => {
   const mergedProps = { ...defaultProps, ...props };
   return (
-    <Col xxl={4} xl={5} xs={0}>
+    <Col {...layout.rightSidebar.width}>
       <div className={styles.scrollspy}>
         {mergedProps.sections.length > 1 && (
           <EditPage githubUrl={mergedProps.githubUrl} />

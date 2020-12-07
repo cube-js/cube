@@ -4,6 +4,7 @@ import { Layout, Row, Col, Button, Icon } from 'antd';
 import logo from '../../pages/images/Logo.png';
 
 import styles from '../../../static/styles/index.module.scss';
+import { layout } from '../../theme';
 
 type Props = {
   className?: string;
@@ -13,13 +14,7 @@ const Header: React.FC<Props> = (props) => (
   <Layout.Header className={props.className}>
     <div className={styles.searchDimmer}></div>
     <Row>
-      <Col
-        xxl={4}
-        xl={5}
-        lg={7}
-        md={4}
-        xs={24}
-      >
+      <Col {...layout.leftSidebar.width} xs={24}>
         <div className={styles.logoWrapper}>
           <a href="/" className={styles.logo}>
             <img src={logo} alt="Logo" style={{ height: 36 }} />
@@ -30,20 +25,12 @@ const Header: React.FC<Props> = (props) => (
           </a>
         </div>
       </Col>
-      <Col
-        xxl={16}
-        xl={14}
-        lg={10}
-        md={16}
-        xs={0}
-      >
+      <Col {...layout.contentArea.width} lg={10} xs={0}>
         {props.children}
       </Col>
       <Col
-        xxl={4}
-        xl={5}
-        lg={7}
-        md={4}
+        {...layout.rightSidebar.width}
+        // md={4}
         xs={0}
         style={{ height: 'inherit', textAlign: 'right' }}
       >

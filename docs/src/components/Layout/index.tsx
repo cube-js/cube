@@ -29,6 +29,7 @@ import {
 } from '../../types';
 import { RouteComponentProps } from '@reach/router';
 import { MenuMode } from 'antd/lib/menu';
+import { layout } from '../../theme';
 
 // trim leading and trailing slashes
 export const trimSlashes = (str: string) => str.replace(/^\/|\/$/g, '');
@@ -236,10 +237,7 @@ class AppLayout extends React.Component<
                   {...menuProps}
                 />
                 <Col
-                  xxl={16}
-                  xl={14}
-                  lg={17}
-                  md={15}
+                  {...layout.contentArea.width}
                   xs={this.state.mobileMode === 'content' ? 24 : 0}
                 >
                   {pageFrameworkOfChoice && (

@@ -14,6 +14,7 @@ import {
   Scopes,
 } from '../../types';
 import { MenuMode } from 'antd/lib/menu';
+import { layout } from '../../theme';
 
 const menuOrderCloud = ['Quickstart', 'Configuring Cube Cloud'];
 
@@ -77,7 +78,10 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
   const menuOrderResolved = isCloudDocs ? menuOrderCloud : menuOrder;
 
   return (
-    <Col xxl={4} xl={5} lg={7} md={9} xs={props.mobileMode === 'menu' ? 24 : 0}>
+    <Col
+      {...layout.leftSidebar.width}
+      xs={props.mobileMode === 'menu' ? 24 : 0}
+    >
       <div className={styles.menuWrapper}>
         <Menu {...menuProps} className={styles.antMenu}>
           <MenuItem to={isCloudDocs ? '/cloud' : '/'} title="Home" />
