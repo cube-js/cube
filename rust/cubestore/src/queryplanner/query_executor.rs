@@ -6,8 +6,10 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray,
-    TimestampNanosecondArray, UInt64Array,
+    Array, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array, Int64Decimal10Array,
+    Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array, Int64Decimal4Array,
+    Int64Decimal5Array, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
+    UInt64Array,
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
@@ -30,8 +32,10 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream};
 use itertools::Itertools;
-use log::{debug, trace, warn, error};
+use log::{debug, error, trace, warn};
 use mockall::automock;
+use num::BigInt;
+use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
@@ -197,6 +201,12 @@ impl QueryExecutor for QueryExecutorImpl {
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {:#?}",
+                execution_time.elapsed()?,
+                &worker_plan
+            );
+        } else {
+            trace!(
+                "Partition Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &worker_plan
             );
@@ -719,6 +729,31 @@ impl TableProvider for CubeTable {
     }
 }
 
+macro_rules! convert_array {
+    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, Decimal, $SCALE: expr) => {{
+        let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+        for i in 0..$NUM_ROWS {
+            $ROWS[i].push(if a.is_null(i) {
+                TableValue::Null
+            } else {
+                TableValue::Decimal(
+                    BigDecimal::new(BigInt::from(a.value(i) as i64), $SCALE).to_string(),
+                )
+            });
+        }
+    }};
+    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, $TABLE_TYPE: ident, $NATIVE: ty) => {{
+        let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+        for i in 0..$NUM_ROWS {
+            $ROWS[i].push(if a.is_null(i) {
+                TableValue::Null
+            } else {
+                TableValue::$TABLE_TYPE(a.value(i) as $NATIVE)
+            });
+        }
+    }};
+}
+
 pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
     let mut cols = vec![];
     let mut all_rows = vec![];
@@ -743,41 +778,49 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             rows.push(Row::new(Vec::with_capacity(batch.num_columns())));
         }
 
+        let cut_trailing_zeros = Regex::new(r"^(-?\d+\.[1-9]*)([0]+)$").unwrap();
+
         for column_index in 0..batch.num_columns() {
             let array = batch.column(column_index);
             let num_rows = batch.num_rows();
             match array.data_type() {
-                DataType::UInt64 => {
-                    let a = array.as_any().downcast_ref::<UInt64Array>().unwrap();
-                    for i in 0..num_rows {
-                        rows[i].push(if a.is_null(i) {
-                            TableValue::Null
-                        } else {
-                            TableValue::Int(a.value(i) as i64)
-                        });
-                    }
-                }
-                DataType::Int64 => {
-                    let a = array.as_any().downcast_ref::<Int64Array>().unwrap();
-                    for i in 0..num_rows {
-                        rows[i].push(if a.is_null(i) {
-                            TableValue::Null
-                        } else {
-                            TableValue::Int(a.value(i) as i64)
-                        });
-                    }
-                }
+                DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int, i64),
+                DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
+                            let decimal = BigDecimal::try_from(a.value(i) as f64)?;
                             TableValue::Decimal(
-                                BigDecimal::try_from(a.value(i) as f64)?.to_string(),
+                                cut_trailing_zeros
+                                    .replace(&decimal.to_string(), "$1")
+                                    .to_string(),
                             )
                         });
                     }
+                }
+                DataType::Int64Decimal(0) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal0Array, Decimal, 0)
+                }
+                DataType::Int64Decimal(1) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal1Array, Decimal, 1)
+                }
+                DataType::Int64Decimal(2) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal2Array, Decimal, 2)
+                }
+                DataType::Int64Decimal(3) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal3Array, Decimal, 3)
+                }
+                DataType::Int64Decimal(4) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal4Array, Decimal, 4)
+                }
+                DataType::Int64Decimal(5) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal5Array, Decimal, 5)
+                }
+                DataType::Int64Decimal(10) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal10Array, Decimal, 10)
                 }
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
@@ -837,7 +880,14 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     match arrow_type {
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
-        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Decimal),
+        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Decimal {
+            scale: 10,
+            precision: 18,
+        }),
+        DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
+            scale: scale as i32,
+            precision: 18,
+        }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16

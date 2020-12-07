@@ -251,8 +251,23 @@ pub enum ColumnType {
     Int,
     Bytes,
     Timestamp,
-    Decimal,
+    Decimal { scale: i32, precision: i32 },
     Boolean,
+}
+
+impl ColumnType {
+    pub fn target_scale(&self) -> i32 {
+        match self {
+            ColumnType::Decimal { scale, .. } => {
+                if *scale > 5 {
+                    10
+                } else {
+                    *scale
+                }
+            }
+            x => panic!("target_scale called on {:?}", x),
+        }
+    }
 }
 
 impl From<&Column> for parquet::schema::types::Type {
@@ -272,10 +287,11 @@ impl From<&Column> for parquet::schema::types::Type {
                     .build()
                     .unwrap()
             }
-            crate::metastore::ColumnType::Decimal => {
+            crate::metastore::ColumnType::Decimal { precision, .. } => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::INT64)
-                    //TODO DECIMAL?
                     .with_logical_type(LogicalType::DECIMAL)
+                    .with_precision(*precision)
+                    .with_scale(column.get_column_type().target_scale())
                     .with_repetition(Repetition::OPTIONAL)
                     .build()
                     .unwrap()
@@ -321,7 +337,10 @@ impl Into<Field> for Column {
                 ColumnType::Int => DataType::Int64,
                 ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
                 ColumnType::Boolean => DataType::Boolean,
-                x => panic!("Unimplemented arrow type: {:?}", x),
+                ColumnType::Decimal { .. } => {
+                    DataType::Int64Decimal(self.column_type.target_scale() as usize)
+                }
+                ColumnType::Bytes => DataType::Binary,
             },
             false,
         )
@@ -330,17 +349,17 @@ impl Into<Field> for Column {
 
 impl fmt::Display for Column {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!(
-            "{} {}",
-            self.name,
-            match &self.column_type {
-                ColumnType::String => "STRING",
-                ColumnType::Int => "INT",
-                ColumnType::Timestamp => "TIMESTAMP",
-                ColumnType::Boolean => "BOOLEAN",
-                x => panic!("TODO: {:?}", x),
+        let column_type = match &self.column_type {
+            ColumnType::String => "STRING".to_string(),
+            ColumnType::Int => "INT".to_string(),
+            ColumnType::Timestamp => "TIMESTAMP".to_string(),
+            ColumnType::Boolean => "BOOLEAN".to_string(),
+            ColumnType::Decimal { scale, precision } => {
+                format!("DECIMAL({}, {})", precision, scale)
             }
-        ))
+            ColumnType::Bytes => "BYTES".to_string(),
+        };
+        f.write_fmt(format_args!("{} {}", self.name, column_type))
     }
 }
 
@@ -1806,7 +1825,6 @@ impl MetaStore for RocksMetaStore {
                 import_format,
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
-            let sort_key_size = index_cols.len() as u64;
             for index_def in indexes.into_iter() {
                 let (mut sorted, mut unsorted) =
                     index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
@@ -1818,7 +1836,7 @@ impl MetaStore for RocksMetaStore {
                     });
                 let sorted_key_size = sorted.len() as u64;
                 sorted.append(&mut unsorted);
-                let index = Index::new(
+                let index = Index::try_new(
                     index_def.name,
                     table_id.get_id(),
                     sorted
@@ -1827,17 +1845,33 @@ impl MetaStore for RocksMetaStore {
                         .map(|(i, c)| c.replace_index(i))
                         .collect::<Vec<_>>(),
                     sorted_key_size,
-                );
+                )?;
                 let index_id = rocks_index.insert(index, batch_pipe)?;
                 let partition = Partition::new(index_id.id, None, None);
                 let _ = rocks_partition.insert(partition, batch_pipe)?;
             }
-            let index = Index::new(
+
+            let (mut sorted, mut unsorted) =
+                index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
+                    match c.get_column_type() {
+                        ColumnType::Decimal { .. } | ColumnType::Bytes => false,
+                        _ => true,
+                    }
+                });
+
+            let sorted_key_size = sorted.len() as u64;
+            sorted.append(&mut unsorted);
+
+            let index = Index::try_new(
                 "default".to_string(),
                 table_id.get_id(),
-                index_cols,
-                sort_key_size,
-            );
+                sorted
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, c)| c.replace_index(i))
+                    .collect::<Vec<_>>(),
+                sorted_key_size,
+            )?;
             let index_id = rocks_index.insert(index, batch_pipe)?;
             let partition = Partition::new(index_id.id, None, None);
             let _ = rocks_partition.insert(partition, batch_pipe)?;
@@ -2523,7 +2557,14 @@ mod tests {
             let mut columns = Vec::new();
             columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
             columns.push(Column::new("col2".to_string(), ColumnType::String, 1));
-            columns.push(Column::new("col3".to_string(), ColumnType::Decimal, 2));
+            columns.push(Column::new(
+                "col3".to_string(),
+                ColumnType::Decimal {
+                    scale: 2,
+                    precision: 18,
+                },
+                2,
+            ));
 
             let table1 = meta_store
                 .create_table(
@@ -2559,12 +2600,13 @@ mod tests {
                 table1
             );
 
-            let expected_index = Index::new(
+            let expected_index = Index::try_new(
                 "default".to_string(),
                 table1_id,
                 columns.clone(),
-                columns.len() as u64,
-            );
+                columns.len() as u64 - 1,
+            )
+            .unwrap();
             let expected_res = vec![IdRow::new(1, expected_index)];
             assert_eq!(meta_store.get_table_indexes(1).await.unwrap(), expected_res);
         }

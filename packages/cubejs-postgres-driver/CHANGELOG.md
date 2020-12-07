@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.4](https://github.com/cube-js/cube.js/compare/v0.24.3...v0.24.4) (2020-12-07)
+
+
+### Features
+
+* **@cubejs-backend/postgres-driver:** Support CUBEJS_DB_SSL_SERVERNAME ([f044372](https://github.com/cube-js/cube.js/commit/f04437236ca78cb23ef69f2a5de6be60006f2464))
+* Ability to load SSL keys from FS ([#1512](https://github.com/cube-js/cube.js/issues/1512)) ([71da5bb](https://github.com/cube-js/cube.js/commit/71da5bb529294fabd92b3a914b1e8bceb464643c))
+
+
+
+
+
 ## [0.24.3](https://github.com/cube-js/cube.js/compare/v0.24.2...v0.24.3) (2020-12-01)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver

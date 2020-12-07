@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.4](https://github.com/cube-js/cube.js/compare/v0.24.3...v0.24.4) (2020-12-07)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server:** Versions inside error message ([1a8cc4f](https://github.com/cube-js/cube.js/commit/1a8cc4f9ec15c18744c1541499552fa2133484ac))
+* **@cubejs-backend/server-core:** Allow to pass externalRefresh inside preAggregationsOptions, fix [#1524](https://github.com/cube-js/cube.js/issues/1524) ([a6959c9](https://github.com/cube-js/cube.js/commit/a6959c9f47d3751bdc6b5d132e858d55107d9a50))
+* **@cubejs-client/playground:** always show scrollbars in menu if content is too big ([5e22a3a](https://github.com/cube-js/cube.js/commit/5e22a3a179fa38bdbd539ec00b09f2ca0e89b8b9))
+* **cubestore:** Merge sort propagation fixes ([35125ad](https://github.com/cube-js/cube.js/commit/35125ad58296cef5a038dfce27a95941487c9ab0))
+* **docker:** Add sqlite driver to built-in drivers ([3b7b0f7](https://github.com/cube-js/cube.js/commit/3b7b0f74a3474a561481fac80cb5bc4b9c8450c9))
+* **docker:** Use latest snowflake driver ([f607ed0](https://github.com/cube-js/cube.js/commit/f607ed01366981f3f1b53ab0782cca867ed5d50c))
+
+
+### Features
+
+* **@cubejs-backend/api-gateway:** Migrate some parts to TS ([c1166d7](https://github.com/cube-js/cube.js/commit/c1166d744ccd562db492e5dedd01eab63e07bfd4))
+* **@cubejs-backend/api-gateway:** Migrate to TS initial ([1edef6d](https://github.com/cube-js/cube.js/commit/1edef6d269fd1877f0bfcdcf17d2f780abd4404c))
+* **@cubejs-backend/postgres-driver:** Support CUBEJS_DB_SSL_SERVERNAME ([f044372](https://github.com/cube-js/cube.js/commit/f04437236ca78cb23ef69f2a5de6be60006f2464))
+* Ability to load SSL keys from FS ([#1512](https://github.com/cube-js/cube.js/issues/1512)) ([71da5bb](https://github.com/cube-js/cube.js/commit/71da5bb529294fabd92b3a914b1e8bceb464643c))
+* **cubestore:** Decimal support ([6bdc68b](https://github.com/cube-js/cube.js/commit/6bdc68b4de96a050306044cb61e337961c76d898))
+* **cubestore:** Left join support ([9d1fd09](https://github.com/cube-js/cube.js/commit/9d1fd0996dcb4838ff848d1905955d82132f1338))
+* **cubestore:** Mediumint support ([f98540b](https://github.com/cube-js/cube.js/commit/f98540bb0db705ea53e5fb73dd242338c9145adc))
+
+
+
+
+
 ## [0.24.3](https://github.com/cube-js/cube.js/compare/v0.24.2...v0.24.3) (2020-12-01)
 
 

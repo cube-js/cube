@@ -58,3 +58,24 @@ export async function requireFromPackage<T = unknown>(
   // eslint-disable-next-line global-require,import/no-dynamic-require
   return require(path.join(basePath, 'node_modules', pkg));
 }
+
+export function isSslKey(content: string) {
+  return content.startsWith('-----BEGIN RSA PRIVATE KEY-----');
+}
+
+export function isSslCert(content: string) {
+  return content.startsWith('-----BEGIN CERTIFICATE-----');
+}
+
+export function isFilePath(fp: string): boolean {
+  if (fp === '') {
+    return false;
+  }
+
+  const resolvedPath = path.parse(fp);
+  if ((resolvedPath.root || resolvedPath.dir) && resolvedPath.name) {
+    return true;
+  }
+
+  return false;
+}

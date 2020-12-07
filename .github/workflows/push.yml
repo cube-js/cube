@@ -155,7 +155,7 @@ jobs:
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
-        run: yarn lerna run --concurrency 1 --ignore @cubejs-client/vue build
+        run: yarn lerna run --concurrency 1 build
 
   integration-wrk-1:
     runs-on: ubuntu-latest

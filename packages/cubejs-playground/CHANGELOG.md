@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.4](https://github.com/cube-js/cube.js/compare/v0.24.3...v0.24.4) (2020-12-07)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** always show scrollbars in menu if content is too big ([5e22a3a](https://github.com/cube-js/cube.js/commit/5e22a3a179fa38bdbd539ec00b09f2ca0e89b8b9))
+
+
+
+
+
 # [0.24.0](https://github.com/cube-js/cube.js/compare/v0.23.15...v0.24.0) (2020-11-26)
 
 

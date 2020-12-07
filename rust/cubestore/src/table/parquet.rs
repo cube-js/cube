@@ -14,7 +14,9 @@ use parquet::schema::types;
 use std::cmp::{max, min};
 use std::fs::File;
 
+use bigdecimal::{BigDecimal, Num, ToPrimitive};
 use num::integer::div_ceil;
+use num::BigInt;
 use parquet::file::metadata::RowGroupMetaData;
 use std::sync::Arc;
 
@@ -24,6 +26,7 @@ pub struct ParquetTableStore {
 }
 
 pub struct RowParquetWriter {
+    columns: Vec<Column>,
     parquet_writer: SerializedFileWriter<File>,
     buffer: Vec<Row>,
     row_group_size: usize,
@@ -196,9 +199,9 @@ impl<'a> RowParquetReader<'a> {
                         ColumnType::String => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
                         ColumnType::Bytes => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
                         ColumnType::Int => ColumnAccessor::Int(vec![0; 16384]),
+                        ColumnType::Decimal { .. } => ColumnAccessor::Int(vec![0; 16384]),
                         ColumnType::Timestamp => ColumnAccessor::Int(vec![0; 16384]),
                         ColumnType::Boolean => ColumnAccessor::Boolean(vec![false; 16384]),
-                        x => panic!("Column type is not supported: {:?}", x),
                     },
                     Some(vec![0; 16384]),
                 )
@@ -317,6 +320,25 @@ impl<'a> RowParquetReader<'a> {
                                 }
                             }
                         }
+                        ColumnType::Decimal { .. } => {
+                            if let ColumnAccessor::Int(buffer) = &column_accessor {
+                                for i in 0..values_read {
+                                    if levels[i] == 1 {
+                                        let value = buffer[cur_value_index];
+                                        vec_result[i].push(TableValue::Decimal(
+                                            BigDecimal::new(
+                                                BigInt::from(value),
+                                                col.get_column_type().target_scale() as i64,
+                                            )
+                                            .to_string(),
+                                        ));
+                                        cur_value_index += 1;
+                                    } else {
+                                        vec_result[i].push(TableValue::Null);
+                                    }
+                                }
+                            }
+                        }
                         ColumnType::Timestamp => {
                             if let ColumnAccessor::Int(buffer) = &column_accessor {
                                 for i in 0..values_read {
@@ -345,7 +367,6 @@ impl<'a> RowParquetReader<'a> {
                                 }
                             }
                         }
-                        x => panic!("Unsupported value: {:?}", x),
                     };
                 }
                 x => panic!("Unsupported value: {:?}", x),
@@ -468,6 +489,7 @@ impl RowParquetWriter {
         let parquet_writer = SerializedFileWriter::new(file.try_clone()?, schema, props)?;
 
         Ok(RowParquetWriter {
+            columns: table.get_columns().clone(),
             parquet_writer,
             row_group_size,
             buffer: Vec::with_capacity(row_group_size as usize),
@@ -499,25 +521,42 @@ impl RowParquetWriter {
                 // TODO types
                 match col_writer {
                     ColumnWriter::Int64ColumnWriter(ref mut typed) => {
+                        let column = &self.columns[column_index];
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
                                 &self.buffer[row_batch_index * batch_size + row_index].values
                                     [column_index]
                                     != &TableValue::Null
                             })
-                            .map(|row_index| {
+                            .map(|row_index| -> Result<_, CubeError> {
                                 // TODO types
                                 match &self.buffer[row_batch_index * batch_size + row_index].values
                                     [column_index]
                                 {
-                                    TableValue::Int(val) => i64::from(val.clone()),
+                                    TableValue::Int(val) => Ok(i64::from(val.clone())),
+                                    TableValue::Decimal(val) => match column.get_column_type() {
+                                        ColumnType::Decimal { .. } => {
+                                            Ok((BigDecimal::from_str_radix(val, 10)?)
+                                                .with_scale(
+                                                    column.get_column_type().target_scale() as i64
+                                                )
+                                                .as_bigint_and_exponent()
+                                                .0
+                                                .to_i64()
+                                                .ok_or(CubeError::internal(format!(
+                                                    "Can't convert to i64 decimal: {}",
+                                                    val
+                                                )))?)
+                                        }
+                                        x => panic!("Unexpected type: {:?}", x),
+                                    },
                                     TableValue::Timestamp(t) => {
-                                        i64::from(t.clone().get_time_stamp() / 1000)
+                                        Ok(i64::from(t.clone().get_time_stamp() / 1000))
                                     }
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
-                            .collect::<Vec<i64>>();
+                            .collect::<Result<Vec<i64>, _>>()?;
                         let min = if self.sort_key_size >= column_index as u64
                             && column_values.len() > 0
                         {
@@ -719,6 +758,7 @@ mod tests {
 
     use arrow::array::UInt64Array;
     use arrow::datatypes::DataType;
+    use bigdecimal::BigDecimal;
     use csv::ReaderBuilder;
     use datafusion::logical_plan::Operator;
     use datafusion::physical_plan::expressions::{binary, Count, Literal};
@@ -728,6 +768,7 @@ mod tests {
     use datafusion::scalar::ScalarValue;
     use futures::executor::block_on;
     use futures::StreamExt;
+    use num::BigInt;
     use parquet::file::reader::FileReader;
     use parquet::file::statistics::Statistics;
     use std::fs::File;
@@ -740,7 +781,7 @@ mod tests {
     #[test]
     fn gutter() {
         let store = ParquetTableStore {
-            table: Index::new(
+            table: Index::try_new(
                 "foo".to_string(),
                 1,
                 vec![
@@ -748,9 +789,18 @@ mod tests {
                     Column::new("foo".to_string(), ColumnType::String, 1),
                     Column::new("boo".to_string(), ColumnType::String, 2),
                     Column::new("bool".to_string(), ColumnType::Boolean, 3),
+                    Column::new(
+                        "dec".to_string(),
+                        ColumnType::Decimal {
+                            scale: 5,
+                            precision: 18,
+                        },
+                        4,
+                    ),
                 ],
                 3,
-            ),
+            )
+            .unwrap(),
             row_group_size: 7,
         };
         let file_name = "foo.parquet";
@@ -766,6 +816,7 @@ mod tests {
                         TableValue::String(format!("Boo {}", i))
                     },
                     TableValue::Boolean(i % 5 == 0),
+                    TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()),
                 ])
             })
             .collect::<Vec<_>>();
@@ -787,6 +838,7 @@ mod tests {
                     TableValue::String(format!("Foo {}", i)),
                     TableValue::String(format!("Boo {}", i)),
                     TableValue::Boolean(false),
+                    TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()),
                 ])
             })
             .collect::<Vec<_>>();
@@ -823,6 +875,7 @@ mod tests {
                     TableValue::String(format!("Foo {}", i)),
                     TableValue::String(format!("Boo {}", i)),
                     TableValue::Boolean(false),
+                    TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()),
                 ])
             })
             .collect::<Vec<_>>();
@@ -859,13 +912,15 @@ mod tests {
                             TableValue::Int(0),
                             TableValue::String(format!("Foo {}", 0)),
                             TableValue::Null,
-                            TableValue::Boolean(true)
+                            TableValue::Boolean(true),
+                            TableValue::Decimal("0.00000".to_string()),
                         ]),
                         Row::new(vec![
                             TableValue::Int(74),
                             TableValue::String(format!("Foo {}", 74)),
                             TableValue::String(format!("Boo {}", 74)),
-                            TableValue::Boolean(false)
+                            TableValue::Boolean(false),
+                            TableValue::Decimal("7.40000".to_string()),
                         ])
                     )
                 ),
@@ -876,13 +931,15 @@ mod tests {
                             TableValue::Int(75),
                             TableValue::String(format!("Foo {}", 75)),
                             TableValue::String(format!("Boo {}", 75)),
-                            TableValue::Boolean(false)
+                            TableValue::Boolean(false),
+                            TableValue::Decimal("7.50000".to_string()),
                         ]),
                         Row::new(vec![
                             TableValue::Int(149),
                             TableValue::String(format!("Foo {}", 149)),
                             TableValue::String(format!("Boo {}", 149)),
-                            TableValue::Boolean(false)
+                            TableValue::Boolean(false),
+                            TableValue::Decimal("14.90000".to_string()),
                         ])
                     )
                 )
@@ -1012,7 +1069,7 @@ mod tests {
 
     fn prepare_donors() -> Result<(ParquetTableStore, Vec<Column>), io::Error> {
         let store = ParquetTableStore {
-            table: Index::new(
+            table: Index::try_new(
                 "donors".to_string(),
                 1,
                 vec![
@@ -1023,7 +1080,8 @@ mod tests {
                     Column::new("Donor Zip".to_string(), ColumnType::String, 4),
                 ],
                 6,
-            ),
+            )
+            .unwrap(),
             row_group_size: 16384,
         };
 
