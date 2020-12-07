@@ -1,13 +1,21 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import './index.css';
+import { Layout } from 'antd';
+import 'antd/dist/antd.less';
 import App from './App';
+import Header from './Header';
 import reportWebVitals from './reportWebVitals';
+import { layout, content } from './index.module.less';
+
+const { Content } = Layout;
 
 ReactDOM.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <Layout className={layout}>
+    <Header />
+    <Content className={content}>
+      <App />
+    </Content>
+  </Layout>,
   document.getElementById('root')
 );
 

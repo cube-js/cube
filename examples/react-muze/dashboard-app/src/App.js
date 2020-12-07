@@ -1,8 +1,10 @@
 import cubejs from '@cubejs-client/core';
 import { useCubeQuery } from '@cubejs-client/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Muze, { Canvas, Layer } from '@chartshq/react-muze/components';
-import './App.css';
+import { Spin, Row, Col } from 'antd';
+import { row } from './App.module.less';
+import useSize from './hooks/use-size';
 
 const { REACT_APP_CUBEJS_TOKEN, REACT_APP_API_URL } = process.env;
 
@@ -51,6 +53,8 @@ function generateSchema({ dimensions, measures, timeDimensions }) {
 }
 
 function App() {
+  const rowRef = useRef(null);
+  const { width, height } = useSize(rowRef);
   const [dataModel, setDataModel] = useState();
   const { resultSet } = useCubeQuery(CUBE_QUERY, { cubejsApi });
 
@@ -74,20 +78,28 @@ function App() {
     return () => dataModel != null && dataModel.dispose();
   }, [resultSet]);
 
-  return dataModel == null ? (
-    'Loading data. Please wait.'
-  ) : (
-    <Muze data={dataModel}>
-      <Canvas
-        width={'1440px'}
-        height={'900px'}
-        columns={['ProductCategories.name', 'Orders.createdAt.month']}
-        rows={['Orders.count', 'Users.city']}
-        color={'Users.gender'}
-      >
-        <Layer mark="bar"></Layer>
-      </Canvas>
-    </Muze>
+  return (
+    <Row ref={rowRef} className={row} justify="center" align="middle">
+      <Col>
+        {dataModel == null ? (
+          <Spin size="large" />
+        ) : (
+          <Muze data={dataModel}>
+            <Canvas
+              width={width}
+              height={height}
+              columns={['ProductCategories.name', 'Orders.createdAt.month']}
+              rows={['Orders.count', 'Users.city']}
+              color={'Users.gender'}
+              title="Orders over Time"
+              subtitle="Across every category in all cities"
+            >
+              <Layer mark="bar"></Layer>
+            </Canvas>
+          </Muze>
+        )}
+      </Col>
+    </Row>
   );
 }
 
