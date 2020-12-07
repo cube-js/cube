@@ -828,10 +828,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.24.0":
-  version "0.24.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.24.0.tgz#0c4de3c762efbe941286e0abe456db501529a358"
-  integrity sha512-4Ycf/47Qbl0fg2KJjcn4bHQMbLVz3Lm6oIKYSbYmNZI/3vR8Gz+LDwW2CKhT6zwIULDyVO9xBJYryMbcTSkioA==
+"@cubejs-backend/api-gateway@^0.24.4":
+  version "0.24.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.24.4.tgz#757d14fd23e6064f264eb494f23913eb7f6a8238"
+  integrity sha512-fTsPWrRqpnQrD9JJqxplu22sGVK9FuxnUFe2OhbUQSkKzvrCqpwc4rI4GPT+uSLRW8twxIvitVbfbrpZ7t1SoQ==
   dependencies:
     "@hapi/joi" "^15.1.1"
     body-parser "^1.19.0"
@@ -843,19 +843,20 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.24.3":
-  version "0.24.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.3.tgz#dcfdf3a415dc99a4799daa697dc7cdfbb54762bc"
-  integrity sha512-9xoXcqImifbnMmH/bMWiVen3BZQSLgnL+/oytKLJbdYRsTBD8bMB7q3vuazs5Tf2NYnxwZyhXm4NZOqMTp8wUg==
+"@cubejs-backend/query-orchestrator@^0.24.4":
+  version "0.24.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.4.tgz#fec9ef3214489e0a69bd30725ea12a2961401174"
+  integrity sha512-DCQChsHml2n+O+SFWxMVSt2102w7ANl1fTT77xeysaMG5Oxx0pq0QKPBsZgLEQdvZ8Wa9m4Ef+AxOJWVvT+MSw==
   dependencies:
+    "@cubejs-backend/shared" "^0.24.4"
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.24.1":
-  version "0.24.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.24.1.tgz#8884446b72f3e810b8ffa27e924eae3a940963b8"
-  integrity sha512-vLQWH+KHg3wt2Ig40zNWIKdjAN+ZHApz0xyGbpxyi8X52AmmdL8il0/UaL/iE06eqiwyj/k9G2e6pRSeOvdf6w==
+"@cubejs-backend/schema-compiler@^0.24.4":
+  version "0.24.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.24.4.tgz#06c766fc2bcc18bfa6cba04da4801e4a4263d8da"
+  integrity sha512-E9ynFnaGwJiGBSJOSTC/B3K1fQrVo0cb0rXASZmkeV2tRvd3aFMLJc+QL0RPqZGq2TAOio7kxxuYVoGI90ECBA==
   dependencies:
     "@babel/core" "^7.4.0"
     "@babel/generator" "^7.4.0"
@@ -880,6 +881,13 @@
   version "0.24.3"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.3.tgz#f2e3d9ba99cab906e7b4953c1c475fd81fd120eb"
   integrity sha512-r5/E5cX6cleTM9HWP/i2o0iZbbotlD10JiLT4FFcvCVcj+XPc5064w6yP84YjiwpKyBvbO+OW9JyFguZ7Lf6vw==
+  dependencies:
+    env-var "^6.3.0"
+
+"@cubejs-backend/shared@^0.24.4":
+  version "0.24.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.4.tgz#3ad5797aefbe2d476fce4f1e07303a7f9f56555b"
+  integrity sha512-CjTlZcrp4qDOiuRxOuwe67FWFZm/nXFMqmhHAyfUsuYA235bIBaYX6UFJCnHaW88T6gMFh1+phroJUqggzdFXg==
   dependencies:
     env-var "^6.3.0"
 
@@ -3179,6 +3187,11 @@ is-descriptor@^1.0.0, is-descriptor@^1.0.2:
     is-accessor-descriptor "^1.0.0"
     is-data-descriptor "^1.0.0"
     kind-of "^6.0.2"
+
+is-docker@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/is-docker/-/is-docker-2.1.1.tgz#4125a88e44e450d384e09047ede71adc2d144156"
+  integrity sha512-ZOoqiXfEwtGknTiuDEy8pN2CfE3TxMHprvNer1mXiqwkOT77Rw3YVrUQ52EqAOU3QAWDQ+bQdx7HJzrv7LS2Hw==
 
 is-extendable@^0.1.0, is-extendable@^0.1.1:
   version "0.1.1"

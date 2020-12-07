@@ -1,13 +1,15 @@
 /* eslint-disable global-require */
-const { ApiGateway } = require('@cubejs-backend/api-gateway');
-const { track, isDockerImage, resolveBuiltInPackageVersion, internalExceptions } = require('@cubejs-backend/shared');
-
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
 const LRUCache = require('lru-cache');
 const SqlString = require('sqlstring');
 const R = require('ramda');
+const isDocker = require('is-docker');
+
+const { ApiGateway } = require('@cubejs-backend/api-gateway');
+const { track, internalExceptions, getEnv, getAnonymousId } = require('@cubejs-backend/shared');
+
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const RefreshScheduler = require('./RefreshScheduler');
@@ -293,31 +295,24 @@ class CubejsServerCore {
         }
       }
 
-      if (!this.coreServerVersion) {
-        try {
-          const coreServerJson = await fs.readJson(path.join(__dirname, '..', 'package.json'));
-          this.coreServerVersion = coreServerJson.version;
-        } catch (e) {
-          internalExceptions(e);
-        }
+      if (!this.anonymousId) {
+        this.anonymousId = getAnonymousId();
       }
 
-      if (!this.dockerVersion && isDockerImage()) {
-        try {
-          this.dockerVersion = await resolveBuiltInPackageVersion(
-            '@cubejs-backend/docker',
-          );
-        } catch (e) {
-          internalExceptions(e);
-        }
+      if (!this.coreServerVersion) {
+        this.coreServerVersion = version;
       }
+
+      const internalExceptionsEnv = getEnv('internalExceptions');
 
       try {
         await track({
           event: name,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
-          dockerVersion: this.dockerVersion,
+          dockerVersion: getEnv('dockerImageVersion'),
+          isDocker: isDocker(),
+          internalExceptions: internalExceptionsEnv !== 'false' ? internalExceptionsEnv : undefined,
           ...props
         });
       } catch (e) {

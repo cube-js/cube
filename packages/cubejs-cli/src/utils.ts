@@ -33,6 +33,22 @@ export const displayWarning = (message: string) => {
   console.log(`${chalk.yellow('Warning.')} ${message}`);
 };
 
+export function loadCliManifest() {
+  // eslint-disable-next-line global-require
+  return require('../../package.json');
+}
+
+export async function event(opts: BaseEvent) {
+  try {
+    await track({
+      ...opts,
+      cliVersion: loadCliManifest().version,
+    });
+  } catch (e) {
+    internalExceptions(e);
+  }
+}
+
 export const displayError = async (text: string|string[], options = {}) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
@@ -47,7 +63,7 @@ export const displayError = async (text: string|string[], options = {}) => {
   console.error('');
   console.error(chalk.yellow('Need some help? -------------------------------------'));
 
-  await track({
+  await event({
     name: 'Error',
     error: Array.isArray(text) ? text.join('\n') : text.toString(),
     ...options
@@ -76,20 +92,4 @@ export function findMaxVersion(versions: string[]): SemVer {
   return versions
     .map((v) => <SemVer>semverParse(v))
     .reduce((a, b) => (semverCompare(a, b) === 1 ? a : b));
-}
-
-export function loadCliManifest() {
-  // eslint-disable-next-line global-require
-  return require('../../package.json');
-}
-
-export async function event(opts: BaseEvent) {
-  try {
-    await track({
-      ...opts,
-      cliVersion: loadCliManifest().version,
-    });
-  } catch (e) {
-    internalExceptions(e);
-  }
 }
