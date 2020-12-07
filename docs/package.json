@@ -7,6 +7,7 @@
   "scripts": {
     "precommit": "lint-staged",
     "build": "GATSBY_ENV=production gatsby build",
+    "clean": "gatsby clean",
     "dev": "GATSBY_ENV=development gatsby develop",
     "deploy": "gatsby-plugin-s3 deploy",
     "lint:markdown": "markdownlint-cli2 content/**/*.md",
