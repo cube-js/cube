@@ -27,9 +27,9 @@
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
     "prepack": "npm run tsc && oclif-dev manifest",
-    "build": "tsc",
-    "tsc": "rm -rf dist && tsc",
-    "watch": "rm -rf dist && tsc -w",
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
     "test": "npm run unit",
     "lint": "linter src/* tests/ --ext .ts,.js",
     "lint:fix": "linter --fix src/* tests/ --ext .ts,js",
