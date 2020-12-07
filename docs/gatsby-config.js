@@ -62,9 +62,9 @@ const config = {
       },
     },
     {
-      resolve: 'gatsby-transformer-remark',
+      resolve: 'gatsby-plugin-mdx',
       options: {
-        plugins: [
+        gatsbyRemarkPlugins: [
           {
             resolve: 'gatsby-remark-copy-linked-files',
             options: {
@@ -105,7 +105,12 @@ const config = {
         ]
       }
     },
-    'gatsby-redirect-from',
+    {
+      resolve: 'gatsby-redirect-from',
+      options: {
+        query: 'allMdx'
+      },
+    },
     'gatsby-plugin-meta-redirect',
     'gatsby-plugin-percy',
   ],

@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { graphql } from 'gatsby';
+import { MDXRenderer } from 'gatsby-plugin-mdx';
 import Helmet from 'react-helmet';
 import ReactHtmlParser from 'react-html-parser';
 import { scroller } from 'react-scroll';
@@ -61,15 +62,15 @@ class DocTemplate extends Component<Props, State> {
   };
 
   componentWillMount() {
-    const { markdownRemark = {} } = this.props.data;
-    const { html, frontmatter } = markdownRemark;
+    const { mdx = {} } = this.props.data;
+    const { body, frontmatter } = mdx;
     this.props.changePage({
       scope: frontmatter.scope,
       category: renameCategory(frontmatter.category),
       noscrollmenu: false,
     });
     this.createAnchors(
-      html,
+      body,
       frontmatter.title,
       getGithubUrl(this.props.pathContext.fileAbsolutePath)
     );
@@ -240,14 +241,16 @@ class DocTemplate extends Component<Props, State> {
   };
 
   render() {
-    const { markdownRemark = {} } = this.props.data;
-    const { frontmatter } = markdownRemark;
+    const { mdx = {} } = this.props.data;
+    const { frontmatter } = mdx;
 
     return (
       <div>
         <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
         <div className={styles.docContentWrapper}>
-          <div className={styles.docContent}>{this.state.nodes}</div>
+          <div className={styles.docContent}>
+            <MDXRenderer>{this.state.nodes}</MDXRenderer>
+          </div>
         </div>
       </div>
     );
@@ -258,8 +261,8 @@ export default DocTemplate;
 
 export const pageQuery = graphql`
   query postByPath($path: String!) {
-    markdownRemark(frontmatter: { permalink: { eq: $path } }) {
-      html
+    mdx(frontmatter: { permalink: { eq: $path } }) {
+      body
       frontmatter {
         permalink
         title

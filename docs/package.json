@@ -44,7 +44,6 @@
     "gatsby-remark-custom-blocks": "^2.3.13",
     "gatsby-remark-images": "^3.0.10",
     "gatsby-source-filesystem": "^2.0.28",
-    "gatsby-transformer-remark": "^2.3.8",
     "loader-utils": "^1.2.3",
     "lockr": "^0.8.5",
     "lodash": "^4.17.20",
@@ -58,6 +57,8 @@
     "sharp": "^0.26.0"
   },
   "devDependencies": {
+    "@mdx-js/mdx": "^1.6.22",
+    "@mdx-js/react": "^1.6.22",
     "@percy/agent": "^0.28.5",
     "@types/classnames": "^2.2.11",
     "@types/lockr": "^0.8.6",
@@ -68,6 +69,7 @@
     "@types/react-helmet": "^6.1.0",
     "@types/react-html-parser": "^2.0.1",
     "@types/react-scroll": "^1.8.2",
+    "gatsby-plugin-mdx": "^1.6.0",
     "gatsby-plugin-percy": "^0.1.4",
     "lint-staged": "^10.5.2",
     "markdownlint-cli2": "^0.0.11",

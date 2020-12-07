@@ -205,7 +205,7 @@ class AppLayout extends React.Component<
     );
 
     const pageFrameworkOfChoice: string =
-      pageData && pageData.markdownRemark.frontmatter.frameworkOfChoice!;
+      pageData && pageData.mdx.frontmatter.frameworkOfChoice!;
 
     return (
       <FrameworkOfChoiceStore>
@@ -233,7 +233,7 @@ class AppLayout extends React.Component<
                 })}
               >
                 <MainMenu
-                  items={parseResults(data.allMarkdownRemark.edges)}
+                  items={parseResults(data.allMdx.edges)}
                   {...menuProps}
                 />
                 <Col
@@ -282,17 +282,17 @@ interface Edge<T> {
 }
 
 interface LayoutQueryResponse {
-  allMarkdownRemark: {
+  allMdx: {
     edges: Edge<MarkdownNode>[];
   };
 }
 
 const layoutQuery = graphql`
   query LayoutQuery {
-    allMarkdownRemark(limit: 1000) {
+    allMdx(limit: 1000) {
       edges {
         node {
-          html
+          body
           fileAbsolutePath
           frontmatter {
             permalink

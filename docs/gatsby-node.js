@@ -7,12 +7,12 @@ exports.createPages = ({ actions, graphql }) => {
   const DocTemplate = path.resolve('src/templates/DocTemplate.tsx');
 
   return graphql(`{
-    allMarkdownRemark(
+    allMdx(
       limit: 1000
     ) {
       edges {
         node {
-          html
+          body
           fileAbsolutePath
           frontmatter {
             permalink
@@ -29,7 +29,7 @@ exports.createPages = ({ actions, graphql }) => {
       return Promise.reject(result.errors);
     }
 
-    result.data.allMarkdownRemark.edges.forEach(({ node }) => {
+    result.data.allMdx.edges.forEach(({ node }) => {
       createPage({
         path: node.frontmatter.permalink,
         title: node.frontmatter.title,
@@ -49,7 +49,7 @@ exports.createPages = ({ actions, graphql }) => {
 exports.onCreateNode = ({ node, actions, getNode }) => {
   const { createNodeField } = actions;
 
-  if (node.internal.type === 'MarkdownRemark') {
+  if (node.internal.type === 'Mdx') {
     createNodeField({
       name: 'slug',
       node,
