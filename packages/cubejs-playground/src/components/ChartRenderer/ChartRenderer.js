@@ -18,6 +18,7 @@ export default function ChartRenderer({
     return () => {
       onChartRendererReadyChange(false);
     };
+    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function ChartRenderer({
         onChartRendererReadyChange(true);
       });
     }
+    // eslint-disable-next-line
   }, [iframeRef]);
 
   useEffect(() => {
@@ -37,6 +39,7 @@ export default function ChartRenderer({
         chartingLibrary,
       });
     }
+    // eslint-disable-next-line
   }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType]));
 
   return (
