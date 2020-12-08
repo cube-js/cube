@@ -5,7 +5,7 @@ category: Authentication & Authorization
 menuOrder: 1
 ---
 
-In Cube.js, access control or authorization is based on the **security context**. The diagram below shows how it works during the request processing in Cube.js:
+In Cube.js, authorization (or access control) is based on the **security context**. The diagram below shows how it works during the request processing in Cube.js:
 
 
 <p
@@ -18,9 +18,9 @@ In Cube.js, access control or authorization is based on the **security context**
   />
 </p>
 
-Authentication is handled outside of Cube.js. Your auth server issues JWTs to your client app, which, when sent as part of the request, are verified and decoded by the Cube.js to get security context claims to evaluate access control rules.
+Authentication is handled outside of Cube.js. Your authentication server issues JWTs to your client application, which, when sent as part of the request, are verified and decoded by Cube.js to get security context claims to evaluate access control rules.
 
-For access control or authorization, Cube.js allows you to define granular access control rules for evey cube in your data schema. Cube.js uses request and the security context claims in the JWT token to generate a SQL query, which includes row-level constraints from the access control rules.
+For access control or authorization, Cube.js allows you to define granular access control rules for every cube in your data schema. Cube.js uses the request and the security context claims in the JWT token to generate a SQL query, which includes row-level constraints from the access control rules.
 
 Cube.js uses [JSON Web Tokens (JWT)][link-jwt] which should be passed in the
 `Authorization: <JWT>` header to authenticate requests.
@@ -81,7 +81,7 @@ You can generate two types of tokens:
   models where users will have different levels of access to data.
 
 [[info | ]]
-| It is considered best practice to use an `exp` expiration claim to limit the life time of your public tokens. [Learn more at JWT docs][link-jwt-docs].
+| It is considered best practice to use an `exp` expiration claim to limit the lifetime of your public tokens. [Learn more in the JWT docs][link-jwt-docs].
 
 [link-jwt-docs]:
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
