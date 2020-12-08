@@ -75,6 +75,10 @@ pub trait ConfigObj: Send + Sync {
     fn compaction_chunks_count_threshold(&self) -> u64;
 
     fn select_worker_pool_size(&self) -> usize;
+
+    fn bind_port(&self) -> u16;
+
+    fn bind_address(&self) -> &str;
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +89,8 @@ pub struct ConfigObjImpl {
     pub data_dir: PathBuf,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
+    pub bind_port: u16,
+    pub bind_address: String
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -102,6 +108,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn select_worker_pool_size(&self) -> usize {
         self.select_worker_pool_size
+    }
+
+    fn bind_port(&self) -> u16 {
+        self.bind_port
+    }
+
+    fn bind_address(&self) -> &str {
+        &self.bind_address
     }
 }
 
@@ -139,6 +153,13 @@ impl Config {
                     .ok()
                     .map(|v| v.parse::<usize>().unwrap())
                     .unwrap_or(4),
+                bind_address: env::var("CUBESTORE_BIND_ADDR")
+                    .ok()
+                    .unwrap_or("0.0.0.0".to_string()),
+                bind_port: env::var("CUBESTORE_PORT")
+                    .ok()
+                    .map(|v| v.parse::<u16>().unwrap())
+                    .unwrap_or(3306u16)
             }),
         }
     }
@@ -158,6 +179,8 @@ impl Config {
                         .join(format!("{}-upstream", name)),
                 },
                 select_worker_pool_size: 0,
+                bind_port: 3306,
+                bind_address: "0.0.0.0".to_string()
             }),
         }
     }

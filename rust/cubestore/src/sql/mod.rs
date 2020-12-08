@@ -625,6 +625,7 @@ mod tests {
     use std::io::Write;
     use std::path::PathBuf;
     use std::{env, fs};
+    use std::collections::HashSet;
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -1104,18 +1105,17 @@ mod tests {
             let p_2 = partitions.iter().find(|r| r.get_id() == 6).unwrap();
             let p_3 = partitions.iter().find(|r| r.get_id() == 7).unwrap();
             let p_4 = partitions.iter().find(|r| r.get_id() == 8).unwrap();
-            println!("{:?}", vec![p_1, p_2, p_3, p_4]);
-            assert_eq!(p_1.get_row().get_min_val(), &None);
-            assert_eq!(p_1.get_row().get_max_val(), &Some(Row::new(vec![TableValue::Int(2)])));
-
-            assert_eq!(p_2.get_row().get_min_val(), &Some(Row::new(vec![TableValue::Int(2)])));
-            assert_eq!(p_2.get_row().get_max_val(), &Some(Row::new(vec![TableValue::Int(10)])));
-
-            assert_eq!(p_3.get_row().get_min_val(), &Some(Row::new(vec![TableValue::Int(10)])));
-            assert_eq!(p_3.get_row().get_max_val(), &Some(Row::new(vec![TableValue::Int(27)])));
-
-            assert_eq!(p_4.get_row().get_min_val(), &Some(Row::new(vec![TableValue::Int(27)])));
-            assert_eq!(p_4.get_row().get_max_val(), &None);
+            let new_partitions = vec![p_1, p_2, p_3, p_4];
+            println!("{:?}", new_partitions);
+            let intervals_set = new_partitions.into_iter()
+                .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
+                .collect::<HashSet<_>>();
+            assert_eq!(intervals_set, vec![
+                (None, Some(Row::new(vec![TableValue::Int(2)]))),
+                (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
+                (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
+                (Some(Row::new(vec![TableValue::Int(27)])), None),
+            ].into_iter().collect::<HashSet<_>>());
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
 

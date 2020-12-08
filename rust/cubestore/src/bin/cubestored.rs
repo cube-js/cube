@@ -49,7 +49,7 @@ fn main() {
 
         track_event("Cube Store Start".to_string(), HashMap::new()).await;
 
-        MySqlServer::listen("0.0.0.0:3306".to_string(), services.sql_service.clone())
+        MySqlServer::listen(format!("{}:{}", config.config_obj().bind_address(), config.config_obj().bind_port()), services.sql_service.clone())
             .await
             .unwrap();
     });
