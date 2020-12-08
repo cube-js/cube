@@ -16,7 +16,6 @@
     "antd": "^3.3.3",
     "classnames": "^2.2.6",
     "cubedev-tracking": "^1.0.4",
-    "dompurify": "^1.0.10",
     "dotenv": "^7.0.0",
     "gatsby": "^2.0.0",
     "gatsby-image": "^2.0.37",
