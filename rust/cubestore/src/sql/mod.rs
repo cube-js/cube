@@ -624,7 +624,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
-    use std::{env, fs, thread, time};
+    use std::{env, fs};
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -956,6 +956,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn in_list() {
+        Config::run_test("in_list", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.customers (id text, city text, state text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY'), ('c', 'San Diego', 'CA'), ('d', 'Austin', 'TX')"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.customers WHERE state in ('CA', 'TX')").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn union() {
         Config::run_test("union", async move |services| {
             let service = services.sql_service;
@@ -1077,8 +1096,6 @@ mod tests {
                 (RowKey::Table(TableId::Partitions, 2), JobType::Repartition),
                 (RowKey::Table(TableId::Partitions, 3), JobType::Repartition),
             ]).await.unwrap();
-
-            thread::sleep(time::Duration::from_millis(1000));
 
             let partitions = services.meta_store.get_active_partitions_by_index_id(1).await.unwrap();
 
