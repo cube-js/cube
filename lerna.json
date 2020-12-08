@@ -1,7 +1,8 @@
 {
   "packages": [
     "docs",
-    "packages/*"
+    "packages/*",
+    "packages/community/*"
   ],
   "command": {
     "bootstrap": {

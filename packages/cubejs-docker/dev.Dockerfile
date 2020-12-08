@@ -41,7 +41,6 @@ COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-d
 COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
-COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
 COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/package.json
 COPY packages/cubejs-mongobi-driver/package.json packages/cubejs-mongobi-driver/package.json
 COPY packages/cubejs-mssql-driver/package.json packages/cubejs-mssql-driver/package.json
@@ -55,7 +54,11 @@ COPY packages/cubejs-schema-compiler/package.json packages/cubejs-schema-compile
 COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
 COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/package.json
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
-COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
+
+
+COPY packages/community/cubejs-mysql-aurora-serverless-driver/package.json packages/community/cubejs-mysql-aurora-serverless-driver/package.json
+COPY packages/community/cubejs-elasticsearch-driver/package.json packages/community/cubejs-elasticsearch-driver/package.json
+COPY packages/community/cubejs-sqlite-driver/package.json packages/community/cubejs-sqlite-driver/package.json
 
 COPY packages/cubejs-backend-shared/yarn.lock packages/cubejs-backend-shared/yarn.lock
 COPY packages/cubejs-api-gateway/yarn.lock packages/cubejs-api-gateway/yarn.lock
@@ -66,7 +69,6 @@ COPY packages/cubejs-clickhouse-driver/yarn.lock packages/cubejs-clickhouse-driv
 COPY packages/cubejs-docker/yarn.lock packages/cubejs-docker/yarn.lock
 COPY packages/cubejs-dremio-driver/yarn.lock packages/cubejs-dremio-driver/yarn.lock
 COPY packages/cubejs-druid-driver/yarn.lock packages/cubejs-druid-driver/yarn.lock
-COPY packages/cubejs-elasticsearch-driver/yarn.lock packages/cubejs-elasticsearch-driver/yarn.lock
 COPY packages/cubejs-hive-driver/yarn.lock packages/cubejs-hive-driver/yarn.lock
 COPY packages/cubejs-mongobi-driver/yarn.lock packages/cubejs-mongobi-driver/yarn.lock
 COPY packages/cubejs-mssql-driver/yarn.lock packages/cubejs-mssql-driver/yarn.lock
@@ -80,7 +82,10 @@ COPY packages/cubejs-schema-compiler/yarn.lock packages/cubejs-schema-compiler/y
 COPY packages/cubejs-server/yarn.lock packages/cubejs-server/yarn.lock
 COPY packages/cubejs-server-core/yarn.lock packages/cubejs-server-core/yarn.lock
 COPY packages/cubejs-snowflake-driver/yarn.lock packages/cubejs-snowflake-driver/yarn.lock
-COPY packages/cubejs-sqlite-driver/yarn.lock packages/cubejs-sqlite-driver/yarn.lock
+
+COPY packages/community/cubejs-mysql-aurora-serverless-driver/yarn.lock packages/community/cubejs-mysql-aurora-serverless-driver/yarn.lock
+COPY packages/community/cubejs-elasticsearch-driver/yarn.lock packages/community/cubejs-elasticsearch-driver/yarn.lock
+COPY packages/community/cubejs-sqlite-driver/yarn.lock packages/community/cubejs-sqlite-driver/yarn.lock
 
 #  --ignore @cubejs-backend/jdbc-driver not needed, because it's ignored by .dockerignore
 RUN yarn lerna bootstrap
@@ -94,7 +99,6 @@ COPY packages/cubejs-clickhouse-driver/ packages/cubejs-clickhouse-driver/
 COPY packages/cubejs-docker/ packages/cubejs-docker/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
-COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
 COPY packages/cubejs-hive-driver/ packages/cubejs-hive-driver/
 COPY packages/cubejs-mongobi-driver/ packages/cubejs-mongobi-driver/
 COPY packages/cubejs-mssql-driver/ packages/cubejs-mssql-driver/
@@ -108,7 +112,7 @@ COPY packages/cubejs-schema-compiler/ packages/cubejs-schema-compiler/
 COPY packages/cubejs-server/ packages/cubejs-server/
 COPY packages/cubejs-server-core/ packages/cubejs-server-core/
 COPY packages/cubejs-snowflake-driver/ packages/cubejs-snowflake-driver/
-COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
+COPY packages/community/ packages/community/
 
 RUN yarn lerna run build
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
