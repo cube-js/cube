@@ -115,6 +115,8 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+          build-args: |
+            IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-alpine:
     needs: npm
@@ -179,3 +181,5 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+          build-args: |
+            IMAGE_VERSION=${{ steps.prep.outputs.version }}

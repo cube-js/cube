@@ -1,13 +1,9 @@
 import os from 'os';
 import { spawn } from 'cross-spawn';
 import fs from 'fs-extra';
-import path from 'path';
 import chalk from 'chalk';
-import { machineIdSync } from 'node-machine-id';
-
-import { track } from './track';
-
-export const isDockerImage = () => Boolean(process.env.CUBEJS_DOCKER_IMAGE_TAG);
+import { track, BaseEvent, internalExceptions } from '@cubejs-backend/shared';
+import { compare as semverCompare, parse as semverParse, SemVer } from 'semver';
 
 export const executeCommand = (command: string, args: string[]) => {
   const child = spawn(command, args, { stdio: 'inherit' });
@@ -33,23 +29,25 @@ export const npmInstall = (dependencies: string[], isDev?: boolean) => executeCo
   'npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies)
 );
 
-const anonymousId = machineIdSync();
-
-export const event = async (name: string, props?: any) => {
-  try {
-    await track({
-      event: name,
-      anonymousId,
-      ...props
-    });
-  } catch (e) {
-    // ignore
-  }
-};
-
 export const displayWarning = (message: string) => {
   console.log(`${chalk.yellow('Warning.')} ${message}`);
 };
+
+export function loadCliManifest() {
+  // eslint-disable-next-line global-require
+  return require('../../package.json');
+}
+
+export async function event(opts: BaseEvent) {
+  try {
+    await track({
+      ...opts,
+      cliVersion: loadCliManifest().version,
+    });
+  } catch (e) {
+    internalExceptions(e);
+  }
+}
 
 export const displayError = async (text: string|string[], options = {}) => {
   console.error('');
@@ -65,7 +63,11 @@ export const displayError = async (text: string|string[], options = {}) => {
   console.error('');
   console.error(chalk.yellow('Need some help? -------------------------------------'));
 
-  await event('Error', { error: Array.isArray(text) ? text.join('\n') : text.toString(), ...options });
+  await event({
+    name: 'Error',
+    error: Array.isArray(text) ? text.join('\n') : text.toString(),
+    ...options
+  });
 
   console.error('');
   console.error(`${chalk.yellow('  Ask this question in Cube.js Slack:')} https://slack.cube.dev`);
@@ -75,52 +77,19 @@ export const displayError = async (text: string|string[], options = {}) => {
   process.exit(1);
 };
 
-export const packageExists = (moduleName: string, relative: boolean = false) => {
-  if (relative) {
-    try {
-      // eslint-disable-next-line global-require,import/no-dynamic-require
-      require.resolve(`${moduleName}`);
-
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  const modulePath = path.join(process.cwd(), 'node_modules', moduleName);
-  return fs.pathExistsSync(modulePath);
-};
-
-const requiredPackageExists = async (moduleName: string, relative: boolean = false) => {
-  if (!packageExists(moduleName, relative)) {
-    await displayError(
-      `${moduleName} dependency not found. Please run this command from project directory.`
-    );
-  }
-};
-
-export const requireFromPackage = async <T = any>(moduleName: string, relative: boolean = false): Promise<T> => {
-  await requiredPackageExists(moduleName, relative);
-
-  if (relative) {
-    const resolvePath = require.resolve(`${moduleName}`);
-
-    // eslint-disable-next-line global-require,import/no-dynamic-require
-    return require(resolvePath);
-  }
-
-  // eslint-disable-next-line global-require,import/no-dynamic-require
-  return require(path.join(process.cwd(), 'node_modules', moduleName));
-};
-
 export const logStage = async (stage: string, eventName: string, props?: any) => {
   console.log(`- ${stage}`);
+
   if (eventName) {
-    await event(eventName, props);
+    await track({
+      name: eventName,
+      ...props
+    });
   }
 };
 
-export function loadCliManifest() {
-  // eslint-disable-next-line global-require
-  return require('../package.json');
+export function findMaxVersion(versions: string[]): SemVer {
+  return versions
+    .map((v) => <SemVer>semverParse(v))
+    .reduce((a, b) => (semverCompare(a, b) === 1 ? a : b));
 }

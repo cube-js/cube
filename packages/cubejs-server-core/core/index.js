@@ -1,17 +1,20 @@
 /* eslint-disable global-require */
-const { ApiGateway } = require('@cubejs-backend/api-gateway');
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
 const LRUCache = require('lru-cache');
 const SqlString = require('sqlstring');
 const R = require('ramda');
+const isDocker = require('is-docker');
+
+const { ApiGateway } = require('@cubejs-backend/api-gateway');
+const { track, internalExceptions, getEnv, getAnonymousId } = require('@cubejs-backend/shared');
+
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const RefreshScheduler = require('./RefreshScheduler');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
-const track = require('./track');
 const agentCollect = require('./agentCollect');
 const { version } = require('../package.json');
 const DriverDependencies = require('./DriverDependencies');
@@ -238,15 +241,19 @@ class CubejsServerCore {
     )) {
       this.scheduledRefreshTimer = parseInt(this.scheduledRefreshTimer, 10) * 1000;
     }
+
     if (this.scheduledRefreshTimer && typeof this.scheduledRefreshTimer === 'string') {
       this.scheduledRefreshTimer = this.scheduledRefreshTimer.toLowerCase() === 'true';
     }
+
     if (this.scheduledRefreshTimer == null) {
       this.scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
     }
+
     if (typeof this.scheduledRefreshTimer === 'boolean' && this.scheduledRefreshTimer) {
       this.scheduledRefreshTimer = 5000;
     }
+
     if (
       this.scheduledRefreshTimer
     ) {
@@ -273,40 +280,43 @@ class CubejsServerCore {
       );
     }
 
-    const { machineIdSync } = require('node-machine-id');
-    let anonymousId = 'unknown';
-    try {
-      anonymousId = machineIdSync();
-    } catch (e) {
-      // console.error(e);
-    }
-    this.anonymousId = anonymousId;
     this.event = async (name, props) => {
       if (!options.telemetry) {
         return;
       }
-      try {
-        if (!this.projectFingerprint) {
-          try {
-            this.projectFingerprint =
-              crypto.createHash('md5').update(JSON.stringify(await fs.readJson('package.json'))).digest('hex');
-            const coreServerJson = await fs.readJson(path.join(__dirname, '..', 'package.json'));
-            this.coreServerVersion = coreServerJson.version;
-          } catch (e) {
-            // console.error(e);
-          }
+
+      if (!this.projectFingerprint) {
+        try {
+          this.projectFingerprint = crypto.createHash('md5')
+            .update(JSON.stringify(await fs.readJson('package.json')))
+            .digest('hex');
+        } catch (e) {
+          internalExceptions(e);
         }
+      }
+
+      if (!this.anonymousId) {
+        this.anonymousId = getAnonymousId();
+      }
+
+      if (!this.coreServerVersion) {
+        this.coreServerVersion = version;
+      }
+
+      const internalExceptionsEnv = getEnv('internalExceptions');
+
+      try {
         await track({
           event: name,
-          anonymousId,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
-          imageTag: process.env.CUBEJS_DOCKER_IMAGE_TAG,
-          nodeVersion: process.version,
+          dockerVersion: getEnv('dockerImageVersion'),
+          isDocker: isDocker(),
+          internalExceptions: internalExceptionsEnv !== 'false' ? internalExceptionsEnv : undefined,
           ...props
         });
       } catch (e) {
-        // console.error(e);
+        internalExceptions(e);
       }
     };
 

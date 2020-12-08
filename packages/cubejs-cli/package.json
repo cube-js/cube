@@ -12,19 +12,19 @@
     "node": ">=8.11.1"
   },
   "bin": {
-    "cubejs": "dist/index.js"
+    "cubejs": "dist/src/index.js"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest dist",
+    "unit": "jest dist/test",
     "lint": "linter src/* --ext .ts,.js",
     "lint:fix": "linter --fix src/* --ext .ts,.js"
   },
   "files": [
-    "dist",
+    "dist/src/*",
     "yarn.lock",
     "README.md",
     "LICENSE"
@@ -39,8 +39,6 @@
     "fs-extra": "^8.1.0",
     "inquirer": "^7.1.0",
     "jsonwebtoken": "^8.5.1",
-    "node-fetch": "^2.6.0",
-    "node-machine-id": "^1.1.10",
     "request": "^2.88.2",
     "request-promise": "^4.2.5",
     "semver": "^7.3.2",
@@ -53,13 +51,13 @@
     "@types/cross-spawn": "^6.0.2",
     "@types/fs-extra": "^9.0.2",
     "@types/inquirer": "^7.3.1",
+    "@types/jest": "^25.2.3",
     "@types/jsonwebtoken": "^8.5.0",
     "@types/node": "^14.11.10",
     "@types/request-promise": "^4.1.46",
     "@types/semver": "^7.3.4",
     "husky": "^4.2.3",
-    "jest": "^24.8.0",
-    "mocha": "^8.0.1",
+    "jest": "^25.5.4",
     "should": "^13.2.3",
     "typescript": "~4.1.2"
   },

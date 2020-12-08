@@ -1,13 +1,27 @@
 import { CreateOptions } from '@cubejs-backend/server-core';
-import { requireFromPackage, isDockerImage, packageExists, PackageManifest } from '@cubejs-backend/shared';
+import { isDockerImage, packageExists, PackageManifest, resolveBuiltInPackageVersion } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 
-import { getMajorityVersion, isCubeNotServerPackage, isDevPackage, isSimilarPackageRelease } from './utils';
+import {
+  getMajorityVersion,
+  isCubeNotServerPackage,
+  isDevPackage,
+  isSimilarPackageRelease, parseNpmLock,
+  parseYarnLock, ProjectLock,
+} from './utils';
 import { CubejsServer } from '../server';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
+
+function safetyParseSemver(version: string|null) {
+  if (version) {
+    return semverParse(version);
+  }
+
+  return null;
+}
 
 export class ServerContainer {
   public constructor(
@@ -25,43 +39,6 @@ export class ServerContainer {
 
     throw new Error(
       'Typescript dependency not found. Please run this command from project directory.'
-    );
-  }
-
-  protected async resolvePackageVersion(basePath: string, pkgName: string) {
-    const resolvedManifest = await requireFromPackage<PackageManifest|null>(
-      path.join(pkgName, 'package.json'),
-      {
-        basePath,
-        relative: false,
-        silent: true,
-      },
-    );
-    if (resolvedManifest) {
-      return semverParse(resolvedManifest.version);
-    }
-
-    if (this.configuration.debug) {
-      console.log(
-        `[resolvePackageVersion] Unable to resolve version for ${pkgName} by ${basePath} prefix`
-      );
-    }
-
-    return null;
-  }
-
-  protected async resolveBuiltInPackageVersion(pkgName: string) {
-    return this.resolvePackageVersion(
-      '/cube',
-      pkgName,
-    );
-  }
-
-  protected async resolveUserPackageVersion(pkgName: string) {
-    return this.resolvePackageVersion(
-      // In the official docker image, it will be resolved to /cube/conf
-      process.cwd(),
-      pkgName,
     );
   }
 
@@ -91,23 +68,57 @@ export class ServerContainer {
     }
   }
 
-  protected async runProjectDockerDiagnostics(manifest: PackageManifest) {
+  protected async parseLock() {
+    const hasNpm = fs.existsSync(path.join(process.cwd(), 'package-lock.json'));
+    const hasYarn = fs.existsSync(path.join(process.cwd(), 'yarn.lock'));
+
+    if (this.configuration.debug) {
+      console.log('[parseLock] do', {
+        hasNpm,
+        hasYarn
+      });
+    }
+
+    if (hasNpm && hasYarn) {
+      throw new Error(
+        'You are using two different lock files, both for npm/yarn. Please use only one.'
+      );
+    }
+
+    if (hasNpm) {
+      return parseNpmLock();
+    }
+
+    if (hasYarn) {
+      return parseYarnLock();
+    }
+
+    // @todo Error or notice?
+    return null;
+  }
+
+  protected async runProjectDockerDiagnostics(manifest: PackageManifest, lock: ProjectLock) {
     if (this.configuration.debug) {
       console.log('[runProjectDockerDiagnostics] do');
     }
 
-    const builtInCoreVersion = await this.resolveBuiltInPackageVersion(
-      '@cubejs-backend/server',
+    const builtInCoreVersion = safetyParseSemver(
+      await resolveBuiltInPackageVersion(
+        '@cubejs-backend/server',
+      )
     );
     if (!builtInCoreVersion) {
       return;
     }
 
-    const userCoreVersion = await this.resolveUserPackageVersion(
-      '@cubejs-backend/server',
+    const userCoreVersion = safetyParseSemver(
+      lock.resolveVersion('@cubejs-backend/server'),
     );
     if (userCoreVersion) {
-      this.compareBuiltInAndUserVersions(builtInCoreVersion, userCoreVersion);
+      this.compareBuiltInAndUserVersions(
+        builtInCoreVersion,
+        userCoreVersion
+      );
 
       return;
     }
@@ -121,8 +132,8 @@ export class ServerContainer {
     );
     // eslint-disable-next-line no-restricted-syntax
     for (const pkgName of depsToCompareVersions) {
-      const pkgVersion = await this.resolveUserPackageVersion(
-        pkgName,
+      const pkgVersion = safetyParseSemver(
+        lock.resolveVersion(pkgName)
       );
       if (pkgVersion) {
         this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
@@ -142,56 +153,66 @@ export class ServerContainer {
     }
 
     // eslint-disable-next-line global-require,import/no-dynamic-require
-    const manifest: PackageManifest = require(path.join(process.cwd(), 'package.json'));
-    if (manifest) {
-      if (manifest.dependencies) {
-        // eslint-disable-next-line no-restricted-syntax
-        for (const [pkgName] of Object.entries(manifest.dependencies)) {
-          if (isDevPackage(pkgName)) {
-            throw new Error(
-              `"${pkgName}" package must be installed in devDependencies`
-            );
-          }
-        }
-      }
+    const manifest = require(path.join(process.cwd(), 'package.json'));
+    if (!manifest) {
+      return;
+    }
 
-      if (manifest.devDependencies) {
-        // eslint-disable-next-line no-restricted-syntax
-        for (const pkgName of Object.keys(manifest.devDependencies)) {
-          if (!isDevPackage(pkgName)) {
-            console.log(
-              `${color.yellow('warning')} "${pkgName}" will not be installed in Cube Cloud (please move it to dependencies)`
-            );
-          }
-        }
-
-        const coreVersion = await this.resolveUserPackageVersion(
-          '@cubejs-backend/server',
-        );
-        if (coreVersion) {
-          const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
-            isCubeNotServerPackage
+    if (manifest.dependencies) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const [pkgName] of Object.entries(manifest.dependencies)) {
+        if (isDevPackage(pkgName)) {
+          throw new Error(
+            `"${pkgName}" package must be installed in devDependencies`
           );
-          // eslint-disable-next-line no-restricted-syntax
-          for (const pkgName of depsToCompareVersions) {
-            const pkgVersion = await this.resolveUserPackageVersion(
-              pkgName,
+        }
+      }
+    }
+
+    if (manifest.devDependencies) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const pkgName of Object.keys(manifest.devDependencies)) {
+        if (!isDevPackage(pkgName)) {
+          console.log(
+            `${color.yellow('warning')} "${pkgName}" will not be installed in Cube Cloud (please move it to dependencies)`
+          );
+        }
+      }
+    }
+
+    const lock = await this.parseLock();
+    if (!lock) {
+      return;
+    }
+
+    if (manifest.devDependencies) {
+      const coreVersion = safetyParseSemver(
+        lock.resolveVersion('@cubejs-backend/server'),
+      );
+      if (coreVersion) {
+        const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
+          isCubeNotServerPackage
+        );
+
+        // eslint-disable-next-line no-restricted-syntax
+        for (const pkgName of depsToCompareVersions) {
+          const pkgVersion = safetyParseSemver(
+            lock.resolveVersion(pkgName)
+          );
+          if (pkgVersion && !isSimilarPackageRelease(pkgVersion, coreVersion)) {
+            console.log(
+              `${color.yellow('error')} "${pkgName}" (${getMajorityVersion(pkgVersion)}) `
+              + `is using another release then @cubejs-backend/server (${getMajorityVersion(coreVersion)}).`
             );
-            if (pkgVersion && !isSimilarPackageRelease(pkgVersion, coreVersion)) {
-              console.log(
-                `${color.yellow('error')} "${pkgName}" (${getMajorityVersion(pkgVersion)}) `
-                + `is using another release then @cubejs-backend/server (${getMajorityVersion(coreVersion)}).`
-              );
-            }
           }
         }
       }
+    }
 
-      if (isDockerImage()) {
-        await this.runProjectDockerDiagnostics(manifest);
-      } else if (this.configuration.debug) {
-        console.log('[runProjectDockerDiagnostics] skipped');
-      }
+    if (isDockerImage()) {
+      await this.runProjectDockerDiagnostics(manifest, lock);
+    } else if (this.configuration.debug) {
+      console.log('[runProjectDockerDiagnostics] skipped');
     }
   }
 

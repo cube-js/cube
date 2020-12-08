@@ -1,3 +1,18 @@
+export type TemplateFileContext = {
+  dbType: string,
+  apiSecret: string,
+  projectName: string,
+  dockerVersion: string,
+  driverEnvVariables?: string[],
+};
+
+export type Template = {
+  scripts: Record<string, string>,
+  files: Record<string, (ctx: TemplateFileContext) => string>,
+  dependencies?: string[],
+  devDependencies?: string[],
+};
+
 const indexJs = `const CubejsServer = require('@cubejs-backend/server');
 
 const server = new CubejsServer();
@@ -214,24 +229,12 @@ module.exports = {
 };
 `;
 
-const dockerCompose = `
+const dockerCompose = (ctx: TemplateFileContext) => `
 version: '2.2'
 
 services:
-# Example of PostgreSQL configuration, uncomment if you want to use postgres
-#  postgres:
-#    image: postgres:12.4
-#    environment:
-#      POSTGRES_USER: 'test'
-#      POSTGRES_PASSWORD: 'test'
-#      POSTGRES_DB: 'test'
-
   cube:
-    image: cubejs/cube:latest
-    #depends_on:
-    #  - postgres
-    #links:
-    #  - postgres
+    image: cubejs/cube:${ctx.dockerVersion}
     ports:
       # It's better to use random port binding for 4000/3000 ports
       # without it you will not able to start multiple projects inside docker
@@ -243,21 +246,19 @@ services:
       - 3000:3000
     env_file: .env
     volumes:
-      # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
-      # - .:/cube/conf
-      - ./dashboard-app:/cube/conf/dashboard-app
-      - ./cube.js:/cube/conf/cube.js
-      - ./schema:/cube/conf/schema
+      - .:/cube/conf
+      # We ignore Cube.js deps, because they are built-in inside the official Docker image
+      - .empty:/cube/conf/node_modules/@cubejs-backend/
 `;
 
-const templates = {
+const templates: Record<string, Template> = {
   docker: {
     scripts: {
       dev: './node_modules/.bin/cubejs-server',
     },
     files: {
       'cube.js': () => cubeJs,
-      'docker-compose.yml': () => dockerCompose,
+      'docker-compose.yml': dockerCompose,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
       'schema/Orders.js': () => ordersJs

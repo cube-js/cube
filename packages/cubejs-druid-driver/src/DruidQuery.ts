@@ -1,5 +1,5 @@
-const moment = require('moment-timezone');
-const BaseQuery = require('@cubejs-backend/schema-compiler/adapter/BaseQuery');
+import moment from 'moment-timezone';
+import BaseQuery from '@cubejs-backend/schema-compiler/adapter/BaseQuery';
 
 const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: date => `DATE_TRUNC('day', ${date})`,
