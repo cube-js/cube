@@ -483,7 +483,6 @@ impl CubeTable {
                 partition_execs.push(arc);
             }
 
-            // TODO look up in not repartitioned parent chunks
             let chunks = partition_snapshot.chunks();
             for chunk in chunks {
                 let remote_path = chunk.get_row().get_full_name(chunk.get_id());

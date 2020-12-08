@@ -459,13 +459,16 @@ impl SplitRowParquetWriter {
             self.current_writer += 1;
             remaining_slice = &remaining_slice[split_at..];
         }
-        if self.first_row.is_none() {
-            self.first_row = Some(remaining_slice[0].clone());
+        if remaining_slice.len() > 0 {
+            if self.first_row.is_none() {
+                self.first_row = Some(remaining_slice[0].clone());
+            }
+            self.writers[self.current_writer].write_rows(remaining_slice)?;
+            self.last_row = Some(remaining_slice[remaining_slice.len() - 1].clone());
+            self.rows_written += remaining_slice.len();
+            self.rows_written_current_file += remaining_slice.len() as u64;
         }
-        self.writers[self.current_writer].write_rows(remaining_slice)?;
-        self.last_row = Some(remaining_slice[remaining_slice.len() - 1].clone());
-        self.rows_written += remaining_slice.len();
-        self.rows_written_current_file += remaining_slice.len() as u64;
+
         Ok(())
     }
 
@@ -478,6 +481,7 @@ impl SplitRowParquetWriter {
     }
 
     fn close(mut self) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
+        // TODO handle case if only one partition is written out of 3
         assert!(self.current_writer == self.writers.len() - 1);
         if self.first_row.is_some() && self.last_row.is_some() {
             self.min_max_rows.push((

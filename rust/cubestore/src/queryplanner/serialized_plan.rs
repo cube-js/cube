@@ -436,7 +436,7 @@ impl SerializedPlan {
                     partition_snapshots.push(PartitionSnapshot {
                         chunks: meta_store_to_move
                             .clone()
-                            .get_chunks_by_partition(partition.get_id())
+                            .get_chunks_by_partition_with_non_repartitioned(partition.get_id())
                             .await?,
                         partition,
                     });

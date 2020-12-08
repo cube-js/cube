@@ -336,6 +336,7 @@ impl ChunkDataStore for ChunkStore {
         for chunk in chunks.into_iter() {
             let chunk_id = chunk.get_id();
             let data = self.get_chunk(chunk).await?;
+            // TODO atomic
             self.partition_data_frame(partition.get_row().get_index_id(), data)
                 .await?;
             self.meta_store.deactivate_chunk(chunk_id).await?;
@@ -591,7 +592,7 @@ impl ChunkStore {
                         .get_row()
                         .get_max_val()
                         .as_ref()
-                        .map(|max| r.sort_key(sort_key_size) <= max.sort_key(sort_key_size))
+                        .map(|max| r.sort_key(sort_key_size) < max.sort_key(sort_key_size))
                         .unwrap_or(true)
             });
             if to_write.len() > 0 {
@@ -604,6 +605,8 @@ impl ChunkStore {
             }
             remaining_rows = next;
         }
+
+        assert_eq!(remaining_rows.len(), 0);
 
         Ok(())
     }

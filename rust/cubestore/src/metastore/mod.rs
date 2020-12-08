@@ -487,6 +487,8 @@ pub trait MetaStoreTable: Send + Sync {
     async fn row_by_id_or_not_found(&self, id: u64) -> Result<IdRow<Self::T>, CubeError>;
 
     async fn insert_row(&self, row: Self::T) -> Result<IdRow<Self::T>, CubeError>;
+
+    async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError>;
 }
 
 struct MetaStoreTableImpl<
@@ -521,6 +523,13 @@ impl<R: RocksTable + 'static, F: Fn(Arc<DB>) -> R + Send + Sync + Clone + 'stati
         let table = self.rocks_table_fn.clone();
         self.rocks_meta_store
             .write_operation(move |db_ref, batch| Ok(table(db_ref).insert(row, batch)?))
+            .await
+    }
+
+    async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
+        let table = self.rocks_table_fn.clone();
+        self.rocks_meta_store
+            .write_operation(move |db_ref, batch| Ok(table(db_ref).delete(id, batch)?))
             .await
     }
 }
@@ -605,6 +614,10 @@ pub trait MetaStore: Send + Sync {
     ) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunks_by_partition(
+        &self,
+        partition_id: u64,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
+    async fn get_chunks_by_partition_with_non_repartitioned(
         &self,
         partition_id: u64,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
@@ -2167,6 +2180,40 @@ impl MetaStore for RocksMetaStore {
                 .collect::<Vec<_>>())
         })
         .await
+    }
+
+    async fn get_chunks_by_partition_with_non_repartitioned(
+        &self,
+        partition_id: u64,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let table = ChunkRocksTable::new(db_ref.clone());
+            let mut partitions_up_to_root = Vec::new();
+            let partition_table = PartitionRocksTable::new(db_ref);
+            let mut current_partition = partition_table.get_row_or_not_found(partition_id)?;
+            partitions_up_to_root.push(current_partition.get_id());
+            while let Some(parent_id) = current_partition.get_row().parent_partition_id() {
+                let parent = partition_table.get_row_or_not_found(*parent_id)?;
+                partitions_up_to_root.push(parent.get_id());
+                current_partition = parent;
+            }
+
+            let mut chunks = Vec::new();
+
+            for partition_id in partitions_up_to_root.into_iter() {
+                chunks.extend(
+                    table
+                    .get_rows_by_index(
+                        &ChunkIndexKey::ByPartitionId(partition_id),
+                        &ChunkRocksIndex::PartitionId,
+                    )?
+                    .into_iter()
+                    .filter(|c| c.get_row().uploaded() && c.get_row().active())
+                );
+            }
+
+            Ok(chunks)
+        }).await
     }
 
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {

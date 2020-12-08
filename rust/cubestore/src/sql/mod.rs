@@ -624,7 +624,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
-    use std::{env, fs};
+    use std::{env, fs, thread, time};
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -1043,6 +1043,66 @@ mod tests {
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn compaction() {
+        Config::test("compaction").update_config(|mut config| {
+            config.partition_split_threshold = 5;
+            config.compaction_chunks_count_threshold = 0;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.table (t int)").await.unwrap();
+
+            let listener = services.cluster.job_result_listener();
+
+            service.exec_query(
+                "INSERT INTO foo.table (t) VALUES (NULL), (1), (3), (5), (10), (20), (25), (25), (25), (25), (25)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.table (t) VALUES (NULL), (NULL), (NULL), (2), (4), (5), (27), (28), (29)"
+            ).await.unwrap();
+
+            listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
+                (RowKey::Table(TableId::Partitions, 2), JobType::PartitionCompaction),
+                (RowKey::Table(TableId::Partitions, 3), JobType::PartitionCompaction),
+                (RowKey::Table(TableId::Partitions, 1), JobType::Repartition),
+                (RowKey::Table(TableId::Partitions, 2), JobType::Repartition),
+                (RowKey::Table(TableId::Partitions, 3), JobType::Repartition),
+            ]).await.unwrap();
+
+            thread::sleep(time::Duration::from_millis(1000));
+
+            let partitions = services.meta_store.get_active_partitions_by_index_id(1).await.unwrap();
+
+            assert_eq!(partitions.len(), 4);
+            let p_1 = partitions.iter().find(|r| r.get_id() == 5).unwrap();
+            let p_2 = partitions.iter().find(|r| r.get_id() == 6).unwrap();
+            let p_3 = partitions.iter().find(|r| r.get_id() == 7).unwrap();
+            let p_4 = partitions.iter().find(|r| r.get_id() == 8).unwrap();
+            println!("{:?}", vec![p_1, p_2, p_3, p_4]);
+            assert_eq!(p_1.get_row().get_min_val(), &None);
+            assert_eq!(p_1.get_row().get_max_val(), &Some(Row::new(vec![TableValue::Int(2)])));
+
+            assert_eq!(p_2.get_row().get_min_val(), &Some(Row::new(vec![TableValue::Int(2)])));
+            assert_eq!(p_2.get_row().get_max_val(), &Some(Row::new(vec![TableValue::Int(10)])));
+
+            assert_eq!(p_3.get_row().get_min_val(), &Some(Row::new(vec![TableValue::Int(10)])));
+            assert_eq!(p_3.get_row().get_max_val(), &Some(Row::new(vec![TableValue::Int(27)])));
+
+            assert_eq!(p_4.get_row().get_min_val(), &Some(Row::new(vec![TableValue::Int(27)])));
+            assert_eq!(p_4.get_row().get_max_val(), &None);
+
+            let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(20)]));
         }).await;
     }
 }
