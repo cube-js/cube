@@ -449,9 +449,10 @@ mod tests {
                 .collect::<Vec<_>>();
 
             let data_frame = DataFrame::new(col.clone(), first_rows);
-            let table = IdRow::new(1, Table::new("foo".to_string(), 1, col.clone(), None, None));
 
-            let _ = store.add_wal(table.clone(), data_frame).await;
+            store.meta_store.create_schema("s".to_string(), false).await.unwrap();
+            let table = store.meta_store.create_table("s".to_string(), "foo".to_string(), col.clone(), None, None, Vec::new()).await.unwrap();
+            store.add_wal(table.clone(), data_frame).await.unwrap();
             let wal = IdRow::new(1, WAL::new(1, 10));
             let restored_wal: DataFrame = store.get_wal(wal.get_id()).await.unwrap();
 

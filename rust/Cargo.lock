@@ -126,7 +126,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#55a23c59df7308c59f705fe9936aa9d2ffab423c"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#8c937f87e372a6d62666230b97c45bbc440a7555"
 dependencies = [
  "chrono",
  "csv",
@@ -147,7 +147,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#55a23c59df7308c59f705fe9936aa9d2ffab423c"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#8c937f87e372a6d62666230b97c45bbc440a7555"
 dependencies = [
  "arrow",
  "bytes",
@@ -265,10 +265,11 @@ dependencies = [
 
 [[package]]
 name = "async-std"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7e82538bc65a25dbdff70e4c5439d52f068048ab97cdea0acd73f131594caa1"
+checksum = "8f9f84f1280a2b436a2c77c2582602732b6c2f4321d5494d6e799e6c367859a8"
 dependencies = [
+ "async-channel",
  "async-global-executor",
  "async-io",
  "async-mutex",
@@ -284,7 +285,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.2.0",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -1023,7 +1024,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#55a23c59df7308c59f705fe9936aa9d2ffab423c"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#8c937f87e372a6d62666230b97c45bbc440a7555"
 dependencies = [
  "ahash 0.6.1",
  "arrow",
@@ -2553,7 +2554,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#55a23c59df7308c59f705fe9936aa9d2ffab423c"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#8c937f87e372a6d62666230b97c45bbc440a7555"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3155,7 +3156,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a04bdd0f5118d06ef0e2daa658a9e5135282bcecfd6c46b11fddf47b1d5d736d"
 dependencies = [
- "async-std 1.7.0",
+ "async-std 1.8.0",
  "aws-creds",
  "aws-region",
  "base64 0.13.0",

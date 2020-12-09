@@ -22,7 +22,9 @@ pub struct Table {
     schema_id: u64,
     columns: Vec<Column>,
     location: Option<String>,
-    import_format: Option<ImportFormat>
+    import_format: Option<ImportFormat>,
+    #[serde(default)]
+    has_data: bool
 }
 }
 
@@ -54,6 +56,7 @@ impl Table {
             columns,
             location,
             import_format,
+            has_data: false
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -74,6 +77,21 @@ impl Table {
 
     pub fn get_table_name(&self) -> &String {
         &self.table_name
+    }
+
+    pub fn has_data(&self) -> &bool {
+        &self.has_data
+    }
+
+    pub fn update_has_data(&self, has_data: bool) -> Self {
+        Self {
+            table_name: self.table_name.clone(),
+            schema_id: self.schema_id,
+            columns: self.columns.clone(),
+            location: self.location.clone(),
+            import_format: self.import_format.clone(),
+            has_data
+        }
     }
 }
 

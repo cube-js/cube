@@ -140,49 +140,20 @@ impl SqlServiceImpl {
         }
     }
 
-    async fn _create_index(
+    async fn create_index(
         &self,
         schema_name: String,
         table_name: String,
         name: String,
         columns: &Vec<Ident>,
     ) -> Result<IdRow<Index>, CubeError> {
-        let table = self
-            .db
-            .get_table(schema_name.clone(), table_name.clone())
-            .await?;
-        let columns_to_write = columns
-            .iter()
-            .enumerate()
-            .map(|(i, c)| {
-                table
-                    .get_row()
-                    .get_columns()
-                    .iter()
-                    .find(|tc| tc.get_name() == &c.value)
-                    .map(|c| c.replace_index(i))
-                    .ok_or(CubeError::user(format!(
-                        "Column '{}' is not found in {}.{}",
-                        c.value, schema_name, table_name
-                    )))
-            })
-            .collect::<Vec<_>>();
-        if let Some(Err(e)) = columns_to_write.iter().find(|r| r.is_err()) {
-            return Err(e.clone());
-        }
         Ok(self
             .db
-            .index_table()
-            .insert_row(Index::try_new(
+            .create_index(schema_name, table_name, IndexDef {
                 name,
-                table.get_id(),
-                columns_to_write
-                    .into_iter()
-                    .map(|c| c.unwrap().clone())
-                    .collect::<Vec<_>>(),
-                columns.len() as u64,
-            )?)
-            .await?)
+                columns: columns.iter().map(|c| c.to_string()).collect()
+            }).await?
+        )
     }
 
     async fn insert_data<'a>(
@@ -324,7 +295,7 @@ impl SqlService for SqlServiceImpl {
             } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
-                    return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
+                    return Err(CubeError::user(format!("Schema's name should be present in table name but found: {}", name)));
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
@@ -339,6 +310,15 @@ impl SqlService for SqlServiceImpl {
                         indexes,
                     )
                     .await?;
+                Ok(DataFrame::from(vec![res]))
+            }
+            CubeStoreStatement::Statement(Statement::CreateIndex { name, table_name, columns, .. }) => {
+                if table_name.0.len() != 2 {
+                    return Err(CubeError::user(format!("Schema's name should be present in table name but found: {}", table_name)));
+                }
+                let schema_name = &table_name.0[0].value;
+                let table_name = &table_name.0[1].value;
+                let res = self.create_index(schema_name.to_string(), table_name.to_string(), name.to_string(), &columns).await?;
                 Ok(DataFrame::from(vec![res]))
             }
             CubeStoreStatement::Statement(Statement::Drop {
@@ -709,6 +689,7 @@ mod tests {
                 TableValue::String("[{\"name\":\"PersonID\",\"column_type\":\"Int\",\"column_index\":0},{\"name\":\"LastName\",\"column_type\":\"String\",\"column_index\":1},{\"name\":\"FirstName\",\"column_type\":\"String\",\"column_index\":2},{\"name\":\"Address\",\"column_type\":\"String\",\"column_index\":3},{\"name\":\"City\",\"column_type\":\"String\",\"column_index\":4}]".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("false".to_string()),
             ]));
         }
         let _ = DB::destroy(&Options::default(), path);
@@ -976,6 +957,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn numeric_cast() {
+        Config::run_test("numeric_cast", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.managers (id text, department_id int)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.managers (id, department_id) VALUES ('a', 1), ('b', 3), ('c', 3), ('d', 5)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.managers WHERE department_id in ('3', '5')").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn union() {
         Config::run_test("union", async move |services| {
             let service = services.sql_service;
@@ -1042,6 +1042,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_index_before_ingestion() {
+        Config::run_test("create_index_before_ingestion", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.timestamps (id int, t timestamp)").await.unwrap();
+
+            service.exec_query("CREATE INDEX by_timestamp ON foo.timestamps (t)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.timestamps (id, t) VALUES (1, '2020-01-01T00:00:00.000Z'), (2, '2020-01-02T00:00:00.000Z'), (3, '2020-01-03T00:00:00.000Z')"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn create_table_with_location() {
         Config::run_test("create_table_with_location", async move |services| {
             let service = services.sql_service;
@@ -1060,6 +1081,9 @@ mod tests {
 
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
             let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text) INDEX persons_city (city, id) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
+            let res = service.exec_query("CREATE INDEX by_city ON Foo.Persons (city)").await;
+            let error = format!("{:?}", res);
+            assert!(error.contains("has data"));
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
