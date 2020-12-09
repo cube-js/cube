@@ -36,21 +36,23 @@ features:
 
 | Status     | Feature                                                               | Deprecated | Remove    |
 | ---------- | --------------------------------------------------------------------- | ---------- | --------- |
-| Deprecated | [Embedding Cube.js within Express](#embedding-cube-js-within-express) | v0.24.0    | June 2021 |
-| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs-enable-tls)                             | v0.23.11   | June 2021 |
+| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)  | v0.24.0    | June 2021 |
+| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                             | v0.23.11   | June 2021 |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                               | v0.23.8    | June 2021 |
 
 ### Embedding Cube.js within Express
 
 **Deprecated in Release: v0.24.0**
 
-Embedding Cube.js into Express applications is deprecated due to
-performance and reliability considerations.
+Embedding Cube.js into Express applications is deprecated due to performance and
+reliability considerations. [Read more about this change
+here][link-cube-docker].
 
 Developers are encouraged to [migrate to the new `cube.js` configuration
 file][link-migration] and deploy Cube.js as a microservice (or multiple
 microservices, if necessary).
 
+[link-cube-docker]: https://cube.dev/blog/cubejs-loves-docker
 [link-migration]:
   https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
 
@@ -59,7 +61,11 @@ microservices, if necessary).
 **Deprecated in Release: v0.23.11**
 
 We no longer recommend setting TLS options via Cube.js. Developers should set up
-TLS on a load balancer or reverse proxy instead.
+TLS on a load balancer or reverse proxy instead. [Read more
+here][link-enable-https].
+
+[link-enable-https]:
+  https://cube.dev/docs/deployment/production-checklist#enable-https
 
 ### `hearBeatInterval`
 
