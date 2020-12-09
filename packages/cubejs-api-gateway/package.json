@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "0.24.4",
+  "version": "0.24.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -38,7 +38,7 @@
     "uuid": "^3.3.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.24.4",
+    "@cubejs-backend/linter": "^0.24.5",
     "@types/express": "^4.17.9",
     "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^25.2.3",

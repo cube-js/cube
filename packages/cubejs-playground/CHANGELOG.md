@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.5](https://github.com/cube-js/cube.js/compare/v0.24.4...v0.24.5) (2020-12-09)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** fix user select on tab content ([7a0e4ef](https://github.com/cube-js/cube.js/commit/7a0e4ef10fb42597a402c69004c0d94178ce62ed))
+
+
+
+
+
 ## [0.24.4](https://github.com/cube-js/cube.js/compare/v0.24.3...v0.24.4) (2020-12-07)
 
 

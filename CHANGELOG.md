@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.5](https://github.com/cube-js/cube.js/compare/v0.24.4...v0.24.5) (2020-12-09)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/api-gateway:** Export UserError/CubejsHandlerError ([#1540](https://github.com/cube-js/cube.js/issues/1540)) ([20124ba](https://github.com/cube-js/cube.js/commit/20124ba26f8330801fd23e33c7c36a2005ae98e8))
+* **@cubejs-client/playground:** fix user select on tab content ([7a0e4ef](https://github.com/cube-js/cube.js/commit/7a0e4ef10fb42597a402c69004c0d94178ce62ed))
+* **cubestore:** Compaction fixes ([7441a26](https://github.com/cube-js/cube.js/commit/7441a267d382c126b9e567f59c2b06aed2ca34a5))
+* **cubestore:** Partition range gap fix ([3610b61](https://github.com/cube-js/cube.js/commit/3610b612009016431859bdf18a3760ba029e8613))
+
+
+### Features
+
+* **@cubejs-backend/bigquery-driver:** Allow to make BigQueryDriver as readOnly, fix [#1028](https://github.com/cube-js/cube.js/issues/1028) ([d9395f6](https://github.com/cube-js/cube.js/commit/d9395f6df4e896c1b987ff5dfbf741829e3b51df))
+* **@cubejs-backend/mysql-driver:** CAST all time dimensions with granularities to DATETIME in order to provide typing for rollup downloads. Add mediumtext and mediumint generic type conversions. ([3d8cb37](https://github.com/cube-js/cube.js/commit/3d8cb37d03716cd2768a0986643495e4a844cb8d))
+* **cubejs-cli:** improve DX for docker ([#1457](https://github.com/cube-js/cube.js/issues/1457)) ([72ad782](https://github.com/cube-js/cube.js/commit/72ad782090c52e677b9e51e43818f1dca40db791))
+* **cubestore:** CUBESTORE_PORT env variable ([11e36a7](https://github.com/cube-js/cube.js/commit/11e36a726b930a1952eb917868c93078e1a9308e))
+* **cubestore:** IN Implementation ([945d8bc](https://github.com/cube-js/cube.js/commit/945d8bc3728b3ab462e7448b13d92d65d1581ac8))
+
+
+
+
+
 ## [0.24.4](https://github.com/cube-js/cube.js/compare/v0.24.3...v0.24.4) (2020-12-07)
 
 
