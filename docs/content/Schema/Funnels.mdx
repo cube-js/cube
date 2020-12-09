@@ -49,8 +49,8 @@ even for such a small funnel.
 
 <a href="#" className="accordion-trigger" id="show-sql-accordion"> Show Funnel's SQL </a>
 <div className="accordion" id="show-sql-accordion-body">
-  <pre className="language-sql">
-    <code className="language-sql">
+
+```sql
 SELECT
   purchase_funnel.step "purchase_funnel.step",
   count(purchase_funnel.user_id) "purchase_funnel.conversions"
@@ -136,8 +136,9 @@ ORDER BY
   2 DESC
 LIMIT
   5000
-    </code>
-  </pre>
+
+```
+
 </div>
 
 ## Funnel parameters

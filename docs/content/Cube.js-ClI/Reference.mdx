@@ -83,7 +83,7 @@ $ cubejs generate -t TABLE-NAMES
 
 | Parameter | Description | Values |
 | --------- | ----------- | ------ |
-| -t, --tables <tables> | Comma delimited list of tables to generate schema for. | `TABLE-NAME-1,TABLE-NAME-2` |
+| `-t, --tables <tables>` | Comma delimited list of tables to generate schema for. | `TABLE-NAME-1,TABLE-NAME-2` |
 
 ### Example
 
@@ -98,7 +98,7 @@ $ cubejs generate -t orders,customers
 The `token` command generates a JWT Cube.js token. It either uses the value of the `CUBEJS_API_SECRET` environment variable or provided value with `-s` flag.
 You can only run `token` command from the Cube.js app directory.
 
-_Use these manually generated tokens in production with caution._ <br> _Please refer to the [Security Guide](https://cube.dev/docs/security) for production security best practices._
+_Use these manually generated tokens in production with caution._ <br/> _Please refer to the [Security Guide](https://cube.dev/docs/security) for production security best practices._
 
 ### Usage
 
@@ -110,10 +110,10 @@ $ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 
 | Parameter | Description | Example |
 | --------- | ----------- | ------ |
-| -e, --expiry &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;  | Token expiry. Set to 0 for no expiry (default: "30 days") | `1 day`, `30 days` &nbsp; &nbsp; &nbsp; &nbsp;  |
-| -s, --secret | Cube.js app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | - |
-| -p, --payload | Token Payload | `foo=bar`, `userId=2` |
-| -u, --user-context | Token USER_CONTEXT Payload | `baz=qux`, `companyId=5` |
+| `-e, --expiry` | Token expiry. Set to 0 for no expiry (default: "30 days") | `1 day`, `30 days` &nbsp; &nbsp; &nbsp; &nbsp;  |
+| `-s, --secret` | Cube.js app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | - |
+| `-p, --payload` | Token Payload | `foo=bar`, `userId=2` |
+| `-u, --user-context` | Token USER_CONTEXT Payload | `baz=qux`, `companyId=5` |
 
 ### Example
 
