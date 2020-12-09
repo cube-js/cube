@@ -80,9 +80,11 @@ export class ServerContainer {
     }
 
     if (hasNpm && hasYarn) {
-      throw new Error(
-        'You are using two different lock files, both for npm/yarn. Please use only one.'
+      console.log(
+        `${color.yellow('warning')} You are using two different lock files, both for npm/yarn. Please use only one.`
       );
+
+      return null;
     }
 
     if (hasNpm) {
