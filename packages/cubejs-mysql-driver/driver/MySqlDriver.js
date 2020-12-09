@@ -7,7 +7,7 @@ const fs = require('fs');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
-  text: 'varchar(255) CHARACTER SET utf8mb4'
+  text: 'TEXT CHARACTER SET utf8mb4'
 };
 
 const MySqlToGenericType = {
