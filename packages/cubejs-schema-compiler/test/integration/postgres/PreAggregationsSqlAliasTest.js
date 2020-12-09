@@ -2,10 +2,10 @@
 /* globals it, describe, after */
 const R = require('ramda');
 const should = require('should');
-const UserError = require('../compiler/UserError');
+const UserError = require('../../../compiler/UserError');
 
-const PostgresQuery = require('../adapter/PostgresQuery');
-const PrepareCompiler = require('./PrepareCompiler');
+const PostgresQuery = require('../../../adapter/PostgresQuery');
+const PrepareCompiler = require('../../unit/PrepareCompiler');
 
 const { prepareCompiler } = PrepareCompiler;
 const dbRunner = require('./DbRunner');

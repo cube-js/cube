@@ -10,6 +10,11 @@ const GenericTypeToMySql = {
   text: 'varchar(255) CHARACTER SET utf8mb4'
 };
 
+const MySqlToGenericType = {
+  mediumtext: 'text',
+  mediumint: 'int'
+};
+
 class MySqlDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -24,6 +29,7 @@ class MySqlDriver extends BaseDriver {
       socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
       timezone: 'Z',
       ssl: this.getSslOptions(),
+      dateStrings: true,
       ...restConfig,
     };
 
@@ -207,6 +213,10 @@ class MySqlDriver extends BaseDriver {
       await this.dropTable(table);
       throw e;
     }
+  }
+
+  toGenericType(columnType) {
+    return MySqlToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 }
 
