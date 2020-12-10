@@ -1,3 +1,9 @@
+import type {
+  Request as ExpressRequest,
+  Response as ExpressResponse,
+  NextFunction as ExpressNextFunction
+} from 'express';
+
 export interface QueryFilter {
   member: string;
   operator:
@@ -53,3 +59,18 @@ export interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: number;
 }
+
+export interface RequestContext {
+  authInfo: any;
+  requestId: string;
+}
+
+export type QueryTransformerFn = (query: Query, context: RequestContext) => Promise<Query>;
+
+// @deprecated
+export type CheckAuthMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void
+
+// @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
+export type CheckAuthFn = (ctx: any, authorization?: string) => any;
+
+export type ExtendContextFn = (req: ExpressRequest) => any;
