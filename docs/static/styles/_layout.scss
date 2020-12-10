@@ -388,7 +388,7 @@ span.group-header {
   //padding-left: calc(9999px + 24px);
   //padding-right: 24px;
   //margin-left: -9999px;
-  min-width: 245px;
+  //min-width: 245px;
   max-height: calc(100% - 66px);
   //background: $light;
 
@@ -410,10 +410,13 @@ span.group-header {
 
     :global {
       .ant-menu-item {
+        display: inline-flex;
+        align-items: center;
         color: inherit;
+        padding: 8px 0;
         font-family: inherit;
-        font-size: 16px;
-        line-height: 40px;
+        font-size: 1rem;
+        line-height: 1.5rem;
         letter-spacing: 0.02em;
         padding-left: 0 !important;
         margin-top: 0 !important;
@@ -425,6 +428,7 @@ span.group-header {
 
         a {
           color: inherit;
+          white-space: break-spaces;
         }
 
         &:after {
@@ -548,21 +552,20 @@ span.group-header {
 }
 
 .scrollspy {
-  padding: 16px 0;
+  padding: 1rem 1.5rem 1rem 0;
   overflow-y: auto;
   overflow-x: hidden;
   position: fixed;
   display: flex;
   flex-direction: column;
-  min-width: 230px;
   max-height: calc(100% - 66px);
 
   @media screen and (min-width: 1600px) {
-    max-width: 260px;
+    //max-width: 260px;
   }
 
   @media screen and (min-width: 1200px) and (max-width: 1600px) {
-    max-width: 230px;
+    //max-width: 230px;
   }
 
   .scrollspyLinkWrapper {
@@ -671,7 +674,7 @@ span.group-header {
 
 .header {
   background: #fff;
-  padding: 0 8px;
+  padding: 0 1rem;
   position: fixed;
   z-index: 1;
   width: 100%;

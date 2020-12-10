@@ -1,25 +1,25 @@
 export const layout = {
   leftSidebar: {
     width: {
-      xxl: 5,
+      xxl: 6,
       xl: 6,
       lg: 7,
-      md: 9,
+      md: 7,
     },
   },
   contentArea: {
     width: {
-      xxl: 14,
-      xl: 12,
-      lg: 17,
-      md: 15,
+      xxl: { span: 12, offset: 1 },
+      xl: { span: 12, offset: 1 },
+      lg: { span: 15, offset: 1 },
+      md: { span: 15, offset: 1 },
     },
   },
   rightSidebar: {
     width: {
-      xxl: 5,
-      xl: 6,
-      lg: 7,
+      xxl: { span: 4, offset: 1 },
+      xl: { span: 4, offset: 1 },
+      lg: 0,
       xs: 0,
     },
   },

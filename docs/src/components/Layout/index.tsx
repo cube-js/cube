@@ -238,7 +238,11 @@ class AppLayout extends React.Component<
                 />
                 <Col
                   {...layout.contentArea.width}
-                  xs={this.state.mobileMode === 'content' ? 24 : 0}
+                  xs={
+                    this.state.mobileMode === 'content'
+                      ? { span: 22, offset: 1 }
+                      : 0
+                  }
                 >
                   {pageFrameworkOfChoice && (
                     <FrameworkSwitcher value={pageFrameworkOfChoice} />

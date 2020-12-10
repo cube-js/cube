@@ -4,7 +4,36 @@ import { Layout, Row, Col, Button, Icon } from 'antd';
 import logo from '../../pages/images/Logo.png';
 
 import styles from '../../../static/styles/index.module.scss';
-import { layout } from '../../theme';
+
+const layout = {
+  leftSidebar: {
+    width: {
+      xxl: 6,
+      xl: 6,
+      lg: 7,
+      md: 7,
+      xs: 24,
+    },
+  },
+  contentArea: {
+    width: {
+      xxl: { span: 12, offset: 1 },
+      xl: { span: 12, offset: 1 },
+      lg: { span: 9, offset: 1 },
+      md: { span: 7, offset: 1 },
+      xs: 0,
+    },
+  },
+  rightSidebar: {
+    width: {
+      xxl: { span: 4, offset: 1 },
+      xl: { span: 4, offset: 1 },
+      lg: { span: 6, offset: 1 },
+      md: { span: 8, offset: 1 },
+      xs: 0,
+    },
+  },
+};
 
 type Props = {
   className?: string;
@@ -14,7 +43,7 @@ const Header: React.FC<Props> = (props) => (
   <Layout.Header className={props.className}>
     <div className={styles.searchDimmer}></div>
     <Row>
-      <Col {...layout.leftSidebar.width} xs={24}>
+      <Col {...layout.leftSidebar.width}>
         <div className={styles.logoWrapper}>
           <a href="/" className={styles.logo}>
             <img src={logo} alt="Logo" style={{ height: 36 }} />
@@ -25,13 +54,9 @@ const Header: React.FC<Props> = (props) => (
           </a>
         </div>
       </Col>
-      <Col {...layout.contentArea.width} lg={10} xs={0}>
-        {props.children}
-      </Col>
+      <Col {...layout.contentArea.width}>{props.children}</Col>
       <Col
         {...layout.rightSidebar.width}
-        // md={4}
-        xs={0}
         style={{ height: 'inherit', textAlign: 'right' }}
       >
         <div className={styles.headerButtonWrapper}>
