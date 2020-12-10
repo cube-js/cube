@@ -23,7 +23,8 @@ cube(`Answers`, {
     answersCount: {
       type: `rollup`,
       measureReferences: [Answers.count],
-      dimensionReferences: [Users.geometry]
+      dimensionReferences: [Users.geometry],
+      external: true
     }
   }
 });
