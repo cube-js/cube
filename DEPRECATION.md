@@ -39,6 +39,7 @@ features:
 | Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)  | v0.24.0    | June 2021 |
 | Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                             | v0.23.11   | June 2021 |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                               | v0.23.8    | June 2021 |
+| Deprecated | [Node.js 8](#nodejs-8)                                                | v0.22.4    |   v0.26.0 |
 
 ### Embedding Cube.js within Express
 
@@ -76,3 +77,12 @@ replaced by `heartBeatInterval`.
 
 [link-hearbeatinterval]:
   https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
+
+### Node.js 8
+
+**Deprecated in Release: v0.22.4**
+
+Node.js 8 reached [End of Life on December 31, 2019][link-nodejs-eol]. This
+means no more updates. Please upgrade to Node.js 10 or higher.
+
+[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
