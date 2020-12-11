@@ -535,8 +535,7 @@ class PreAggregationLoader {
     await this.dropOrphanedTables(client, targetTableName, saveCancelFn);
   }
 
-  async refreshImplStreamExternalStrategy
-  (client, newVersionEntry, saveCancelFn, invalidationKeys) {
+  async refreshImplStreamExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
     if (!client.downloadQueryResults) {
