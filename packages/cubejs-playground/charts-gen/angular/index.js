@@ -20,6 +20,7 @@ const packages = [
   // 'dev-cnga',
   'create-ng-app',
   'angular-charts',
+  'ng-credentials'
 ];
 
 const rootPath = path.resolve(`${__dirname}/../..`);

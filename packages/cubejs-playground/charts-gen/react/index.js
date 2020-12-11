@@ -30,7 +30,6 @@ const packages = [
   // 'dev-cra',
   'create-react-app',
   'react-charts',
-  'react-credentials',
 ];
 
 (async () => {
@@ -154,3 +153,5 @@ const packages = [
   );
   await appContainer.ensureDependencies();
 })();
+
+// npm install --save antd @ant-design/compatible @cubejs-client/core @cubejs-client/react chart.js bizcharts recharts d3 react-chartjs
