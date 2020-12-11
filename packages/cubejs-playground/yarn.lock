@@ -1312,10 +1312,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.23.14":
-  version "0.23.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.23.14.tgz#4c3418828cef181a06d04a4e31af0b8a2aab8008"
-  integrity sha512-UqRa+J9SMTIHuio+BI4WsoIIfuoQF3Uhb61wonesz8WqPELIEd2Wq8OpHuZ4+dnQ6ZBHOjerqc0iDkRWZwUDcQ==
+"@cubejs-client/core@^0.24.4":
+  version "0.24.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.24.4.tgz#cf999cde9033fb7c080a3669f0c41bf082540263"
+  integrity sha512-E1jbDcY3wrGZvByLvJFN1b6oklkbX63otir9zfxWi3ulud1wOVO6O2GklmFTZnjpY9m+bQ7DMf6ZPx0MLSEeCw==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1326,13 +1326,13 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.23.15":
-  version "0.23.15"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.23.15.tgz#6a7d0660b379a98e5df236da9ac2c8c9627e7b54"
-  integrity sha512-ep9nJxysjOKT8/JhDjm4iWlwJ81BWdSxNmPkIwc8MdeqTglmEn62Y0fqbw3pw82a9jW/I6BQr5xSVUBf8aucPw==
+"@cubejs-client/react@^0.24.4":
+  version "0.24.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.24.4.tgz#2a6d19204fc78e9bb25e40380d47656ece7b1143"
+  integrity sha512-s5wDIC6KqK3wpWYboQvJ4Uzj7RuQKzleiqRkGJzDc9GKArBWTGYA1wGwHzvLi95MtK+YU025KK5u13W7XF66VA==
   dependencies:
     "@babel/runtime" "^7.1.2"
-    "@cubejs-client/core" "^0.23.14"
+    "@cubejs-client/core" "^0.24.4"
     core-js "^3.6.5"
     ramda "^0.27.0"
 
@@ -6365,9 +6365,9 @@ inherits@2.0.3:
   integrity sha1-Yzwsg+PaQqUC9SRmAiSA9CCCYd4=
 
 ini@^1.3.5:
-  version "1.3.5"
-  resolved "https://registry.yarnpkg.com/ini/-/ini-1.3.5.tgz#eee25f56db1c9ec6085e0c22778083f596abf927"
-  integrity sha512-RZY5huIKCMRWDUqZlEi72f/lmXKMvuszcMBduliQ3nnWbx9X/ZBQO7DijMEYS9EhHBb2qacRUMtC7svLwe0lcw==
+  version "1.3.7"
+  resolved "https://registry.yarnpkg.com/ini/-/ini-1.3.7.tgz#a09363e1911972ea16d7a8851005d84cf09a9a84"
+  integrity sha512-iKpRpXP+CrP2jyrxvg1kMUpXDyRUFDWurxbnVT1vQPx+Wz9uCYsMIqYuSBLV+PAaZG/d7kRLKRFc9oDMsH+mFQ==
 
 inquirer@7.0.4:
   version "7.0.4"
