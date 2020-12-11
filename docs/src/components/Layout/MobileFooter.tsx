@@ -9,16 +9,15 @@ import styles from '../../../static/styles/index.module.scss';
 import { MobileModes } from '../../types';
 
 type Props = {
-  setMobileMode(props: any, mode?: MobileModes): void;
+  setMobileMode(mode: MobileModes): void;
   mobileMode?: MobileModes;
 };
 
 const setMobileMode = (props: Props, mode: MobileModes) => {
-  if (props.mobileMode !== 'content' && mode !== props.mobileMode) {
-    return;
-  }
-
-  props.setMobileMode(props.mobileMode === mode ? 'content' : mode);
+  const nextMode = mode === MobileModes.MENU ? MobileModes.CONTENT : mode;
+  props.setMobileMode(
+    props.mobileMode === nextMode ? MobileModes.MENU : nextMode
+  );
 };
 
 const defaultProps: Partial<Props> = {
@@ -31,10 +30,10 @@ const MobileFooter: React.FC<Props> = (props) => {
   let mobileSiderIcon;
 
   switch (props.mobileMode) {
-    case 'menu':
+    case MobileModes.MENU:
       mobileSiderIcon = close;
       break;
-    case 'search':
+    case MobileModes.SEARCH:
       mobileSiderIcon = siderMobileInactive;
       break;
     default:
@@ -46,12 +45,7 @@ const MobileFooter: React.FC<Props> = (props) => {
       <Col md={0} xs={24}>
         <div
           className={styles.mobileFooterButton}
-          onTouchStart={(e) => {
-            e.preventDefault();
-            setMobileMode(mergedProps, MobileModes.MENU);
-          }}
           onClick={() => setMobileMode(mergedProps, MobileModes.MENU)}
-          onTouchMove={(e) => e.preventDefault()}
         >
           <img
             src={mobileSiderIcon}
