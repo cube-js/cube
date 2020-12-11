@@ -204,6 +204,10 @@ export class BaseDriver {
   }
 
   async uploadTable(table, columns, tableData) {
+    return this.uploadTableWithIndexes(table, columns, tableData, []);
+  }
+
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -216,6 +220,10 @@ export class BaseDriver {
         VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
           columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
         );
+      }
+      for (let i = 0; i < indexesSql.length; i++) {
+        const [query, params] = indexesSql[i].sql;
+        await this.query(query, params);
       }
     } catch (e) {
       await this.dropTable(table);

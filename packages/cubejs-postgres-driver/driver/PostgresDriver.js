@@ -99,7 +99,7 @@ class PostgresDriver extends BaseDriver {
     return !!this.config.readOnly;
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -111,6 +111,10 @@ class PostgresDriver extends BaseDriver {
       SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${this.fromGenericType(c.type)}[]`).join(', ')})`,
         columns.map(c => tableData.rows.map(r => r[c.name]))
       );
+      for (let i = 0; i < indexesSql.length; i++) {
+        const [query, p] = indexesSql[i].sql;
+        await this.query(query, p);
+      }
     } catch (e) {
       await this.dropTable(table);
       throw e;

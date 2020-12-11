@@ -143,12 +143,16 @@ class CubeStoreDriver extends BaseDriver {
     return super.toColumnValue(value, genericType);
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
     await this.createTable(table, columns);
     try {
+      for (let i = 0; i < indexesSql.length; i++) {
+        const [query, params] = indexesSql[i].sql;
+        await this.query(query, params);
+      }
       const batchSize = 1000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);

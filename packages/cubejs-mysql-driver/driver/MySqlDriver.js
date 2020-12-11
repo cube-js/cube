@@ -186,7 +186,7 @@ class MySqlDriver extends BaseDriver {
     return super.toColumnValue(value, genericType);
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -208,6 +208,10 @@ class MySqlDriver extends BaseDriver {
         VALUES ${valueParamPlaceholders}`,
           params
         );
+        for (let i = 0; i < indexesSql.length; i++) {
+          const [query, p] = indexesSql[i].sql;
+          await this.query(query, p);
+        }
       }
     } catch (e) {
       await this.dropTable(table);

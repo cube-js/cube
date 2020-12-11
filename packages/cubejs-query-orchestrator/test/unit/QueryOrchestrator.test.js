@@ -62,10 +62,40 @@ class MockDriver {
     this.tables = this.tables.filter(t => t !== tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
+
+  async downloadTable(table) {
+    return { rows: await this.query(`SELECT * FROM ${table}`) };
+  }
+
+  async tableColumnTypes() {
+    return [{ name: 'foo', type: 'int' }];
+  }
+}
+
+class ExternalMockDriver extends MockDriver {
+  constructor() {
+    super();
+    this.indexes = [];
+  }
+
+  async uploadTable(table) {
+    this.tables.push(table.substring(0, 100));
+    throw new Error('uploadTable has been called instead of uploadTableWithIndexes');
+  }
+
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
+    this.tables.push(table.substring(0, 100));
+    for (let i = 0; i < indexesSql.length; i++) {
+      const [query, params] = indexesSql[i].sql;
+      await this.query(query, params);
+    }
+    this.indexes = this.indexes.concat(indexesSql);
+  }
 }
 
 describe('QueryOrchestrator', () => {
   let mockDriver = null;
+  let externalMockDriver = null;
   const queryOrchestrator = new QueryOrchestrator(
     'TEST',
     async () => mockDriver,
@@ -75,12 +105,14 @@ describe('QueryOrchestrator', () => {
           executionTimeout: 1
         },
         usedTablePersistTime: 1
-      }
+      },
+      externalDriverFactory: () => externalMockDriver
     }
   );
 
   beforeEach(() => {
     mockDriver = new MockDriver();
+    externalMockDriver = new ExternalMockDriver();
   });
 
   afterEach(async () => {
@@ -134,6 +166,34 @@ describe('QueryOrchestrator', () => {
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_l3kvjcmu_khbemovd/);
     expect(mockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_l3kvjcmu_khbemovd/);
+  });
+
+  test('external indexes', async () => {
+    const query = {
+      query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
+      values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_number_and_count_week20191101 ON stb_pre_aggregations.orders_number_and_count20191101 ("orders__created_at_week")', []],
+          indexName: 'orders_number_and_count_week20191101'
+        }],
+        external: true
+      }],
+      renewQuery: true,
+      requestId: 'external indexes'
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    console.log(result.data[0]);
+    expect(result.data[0]).toMatch(/orders_number_and_count20191101_l3kvjcmu_khbemovd/);
+    expect(externalMockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_l3kvjcmu_khbemovd/);
   });
 
   test('silent truncate', async () => {

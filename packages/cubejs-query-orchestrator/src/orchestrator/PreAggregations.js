@@ -499,6 +499,7 @@ class PreAggregationLoader {
         targetTableName
       );
     this.logExecutingSql(invalidationKeys, query, params, targetTableName, newVersionEntry);
+    // TODO move index creation to the driver
     await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
@@ -534,7 +535,8 @@ class PreAggregationLoader {
     await this.dropOrphanedTables(client, targetTableName, saveCancelFn);
   }
 
-  async refreshImplStreamExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
+  async refreshImplStreamExternalStrategy
+  (client, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
     if (!client.downloadQueryResults) {
@@ -579,18 +581,33 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    await saveCancelFn(externalDriver.uploadTable(table, tableData.types, tableData));
-    await this.createIndexes(externalDriver, newVersionEntry, saveCancelFn);
+    if (externalDriver.uploadTableWithIndexes) {
+      await saveCancelFn(
+        externalDriver.uploadTableWithIndexes(
+          table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry)
+        )
+      );
+    } else {
+      await saveCancelFn(externalDriver.uploadTable(table, tableData.types, tableData));
+      await this.createIndexes(externalDriver, newVersionEntry, saveCancelFn);
+    }
     await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn);
   }
 
   async createIndexes(driver, newVersionEntry, saveCancelFn) {
-    if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
-      return;
+    const indexesSql = this.prepareIndexesSql(newVersionEntry);
+    for (let i = 0; i < indexesSql.length; i++) {
+      const [query, params] = indexesSql[i].sql;
+      await saveCancelFn(driver.query(query, params));
     }
-    for (let i = 0; i < this.preAggregation.indexesSql.length; i++) {
-      const { sql, indexName } = this.preAggregation.indexesSql[i];
+  }
+
+  prepareIndexesSql(newVersionEntry) {
+    if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
+      return [];
+    }
+    return this.preAggregation.indexesSql.map(({ sql, indexName }) => {
       const [query, params] = sql;
       const indexVersionEntry = {
         ...newVersionEntry,
@@ -601,17 +618,15 @@ class PreAggregationLoader {
         requestId: this.requestId,
         sql
       });
-      await saveCancelFn(driver.query(
-        QueryCache.replacePreAggregationTableNames(
-          query,
-          this.preAggregationsTablesToTempTables.concat([
-            [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],
-            [indexName, { targetTableName: this.targetTableName(indexVersionEntry) }]
-          ])
-        ),
-        params
-      ));
-    }
+      const resultingSql = QueryCache.replacePreAggregationTableNames(
+        query,
+        this.preAggregationsTablesToTempTables.concat([
+          [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],
+          [indexName, { targetTableName: this.targetTableName(indexVersionEntry) }]
+        ])
+      );
+      return { sql: [resultingSql, params] };
+    });
   }
 
   async dropOrphanedTables(client, justCreatedTable, saveCancelFn) {
