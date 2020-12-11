@@ -5,6 +5,7 @@ import { UserError } from './UserError';
 const methodParams = {
   load: ['query', 'queryType'],
   sql: ['query'],
+  'dry-run': ['query'],
   meta: [],
   subscribe: ['query', 'queryType'],
   unsubscribe: []
@@ -59,6 +60,10 @@ export class SubscriptionServer {
         return;
       }
 
+      if (!message.method) {
+        throw new UserError('method is required');
+      }
+
       if (!methodParams[message.method]) {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
@@ -70,7 +75,9 @@ export class SubscriptionServer {
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
         .reduce((a, b) => ({ ...a, ...b }), {});
-      await this.apiGateway[message.method]({
+
+      const method = message.method.replace(/[^a-z]+(.)/g, (m, chr) => chr.toUpperCase());
+      await this.apiGateway[method]({
         ...params,
         context,
         isSubscription,
@@ -85,6 +92,7 @@ export class SubscriptionServer {
         }),
         unsubscribe: async () => this.subscriptionStore.unsubscribe(connectionId, message.messageId)
       });
+
       await this.sendMessage(connectionId, { messageProcessedId: message.messageId });
     } catch (e) {
       this.apiGateway.handleError({
