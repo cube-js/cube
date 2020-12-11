@@ -49,12 +49,6 @@ use std::time::SystemTime;
 #[automock]
 #[async_trait]
 pub trait QueryExecutor: Send + Sync {
-    async fn execute_plan(
-        &self,
-        plan: SerializedPlan,
-        remote_to_local_names: HashMap<String, String>,
-    ) -> Result<DataFrame, CubeError>;
-
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
@@ -72,45 +66,6 @@ pub struct QueryExecutorImpl;
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
-    async fn execute_plan(
-        &self,
-        plan: SerializedPlan,
-        remote_to_local_names: HashMap<String, String>,
-    ) -> Result<DataFrame, CubeError> {
-        let plan_to_move = plan.logical_plan();
-        let ctx = self.execution_context(
-            plan.index_snapshots(),
-            remote_to_local_names,
-            HashSet::new(),
-        )?;
-        let plan_ctx = ctx.clone();
-
-        let physical_plan =
-            tokio::task::spawn_blocking(move || plan_ctx.create_physical_plan(&plan_to_move))
-                .await??;
-
-        let execution_time = SystemTime::now();
-        let results = ctx.collect(physical_plan.clone()).await?;
-        debug!(
-            "Query data processing time: {:?}",
-            execution_time.elapsed()?
-        );
-        if execution_time.elapsed()?.as_millis() > 200 {
-            warn!(
-                "Slow Query ({:?}):\n{:#?}",
-                execution_time.elapsed()?,
-                plan.logical_plan()
-            );
-            debug!(
-                "Slow Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &physical_plan
-            );
-        }
-        let data_frame = batch_to_dataframe(&results)?;
-        Ok(data_frame)
-    }
-
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
@@ -428,7 +383,7 @@ impl CubeTable {
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             index_snapshot
-                .table()
+                .index()
                 .get_row()
                 .get_columns()
                 .iter()
@@ -503,9 +458,9 @@ impl CubeTable {
             partition_execs.push(Arc::new(EmptyExec::new(false, self.schema.clone())));
         }
 
-        let projected_schema = if let Some(p) = projection {
+        let projected_schema = if let Some(p) = mapped_projection {
             Arc::new(Schema::new(
-                p.iter().map(|i| self.schema.field(*i).clone()).collect(),
+                self.schema.fields().iter().enumerate().filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone())).collect(),
             ))
         } else {
             self.schema.clone()

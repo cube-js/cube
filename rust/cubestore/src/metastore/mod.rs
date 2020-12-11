@@ -1656,6 +1656,9 @@ impl RocksMetaStore {
         table_id: &IdRow<Table>,
         index_def: IndexDef) -> Result<IdRow<Index>, CubeError>
     {
+        if let Some(not_found) = index_def.columns.iter().find(|dc| index_cols.iter().all(|c| c.name.as_str() != dc.as_str())) {
+            return Err(CubeError::user(format!("Column {} in index {} not found in table {}", not_found, index_def.name, table_id.get_row().get_table_name())));
+        }
         let (mut sorted, mut unsorted) =
             index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
                 index_def

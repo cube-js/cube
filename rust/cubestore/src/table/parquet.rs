@@ -7,7 +7,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use parquet::column::reader::ColumnReader;
 use parquet::column::writer::ColumnWriter;
 use parquet::data_type::*;
-use parquet::file::properties::WriterProperties;
+use parquet::file::properties::{WriterProperties, WriterVersion};
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use parquet::file::writer::{FileWriter, SerializedFileWriter};
 use parquet::schema::types;
@@ -785,6 +785,7 @@ impl RowParquetWriter {
                 //     "key".to_string(),
                 //     "value".to_string(),
                 // )]))
+                .set_writer_version(WriterVersion::PARQUET_2_0)
                 .set_statistics_enabled(true)
                 // .set_column_dictionary_enabled(ColumnPath::new(vec!["col0".to_string()]), true)
                 // .set_column_encoding(ColumnPath::new(vec!["col1".to_string()]), Encoding::RLE)

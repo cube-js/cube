@@ -151,7 +151,7 @@ impl SqlServiceImpl {
             .db
             .create_index(schema_name, table_name, IndexDef {
                 name,
-                columns: columns.iter().map(|c| c.to_string()).collect()
+                columns: columns.iter().map(|c| c.value.to_string()).collect()
             }).await?
         )
     }
@@ -246,7 +246,9 @@ impl Dialect for MySqlDialectWithBackTicks {
 #[async_trait]
 impl SqlService for SqlServiceImpl {
     async fn exec_query(&self, q: &str) -> Result<DataFrame, CubeError> {
-        trace!("Query: '{}'", q);
+        if !q.to_lowercase().starts_with("insert") {
+            trace!("Query: '{}'", q);
+        }
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(q) {
             return Ok(data_frame);
         }
@@ -606,6 +608,7 @@ mod tests {
     use std::path::PathBuf;
     use std::{env, fs};
     use std::collections::HashSet;
+    use itertools::Itertools;
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -913,6 +916,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn over_2k_booleans() {
+        Config::test("over_2k_booleans").update_config(|mut c| {
+            c.partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 0;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.bool_group (bool_value boolean)").await.unwrap();
+
+            for batch in 0..25 {
+                let mut bools = Vec::new();
+                for i in 0..1000 {
+                    bools.push(i % (batch + 1) == 0);
+                }
+
+                let values = bools.into_iter().map(|b| format!("({})", b)).join(", ");
+                service.exec_query(
+                    &format!("INSERT INTO foo.bool_group (bool_value) VALUES {}", values)
+                ).await.unwrap();
+            }
+
+            let result = service.exec_query("SELECT count(*) from foo.bool_group").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(25000)]));
+
+            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3823)]));
+
+            let result = service.exec_query("SELECT g.bool_value, count(*) from foo.bool_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(21177)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(3823)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn join() {
         Config::run_test("join", async move |services| {
             let service = services.sql_service;
@@ -1050,7 +1091,7 @@ mod tests {
 
             service.exec_query("CREATE TABLE foo.timestamps (id int, t timestamp)").await.unwrap();
 
-            service.exec_query("CREATE INDEX by_timestamp ON foo.timestamps (t)").await.unwrap();
+            service.exec_query("CREATE INDEX by_timestamp ON foo.timestamps (`t`)").await.unwrap();
 
             service.exec_query(
                 "INSERT INTO foo.timestamps (id, t) VALUES (1, '2020-01-01T00:00:00.000Z'), (2, '2020-01-02T00:00:00.000Z'), (3, '2020-01-03T00:00:00.000Z')"
@@ -1059,6 +1100,32 @@ mod tests {
             let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn ambiguous_join_sort() {
+        Config::run_test("ambiguous_join_sort", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.sessions (t timestamp, id int)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.page_views (session_id int, page_view_count int)").await.unwrap();
+
+            service.exec_query("CREATE INDEX by_id ON foo.sessions (id)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.sessions (t, id) VALUES ('2020-01-01T00:00:00.000Z', 1), ('2020-01-02T00:00:00.000Z', 2), ('2020-01-03T00:00:00.000Z', 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.page_views (session_id, page_view_count) VALUES (1, 10), (2, 20), (3, 30)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT sum(p.page_view_count) from foo.sessions s JOIN foo.page_views p ON s.id = p.session_id WHERE s.t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(50)]));
         }).await;
     }
 
