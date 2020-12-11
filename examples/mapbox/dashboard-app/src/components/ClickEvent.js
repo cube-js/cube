@@ -63,24 +63,28 @@ export default () => {
 
   if (questionsSet) {
     questionsSet.tablePivot().forEach((item) => {
-      dataQuestions['features'].push({
-        type: 'Feature',
-        properties: {
-          count: item['Questions.count'],
-          geometry: item['Users.geometry'],
-          id: item['Users.id'],
-        },
-        geometry: JSON.parse(item['Users.geometry'])
-      });
+      if (item['Users.geometry']) {
+        dataQuestions['features'].push({
+          type: 'Feature',
+          properties: {
+            count: item['Questions.count'],
+            geometry: item['Users.geometry'],
+            id: item['Users.id'],
+          },
+          geometry: JSON.parse(item['Users.geometry'].replaceAll('\\', ''))
+        });
+      }
     });
   }
 
   if (answersSet) {
     answersSet.tablePivot().forEach((item) => {
-      dataAnswers['features'].push({
-        type: 'Feature',
-        geometry: JSON.parse(item['Users.geometry']),
-      });
+      if (item['Users.geometry']) {
+        dataAnswers['features'].push({
+          type: 'Feature',
+          geometry: JSON.parse(item['Users.geometry'].replaceAll('\\', '')),
+        });
+      }
     });
   }
 

@@ -61,13 +61,15 @@ export default () => {
 
   if (points) {
     points.tablePivot().forEach((item) => {
-      data['features'].push({
-        type: 'Feature',
-        properties: {
-          value: parseInt(item['Users.max']),
-        },
-        geometry: JSON.parse(item['Users.geometry']),
-      });
+      if (item['Users.geometry']) {
+        data['features'].push({
+          type: 'Feature',
+          properties: {
+            value: parseInt(item['Users.max']),
+          },
+          geometry: JSON.parse(item['Users.geometry'].replaceAll('\\', '')),
+        });
+      }
     });
   }
 

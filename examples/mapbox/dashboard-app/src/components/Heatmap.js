@@ -95,7 +95,7 @@ export default () => {
         properties: {
           value: parseInt(item['Users.count']),
         },
-        geometry: JSON.parse(item['Users.geometry']),
+        geometry: JSON.parse(item['Users.geometry'].replaceAll('\\', '')),
       });
     });
   }
