@@ -15,7 +15,7 @@ jobs:
         with:
           repository: 'cube-js/github-actions'
           path: ./actions
-          ref: v3
+          ref: v4
       - name: Install Actions
         run: npm install --production --prefix ./actions
       - name: Detect author
