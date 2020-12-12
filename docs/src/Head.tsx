@@ -45,51 +45,10 @@ const Prod: React.FC<Props> = (props) => (
       src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"
     ></script>
     <script src={`${process.env.PATH_PREFIX}/scripts/prism.js`} />
-    <script src={`${process.env.PATH_PREFIX}/scripts/analytics.js`} />
-    <script src={`${process.env.PATH_PREFIX}/scripts/fullstory.js`} />
     <link
       href={`${process.env.PATH_PREFIX}/styles/content.css`}
       rel="stylesheet"
     />
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `
-      (function(h,o,t,j,a,r){
-          h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-          h._hjSettings={hjid:1405282,hjsv:6};
-          a=o.getElementsByTagName('head')[0];
-          r=o.createElement('script');r.async=1;
-          r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
-          a.appendChild(r);
-      })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
-    `,
-      }}
-    />
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `
-       (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-       m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-       (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-
-       ym(54473377, "init", {
-            clickmap:true,
-            trackLinks:true,
-            accurateTrackBounce:true,
-            webvisor:true
-       });
-    `,
-      }}
-    />
-    <noscript>
-      <div>
-        <img
-          src="https://mc.yandex.ru/watch/54473377"
-          style={{ position: 'absolute', left: -9999 }}
-          alt=""
-        />
-      </div>
-    </noscript>
     {props.css}
   </head>
 );
