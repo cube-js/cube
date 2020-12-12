@@ -249,7 +249,7 @@ class DocTemplate extends Component<Props, State> {
         <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
-            <MDXRenderer>{this.state.nodes}</MDXRenderer>
+            <MDXRenderer>{this.props.data.mdx.body}</MDXRenderer>
           </div>
         </div>
       </div>
