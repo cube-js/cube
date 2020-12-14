@@ -1,31 +1,49 @@
-import genericPool from 'generic-pool';
+import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
+import type { RedisClient } from 'redis';
+
 import { createRedisClient } from './RedisFactory';
 
+export type CreateRedisClientFn = () => PromiseLike<RedisClient>;
+
+export interface RedisPoolOptions {
+  poolMin?: number;
+  poolMax?: number;
+  createClient?: CreateRedisClientFn;
+  destroyClient?: (client: RedisClient) => PromiseLike<void>;
+}
+
 export class RedisPool {
-  constructor(options) {
-    options = options || {};
+  protected readonly pool: Pool<RedisClient>|null = null;
+
+  protected readonly create: CreateRedisClientFn|null = null;
+
+  public constructor(options: RedisPoolOptions = {}) {
     const defaultMin = process.env.CUBEJS_REDIS_POOL_MIN ? parseInt(process.env.CUBEJS_REDIS_POOL_MIN, 10) : 2;
     const defaultMax = process.env.CUBEJS_REDIS_POOL_MAX ? parseInt(process.env.CUBEJS_REDIS_POOL_MAX, 10) : 1000;
     const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : defaultMin;
     const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : defaultMax;
-    const create = options.createClient || (() => createRedisClient(process.env.REDIS_URL));
-    const destroy = options.destroyClient || (client => client.end(true));
-    const opts = {
+
+    const opts: PoolOptions = {
       min,
       max,
       acquireTimeoutMillis: 5000,
       idleTimeoutMillis: 5000,
       evictionRunIntervalMillis: 5000
     };
+
+    const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
+
     if (max > 0) {
-      this.pool = genericPool.createPool({ create, destroy }, opts);
+      const destroy = options.destroyClient || (async (client) => client.end(true));
+
+      this.pool = genericPool.createPool<RedisClient>({ create, destroy }, opts);
     } else {
       // fallback to un-pooled behavior if pool max is 0
       this.create = create;
     }
   }
 
-  async getClient() {
+  public async getClient() {
     if (this.pool) {
       return this.pool.acquire();
     } else {
@@ -33,7 +51,7 @@ export class RedisPool {
     }
   }
 
-  release(client) {
+  public release(client) {
     if (this.pool) {
       this.pool.release(client);
     } else if (client) {
@@ -41,7 +59,7 @@ export class RedisPool {
     }
   }
 
-  async cleanup() {
+  public async cleanup() {
     if (this.pool) {
       await this.pool.drain();
       this.pool.clear();
