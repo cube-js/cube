@@ -47,8 +47,8 @@ export interface OrchestratorOptions {
   poolOptions?: {
     poolMin?: number;
     poolMax?: number;
-    createClient?: (redisUrl: string) => {}
-    destroyClient?: (client) => {}
+    createClient?: (redisUrl: string) => RedisClient
+    destroyClient?: (client: RedisClient) => void
   }
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
