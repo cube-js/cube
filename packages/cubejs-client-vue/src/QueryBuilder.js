@@ -1,3 +1,4 @@
+import { isQueryPresent, defaultOrder, defaultHeuristics } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
@@ -46,6 +47,7 @@ export default {
   },
 
   render(createElement) {
+    console.log('this.measures', this.measures);
     const {
       chartType,
       cubejsApi,
@@ -139,7 +141,7 @@ export default {
     isQueryPresent() {
       const { query } = this;
 
-      return Object.keys(query).length > 0;
+      return isQueryPresent(query);
     },
     validatedQuery() {
       const validatedQuery = {};
@@ -196,6 +198,14 @@ export default {
         if (this.renewQuery) {
           validatedQuery.renewQuery = this.renewQuery;
         }
+      }
+      
+      if (isQueryPresent(validatedQuery)) {
+        console.log({
+          order: defaultOrder(validatedQuery),
+          // heuristics: defaultHeuristics(validatedQuery)
+        } );
+        validatedQuery.order = defaultOrder(validatedQuery);
       }
 
       return validatedQuery;
@@ -270,7 +280,9 @@ export default {
         mem = this[`available${name}`].find(m => m.name === member);
       }
 
-      if (mem) { this[element].push(mem); }
+      if (mem) {
+        this[element].push(mem); 
+      }
     },
     removeMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
@@ -391,9 +403,23 @@ export default {
   },
 
   watch: {
+    validatedQuery: {
+      deep: true,
+      handler(newQuery, oldQuery) {
+        const { query, shouldApplyHeuristicOrder } = defaultHeuristics(newQuery, oldQuery, {
+          meta: this.meta
+        });
+        console.log('default >>', query);
+        // this.query = query;
+      }
+    }, 
     query: {
       deep: true,
-      handler() {
+      handler(cur, prev) {
+        console.log('the query has changed', {
+          cur, 
+          prev
+        });
         if (!this.meta) {
           // this is ok as if meta has not been loaded by the time query prop has changed,
           // then the promise for loading meta (found in mounted()) will call

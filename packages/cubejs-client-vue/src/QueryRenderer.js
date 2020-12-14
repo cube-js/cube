@@ -129,12 +129,13 @@ export default {
   },
   watch: {
     query: {
+      deep: true,
       handler(val) {
+        console.log('has Changed!', val);
         if (val) {
           this.load();
         }
       },
-      deep: true,
     },
     queries: {
       handler(val) {
