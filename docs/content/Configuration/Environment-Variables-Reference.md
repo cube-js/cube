@@ -39,8 +39,10 @@ options][link-config].
 ## Database Connection
 
 The following environment variables are used to provide credentials for Cube.js
-to connect to the databases. You can
-[learn more about connecting to the databases in this guide.](connecting-to-the-database)
+to connect to the databases. You can learn more about connecting to the
+databases [in this guide][link-connecting-to-db].
+
+[link-connecting-to-db]: /connecting-to-the-database
 
 | Environment variable                            | Used With            | Description                                                                                                                                                                                                 | Possible Values                                                  |
 | ----------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
