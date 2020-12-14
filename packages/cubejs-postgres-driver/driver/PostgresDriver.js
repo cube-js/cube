@@ -2,7 +2,6 @@ const pg = require('pg');
 const { types } = require('pg');
 const moment = require('moment');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
-const fs = require('fs');
 
 const { Pool } = pg;
 
