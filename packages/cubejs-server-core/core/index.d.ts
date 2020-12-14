@@ -4,6 +4,7 @@ import {
   NextFunction as ExpressNextFunction
 } from "express";
 import { NormalizedQuery as Query } from "@cubejs-backend/api-gateway";
+import { RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 
 export type CubejsServerCore = any;
 export function create(options?: CreateOptions): CubejsServerCore;
@@ -44,12 +45,7 @@ export interface CreateOptions {
 
 export interface OrchestratorOptions {
   redisPrefix?: string;
-  poolOptions?: {
-    poolMin?: number;
-    poolMax?: number;
-    createClient?: (redisUrl: string) => {}
-    destroyClient?: (client) => {}
-  }
+  poolOptions?: RedisPoolOptions;
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
