@@ -265,6 +265,46 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
 ]
 ```
 
+#### seriesAlias
+
+When using `chartPivot()`, you can pass `seriesAlias` in the `pivotConfig`
+to give each series a unique prefix. This is useful for `blending queries` which use the same measure multiple times.
+
+```js
+// For the queries
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }]
+},
+{
+  measures: ['Stories.count'],
+  timeDimensions: [{
+    dimension: 'Stories.time',
+    dateRange: ['2015-01-01', '2015-12-31'],
+    granularity: 'month'
+  }],
+  filters: [
+    {
+      member: 'Stores.read',
+      operator: 'equals',
+      value: ['true']
+    }
+  ]
+}
+
+// ResultSet.chartPivot({ seriesAlias: ['one', 'two'] }) will return
+[
+  { "x":"2015-01-01T00:00:00", "one,Stories.count": 27120, "two,Stories.count": 8933, "xValues": ["2015-01-01T00:00:00"] },
+  { "x":"2015-02-01T00:00:00", "one,Stories.count": 25861, "two,Stories.count": 8344, "xValues": ["2015-02-01T00:00:00"]  },
+  { "x":"2015-03-01T00:00:00", "one,Stories.count": 29661, "two,Stories.count": 9023, "xValues": ["2015-03-01T00:00:00"]  },
+  //...
+]
+```
+
 ### decompose
 
 >  **decompose**(): *Object*
@@ -454,6 +494,12 @@ Returns an array of series objects, containing `key` and `title` parameters.
   },
 ]
 ```
+
+#### seriesAlias
+
+When using `seriesNames()`, you can pass `seriesAlias` in the `pivotConfig`
+to give each series a unique prefix. This is useful for `blending queries` which use the same measure multiple times.
+
 
 ### tableColumns
 
