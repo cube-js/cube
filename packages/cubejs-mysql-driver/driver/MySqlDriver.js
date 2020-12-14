@@ -3,11 +3,11 @@ const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const crypto = require('crypto');
-const fs = require('fs');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
-  text: 'varchar(255) CHARACTER SET utf8mb4'
+  text: 'varchar(255) CHARACTER SET utf8mb4',
+  decimal: 'decimal(38,10)',
 };
 
 const MySqlToGenericType = {
