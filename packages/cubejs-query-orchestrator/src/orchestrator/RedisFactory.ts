@@ -1,14 +1,14 @@
-import redis from 'redis';
+import redis, { ClientOpts } from 'redis';
 import { promisify } from 'util';
 
-export function createRedisClient(url) {
+export function createRedisClient(url: string) {
   redis.Multi.prototype.execAsync = function execAsync() {
     return new Promise((resolve, reject) => this.exec((err, res) => (
       err ? reject(err) : resolve(res)
     )));
   };
 
-  const options = {
+  const options: ClientOpts = {
     url,
   };
 
