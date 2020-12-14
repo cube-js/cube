@@ -5,6 +5,8 @@ const { TargetSource } = require('@cubejs-templates/core');
 
 const commonFiles = {
   'src/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { NgxSpinnerModule } from 'ngx-spinner';
 import { NgModule } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
 import { CubejsClientModule } from '@cubejs-client/ngx';
@@ -30,6 +32,8 @@ const cubejsOptions = {
     MatTableModule,
     CubejsClientModule.forRoot(cubejsOptions),
     ChartsModule,
+    BrowserAnimationsModule,
+    NgxSpinnerModule,
   ],
   providers: [],
   bootstrap: [AppComponent],
