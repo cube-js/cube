@@ -178,6 +178,10 @@ declare module '@cubejs-client/core' {
      * If `true` missing dates on the time dimensions will be filled with `0` for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
      */
     fillMissingDates?: boolean | null;
+    /**
+     * Give each series a prefix alias. Should have one entry for each query:measure.
+     */
+    aliasSeries?: string[];
   };
 
   export type DrillDownLocator = {

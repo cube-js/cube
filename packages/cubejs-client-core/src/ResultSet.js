@@ -1,6 +1,6 @@
 import {
   groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
-  pluck, mergeAll
+  pluck, mergeAll, flatten,
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -420,6 +420,24 @@ class ResultSet {
       }
 
       return value;
+    };
+
+    const duplicateMeasures = new Set();
+
+    const findDuplicateMeasures = () => {
+      if (this.queryType !== QUERY_TYPE.BLENDING_QUERY) {
+        return;
+      }
+
+      const allMeasures = flatten(this.loadResponses.map(({ query }) => query.measures));
+      const duplicateMeasures = allMeasures.filter((e, i, a) => a.indexOf(e) !== i);
+    }
+
+    const aliasSeries = (yValues, i) => {
+      if (pivotConfig && pivotConfig.aliasSeries && pivotConfig.aliasSeries[i]) {
+        return [pivotConfig.aliasSeries[i], ...yValues];
+      }
+      return [yValues];
     };
     
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
