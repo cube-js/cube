@@ -49,15 +49,7 @@ class MySqlDriver extends BaseDriver {
 
         return conn;
       },
-      destroy: (connection) => promisify(connection.end.bind(connection))(),
-      validate: async (connection) => {
-        try {
-          await connection.execute('SELECT 1');
-        } catch (e) {
-          return false;
-        }
-        return true;
-      }
+      destroy: (connection) => promisify(connection.end.bind(connection))()
     }, {
       min: 0,
       max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
