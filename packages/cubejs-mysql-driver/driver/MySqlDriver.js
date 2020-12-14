@@ -56,7 +56,6 @@ class MySqlDriver extends BaseDriver {
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
-      testOnBorrow: true,
       acquireTimeoutMillis: 20000,
       ...pool
     });
