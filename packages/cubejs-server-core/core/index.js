@@ -251,7 +251,7 @@ class CubejsServerCore {
     }
 
     if (typeof this.scheduledRefreshTimer === 'boolean' && this.scheduledRefreshTimer) {
-      this.scheduledRefreshTimer = 5000;
+      this.scheduledRefreshTimer = 30000;
     }
 
     if (
