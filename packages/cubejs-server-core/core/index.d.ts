@@ -45,7 +45,7 @@ export interface CreateOptions {
 
 export interface OrchestratorOptions {
   redisPrefix?: string;
-  poolOptions?: RedisPoolOptions;
+  redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
