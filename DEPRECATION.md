@@ -26,8 +26,7 @@ features:
   used. The feature may be removed, disabled, or change behavior in a future
   release. The _"Deprecated"_ column contains the release in which the feature
   was marked deprecated, whereas the _"Remove"_ column contains a tentative
-  release in which the feature is to be removed. If no release is included in
-  the _"Remove"_ column, the release is yet to be decided on.
+  release in which the feature is to be removed.
 - **Removed**: the feature was removed, disabled, or hidden. Refer to the linked
   section for details. Some features are "soft" deprecated, which means that
   they remain functional for backward compatibility, and to allow users to
