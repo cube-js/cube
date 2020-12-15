@@ -1,7 +1,10 @@
 {
+  "CHANGELOG.md": [
+    ""
+  ],
   "*.md": [
-    "markdownlint-cli2",
-    "prettier --write"
+    "prettier --write",
+    "markdownlint-cli2"
   ],
   "*.scss": [
   ],
