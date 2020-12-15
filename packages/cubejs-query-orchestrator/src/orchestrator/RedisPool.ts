@@ -58,6 +58,20 @@ export class RedisPool {
     }
   }
 
+  public async testConnection() {
+    const client = await this.getClient();
+
+    try {
+      await client.ping();
+
+      return true;
+    } catch (e) {
+      return false;
+    } finally {
+      this.release(client);
+    }
+  }
+
   public async cleanup() {
     if (this.pool) {
       await this.pool.drain();

@@ -148,6 +148,7 @@ interface Request extends ExpressRequest {
 }
 
 export interface ApiGatewayOptions {
+  standalone: boolean;
   refreshScheduler: any;
   basePath?: string;
   extendContext?: ExtendContextFn;
@@ -171,6 +172,8 @@ export class ApiGateway {
 
   protected readonly enforceSecurityChecks: boolean;
 
+  protected readonly standalone: boolean;
+
   protected readonly extendContext?: ExtendContextFn;
 
   protected readonly requestMiddleware: RequestHandler[];
@@ -187,7 +190,7 @@ export class ApiGateway {
     options = options || {};
 
     this.refreshScheduler = options.refreshScheduler;
-
+    this.standalone = options.standalone;
     this.basePath = options.basePath || '/cubejs-api';
 
     this.queryTransformer = options.queryTransformer || (async (query) => query);
@@ -267,6 +270,17 @@ export class ApiGateway {
       await this.dryRun({
         query: req.body.query,
         context: req.context,
+      });
+    }));
+
+    app.get(`${this.basePath}/v1/health/live`, this.requestMiddleware, (async (req, res) => {
+      await this.healthLive({
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.get(`${this.basePath}/v1/health/ready`, this.requestMiddleware, (async (req, res) => {
+      await this.healthReady({
         res: this.resToResultFn(res)
       });
     }));
@@ -745,4 +759,32 @@ export class ApiGateway {
       requestId: context.requestId
     });
   }
+
+  protected async healthHandler({ res }) {
+    const queryOrchestrator = await this.adapterApi({});
+
+    const [main, external] = await queryOrchestrator.testConnection();
+    const [driver, status] = await queryOrchestrator.testOrchestratorConnection();
+
+    res({
+      health: true,
+      standalone: this.standalone,
+      driver: {
+        main: {
+          status: main,
+        },
+        external: {
+          status: external,
+        }
+      },
+      cache: {
+        driver,
+        status,
+      },
+    });
+  }
+
+  protected healthLive = this.healthHandler;
+
+  protected healthReady = this.healthHandler;
 }

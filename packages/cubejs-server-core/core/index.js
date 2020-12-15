@@ -218,8 +218,17 @@ class CubejsServerCore {
       maxAge: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     });
+
     this.dataSourceIdToOrchestratorApi = {};
-    this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
+
+    if (this.options.contextToAppId) {
+      this.contextToAppId = options.contextToAppId;
+      this.standalone = false;
+    } else {
+      this.contextToAppId = () => process.env.CUBEJS_APP || 'STANDALONE';
+      this.standalone = true;
+    }
+
     this.contextToDataSourceId = options.contextToDataSourceId || this.defaultContextToDataSourceId.bind(this);
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
@@ -412,8 +421,10 @@ class CubejsServerCore {
 
   async initApp(app) {
     checkEnvForPlaceholders();
+
     const apiGateway = this.apiGateway();
     apiGateway.initApp(app);
+
     if (this.options.devServer) {
       this.devServer.initDevEnv(app);
     } else {
@@ -426,6 +437,7 @@ class CubejsServerCore {
 
   initSubscriptionServer(sendMessage) {
     checkEnvForPlaceholders();
+
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
   }
@@ -437,12 +449,13 @@ class CubejsServerCore {
         this.getCompilerApi.bind(this),
         this.getOrchestratorApi.bind(this),
         this.logger, {
+          standalone: this.standalone,
           basePath: this.options.basePath,
           checkAuthMiddleware: this.options.checkAuthMiddleware,
           checkAuth: this.options.checkAuth,
           queryTransformer: this.options.queryTransformer,
           extendContext: this.options.extendContext,
-          refreshScheduler: () => new RefreshScheduler(this)
+          refreshScheduler: () => new RefreshScheduler(this),
         }
       );
     }
@@ -535,6 +548,7 @@ class CubejsServerCore {
 
   createOrchestratorApi(options) {
     options = options || {};
+
     return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
       redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
       externalDriverFactory: options.getExternalDriverFactory,
@@ -590,10 +604,12 @@ class CubejsServerCore {
 
   testConnections() {
     const tests = [];
+
     Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
       const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
       tests.push(orchestratorApi.testConnection());
     });
+
     return Promise.all(tests);
   }
 

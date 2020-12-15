@@ -116,6 +116,20 @@ export class QueryOrchestrator {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
+  public async testConnection() {
+    if (this.redisPool) {
+      return [
+        'redis',
+        await this.redisPool.testConnection()
+      ];
+    }
+
+    return [
+      'memory',
+      true
+    ];
+  }
+
   public async cleanup() {
     if (this.redisPool) {
       await this.redisPool.cleanup();
