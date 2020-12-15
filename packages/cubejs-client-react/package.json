@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.24.0",
+  "version": "0.24.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -10,7 +10,7 @@
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "^0.24.0",
+    "@cubejs-client/core": "^0.24.4",
     "core-js": "^3.6.5",
     "ramda": "^0.27.0"
   },
@@ -30,7 +30,6 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-client/core": "^0.23.6",
     "@types/react": "^16.9.41",
     "eslint": "^6.5.1",
     "eslint-config-airbnb": "^18.0.1",

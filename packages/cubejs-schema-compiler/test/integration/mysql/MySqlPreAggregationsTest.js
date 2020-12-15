@@ -143,22 +143,22 @@ describe('MySqlPreAggregations', function test() {
         [
           {
             'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-02T00:00:00.000',
+            'visitors__created_at_day': '2017-01-02 00:00:00',
             'visitors__count': 1
           },
           {
             'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-04T00:00:00.000',
+            'visitors__created_at_day': '2017-01-04 00:00:00',
             'visitors__count': 1
           },
           {
             'visitors__source': 'google',
-            'visitors__created_at_day': '2017-01-05T00:00:00.000',
+            'visitors__created_at_day': '2017-01-05 00:00:00',
             'visitors__count': 1
           },
           {
             'visitors__source': null,
-            'visitors__created_at_day': '2017-01-06T00:00:00.000',
+            'visitors__created_at_day': '2017-01-06 00:00:00',
             'visitors__count': 2
           }
         ]
@@ -236,7 +236,7 @@ describe('MySqlPreAggregations', function test() {
       res.should.be.deepEqual(
         [
           {
-            'visitors__created_at_day': '2017-01-06T00:00:00.000',
+            'visitors__created_at_day': '2017-01-06 00:00:00',
             'visitors__count': 1
           }
         ]

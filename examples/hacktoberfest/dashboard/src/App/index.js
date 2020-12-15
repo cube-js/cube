@@ -93,8 +93,8 @@ export default function App() {
         <Logo />
         <div className={styles.content}>
           <div className={styles.paragraph}>
-            This story reveals the unofficial results of <a href='https://hacktoberfest.digitalocean.com' target='_blank' rel='noreferrer'>Hacktoberfest 2020</a>,
-            carefully gathered and presented by the <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=hacktoberfest' target='_blank' rel='noreferrer'>Cube.js</a> team.
+            This story reveals the <b>unofficial results of <a href='https://hacktoberfest.digitalocean.com' target='_blank' rel='noreferrer'>Hacktoberfest 2020</a> based on a subset of public data</b>,
+            presented by the <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=hacktoberfest' target='_blank' rel='noreferrer'>Cube.js</a> team.
             Learn all about Hacktoberfest, check out <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=hacktoberfest' target='_blank' rel='noreferrer'>Cube.js</a>, and don't forget to pick your favorite language -->
           </div>
 
@@ -133,7 +133,7 @@ export default function App() {
           <Pair filters={filters} of={[ PrCountCard, PrToOwnRepoCountCard ]} />
           <Pair filters={filters} of={[ UnmergedPrCountCard, PrContentsCountsCard ]} />
 
-          <div className={styles.footer}>This story is brought to you by <a href='https://twitter.com/igorlukanin' target='_blank' rel='noreferrer'>Igor Lukanin</a> and <a href='https://twitter.com/Leonid_frontend' target='_blank' rel='noreferrer'>Leonid Yakovlev</a>. Inspired by the <a href='https://github.com/MattIPv4/hacktoberfest-data' target='_blank' rel='noreferrer'>Hacktoberfest stats</a> by <a href='https://twitter.com/MattIPv4' target='_blank' rel='noreferrer'>Matt Cowley</a> ❤️</div>
+          <div className={styles.footer}>This story is brought to you by <a href='https://twitter.com/igorlukanin' target='_blank' rel='noreferrer'>Igor Lukanin</a> and <a href='https://twitter.com/Leonid_frontend' target='_blank' rel='noreferrer'>Leonid Yakovlev</a>.</div>
 
           <div className={styles.footnote}>Based on pull requests with the <span className={styles.code}>hacktoberfest-accepted</span> label collected via GitHub API in the first week of November 2020.</div>
         </div>

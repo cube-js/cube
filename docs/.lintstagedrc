@@ -1,0 +1,13 @@
+{
+  "*.md": [
+    "markdownlint-cli2",
+    "prettier --write"
+  ],
+  "*.scss": [
+  ],
+  "*.js?(x)": [
+  ],
+  "*.ts?(x)": [
+    "prettier --write"
+  ]
+}

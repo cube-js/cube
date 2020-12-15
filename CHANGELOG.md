@@ -3,6 +3,86 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.7](https://github.com/cube-js/cube.js/compare/v0.24.6...v0.24.7) (2020-12-14)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mysql-driver:** Do not validate connections in pool and expose all errors to clients ([b62f27f](https://github.com/cube-js/cube.js/commit/b62f27fb8319c5ea161d601586bd5cf0e3e940dd))
+
+
+
+
+
+## [0.24.6](https://github.com/cube-js/cube.js/compare/v0.24.5...v0.24.6) (2020-12-13)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/api-gateway:** SubscriptionServer - support dry-run ([#1581](https://github.com/cube-js/cube.js/issues/1581)) ([43fbc20](https://github.com/cube-js/cube.js/commit/43fbc20a66b4aad335ba198960cc1f626fb909a4))
+* **cubejs-cli:** deploy --upload-env - filter CUBEJS_DEV_MODE ([81a835f](https://github.com/cube-js/cube.js/commit/81a835f033e44b945d0c3a6115491e337a7eddfd))
+
+
+### Features
+
+* **cubestore:** Explicit index selection for join ([290cab8](https://github.com/cube-js/cube.js/commit/290cab82586084ed464b50ecdc9ad8bfe1461c9e))
+* Move index creation orchestration to the driver: allow to control drivers when to create indexes ([2a94e71](https://github.com/cube-js/cube.js/commit/2a94e710a89954ecedf4aa6f76b89578138e7aff))
+* **cubestore:** String implicit casts. CREATE INDEX support. ([d42c199](https://github.com/cube-js/cube.js/commit/d42c1995f675c437812196c30d2ba08cd35f273a))
+
+
+
+
+
+## [0.24.5](https://github.com/cube-js/cube.js/compare/v0.24.4...v0.24.5) (2020-12-09)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/api-gateway:** Export UserError/CubejsHandlerError ([#1540](https://github.com/cube-js/cube.js/issues/1540)) ([20124ba](https://github.com/cube-js/cube.js/commit/20124ba26f8330801fd23e33c7c36a2005ae98e8))
+* **@cubejs-client/playground:** fix user select on tab content ([7a0e4ef](https://github.com/cube-js/cube.js/commit/7a0e4ef10fb42597a402c69004c0d94178ce62ed))
+* **cubestore:** Compaction fixes ([7441a26](https://github.com/cube-js/cube.js/commit/7441a267d382c126b9e567f59c2b06aed2ca34a5))
+* **cubestore:** Partition range gap fix ([3610b61](https://github.com/cube-js/cube.js/commit/3610b612009016431859bdf18a3760ba029e8613))
+
+
+### Features
+
+* **@cubejs-backend/bigquery-driver:** Allow to make BigQueryDriver as readOnly, fix [#1028](https://github.com/cube-js/cube.js/issues/1028) ([d9395f6](https://github.com/cube-js/cube.js/commit/d9395f6df4e896c1b987ff5dfbf741829e3b51df))
+* **@cubejs-backend/mysql-driver:** CAST all time dimensions with granularities to DATETIME in order to provide typing for rollup downloads. Add mediumtext and mediumint generic type conversions. ([3d8cb37](https://github.com/cube-js/cube.js/commit/3d8cb37d03716cd2768a0986643495e4a844cb8d))
+* **cubejs-cli:** improve DX for docker ([#1457](https://github.com/cube-js/cube.js/issues/1457)) ([72ad782](https://github.com/cube-js/cube.js/commit/72ad782090c52e677b9e51e43818f1dca40db791))
+* **cubestore:** CUBESTORE_PORT env variable ([11e36a7](https://github.com/cube-js/cube.js/commit/11e36a726b930a1952eb917868c93078e1a9308e))
+* **cubestore:** IN Implementation ([945d8bc](https://github.com/cube-js/cube.js/commit/945d8bc3728b3ab462e7448b13d92d65d1581ac8))
+
+
+
+
+
+## [0.24.4](https://github.com/cube-js/cube.js/compare/v0.24.3...v0.24.4) (2020-12-07)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server:** Versions inside error message ([1a8cc4f](https://github.com/cube-js/cube.js/commit/1a8cc4f9ec15c18744c1541499552fa2133484ac))
+* **@cubejs-backend/server-core:** Allow to pass externalRefresh inside preAggregationsOptions, fix [#1524](https://github.com/cube-js/cube.js/issues/1524) ([a6959c9](https://github.com/cube-js/cube.js/commit/a6959c9f47d3751bdc6b5d132e858d55107d9a50))
+* **@cubejs-client/playground:** always show scrollbars in menu if content is too big ([5e22a3a](https://github.com/cube-js/cube.js/commit/5e22a3a179fa38bdbd539ec00b09f2ca0e89b8b9))
+* **cubestore:** Merge sort propagation fixes ([35125ad](https://github.com/cube-js/cube.js/commit/35125ad58296cef5a038dfce27a95941487c9ab0))
+* **docker:** Add sqlite driver to built-in drivers ([3b7b0f7](https://github.com/cube-js/cube.js/commit/3b7b0f74a3474a561481fac80cb5bc4b9c8450c9))
+* **docker:** Use latest snowflake driver ([f607ed0](https://github.com/cube-js/cube.js/commit/f607ed01366981f3f1b53ab0782cca867ed5d50c))
+
+
+### Features
+
+* **@cubejs-backend/api-gateway:** Migrate some parts to TS ([c1166d7](https://github.com/cube-js/cube.js/commit/c1166d744ccd562db492e5dedd01eab63e07bfd4))
+* **@cubejs-backend/api-gateway:** Migrate to TS initial ([1edef6d](https://github.com/cube-js/cube.js/commit/1edef6d269fd1877f0bfcdcf17d2f780abd4404c))
+* **@cubejs-backend/postgres-driver:** Support CUBEJS_DB_SSL_SERVERNAME ([f044372](https://github.com/cube-js/cube.js/commit/f04437236ca78cb23ef69f2a5de6be60006f2464))
+* Ability to load SSL keys from FS ([#1512](https://github.com/cube-js/cube.js/issues/1512)) ([71da5bb](https://github.com/cube-js/cube.js/commit/71da5bb529294fabd92b3a914b1e8bceb464643c))
+* **cubestore:** Decimal support ([6bdc68b](https://github.com/cube-js/cube.js/commit/6bdc68b4de96a050306044cb61e337961c76d898))
+* **cubestore:** Left join support ([9d1fd09](https://github.com/cube-js/cube.js/commit/9d1fd0996dcb4838ff848d1905955d82132f1338))
+* **cubestore:** Mediumint support ([f98540b](https://github.com/cube-js/cube.js/commit/f98540bb0db705ea53e5fb73dd242338c9145adc))
+
+
+
+
+
 ## [0.24.3](https://github.com/cube-js/cube.js/compare/v0.24.2...v0.24.3) (2020-12-01)
 
 

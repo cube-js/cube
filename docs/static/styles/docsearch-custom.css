@@ -1,7 +1,6 @@
 .algolia-autocomplete {
   line-height: 40px;
   width: 100%;
-  max-width: 400px;
 }
 
 .algolia-autocomplete .ds-suggestions {

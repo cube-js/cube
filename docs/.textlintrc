@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "textlint-rule-alex": true,
+    "textlint-rule-diacritics": true,
+    "textlint-rule-no-todo": true,
+    "textlint-rule-stop-words": true
+  }
+}

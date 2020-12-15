@@ -222,7 +222,12 @@ cube(`Sessions`, {
         every: `5 minutes`
       },
       external: true,
-      scheduledRefresh: true
+      scheduledRefresh: true,
+      indexes: {
+        sessionId: {
+          columns: [`session_id`, `events_count`]
+        }
+      }
     },
     additive: {
       type: `rollup`,
@@ -268,11 +273,11 @@ cube(`SessionUsers`, {
       scheduledRefresh: true,
       partitionGranularity: `month`,
       timeDimensionReference: sessionStart,
-      //indexes: {
-      //  sessionId: {
-      //    columns: [`session_id`]
-      //  }
-      //}
+      indexes: {
+        sessionId: {
+          columns: [`session_id`]
+        }
+      }
     }
   }
 });

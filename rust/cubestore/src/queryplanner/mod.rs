@@ -20,7 +20,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{SchemaProvider, SqlToRel};
 use datafusion::{datasource::MemTable, datasource::TableProvider, prelude::ExecutionContext};
-use log::debug;
+use log::{debug, trace};
 use mockall::automock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -57,6 +57,11 @@ impl QueryPlanner for QueryPlannerImpl {
         let mut logical_plan = query_planner.statement_to_plan(&statement)?;
 
         logical_plan = ctx.optimize(&logical_plan)?;
+
+        trace!(
+            "Logical Plan: {:#?}",
+            &logical_plan
+        );
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             QueryPlan::Select(SerializedPlan::try_new(logical_plan, self.meta_store.clone()).await?)

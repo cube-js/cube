@@ -1,4 +1,6 @@
 import { reduce } from 'ramda';
+import fs from 'fs';
+import { isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
 
 import { cancelCombinator } from './utils';
 
@@ -49,6 +51,67 @@ export class BaseDriver {
       FROM information_schema.columns
       WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
    `;
+  }
+
+  getSslOptions() {
+    let ssl;
+
+    const sslOptions = [
+      { name: 'ca', canBeFile: true, envKey: 'CUBEJS_DB_SSL_CA', validate: isSslCert },
+      { name: 'cert', canBeFile: true, envKey: 'CUBEJS_DB_SSL_CERT', validate: isSslCert },
+      { name: 'key', canBeFile: true, envKey: 'CUBEJS_DB_SSL_KEY', validate: isSslKey },
+      { name: 'ciphers', envKey: 'CUBEJS_DB_SSL_CIPHERS' },
+      { name: 'passphrase', envKey: 'CUBEJS_DB_SSL_PASSPHRASE' },
+      { name: 'servername', envKey: 'CUBEJS_DB_SSL_SERVERNAME' },
+    ];
+
+    if (
+      process.env.CUBEJS_DB_SSL === 'true' ||
+      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
+      sslOptions.find(o => !!process.env[o.value])
+    ) {
+      ssl = sslOptions.reduce(
+        (agg, { name, envKey, canBeFile, validate }) => {
+          if (process.env[envKey]) {
+            const value = process.env[envKey];
+
+            if (canBeFile) {
+              if (isFilePath(value)) {
+                if (!fs.existsSync(value)) {
+                  throw new Error(
+                    `Unable to find ${name} from path: "${value}"`,
+                  );
+                }
+
+                return {
+                  ...agg,
+                  ...{ [name]: fs.readFileSync(value) }
+                };
+              } else if (!validate(value)) {
+                throw new Error(
+                  `${envKey} is not a valid ssl key. If it's a path, please specify it correctly`,
+                );
+              }
+            }
+
+            return {
+              ...agg,
+              ...{ [name]: value }
+            };
+          }
+
+          return agg;
+        },
+        {}
+      );
+
+      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
+        ssl.rejectUnauthorized =
+          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
+      }
+    }
+
+    return ssl;
   }
 
   testConnection() {
@@ -141,6 +204,10 @@ export class BaseDriver {
   }
 
   async uploadTable(table, columns, tableData) {
+    return this.uploadTableWithIndexes(table, columns, tableData, []);
+  }
+
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -153,6 +220,10 @@ export class BaseDriver {
         VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
           columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
         );
+      }
+      for (let i = 0; i < indexesSql.length; i++) {
+        const [query, params] = indexesSql[i].sql;
+        await this.query(query, params);
       }
     } catch (e) {
       await this.dropTable(table);

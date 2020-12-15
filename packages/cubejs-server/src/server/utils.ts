@@ -1,4 +1,8 @@
 import { SemVer } from 'semver';
+import * as lockfile from '@yarnpkg/lockfile';
+import * as fs from 'fs';
+import * as path from 'path';
+import { internalExceptions } from '@cubejs-backend/shared';
 
 const devPackages = [
   'typescript',
@@ -38,4 +42,64 @@ export function getMajorityVersion(pkg: SemVer, strict: boolean = false): string
   }
 
   return `^${pkg.major}`;
+}
+
+export type ProjectLock = {
+  resolveVersion: (pkg: string) => string|null
+}
+
+export function parseNpmLock(): ProjectLock|null {
+  const file = fs.readFileSync(
+    path.join(process.cwd(), 'package-lock.json'),
+    'utf8'
+  );
+
+  try {
+    const lock = JSON.parse(file);
+
+    if (!lock) {
+      return null;
+    }
+
+    if (!lock.dependencies) {
+      return null;
+    }
+
+    return {
+      resolveVersion: (pkg: string) => {
+        if (pkg in lock.dependencies) {
+          return lock.dependencies[pkg].version;
+        }
+
+        return null;
+      },
+    };
+  } catch (e) {
+    internalExceptions(e);
+
+    return null;
+  }
+}
+
+export function parseYarnLock(): ProjectLock|null {
+  const file = fs.readFileSync(
+    path.join(process.cwd(), 'yarn.lock'),
+    'utf8'
+  );
+
+  const { type, object } = lockfile.parse(file);
+
+  if (type === 'success') {
+    return {
+      resolveVersion: (pkg: string) => {
+        if (pkg in object) {
+          return object[pkg].version;
+        }
+
+        return null;
+      },
+    };
+  }
+
+  return null;
 }

@@ -2,33 +2,33 @@ import { CommanderStatic } from 'commander';
 import chalk from 'chalk';
 import semver from 'semver';
 import type { Command, flags } from '@oclif/command';
-import path from 'path';
 import {
-  displayError,
   isDockerImage,
-  loadCliManifest,
   packageExists,
   requireFromPackage,
-} from '../utils';
+  requirePackageManifest,
+} from '@cubejs-backend/shared';
+import { displayError, loadCliManifest, } from '../utils';
 
 export async function proxyCommand(program: CommanderStatic, command: string) {
-  const relativeResolution = isDockerImage();
-  const serverPackageExists = packageExists('@cubejs-backend/server', relativeResolution);
+  const relative = isDockerImage();
+  const serverPackageExists = packageExists('@cubejs-backend/server', relative);
 
   const commandInfo = program
     .command(command);
 
   if (serverPackageExists) {
-    const PackageManifiest = await requireFromPackage(
-      path.join('@cubejs-backend/server', 'package.json'),
-      relativeResolution
-    );
-    if (PackageManifiest.cubejsCliVersion) {
-      const cliManifiest = loadCliManifest();
-      if (semver.satisfies(cliManifiest.version, PackageManifiest.cubejsCliVersion)) {
-        const OriginalCommandPackage = await requireFromPackage(
+    const packageManifest = await requirePackageManifest<any>('@cubejs-backend/server', {
+      relative,
+    });
+    if (packageManifest.cubejsCliVersion) {
+      const cliManifest = loadCliManifest();
+      if (semver.satisfies(cliManifest.version, packageManifest.cubejsCliVersion)) {
+        const OriginalCommandPackage = await requireFromPackage<any>(
           `@cubejs-backend/server/dist/command/${command}.js`,
-          relativeResolution
+          {
+            relative,
+          }
         );
 
         commandInfo
@@ -58,7 +58,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
       }
 
       const message = `${chalk.red('Unavailable.')} @cubejs-backend/server inside current directory requires ` +
-        `cubejs-cli (${PackageManifiest.cubejsCliVersion}).`;
+        `cubejs-cli (${packageManifest.cubejsCliVersion}).`;
 
       commandInfo
         .description(

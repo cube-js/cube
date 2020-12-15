@@ -1,5 +1,6 @@
 {
   "packages": [
+    "docs",
     "packages/*"
   ],
   "command": {
@@ -10,5 +11,5 @@
     }
   },
   "npmClient": "yarn",
-  "version": "0.24.3"
+  "version": "0.24.7"
 }
