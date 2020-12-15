@@ -12,6 +12,7 @@ import { SubscriptionServer } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
 import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
 import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, RequestContext } from './interfaces';
+import { cachedHandler } from './cached-handler';
 
 type MetaConfig = {
   config: {
@@ -273,17 +274,8 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`${this.basePath}/v1/health/live`, this.requestMiddleware, (async (req, res) => {
-      await this.healthLive({
-        res: this.resToResultFn(res)
-      });
-    }));
-
-    app.get(`${this.basePath}/v1/health/ready`, this.requestMiddleware, (async (req, res) => {
-      await this.healthReady({
-        res: this.resToResultFn(res)
-      });
-    }));
+    app.get(`${this.basePath}/v1/health/live`, this.requestMiddleware, cachedHandler(this.healthHandler));
+    app.get(`${this.basePath}/v1/health/ready`, this.requestMiddleware, cachedHandler(this.healthHandler));
   }
 
   public initSubscriptionServer(sendMessage) {
@@ -760,13 +752,13 @@ export class ApiGateway {
     });
   }
 
-  protected async healthHandler({ res }) {
+  protected healthHandler: RequestHandler = async (req, res) => {
     const queryOrchestrator = await this.adapterApi({});
 
     const [main, external] = await queryOrchestrator.testConnection();
     const [driver, status] = await queryOrchestrator.testOrchestratorConnection();
 
-    res({
+    res.status(200).json({
       health: true,
       standalone: this.standalone,
       driver: {
@@ -783,8 +775,4 @@ export class ApiGateway {
       },
     });
   }
-
-  protected healthLive = this.healthHandler;
-
-  protected healthReady = this.healthHandler;
 }
