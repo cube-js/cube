@@ -730,6 +730,7 @@ Name | Type | Description |
 ------ | ------ | ------ |
 apiUrl | string | URL of your Cube.js Backend. By default, in the development environment it is `http://localhost:4000/cubejs-api/v1` |
 credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
+method? | "GET" &#124; "POST" &#124; | HTTP method, by default it use GET. |
 headers? | Record‹string, string› | - |
 parseDateMeasures? | boolean | - |
 pollInterval? | number | - |
