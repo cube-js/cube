@@ -3,11 +3,16 @@ const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const crypto = require('crypto');
-const fs = require('fs');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
-  text: 'varchar(255) CHARACTER SET utf8mb4'
+  text: 'varchar(255) CHARACTER SET utf8mb4',
+  decimal: 'decimal(38,10)',
+};
+
+const MySqlToGenericType = {
+  mediumtext: 'text',
+  mediumint: 'int'
 };
 
 class MySqlDriver extends BaseDriver {
@@ -24,6 +29,7 @@ class MySqlDriver extends BaseDriver {
       socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
       timezone: 'Z',
       ssl: this.getSslOptions(),
+      dateStrings: true,
       ...restConfig,
     };
 
@@ -43,22 +49,13 @@ class MySqlDriver extends BaseDriver {
 
         return conn;
       },
-      destroy: (connection) => promisify(connection.end.bind(connection))(),
-      validate: async (connection) => {
-        try {
-          await connection.execute('SELECT 1');
-        } catch (e) {
-          return false;
-        }
-        return true;
-      }
+      destroy: (connection) => promisify(connection.end.bind(connection))()
     }, {
       min: 0,
       max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
-      testOnBorrow: true,
       acquireTimeoutMillis: 20000,
       ...pool
     });
@@ -180,7 +177,7 @@ class MySqlDriver extends BaseDriver {
     return super.toColumnValue(value, genericType);
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -202,11 +199,19 @@ class MySqlDriver extends BaseDriver {
         VALUES ${valueParamPlaceholders}`,
           params
         );
+        for (let i = 0; i < indexesSql.length; i++) {
+          const [query, p] = indexesSql[i].sql;
+          await this.query(query, p);
+        }
       }
     } catch (e) {
       await this.dropTable(table);
       throw e;
     }
+  }
+
+  toGenericType(columnType) {
+    return MySqlToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 }
 

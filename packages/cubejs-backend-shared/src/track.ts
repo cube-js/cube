@@ -1,15 +1,25 @@
-import { loadCliManifest } from './utils';
+import crypto from 'crypto';
+import fetch from 'node-fetch';
+import { machineIdSync } from 'node-machine-id';
+import { internalExceptions } from './errors';
 
-const fetch = require('node-fetch');
-const crypto = require('crypto');
+export type BaseEvent = {
+  name: string,
+  [key: string]: any,
+};
 
-export type BaseEvent = any;
-export type Event = BaseEvent & any;
+export type Event = BaseEvent & {
+  id: string,
+  clientTimestamp: string,
+  anonymousId: string,
+  platform: string,
+  nodeVersion: string,
+};
 
 let flushPromise: Promise<any>|null = null;
 let trackEvents: Array<Event> = [];
 
-const flush = async (toFlush?: Array<Event>, retries: number = 10): Promise<any> => {
+async function flush(toFlush?: Array<Event>, retries: number = 10): Promise<any> {
   if (!toFlush) {
     toFlush = trackEvents;
     trackEvents = [];
@@ -26,6 +36,7 @@ const flush = async (toFlush?: Array<Event>, retries: number = 10): Promise<any>
       body: JSON.stringify(toFlush.map(r => ({ ...r, sentAt }))),
       headers: { 'Content-Type': 'application/json' },
     });
+
     if (result.status !== 200 && retries > 0) {
       // eslint-disable-next-line consistent-return
       return flush(toFlush, retries - 1);
@@ -37,18 +48,31 @@ const flush = async (toFlush?: Array<Event>, retries: number = 10): Promise<any>
       // eslint-disable-next-line consistent-return
       return flush(toFlush, retries - 1);
     }
-    // console.log(e);
+
+    internalExceptions(e);
   }
-};
+}
 
-export const track = async (event: BaseEvent) => {
-  const cliManifest = loadCliManifest();
+let anonymousId: string = 'unknown';
 
+try {
+  anonymousId = machineIdSync();
+} catch (e) {
+  internalExceptions(e);
+}
+
+export function getAnonymousId() {
+  return anonymousId;
+}
+
+export async function track(opts: BaseEvent) {
   trackEvents.push({
-    ...event,
+    ...opts,
     id: crypto.randomBytes(16).toString('hex'),
     clientTimestamp: new Date().toJSON(),
-    cliVersion: cliManifest.version,
+    platform: process.platform,
+    nodeVersion: process.version,
+    anonymousId,
   });
 
   const currentPromise = (flushPromise || Promise.resolve()).then(() => flush()).then(() => {
@@ -59,4 +83,4 @@ export const track = async (event: BaseEvent) => {
 
   flushPromise = currentPromise;
   return flushPromise;
-};
+}

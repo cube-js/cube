@@ -18,20 +18,6 @@ export default function RepoStarCountCard() {
     }
   }, [ avgCountSet ])
 
-  // Median
-
-  const { resultSet: medianCountSet } = useCubeQuery({
-    measures: [ 'Repos.medianStarCount' ],
-  })
-
-  const [ medianCount, setMedianCount ] = useState(0)
-
-  useEffect(() => {
-    if (medianCountSet) {
-      setMedianCount(medianCountSet.tablePivot()[0]['Repos.medianStarCount'])
-    }
-  }, [ medianCountSet ])
-
   // Max
 
   const { resultSet: maxCountSet } = useCubeQuery({
@@ -62,7 +48,6 @@ export default function RepoStarCountCard() {
     <>
       <a href={maxRepoUrl} target='_blank' rel='noreferrer'>{maxRepoName}</a>{' '}
       stands out with {formatNumber(roundNumberWithThousandPrecision(maxCount))} stars
-      but the median is {medianCount}, obviously
     </>
   )
 

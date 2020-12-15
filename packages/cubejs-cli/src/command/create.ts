@@ -4,14 +4,15 @@ import inquirer from 'inquirer';
 import path from 'path';
 import crypto from 'crypto';
 import { CommanderStatic } from 'commander';
+import { requireFromPackage, requirePackageManifest } from '@cubejs-backend/shared';
+
 import {
   displayError,
-  event,
-  executeCommand,
+  executeCommand, findMaxVersion,
   loadCliManifest,
   npmInstall,
-  requireFromPackage,
   writePackageJson,
+  event,
 } from '../utils';
 import templates from '../templates';
 
@@ -24,7 +25,10 @@ const create = async (projectName, options) => {
   options.template = options.template || 'docker';
   const createAppOptions = { projectName, dbType: options.dbType, template: options.template };
 
-  event('Create App', createAppOptions);
+  event({
+    name: 'Create App',
+    ...createAppOptions,
+  });
 
   if (await fs.pathExists(projectName)) {
     await displayError(
@@ -62,7 +66,7 @@ const create = async (projectName, options) => {
   await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
 
   if (!options.dbType) {
-    const Drivers = await requireFromPackage('@cubejs-backend/server-core/core/DriverDependencies.js');
+    const Drivers = await requireFromPackage<any>('@cubejs-backend/server-core/core/DriverDependencies.js');
     const prompt = await inquirer.prompt([{
       type: 'list',
       name: 'dbType',
@@ -74,7 +78,8 @@ const create = async (projectName, options) => {
   }
 
   logStage('Installing DB driver dependencies');
-  const CubejsServer = await requireFromPackage('@cubejs-backend/server');
+  const CubejsServer = await requireFromPackage<any>('@cubejs-backend/server');
+
   let driverDependencies = CubejsServer.driverDependencies(options.dbType);
   if (!driverDependencies) {
     await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
@@ -90,7 +95,7 @@ const create = async (projectName, options) => {
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
     logStage('Installing JDBC dependencies');
 
-    // eslint-disable-next-line import/no-dynamic-require,global-require
+    // eslint-disable-next-line import/no-dynamic-require,global-require,@typescript-eslint/no-var-requires
     const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
     const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
     if (!dbTypeDescription) {
@@ -112,14 +117,26 @@ const create = async (projectName, options) => {
 
   logStage('Writing files from template');
 
-  const driverClass = await requireFromPackage(driverDependencies[0]);
+  const driverClass = await requireFromPackage<any>(driverDependencies[0]);
+
+  const driverPackageManifest = await requirePackageManifest(driverDependencies[0]);
+  const serverCorePackageManifest = await requirePackageManifest('@cubejs-backend/server-core');
+  const serverPackageManifest = await requirePackageManifest('@cubejs-backend/server');
+
+  const dockerVersion = findMaxVersion([
+    serverPackageManifest.version,
+    serverCorePackageManifest.version,
+    driverPackageManifest.version
+  ]);
 
   const env = {
     dbType: options.dbType,
     apiSecret: crypto.randomBytes(64).toString('hex'),
     projectName,
+    dockerVersion: `v${dockerVersion.version}`,
     driverEnvVariables: driverClass.driverEnvVariables && driverClass.driverEnvVariables()
   };
+
   await Promise.all(Object.keys(templateConfig.files).map(async fileName => {
     await fs.ensureDir(path.dirname(fileName));
     await fs.writeFile(fileName, templateConfig.files[fileName](env));
@@ -135,7 +152,12 @@ const create = async (projectName, options) => {
     await npmInstall(templateConfig.devDependencies);
   }
 
-  await event('Create App Success', { projectName, dbType: options.dbType });
+  await event({
+    name: 'Create App Success',
+    projectName,
+    dbType: options.dbType
+  });
+
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
 
   console.log();

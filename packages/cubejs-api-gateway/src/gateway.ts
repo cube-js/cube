@@ -1,31 +1,30 @@
 import jwt from 'jsonwebtoken';
 import R from 'ramda';
-import Joi from '@hapi/joi';
 import moment from 'moment';
 import uuid from 'uuid/v4';
 import bodyParser from 'body-parser';
+import type { Request as ExpressRequest, Response, NextFunction, Application as ExpressApplication, RequestHandler } from 'express';
 
-import { dateParser } from './dateParser';
 import { requestParser } from './requestParser';
 import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
+import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
+import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, RequestContext } from './interfaces';
 
-const QUERY_TYPE = {
-  REGULAR_QUERY: 'regularQuery',
-  COMPARE_DATE_RANGE_QUERY: 'compareDateRangeQuery',
-  BLENDING_QUERY: 'blendingQuery',
+type MetaConfig = {
+  config: {
+    name: string,
+    title: string
+  }
 };
 
-const toConfigMap = (metaConfig) => (
-  R.pipe(
-    R.map(c => [c.config.name, c.config]),
-    R.fromPairs
-  )(metaConfig)
+const toConfigMap = (metaConfig: MetaConfig[]) => R.fromPairs(
+  R.map((c) => [c.config.name, c.config], metaConfig)
 );
 
-const prepareAnnotation = (metaConfig, query) => {
+const prepareAnnotation = (metaConfig: MetaConfig[], query: any) => {
   const configMap = toConfigMap(metaConfig);
 
   const annotation = (memberType) => (member) => {
@@ -71,37 +70,6 @@ const prepareAnnotation = (metaConfig, query) => {
   };
 };
 
-const getQueryGranularity = (queries) => R.pipe(
-  R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
-  R.filter(Boolean),
-  R.uniq
-)(queries);
-
-const getPivotQuery = (queryType, queries) => {
-  let [pivotQuery] = queries;
-
-  if (queryType === QUERY_TYPE.BLENDING_QUERY) {
-    pivotQuery = R.fromPairs(
-      ['measures', 'dimensions'].map(
-        (key) => [key, R.uniq(queries.reduce((memo, q) => memo.concat(q[key]), []))]
-      )
-    );
-
-    const [granularity] = getQueryGranularity(queries);
-
-    pivotQuery.timeDimensions = [{
-      dimension: 'time',
-      granularity
-    }];
-  } else if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
-    pivotQuery.dimensions = ['compareDateRange'].concat(pivotQuery.dimensions || []);
-  }
-
-  pivotQuery.queryType = queryType;
-
-  return pivotQuery;
-};
-
 const transformValue = (value, type) => {
   if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
     return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
@@ -111,6 +79,7 @@ const transformValue = (value, type) => {
 
 const transformData = (aliasToMemberNameMap, annotation, data, query, queryType) => (data.map(r => {
   const row = R.pipe(
+    // @ts-ignore
     R.toPairs,
     R.map(p => {
       const memberName = aliasToMemberNameMap[p[0]];
@@ -143,8 +112,10 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
     }),
     R.unnest,
     R.fromPairs
+  // @ts-ignore
   )(r);
 
+  // @ts-ignore
   const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
 
   if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
@@ -162,178 +133,6 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
   return row;
 }));
 
-const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
-
-const operators = [
-  'equals',
-  'notEquals',
-  'contains',
-  'notContains',
-  'in',
-  'notIn',
-  'gt',
-  'gte',
-  'lt',
-  'lte',
-  'set',
-  'notSet',
-  'inDateRange',
-  'notInDateRange',
-  'onTheDate',
-  'beforeDate',
-  'afterDate',
-  'measureFilter',
-];
-
-const oneFilter = Joi.object().keys({
-  dimension: id,
-  member: id,
-  operator: Joi.valid(operators).required(),
-  values: Joi.array().items(Joi.string().allow('', null), Joi.lazy(() => oneFilter))
-}).xor('dimension', 'member');
-
-const oneCondition = Joi.object().keys({
-  or: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
-  and: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
-}).xor('or', 'and');
-
-const querySchema = Joi.object().keys({
-  measures: Joi.array().items(id),
-  dimensions: Joi.array().items(dimensionWithTime),
-  filters: Joi.array().items(oneFilter, oneCondition),
-  timeDimensions: Joi.array().items(Joi.object().keys({
-    dimension: id.required(),
-    granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
-    dateRange: [
-      Joi.array().items(Joi.string()).min(1).max(2),
-      Joi.string()
-    ],
-    compareDateRange: Joi.array()
-  }).oxor('dateRange', 'compareDateRange')),
-  order: Joi.alternatives(
-    Joi.object().pattern(id, Joi.valid('asc', 'desc')),
-    Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
-  ),
-  segments: Joi.array().items(id),
-  timezone: Joi.string(),
-  limit: Joi.number().integer().min(1).max(50000),
-  offset: Joi.number().integer().min(0),
-  renewQuery: Joi.boolean(),
-  ungrouped: Joi.boolean()
-});
-
-const normalizeQueryOrder = order => {
-  let result = [];
-  const normalizeOrderItem = (k, direction) => ({
-    id: k,
-    desc: direction === 'desc'
-  });
-  if (order) {
-    result = Array.isArray(order) ?
-      order.map(([k, direction]) => normalizeOrderItem(k, direction)) :
-      Object.keys(order).map(k => normalizeOrderItem(k, order[k]));
-  }
-  return result;
-};
-
-const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
-
-const checkQueryFilters = (filter) => {
-  filter.find(f => {
-    if (f.or) {
-      checkQueryFilters(f.or);
-      return false;
-    }
-    if (f.and) {
-      checkQueryFilters(f.and);
-      return false;
-    }
-
-    if (!f.operator) {
-      throw new UserError(`Operator required for filter: ${JSON.stringify(f)}`);
-    }
-
-    if (operators.indexOf(f.operator) === -1) {
-      throw new UserError(`Operator ${f.operator} not supported for filter: ${JSON.stringify(f)}`);
-    }
-
-    if (!f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
-      throw new UserError(`Values required for filter: ${JSON.stringify(f)}`);
-    }
-    return false;
-  });
-
-  return true;
-};
-
-const normalizeQuery = (query) => {
-  const { error } = Joi.validate(query, querySchema);
-  if (error) {
-    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
-  }
-  const validQuery = query.measures && query.measures.length ||
-    query.dimensions && query.dimensions.length ||
-    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
-  if (!validQuery) {
-    throw new UserError(
-      'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
-    );
-  }
-
-  checkQueryFilters(query.filters || []);
-
-  const regularToTimeDimension = (query.dimensions || []).filter(d => d.split('.').length === 3).map(d => ({
-    dimension: d.split('.').slice(0, 2).join('.'),
-    granularity: d.split('.')[2]
-  }));
-  const timezone = query.timezone || 'UTC';
-  return {
-    ...query,
-    rowLimit: query.rowLimit || query.limit,
-    timezone,
-    order: normalizeQueryOrder(query.order),
-    filters: (query.filters || []).map(f => {
-      const { dimension, member, ...filter } = f;
-      const normalizedFlter = {
-        ...filter,
-        member: member || dimension
-      };
-
-      Object.defineProperty(normalizedFlter, 'dimension', {
-        get() {
-          console.warn('Warning: Attribute `filter.dimension` is deprecated. Please use \'member\' instead of \'dimension\'.');
-          return this.member;
-        }
-      });
-      return normalizedFlter;
-    }),
-    dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
-    timeDimensions: (query.timeDimensions || []).map(td => {
-      let dateRange;
-
-      const compareDateRange = td.compareDateRange ? td.compareDateRange.map((currentDateRange) => (typeof currentDateRange === 'string' ? dateParser(currentDateRange, timezone) : currentDateRange)) : null;
-
-      if (typeof td.dateRange === 'string') {
-        dateRange = dateParser(td.dateRange, timezone);
-      } else {
-        dateRange = td.dateRange && td.dateRange.length === 1 ? [td.dateRange[0], td.dateRange[0]] : td.dateRange;
-      }
-      return {
-        ...td,
-        dateRange: dateRange && dateRange.map(
-          (d, i) => (
-            i === 0 ?
-              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
-              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
-          )
-        ),
-        ...(compareDateRange ? { compareDateRange } : {})
-      };
-    }).concat(regularToTimeDimension)
-  };
-};
-
 const coerceForSqlQuery = (query, context) => ({
   ...query,
   timeDimensions: query.timeDimensions || [],
@@ -343,33 +142,68 @@ const coerceForSqlQuery = (query, context) => ({
   requestId: context.requestId
 });
 
+interface Request extends ExpressRequest {
+  context?: RequestContext,
+  authInfo?: any,
+}
+
+export interface ApiGatewayOptions {
+  refreshScheduler: any;
+  basePath?: string;
+  extendContext?: ExtendContextFn;
+  checkAuth?: CheckAuthFn;
+  // @deprecated Please use checkAuth
+  checkAuthMiddleware?: CheckAuthMiddlewareFn;
+  queryTransformer?: QueryTransformerFn;
+  subscriptionStore?: any;
+  enforceSecurityChecks?: boolean;
+  requestLoggerMiddleware?: any;
+}
+
 export class ApiGateway {
-  constructor(apiSecret, compilerApi, adapterApi, logger, options) {
+  protected readonly refreshScheduler: any;
+
+  protected readonly basePath: string;
+
+  protected readonly queryTransformer: QueryTransformerFn;
+
+  protected readonly subscriptionStore: any;
+
+  protected readonly enforceSecurityChecks: boolean;
+
+  protected readonly extendContext?: ExtendContextFn;
+
+  protected readonly requestMiddleware: RequestHandler[];
+
+  public readonly checkAuthFn: CheckAuthFn;
+
+  public constructor(
+    protected readonly apiSecret: string,
+    protected readonly compilerApi: any,
+    protected readonly adapterApi: any,
+    protected readonly logger: any,
+    options: ApiGatewayOptions,
+  ) {
     options = options || {};
-    this.apiSecret = apiSecret;
-    this.compilerApi = compilerApi;
-    this.adapterApi = adapterApi;
+
     this.refreshScheduler = options.refreshScheduler;
-    this.logger = logger;
+
     this.basePath = options.basePath || '/cubejs-api';
-    // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
-    this.queryTransformer = options.queryTransformer || (async (query, context) => query);
+
+    this.queryTransformer = options.queryTransformer || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
-
-    this.initializeMiddleware(options);
-  }
-
-  initializeMiddleware(options) {
-    const checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
     this.checkAuthFn = options.checkAuth || this.defaultCheckAuth.bind(this);
-    const requestContextMiddleware = this.requestContextMiddleware.bind(this);
-    const requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger.bind(this);
-    this.requestMiddleware = [checkAuthMiddleware, requestContextMiddleware, requestLoggerMiddleware];
+
+    this.requestMiddleware = [
+      options.checkAuthMiddleware || this.checkAuth,
+      this.requestContextMiddleware,
+      options.requestLoggerMiddleware || this.requestLogger
+    ];
   }
 
-  initApp(app) {
+  public initApp(app: ExpressApplication) {
     app.get(`${this.basePath}/v1/load`, this.requestMiddleware, (async (req, res) => {
       await this.load({
         query: req.query.query,
@@ -430,15 +264,15 @@ export class ApiGateway {
     }));
   }
 
-  initSubscriptionServer(sendMessage) {
+  public initSubscriptionServer(sendMessage) {
     return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
   }
 
-  duration(requestStarted) {
+  protected duration(requestStarted) {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
-  async runScheduledRefresh({ context, res, queryingOptions }) {
+  public async runScheduledRefresh({ context, res, queryingOptions }) {
     const requestStarted = new Date();
     try {
       const refreshScheduler = this.refreshScheduler();
@@ -453,7 +287,7 @@ export class ApiGateway {
     }
   }
 
-  async meta({ context, res }) {
+  public async meta({ context, res }) {
     const requestStarted = new Date();
     try {
       const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
@@ -466,7 +300,7 @@ export class ApiGateway {
     }
   }
 
-  async getNormalizedQueries(query, context) {
+  protected async getNormalizedQueries(query, context): Promise<any> {
     query = this.parseQueryParam(query);
     let queryType = QUERY_TYPE.REGULAR_QUERY;
 
@@ -502,7 +336,7 @@ export class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  async sql({ query, context, res }) {
+  public async sql({ query, context, res }) {
     const requestStarted = new Date();
 
     try {
@@ -531,13 +365,13 @@ export class ApiGateway {
     }
   }
 
-  async dryRun({ query, context, res }) {
+  protected async dryRun({ query, context, res }: any) {
     const requestStarted = new Date();
 
     try {
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
-      const sqlQueries = await Promise.all(
+      const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           coerceForSqlQuery(normalizedQuery, context),
           { includeDebugInfo: process.env.NODE_ENV !== 'production' }
@@ -559,7 +393,7 @@ export class ApiGateway {
     }
   }
 
-  async load({ query, context, res, ...props }) {
+  public async load({ query, context, res, ...props }: any) {
     const requestStarted = new Date();
 
     try {
@@ -659,7 +493,7 @@ export class ApiGateway {
     }
   }
 
-  async subscribe({
+  public async subscribe({
     query, context, res, subscribe, subscriptionState, queryType
   }) {
     const requestStarted = new Date();
@@ -668,8 +502,9 @@ export class ApiGateway {
         type: 'Subscribe',
         query
       });
-      let result = null;
-      let error = null;
+
+      let result: any = null;
+      let error: any = null;
 
       if (!subscribe) {
         await this.load({ query, context, res, queryType });
@@ -703,11 +538,12 @@ export class ApiGateway {
     }
   }
 
-  resToResultFn(res) {
+  protected resToResultFn(res: Response) {
+    // @ts-ignore
     return (message, { status } = {}) => (status ? res.status(status).json(message) : res.json(message));
   }
 
-  parseQueryParam(query) {
+  protected parseQueryParam(query) {
     if (!query || query === 'undefined') {
       throw new UserError('query param is required');
     }
@@ -717,21 +553,23 @@ export class ApiGateway {
     return query;
   }
 
-  getCompilerApi(context) {
+  protected getCompilerApi(context) {
     if (typeof this.compilerApi === 'function') {
       return this.compilerApi(context);
     }
+
     return this.compilerApi;
   }
 
-  getAdapterApi(context) {
+  protected getAdapterApi(context) {
     if (typeof this.adapterApi === 'function') {
       return this.adapterApi(context);
     }
+
     return this.adapterApi;
   }
 
-  async contextByReq(req, authInfo, requestId) {
+  public async contextByReq(req, authInfo, requestId) {
     const extensions = await Promise.resolve(typeof this.extendContext === 'function' ? this.extendContext(req) : {});
 
     return {
@@ -741,13 +579,13 @@ export class ApiGateway {
     };
   }
 
-  requestIdByReq(req) {
+  protected requestIdByReq(req) {
     return req.headers['x-request-id'] || req.headers.traceparent || uuid();
   }
 
-  handleError({
+  public handleError({
     e, context, query, res, requestStarted
-  }) {
+  }: any) {
     if (e instanceof CubejsHandlerError) {
       this.log(context, {
         type: e.type,
@@ -797,7 +635,7 @@ export class ApiGateway {
     }
   }
 
-  async defaultCheckAuth(req, auth) {
+  protected async defaultCheckAuth(req, auth) {
     if (auth) {
       const secret = this.apiSecret;
       try {
@@ -818,7 +656,7 @@ export class ApiGateway {
     }
   }
 
-  async checkAuth(req, res, next) {
+  protected checkAuth: RequestHandler = async (req, res, next) => {
     const auth = req.headers.authorization;
 
     try {
@@ -840,14 +678,14 @@ export class ApiGateway {
     }
   }
 
-  async requestContextMiddleware(req, res, next) {
+  protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     req.context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
     if (next) {
       next();
     }
   }
 
-  async requestLogger(req, res, next) {
+  protected requestLogger: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     const details = requestParser(req, res);
     this.log(req.context, { type: 'REST API Request', ...details });
     if (next) {
@@ -855,7 +693,7 @@ export class ApiGateway {
     }
   }
 
-  compareDateRangeTransformer(query) {
+  protected compareDateRangeTransformer(query) {
     let queryCompareDateRange;
     let compareDateRangeTDIndex;
 
@@ -891,7 +729,7 @@ export class ApiGateway {
     }));
   }
 
-  log(context, event) {
+  protected log(context, event) {
     const { type, ...restParams } = event;
     this.logger(type, {
       ...restParams,

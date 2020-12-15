@@ -46,6 +46,10 @@ export class Config {
     if (await fs.pathExists(envFile)) {
       const env = dotenv.config({ path: envFile }).parsed;
       if (env) {
+        if ('CUBEJS_DEV_MODE' in env) {
+          delete env.CUBEJS_DEV_MODE;
+        }
+
         const resolvePossibleFiles = [
           'CUBEJS_DB_SSL_CA',
           'CUBEJS_DB_SSL_CERT',

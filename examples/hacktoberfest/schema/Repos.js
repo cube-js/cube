@@ -61,11 +61,6 @@ cube(`Repos`, {
       type: `max`,
     },
 
-    medianStarCount: {
-      sql: `APPROX_PERCENTILE(${starCount}, 0.5)`,
-      type: `number`,
-    },
-
     avgWatcherCount: {
       sql: `${watcherCount}`,
       type: `avg`,
@@ -76,11 +71,6 @@ cube(`Repos`, {
       type: `max`,
     },
 
-    medianWatcherCount: {
-      sql: `APPROX_PERCENTILE(${watcherCount}, 0.5)`,
-      type: `number`,
-    },
-
     avgForkCount: {
       sql: `${forkCount}`,
       type: `avg`,
@@ -89,11 +79,6 @@ cube(`Repos`, {
     maxForkCount: {
       sql: `${forkCount}`,
       type: `max`,
-    },
-
-    medianForkCount: {
-      sql: `APPROX_PERCENTILE(${forkCount}, 0.5)`,
-      type: `number`,
     },
   },
 

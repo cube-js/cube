@@ -21,22 +21,30 @@ export const packageExists = (
   return fs.existsSync(modulePath);
 };
 
-type RequireFromPackageOptions = {
-  basePath?: string,
-  relative: boolean,
-  silent?: true
-}
-
 export type PackageManifest = {
   version: string,
   dependencies: Record<string, string>,
   devDependencies: Record<string, string>
 }
 
-export async function requireFromPackage<T = unknown>(
+type RequireBaseOptions = {
+  basePath?: string,
+  relative?: boolean,
+}
+
+type RequireOptions = RequireBaseOptions & { silent?: true };
+
+export function requireFromPackage<T = unknown|null>(
   pkg: string,
-  { basePath = process.cwd(), relative, silent }: RequireFromPackageOptions
-): Promise<T|null> {
+  opts: RequireBaseOptions & { silent: true }
+): Promise<T|null>;
+export function requireFromPackage<T = unknown>(
+  pkg: string,
+  opts?: RequireBaseOptions
+): Promise<T>;
+export async function requireFromPackage<T = unknown|null>(pkg: string, options?: RequireOptions): Promise<T|null> {
+  const { basePath = process.cwd(), relative = false, silent = undefined } = options || {};
+
   const exists = await packageExists(pkg, relative, basePath);
   if (!exists) {
     if (silent) {
@@ -78,4 +86,53 @@ export function isFilePath(fp: string): boolean {
   }
 
   return false;
+}
+
+export function requirePackageManifest<T = PackageManifest>(
+  pkg: string,
+  opts: RequireBaseOptions & { silent: true }
+): Promise<T|null>;
+export function requirePackageManifest<T = PackageManifest>(
+  pkg: string,
+  opts?: RequireBaseOptions
+): Promise<T>;
+export async function requirePackageManifest(
+  pkgName: string,
+  options?: RequireOptions
+) {
+  return requireFromPackage<PackageManifest>(
+    path.join(pkgName, 'package.json'),
+    options
+  );
+}
+
+export async function resolvePackageVersion(basePath: string, pkgName: string) {
+  const resolvedManifest = await requirePackageManifest(
+    pkgName,
+    {
+      basePath,
+      relative: false,
+      silent: true,
+    },
+  );
+  if (resolvedManifest) {
+    return resolvedManifest.version;
+  }
+
+  return null;
+}
+
+export async function resolveBuiltInPackageVersion(pkgName: string) {
+  return resolvePackageVersion(
+    '/cube',
+    pkgName,
+  );
+}
+
+export async function resolveUserPackageVersion(pkgName: string) {
+  return resolvePackageVersion(
+    // In the official docker image, it will be resolved to /cube/conf
+    process.cwd(),
+    pkgName,
+  );
 }

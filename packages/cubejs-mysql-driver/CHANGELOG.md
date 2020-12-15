@@ -3,6 +3,50 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.8](https://github.com/cube-js/cube.js/compare/v0.24.7...v0.24.8) (2020-12-15)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mysql-driver:** Use decimal(38,10) for external pre-aggregations, fix [#1563](https://github.com/cube-js/cube.js/issues/1563) ([3aec549](https://github.com/cube-js/cube.js/commit/3aec549f0344590185618427b854eef863d24287))
+
+
+
+
+
+## [0.24.7](https://github.com/cube-js/cube.js/compare/v0.24.6...v0.24.7) (2020-12-14)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mysql-driver:** Do not validate connections in pool and expose all errors to clients ([b62f27f](https://github.com/cube-js/cube.js/commit/b62f27fb8319c5ea161d601586bd5cf0e3e940dd))
+
+
+
+
+
+## [0.24.6](https://github.com/cube-js/cube.js/compare/v0.24.5...v0.24.6) (2020-12-13)
+
+
+### Features
+
+* Move index creation orchestration to the driver: allow to control drivers when to create indexes ([2a94e71](https://github.com/cube-js/cube.js/commit/2a94e710a89954ecedf4aa6f76b89578138e7aff))
+
+
+
+
+
+## [0.24.5](https://github.com/cube-js/cube.js/compare/v0.24.4...v0.24.5) (2020-12-09)
+
+
+### Features
+
+* **@cubejs-backend/mysql-driver:** CAST all time dimensions with granularities to DATETIME in order to provide typing for rollup downloads. Add mediumtext and mediumint generic type conversions. ([3d8cb37](https://github.com/cube-js/cube.js/commit/3d8cb37d03716cd2768a0986643495e4a844cb8d))
+
+
+
+
+
 ## [0.24.4](https://github.com/cube-js/cube.js/compare/v0.24.3...v0.24.4) (2020-12-07)
 
 

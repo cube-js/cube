@@ -34,7 +34,7 @@ The package provides convenient tools to work with Cube.js in Angular:
 
 ## Example Usage
 
-Here are the typical steps to query and visualize analytical data in Due:
+Here are the typical steps to query and visualize analytical data in Angular:
 
 - **Import `@cubejs-client/core` and `@cubejs-client/ngx` packages.** These packages provide all the necessary methods and convenient Angular tools.
 - **Create an instance of Cube.js JavaScript Client.** The client is initialized with Cube.js API URL. In development mode, the default URL is [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1). The client is also initialized with an [API token](https://cube.dev/docs/security), but it takes effect only in [production](https://cube.dev/docs/deployment#production-mode).

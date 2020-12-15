@@ -6,7 +6,8 @@ const colors = {
   text: '91, 92, 125',
   'dark-01': '20, 20, 70',
   'dark-02': '67, 67, 107',
-  'dark-03': '161, 161, 181',
+  'dark-03': '114, 114, 144',
+  'dark-04': '161, 161, 181',
   'dark-05': '213, 213, 226',
   light: '243, 243, 251',
 };
@@ -42,13 +43,13 @@ module.exports = {
   'item-hover-bg': color('light'),
   'layout-header-height': '48px',
 
-  'font-family': '\'DM Sans\', sans-serif',
+  'font-family': 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Avenir Next", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif',
   'menu-item-font-size': '15px',
   'btn-primary-shadow': 'none',
   'btn-text-shadow': 'none',
   'modal-body-padding': '32px',
   'form-item-margin-bottom': '23px',
-  'disabled-color': color('dark-03'),
+  'disabled-color': color('dark-04'),
   'disabled-bg': color('dark-05', .2),
 
   // menu

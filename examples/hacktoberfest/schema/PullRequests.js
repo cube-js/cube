@@ -62,11 +62,6 @@ cube(`PullRequests`, {
       type: `max`,
     },
 
-    medianCommitCount: {
-      sql: `APPROX_PERCENTILE(${commitCount}, 0.5)`,
-      type: `number`,
-    },
-
     avgAdditionCount: {
       sql: `${additionCount}`,
       type: `avg`,
@@ -75,11 +70,6 @@ cube(`PullRequests`, {
     maxAdditionCount: {
       sql: `${additionCount}`,
       type: `max`,
-    },
-
-    medianAdditionCount: {
-      sql: `APPROX_PERCENTILE(${additionCount}, 0.5)`,
-      type: `number`,
     },
 
     avgDeletionCount: {
@@ -92,11 +82,6 @@ cube(`PullRequests`, {
       type: `max`,
     },
 
-    medianDeletionCount: {
-      sql: `APPROX_PERCENTILE(${deletionCount}, 0.5)`,
-      type: `number`,
-    },
-
     avgChangedFileCount: {
       sql: `${changedFileCount}`,
       type: `avg`,
@@ -105,11 +90,6 @@ cube(`PullRequests`, {
     maxChangedFileCount: {
       sql: `${changedFileCount}`,
       type: `max`,
-    },
-
-    medianChangedFileCount: {
-      sql: `APPROX_PERCENTILE(${changedFileCount}, 0.5)`,
-      type: `number`,
     },
   },
 

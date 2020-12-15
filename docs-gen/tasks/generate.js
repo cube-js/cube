@@ -2,6 +2,8 @@ const TypeDoc = require('typedoc');
 const path = require('path');
 const fs = require('fs-extra');
 
+const outputDir = '../docs/content/Cube.js-Frontend';
+
 const app = new TypeDoc.Application();
 
 app.options.addReader(new TypeDoc.TSConfigReader());
@@ -19,17 +21,17 @@ const projects = [
   {
     name: '@cubejs-client-core',
     docsPath: '../packages/cubejs-client-core/index.d.ts',
-    outputDir: '../docs/Cube.js-Frontend',
+    outputDir,
   },
   {
     name: '@cubejs-client-react',
     docsPath: '../packages/cubejs-client-react/index.d.ts',
-    outputDir: '../docs/Cube.js-Frontend',
+    outputDir,
   },
   {
     name: '@cubejs-client-ws-transport',
     docsPath: '../packages/cubejs-client-ws-transport/index.d.ts',
-    outputDir: '../docs/Cube.js-Frontend',
+    outputDir,
   },
 ];
 

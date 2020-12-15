@@ -34,8 +34,30 @@ a {
   }
 }
 
+.contentWrapper {
+  display: flex;
+  justify-content: center;
+
+  > div {
+    width: 100%;
+  }
+
+  @media screen and (max-width: 576px) {
+    display: block;
+    justify-content: unset;
+  }
+}
+
+.docContentWrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .docContent {
   @include body-text;
+  width: inherit;
+  max-width: $content-max-width;
 
   @media screen and (max-width: 576px) {
     font-size: 16px;
@@ -71,9 +93,16 @@ a {
   margin-bottom: 200px;
 }
 
+.searchBoxWrapper {
+  display: flex;
+  justify-content: center;
+}
+
 .searchBox {
   display: flex;
   margin-top: 25px;
+  width: 100%;
+  max-width: $content-max-width;
 
   @media screen and (max-width: 576px) {
     margin: 20px;
@@ -109,7 +138,7 @@ a {
   padding-bottom: 0;
 
   box-shadow: none;
-  font-size: 1.7rem;
+  font-size: 1rem;
 
   @media screen and (max-width: 576px) {
     line-height: 33px;
@@ -349,21 +378,22 @@ span.group-header {
 }
 
 .menuWrapper {
-  padding-top: 48px;
-  padding-bottom: 48px;
+  height: 100%;
+  width: inherit;
+  background: $sidebar-bg;
+  padding: 16px 24px;
   overflow-y: auto;
   overflow-x: hidden;
   position: fixed;
   //padding-left: calc(9999px + 24px);
   //padding-right: 24px;
   //margin-left: -9999px;
-  min-width: 245px;
+  //min-width: 245px;
   max-height: calc(100% - 66px);
   //background: $light;
 
   @media screen and (max-width: 767px) {
     max-height: calc(100% - 48px); // footer is fixed on mobile screen
-    padding-top: 95px;
     min-width: 95%;
   }
 
@@ -380,10 +410,13 @@ span.group-header {
 
     :global {
       .ant-menu-item {
+        display: inline-flex;
+        align-items: center;
         color: inherit;
+        padding: 8px 0;
         font-family: inherit;
-        font-size: 16px;
-        line-height: 40px;
+        font-size: 1rem;
+        line-height: 1.5rem;
         letter-spacing: 0.02em;
         padding-left: 0 !important;
         margin-top: 0 !important;
@@ -395,6 +428,7 @@ span.group-header {
 
         a {
           color: inherit;
+          white-space: break-spaces;
         }
 
         &:after {
@@ -518,22 +552,20 @@ span.group-header {
 }
 
 .scrollspy {
-  padding-top: 48px;
-  padding-bottom: 48px;
+  padding: 1rem 1.5rem 1rem 0;
   overflow-y: auto;
   overflow-x: hidden;
   position: fixed;
   display: flex;
   flex-direction: column;
-  min-width: 230px;
   max-height: calc(100% - 66px);
 
   @media screen and (min-width: 1600px) {
-    max-width: 260px;
+    //max-width: 260px;
   }
 
   @media screen and (min-width: 1200px) and (max-width: 1600px) {
-    max-width: 230px;
+    //max-width: 230px;
   }
 
   .scrollspyLinkWrapper {
@@ -592,14 +624,16 @@ span.group-header {
 }
 
 .logoWrapper {
+  display: flex;
+  justify-content: center;
+
   @media screen and (max-width: 767px) {
     text-align: center;
   }
 }
 
 .logoDocs {
-  position: absolute;
-  margin-left: 4px;
+  margin-left: 0.25em;
   font-size: 24px;
   font-weight: normal;
 }
@@ -640,29 +674,45 @@ span.group-header {
 
 .header {
   background: #fff;
-  padding: 0;
+  padding: 0 1rem;
   position: fixed;
   z-index: 1;
   width: 100%;
-  //border-bottom: 1px solid rgb(236, 236, 240);
   filter: drop-shadow(0px 0px 15px rgba(67, 67, 107, 0.1));
-  height: auto;
-  min-height: 66px;
+  height: $header-max-height;
+
+  > :global.ant-row {
+    height: inherit;
+  }
 
   @media screen and (max-width: 767px) {
-    position: relative;
 
     &.fixed {
       position: fixed;
     }
   }
 
+  .headerButtonWrapper {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+
+    a:first-child {
+      margin-left: 0;
+    }
+
+    a:last-child {
+      margin-right: 0;
+    }
+  }
+
   .headerButton {
-    display: inline-grid;
+    display: inline-flex;
     grid-auto-flow: column;
     place-content: center stretch;
     place-items: center stretch;
-    margin: 14px 5px 0 5px;
+    margin: 0 5px;
     border-radius: 4px;
     border: 1px solid #D5D5E2;
     background-color: transparent;
@@ -706,10 +756,9 @@ span.group-header {
 }
 
 .contentColumn {
-  margin-top: 66px;
+  margin-top: 64px;
 
   @media screen and (max-width: 767px) {
-    margin-top: 0;
     overflow-x: hidden;
 
     &.fixed {
@@ -738,8 +787,12 @@ span.group-header {
     font-size: inherit;
     margin-top: 6px;
     position: absolute;
-    left: 5px;
+    left: -0.75rem;
     padding-right: 10px;
+
+    @media screen and (min-width: 2000px) {
+      left: 0.75rem;
+    }
 
     &:hover {
       display: inline;
@@ -873,12 +926,6 @@ section[type=h2] > :last-child :not(pre) {
 
 .editPage {
   max-height: 0;
-  //margin-bottom: -91px;
-  //margin-top: 58px;
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  text-align: right;
   padding: 0;
 
   a {

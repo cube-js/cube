@@ -145,9 +145,9 @@ describe('index.test', () => {
 
   expectRefreshTimerOption(10, 10000);
   expectRefreshTimerOption('9', 9000);
-  expectRefreshTimerOption(true, 5000);
+  expectRefreshTimerOption(true, 30000);
   expectRefreshTimerOption(false, false);
   expectRefreshTimerOption('false', false);
-  expectRefreshTimerOption(undefined, 5000);
+  expectRefreshTimerOption(undefined, 30000);
   expectRefreshTimerOption(undefined, false, true);
 });

@@ -13,7 +13,8 @@ class MSSqlDbRunner extends BaseDbRunner {
           port,
           user: 'root',
           database: 'mysql',
-          password: this.password()
+          password: this.password(),
+          dateStrings: true
         });
         const connect = promisify(conn.connect.bind(conn));
 

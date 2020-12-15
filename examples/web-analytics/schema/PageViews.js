@@ -114,7 +114,12 @@ cube(`PageUsers`, {
       partitionGranularity: `month`,
       timeDimensionReference: time,
       external: true,
-      scheduledRefresh: true
+      scheduledRefresh: true,
+      indexes: {
+        sessionId: {
+          columns: ['session_id']
+        }
+      }
     }
   }
 });

@@ -336,6 +336,7 @@ impl ChunkDataStore for ChunkStore {
         for chunk in chunks.into_iter() {
             let chunk_id = chunk.get_id();
             let data = self.get_chunk(chunk).await?;
+            // TODO atomic
             self.partition_data_frame(partition.get_row().get_index_id(), data)
                 .await?;
             self.meta_store.deactivate_chunk(chunk_id).await?;
@@ -448,9 +449,10 @@ mod tests {
                 .collect::<Vec<_>>();
 
             let data_frame = DataFrame::new(col.clone(), first_rows);
-            let table = IdRow::new(1, Table::new("foo".to_string(), 1, col.clone(), None, None));
 
-            let _ = store.add_wal(table.clone(), data_frame).await;
+            store.meta_store.create_schema("s".to_string(), false).await.unwrap();
+            let table = store.meta_store.create_table("s".to_string(), "foo".to_string(), col.clone(), None, None, Vec::new()).await.unwrap();
+            store.add_wal(table.clone(), data_frame).await.unwrap();
             let wal = IdRow::new(1, WAL::new(1, 10));
             let restored_wal: DataFrame = store.get_wal(wal.get_id()).await.unwrap();
 
@@ -591,7 +593,7 @@ impl ChunkStore {
                         .get_row()
                         .get_max_val()
                         .as_ref()
-                        .map(|max| r.sort_key(sort_key_size) <= max.sort_key(sort_key_size))
+                        .map(|max| r.sort_key(sort_key_size) < max.sort_key(sort_key_size))
                         .unwrap_or(true)
             });
             if to_write.len() > 0 {
@@ -604,6 +606,8 @@ impl ChunkStore {
             }
             remaining_rows = next;
         }
+
+        assert_eq!(remaining_rows.len(), 0);
 
         Ok(())
     }
