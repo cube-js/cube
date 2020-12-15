@@ -217,27 +217,27 @@ cube(`ExtendedOrderFacts`, {
 
 Cube.js caching layer uses `refreshKey` queries to get the current version of content for a specific cube.
 If a query result changes, Cube.js will invalidate all queries that rely on that cube.
-If the `refreshKey` is not set, Cube.js will use the default strategy:
 
-1. Check used pre-aggregations for query and use [pre-aggregations refreshKey](pre-aggregations#refresh-key), if none pre-aggregations are used…
-2. Check the `max` of time dimensions with `updated` in the name, if none exist…
-3. Check the `max` of any existing time dimension, if none exist…
-4. Check the row count for this cube.
 
-The result of the default `refreshKey` query itself is cached for 10 seconds for RDBMS backends and for 2 minutes for big data backends by default. 
+The default values for `refreshKey` are
+ * `every: '2 minute'` for BigQuery, Athena, Snowflake, and Presto.
+ * `every: '10 second'` for all other databases.
 
 Refresh key of a query is a concatenation of all cubes refresh keys involved in query.
 For rollup queries pre-aggregation table name is used as a refresh key.
 
-You can use an existing timestamp from your tables. Make sure to select max
+You can set up a custom refresh check SQL by changing `refreshKey` property. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a metadata table for whatever system is managing the data to see when it last ran.
 timestamp in that case.
 
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
 
+  // With this refreshKey Cube.js will only refresh the data if
+  // the value of previous MAX(updated_at_timestamp) changed
+  // By default Cube.js will check this refreshKey every 10 seconds
   refreshKey: {
-    sql: `SELECT MAX(created_at) FROM orders`
+    sql: `SELECT MAX(updated_at_timestamp) FROM orders`
   }
 });
 ```

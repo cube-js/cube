@@ -81,9 +81,8 @@ depending on the specific use case.
 
 ## Set up Refresh Worker
 
-If you are using [scheduled pre-aggregations][link-scheduled-refresh], we
-recommend running a separate Cube.js worker instance to refresh scheduled
-pre-aggregations in the background. This allows your main Cube.js instance
+To refresh in-memory cache and [scheduled pre-aggregations][link-scheduled-refresh] in the background, we
+recommend running a separate Cube.js refresh worker instance. This allows your main Cube.js instance
 to continue to serve requests with high availability.
 
 [link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
@@ -92,6 +91,8 @@ to continue to serve requests with high availability.
 # Set to true so a Cube.js instance acts as a refresh worker
 CUBEJS_SCHEDULED_REFRESH_TIMER=true
 ```
+
+For Serverless deployments, use the [Run Scheduled Refresh endpoint of the REST API](rest-api#api-reference-v-1-run-scheduled-refresh) instead of a refresh worker.
 
 ## Enable HTTPS
 
@@ -126,4 +127,3 @@ server {
   }
 }
 ```
-
