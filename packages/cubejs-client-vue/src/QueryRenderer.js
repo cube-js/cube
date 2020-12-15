@@ -74,14 +74,7 @@ export default {
       slot = $scopedSlots.error ? $scopedSlots.error({ error, sqlQuery }) : slot;
     }
 
-    return createElement(
-      'div',
-      {},
-      [
-        controls,
-        slot,
-      ],
-    );
+    return createElement('div', {}, [controls, slot]);
   },
   methods: {
     async load() {
@@ -97,7 +90,10 @@ export default {
             this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
             this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
           } else {
-            this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
+            this.resultSet = await this.cubejsApi.load(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'query',
+            });
           }
         }
 
@@ -114,10 +110,11 @@ export default {
         this.error = undefined;
         this.loading = true;
 
-        const resultPromises = Promise.all(toPairs(queries).map(
-          ([name, query]) =>
-          this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
-        ));
+        const resultPromises = Promise.all(
+          toPairs(queries).map(([name, query]) =>
+            this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then((r) => [name, r])
+          )
+        );
 
         this.resultSet = fromPairs(await resultPromises);
         this.loading = false;

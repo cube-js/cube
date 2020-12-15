@@ -1,3 +1,4 @@
+import equals from 'fast-deep-equal';
 import { isQueryPresent, defaultOrder, defaultHeuristics } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer';
 
@@ -33,6 +34,7 @@ export default {
       offset: null,
       renewQuery: false,
       order: null,
+      prevValidatedQuery: null,
     };
 
     data.granularities = [
@@ -47,7 +49,6 @@ export default {
   },
 
   render(createElement) {
-    console.log('this.measures', this.measures);
     const {
       chartType,
       cubejsApi,
@@ -71,7 +72,7 @@ export default {
       setOffset,
       removeOffset,
       renewQuery,
-      order
+      order,
     } = this;
 
     let builderProps = {};
@@ -100,42 +101,49 @@ export default {
         removeOffset,
         renewQuery,
         order,
-        setOrder: this.setOrder
+        setOrder: this.setOrder,
+        setQuery: this.setQuery,
       };
 
-      QUERY_ELEMENTS.forEach((e) => {
-        const name = e.charAt(0).toUpperCase() + e.slice(1);
+      QUERY_ELEMENTS.forEach((elementName) => {
+        const name = elementName.charAt(0).toUpperCase() + elementName.slice(1);
 
         builderProps[`add${name}`] = (member) => {
-          this.addMember(e, member);
+          this.addMember(elementName, member);
         };
 
         builderProps[`update${name}`] = (member, updateWith) => {
-          this.updateMember(e, member, updateWith);
+          this.updateMember(elementName, member, updateWith);
         };
 
         builderProps[`remove${name}`] = (member) => {
-          this.removeMember(e, member);
+          this.removeMember(elementName, member);
         };
 
         builderProps[`set${name}`] = (members) => {
-          this.setMembers(e, members);
+          this.setMembers(elementName, members);
         };
       });
     }
 
     // Pass parent slots to child QueryRenderer component
-    const children = Object.keys(this.$slots).map(slot =>
-      createElement('template', { slot }, this.$slots[slot]));
+    const children = Object.keys(this.$slots).map((slot) => createElement('template', { slot }, this.$slots[slot]));
 
-    return createElement(QueryRenderer, {
-      props: {
-        query: this.validatedQuery,
-        cubejsApi,
-        builderProps,
+    console.log('validatedQuery', this.validatedQuery);
+
+    // return createElement('div');
+    return createElement(
+      QueryRenderer,
+      {
+        props: {
+          query: this.validatedQuery,
+          cubejsApi,
+          builderProps,
+        },
+        scopedSlots: this.$scopedSlots,
       },
-      scopedSlots: this.$scopedSlots,
-    }, children);
+      children
+    );
   },
   computed: {
     isQueryPresent() {
@@ -144,8 +152,8 @@ export default {
       return isQueryPresent(query);
     },
     validatedQuery() {
-      const validatedQuery = {};
-      let toQuery = member => member.name;
+      let validatedQuery = {};
+      let toQuery = (member) => member.name;
       // TODO: implement timezone
 
       let hasElements = false;
@@ -169,7 +177,7 @@ export default {
         }
 
         if (this[e].length > 0) {
-          validatedQuery[e] = this[e].map(x => toQuery(x));
+          validatedQuery[e] = this[e].map((x) => toQuery(x));
 
           hasElements = true;
         }
@@ -177,7 +185,7 @@ export default {
       // TODO: implement default heuristics
 
       if (validatedQuery.filters) {
-        validatedQuery.filters = validatedQuery.filters.filter(f => f.operator);
+        validatedQuery.filters = validatedQuery.filters.filter((f) => f.operator);
       }
 
       // only set limit and offset if there are elements otherwise an invalid request with just limit/offset
@@ -199,15 +207,38 @@ export default {
           validatedQuery.renewQuery = this.renewQuery;
         }
       }
-      
-      if (isQueryPresent(validatedQuery)) {
-        console.log({
-          order: defaultOrder(validatedQuery),
-          // heuristics: defaultHeuristics(validatedQuery)
-        } );
-        validatedQuery.order = defaultOrder(validatedQuery);
+
+      if (isQueryPresent(validatedQuery) && this.meta) {
+        const order = defaultOrder(validatedQuery);
+        const { query, shouldApplyHeuristicOrder } = defaultHeuristics(validatedQuery, this.prevValidatedQuery, {
+          meta: this.meta
+        });
+        // console.log({
+        //   order: defaultOrder(validatedQuery),
+        //   heuristics: defaultHeuristics(validatedQuery, this.prevValidatedQuery, {
+        //     meta: this.meta
+        //   }),
+        // });
+        // validatedQuery.order = defaultOrder(validatedQuery);
+        validatedQuery = {
+          ...query,
+          ...(shouldApplyHeuristicOrder ? { order } : null)
+        }
+
+        console.log('**', validatedQuery)
       }
 
+      console.log(
+        '??',
+        JSON.parse(
+          JSON.stringify({
+            prev: this.prevValidatedQuery,
+            cur: validatedQuery,
+          })
+        )
+      );
+
+      this.prevValidatedQuery = validatedQuery;
       return validatedQuery;
     },
   },
@@ -219,8 +250,9 @@ export default {
   },
 
   methods: {
-    copyQueryFromProps() {
-      const { measures, dimensions, segments, timeDimensions, filters, limit, offset, renewQuery, order } = this.query;
+    copyQueryFromProps(query) {
+      const { measures, dimensions, segments, timeDimensions, filters, limit, offset, renewQuery, order } =
+        query || this.query;
 
       this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
       this.dimensions = (dimensions || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') }));
@@ -228,31 +260,32 @@ export default {
       this.timeDimensions = (timeDimensions || []).map((m, i) => ({
         ...m,
         dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
-        index: i
+        index: i,
       }));
       this.filters = (filters || []).map((m, i) => ({
         ...m,
         member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
         operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
-        index: i
+        index: i,
       }));
 
       this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
       this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
-      this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || [])
-        .filter(m => m.type === 'time');
+      this.availableTimeDimensions = (this.meta.membersForQuery({}, 'dimensions') || []).filter(
+        (m) => m.type === 'time'
+      );
       this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
-      this.limit = (limit || null);
-      this.offset = (offset || null);
-      this.renewQuery = (renewQuery || false);
-      this.order = (order || null);
+      this.limit = limit || null;
+      this.offset = offset || null;
+      this.renewQuery = renewQuery || false;
+      this.order = order || null;
     },
     addMember(element, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
       let mem;
 
       if (element === 'timeDimensions') {
-        mem = this[`available${name}`].find(m => m.name === member.dimension);
+        mem = this[`available${name}`].find((m) => m.name === member.dimension);
         if (mem) {
           const dimension = {
             ...this.meta.resolveMember(mem.name, 'dimensions'),
@@ -277,11 +310,11 @@ export default {
           member: filterMember,
         };
       } else {
-        mem = this[`available${name}`].find(m => m.name === member);
+        mem = this[`available${name}`].find((m) => m.name === member);
       }
 
       if (mem) {
-        this[element].push(mem); 
+        this[element].push(mem);
       }
     },
     removeMember(element, member) {
@@ -289,15 +322,15 @@ export default {
       let mem;
 
       if (element === 'timeDimensions') {
-        mem = this[`available${name}`].find(x => x.name === member);
+        mem = this[`available${name}`].find((x) => x.name === member);
       } else if (element === 'filters') {
         mem = member;
       } else {
-        mem = this[`available${name}`].find(m => m.name === member);
+        mem = this[`available${name}`].find((m) => m.name === member);
       }
 
       if (mem) {
-        const index = this[element].findIndex(x => x.name === mem);
+        const index = this[element].findIndex((x) => x.name === mem);
         this[element].splice(index, 1);
       }
     },
@@ -307,8 +340,8 @@ export default {
       let index;
 
       if (element === 'timeDimensions') {
-        index = this[element].findIndex(x => x.dimension.name === old.dimension);
-        mem = this[`available${name}`].find(m => m.name === member.dimension);
+        index = this[element].findIndex((x) => x.dimension.name === old.dimension);
+        mem = this[`available${name}`].find((m) => m.name === member.dimension);
         if (mem) {
           const dimension = {
             ...this.meta.resolveMember(mem.name, 'dimensions'),
@@ -324,7 +357,7 @@ export default {
           };
         }
       } else if (element === 'filters') {
-        index = this[element].findIndex(x => x.dimension === old);
+        index = this[element].findIndex((x) => x.dimension === old);
         const filterMember = {
           ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
         };
@@ -334,8 +367,8 @@ export default {
           member: filterMember,
         };
       } else {
-        index = this[element].findIndex(x => x.name === old);
-        mem = this[`available${name}`].find(m => m.name === member);
+        index = this[element].findIndex((x) => x.name === old);
+        mem = this[`available${name}`].find((m) => m.name === member);
       }
 
       if (mem) {
@@ -349,7 +382,7 @@ export default {
 
       members.filter(Boolean).forEach((m) => {
         if (element === 'timeDimensions') {
-          mem = this[`available${name}`].find(x => x.name === m.dimension);
+          mem = this[`available${name}`].find((x) => x.name === m.dimension);
           if (mem) {
             const dimension = {
               ...this.meta.resolveMember(mem.name, 'dimensions'),
@@ -374,10 +407,12 @@ export default {
             member,
           };
         } else {
-          mem = this[`available${name}`].find(x => x.name === m);
+          mem = this[`available${name}`].find((x) => x.name === m);
         }
 
-        if (mem) { elements.push(mem); }
+        if (mem) {
+          elements.push(mem);
+        }
       });
 
       this[element] = elements;
@@ -399,26 +434,39 @@ export default {
     },
     setOrder(order = {}) {
       this.order = order;
-    }
+    },
   },
 
   watch: {
     validatedQuery: {
       deep: true,
       handler(newQuery, oldQuery) {
-        const { query, shouldApplyHeuristicOrder } = defaultHeuristics(newQuery, oldQuery, {
-          meta: this.meta
-        });
-        console.log('default >>', query);
-        // this.query = query;
-      }
-    }, 
+        // newQuery = JSON.parse(JSON.stringify(newQuery));
+        // const { query, shouldApplyHeuristicOrder } = defaultHeuristics(newQuery, oldQuery, {
+        //   meta: this.meta,
+        // });
+        // console.log('defaultHeuristics', {
+        //   newQuery,
+        //   query,
+        //   shouldApplyHeuristicOrder,
+        // });
+        //
+        // if (!equals(newQuery, query)) {
+        //   console.log('DANGER!');
+        //   this.$nextTick(() => {
+        //     this.validatedQuery = {
+        //       ...query,
+        //     };
+        //   });
+        // }
+      },
+    },
     query: {
       deep: true,
       handler(cur, prev) {
         console.log('the query has changed', {
-          cur, 
-          prev
+          cur,
+          prev,
         });
         if (!this.meta) {
           // this is ok as if meta has not been loaded by the time query prop has changed,
@@ -427,7 +475,7 @@ export default {
           return;
         }
         this.copyQueryFromProps();
-      }
-    }
-  }
+      },
+    },
+  },
 };

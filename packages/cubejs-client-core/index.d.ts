@@ -865,7 +865,17 @@ declare module '@cubejs-client/core' {
     sessionGranularity?: TimeDimensionGranularity;
   };
 
-  export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: TDefaultHeuristicsOptions): any;
+  export type TDefaultHeuristicsResponse = {
+    shouldApplyHeuristicOrder: boolean;
+    pivotConfig: PivotConfig | null;
+    query: Query;
+  };
+
+  export function defaultHeuristics(
+    newQuery: Query,
+    oldQuery: Query,
+    options: TDefaultHeuristicsOptions
+  ): TDefaultHeuristicsResponse;
   /**
    * @hidden
    */
