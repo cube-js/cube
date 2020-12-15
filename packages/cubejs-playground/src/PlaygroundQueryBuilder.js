@@ -81,7 +81,6 @@ export default function PlaygroundQueryBuilder({
   cubejsApi,
   apiUrl,
   cubejsToken,
-  dashboardSource,
   setQuery,
 }) {
   const ref = useRef(null);
@@ -302,7 +301,6 @@ PlaygroundQueryBuilder.propTypes = {
   query: PropTypes.object,
   setQuery: PropTypes.func,
   cubejsApi: PropTypes.object,
-  dashboardSource: PropTypes.object,
   apiUrl: PropTypes.string,
   cubejsToken: PropTypes.string,
 };
