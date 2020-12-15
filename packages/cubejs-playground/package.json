@@ -72,8 +72,5 @@
     "react-app-rewired": "^2.1.0",
     "recursive-readdir": "^2.2.2",
     "terser-webpack-plugin": "^4.1.0"
-  },
-  "resolutions": {
-    "@babel/preset-env": "7.5.5"
   }
 }
