@@ -244,7 +244,7 @@ Provides a convenient interface for data manipulation.
 
 Returns normalized query result data in the following format.
 
-You can find the examples of using the `pivotConfig` [here](#pivot-config)
+You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
 ```js
 // For the query
 {
@@ -263,6 +263,63 @@ You can find the examples of using the `pivotConfig` [here](#pivot-config)
   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
   //...
 ]
+
+```
+When using `chartPivot()` or `seriesNames()`, you can pass `aliasSeries` in the [pivotConfig](#types-pivot-config)
+to give each series a unique prefix. This is useful for `blending queries` which use the same measure multiple times.
+
+```js
+// For the queries
+{
+  measures: ['Stories.count'],
+  timeDimensions: [
+    {
+      dimension: 'Stories.time',
+      dateRange: ['2015-01-01', '2015-12-31'],
+      granularity: 'month',
+    },
+  ],
+},
+{
+  measures: ['Stories.count'],
+  timeDimensions: [
+    {
+      dimension: 'Stories.time',
+      dateRange: ['2015-01-01', '2015-12-31'],
+      granularity: 'month',
+    },
+  ],
+  filters: [
+    {
+      member: 'Stores.read',
+      operator: 'equals',
+      value: ['true'],
+    },
+  ],
+},
+
+// ResultSet.chartPivot({ aliasSeries: ['one', 'two'] }) will return
+[
+  {
+    x: '2015-01-01T00:00:00',
+    'one,Stories.count': 27120,
+    'two,Stories.count': 8933,
+    xValues: ['2015-01-01T00:00:00'],
+  },
+  {
+    x: '2015-02-01T00:00:00',
+    'one,Stories.count': 25861,
+    'two,Stories.count': 8344,
+    xValues: ['2015-02-01T00:00:00'],
+  },
+  {
+    x: '2015-03-01T00:00:00',
+    'one,Stories.count': 29661,
+    'two,Stories.count': 9023,
+    xValues: ['2015-03-01T00:00:00'],
+  },
+  //...
+];
 ```
 
 ### decompose
@@ -345,7 +402,7 @@ Base method for pivoting [ResultSet](#result-set) data.
 Most of the times shouldn't be used directly and [chartPivot](#result-set-chart-pivot)
 or (tablePivot)[#table-pivot] should be used instead.
 
-You can find the examples of using the `pivotConfig` [here](#pivot-config)
+You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
 ```js
 // For query
 {
@@ -557,7 +614,7 @@ then `tableColumns` will group the table head and return
 
 Returns normalized query result data prepared for visualization in the table format.
 
-You can find the examples of using the `pivotConfig` [here](#pivot-config)
+You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
 
 For example:
 ```js
@@ -632,7 +689,7 @@ options? | Object | - |
 
 Name | Type |
 ------ | ------ |
-format? | "currency" &#124; "percentage" |
+format? | "currency" &#124; "percent" &#124; "number" |
 shortTitle | string |
 title | string |
 type | string |
@@ -781,6 +838,7 @@ resultSet.tablePivot({
 
 Name | Type | Description |
 ------ | ------ | ------ |
+aliasSeries? | string[] | Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#result-set-chart-pivot) |
 fillMissingDates? | boolean &#124; null | If `true` missing dates on the time dimensions will be filled with `0` for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query |
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
 y? | string[] | Dimensions to put on **y** or **columns** axis. |
@@ -915,6 +973,15 @@ normalizedQueries | [Query](#types-query)[] |
 pivotQuery | [PivotQuery](#types-pivot-query) |
 queryOrder | Array‹object› |
 queryType | [QueryType](#types-query-type) |
+
+### TFlatFilter
+
+Name | Type |
+------ | ------ |
+dimension? | string |
+member? | string |
+operator | [BinaryOperator](#types-binary-operator) |
+values | string[] |
 
 ### TQueryOrderArray
 

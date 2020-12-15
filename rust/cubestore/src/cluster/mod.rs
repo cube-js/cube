@@ -314,28 +314,36 @@ impl JobRunner {
         match job.job_type() {
             JobType::WalPartitioning => {
                 if let RowKey::Table(TableId::WALs, wal_id) = job.row_reference() {
-                    self.chunk_store.partition(*wal_id).await?;
+                    let chunk_store = self.chunk_store.clone();
+                    let wal_id = *wal_id;
+                    tokio::spawn(async move { chunk_store.partition(wal_id).await }).await??
                 } else {
                     Self::fail_job_row_key(job);
                 }
             }
             JobType::Repartition => {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
-                    self.chunk_store.repartition(*partition_id).await?;
+                    let chunk_store = self.chunk_store.clone();
+                    let partition_id = *partition_id;
+                    tokio::spawn(async move { chunk_store.repartition(partition_id).await }).await??
                 } else {
                     Self::fail_job_row_key(job);
                 }
             }
             JobType::PartitionCompaction => {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
-                    self.compaction_service.compact(*partition_id).await?;
+                    let compaction_service = self.compaction_service.clone();
+                    let partition_id = *partition_id;
+                    tokio::spawn(async move { compaction_service.compact(partition_id).await }).await??
                 } else {
                     Self::fail_job_row_key(job);
                 }
             }
             JobType::TableImport => {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
-                    self.import_service.import_table(*table_id).await?;
+                    let import_service = self.import_service.clone();
+                    let table_id = *table_id;
+                    tokio::spawn(async move { import_service.import_table(table_id).await }).await??
                 } else {
                     Self::fail_job_row_key(job);
                 }

@@ -63,7 +63,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     metastore::ColumnType::String => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Timestamp => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Int => ColumnType::MYSQL_TYPE_LONGLONG,
-                    metastore::ColumnType::Decimal => ColumnType::MYSQL_TYPE_DECIMAL,
+                    metastore::ColumnType::Decimal { .. } => ColumnType::MYSQL_TYPE_DECIMAL,
                     metastore::ColumnType::Boolean => ColumnType::MYSQL_TYPE_STRING,
                     x => panic!("Unsupported type in MySQL adapter: {:?}", x),
                 },

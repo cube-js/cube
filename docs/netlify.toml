@@ -1,6 +1,6 @@
 [build]
 publish = "public/"
-command = "./build-netlify.sh"
+command = "source .env.production && ./build-netlify.sh"
 ignore = "cd .. && git diff --quiet HEAD^ HEAD -- docs/"
 
 [[redirects]]
@@ -22,13 +22,13 @@ status = 200
 force = true
 
 [[redirects]]
-from = "/scripts/*"
+from = "/docs/scripts/*"
 to = "/scripts/:splat"
 status = 200
 force = true
 
 [[redirects]]
-from = "/styles/*"
+from = "/docs/styles/*"
 to = "/styles/:splat"
 status = 200
 force = true

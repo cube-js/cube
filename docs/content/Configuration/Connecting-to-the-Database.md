@@ -91,10 +91,12 @@ CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 Cube.js supports SSL-encrypted connections for **Postgres**, **MongoDB** and
 **MySQL**. To enable it set the `CUBEJS_DB_SSL` environment variable to `true`.
 Cube.js can also be configured to use custom connection settings. For example,
-to use a custom CA, you could do the following:
+to use a custom CA and certificates, you could do the following:
 
 ```dotenv
-CUBEJS_DB_SSL_CA="-----BEGIN CERTIFICATE-----\nMIIEBjCCAu6gAwIBAgIJAMc0ZzaSUK51MA0GCSqGSIb3DQEBCwUAMIGPMQswCQYD\nVQQGEwJVUzEQMA4GA1UEBwwHU2VhdHRsZTETMBEGA1UECAwKV2FzaGluZ3RvbjEi\n-----END CERTIFICATE-----"
+CUBEJS_DB_SSL_CA=/ssl/ca.pem
+CUBEJS_DB_SSL_CERT=/ssl/cert.pem
+CUBEJS_DB_SSL_KEY=/ssl/key.pem
 ```
 
 For a complete list of SSL-related environment variables, consult the [Database
@@ -169,10 +171,11 @@ You can learn more about acquiring Google BigQuery credentials
 ### Google Cloud SQL Postgres
 
 You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
-`true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how you
-are [connecting to Cloud SQL][link-cloud-sql-connect].
+`true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how
+you are [connecting to Cloud SQL][link-cloud-sql-connect].
 
-[link-cloud-sql-connect]: https://cloud.google.com/sql/docs/postgres/connect-functions#connecting_to
+[link-cloud-sql-connect]:
+  https://cloud.google.com/sql/docs/postgres/connect-functions#connecting_to
 
 ### MySQL
 

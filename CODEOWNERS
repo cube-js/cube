@@ -3,7 +3,9 @@
 # someone opens a pull request.
 *           @cube-js/core
 
+
 # Developer Relations and Community
+*.md        @cube-js/developer-relations-and-community
 /docs/      @cube-js/developer-relations-and-community
 /examples/  @cube-js/developer-relations-and-community
 /guides/    @cube-js/developer-relations-and-community

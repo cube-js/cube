@@ -1,7 +1,8 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
-import { displayError, event, isDockerImage, packageExists, requireFromPackage } from '../utils';
+import { isDockerImage, requireFromPackage, packageExists } from '@cubejs-backend/shared';
+import { displayError, event } from '../utils';
 
 // @todo There is another function with similar name inside utils, but without analytics
 const logStage = (stage) => {
@@ -10,7 +11,12 @@ const logStage = (stage) => {
 
 const generate = async (options) => {
   const generateSchemaOptions = { tables: options.tables };
-  event('Generate Schema', generateSchemaOptions);
+
+  event({
+    name: 'Generate Schema',
+    ...generateSchemaOptions,
+  });
+
   if (!options.tables) {
     await displayError([
       'You must pass table names to generate schema from (-t).',
@@ -20,8 +26,9 @@ const generate = async (options) => {
     ], generateSchemaOptions);
   }
 
-  const relativeResolution = isDockerImage();
-  if (!packageExists('@cubejs-backend/server', relativeResolution)) {
+  const relative = isDockerImage();
+
+  if (!packageExists('@cubejs-backend/server', relative)) {
     await displayError(
       '@cubejs-backend/server dependency not found. Please run generate command from project directory.',
       generateSchemaOptions
@@ -29,9 +36,11 @@ const generate = async (options) => {
   }
 
   logStage('Fetching DB schema');
-  const CubejsServer = await requireFromPackage(
+  const CubejsServer = await requireFromPackage<any>(
     '@cubejs-backend/server',
-    relativeResolution
+    {
+      relative,
+    }
   );
   const driver = await CubejsServer.createDriver();
   await driver.testConnection();
@@ -41,15 +50,21 @@ const generate = async (options) => {
   }
 
   logStage('Generating schema files');
-  const ScaffoldingTemplate = await requireFromPackage(
+  const ScaffoldingTemplate = await requireFromPackage<any>(
     '@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate.js',
-    relativeResolution
+    {
+      relative,
+    }
   );
   const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
   const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
   await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 
-  await event('Generate Schema Success', generateSchemaOptions);
+  await event({
+    name: 'Generate Schema Success',
+    ...generateSchemaOptions
+  });
+
   logStage(`Schema for ${options.tables.join(', ')} was successfully generated 🎉`);
 };
 

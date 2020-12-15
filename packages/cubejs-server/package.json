@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
-  "version": "0.24.3",
+  "version": "0.24.8",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
@@ -27,9 +27,9 @@
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
     "prepack": "npm run tsc && oclif-dev manifest",
-    "build": "tsc",
-    "tsc": "rm -rf dist && tsc",
-    "watch": "rm -rf dist && tsc -w",
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
     "test": "npm run unit",
     "lint": "linter src/* tests/ --ext .ts,.js",
     "lint:fix": "linter --fix src/* tests/ --ext .ts,js",
@@ -38,13 +38,14 @@
     "jest:shapshot": "jest --updateSnapshot"
   },
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.24.3",
-    "@cubejs-backend/shared": "^0.24.3",
+    "@cubejs-backend/server-core": "^0.24.8",
+    "@cubejs-backend/shared": "^0.24.5",
     "@oclif/color": "^0.1.2",
     "@oclif/command": "^1.8.0",
     "@oclif/config": "^1.17.0",
     "@oclif/errors": "^1.3.4",
     "@oclif/plugin-help": "^3.2.0",
+    "@yarnpkg/lockfile": "^1.1.0",
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
@@ -57,12 +58,13 @@
     "ws": "^7.1.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.24.3",
+    "@cubejs-backend/linter": "^0.24.5",
     "@oclif/dev-cli": "^1.23.1",
     "@types/cors": "^2.8.8",
     "@types/node": "^10.0.10",
     "@types/semver": "^7.3.4",
     "@types/ws": "^7.2.9",
+    "@types/yarnpkg__lockfile": "^1.1.4",
     "eslint": "^6.8.0",
     "eslint-plugin-node": "^5.2.1",
     "jest": "^26.0.0",

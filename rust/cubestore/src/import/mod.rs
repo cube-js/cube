@@ -3,6 +3,7 @@ use crate::store::{DataFrame, WALDataStore};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
 use async_trait::async_trait;
+use bigdecimal::{BigDecimal, Num};
 use core::mem;
 use futures::StreamExt;
 use mockall::automock;
@@ -43,7 +44,13 @@ impl ImportFormat {
 
                         row.push(match column.get_column_type() {
                             ColumnType::String => TableValue::String(value.to_string()),
-                            ColumnType::Int => TableValue::Int(value.parse()?),
+                            ColumnType::Int => value
+                                .parse()
+                                .map(|v| TableValue::Int(v))
+                                .unwrap_or(TableValue::Null),
+                            ColumnType::Decimal { .. } => BigDecimal::from_str_radix(value, 10)
+                                .map(|d| TableValue::Decimal(d.to_string()))
+                                .unwrap_or(TableValue::Null),
                             x => panic!("CSV import for {:?} is not implemented", x),
                         });
 

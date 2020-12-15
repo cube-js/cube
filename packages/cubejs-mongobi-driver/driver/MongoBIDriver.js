@@ -8,41 +8,13 @@ class MongoBIDriver extends BaseDriver {
     super();
     config = config || {};
 
-    let ssl;
-
-    const sslOptions = [
-      { name: 'ca', value: 'CUBEJS_DB_SSL_CA' },
-      { name: 'cert', value: 'CUBEJS_DB_SSL_CERT' },
-      { name: 'ciphers', value: 'CUBEJS_DB_SSL_CIPHERS' },
-      { name: 'passphrase', value: 'CUBEJS_DB_SSL_PASSPHRASE' },
-    ];
-
-    if (
-      process.env.CUBEJS_DB_SSL === 'true' ||
-      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
-      sslOptions.find(o => !!process.env[o.value])
-    ) {
-      ssl = sslOptions.reduce(
-        (agg, { name, value }) => ({
-          ...agg,
-          ...(process.env[value] ? { [name]: process.env[value] } : {}),
-        }),
-        {}
-      );
-
-      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
-        ssl.rejectUnauthorized =
-          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
-      }
-    }
-
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ssl,
+      ssl: this.getSslOptions(),
       authSwitchHandler: (data, cb) => {
         const password = config.password || process.env.CUBEJS_DB_PASS || '';
         const buffer = Buffer.from((password).concat('\0'));

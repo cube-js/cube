@@ -5,23 +5,50 @@ category: Authentication & Authorization
 menuOrder: 1
 ---
 
+In Cube.js, authorization (or access control) is based on the **security context**. The diagram below shows how it works during the request processing in Cube.js:
+
+
+<p
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/authentication-overview.png"
+  style="border: none"
+  width="80%"
+  />
+</p>
+
+Authentication is handled outside of Cube.js. Your authentication server issues JWTs to your client application, which, when sent as part of the request, are verified and decoded by Cube.js to get security context claims to evaluate access control rules.
+
+For access control or authorization, Cube.js allows you to define granular access control rules for every cube in your data schema. Cube.js uses the request and the security context claims in the JWT token to generate a SQL query, which includes row-level constraints from the access control rules.
+
 Cube.js uses [JSON Web Tokens (JWT)][link-jwt] which should be passed in the
-`Authorization` header to authenticate requests. JWTs can also be used for
-passing additional information about the user, which can be accessed in the
-[USER_CONTEXT][link-user-context] object in the Data Schema.
+`Authorization: <JWT>` header to authenticate requests.
+
+JWTs can also be used to pass additional information about the user, known as a [security context][link-security-context]. It must be stored inside the **u** namespace. It will be accessible in the
+[USER_CONTEXT][link-user-context] object in the Data Schema and in [authInfo][link-authinfo] variable which is used to support [Multitenancy][link-multitenancy].
+
+In the example
+below **user_id**, located inside the **u** namespace, will be passed inside the
+security context and will be accessible in the [USER_CONTEXT][link-user-context] object.
+
+```json
+{
+  "sub": "1234567890",
+  "iat": 1516239022,
+  "u": {
+    "user_id": 131
+  }
+}
+```
 
 [link-jwt]: https://jwt.io/
 [link-user-context]: /cube#context-variables-user-context
-
-The `Authorization` header is parsed and the JWT's contents set to the
-[authInfo][link-authinfo] variable which can be used to support
-[Multitenancy][link-multitenancy].
-
-[link-authinfo]: /@cubejs-backend-server-core#authinfo
+[link-authinfo]: /config#authinfo
 [link-multitenancy]: /multitenancy-setup
 
-Cube.js tokens are designed to work well in microservice-based environments. A
-typical use case would be:
+
+Authentication is handled outside of Cube.js. A typical use case would be:
 
 1. A web server serves an HTML page containing the Cube.js client, which needs
    to communicate securely with the Cube.js API.
@@ -32,16 +59,11 @@ typical use case would be:
 3. The JavaSript client is initialized using this token, and includes it in
    calls to the Cube.js API.
 
-If you are using the [REST API][link-rest-api] you must pass the API token via
-the Authorization Header. The Cube.js JavaScript client accepts an
-authentication token as the first argument to the
-[`cubejs(authToken, options)`][link-cubejs-client-core-ref] function.
-
 [link-rest-api]: /rest-api
 [link-cubejs-client-core-ref]: /@cubejs-client-core#cubejs
 
-**In development mode, the token is not required for authorization**, but you
-can still use it to [pass a security context][link-security-context].
+[[info | ]]
+| **In development mode, the token is not required for authorization**, but you can still use it to [pass a security context][link-security-context].
 
 [link-security-context]: /security#security-context
 
@@ -58,28 +80,11 @@ You can generate two types of tokens:
 - With security context, which will allow you to implement role-based security
   models where users will have different levels of access to data.
 
-_It is considered best practice to use an `exp` expiration claim to limit the
-life time of your public tokens. [Learn more at JWT docs][link-jwt-docs]._
+[[info | ]]
+| It is considered best practice to use an `exp` expiration claim to limit the lifetime of your public tokens. [Learn more in the JWT docs][link-jwt-docs].
 
 [link-jwt-docs]:
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
-
-### Using the CLI
-
-You can use the Cube.js CLI [`token`][link-cubejs-cli-token-ref] command to
-generate an API token.
-
-[link-cubejs-cli-token-ref]: /reference#token
-
-```bash
-$ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
-```
-
-It is helpful to be able to create an API token with the CLI command for testing
-and development purposes, but we strongly recommend programmatically generating
-tokens in production.
-
-### Programmatically
 
 You can find a library for JWT generation for your programming language
 [here](https://jwt.io/#libraries-io).
@@ -144,7 +149,7 @@ can then use it to query the Cube.js API.
 ## Security Context
 
 A "security context" is a verified set of claims about the current user that the
-cube.js server can use to ensure that users only have access to the data that
+Cube.js server can use to ensure that users only have access to the data that
 they are authorized to access. You can provide a security context by passing the
 `u` param in the JSON payload that you pass to your JWT signing function. For
 example if you want to pass the user ID in the security context you could create
@@ -152,11 +157,11 @@ a token with this json structure:
 
 ```json
 {
-  "u": { "id": 42 }
+  "u": { "user_id": 42 }
 }
 ```
 
-In this case, the `{ "id": 42 }` object will be accessible as
+In this case, the `{ "user_id": 42 }` object will be accessible as
 [USER_CONTEXT][link-user-context] in the Cube.js Data Schema.
 
 [link-user-context]: /cube#context-variables-user-context
@@ -171,7 +176,7 @@ filter the results.
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM public.orders WHERE ${USER_CONTEXT.id.filter('user_id')}`,
+  sql: `SELECT * FROM public.orders WHERE ${USER_CONTEXT.user_id.filter('user_id')}`,
 
   measures: {
     count: {
@@ -188,7 +193,7 @@ ID:
 const jwt = require('jsonwebtoken');
 const CUBE_API_SECRET = 'secret';
 
-const cubejsToken = jwt.sign({ u: { id: 42 } }, CUBEJS_API_SECRET, {
+const cubejsToken = jwt.sign({ u: { user_id: 42 } }, CUBEJS_API_SECRET, {
   expiresIn: '30d',
 });
 ```

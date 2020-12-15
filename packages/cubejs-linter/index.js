@@ -47,7 +47,10 @@ module.exports = {
     '@typescript-eslint/no-extra-semi': 'error',
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': 'warn',
+    // '@typescript-eslint/no-var-requires': 'error',
     '@typescript-eslint/prefer-as-const': 'error',
+    '@typescript-eslint/prefer-namespace-keyword': 'error',
+    '@typescript-eslint/triple-slash-reference': 'error',
   },
   overrides: [
     {
@@ -77,6 +80,8 @@ module.exports = {
         'valid-typeof': 'off', // ts(2367)
         // TypeScript Additional
         '@typescript-eslint/explicit-member-accessibility': 'warn',
+        'no-shadow': 'off',
+        '@typescript-eslint/no-shadow': ['error', { ignoreTypeValueShadow: true }],
       },
     },
   ],
