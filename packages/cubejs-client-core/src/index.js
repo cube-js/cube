@@ -228,5 +228,6 @@ export {
   isQueryPresent,
   moveItemInArray,
   defaultOrder,
-  flattenFilters
+  flattenFilters,
+  GRANULARITIES
 } from './utils';

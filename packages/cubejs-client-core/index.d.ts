@@ -905,4 +905,11 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function flattenFilters(filters: Filter[]): TFlatFilter[];
+  
+  type TGranularityMap = {
+    name: TimeDimensionGranularity | undefined;
+    title: string;
+  }
+  
+  const GRANULARITIES: TGranularityMap[]
 }

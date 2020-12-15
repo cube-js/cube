@@ -1,5 +1,16 @@
 export const DEFAULT_GRANULARITY = 'day';
 
+export const GRANULARITIES = [
+  { name: undefined, title: 'w/o grouping' },
+  { name: 'second', title: 'Second' },
+  { name: 'minute', title: 'Minute' },
+  { name: 'hour', title: 'Hour' },
+  { name: 'day', title: 'Day' },
+  { name: 'week', title: 'Week' },
+  { name: 'month', title: 'Month' },
+  { name: 'year', title: 'Year' }
+];
+
 export function defaultOrder(query) {
   const granularity = (query.timeDimensions || []).find((d) => d.granularity);
 

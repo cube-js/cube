@@ -1,8 +1,9 @@
-import equals from 'fast-deep-equal';
-import { isQueryPresent, defaultOrder, defaultHeuristics } from '@cubejs-client/core';
+import { isQueryPresent, defaultOrder, defaultHeuristics, GRANULARITIES } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
+
+const d = (v) => JSON.parse(JSON.stringify(v));
 
 export default {
   components: {
@@ -18,7 +19,7 @@ export default {
     },
   },
   data() {
-    const data = {
+    return {
       meta: undefined,
       chartType: undefined,
       measures: [],
@@ -35,17 +36,8 @@ export default {
       renewQuery: false,
       order: null,
       prevValidatedQuery: null,
+      granularities: GRANULARITIES
     };
-
-    data.granularities = [
-      { name: 'hour', title: 'Hour' },
-      { name: 'day', title: 'Day' },
-      { name: 'week', title: 'Week' },
-      { name: 'month', title: 'Month' },
-      { name: 'year', title: 'Year' },
-    ];
-
-    return data;
   },
 
   render(createElement) {
@@ -182,7 +174,6 @@ export default {
           hasElements = true;
         }
       });
-      // TODO: implement default heuristics
 
       if (validatedQuery.filters) {
         validatedQuery.filters = validatedQuery.filters.filter((f) => f.operator);
@@ -209,34 +200,29 @@ export default {
       }
 
       if (isQueryPresent(validatedQuery) && this.meta) {
-        const order = defaultOrder(validatedQuery);
         const { query, shouldApplyHeuristicOrder } = defaultHeuristics(validatedQuery, this.prevValidatedQuery, {
-          meta: this.meta
+          meta: this.meta,
         });
-        // console.log({
-        //   order: defaultOrder(validatedQuery),
-        //   heuristics: defaultHeuristics(validatedQuery, this.prevValidatedQuery, {
-        //     meta: this.meta
-        //   }),
-        // });
-        // validatedQuery.order = defaultOrder(validatedQuery);
-        validatedQuery = {
-          ...query,
-          ...(shouldApplyHeuristicOrder ? { order } : null)
-        }
 
-        console.log('**', validatedQuery)
+        validatedQuery = {
+          ...validatedQuery,
+          ...query,
+          ...(shouldApplyHeuristicOrder ? { order: defaultOrder(query) } : null),
+        };
+
+        console.log('**', d(validatedQuery));
+        this.copyQueryFromProps(validatedQuery);
       }
 
-      console.log(
-        '??',
-        JSON.parse(
-          JSON.stringify({
-            prev: this.prevValidatedQuery,
-            cur: validatedQuery,
-          })
-        )
-      );
+      // console.log(
+      //   '??',
+      //   JSON.parse(
+      //     JSON.stringify({
+      //       prev: this.prevValidatedQuery,
+      //       cur: validatedQuery,
+      //     })
+      //   )
+      // );
 
       this.prevValidatedQuery = validatedQuery;
       return validatedQuery;
@@ -259,7 +245,10 @@ export default {
       this.segments = (segments || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'segments') }));
       this.timeDimensions = (timeDimensions || []).map((m, i) => ({
         ...m,
-        dimension: { ...this.meta.resolveMember(m.dimension, 'dimensions'), granularities: this.granularities },
+        dimension: {
+          ...this.meta.resolveMember(m.dimension, 'dimensions'),
+          granularities: this.granularities,
+        },
         index: i,
       }));
       this.filters = (filters || []).map((m, i) => ({
@@ -438,9 +427,9 @@ export default {
   },
 
   watch: {
-    validatedQuery: {
-      deep: true,
-      handler(newQuery, oldQuery) {
+    // validatedQuery: {
+      // deep: true,
+      // handler(newQuery, oldQuery) {
         // newQuery = JSON.parse(JSON.stringify(newQuery));
         // const { query, shouldApplyHeuristicOrder } = defaultHeuristics(newQuery, oldQuery, {
         //   meta: this.meta,
@@ -459,15 +448,11 @@ export default {
         //     };
         //   });
         // }
-      },
-    },
+    //   },
+    // },
     query: {
       deep: true,
       handler(cur, prev) {
-        console.log('the query has changed', {
-          cur,
-          prev,
-        });
         if (!this.meta) {
           // this is ok as if meta has not been loaded by the time query prop has changed,
           // then the promise for loading meta (found in mounted()) will call

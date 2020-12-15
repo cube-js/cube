@@ -59,7 +59,6 @@
               </v-col>
 
               <v-col cols="12" md="2">
-<!--                Time Dimensions-->
                 <v-select
                   label="Time Dimensions"
                   outlined
@@ -78,44 +77,44 @@
                 />
               </v-col>
 
-              <v-col cols="12" md="1" style="min-width: 120px">
-                Granularity
-<!--                <v-select-->
-<!--                  label="Granularity"-->
-<!--                  outlined-->
-<!--                  hide-details-->
-<!--                  @change="-->
-<!--                    setTimeDimensions([-->
-<!--                      {-->
-<!--                        dimension: timeDimensions[0].dimension.name,-->
-<!--                        granularity: $event,-->
-<!--                        dateRange: timeDimensions[0].dateRange,-->
-<!--                      },-->
-<!--                    ])-->
-<!--                  "-->
-<!--                  :value="timeDimensions[0].granularity"-->
-<!--                  :items="timeDimensions[0].dimension.granularities.map((obj) => obj.name)"-->
-<!--                />-->
+              <v-col cols="12" md="1" style="min-width: 160px">
+                <v-select
+                  label="Granularity"
+                  outlined
+                  hide-details
+                  @change="
+                    setTimeDimensions([
+                      {
+                        dimension: timeDimensions[0].dimension.name,
+                        granularity: $event,
+                        dateRange: timeDimensions[0].dateRange,
+                      },
+                    ])
+                  "
+                  item-text="title"
+                  item-value="name"
+                  :value="timeDimensions[0] && timeDimensions[0].granularity"
+                  :items="GRANULARITIES"
+                />
               </v-col>
 
               <v-col cols="12" md="2">
-                Date Range
-<!--                <v-select-->
-<!--                  label="Date Range"-->
-<!--                  outlined-->
-<!--                  hide-details-->
-<!--                  :value="timeDimensions[0].dateRange"-->
-<!--                  :items="dateRangeItems"-->
-<!--                  @change="-->
-<!--                    setTimeDimensions([-->
-<!--                      {-->
-<!--                        dimension: timeDimensions[0].dimension.name,-->
-<!--                        granularity: timeDimensions[0].granularity,-->
-<!--                        dateRange: $event,-->
-<!--                      },-->
-<!--                    ])-->
-<!--                  "-->
-<!--                />-->
+                <v-select
+                  label="Date Range"
+                  outlined
+                  hide-details
+                  :value="timeDimensions[0] && timeDimensions[0].dateRange"
+                  :items="dateRangeItems"
+                  @change="
+                    setTimeDimensions([
+                      {
+                        dimension: timeDimensions[0].dimension.name,
+                        granularity: timeDimensions[0].granularity,
+                        dateRange: $event,
+                      },
+                    ])
+                  "
+                />
               </v-col>
             </v-row>
 
@@ -147,7 +146,7 @@
 
 <script>
 import cubejs from '@cubejs-client/core';
-import { QueryBuilder } from '@cubejs-client/vue';
+import { QueryBuilder, GRANULARITIES } from '@cubejs-client/vue';
 import FilterComponent from './FilterComponent.vue';
 import Table from './Table';
 
@@ -166,7 +165,7 @@ export default {
     FilterComponent,
     Table,
   },
-  data: () => {
+  data() {
     let query = {};
 
     query = {
@@ -184,6 +183,10 @@ export default {
     query = {};
 
     return {
+      selectedGranularity: {
+        name: 'day',
+        title: 'DAyyyy',
+      },
       cubejsApi,
       query,
       dateRangeItems: [
@@ -197,6 +200,7 @@ export default {
         'Last year',
       ],
       type: 'line',
+      GRANULARITIES,
     };
   },
   methods: {
