@@ -1,6 +1,6 @@
 import {
   groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
-  pluck, mergeAll
+  pluck, mergeAll, flatten,
 } from 'ramda';
 import Moment from 'moment';
 import momentRange from 'moment-range';
@@ -421,6 +421,22 @@ class ResultSet {
 
       return value;
     };
+
+    const duplicateMeasures = new Set();
+    if (this.queryType === QUERY_TYPE.BLENDING_QUERY) {
+      const allMeasures = flatten(this.loadResponses.map(({ query }) => query.measures));
+      allMeasures.filter((e, i, a) => a.indexOf(e) !== i).forEach(m => duplicateMeasures.add(m));
+    }
+
+    const aliasSeries = (yValues, i) => {
+      // manual alias
+      if (pivotConfig && pivotConfig.aliasSeries && pivotConfig.aliasSeries[i]) {
+        return [pivotConfig.aliasSeries[i], ...yValues];
+      } else if (duplicateMeasures.has(yValues[0])) {
+        return [i, ...yValues];
+      }
+      return [yValues];
+    };
     
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ','), // TODO deprecated
@@ -428,8 +444,8 @@ class ResultSet {
       xValues,
       ...(
         yValuesArray
-          .map(([yValues, m]) => ({
-            [this.axisValuesString(yValues, ',')]: m && validate(m),
+          .map(([yValues, m], i) => ({
+            [this.axisValuesString(aliasSeries(yValues, i), ',')]: m && validate(m),
           }))
           .reduce((a, b) => Object.assign(a, b), {})
       )
@@ -589,19 +605,37 @@ class ResultSet {
     )(
       this.timeDimensionBackwardCompatibleData(index)
     )));
-    return seriesNames.map(axisValues => ({
-      title: this.axisValuesString(
-        pivotConfig.y.find(d => d === 'measures') ?
-          dropLast(1, axisValues).concat(
-            measures[
-              ResultSet.measureFromAxis(axisValues)
-            ].title
-          ) :
-          axisValues, ', '
-      ),
-      key: this.axisValuesString(axisValues, ','),
-      yValues: axisValues
-    }));
+    const duplicateMeasures = new Set();
+    if (this.queryType === QUERY_TYPE.BLENDING_QUERY) {
+      const allMeasures = flatten(this.loadResponses.map(({ query }) => query.measures));
+      allMeasures.filter((e, i, a) => a.indexOf(e) !== i).forEach(m => duplicateMeasures.add(m));
+    }
+
+    const aliasSeries = (yValues, i) => {
+      if (pivotConfig && pivotConfig.aliasSeries && pivotConfig.aliasSeries[i]) {
+        return [pivotConfig.aliasSeries[i], ...yValues];
+      } else if (duplicateMeasures.has(yValues[0])) {
+        return [i, ...yValues];
+      }
+      return yValues;
+    };
+
+    return seriesNames.map((axisValues, i) => {
+      const aliasedAxis = aliasSeries(axisValues, i);
+      return {
+        title: this.axisValuesString(
+          pivotConfig.y.find(d => d === 'measures') ?
+            dropLast(1, aliasedAxis).concat(
+              measures[
+                ResultSet.measureFromAxis(axisValues)
+              ].title
+            ) :
+            aliasedAxis, ', '
+        ),
+        key: this.axisValuesString(aliasedAxis, ','),
+        yValues: axisValues
+      };
+    });
   }
 
   query() {
