@@ -26,7 +26,7 @@ const Section = styled.div`
   }
 `;
 
-const frameworkChartLibraries = {
+export const frameworkChartLibraries = {
   react: [
     {
       value: 'bizcharts',
