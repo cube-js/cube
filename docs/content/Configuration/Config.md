@@ -474,7 +474,7 @@ Timeout and interval options' values are in seconds.
 
 | Option              | Description                                                                                                  | Default Value |
 | ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
-| concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool it should be adjusted accordingly. | `2`           |
+| concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. | `2`           |
 | continueWaitTimeout | Long polling interval                                                                                        | `5`           |
 | executionTimeout    | Total timeout of single query                                                                                | `600`         |
 | orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                   | `120`         |
