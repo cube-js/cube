@@ -5,6 +5,8 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
+import { RedisPool } from './RedisPool';
+import type { QueryOrchestratorOptions } from './QueryOrchestrator';
 
 export class QueryCache {
   protected readonly cacheDriver: CacheDriverInterface;
@@ -19,9 +21,20 @@ export class QueryCache {
     protected readonly logger: any,
     protected readonly options: any = {}
   ) {
-    this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver({ pool: options.redisPool }) :
-      new LocalCacheDriver();
+    this.cacheDriver = options.cacheDriver;
+  }
+
+  static createCacheDriver(cacheAndQueueDriver: string, options: QueryOrchestratorOptions): CacheDriverInterface {
+    switch (cacheAndQueueDriver) {
+      case 'redis':
+        return new RedisCacheDriver({ pool: new RedisPool(options.redisPoolOptions) });
+      case 'memory':
+        return new LocalCacheDriver();
+      default:
+        throw new Error(
+          `Only 'redis' or 'memory' are supported for cacheAndQueueDriver option`
+        );
+    }
   }
 
   public async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {

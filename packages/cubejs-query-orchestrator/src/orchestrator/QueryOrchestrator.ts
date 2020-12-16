@@ -4,7 +4,7 @@ import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 
-interface QueryOrchestratorOptions {
+export interface QueryOrchestratorOptions {
   cacheAndQueueDriver?: 'redis' | 'memory';
   externalDriverFactory?: any;
   redisPoolOptions?: RedisPoolOptions;
@@ -34,28 +34,20 @@ export class QueryOrchestrator {
       process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
     );
 
-    if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
-      throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
-    }
+    const cacheDriver = QueryCache.createCacheDriver(cacheAndQueueDriver, options);
 
-    this.redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
-
-    const { externalDriverFactory } = options;
-
-    this.queryCache = new QueryCache(
-      this.redisPrefix, this.driverFactory, this.logger, {
-        externalDriverFactory,
-        cacheAndQueueDriver,
-        redisPool: this.redisPool,
-        ...options.queryCacheOptions,
-      }
-    );
+    this.queryCache = new QueryCache(this.redisPrefix, this.driverFactory, this.logger, {
+      externalDriverFactory: options.externalDriverFactory,
+      cacheDriver,
+      cacheAndQueueDriver,
+      ...options.queryCacheOptions,
+    });
 
     this.preAggregations = new PreAggregations(
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
-        externalDriverFactory,
+        externalDriverFactory: options.externalDriverFactory,
         cacheAndQueueDriver,
-        redisPool: this.redisPool,
+        cacheDriver,
         ...options.preAggregationsOptions
       }
     );
