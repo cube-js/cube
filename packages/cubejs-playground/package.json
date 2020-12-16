@@ -9,8 +9,8 @@
   "dependencies": {
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.23.14",
-    "@cubejs-client/react": "^0.23.15",
+    "@cubejs-client/core": "^0.24.8",
+    "@cubejs-client/react": "^0.24.8",
     "antd": "^4.8.5",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
