@@ -291,4 +291,12 @@ export class BaseDriver {
       });
     }
   }
+
+  databasePoolError(error) {
+    if (this.logger) {
+      this.logger('Database Pool Error', {
+        error: (error.stack || error).toString()
+      });
+    }
+  }
 }
