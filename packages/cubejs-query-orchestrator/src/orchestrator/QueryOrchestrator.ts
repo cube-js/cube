@@ -2,44 +2,66 @@ import R from 'ramda';
 
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
-import { RedisPool } from './RedisPool';
+import { RedisPool, RedisPoolOptions } from './RedisPool';
+
+interface QueryOrchestratorOptions {
+  cacheAndQueueDriver?: 'redis' | 'memory';
+  externalDriverFactory?: any;
+  redisPoolOptions?: RedisPoolOptions;
+  queryCacheOptions?: any;
+  preAggregationsOptions?: any;
+  rollupOnlyMode?: boolean;
+}
 
 export class QueryOrchestrator {
-  constructor(redisPrefix, driverFactory, logger, options) {
-    options = options || {};
-    this.redisPrefix = redisPrefix;
-    this.driverFactory = driverFactory;
-    this.logger = logger;
-    const { externalDriverFactory } = options;
+  protected readonly queryCache: QueryCache;
+
+  protected readonly preAggregations: PreAggregations;
+
+  protected readonly redisPool: RedisPool|undefined;
+
+  protected readonly rollupOnlyMode: boolean;
+
+  public constructor(
+    protected readonly redisPrefix: string,
+    protected readonly driverFactory: any,
+    protected readonly logger: any,
+    options: QueryOrchestratorOptions = {}
+  ) {
+    this.rollupOnlyMode = options.rollupOnlyMode;
+
     const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
       process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
     );
-    if (cacheAndQueueDriver !== 'redis' && cacheAndQueueDriver !== 'memory') {
+
+    if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
       throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
     }
-    const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
 
-    this.redisPool = redisPool;
+    this.redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
+
+    const { externalDriverFactory } = options;
+
     this.queryCache = new QueryCache(
       this.redisPrefix, this.driverFactory, this.logger, {
         externalDriverFactory,
         cacheAndQueueDriver,
-        redisPool,
+        redisPool: this.redisPool,
         ...options.queryCacheOptions,
       }
     );
+
     this.preAggregations = new PreAggregations(
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
         cacheAndQueueDriver,
-        redisPool,
+        redisPool: this.redisPool,
         ...options.preAggregationsOptions
       }
     );
-    this.rollupOnlyMode = options.rollupOnlyMode;
   }
 
-  async fetchQuery(queryBody) {
+  public async fetchQuery(queryBody: any) {
     return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
       .then(async preAggregationsTablesToTempTables => {
         const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
@@ -61,7 +83,7 @@ export class QueryOrchestrator {
       });
   }
 
-  async queryStage(queryBody) {
+  public async queryStage(queryBody: any) {
     const queue = this.preAggregations.getQueue();
     const preAggregationsQueryStageState = await queue.fetchQueryStageState();
     const pendingPreAggregationIndex =
@@ -90,11 +112,11 @@ export class QueryOrchestrator {
     }
   }
 
-  resultFromCacheIfExists(queryBody) {
+  public resultFromCacheIfExists(queryBody: any) {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
-  async cleanup() {
+  public async cleanup() {
     if (this.redisPool) {
       await this.redisPool.cleanup();
     }
