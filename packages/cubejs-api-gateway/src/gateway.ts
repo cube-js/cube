@@ -262,6 +262,14 @@ export class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+
+    app.post(`${this.basePath}/v1/dry-run`, jsonParser, this.requestMiddleware, (async (req, res) => {
+      await this.dryRun({
+        query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
   }
 
   public initSubscriptionServer(sendMessage) {
