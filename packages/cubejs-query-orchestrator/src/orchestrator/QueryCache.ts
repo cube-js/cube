@@ -4,20 +4,27 @@ import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
+import { CacheDriverInterface } from './cache-driver.interface';
 
 export class QueryCache {
-  constructor(redisPrefix, clientFactory, logger, options) {
-    this.options = options || {};
-    this.redisPrefix = redisPrefix;
-    this.driverFactory = clientFactory;
-    this.externalDriverFactory = options.externalDriverFactory;
-    this.logger = logger;
+  protected readonly cacheDriver: CacheDriverInterface;
+
+  protected queue: QueryQueue|null = null;
+
+  protected externalQueue: QueryQueue|null = null;
+
+  public constructor(
+    protected readonly redisPrefix: string,
+    protected readonly driverFactory: any,
+    protected readonly logger: any,
+    protected readonly options: any = {}
+  ) {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver({ pool: options.redisPool }) :
       new LocalCacheDriver();
   }
 
-  async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
+  public async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
     const replacePreAggregationTableNames = (queryAndParams) => QueryCache.replacePreAggregationTableNames(
       queryAndParams, preAggregationsTablesToTempTables
     );
@@ -51,6 +58,7 @@ export class QueryCache {
         })
       };
     }
+
     const cacheKey = QueryCache.queryCacheKey(queryBody);
 
     if (queryBody.renewQuery) {
@@ -107,11 +115,11 @@ export class QueryCache {
     };
   }
 
-  static queryCacheKey(queryBody) {
+  public static queryCacheKey(queryBody) {
     return [queryBody.query, queryBody.values, (queryBody.preAggregations || []).map(p => p.loadSql)];
   }
 
-  static replaceAll(replaceThis, withThis, inThis) {
+  protected static replaceAll(replaceThis, withThis, inThis) {
     withThis = withThis.replace(/\$/g, '$$$$');
     return inThis.replace(
       new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
@@ -119,7 +127,7 @@ export class QueryCache {
     );
   }
 
-  static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
+  protected static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
     const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
@@ -128,9 +136,9 @@ export class QueryCache {
     return Array.isArray(queryAndParams) ? [replacedKeqQuery, params] : replacedKeqQuery;
   }
 
-  queryWithRetryAndRelease(query, values, {
+  public queryWithRetryAndRelease(query, values, {
     priority, cacheKey, external, requestId
-  }) {
+  }: any) {
     const queue = external ? this.getExternalQueue() : this.getQueue();
     return queue.executeInQueue('query', cacheKey, {
       queryKey: cacheKey, query, values, requestId
@@ -140,7 +148,7 @@ export class QueryCache {
     });
   }
 
-  getQueue() {
+  public getQueue() {
     if (!this.queue) {
       this.queue = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}`,
@@ -161,11 +169,11 @@ export class QueryCache {
     return this.queue;
   }
 
-  getExternalQueue() {
+  public getExternalQueue() {
     if (!this.externalQueue) {
       this.externalQueue = QueryCache.createQueue(
         `SQL_QUERY_EXT_${this.redisPrefix}`,
-        this.externalDriverFactory,
+        this.options.externalDriverFactory,
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
@@ -183,9 +191,9 @@ export class QueryCache {
     return this.externalQueue;
   }
 
-  static createQueue(redisPrefix, clientFactory, executeFn, options) {
+  public static createQueue(redisPrefix, clientFactory, executeFn, options) {
     options = options || {};
-    const queue = new QueryQueue(redisPrefix, {
+    const queue: any = new QueryQueue(redisPrefix, {
       queryHandlers: {
         query: async (q, setCancelHandle) => {
           const client = await clientFactory();
@@ -220,7 +228,7 @@ export class QueryCache {
     return queue;
   }
 
-  startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
+  public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
     this.renewQuery(
       query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
     ).catch(e => {
@@ -232,7 +240,7 @@ export class QueryCache {
     });
   }
 
-  renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
+  public renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
     options = options || {};
     return Promise.all(
       cacheKeyQueries.map((q, i) => this.cacheQueryResult(
@@ -280,7 +288,7 @@ export class QueryCache {
       ));
   }
 
-  cacheQueryResult(query, values, cacheKey, expiration, options) {
+  public cacheQueryResult(query, values, cacheKey, expiration, options) {
     options = options || {};
     const { renewalThreshold } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
@@ -360,12 +368,12 @@ export class QueryCache {
     });
   }
 
-  async lastRefreshTime(cacheKey) {
+  protected async lastRefreshTime(cacheKey) {
     const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
     return cachedValue && new Date(cachedValue.time);
   }
 
-  async resultFromCacheIfExists(queryBody) {
+  public async resultFromCacheIfExists(queryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
     const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
     if (cachedValue) {
@@ -377,7 +385,7 @@ export class QueryCache {
     return null;
   }
 
-  queryRedisKey(cacheKey) {
+  public queryRedisKey(cacheKey) {
     return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest('hex')}`;
   }
 }
