@@ -25,7 +25,6 @@ RUN yarn install
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
 
-VOLUME /cube/conf
 WORKDIR /cube/conf
 
 EXPOSE 4000
