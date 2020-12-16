@@ -1,14 +1,24 @@
-export class RedisCacheDriver {
-  constructor({ pool }) {
+import { RedisPool } from './RedisPool';
+import { CacheDriverInterface } from './cache-driver.interface';
+
+interface RedisCacheDriverOptions {
+  pool: RedisPool,
+}
+
+export class RedisCacheDriver implements CacheDriverInterface {
+  protected readonly redisPool: RedisPool;
+
+  public constructor({ pool }: RedisCacheDriverOptions) {
     this.redisPool = pool;
   }
 
-  async getClient() {
+  protected async getClient() {
     return this.redisPool.getClient();
   }
 
-  async get(key) {
+  public async get(key: string) {
     const client = await this.getClient();
+
     try {
       const res = await client.getAsync(key);
       return res && JSON.parse(res);
@@ -17,8 +27,9 @@ export class RedisCacheDriver {
     }
   }
 
-  async set(key, value, expiration) {
+  public async set(key: string, value, expiration) {
     const client = await this.getClient();
+
     try {
       return await client.setAsync(key, JSON.stringify(value), 'EX', expiration);
     } finally {
@@ -26,8 +37,9 @@ export class RedisCacheDriver {
     }
   }
 
-  async remove(key) {
+  public async remove(key: string) {
     const client = await this.getClient();
+
     try {
       return await client.delAsync(key);
     } finally {
@@ -35,8 +47,9 @@ export class RedisCacheDriver {
     }
   }
 
-  async keysStartingWith(prefix) {
+  public async keysStartingWith(prefix: string) {
     const client = await this.getClient();
+
     try {
       return await client.keysAsync(`${prefix}*`);
     } finally {

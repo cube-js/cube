@@ -1,5 +1,5 @@
 export class ContinueWaitError extends Error {
-  constructor() {
+  public constructor() {
     super('Continue wait');
   }
 }

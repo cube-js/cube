@@ -1,29 +1,33 @@
+import { CacheDriverInterface } from './cache-driver.interface';
+
 const store = {};
 
-export class LocalCacheDriver {
-  constructor() {
+export class LocalCacheDriver implements CacheDriverInterface {
+  protected readonly store: Record<string, any>;
+
+  public constructor() {
     this.store = store;
   }
 
-  async get(key) {
+  public async get(key: string) {
     if (this.store[key] && this.store[key].exp < new Date().getTime()) {
       delete this.store[key];
     }
     return this.store[key] && this.store[key].value;
   }
 
-  async set(key, value, expiration) {
+  public async set(key: string, value, expiration) {
     this.store[key] = {
       value,
       exp: new Date().getTime() + expiration * 1000
     };
   }
 
-  async remove(key) {
+  public async remove(key: string) {
     delete this.store[key];
   }
 
-  async keysStartingWith(prefix) {
+  public async keysStartingWith(prefix: string) {
     return Object.keys(this.store)
       .filter(k => k.indexOf(prefix) === 0 && this.store[k].exp > new Date().getTime());
   }
