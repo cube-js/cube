@@ -24,7 +24,7 @@ region of your choice.
 
 The next step is to upload your existing Cube.js project to the Cube Cloud.
 
-You can do it by running the following command from terminal within your Cube.js
+You can do it by running the following command from terminal in your Cube.js
 project directory.
 
 ```bash
