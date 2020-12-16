@@ -1,6 +1,6 @@
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 const crypto = require('crypto');
 const dataApi = require('data-api-client');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',

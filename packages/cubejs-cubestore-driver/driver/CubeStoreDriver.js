@@ -1,8 +1,7 @@
 const mysql = require('mysql');
 const genericPool = require('generic-pool');
 const { promisify } = require('util');
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
-const fs = require('fs');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const CubeStoreQuery = require('./CubeStoreQuery');
 
 const GenericTypeToCubeStore = {
