@@ -3,12 +3,13 @@ import styled from 'styled-components';
 import '@ant-design/compatible/assets/index.css';
 import { Col, Row, Spin, Typography } from 'antd';
 import { Redirect, withRouter } from 'react-router-dom';
+
 import DashboardSource from '../DashboardSource';
 import { frameworks } from '../ChartContainer';
-import { chartLibraries } from '../ChartRenderer';
 import { Button, Card } from '../components';
 import { ReactComponent as PlusSVG } from './plus.svg';
 import CreateOwnModal from './CreateOwnModal';
+import { frameworkChartLibraries } from '../PlaygroundQueryBuilder';
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>
@@ -150,7 +151,7 @@ class TemplateGalleryPage extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      chartLibrary: chartLibraries[0].value,
+      chartLibrary: frameworkChartLibraries.react[0].value,
       framework: 'react',
       templatePackageName: 'react-antd-dynamic',
       templates: null,
@@ -186,7 +187,7 @@ class TemplateGalleryPage extends Component {
       enableWebSocketTransport,
     } = this.state;
     const { history } = this.props;
-    const currentLibraryItem = chartLibraries.find(
+    const currentLibraryItem = frameworkChartLibraries[framework].find(
       (m) => m.value === chartLibrary
     );
     const frameworkItem = frameworks.find((m) => m.id === framework);
@@ -263,7 +264,7 @@ class TemplateGalleryPage extends Component {
                 templatePackages = [
                   'create-ng-app',
                   templatePackageName,
-                  `${chartLibrary}-charts`,
+                  `ng2-charts`,
                   'ng-credentials',
                 ];
               }
@@ -279,23 +280,12 @@ class TemplateGalleryPage extends Component {
                 this.setState({
                   templatePackageName: 'ng-material-dynamic',
                   chartLibrary:
-                    value.toLowerCase() === 'angular'
-                      ? 'ng2'
-                      : chartLibraries[0].value,
+                    frameworkChartLibraries[value.toLowerCase()][0].value,
                 });
               }
               this.setState({ [key]: value });
             }}
-            chartLibraries={
-              framework.toLowerCase() === 'angular'
-                ? [
-                    {
-                      title: 'ng2-charts',
-                      value: 'ng2',
-                    },
-                  ]
-                : chartLibraries.filter(({ value }) => value !== 'ng2')
-            }
+            chartLibraries={frameworkChartLibraries[framework]}
             currentLibraryItem={currentLibraryItem}
             frameworks={frameworks}
             framework={framework}

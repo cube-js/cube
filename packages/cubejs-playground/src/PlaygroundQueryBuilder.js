@@ -1,27 +1,57 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
-import { QueryBuilder } from '@cubejs-client/react';
-import { ChartRenderer } from './ChartRenderer';
+import { QueryBuilder, useDryRun } from '@cubejs-client/react';
+
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
 import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
+import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { Card, SectionHeader, SectionRow } from './components';
 import styled from 'styled-components';
+import ChartContainer from './ChartContainer';
+import { dispatchChartEvent } from './utils';
 
 const Section = styled.div`
   display: flex;
   flex-flow: column;
   margin-right: 24px;
   margin-bottom: 16px;
-  
+
   > *:first-child {
     margin-bottom: 8px;
   }
 `;
+
+export const frameworkChartLibraries = {
+  react: [
+    {
+      value: 'bizcharts',
+      title: 'Bizcharts',
+    },
+    {
+      value: 'recharts',
+      title: 'Recharts',
+    },
+    {
+      value: 'd3',
+      title: 'D3',
+    },
+    {
+      value: 'chartjs',
+      title: 'Chart.js',
+    },
+  ],
+  angular: [
+    {
+      value: 'angular-ng2-charts',
+      title: 'ng2',
+    },
+  ],
+};
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>
   Object.keys(updateMethods)
@@ -47,13 +77,28 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     .reduce((a, b) => ({ ...a, ...b }), {});
 
 export default function PlaygroundQueryBuilder({
-                                                 query,
-                                                 cubejsApi,
-                                                 apiUrl,
-                                                 cubejsToken,
-                                                 dashboardSource,
-                                                 setQuery,
-                                               }) {
+  query = {},
+  cubejsApi,
+  apiUrl,
+  cubejsToken,
+  setQuery,
+}) {
+  const ref = useRef(null);
+  const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
+  const [isChartRendererReady, setChartRendererReady] = useState(false);
+
+  const { response } = useDryRun(query, {
+    skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
+  });
+
+  let parsedDateRange;
+  if (response) {
+    const { timeDimensions = [] } = response.pivotQuery || {};
+    parsedDateRange = timeDimensions[0]?.dateRange;
+  } else if (Array.isArray(query.timeDimensions?.[0]?.dateRange)) {
+    parsedDateRange = query.timeDimensions[0].dateRange;
+  }
+
   return (
     <QueryBuilder
       query={query}
@@ -61,38 +106,29 @@ export default function PlaygroundQueryBuilder({
       cubejsApi={cubejsApi}
       wrapWithQueryRenderer={false}
       render={({
-                 resultSet,
-                 error,
-                 isQueryPresent,
-                 chartType,
-                 updateChartType,
-                 measures,
-                 availableMeasures,
-                 updateMeasures,
-                 dimensions,
-                 availableDimensions,
-                 updateDimensions,
-                 segments,
-                 availableSegments,
-                 updateSegments,
-                 filters,
-                 updateFilters,
-                 timeDimensions,
-                 availableTimeDimensions,
-                 updateTimeDimensions,
-                 orderMembers,
-                 updateOrder,
-                 pivotConfig,
-                 updatePivotConfig,
-               }) => {
-        let parsedDateRange = null;
-
-        if (resultSet) {
-          const { timeDimensions = [] } =
-          resultSet.pivotQuery() || resultSet.query() || {};
-          parsedDateRange = timeDimensions[0]?.dateRange;
-        }
-
+        error,
+        isQueryPresent,
+        chartType,
+        updateChartType,
+        measures,
+        availableMeasures,
+        updateMeasures,
+        dimensions,
+        availableDimensions,
+        updateDimensions,
+        segments,
+        availableSegments,
+        updateSegments,
+        filters,
+        updateFilters,
+        timeDimensions,
+        availableTimeDimensions,
+        updateTimeDimensions,
+        orderMembers,
+        updateOrder,
+        pivotConfig,
+        updatePivotConfig,
+      }) => {
         return (
           <>
             <Row
@@ -110,76 +146,66 @@ export default function PlaygroundQueryBuilder({
                     style={{ marginBottom: -12 }}
                   >
                     <Section>
-                      <SectionHeader>
-                        Measures
-                      </SectionHeader>
+                      <SectionHeader>Measures</SectionHeader>
                       <MemberGroup
                         members={measures}
                         availableMembers={availableMeasures}
                         addMemberName="Measure"
                         updateMethods={playgroundActionUpdateMethods(
                           updateMeasures,
-                          'Measure',
+                          'Measure'
                         )}
                       />
                     </Section>
                     <Section>
-                      <SectionHeader>
-                        Dimensions
-                      </SectionHeader>
+                      <SectionHeader>Dimensions</SectionHeader>
                       <MemberGroup
                         members={dimensions}
                         availableMembers={availableDimensions}
                         addMemberName="Dimension"
                         updateMethods={playgroundActionUpdateMethods(
                           updateDimensions,
-                          'Dimension',
+                          'Dimension'
                         )}
                       />
                     </Section>
                     <Section>
-                      <SectionHeader>
-                        Segment
-                      </SectionHeader>
+                      <SectionHeader>Segment</SectionHeader>
                       <MemberGroup
                         members={segments}
                         availableMembers={availableSegments}
                         addMemberName="Segment"
                         updateMethods={playgroundActionUpdateMethods(
                           updateSegments,
-                          'Segment',
+                          'Segment'
                         )}
                       />
                     </Section>
                     <Section>
-                      <SectionHeader>
-                        Time
-                      </SectionHeader>
+                      <SectionHeader>Time</SectionHeader>
                       <TimeGroup
                         members={timeDimensions}
                         availableMembers={availableTimeDimensions}
                         addMemberName="Time"
                         updateMethods={playgroundActionUpdateMethods(
                           updateTimeDimensions,
-                          'Time',
+                          'Time'
                         )}
                         parsedDateRange={parsedDateRange}
                       />
                     </Section>
 
                     <Section>
-                      <SectionHeader>
-                        Filters
-                      </SectionHeader>
+                      <SectionHeader>Filters</SectionHeader>
                       <FilterGroup
                         members={filters}
                         availableMembers={availableDimensions.concat(
-                          availableMeasures,
+                          availableMeasures
                         )}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(
                           updateFilters,
-                          'Filter',
+                          'Filter'
                         )}
                       />
                     </Section>
@@ -209,19 +235,58 @@ export default function PlaygroundQueryBuilder({
               </Col>
             </Row>
 
-            <Row justify="space-around" align="top" gutter={24} style={{ marginRight: 0, marginLeft: 0 }}>
-              <Col span={24} style={{ paddingLeft: 16, paddingRight: 16 }}>
+            <Row
+              justify="space-around"
+              align="top"
+              gutter={24}
+              style={{
+                marginRight: 0,
+                marginLeft: 0,
+              }}
+            >
+              <Col
+                span={24}
+                style={{
+                  paddingLeft: 16,
+                  paddingRight: 16,
+                }}
+              >
                 {isQueryPresent ? (
-                  <ChartRenderer
-                    query={query}
-                    resultSet={resultSet}
-                    error={error}
+                  <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
+                    iframeRef={ref}
+                    isChartRendererReady={isChartRendererReady}
+                    query={query}
+                    error={error}
                     chartType={chartType}
-                    cubejsApi={cubejsApi}
-                    dashboardSource={dashboardSource}
                     pivotConfig={pivotConfig}
+                    chartingLibrary={chartingLibrary}
+                    setChartLibrary={(value) => {
+                      if (ref.current) {
+                        dispatchChartEvent(ref.current.contentDocument, {
+                          chartingLibrary: value,
+                        });
+                      }
+                      setChartingLibrary(value);
+                    }}
+                    chartLibraries={frameworkChartLibraries}
+                    cubejsApi={cubejsApi}
+                    render={({ framework }) => {
+                      return (
+                        <ChartRenderer
+                          isChartRendererReady={isChartRendererReady}
+                          framework={framework}
+                          chartingLibrary={chartingLibrary}
+                          chartType={chartType}
+                          query={query}
+                          pivotConfig={pivotConfig}
+                          iframeRef={ref}
+                          onChartRendererReadyChange={setChartRendererReady}
+                        />
+                      );
+                    }}
+                    onChartRendererReadyChange={setChartRendererReady}
                   />
                 ) : (
                   <h2 style={{ textAlign: 'center' }}>
@@ -241,16 +306,6 @@ PlaygroundQueryBuilder.propTypes = {
   query: PropTypes.object,
   setQuery: PropTypes.func,
   cubejsApi: PropTypes.object,
-  dashboardSource: PropTypes.object,
   apiUrl: PropTypes.string,
   cubejsToken: PropTypes.string,
-};
-
-PlaygroundQueryBuilder.defaultProps = {
-  query: {},
-  setQuery: null,
-  cubejsApi: null,
-  dashboardSource: null,
-  apiUrl: '/cubejs-api/v1',
-  cubejsToken: null,
 };

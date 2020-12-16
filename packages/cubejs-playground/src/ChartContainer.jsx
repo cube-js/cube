@@ -13,8 +13,6 @@ import {
 import { Dropdown, Menu, Modal, notification } from 'antd';
 import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
-import { fetch } from 'whatwg-fetch';
-import { map } from 'ramda';
 import styled from 'styled-components';
 import { Redirect, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
@@ -23,6 +21,13 @@ import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
+import { codeSandboxDefinition } from './utils';
+
+const frameworkToTemplate = {
+  react: 'create-react-app',
+  angular: 'angular-cli',
+  vue: 'vue-cli',
+};
 
 const StyledCard = styled(Card)`
   .ant-card-head {
@@ -31,7 +36,7 @@ const StyledCard = styled(Card)`
     z-index: 100;
     background: white;
   }
-  
+
   .ant-card-body {
     max-width: 100%;
     overflow: auto;
@@ -48,12 +53,12 @@ export const frameworks = [
     id: 'react',
     title: 'React',
     supported: true,
-    scaffoldingSupported: true
+    scaffoldingSupported: true,
   },
   {
     id: 'angular',
     title: 'Angular',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-ngx',
+    supported: true,
     scaffoldingSupported: true,
   },
   {
@@ -64,6 +69,42 @@ export const frameworks = [
 ];
 
 class ChartContainer extends React.Component {
+  static getDerivedStateFromProps(props, state) {
+    if (
+      props.isChartRendererReady &&
+      props.iframeRef.current != null &&
+      props.chartingLibrary
+    ) {
+      const { __cubejsPlayground } = props.iframeRef.current.contentWindow;
+
+      const codesandboxFiles = __cubejsPlayground.getCodesandboxFiles(
+        props.chartingLibrary,
+        {
+          chartType: props.chartType,
+          query: JSON.stringify(props.query, null, 2),
+          pivotConfig: JSON.stringify(props.pivotConfig, null, 2),
+          apiUrl: `${props.apiUrl}/cubejs-api/v1`,
+          cubejsToken: props.cubejsToken
+        }
+      );
+      let codeExample = '';
+      
+      if (state.framework === 'react') {
+        codeExample = codesandboxFiles['index.js'];
+      } else if (state.framework === 'angular') {
+        codeExample = codesandboxFiles['src/app/query-renderer/query-renderer.component.ts'];
+      }
+
+      return {
+        ...state,
+        dependencies: __cubejsPlayground.getDependencies(props.chartingLibrary),
+        codeExample,
+        codesandboxFiles,
+      };
+    }
+    return state;
+  }
+
   constructor(props) {
     super(props);
     this.state = {
@@ -72,99 +113,67 @@ class ChartContainer extends React.Component {
     };
   }
 
-  async componentDidMount() {
-    const { codeSandboxSource, dependencies } = this.props;
-    const codeSandboxRes = await fetch(
-      'https://codesandbox.io/api/v1/sandboxes/define?json=1',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(
-          this.codeSandboxDefinition(codeSandboxSource, dependencies),
-        ),
-      },
-    );
-    const codeSandboxJson = await codeSandboxRes.json();
-    this.setState({ sandboxId: codeSandboxJson.sandbox_id });
-  }
-
-  codeSandboxDefinition(codeSandboxSource, dependencies) {
-    return {
-      files: {
-        ...(typeof codeSandboxSource === 'string'
-          ? {
-            'index.js': {
-              content: codeSandboxSource,
-            },
-          }
-          : codeSandboxSource),
-        'package.json': {
-          content: {
-            dependencies: {
-              'react-dom': 'latest',
-              ...map(() => 'latest', dependencies),
-            },
-          },
-        },
-      },
-      template: 'create-react-app',
-    };
-  }
-
   render() {
     const {
+      codeExample,
+      codesandboxFiles,
+      dependencies,
       redirectToDashboard,
       showCode,
-      sandboxId,
       addingToDashboard,
       framework,
     } = this.state;
     const {
+      isChartRendererReady,
       resultSet,
       error,
-      codeExample,
       render,
-      codeSandboxSource,
-      dependencies,
       dashboardSource,
       hideActions,
       query,
       cubejsApi,
-      chartLibrary,
+      chartingLibrary,
       setChartLibrary,
       chartLibraries,
       history,
+      onChartRendererReadyChange,
     } = this.props;
 
     if (redirectToDashboard) {
       return <Redirect to="/dashboard" />;
     }
 
-    const parameters = getParameters(
-      this.codeSandboxDefinition(codeSandboxSource, dependencies),
-    );
+    const parameters = isChartRendererReady
+      ? getParameters(
+          codeSandboxDefinition(
+            frameworkToTemplate[framework],
+            codesandboxFiles,
+            dependencies
+          )
+        )
+      : null;
 
-    const chartLibrariesMenu = (
-      <Menu
-        onClick={(e) => {
-          playgroundAction('Set Chart Library', { chartLibrary: e.key });
-          setChartLibrary(e.key);
-        }}
-      >
-        {chartLibraries.map((library) => (
-          <Menu.Item key={library.value}>{library.title}</Menu.Item>
-        ))}
-      </Menu>
-    );
+    const chartLibrariesMenu =
+      (chartLibraries[framework] || []).length > 0 ? (
+        <Menu
+          onClick={(e) => {
+            playgroundAction('Set Chart Library', { chartingLibrary: e.key });
+            setChartLibrary(e.key);
+          }}
+        >
+          {(chartLibraries[framework] || []).map((library) => (
+            <Menu.Item key={library.value}>{library.title}</Menu.Item>
+          ))}
+        </Menu>
+      ) : null;
 
     const frameworkMenu = (
       <Menu
         onClick={(e) => {
           playgroundAction('Set Framework', { framework: e.key });
           this.setState({ framework: e.key });
+          onChartRendererReadyChange(false);
+          setChartLibrary(chartLibraries[e.key]?.[0]?.value || null);
         }}
       >
         {frameworks.map((f) => (
@@ -173,9 +182,10 @@ class ChartContainer extends React.Component {
       </Menu>
     );
 
-    const currentLibraryItem = chartLibraries.find(
-      (m) => m.value === chartLibrary,
+    const currentLibraryItem = (chartLibraries[framework] || []).find(
+      (m) => m.value === chartingLibrary
     );
+
     const frameworkItem = frameworks.find((m) => m.id === framework);
     const extra = (
       <form
@@ -183,24 +193,28 @@ class ChartContainer extends React.Component {
         method="POST"
         target="_blank"
       >
-        <input type="hidden" name="parameters" value={parameters} />
+        {parameters != null ? (
+          <input type="hidden" name="parameters" value={parameters} />
+        ) : null}
         <SectionRow>
           <Button.Group>
             <Dropdown overlay={frameworkMenu}>
               <Button size="small">
-                {frameworkItem && frameworkItem.title}
+                {frameworkItem?.title}
                 <DownOutlined />
               </Button>
             </Dropdown>
-            <Dropdown
-              overlay={chartLibrariesMenu}
-              disabled={!frameworkItem.supported}
-            >
-              <Button size="small">
-                {currentLibraryItem && currentLibraryItem.title}
-                <DownOutlined />
-              </Button>
-            </Dropdown>
+            {chartLibrariesMenu ? (
+              <Dropdown
+                overlay={chartLibrariesMenu}
+                disabled={!frameworkItem.supported}
+              >
+                <Button size="small">
+                  {currentLibraryItem?.title}
+                  <DownOutlined />
+                </Button>
+              </Dropdown>
+            ) : null}
           </Button.Group>
           <Button.Group>
             <Button
@@ -363,14 +377,16 @@ class ChartContainer extends React.Component {
             render={({ sqlQuery }) => {
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
-              return <PrismCode code={query && sqlFormatter.format(query.sql())} />;
+              return (
+                <PrismCode code={query && sqlFormatter.format(query.sql())} />
+              );
             }}
           />
         );
       } else if (showCode === 'cache') {
         return <CachePane query={query} cubejsApi={cubejsApi} />;
       }
-      return render({ resultSet, error, sandboxId });
+      return render({ framework, error });
     };
 
     let title;
@@ -378,19 +394,19 @@ class ChartContainer extends React.Component {
     const copyCodeToClipboard = async () => {
       if (!navigator.clipboard) {
         notification.error({
-          message: 'Your browser doesn\'t support copy to clipboard',
+          message: "Your browser doesn't support copy to clipboard",
         });
       }
       try {
         await navigator.clipboard.writeText(
-          showCode === 'query' ? queryText : codeExample,
+          showCode === 'query' ? queryText : codeExample
         );
         notification.success({
           message: 'Copied to clipboard',
         });
       } catch (e) {
         notification.error({
-          message: 'Can\'t copy to clipboard',
+          message: "Can't copy to clipboard",
           description: e,
         });
       }
@@ -437,7 +453,7 @@ class ChartContainer extends React.Component {
     }
 
     return hideActions ? (
-      render({ resultSet, error, sandboxId })
+      render({ resultSet, error })
     ) : (
       <StyledCard title={title} style={{ minHeight: 420 }} extra={extra}>
         {renderChart()}
@@ -449,7 +465,6 @@ class ChartContainer extends React.Component {
 ChartContainer.propTypes = {
   resultSet: PropTypes.object,
   error: PropTypes.object,
-  codeExample: PropTypes.string,
   render: PropTypes.func.isRequired,
   codeSandboxSource: PropTypes.string,
   dependencies: PropTypes.object.isRequired,
@@ -458,9 +473,8 @@ ChartContainer.propTypes = {
   query: PropTypes.object,
   cubejsApi: PropTypes.object,
   history: PropTypes.object.isRequired,
-  chartLibrary: PropTypes.string.isRequired,
+  chartingLibrary: PropTypes.string.isRequired,
   setChartLibrary: PropTypes.func.isRequired,
-  chartLibraries: PropTypes.array.isRequired,
 };
 
 ChartContainer.defaultProps = {
@@ -469,7 +483,6 @@ ChartContainer.defaultProps = {
   hideActions: null,
   dashboardSource: null,
   codeSandboxSource: null,
-  codeExample: null,
   error: null,
   resultSet: null,
 };
