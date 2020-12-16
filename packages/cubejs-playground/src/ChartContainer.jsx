@@ -75,9 +75,9 @@ class ChartContainer extends React.Component {
       props.iframeRef.current != null &&
       props.chartingLibrary
     ) {
-      const { __cubejs } = props.iframeRef.current.contentWindow;
+      const { __cubejsPlayground } = props.iframeRef.current.contentWindow;
 
-      const codesandboxFiles = __cubejs.getCodesandboxFiles(
+      const codesandboxFiles = __cubejsPlayground.getCodesandboxFiles(
         props.chartingLibrary,
         {
           chartType: props.chartType,
@@ -97,7 +97,7 @@ class ChartContainer extends React.Component {
 
       return {
         ...state,
-        dependencies: __cubejs.getDependencies(props.chartingLibrary),
+        dependencies: __cubejsPlayground.getDependencies(props.chartingLibrary),
         codeExample,
         codesandboxFiles,
       };

@@ -60,6 +60,4 @@ ExplorePage.propTypes = {
   history: PropTypes.object.isRequired,
 };
 
-ExplorePage.defaultProps = {};
-
 export default ExplorePage;
