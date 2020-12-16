@@ -2,9 +2,9 @@ import {
   useContext, useEffect, useState, useRef
 } from 'react';
 import { equals } from 'ramda';
-import CubeContext from './CubeContext';
-import isQueryPresent from './isQueryPresent';
-import useDeepCompareMemoize from './useDeepCompareMemoize';
+import CubeContext from '../CubeContext';
+import isQueryPresent from '../isQueryPresent';
+import useDeepCompareMemoize from './deep-compare-memoize';
 
 export default (query, options = {}) => {
   const mutexRef = useRef({});

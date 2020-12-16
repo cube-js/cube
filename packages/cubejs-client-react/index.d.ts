@@ -10,6 +10,7 @@ import {
   TCubeDimension,
   TCubeMember,
   ProgressResponse,
+  TDryRunResponse,
 } from '@cubejs-client/core';
 
 /**
@@ -347,6 +348,27 @@ declare module '@cubejs-client/react' {
     resultSet: ResultSet<TData> | null;
     progress: ProgressResponse;
   };
+
+  /**
+   * @hidden
+   */
+  type UseDryRunResult = {
+    isLoading: boolean;
+    error: Error | null;
+    result: TDryRunResponse;
+  };
+
+  /**
+   * @hidden
+   */
+  type UseDryRunOptions = {
+    skip?: boolean;
+  };
+
+  /**
+   * @hidden
+   */
+  export function useDryRun(query: Query | Query[], options?: UseDryRunOptions): UseDryRunResult;
 
   /**
    * Checks whether the query is ready
