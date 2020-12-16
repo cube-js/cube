@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.9](https://github.com/cube-js/cube.js/compare/v0.24.8...v0.24.9) (2020-12-16)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mysql-driver:** Revert back test on borrow with database pool error logging. ([2cdaf40](https://github.com/cube-js/cube.js/commit/2cdaf406a7d99116849f60e00e1b1bc25605e0d3))
+* **docker:** Drop usage of VOLUME to protected unexpected behavior ([e3f20cd](https://github.com/cube-js/cube.js/commit/e3f20cdad7b72cb45b7a4eee5452dde918539df7))
+* Warning about absolute import ([5f228bc](https://github.com/cube-js/cube.js/commit/5f228bc5e654ab9a4efba458b5c31614ac44a5aa))
+
+
+### Features
+
+* **@cubejs-client/playground:** Angular chart code generation support in Playground ([#1519](https://github.com/cube-js/cube.js/issues/1519)) ([4690e11](https://github.com/cube-js/cube.js/commit/4690e11f417ff65fea8426360f3f5a2b3acd2792)), closes [#1515](https://github.com/cube-js/cube.js/issues/1515) [#1612](https://github.com/cube-js/cube.js/issues/1612)
+* **@cubejs-client/react:** dry run hook ([#1612](https://github.com/cube-js/cube.js/issues/1612)) ([9aea035](https://github.com/cube-js/cube.js/commit/9aea03556ae61f443598ed587538e60239a3be2d))
+
+
+
+
+
 ## [0.24.8](https://github.com/cube-js/cube.js/compare/v0.24.7...v0.24.8) (2020-12-15)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.9](https://github.com/cube-js/cube.js/compare/v0.24.8...v0.24.9) (2020-12-16)
+
+
+### Bug Fixes
+
+* **docker:** Drop usage of VOLUME to protected unexpected behavior ([e3f20cd](https://github.com/cube-js/cube.js/commit/e3f20cdad7b72cb45b7a4eee5452dde918539df7))
+
+
+
+
+
 ## [0.24.8](https://github.com/cube-js/cube.js/compare/v0.24.7...v0.24.8) (2020-12-15)
 
 **Note:** Version bump only for package @cubejs-backend/docker

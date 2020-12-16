@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.9](https://github.com/cube-js/cube.js/compare/v0.24.8...v0.24.9) (2020-12-16)
+
+
+### Features
+
+* **@cubejs-client/playground:** Angular chart code generation support in Playground ([#1519](https://github.com/cube-js/cube.js/issues/1519)) ([4690e11](https://github.com/cube-js/cube.js/commit/4690e11f417ff65fea8426360f3f5a2b3acd2792)), closes [#1515](https://github.com/cube-js/cube.js/issues/1515) [#1612](https://github.com/cube-js/cube.js/issues/1612)
+* **@cubejs-client/react:** dry run hook ([#1612](https://github.com/cube-js/cube.js/issues/1612)) ([9aea035](https://github.com/cube-js/cube.js/commit/9aea03556ae61f443598ed587538e60239a3be2d))
+
+
+
+
+
 ## [0.24.8](https://github.com/cube-js/cube.js/compare/v0.24.7...v0.24.8) (2020-12-15)
 
 **Note:** Version bump only for package @cubejs-client/react

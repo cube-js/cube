@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.9](https://github.com/cube-js/cube.js/compare/v0.24.8...v0.24.9) (2020-12-16)
+
+
+### Bug Fixes
+
+* Warning about absolute import ([5f228bc](https://github.com/cube-js/cube.js/commit/5f228bc5e654ab9a4efba458b5c31614ac44a5aa))
+
+
+
+
+
 ## [0.24.8](https://github.com/cube-js/cube.js/compare/v0.24.7...v0.24.8) (2020-12-15)
 
 **Note:** Version bump only for package @cubejs-backend/mysql-aurora-serverless-driver
