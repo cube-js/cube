@@ -17,6 +17,11 @@ export default function useDryRun(query, options = {}) {
   useEffect(() => {
     const { skip = false } = options;
 
+    const cubejsApi = options.cubejsApi || (context && context.cubejsApi);
+    if (!cubejsApi) {
+      throw new Error('Cube.js API client is not provided');
+    }
+    
     async function loadQuery() {
       if (!skip && query && isQueryPresent(query)) {
         if (!equals(currentQuery, query)) {
@@ -24,13 +29,8 @@ export default function useDryRun(query, options = {}) {
           setCurrentQuery(query);
         }
         setLoading(true);
+        
         try {
-          const cubejsApi = options.cubejsApi || (context && context.cubejsApi);
-
-          if (!cubejsApi) {
-            throw new Error('Cube.js API client is not provided');
-          }
-          
           setResponse(
             await cubejsApi.dryRun(query, {
               mutexObj: mutexRef.current,

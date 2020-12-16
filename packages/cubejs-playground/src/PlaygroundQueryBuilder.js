@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
-import { QueryBuilder } from '@cubejs-client/react';
+import { QueryBuilder, useDryRun } from '@cubejs-client/react';
 
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
@@ -87,6 +87,18 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
 
+  const { response } = useDryRun(query, {
+    skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
+  });
+
+  let parsedDateRange;
+  if (response) {
+    const { timeDimensions = [] } = response.pivotQuery || {};
+    parsedDateRange = timeDimensions[0]?.dateRange;
+  } else if (Array.isArray(query.timeDimensions?.[0]?.dateRange)) {
+    parsedDateRange = query.timeDimensions[0].dateRange;
+  }
+
   return (
     <QueryBuilder
       query={query}
@@ -117,13 +129,6 @@ export default function PlaygroundQueryBuilder({
         pivotConfig,
         updatePivotConfig,
       }) => {
-        let parsedDateRange = null;
-        // if (resultSet) {
-        //   const { timeDimensions = [] } =
-        //   resultSet.pivotQuery() || resultSet.query() || {};
-        //   parsedDateRange = timeDimensions[0]?.dateRange;
-        // }
-
         return (
           <>
             <Row

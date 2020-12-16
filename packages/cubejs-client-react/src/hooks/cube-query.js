@@ -21,6 +21,12 @@ export default (query, options = {}) => {
 
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
+    
+    const cubejsApi = options.cubejsApi || context && context.cubejsApi;
+          
+    if (!cubejsApi) {
+      throw new Error('Cube.js API client is not provided');
+    }
 
     async function loadQuery() {
       if (!skip && query && isQueryPresent(query)) {
@@ -41,11 +47,6 @@ export default (query, options = {}) => {
           if (subscribeRequest) {
             await subscribeRequest.unsubscribe();
             subscribeRequest = null;
-          }
-          const cubejsApi = options.cubejsApi || context && context.cubejsApi;
-          
-          if (!cubejsApi) {
-            throw new Error('Cube.js API client is not provided');
           }
           
           if (options.subscribe) {

@@ -20,7 +20,7 @@ const packages = [
   // 'dev-cnga',
   'create-ng-app',
   'angular-charts',
-  'ng-credentials'
+  'ng-credentials',
 ];
 
 const rootPath = path.resolve(`${__dirname}/../..`);
@@ -118,4 +118,3 @@ const angularChartsPath = `${distPath}/angular-charts`;
   );
   await appContainer.ensureDependencies();
 })();
-
