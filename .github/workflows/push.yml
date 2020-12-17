@@ -82,10 +82,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Use Node.js 12.x
         uses: actions/setup-node@v1
         with:
-          node-version: 14.x
+          node-version: 12.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -121,10 +121,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Use Node.js 12.x
         uses: actions/setup-node@v1
         with:
-          node-version: 14.x
+          node-version: 12.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
