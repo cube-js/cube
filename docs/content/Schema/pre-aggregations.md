@@ -47,16 +47,6 @@ cube(`Orders`, {
 });
 ```
 
-## Limitations when using `readOnly` mode with drivers
-
-By default, Cube.js uses temporary tables to extract data types from executed query while `readOnly` is `false`.
-If the driver is used in `readOnly` mode, it will use heuristics to extract data types from the database's response, but this strategy has certain limitations:
-
-- The aggregation results can be empty, and Cube.js will throw an exception because it is impossible to detect types
-- Data types can be incorrectly inferred, in rare cases
-
-We highly recommend not using `readOnly` mode with drivers for external pre-aggregations.
-
 ## Rollup
 
 Rollup pre-aggregations are most effective way to boost performance of any analytical application.
@@ -314,6 +304,16 @@ const options = {
   })
 };
 ```
+
+### Limitations
+
+By default, Cube.js uses temporary tables to extract data types from executed query while `readOnly` is `false`.
+If the driver is used in `readOnly` mode, it will use heuristics to extract data types from the database's response, but this strategy has certain limitations:
+
+- The aggregation results can be empty, and Cube.js will throw an exception because it is impossible to detect types
+- Data types can be incorrectly inferred, in rare cases
+
+We highly recommend leaving `readOnly` unset or explicitly setting it to `false` when using drivers for external pre-aggregations.
 
 ## refreshKey
 
