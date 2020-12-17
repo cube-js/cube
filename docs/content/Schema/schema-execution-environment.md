@@ -8,26 +8,26 @@ subCategory: Reference
 ---
 
 Cube.js Schema Compiler uses [Node.js VM](https://nodejs.org/api/vm.html) to
-execute schema compiler code. It gives required flexibility allowing to
-transpile schema files before they get executed, allow to store schema in
-external databases and execute untrusted code in safe manner. Cube.js Schema
-JavaScript is standard JavaScript supported by Node.js starting version 8 with
-following exceptions.
+execute schema compiler code. It gives required flexibility allowing transpiling
+schema files before they get executed, storing schemas in external databases and
+executing untrusted code in a safe manner. Cube.js Schema JavaScript is standard
+JavaScript supported by Node.js starting in version 8 with the following
+exceptions.
 
 ## Require
 
-Being executed in VM data schema JavaScript code doesn't have access to
+Being executed in VM data schema, JavaScript code doesn't have access to
 [Node.js require](https://nodejs.org/api/modules.html#modules_require_id)
 directly. Instead `require()` is implemented by Schema Compiler to provide
-access to other data schema files and to regular Node.js modules. Besides that
-data schema `require()` can resolve Cube.js packages such as `Funnels` unlike
-standard Node.js `require()`.
+access to other data schema files and to regular Node.js modules. Besides that,
+the data schema `require()` can resolve Cube.js packages such as `Funnels`
+unlike standard Node.js `require()`.
 
 ## Node.js globals (process.env, console.log and others)
 
 Data schema JavaScript code doesn't have access to any standard Node.js globals
-like `process` or `console`. In order to access `process.env`, helper service
-can be introduced outside of `schema` directory:
+like `process` or `console`. In order to access `process.env`, utility functions
+can be added outside the `schema/` directory:
 
 **tablePrefix.js:**
 
@@ -50,10 +50,10 @@ cube(`Users`, {
 ## console.log
 
 Data schema cannot access `console.log` due to a separate
-[VM instance](https://nodejs.org/api/vm.html) runs it. Suppose you find yourself
-writing complex logic for SQL generation that depends on a lot of external
-input. In that case, you probably want to introduce a helper service outside of
-`schema` directory that you can debug as usual Node.js code.
+[VM instance](https://nodejs.org/api/vm.html) that runs it. Suppose you find
+yourself writing complex logic for SQL generation that depends on a lot of
+external input. In that case, you probably want to introduce a helper service
+outside of `schema` directory that you can debug as usual Node.js code.
 
 ## Cube.js globals (cube and others)
 
@@ -122,10 +122,9 @@ To trigger a schema recompile based on changes of underlying input data,
   https://cube.dev/docs/config#options-reference-schema-version
 
 If there's a need to generate schema based on values from external API or
-database `asyncModule` method can be used for such scenario. `asyncModule`
-method allows to register async function to be executed at the end of data
-schema file compile phase so additional definitions can be added during this
-function call.
+database, the `asyncModule` method can be used for such scenario. `asyncModule`
+allows registering an async function to be executed at the end of the data
+schema file compile phase so additional definitions can be added.
 
 For example:
 
@@ -198,7 +197,7 @@ asyncModule(async () => {
 ## Context symbols transpile
 
 Cube.js uses custom transpiler to optimize boilerplate code around referencing
-cubes and cube members. There're reserved property names inside `cube`
+cubes and cube members. There are reserved property names inside `cube`
 definition that undergo reference resolve transpiling process:
 
 - `sql`
