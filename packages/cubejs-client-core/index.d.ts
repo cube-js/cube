@@ -455,11 +455,11 @@ declare module '@cubejs-client/core' {
      *   { "x":"2015-03-01T00:00:00", "Stories.count": 29661, "xValues": ["2015-03-01T00:00:00"]  },
      *   //...
      * ]
-     * 
+     *
      * ```
      * When using `chartPivot()` or `seriesNames()`, you can pass `aliasSeries` in the [pivotConfig](#types-pivot-config)
      * to give each series a unique prefix. This is useful for `blending queries` which use the same measure multiple times.
-     * 
+     *
      * ```js
      * // For the queries
      * {
@@ -489,7 +489,7 @@ declare module '@cubejs-client/core' {
      *     },
      *   ],
      * },
-     * 
+     *
      * // ResultSet.chartPivot({ aliasSeries: ['one', 'two'] }) will return
      * [
      *   {
@@ -680,11 +680,23 @@ declare module '@cubejs-client/core' {
 
   export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
 
-  export type TimeDimension = {
+  export type DateRange = string | [string, string];
+
+  export type TimeDimensionBase = {
     dimension: string;
-    dateRange?: string | string[];
     granularity?: TimeDimensionGranularity;
   };
+
+  export type TimeDimensionComparison = TimeDimensionBase & {
+    compareDateRange: Array<DateRange>;
+    dateRange?: never;
+  };
+
+  export type TimeDimensionRanged = TimeDimensionBase & {
+    dateRange?: DateRange;
+  };
+
+  export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
 
   export type Query = {
     measures?: string[];
