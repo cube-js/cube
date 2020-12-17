@@ -87,7 +87,6 @@ COPY packages/cubejs-sqlite-driver/yarn.lock packages/cubejs-sqlite-driver/yarn.
 
 #  --ignore @cubejs-backend/jdbc-driver not needed, because it's ignored by .dockerignore
 RUN yarn lerna bootstrap
-RUN yarn lerna run build
 
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
@@ -114,6 +113,7 @@ COPY packages/cubejs-server-core/ packages/cubejs-server-core/
 COPY packages/cubejs-snowflake-driver/ packages/cubejs-snowflake-driver/
 COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
 
+RUN yarn lerna run build
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
