@@ -474,6 +474,8 @@ To keep pre-aggregations always up-to-date you can mark them as `scheduledRefres
 `refreshKey` is used to determine if there's a need to update specific pre-aggregation on each scheduled refresh run.
 For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReference` are fetched to determine range for refresh.
 
+Every time scheduled refresh is run it takes every pre-aggregation partition starting with most recent ones in time and checks if it's `refreshKey` changed. If it's changed then such partition will be refreshed.
+
 In development mode, Cube.js runs the background refresh by default and will
 refresh all the pre-aggregations marked with `scheduledRefresh` parameter.
 
