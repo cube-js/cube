@@ -23,7 +23,7 @@ module.exports = __webpack_require__(/*! /Users/alex/Projects/cube.js/packages/c
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getCodesandboxFiles", function() { return getCodesandboxFiles; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getDependencies", function() { return getDependencies; });
-const chartingLibraryFiles = { "angular-ng2-charts": { "src/app/query-renderer/query-renderer.component.html": "<ngx-spinner\n  bdColor=\"rgba(0,0,0,0)\"\n  size=\"default\"\n  color=\"#000\"\n  type=\"ball-spin\"\n  [fullScreen]=\"false\"\n></ngx-spinner>\n\n<div *ngIf=\"isQueryPresent && !loading\">\n  <div *ngIf=\"chartType !== 'table'\" class=\"chart-container\">\n    <canvas\n      *ngIf=\"chartType === 'line'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"noFillChartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'area'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'bar'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"bar\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'pie'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"pie\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n  </div>\n\n  <table\n    *ngIf=\"chartType === 'table'\"\n    mat-table\n    [dataSource]=\"tableData\"\n    style=\"width: 100%\"\n  >\n    <ng-container\n      *ngFor=\"let column of displayedColumns; let index = index\"\n      [matColumnDef]=\"column\"\n    >\n      <th mat-header-cell *matHeaderCellDef>\n        {{ columnTitles[index] }}\n      </th>\n      <td mat-cell *matCellDef=\"let element\">{{ element[column] }}</td>\n    </ng-container>\n\n    <tr mat-header-row *matHeaderRowDef=\"displayedColumns\"></tr>\n    <tr mat-row *matRowDef=\"let row; columns: displayedColumns\"></tr>\n  </table>\n</div>\n", "src/app/query-renderer/query-renderer.component.ts": "import { Component, Input } from '@angular/core';\nimport { isQueryPresent, ResultSet } from '@cubejs-client/core';\nimport { CubejsClient, TChartType } from '@cubejs-client/ngx';\nimport { BehaviorSubject, combineLatest, of, merge } from 'rxjs';\nimport { catchError, switchMap } from 'rxjs/operators';\nimport { ChartDataSets, ChartOptions } from 'chart.js';\nimport { Label } from 'ng2-charts';\nimport { getDisplayedColumns, flattenColumns } from './utils';\nimport { NgxSpinnerService } from 'ngx-spinner';\n\n@Component({\n  selector: 'query-renderer',\n  templateUrl: './query-renderer.component.html',\n  styles: [\n    `\n      .chart-container {\n        position: relative;\n        height: calc(100% - 52px);\n        min-height: 400px;\n      }\n\n      :host {\n        position: absolute;\n        top: 0;\n        bottom: 0;\n        left: 0;\n        right: 0;\n      }\n    `,\n  ],\n})\nexport class QueryRendererComponent {\n  @Input('cubeQuery')\n  cubeQuery$: BehaviorSubject<any>;\n\n  @Input('pivotConfig')\n  pivotConfig$: any;\n\n  @Input('chartType')\n  chartType$: any;\n\n  chartType: any = null;\n  isQueryPresent = false;\n\n  displayedColumns: string[] = [];\n  tableData: any[] = [];\n  columnTitles: string[] = [];\n  chartData: ChartDataSets[] = [];\n  chartLabels: Label[] = [];\n  chartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n  };\n  noFillChartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n    elements: {\n      line: {\n        fill: false,\n      },\n    },\n  };\n  loading = false;\n\n  constructor(\n    private cubejsClient: CubejsClient,\n    private spinner: NgxSpinnerService\n  ) {}\n\n  ngOnInit() {\n    combineLatest([\n      this.cubeQuery$.pipe(\n        switchMap((cubeQuery) => {\n          return of(isQueryPresent(cubeQuery || {}));\n        })\n      ),\n      this.cubeQuery$.pipe(\n        switchMap((cubeQuery) => {\n          if (!isQueryPresent(cubeQuery || {})) {\n            return of(null);\n          }\n          this.loading = true;\n          this.spinner.show();\n\n          return merge(\n            of(null),\n            this.cubejsClient.load(cubeQuery).pipe(\n              catchError((error) => {\n                console.error(error);\n                return of(null);\n              })\n            )\n          );\n        })\n      ),\n      this.pivotConfig$,\n      this.chartType$,\n    ]).subscribe(\n      ([isQueryPresent, resultSet, pivotConfig, chartType]: [\n        boolean,\n        ResultSet,\n        any,\n        TChartType\n      ]) => {\n        this.chartType = chartType;\n        this.isQueryPresent = isQueryPresent;\n\n        if (resultSet != null) {\n          this.spinner.hide();\n          this.loading = false;\n        }\n\n        if (this.chartType === 'table') {\n          this.updateTableData(resultSet, pivotConfig);\n        } else {\n          this.updateChartData(resultSet, pivotConfig);\n        }\n      }\n    );\n  }\n\n  updateChartData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n\n    this.chartData = resultSet.series(pivotConfig).map((item) => {\n      return {\n        label: item.title,\n        data: item.series.map(({ value }) => value),\n        stack: 'a',\n      };\n    });\n    this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);\n  }\n\n  updateTableData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n\n    this.tableData = resultSet.tablePivot(pivotConfig);\n    this.displayedColumns = getDisplayedColumns(\n      resultSet.tableColumns(pivotConfig)\n    );\n    this.columnTitles = flattenColumns(resultSet.tableColumns(pivotConfig));\n  }\n}\n", "src/app/query-renderer/utils.ts": "import { TableColumn } from '@cubejs-client/core';\n\nexport function getDisplayedColumns(tableColumns: TableColumn[]): string[] {\n  const queue = tableColumns;\n  const columns = [];\n\n  while (queue.length) {\n    const column = queue.shift();\n    if (column.dataIndex) {\n      columns.push(column.dataIndex);\n    }\n    if ((column.children || []).length) {\n      column.children.map((child) => queue.push(child));\n    }\n  }\n\n  return columns;\n}\n\nexport function flattenColumns(columns: TableColumn[] = []) {\n  return columns.reduce((memo, column) => {\n    const titles = flattenColumns(column.children);\n    return [\n      ...memo,\n      ...(titles.length\n        ? titles.map((title) => column.shortTitle + ', ' + title)\n        : [column.shortTitle]),\n    ];\n  }, []);\n}\n" }, "angular-test-charts": { "src/app/query-renderer/query-renderer.component.html": "<div>angular-test-charts</div>\n", "src/app/query-renderer/query-renderer.component.ts": "import { Component, Input } from '@angular/core';\nimport { CubejsClient } from '@cubejs-client/ngx';\nimport { ChartDataSets, ChartOptions } from 'chart.js';\nimport { Label } from 'ng2-charts';\nimport { BehaviorSubject } from 'rxjs';\n\n@Component({\n  selector: 'query-renderer',\n  templateUrl: './query-renderer.component.html',\n  styles: [],\n})\nexport class QueryRendererComponent {\n  @Input('cubeQuery')\n  cubeQuery$: BehaviorSubject<any>;\n\n  @Input('pivotConfig')\n  pivotConfig$: any;\n\n  @Input('chartType')\n  chartType$: any;\n\n  chartType: any = null;\n  isQueryPresent = false;\n\n  displayedColumns: string[] = [];\n  tableData: any[] = [];\n  columnTitles: string[] = [];\n  chartData: ChartDataSets[] = [];\n  chartLabels: Label[] = [];\n  chartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n  };\n  noFillChartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n    elements: {\n      line: {\n        fill: false,\n      },\n    },\n  };\n\n  constructor(private cubejsClient: CubejsClient) {}\n\n  ngOnInit() {}\n\n  updateChartData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n  }\n}\n" } };
+const chartingLibraryFiles = { "angular-ng2-charts": { "src/app/query-renderer/query-renderer.component.html": "<ngx-spinner\n  bdColor=\"rgba(0,0,0,0)\"\n  size=\"default\"\n  color=\"#000\"\n  type=\"ball-spin\"\n  [fullScreen]=\"false\"\n></ngx-spinner>\n\n<div *ngIf=\"error\">{{error}}</div>\n\n<div *ngIf=\"isQueryPresent && !loading\">\n  <div *ngIf=\"chartType !== 'table'\" class=\"chart-container\">\n    <canvas\n      *ngIf=\"chartType === 'line'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"noFillChartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'area'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"line\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'bar'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"bar\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n\n    <canvas\n      *ngIf=\"chartType === 'pie'\"\n      baseChart\n      legend=\"true\"\n      chartType=\"pie\"\n      [datasets]=\"chartData\"\n      [labels]=\"chartLabels\"\n      [options]=\"chartOptions\"\n    >\n    </canvas>\n  </div>\n\n  <table\n    *ngIf=\"chartType === 'table'\"\n    mat-table\n    [dataSource]=\"tableData\"\n    style=\"width: 100%\"\n  >\n    <ng-container\n      *ngFor=\"let column of displayedColumns; let index = index\"\n      [matColumnDef]=\"column\"\n    >\n      <th mat-header-cell *matHeaderCellDef>\n        {{ columnTitles[index] }}\n      </th>\n      <td mat-cell *matCellDef=\"let element\">{{ element[column] }}</td>\n    </ng-container>\n\n    <tr mat-header-row *matHeaderRowDef=\"displayedColumns\"></tr>\n    <tr mat-row *matRowDef=\"let row; columns: displayedColumns\"></tr>\n  </table>\n</div>\n", "src/app/query-renderer/query-renderer.component.ts": "import { Component, Input } from '@angular/core';\nimport { isQueryPresent, ResultSet } from '@cubejs-client/core';\nimport { CubejsClient, TChartType } from '@cubejs-client/ngx';\nimport { BehaviorSubject, combineLatest, of, merge } from 'rxjs';\nimport { catchError, switchMap } from 'rxjs/operators';\nimport { ChartDataSets, ChartOptions } from 'chart.js';\nimport { Label } from 'ng2-charts';\nimport { getDisplayedColumns, flattenColumns } from './utils';\nimport { NgxSpinnerService } from 'ngx-spinner';\n\n@Component({\n  selector: 'query-renderer',\n  templateUrl: './query-renderer.component.html',\n  styles: [\n    `\n      .chart-container {\n        position: relative;\n        height: calc(100% - 52px);\n        min-height: 400px;\n      }\n\n      :host {\n        position: absolute;\n        top: 0;\n        bottom: 0;\n        left: 0;\n        right: 0;\n      }\n    `,\n  ],\n})\nexport class QueryRendererComponent {\n  @Input('cubeQuery')\n  cubeQuery$: BehaviorSubject<any>;\n\n  @Input('pivotConfig')\n  pivotConfig$: any;\n\n  @Input('chartType')\n  chartType$: any;\n\n  chartType: any = null;\n  isQueryPresent = false;\n  error: string | null = null;\n\n  displayedColumns: string[] = [];\n  tableData: any[] = [];\n  columnTitles: string[] = [];\n  chartData: ChartDataSets[] = [];\n  chartLabels: Label[] = [];\n  chartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n  };\n  noFillChartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n    elements: {\n      line: {\n        fill: false,\n      },\n    },\n  };\n  loading = false;\n\n  constructor(\n    private cubejsClient: CubejsClient,\n    private spinner: NgxSpinnerService\n  ) {}\n\n  ngOnInit() {\n    combineLatest([\n      this.cubeQuery$.pipe(\n        switchMap((cubeQuery) => {\n          return of(isQueryPresent(cubeQuery || {}));\n        })\n      ),\n      this.cubeQuery$.pipe(\n        switchMap((cubeQuery) => {\n          this.error = null;\n          if (!isQueryPresent(cubeQuery || {})) {\n            return of(null);\n          }\n          this.loading = true;\n          this.spinner.show();\n\n          return merge(\n            of(null),\n            this.cubejsClient.load(cubeQuery).pipe(\n              catchError((error) => {\n                this.spinner.hide();\n                this.error = error.toString();\n                console.error(error);\n                return of(null);\n              })\n            )\n          );\n        })\n      ),\n      this.pivotConfig$,\n      this.chartType$,\n    ]).subscribe(\n      ([isQueryPresent, resultSet, pivotConfig, chartType]: [\n        boolean,\n        ResultSet,\n        any,\n        TChartType\n      ]) => {\n        this.chartType = chartType;\n        this.isQueryPresent = isQueryPresent;\n\n        if (resultSet != null) {\n          this.spinner.hide();\n          this.loading = false;\n        }\n\n        if (this.chartType === 'table') {\n          this.updateTableData(resultSet, pivotConfig);\n        } else {\n          this.updateChartData(resultSet, pivotConfig);\n        }\n      }\n    );\n  }\n\n  updateChartData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n\n    this.chartData = resultSet.series(pivotConfig).map((item) => {\n      return {\n        label: item.title,\n        data: item.series.map(({ value }) => value),\n        stack: 'a',\n      };\n    });\n    this.chartLabels = resultSet.chartPivot(pivotConfig).map((row) => row.x);\n  }\n\n  updateTableData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n\n    this.tableData = resultSet.tablePivot(pivotConfig);\n    this.displayedColumns = getDisplayedColumns(\n      resultSet.tableColumns(pivotConfig)\n    );\n    this.columnTitles = flattenColumns(resultSet.tableColumns(pivotConfig));\n  }\n}\n", "src/app/query-renderer/utils.ts": "import { TableColumn } from '@cubejs-client/core';\n\nexport function getDisplayedColumns(tableColumns: TableColumn[]): string[] {\n  const queue = tableColumns;\n  const columns = [];\n\n  while (queue.length) {\n    const column = queue.shift();\n    if (column.dataIndex) {\n      columns.push(column.dataIndex);\n    }\n    if ((column.children || []).length) {\n      column.children.map((child) => queue.push(child));\n    }\n  }\n\n  return columns;\n}\n\nexport function flattenColumns(columns: TableColumn[] = []) {\n  return columns.reduce((memo, column) => {\n    const titles = flattenColumns(column.children);\n    return [\n      ...memo,\n      ...(titles.length\n        ? titles.map((title) => column.shortTitle + ', ' + title)\n        : [column.shortTitle]),\n    ];\n  }, []);\n}\n" }, "angular-test-charts": { "src/app/query-renderer/query-renderer.component.html": "<div>angular-test-charts</div>\n", "src/app/query-renderer/query-renderer.component.ts": "import { Component, Input } from '@angular/core';\nimport { CubejsClient } from '@cubejs-client/ngx';\nimport { ChartDataSets, ChartOptions } from 'chart.js';\nimport { Label } from 'ng2-charts';\nimport { BehaviorSubject } from 'rxjs';\n\n@Component({\n  selector: 'query-renderer',\n  templateUrl: './query-renderer.component.html',\n  styles: [],\n})\nexport class QueryRendererComponent {\n  @Input('cubeQuery')\n  cubeQuery$: BehaviorSubject<any>;\n\n  @Input('pivotConfig')\n  pivotConfig$: any;\n\n  @Input('chartType')\n  chartType$: any;\n\n  chartType: any = null;\n  isQueryPresent = false;\n\n  displayedColumns: string[] = [];\n  tableData: any[] = [];\n  columnTitles: string[] = [];\n  chartData: ChartDataSets[] = [];\n  chartLabels: Label[] = [];\n  chartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n  };\n  noFillChartOptions: ChartOptions = {\n    responsive: true,\n    maintainAspectRatio: false,\n    elements: {\n      line: {\n        fill: false,\n      },\n    },\n  };\n\n  constructor(private cubejsClient: CubejsClient) {}\n\n  ngOnInit() {}\n\n  updateChartData(resultSet, pivotConfig) {\n    if (!resultSet) {\n      return;\n    }\n  }\n}\n" } };
 function getFiles(props) {
     return {
         'src/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';
@@ -235,110 +235,119 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-function AngularNg2Charts_div_1_div_1_canvas_1_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 8);
-} if (rf & 2) {
-    const ctx_r3 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r3.chartData)("labels", ctx_r3.chartLabels)("options", ctx_r3.noFillChartOptions);
-} }
-function AngularNg2Charts_div_1_div_1_canvas_2_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 8);
-} if (rf & 2) {
-    const ctx_r4 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r4.chartData)("labels", ctx_r4.chartLabels)("options", ctx_r4.chartOptions);
-} }
-function AngularNg2Charts_div_1_div_1_canvas_3_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 9);
-} if (rf & 2) {
-    const ctx_r5 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r5.chartData)("labels", ctx_r5.chartLabels)("options", ctx_r5.chartOptions);
-} }
-function AngularNg2Charts_div_1_div_1_canvas_4_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 10);
-} if (rf & 2) {
-    const ctx_r6 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r6.chartData)("labels", ctx_r6.chartLabels)("options", ctx_r6.chartOptions);
-} }
-function AngularNg2Charts_div_1_div_1_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "div", 4);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_1_div_1_canvas_1_Template, 1, 3, "canvas", 5);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_1_div_1_canvas_2_Template, 1, 3, "canvas", 5);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](3, AngularNg2Charts_div_1_div_1_canvas_3_Template, 1, 3, "canvas", 6);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](4, AngularNg2Charts_div_1_div_1_canvas_4_Template, 1, 3, "canvas", 7);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
-} if (rf & 2) {
-    const ctx_r1 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](2);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r1.chartType === "line");
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r1.chartType === "area");
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r1.chartType === "bar");
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r1.chartType === "pie");
-} }
-function AngularNg2Charts_div_1_table_2_ng_container_1_th_1_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "th", 18);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtext"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
-} if (rf & 2) {
-    const index_r11 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]().index;
-    const ctx_r12 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtextInterpolate1"](" ", ctx_r12.columnTitles[index_r11], " ");
-} }
-function AngularNg2Charts_div_1_table_2_ng_container_1_td_2_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "td", 19);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtext"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
-} if (rf & 2) {
-    const element_r15 = ctx.$implicit;
-    const column_r10 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]().$implicit;
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtextInterpolate"](element_r15[column_r10]);
-} }
-function AngularNg2Charts_div_1_table_2_ng_container_1_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementContainerStart"](0, 15);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_1_table_2_ng_container_1_th_1_Template, 2, 1, "th", 16);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_1_table_2_ng_container_1_td_2_Template, 2, 1, "td", 17);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementContainerEnd"]();
-} if (rf & 2) {
-    const column_r10 = ctx.$implicit;
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matColumnDef", column_r10);
-} }
-function AngularNg2Charts_div_1_table_2_tr_2_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "tr", 20);
-} }
-function AngularNg2Charts_div_1_table_2_tr_3_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "tr", 21);
-} }
-function AngularNg2Charts_div_1_table_2_Template(rf, ctx) { if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "table", 11);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_1_table_2_ng_container_1_Template, 3, 1, "ng-container", 12);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_1_table_2_tr_2_Template, 1, 0, "tr", 13);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](3, AngularNg2Charts_div_1_table_2_tr_3_Template, 1, 0, "tr", 14);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
-} if (rf & 2) {
-    const ctx_r2 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](2);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("dataSource", ctx_r2.tableData);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngForOf", ctx_r2.displayedColumns);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matHeaderRowDef", ctx_r2.displayedColumns);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matRowDefColumns", ctx_r2.displayedColumns);
-} }
 function AngularNg2Charts_div_1_Template(rf, ctx) { if (rf & 1) {
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "div");
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_1_div_1_Template, 5, 4, "div", 2);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_1_table_2_Template, 4, 4, "table", 3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtext"](1);
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
 } if (rf & 2) {
     const ctx_r0 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r0.chartType !== "table");
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtextInterpolate"](ctx_r0.error);
+} }
+function AngularNg2Charts_div_2_div_1_canvas_1_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 8);
+} if (rf & 2) {
+    const ctx_r4 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r4.chartData)("labels", ctx_r4.chartLabels)("options", ctx_r4.noFillChartOptions);
+} }
+function AngularNg2Charts_div_2_div_1_canvas_2_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 8);
+} if (rf & 2) {
+    const ctx_r5 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r5.chartData)("labels", ctx_r5.chartLabels)("options", ctx_r5.chartOptions);
+} }
+function AngularNg2Charts_div_2_div_1_canvas_3_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 9);
+} if (rf & 2) {
+    const ctx_r6 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r6.chartData)("labels", ctx_r6.chartLabels)("options", ctx_r6.chartOptions);
+} }
+function AngularNg2Charts_div_2_div_1_canvas_4_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "canvas", 10);
+} if (rf & 2) {
+    const ctx_r7 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("datasets", ctx_r7.chartData)("labels", ctx_r7.chartLabels)("options", ctx_r7.chartOptions);
+} }
+function AngularNg2Charts_div_2_div_1_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "div", 4);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_2_div_1_canvas_1_Template, 1, 3, "canvas", 5);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_2_div_1_canvas_2_Template, 1, 3, "canvas", 5);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](3, AngularNg2Charts_div_2_div_1_canvas_3_Template, 1, 3, "canvas", 6);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](4, AngularNg2Charts_div_2_div_1_canvas_4_Template, 1, 3, "canvas", 7);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
+} if (rf & 2) {
+    const ctx_r2 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](2);
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r0.chartType === "table");
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r2.chartType === "line");
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r2.chartType === "area");
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r2.chartType === "bar");
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r2.chartType === "pie");
+} }
+function AngularNg2Charts_div_2_table_2_ng_container_1_th_1_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "th", 18);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtext"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
+} if (rf & 2) {
+    const index_r12 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]().index;
+    const ctx_r13 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtextInterpolate1"](" ", ctx_r13.columnTitles[index_r12], " ");
+} }
+function AngularNg2Charts_div_2_table_2_ng_container_1_td_2_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "td", 19);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtext"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
+} if (rf & 2) {
+    const element_r16 = ctx.$implicit;
+    const column_r11 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]().$implicit;
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtextInterpolate"](element_r16[column_r11]);
+} }
+function AngularNg2Charts_div_2_table_2_ng_container_1_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementContainerStart"](0, 15);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_2_table_2_ng_container_1_th_1_Template, 2, 1, "th", 16);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_2_table_2_ng_container_1_td_2_Template, 2, 1, "td", 17);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementContainerEnd"]();
+} if (rf & 2) {
+    const column_r11 = ctx.$implicit;
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matColumnDef", column_r11);
+} }
+function AngularNg2Charts_div_2_table_2_tr_2_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "tr", 20);
+} }
+function AngularNg2Charts_div_2_table_2_tr_3_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "tr", 21);
+} }
+function AngularNg2Charts_div_2_table_2_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "table", 11);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_2_table_2_ng_container_1_Template, 3, 1, "ng-container", 12);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_2_table_2_tr_2_Template, 1, 0, "tr", 13);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](3, AngularNg2Charts_div_2_table_2_tr_3_Template, 1, 0, "tr", 14);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
+} if (rf & 2) {
+    const ctx_r3 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"](2);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("dataSource", ctx_r3.tableData);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngForOf", ctx_r3.displayedColumns);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matHeaderRowDef", ctx_r3.displayedColumns);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matRowDefColumns", ctx_r3.displayedColumns);
+} }
+function AngularNg2Charts_div_2_Template(rf, ctx) { if (rf & 1) {
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "div");
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_2_div_1_Template, 5, 4, "div", 2);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_2_table_2_Template, 4, 4, "table", 3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
+} if (rf & 2) {
+    const ctx_r1 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r1.chartType !== "table");
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx_r1.chartType === "table");
 } }
 class AngularNg2Charts {
     constructor(cubejsClient, spinner) {
@@ -346,6 +355,7 @@ class AngularNg2Charts {
         this.spinner = spinner;
         this.chartType = null;
         this.isQueryPresent = false;
+        this.error = null;
         this.displayedColumns = [];
         this.tableData = [];
         this.columnTitles = [];
@@ -372,12 +382,15 @@ class AngularNg2Charts {
                 return Object(rxjs__WEBPACK_IMPORTED_MODULE_2__["of"])(Object(_cubejs_client_core__WEBPACK_IMPORTED_MODULE_1__["isQueryPresent"])(cubeQuery || {}));
             })),
             this.cubeQuery$.pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_3__["switchMap"])((cubeQuery) => {
+                this.error = null;
                 if (!Object(_cubejs_client_core__WEBPACK_IMPORTED_MODULE_1__["isQueryPresent"])(cubeQuery || {})) {
                     return Object(rxjs__WEBPACK_IMPORTED_MODULE_2__["of"])(null);
                 }
                 this.loading = true;
                 this.spinner.show();
                 return Object(rxjs__WEBPACK_IMPORTED_MODULE_2__["merge"])(Object(rxjs__WEBPACK_IMPORTED_MODULE_2__["of"])(null), this.cubejsClient.load(cubeQuery).pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_3__["catchError"])((error) => {
+                    this.spinner.hide();
+                    this.error = error.toString();
                     console.error(error);
                     return Object(rxjs__WEBPACK_IMPORTED_MODULE_2__["of"])(null);
                 })));
@@ -422,11 +435,14 @@ class AngularNg2Charts {
     }
 }
 AngularNg2Charts.ɵfac = function AngularNg2Charts_Factory(t) { return new (t || AngularNg2Charts)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_cubejs_client_ngx__WEBPACK_IMPORTED_MODULE_5__["CubejsClient"]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](ngx_spinner__WEBPACK_IMPORTED_MODULE_6__["NgxSpinnerService"])); };
-AngularNg2Charts.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineComponent"]({ type: AngularNg2Charts, selectors: [["angular-ng2-charts"]], inputs: { cubeQuery$: ["cubeQuery", "cubeQuery$"], pivotConfig$: ["pivotConfig", "pivotConfig$"], chartType$: ["chartType", "chartType$"] }, decls: 2, vars: 2, consts: [["bdColor", "rgba(0,0,0,0)", "size", "default", "color", "#000", "type", "ball-spin", 3, "fullScreen"], [4, "ngIf"], ["class", "chart-container", 4, "ngIf"], ["mat-table", "", "style", "width: 100%", 3, "dataSource", 4, "ngIf"], [1, "chart-container"], ["baseChart", "", "legend", "true", "chartType", "line", 3, "datasets", "labels", "options", 4, "ngIf"], ["baseChart", "", "legend", "true", "chartType", "bar", 3, "datasets", "labels", "options", 4, "ngIf"], ["baseChart", "", "legend", "true", "chartType", "pie", 3, "datasets", "labels", "options", 4, "ngIf"], ["baseChart", "", "legend", "true", "chartType", "line", 3, "datasets", "labels", "options"], ["baseChart", "", "legend", "true", "chartType", "bar", 3, "datasets", "labels", "options"], ["baseChart", "", "legend", "true", "chartType", "pie", 3, "datasets", "labels", "options"], ["mat-table", "", 2, "width", "100%", 3, "dataSource"], [3, "matColumnDef", 4, "ngFor", "ngForOf"], ["mat-header-row", "", 4, "matHeaderRowDef"], ["mat-row", "", 4, "matRowDef", "matRowDefColumns"], [3, "matColumnDef"], ["mat-header-cell", "", 4, "matHeaderCellDef"], ["mat-cell", "", 4, "matCellDef"], ["mat-header-cell", ""], ["mat-cell", ""], ["mat-header-row", ""], ["mat-row", ""]], template: function AngularNg2Charts_Template(rf, ctx) { if (rf & 1) {
+AngularNg2Charts.ɵcmp = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineComponent"]({ type: AngularNg2Charts, selectors: [["angular-ng2-charts"]], inputs: { cubeQuery$: ["cubeQuery", "cubeQuery$"], pivotConfig$: ["pivotConfig", "pivotConfig$"], chartType$: ["chartType", "chartType$"] }, decls: 3, vars: 3, consts: [["bdColor", "rgba(0,0,0,0)", "size", "default", "color", "#000", "type", "ball-spin", 3, "fullScreen"], [4, "ngIf"], ["class", "chart-container", 4, "ngIf"], ["mat-table", "", "style", "width: 100%", 3, "dataSource", 4, "ngIf"], [1, "chart-container"], ["baseChart", "", "legend", "true", "chartType", "line", 3, "datasets", "labels", "options", 4, "ngIf"], ["baseChart", "", "legend", "true", "chartType", "bar", 3, "datasets", "labels", "options", 4, "ngIf"], ["baseChart", "", "legend", "true", "chartType", "pie", 3, "datasets", "labels", "options", 4, "ngIf"], ["baseChart", "", "legend", "true", "chartType", "line", 3, "datasets", "labels", "options"], ["baseChart", "", "legend", "true", "chartType", "bar", 3, "datasets", "labels", "options"], ["baseChart", "", "legend", "true", "chartType", "pie", 3, "datasets", "labels", "options"], ["mat-table", "", 2, "width", "100%", 3, "dataSource"], [3, "matColumnDef", 4, "ngFor", "ngForOf"], ["mat-header-row", "", 4, "matHeaderRowDef"], ["mat-row", "", 4, "matRowDef", "matRowDefColumns"], [3, "matColumnDef"], ["mat-header-cell", "", 4, "matHeaderCellDef"], ["mat-cell", "", 4, "matCellDef"], ["mat-header-cell", ""], ["mat-cell", ""], ["mat-header-row", ""], ["mat-row", ""]], template: function AngularNg2Charts_Template(rf, ctx) { if (rf & 1) {
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "ngx-spinner", 0);
-        _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_1_Template, 3, 2, "div", 1);
+        _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, AngularNg2Charts_div_1_Template, 2, 1, "div", 1);
+        _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, AngularNg2Charts_div_2_Template, 3, 2, "div", 1);
     } if (rf & 2) {
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("fullScreen", false);
+        _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+        _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx.error);
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
         _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx.isQueryPresent && !ctx.loading);
     } }, directives: [ngx_spinner__WEBPACK_IMPORTED_MODULE_6__["NgxSpinnerComponent"], _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], ng2_charts__WEBPACK_IMPORTED_MODULE_8__["BaseChartDirective"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatTable"], _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgForOf"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatHeaderRowDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatRowDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatColumnDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatHeaderCellDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatCellDef"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatHeaderCell"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatCell"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatHeaderRow"], _angular_material_table__WEBPACK_IMPORTED_MODULE_9__["MatRow"]], styles: [".chart-container[_ngcontent-%COMP%] {\n        position: relative;\n        height: calc(100% - 52px);\n        min-height: 400px;\n      }\n\n      [_nghost-%COMP%] {\n        position: absolute;\n        top: 0;\n        bottom: 0;\n        left: 0;\n        right: 0;\n      }"] });
