@@ -65,6 +65,7 @@ const config = {
       resolve: 'gatsby-transformer-remark',
       options: {
         plugins: [
+          'gatsby-page-menu-plugin',
           {
             resolve: 'gatsby-remark-copy-linked-files',
             options: {

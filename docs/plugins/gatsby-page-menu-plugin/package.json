@@ -1,0 +1,35 @@
+{
+  "name": "@cubejs-docs/gatsby-page-menu-plugin",
+  "description": "Gatsby page menus plugin",
+  "version": "0.0.4",
+  "keywords": [
+    "gatsby",
+    "gatsby-plugin",
+    "menus",
+    "gatsby-plugin-menus",
+    "gatsby-menus"
+  ],
+  "scripts": {
+    "test": "jest"
+  },
+  "files": [
+    "gatsby-node.js",
+    "index.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stackbithq/gatsby-plugin-menus.git"
+  },
+  "author": "Stackbit",
+  "license": "MIT",
+  "main": "index.js",
+  "bugs": {
+    "url": "https://github.com/stackbithq/gatsby-plugin-menus/issues"
+  },
+  "homepage": "https://github.com/stackbithq/gatsby-plugin-menus#readme",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "gatsby": "^2.5.0"
+  }
+}
