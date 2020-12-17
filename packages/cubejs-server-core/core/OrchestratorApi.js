@@ -78,8 +78,8 @@ class OrchestratorApi {
     ]);
   }
 
-  testOrchestratorConnection() {
-    return this.orchestrator.testConnection();
+  async testOrchestratorConnections() {
+    return this.orchestrator.testConnections();
   }
 
   async testDriverConnection(driverFn) {

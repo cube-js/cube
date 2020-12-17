@@ -62,7 +62,13 @@ export function cachedHandler(handler: Handler, options: CachedRouterOptions = {
           responseWrapper,
           next
         );
+
+        lastCacheExpr = new Date(new Date().getTime() + options.lifetime);
+        lock = false;
       } catch (e) {
+        // console.log('cached-router exception', e);
+
+        lock = false;
         lastCache = {
           status: 200,
           json: null,
@@ -70,10 +76,9 @@ export function cachedHandler(handler: Handler, options: CachedRouterOptions = {
         lastCacheExpr = new Date(
           new Date().getTime() - options.lifetime
         );
-      }
 
-      lastCacheExpr = new Date(new Date().getTime() + options.lifetime);
-      lock = false;
+        next(e);
+      }
 
       let queuedResponse: Response | undefined;
 

@@ -19,6 +19,7 @@ const agentCollect = require('./agentCollect');
 const { version } = require('../package.json');
 const DriverDependencies = require('./DriverDependencies');
 const optionsValidate = require('./optionsValidate');
+const DataSourceStorage = require('./DataSourceStorage');
 
 const checkEnvForPlaceholders = () => {
   const placeholderSubstr = '<YOUR_DB_';
@@ -219,7 +220,7 @@ class CubejsServerCore {
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     });
 
-    this.dataSourceIdToOrchestratorApi = {};
+    this.dataSourceStorage = new DataSourceStorage();
 
     if (this.options.contextToAppId) {
       this.contextToAppId = options.contextToAppId;
@@ -450,6 +451,7 @@ class CubejsServerCore {
         this.getOrchestratorApi.bind(this),
         this.logger, {
           standalone: this.standalone,
+          dataSourceStorage: this.dataSourceStorage,
           basePath: this.options.basePath,
           checkAuthMiddleware: this.options.checkAuthMiddleware,
           checkAuth: this.options.checkAuth,
@@ -493,41 +495,48 @@ class CubejsServerCore {
 
   getOrchestratorApi(context) {
     const dataSourceId = this.contextToDataSourceId(context);
-    if (!this.dataSourceIdToOrchestratorApi[dataSourceId]) {
-      let driverPromise;
-      let externalPreAggregationsDriverPromise;
-      this.dataSourceIdToOrchestratorApi[dataSourceId] = this.createOrchestratorApi({
-        getDriver: async () => {
-          if (!driverPromise) {
-            const driver = await this.driverFactory(context);
-            if (driver.setLogger) {
-              driver.setLogger(this.logger);
-            }
-            driverPromise = driver.testConnection().then(() => driver).catch(e => {
-              driverPromise = null;
-              throw e;
-            });
-          }
-          return driverPromise;
-        },
-        getExternalDriverFactory: this.externalDriverFactory && (async () => {
-          if (!externalPreAggregationsDriverPromise) {
-            const driver = await this.externalDriverFactory(context);
-            if (driver.setLogger) {
-              driver.setLogger(this.logger);
-            }
-            externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
-              externalPreAggregationsDriverPromise = null;
-              throw e;
-            });
-          }
-          return externalPreAggregationsDriverPromise;
-        }),
-        redisPrefix: dataSourceId,
-        orchestratorOptions: this.orchestratorOptions(context)
-      });
+
+    if (this.dataSourceStorage.has(dataSourceId)) {
+      return this.dataSourceStorage.get(dataSourceId);
     }
-    return this.dataSourceIdToOrchestratorApi[dataSourceId];
+
+    let driverPromise;
+    let externalPreAggregationsDriverPromise;
+
+    const orchestratorApi = this.createOrchestratorApi({
+      getDriver: async () => {
+        if (!driverPromise) {
+          const driver = await this.driverFactory(context);
+          if (driver.setLogger) {
+            driver.setLogger(this.logger);
+          }
+          driverPromise = driver.testConnection().then(() => driver).catch(e => {
+            driverPromise = null;
+            throw e;
+          });
+        }
+        return driverPromise;
+      },
+      getExternalDriverFactory: this.externalDriverFactory && (async () => {
+        if (!externalPreAggregationsDriverPromise) {
+          const driver = await this.externalDriverFactory(context);
+          if (driver.setLogger) {
+            driver.setLogger(this.logger);
+          }
+          externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
+            externalPreAggregationsDriverPromise = null;
+            throw e;
+          });
+        }
+        return externalPreAggregationsDriverPromise;
+      }),
+      redisPrefix: dataSourceId,
+      orchestratorOptions: this.orchestratorOptions(context)
+    });
+
+    this.dataSourceStorage.set(dataSourceId, orchestratorApi);
+
+    return orchestratorApi;
   }
 
   createCompilerApi(repository, options) {
@@ -602,25 +611,13 @@ class CubejsServerCore {
     throw new Error(`Unsupported db type: ${dbType}`);
   }
 
-  testConnections() {
-    const tests = [];
-
-    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
-      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
-      tests.push(orchestratorApi.testConnection());
-    });
-
-    return Promise.all(tests);
+  async testConnections() {
+    return this.dataSourceStorage.testConnections();
   }
 
   async releaseConnections() {
-    const releases = [];
-    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
-      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
-      releases.push(orchestratorApi.release());
-    });
-    await Promise.all(releases);
-    this.dataSourceIdToOrchestratorApi = {};
+    await this.dataSourceStorage.releaseConnections();
+
     if (this.scheduledRefreshTimerInterval) {
       clearInterval(this.scheduledRefreshTimerInterval);
     }

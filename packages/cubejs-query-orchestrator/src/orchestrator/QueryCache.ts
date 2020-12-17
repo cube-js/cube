@@ -388,4 +388,12 @@ export class QueryCache {
   public queryRedisKey(cacheKey) {
     return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest('hex')}`;
   }
+
+  public async cleanup() {
+    return this.cacheDriver.cleanup();
+  }
+
+  public async testConnection() {
+    return this.cacheDriver.testConnection();
+  }
 }
