@@ -30,10 +30,14 @@ const DbTypeToGenericType = {
   'double precision': 'decimal'
 };
 
+const DB_INT_MAX = 2147483647;
+const DB_INT_MIN = -2147483648;
+
 // Order of keys is important here: from more specific to less specific
 const DbTypeValueMatcher = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
   date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
+  bigint: (v) => Number.isInteger(v) && (v > DB_INT_MAX || v < DB_INT_MIN),
   int: (v) => Number.isInteger(v) || v.toString().match(/^\d+$/),
   decimal: (v) => v instanceof Number || v.toString().match(/^\d+(\.\d+)?$/),
   boolean: (v) => v === false || v === true || v.toString().toLowerCase() === 'true' || v.toString().toLowerCase() === 'false',
