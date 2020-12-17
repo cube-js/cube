@@ -680,18 +680,20 @@ declare module '@cubejs-client/core' {
 
   export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
 
+  export type DateRange = string | [string, string];
+
   export type TimeDimensionBase = {
     dimension: string;
     granularity?: TimeDimensionGranularity;
   };
 
   export type TimeDimensionComparison = TimeDimensionBase & {
-    compareDateRange: Array<string | Array<string>>;
+    compareDateRange: Array<DateRange>;
     dateRange?: never;
   };
 
   export type TimeDimensionRanged = TimeDimensionBase & {
-    dateRange?: string | string[];
+    dateRange?: DateRange;
   };
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
