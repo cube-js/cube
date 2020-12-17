@@ -19,9 +19,7 @@ export function cachedHandler(handler: Handler, options: CachedRouterOptions = {
     status: 200,
     json: null,
   };
-  let lastCacheExpr = new Date(
-    new Date().getTime() - options.lifetime,
-  );
+  let lastCacheExpr = new Date(Date.now() - options.lifetime);
   let lock = false;
 
   const queue: Response[] = [];
@@ -63,7 +61,7 @@ export function cachedHandler(handler: Handler, options: CachedRouterOptions = {
           next
         );
 
-        lastCacheExpr = new Date(new Date().getTime() + options.lifetime);
+        lastCacheExpr = new Date(Date.now() + options.lifetime);
         lock = false;
       } catch (e) {
         // console.log('cached-router exception', e);
@@ -73,9 +71,7 @@ export function cachedHandler(handler: Handler, options: CachedRouterOptions = {
           status: 200,
           json: null,
         };
-        lastCacheExpr = new Date(
-          new Date().getTime() - options.lifetime
-        );
+        lastCacheExpr = new Date(Date.now() - options.lifetime);
 
         next(e);
       }

@@ -39,18 +39,32 @@ const compilerApi = jest.fn().mockImplementation(() => ({
   },
 }));
 
+class DataSourceStorageMock {
+  async testConnections() {
+    return [];
+  }
+
+  async testOrchestratorConnections() {
+    return [];
+  }
+}
+
 const adapterApi = jest.fn().mockImplementation(() => ({
-  async executeQuery() {
-    return {
-      data: [{ foo__bar: 42 }],
-    };
-  },
+  testConnection: () => Promise.resolve(),
+  testOrchestratorConnections: () => Promise.resolve(),
+  executeQuery: async () => ({
+    data: [{ foo__bar: 42 }],
+  }),
 }));
+
 const logger = (type, message) => console.log({ type, ...message });
 
 describe('API Gateway', () => {
   process.env.NODE_ENV = 'production';
-  const apiGateway = new ApiGateway('secret', compilerApi, adapterApi, logger);
+  const apiGateway = new ApiGateway('secret', compilerApi, adapterApi, logger, {
+    standalone: true,
+    dataSourceStorage: new DataSourceStorageMock(),
+  });
   process.env.NODE_ENV = null;
   const app = express();
   apiGateway.initApp(app);
@@ -224,6 +238,26 @@ describe('API Gateway', () => {
         },
         data: [{ 'Foo.bar': 42 }],
       });
+    });
+
+    test('readyz', async () => {
+      const res = await request(app)
+        .get(`/readyz`)
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body).toMatchObject({ health: 'HEALTH' });
+    });
+
+    test('livez', async () => {
+      const res = await request(app)
+        .get(`/livez`)
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body).toMatchObject({ health: 'HEALTH' });
     });
   });
 });
