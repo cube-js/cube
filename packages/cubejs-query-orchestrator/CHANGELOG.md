@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.12](https://github.com/cube-js/cube.js/compare/v0.24.11...v0.24.12) (2020-12-17)
+
+
+### Features
+
+* **query-orchestrator:** detects bigint in readOnly mode, when it's Number ([a21cc10](https://github.com/cube-js/cube.js/commit/a21cc1065031b23ee7c199cb56ec039112f83770))
+* Introduce health checks ([#1607](https://github.com/cube-js/cube.js/issues/1607)) ([d96c662](https://github.com/cube-js/cube.js/commit/d96c66201ca8202907af8dc563eaaf908a5ece89))
+
+
+
+
+
 ## [0.24.9](https://github.com/cube-js/cube.js/compare/v0.24.8...v0.24.9) (2020-12-16)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.12](https://github.com/cube-js/cube.js/compare/v0.24.11...v0.24.12) (2020-12-17)
+
+
+### Bug Fixes
+
+* **@cubejs-core:** Add type definition for compareDateRange, fix [#1621](https://github.com/cube-js/cube.js/issues/1621) ([#1623](https://github.com/cube-js/cube.js/issues/1623)). Thanks to [@cbroome](https://github.com/cbroome)! ([d8b7f36](https://github.com/cube-js/cube.js/commit/d8b7f3654c705cc020ccfa548b180b56b5422f60))
+
+
+
+
+
 ## [0.24.9](https://github.com/cube-js/cube.js/compare/v0.24.8...v0.24.9) (2020-12-16)
 
 

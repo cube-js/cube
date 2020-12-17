@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.12](https://github.com/cube-js/cube.js/compare/v0.24.11...v0.24.12) (2020-12-17)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** style and error fixes ([#1630](https://github.com/cube-js/cube.js/issues/1630)) ([f5c3857](https://github.com/cube-js/cube.js/commit/f5c385791a5828b646bbde57e958c44ca1955843))
+
+
+### Features
+
+* Introduce health checks ([#1607](https://github.com/cube-js/cube.js/issues/1607)) ([d96c662](https://github.com/cube-js/cube.js/commit/d96c66201ca8202907af8dc563eaaf908a5ece89))
+
+
+
+
+
 ## [0.24.11](https://github.com/cube-js/cube.js/compare/v0.24.10...v0.24.11) (2020-12-17)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

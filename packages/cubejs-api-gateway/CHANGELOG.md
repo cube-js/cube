@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.12](https://github.com/cube-js/cube.js/compare/v0.24.11...v0.24.12) (2020-12-17)
+
+
+### Bug Fixes
+
+* random test crash on Node.js 10 ([b18690e](https://github.com/cube-js/cube.js/commit/b18690e7156ac2ee8892be72e603dbb32836d667))
+
+
+### Features
+
+* **api-gateway:** Support POST for /v1/dry-run ([d9af942](https://github.com/cube-js/cube.js/commit/d9af9421f8ddf9c6e8ba46ee1afb96e367636aaa))
+* Introduce health checks ([#1607](https://github.com/cube-js/cube.js/issues/1607)) ([d96c662](https://github.com/cube-js/cube.js/commit/d96c66201ca8202907af8dc563eaaf908a5ece89))
+
+
+
+
+
 ## [0.24.9](https://github.com/cube-js/cube.js/compare/v0.24.8...v0.24.9) (2020-12-16)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
