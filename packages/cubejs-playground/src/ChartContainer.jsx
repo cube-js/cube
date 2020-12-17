@@ -467,7 +467,6 @@ ChartContainer.propTypes = {
   error: PropTypes.object,
   render: PropTypes.func.isRequired,
   codeSandboxSource: PropTypes.string,
-  dependencies: PropTypes.object.isRequired,
   dashboardSource: PropTypes.object,
   hideActions: PropTypes.array,
   query: PropTypes.object,
