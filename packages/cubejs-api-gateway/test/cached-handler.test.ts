@@ -14,14 +14,17 @@ describe('cachedHandler', () => {
     let reqPassed = 0;
     let resPassed = 0;
 
+    const TEST_TIMEOUT = 25;
+    const TEST_LIFETIME = 100;
+
     const handler = cachedHandler(async (req, res, next) => {
       reqPassed++;
 
-      await createAsyncLock(125);
+      await createAsyncLock(TEST_TIMEOUT);
 
       res.status(200).json('heh');
     }, {
-      lifetime: 250
+      lifetime: TEST_LIFETIME
     });
 
     const req: any = {};
@@ -55,13 +58,13 @@ describe('cachedHandler', () => {
 
     expect(resPassed).toEqual(0);
 
-    await createAsyncLock(125);
+    await createAsyncLock(TEST_TIMEOUT + 10);
 
     expect(resPassed).toEqual(3);
     expect(reqPassed).toEqual(1);
 
     // cache will be expired
-    await createAsyncLock(250);
+    await createAsyncLock(TEST_LIFETIME);
 
     handler(req, res, next);
 
