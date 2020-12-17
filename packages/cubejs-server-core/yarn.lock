@@ -828,10 +828,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.24.4":
-  version "0.24.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.24.4.tgz#757d14fd23e6064f264eb494f23913eb7f6a8238"
-  integrity sha512-fTsPWrRqpnQrD9JJqxplu22sGVK9FuxnUFe2OhbUQSkKzvrCqpwc4rI4GPT+uSLRW8twxIvitVbfbrpZ7t1SoQ==
+"@cubejs-backend/api-gateway@^0.24.9":
+  version "0.24.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.24.9.tgz#966b3d4d4d595d22db83a494ac77cb5b3eaad866"
+  integrity sha512-bLSxJJfYjrxz6qxQDKW7VaUJ9ccclWzHdfzn2dL3l55u8b0hOaZRnuOZGiGg3ml/wgO5BIo8QO6uoZsXTm3dYg==
   dependencies:
     "@hapi/joi" "^15.1.1"
     body-parser "^1.19.0"
@@ -843,20 +843,20 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/query-orchestrator@^0.24.4":
-  version "0.24.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.4.tgz#fec9ef3214489e0a69bd30725ea12a2961401174"
-  integrity sha512-DCQChsHml2n+O+SFWxMVSt2102w7ANl1fTT77xeysaMG5Oxx0pq0QKPBsZgLEQdvZ8Wa9m4Ef+AxOJWVvT+MSw==
+"@cubejs-backend/query-orchestrator@^0.24.9":
+  version "0.24.9"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.24.9.tgz#720a54dd55263fe2d654f6d4a4aad49194c05503"
+  integrity sha512-IKJNpbiRib1SJbQANoPY+KzK+SMROaWfyWDvelgDA/sRa9b7p7uKjCnlxuu8LPDVBqzzBWJHBvAskKTrMu09Hw==
   dependencies:
-    "@cubejs-backend/shared" "^0.24.4"
+    "@cubejs-backend/shared" "^0.24.5"
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.24.4":
-  version "0.24.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.24.4.tgz#06c766fc2bcc18bfa6cba04da4801e4a4263d8da"
-  integrity sha512-E9ynFnaGwJiGBSJOSTC/B3K1fQrVo0cb0rXASZmkeV2tRvd3aFMLJc+QL0RPqZGq2TAOio7kxxuYVoGI90ECBA==
+"@cubejs-backend/schema-compiler@^0.24.8":
+  version "0.24.8"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.24.8.tgz#9d8569d2f63532bd1f16b4816dea683768d74e68"
+  integrity sha512-rNybKz5TpmExuWFyafMn6x92J1YAopLf0Dr4PcMbzvQancciQV4/OFCrFif6SBSR3CNGWpSKaeBv+ciH6cawVw==
   dependencies:
     "@babel/core" "^7.4.0"
     "@babel/generator" "^7.4.0"
@@ -877,19 +877,14 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/shared@^0.24.3":
-  version "0.24.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.3.tgz#f2e3d9ba99cab906e7b4953c1c475fd81fd120eb"
-  integrity sha512-r5/E5cX6cleTM9HWP/i2o0iZbbotlD10JiLT4FFcvCVcj+XPc5064w6yP84YjiwpKyBvbO+OW9JyFguZ7Lf6vw==
+"@cubejs-backend/shared@^0.24.5":
+  version "0.24.5"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.5.tgz#b9cb2d1741522d8d67ebd40d2306419a9bf3e85a"
+  integrity sha512-euyxWzgAPuT7mXDD5zFVw0vIT/yY3w1R7ithx8xY8rlFOf01YR2jiFgR09vrq0HacuDXa9WUxHTfxFl0UntWvQ==
   dependencies:
     env-var "^6.3.0"
-
-"@cubejs-backend/shared@^0.24.4":
-  version "0.24.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.4.tgz#3ad5797aefbe2d476fce4f1e07303a7f9f56555b"
-  integrity sha512-CjTlZcrp4qDOiuRxOuwe67FWFZm/nXFMqmhHAyfUsuYA235bIBaYX6UFJCnHaW88T6gMFh1+phroJUqggzdFXg==
-  dependencies:
-    env-var "^6.3.0"
+    node-fetch "^2.6.1"
+    node-machine-id "^1.1.12"
 
 "@hapi/address@2.x.x":
   version "2.1.4"
@@ -4286,7 +4281,7 @@ node-dijkstra@^2.5.0:
   resolved "https://registry.yarnpkg.com/node-dijkstra/-/node-dijkstra-2.5.0.tgz#0feb76c5a05f35b56e786de6df4d3364af28d4e8"
   integrity sha1-D+t2xaBfNbVueG3m300zZK8o1Og=
 
-node-fetch@^2.6.0:
+node-fetch@^2.6.0, node-fetch@^2.6.1:
   version "2.6.1"
   resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.1.tgz#045bd323631f76ed2e2b55573394416b639a0052"
   integrity sha512-V4aYg89jEoVRxRb2fJdAg8FHvI7cEyYdVAh94HH0UIK8oJxUfkjlDQN9RbMx+bEjP7+ggMiFRprSti032Oipxw==
@@ -4295,6 +4290,11 @@ node-int64@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/node-int64/-/node-int64-0.4.0.tgz#87a9065cdb355d3182d8f94ce11188b825c68a3b"
   integrity sha1-h6kGXNs1XTGC2PlM4RGIuCXGijs=
+
+node-machine-id@^1.1.12:
+  version "1.1.12"
+  resolved "https://registry.yarnpkg.com/node-machine-id/-/node-machine-id-1.1.12.tgz#37904eee1e59b320bb9c5d6c0a59f3b469cb6267"
+  integrity sha512-QNABxbrPa3qEIfrE6GOJ7BYIuignnJw7iQ2YPbc3Nla1HzRJjXzZOiikfF8m7eAMfichLt3M4VgLOetqgDmgGQ==
 
 node-modules-regexp@^1.0.0:
   version "1.0.0"
