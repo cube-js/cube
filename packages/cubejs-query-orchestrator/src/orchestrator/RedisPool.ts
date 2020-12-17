@@ -63,10 +63,6 @@ export class RedisPool {
 
     try {
       await client.ping();
-
-      return true;
-    } catch (e) {
-      return false;
     } finally {
       this.release(client);
     }
