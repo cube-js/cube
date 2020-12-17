@@ -3,7 +3,14 @@ import R from 'ramda';
 import moment from 'moment';
 import uuid from 'uuid/v4';
 import bodyParser from 'body-parser';
-import type { Request as ExpressRequest, Response, NextFunction, Application as ExpressApplication, RequestHandler } from 'express';
+
+import type {
+  Request as ExpressRequest,
+  Response, NextFunction,
+  Application as ExpressApplication,
+  RequestHandler,
+  ErrorRequestHandler
+} from 'express';
 
 import { requestParser } from './requestParser';
 import { UserError } from './UserError';
@@ -12,6 +19,7 @@ import { SubscriptionServer } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
 import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
 import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, RequestContext } from './interfaces';
+import { cachedHandler } from './cached-handler';
 
 type MetaConfig = {
   config: {
@@ -148,6 +156,8 @@ interface Request extends ExpressRequest {
 }
 
 export interface ApiGatewayOptions {
+  standalone: boolean;
+  dataSourceStorage: any;
   refreshScheduler: any;
   basePath?: string;
   extendContext?: ExtendContextFn;
@@ -171,9 +181,13 @@ export class ApiGateway {
 
   protected readonly enforceSecurityChecks: boolean;
 
+  protected readonly standalone: boolean;
+
   protected readonly extendContext?: ExtendContextFn;
 
   protected readonly requestMiddleware: RequestHandler[];
+
+  protected readonly dataSourceStorage: any;
 
   public readonly checkAuthFn: CheckAuthFn;
 
@@ -186,8 +200,9 @@ export class ApiGateway {
   ) {
     options = options || {};
 
+    this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
-
+    this.standalone = options.standalone;
     this.basePath = options.basePath || '/cubejs-api';
 
     this.queryTransformer = options.queryTransformer || (async (query) => query);
@@ -267,9 +282,13 @@ export class ApiGateway {
       await this.dryRun({
         query: req.body.query,
         context: req.context,
-        res: this.resToResultFn(res)
       });
     }));
+
+    app.get(`/readyz`, this.requestMiddleware, cachedHandler(this.readiness));
+    app.get(`/livez`, this.requestMiddleware, cachedHandler(this.liveness));
+
+    app.use(this.handleErrorMiddleware);
   }
 
   public initSubscriptionServer(sendMessage) {
@@ -591,6 +610,17 @@ export class ApiGateway {
     return req.headers['x-request-id'] || req.headers.traceparent || uuid();
   }
 
+  protected handleErrorMiddleware: ErrorRequestHandler = async (e, req, res, next) => {
+    this.handleError({
+      e,
+      context: (<any>req).context,
+      res: this.resToResultFn(res),
+      requestStarted: new Date(),
+    });
+
+    next(e);
+  }
+
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
@@ -743,6 +773,71 @@ export class ApiGateway {
       ...restParams,
       authInfo: context.authInfo,
       requestId: context.requestId
+    });
+  }
+
+  protected readiness: RequestHandler = async (req, res) => {
+    let health = 'HEALTH';
+
+    if (this.standalone) {
+      const orchestratorApi = await this.adapterApi({});
+
+      try {
+        await orchestratorApi.testConnection();
+      } catch (e) {
+        this.log({}, {
+          type: 'Internal Server Error',
+          error: e.stack || e.toString(),
+        });
+
+        health = 'DOWN';
+      }
+
+      try {
+        await orchestratorApi.testOrchestratorConnections();
+      } catch (e) {
+        this.log({}, {
+          type: 'Internal Server Error',
+          error: e.stack || e.toString(),
+        });
+
+        health = 'DOWN';
+      }
+    }
+
+    res.status(health === 'HEALTH' ? 200 : 500).json({
+      health,
+    });
+  }
+
+  protected liveness: RequestHandler = async (req, res) => {
+    let health = 'HEALTH';
+
+    try {
+      await this.dataSourceStorage.testConnections();
+    } catch (e) {
+      this.log({}, {
+        type: 'Internal Server Error',
+        error: e.stack || e.toString(),
+      });
+
+      health = 'DOWN';
+    }
+
+    try {
+      // @todo Optimize this moment?
+      await this.dataSourceStorage.testOrchestratorConnections();
+    } catch (e) {
+      this.log({}, {
+        type: 'Internal Server Error',
+        error: e.stack || e.toString(),
+      });
+
+      health = 'DOWN';
+    }
+
+    res.status(health === 'HEALTH' ? 200 : 500).json({
+      health,
     });
   }
 }

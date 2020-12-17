@@ -31,4 +31,12 @@ export class LocalCacheDriver implements CacheDriverInterface {
     return Object.keys(this.store)
       .filter(k => k.indexOf(prefix) === 0 && this.store[k].exp > new Date().getTime());
   }
+
+  public async cleanup(): Promise<void> {
+    // Nothing to do
+  }
+
+  public async testConnection(): Promise<void> {
+    // Nothing to do
+  }
 }

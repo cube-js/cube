@@ -56,4 +56,18 @@ export class RedisCacheDriver implements CacheDriverInterface {
       this.redisPool.release(client);
     }
   }
+
+  public async cleanup(): Promise<void> {
+    return this.redisPool.cleanup();
+  }
+
+  public async testConnection(): Promise<void> {
+    const client = await this.getClient();
+
+    try {
+      await client.ping();
+    } finally {
+      this.redisPool.release(client);
+    }
+  }
 }

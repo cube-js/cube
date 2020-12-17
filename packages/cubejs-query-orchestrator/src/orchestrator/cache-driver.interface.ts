@@ -3,4 +3,6 @@ export interface CacheDriverInterface {
   set(key: string, value, expiration): Promise<void>;
   remove(key: string): Promise<void>;
   keysStartingWith(prefix: string): Promise<any[]>;
+  cleanup(): Promise<void>;
+  testConnection(): Promise<void>;
 }

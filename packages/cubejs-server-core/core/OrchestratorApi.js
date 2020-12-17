@@ -78,6 +78,10 @@ class OrchestratorApi {
     ]);
   }
 
+  async testOrchestratorConnections() {
+    return this.orchestrator.testConnections();
+  }
+
   async testDriverConnection(driverFn) {
     if (driverFn) {
       const driver = await driverFn();

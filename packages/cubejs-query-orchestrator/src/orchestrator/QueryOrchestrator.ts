@@ -38,15 +38,14 @@ export class QueryOrchestrator {
       throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
     }
 
-    this.redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
-
+    const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     const { externalDriverFactory } = options;
 
     this.queryCache = new QueryCache(
       this.redisPrefix, this.driverFactory, this.logger, {
         externalDriverFactory,
         cacheAndQueueDriver,
-        redisPool: this.redisPool,
+        redisPool,
         ...options.queryCacheOptions,
       }
     );
@@ -55,7 +54,7 @@ export class QueryOrchestrator {
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
         cacheAndQueueDriver,
-        redisPool: this.redisPool,
+        redisPool,
         ...options.preAggregationsOptions
       }
     );
@@ -116,9 +115,12 @@ export class QueryOrchestrator {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
+  public async testConnections() {
+    // @todo Possible, We will allow to use different drivers for cache and queue, dont forget to add both
+    return this.queryCache.testConnection();
+  }
+
   public async cleanup() {
-    if (this.redisPool) {
-      await this.redisPool.cleanup();
-    }
+    return this.queryCache.cleanup();
   }
 }
