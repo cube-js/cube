@@ -47,6 +47,16 @@ cube(`Orders`, {
 });
 ```
 
+## Limitations when using `readOnly` mode with drivers
+
+By default, Cube.js uses temporary tables to extract data types from executed query while `readOnly` is `false`.
+If the driver is used in `readOnly` mode, it will use heuristics to extract data types from the database's response, but this strategy has certain limitations:
+
+- The aggregation results can be empty, and Cube.js will throw an exception because it is impossible to detect types
+- Data types can be incorrectly inferred, in rare cases
+
+We highly recommend not using `readOnly` mode with drivers for external pre-aggregations.
+
 ## Rollup
 
 Rollup pre-aggregations are most effective way to boost performance of any analytical application.
@@ -82,7 +92,7 @@ Here:
 - Multiplied measures are measures of cubes that define `hasMany` relation involved in pre-aggregation definition join.
 
 Also order of pre-aggregations definition in cube matters.
-First matched pre-aggregation wins. 
+First matched pre-aggregation wins.
 Cubes of a measures and then cubes of dimensions are checked to find a matching `rollup`.
 However `rollup` pre-aggregations always have priority over `originalSql`.
 Thus if you have both `originalSql` and `rollup` defined, Cube.js will try to find matching `rollup` before trying to find matching `originalSql`.
@@ -410,7 +420,7 @@ cube(`Orders`, {
       type: 'number',
       sql: 'id',
       primaryKey: true
-    }, 
+    },
     created_at: {
       type: 'time',
       sql: 'created_at'
@@ -573,5 +583,5 @@ cube(`Orders`, {
 When pre-aggregations are refreshed Cube.js will create new pre-aggregation table each time it's version change.
 It allows to seamlessly hot swap tables transparently for users for any database even for those without DDL transactions support.
 It leads to orphaned tables which need to be collected over time though.
-By default Cube.js will store all content versions for 10 minutes and all structure versions for 7 days. 
+By default Cube.js will store all content versions for 10 minutes and all structure versions for 7 days.
 Then it'll retain only the most recent ones and orphaned tables are dropped from database.
