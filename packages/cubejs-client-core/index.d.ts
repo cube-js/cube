@@ -691,7 +691,7 @@ declare module '@cubejs-client/core' {
   }
 
   export interface TimeDimensionRanged extends TimeDimensionBase {
-    dateRange: string | string[];
+    dateRange?: string | string[];
   }
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
