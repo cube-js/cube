@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
-import { Spin } from 'antd';
+import { Alert, Spin } from 'antd';
 
 import { dispatchChartEvent } from '../../utils';
 import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
+import useSlowQuery from '../../hooks/slow-query';
 
 export default function ChartRenderer({
   iframeRef,
@@ -14,6 +15,8 @@ export default function ChartRenderer({
   pivotConfig,
   onChartRendererReadyChange,
 }) {
+  const slowQuery = useSlowQuery();
+  
   useEffect(() => {
     return () => {
       onChartRendererReadyChange(false);
@@ -44,6 +47,8 @@ export default function ChartRenderer({
 
   return (
     <div>
+      {slowQuery ? <Alert message="Warning: slow query" type="warning" /> : null}
+      
       {!isChartRendererReady ? <Spin /> : null}
 
       <iframe

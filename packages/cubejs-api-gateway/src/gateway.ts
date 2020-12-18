@@ -285,8 +285,8 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`/readyz`, this.requestMiddleware, cachedHandler(this.readiness));
-    app.get(`/livez`, this.requestMiddleware, cachedHandler(this.liveness));
+    app.get('/readyz', this.requestMiddleware, cachedHandler(this.readiness));
+    app.get('/livez', this.requestMiddleware, cachedHandler(this.liveness));
 
     app.use(this.handleErrorMiddleware);
   }
@@ -451,6 +451,7 @@ export class ApiGateway {
         ))
       );
 
+      let slowQuery = false;
       const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
         const sqlQuery = sqlQueries[index];
         const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
@@ -476,6 +477,8 @@ export class ApiGateway {
           ...annotation.timeDimensions
         };
 
+        slowQuery = slowQuery || Boolean(response.slowQuery);
+        
         return {
           query: normalizedQuery,
           data: transformData(
@@ -490,7 +493,8 @@ export class ApiGateway {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations
           }),
-          annotation
+          annotation,
+          slowQuery: Boolean(response.slowQuery)
         };
       }));
 
@@ -508,7 +512,8 @@ export class ApiGateway {
         res({
           queryType,
           results,
-          pivotQuery: getPivotQuery(queryType, normalizedQueries)
+          pivotQuery: getPivotQuery(queryType, normalizedQueries),
+          slowQuery
         });
       } else {
         res(results[0]);

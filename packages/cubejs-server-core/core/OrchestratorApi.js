@@ -54,7 +54,10 @@ class OrchestratorApi {
             requestId: query.requestId,
             warning: 'Query is too slow to be renewed during the user request and was served from the cache. Please consider using low latency pre-aggregations.'
           });
-          return fromCache;
+          return {
+            ...fromCache,
+            slowQuery: true
+          };
         }
 
         throw { error: 'Continue wait', stage: await this.orchestrator.queryStage(query) };
