@@ -15,7 +15,7 @@ import type {
 import { requestParser } from './requestParser';
 import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
-import { SubscriptionServer } from './SubscriptionServer';
+import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
 import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
 import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, RequestContext } from './interfaces';
@@ -285,13 +285,13 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`/readyz`, this.requestMiddleware, cachedHandler(this.readiness));
-    app.get(`/livez`, this.requestMiddleware, cachedHandler(this.liveness));
+    app.get('/readyz', this.requestMiddleware, cachedHandler(this.readiness));
+    app.get('/livez', this.requestMiddleware, cachedHandler(this.liveness));
 
     app.use(this.handleErrorMiddleware);
   }
 
-  public initSubscriptionServer(sendMessage) {
+  public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
     return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
   }
 

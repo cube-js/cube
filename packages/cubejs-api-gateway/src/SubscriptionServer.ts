@@ -1,8 +1,10 @@
 import uuid from 'uuid/v4';
 
 import { UserError } from './UserError';
+import type { ApiGateway } from './gateway';
+import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
 
-const methodParams = {
+const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
   sql: ['query'],
   'dry-run': ['query'],
@@ -11,24 +13,29 @@ const methodParams = {
   unsubscribe: []
 };
 
+export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
+
 export class SubscriptionServer {
-  constructor(apiGateway, sendMessage, subscriptionStore) {
-    this.apiGateway = apiGateway;
-    this.sendMessage = sendMessage;
-    this.subscriptionStore = subscriptionStore;
+  public constructor(
+    protected readonly apiGateway: ApiGateway,
+    protected readonly sendMessage: WebSocketSendMessageFn,
+    protected readonly subscriptionStore: LocalSubscriptionStore,
+  ) {
   }
 
-  resultFn(connectionId, messageId) {
-    return (message, { status } = {}) => this.sendMessage(connectionId, { messageId, message, status: status || 200 });
+  public resultFn(connectionId: string, messageId: string) {
+    return (message, { status } = { status: 200 }) => this.sendMessage(connectionId, { messageId, message, status });
   }
 
-  async processMessage(connectionId, message, isSubscription) {
-    let authContext = {};
-    let context = {};
+  public async processMessage(connectionId: string, message, isSubscription) {
+    let authContext: any = {};
+    let context: any = {};
+
     try {
       if (typeof message === 'string') {
         message = JSON.parse(message);
       }
+
       if (message.authorization) {
         authContext = { isSubscription: true };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
@@ -104,14 +111,14 @@ export class SubscriptionServer {
     }
   }
 
-  async processSubscriptions() {
+  public async processSubscriptions() {
     const allSubscriptions = await this.subscriptionStore.getAllSubscriptions();
     await Promise.all(allSubscriptions.map(async subscription => {
       await this.processMessage(subscription.connectionId, subscription.message, true);
     }));
   }
 
-  async disconnect(connectionId) {
+  public async disconnect(connectionId: string) {
     await this.subscriptionStore.cleanupSubscriptions(connectionId);
   }
 }

@@ -1,16 +1,22 @@
+interface LocalSubscriptionStoreOptions {
+  heartBeatInterval?: number;
+}
+
 export class LocalSubscriptionStore {
-  constructor(options) {
-    options = options || {};
-    this.connections = {};
+  protected readonly connections = {};
+
+  protected readonly hearBeatInterval: number;
+
+  public constructor(options: LocalSubscriptionStoreOptions = {}) {
     this.hearBeatInterval = options.heartBeatInterval || 60;
   }
 
-  async getSubscription(connectionId, subscriptionId) {
+  public async getSubscription(connectionId: string, subscriptionId: string) {
     const connection = this.getConnection(connectionId);
     return connection.subscriptions[subscriptionId];
   }
 
-  async subscribe(connectionId, subscriptionId, subscription) {
+  public async subscribe(connectionId: string, subscriptionId: string, subscription) {
     const connection = this.getConnection(connectionId);
     connection.subscriptions[subscriptionId] = {
       ...subscription,
@@ -18,12 +24,12 @@ export class LocalSubscriptionStore {
     };
   }
 
-  async unsubscribe(connectionId, subscriptionId) {
+  public async unsubscribe(connectionId: string, subscriptionId: string) {
     const connection = this.getConnection(connectionId);
     delete connection.subscriptions[subscriptionId];
   }
 
-  async getAllSubscriptions() {
+  public async getAllSubscriptions() {
     return Object.keys(this.connections).map(connectionId => {
       Object.keys(this.connections[connectionId].subscriptions).filter(
         subscriptionId => new Date().getTime() -
@@ -39,22 +45,23 @@ export class LocalSubscriptionStore {
     }).reduce((a, b) => a.concat(b), []);
   }
 
-  async cleanupSubscriptions(connectionId) {
+  public async cleanupSubscriptions(connectionId: string) {
     delete this.connections[connectionId];
   }
 
-  async getAuthContext(connectionId) {
+  public async getAuthContext(connectionId: string) {
     return this.getConnection(connectionId).authContext;
   }
 
-  async setAuthContext(connectionId, authContext) {
+  public async setAuthContext(connectionId: string, authContext) {
     this.getConnection(connectionId).authContext = authContext;
   }
 
-  getConnection(connectionId) {
+  protected getConnection(connectionId: string) {
     if (!this.connections[connectionId]) {
       this.connections[connectionId] = { subscriptions: {} };
     }
+
     return this.connections[connectionId];
   }
 }

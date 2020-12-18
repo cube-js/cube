@@ -242,7 +242,7 @@ describe('API Gateway', () => {
 
     test('readyz', async () => {
       const res = await request(app)
-        .get(`/readyz`)
+        .get('/readyz')
         .set('Content-type', 'application/json')
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
@@ -252,7 +252,7 @@ describe('API Gateway', () => {
 
     test('livez', async () => {
       const res = await request(app)
-        .get(`/livez`)
+        .get('/livez')
         .set('Content-type', 'application/json')
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
