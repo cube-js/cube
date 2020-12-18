@@ -50,15 +50,21 @@ class PreAggregations {
   }
 
   preAggregationDescriptionsFor(cube, foundPreAggregation) {
-    if (this.canPartitionsBeUsed(foundPreAggregation)) {
-      const { dimension, partitionDimension } = this.partitionDimension(foundPreAggregation);
-      return R.unnest(partitionDimension.timeSeries().map(
-        range => this.preAggregationDescriptionsForRecursive(
-          cube, this.addPartitionRangeTo(foundPreAggregation, dimension, range)
-        )
-      ));
+    let preAggregations = [foundPreAggregation];
+    if (foundPreAggregation.preAggregation.type === 'rollupJoin') {
+      preAggregations = foundPreAggregation.preAggregationsToJoin;
     }
-    return this.preAggregationDescriptionsForRecursive(cube, foundPreAggregation);
+    return preAggregations.map(preAggregation => {
+      if (this.canPartitionsBeUsed(preAggregation)) {
+        const { dimension, partitionDimension } = this.partitionDimension(preAggregation);
+        return R.unnest(partitionDimension.timeSeries().map(
+          range => this.preAggregationDescriptionsForRecursive(
+            preAggregation.cube, this.addPartitionRangeTo(preAggregation, dimension, range)
+          )
+        ));
+      }
+      return this.preAggregationDescriptionsForRecursive(preAggregation.cube, preAggregation);
+    }).reduce((a, b) => a.concat(b), []);
   }
 
   canPartitionsBeUsed(foundPreAggregation) {
@@ -369,18 +375,119 @@ class PreAggregations {
     return R.pipe(
       R.toPairs,
       // eslint-disable-next-line no-unused-vars
-      R.filter(([k, a]) => a.type === 'rollup'),
+      R.filter(([k, a]) => a.type === 'rollup' || a.type === 'rollupJoin'),
       R.map(([preAggregationName, preAggregation]) => {
-        const references = this.evaluateAllReferences(cube, preAggregation);
-        return {
-          preAggregationName,
-          preAggregation,
-          cube,
-          canUsePreAggregation: canUsePreAggregation(references),
-          references
-        };
+        const preAggObj = this.evaluatedPreAggregationObj(
+          cube, preAggregationName, preAggregation, canUsePreAggregation
+        );
+        if (preAggregation.type === 'rollupJoin') {
+          // TODO evaluation optimizations. Should be cached or moved to compile time.
+          const preAggregationsToJoin = preAggObj.canUsePreAggregation ? preAggObj.references.rollups.map(
+            name => {
+              const [joinCube, joinPreAggregationName] = this.query.cubeEvaluator.parsePath('preAggregations', name);
+              return this.evaluatedPreAggregationObj(
+                joinCube,
+                joinPreAggregationName,
+                this.query.cubeEvaluator.byPath('preAggregations', name),
+                canUsePreAggregation
+              );
+            }
+          ) : null;
+          return {
+            ...preAggObj,
+            preAggregationsToJoin,
+            // TODO evaluation optimizations. Should be cached or moved to compile time.
+            rollupJoin: preAggObj.canUsePreAggregation ? this.buildRollupJoin(preAggObj, preAggregationsToJoin) : null
+          };
+        } else {
+          return preAggObj;
+        }
       })
     )(preAggregations);
+  }
+
+  // TODO cache, check multiplication factor didn't change
+  buildRollupJoin(preAggObj, preAggObjsToJoin) {
+    const targetJoins = this.resolveJoinMembers(
+      this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(preAggObj))
+    );
+    const existingJoins = R.unnest(preAggObjsToJoin.map(
+      p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p)))
+    ));
+    const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
+      existing => existing.originalFrom === target.originalFrom &&
+        existing.originalTo === target.originalTo &&
+        R.eq(existing.fromMembers, target.fromMembers) &&
+        R.eq(existing.toMembers, target.toMembers)
+    ));
+    if (!nonExistingJoins.length) {
+      throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
+    }
+    return nonExistingJoins.map(join => {
+      const fromPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.fromMembers, join);
+      const toPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.toMembers, join);
+      return {
+        ...join,
+        fromPreAggObj,
+        toPreAggObj
+      };
+    });
+  }
+
+  preAggObjForJoin(preAggObjsToJoin, joinMembers, join) {
+    const fromPreAggObj = preAggObjsToJoin
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+    if (!fromPreAggObj.length) {
+      throw new UserError(`No rollups found that can be used for rollup join: ${JSON.stringify(join)}`);
+    }
+    if (fromPreAggObj.length > 1) {
+      throw new UserError(
+        `Multiple rollups found that can be used for rollup join ${JSON.stringify(join)}: ${fromPreAggObj.map(p => `${p.cube}.${p.preAggregationName}`).join(', ')}`,
+      );
+    }
+    return fromPreAggObj[0];
+  }
+
+  resolveJoinMembers(join) {
+    return join.joins.map(j => {
+      const memberPaths = this.query.collectMemberNamesFor(() => this.query.evaluateSql(j.originalFrom, j.join.sql)).map(m => m.split('.'));
+      const invalidMembers = memberPaths.filter(m => m[0] !== j.originalFrom && m[0] !== j.originalTo);
+      if (invalidMembers.length) {
+        throw new UserError(`Members ${invalidMembers.join(', ')} in join from '${j.originalFrom}' to '${j.originalTo}' doesn't reference join cubes`);
+      }
+      const fromMembers = memberPaths.filter(m => m[0] === j.originalFrom).map(m => m.join('.'));
+      if (!fromMembers.length) {
+        throw new UserError(`From members are not found for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
+      }
+      const toMembers = memberPaths.filter(m => m[0] === j.originalTo).map(m => m.join('.'));
+      if (!toMembers.length) {
+        throw new UserError(`To members are not found for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
+      }
+      return {
+        ...j,
+        fromMembers,
+        toMembers,
+      };
+    });
+  }
+
+  cubesFromPreAggregation(preAggObj) {
+    return R.uniq(
+      preAggObj.references.measures.map(m => this.query.cubeEvaluator.parsePath('measures', m)).concat(
+        preAggObj.references.dimensions.map(m => this.query.cubeEvaluator.parsePath('dimensions', m))
+      ).map(p => p[0])
+    );
+  }
+
+  evaluatedPreAggregationObj(cube, preAggregationName, preAggregation, canUsePreAggregation) {
+    const references = this.evaluateAllReferences(cube, preAggregation);
+    return {
+      preAggregationName,
+      preAggregation,
+      cube,
+      canUsePreAggregation: canUsePreAggregation(references),
+      references
+    };
   }
 
   rollupMatchResultDescriptions() {
@@ -479,7 +586,7 @@ class PreAggregations {
 
   originalSqlPreAggregationTable(preAggregation) {
     if (this.canPartitionsBeUsed(preAggregation)) {
-      return this.partitionUnion(preAggregation, true);
+      return this.partitionUnion(preAggregation);
     }
 
     let { preAggregationName } = preAggregation;
@@ -494,12 +601,50 @@ class PreAggregations {
   }
 
   rollupPreAggregation(preAggregationForQuery) {
-    const table = this.canPartitionsBeUsed(preAggregationForQuery) ?
-      this.partitionUnion(preAggregationForQuery) :
-      this.query.preAggregationTableName(
-        preAggregationForQuery.cube,
-        preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName
-      );
+    let toJoin;
+
+    const sqlAndAlias = (preAgg) => ({
+      preAggregation: preAgg,
+      alias: this.query.cubeAlias(this.query.cubeEvaluator.pathFromArray([preAgg.cube, preAgg.preAggregationName]))
+    });
+
+    if (preAggregationForQuery.preAggregation.type === 'rollupJoin') {
+      const join = preAggregationForQuery.rollupJoin;
+
+      toJoin = [
+        sqlAndAlias(join[0].fromPreAggObj),
+        ...join.map(
+          j => ({
+            ...sqlAndAlias(j.toPreAggObj),
+            on: this.query.evaluateSql(j.originalFrom, j.join.sql, {
+              sqlResolveFn: (symbol, cube, n) => {
+                const path = this.query.cubeEvaluator.pathFromArray([cube, n]);
+                const member =
+                  this.query.cubeEvaluator.isMeasure(path) ?
+                    this.query.newMeasure(path) :
+                    this.query.newDimension(path);
+                return member.aliasName();
+              }
+            })
+          })
+        )
+      ];
+    } else {
+      toJoin = [sqlAndAlias(preAggregationForQuery)];
+    }
+
+    const from = this.query.joinSql(
+      toJoin.map(j => ({
+        ...j,
+        sql: this.canPartitionsBeUsed(j.preAggregation) ?
+          this.partitionUnion(j.preAggregation) :
+          this.query.preAggregationTableName(
+            j.preAggregation.cube,
+            j.preAggregation.sqlAlias || j.preAggregation.preAggregationName
+          )
+      }))
+    );
+
     const segmentFilters = this.query.segments.map(
       s => this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })
     );
@@ -532,7 +677,7 @@ class PreAggregations {
 
     return this.query.evaluateSymbolSqlWithContext(
       // eslint-disable-next-line prefer-template
-      () => `SELECT ${this.query.baseSelect()} FROM ${table} ${this.query.baseWhere(filters)}` +
+      () => `SELECT ${this.query.baseSelect()} FROM ${from} ${this.query.baseWhere(filters)}` +
         this.query.groupByClause() +
         this.query.baseHaving(this.query.measureFilters) +
         this.query.orderBy() +
@@ -545,7 +690,7 @@ class PreAggregations {
     );
   }
 
-  partitionUnion(preAggregationForQuery, withoutAlias) {
+  partitionUnion(preAggregationForQuery) {
     const { dimension, partitionDimension } = this.partitionDimension(preAggregationForQuery);
 
     const tables = partitionDimension.timeSeries().map(range => {
@@ -560,7 +705,7 @@ class PreAggregations {
       return tables[0];
     }
     const union = tables.map(table => `SELECT * FROM ${table}`).join(' UNION ALL ');
-    return `(${union})${withoutAlias ? '' : ' as partition_union'}`;
+    return `(${union})`;
   }
 }
 
