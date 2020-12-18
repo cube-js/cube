@@ -4,7 +4,9 @@
   "no-inline-html": {
     "allowed_elements": [
       "a",
-      "img"
+      "img",
+      "p"
     ]
-  }
+  },
+  "no-trailing-punctuation": ""
 }
