@@ -776,8 +776,14 @@ export class ApiGateway {
     });
   }
 
+  protected healthResponse(res: Response, health: 'HEALTH' | 'DOWN') {
+    res.status(health === 'HEALTH' ? 200 : 500).json({
+      health,
+    });
+  }
+
   protected readiness: RequestHandler = async (req, res) => {
-    let health = 'HEALTH';
+    let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
     if (this.standalone) {
       const orchestratorApi = await this.adapterApi({});
@@ -790,7 +796,7 @@ export class ApiGateway {
           error: e.stack || e.toString(),
         });
 
-        health = 'DOWN';
+        return this.healthResponse(res, health);
       }
 
       try {
@@ -805,13 +811,11 @@ export class ApiGateway {
       }
     }
 
-    res.status(health === 'HEALTH' ? 200 : 500).json({
-      health,
-    });
+    return this.healthResponse(res, health);
   }
 
   protected liveness: RequestHandler = async (req, res) => {
-    let health = 'HEALTH';
+    let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
     try {
       await this.dataSourceStorage.testConnections();
@@ -821,7 +825,7 @@ export class ApiGateway {
         error: e.stack || e.toString(),
       });
 
-      health = 'DOWN';
+      return this.healthResponse(res, health);
     }
 
     try {
@@ -836,8 +840,6 @@ export class ApiGateway {
       health = 'DOWN';
     }
 
-    res.status(health === 'HEALTH' ? 200 : 500).json({
-      health,
-    });
+    return this.healthResponse(res, health);
   }
 }
