@@ -12,6 +12,7 @@ const compilerApi = jest.fn().mockImplementation(() => ({
         foo__bar: 'Foo.bar',
         foo__time: 'Foo.time',
       },
+      order: [{ id: 'id', desc: true, }]
     };
   },
 
@@ -59,6 +60,29 @@ const adapterApi = jest.fn().mockImplementation(() => ({
 
 const logger = (type, message) => console.log({ type, ...message });
 
+async function requestBothGetAndPost(app, { url, query, body }, assert) {
+  {
+    const res = await request(app)
+      .get(url)
+      .query(query)
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    assert(res);
+  }
+
+  {
+    const res = await request(app)
+      .post(url)
+      .set('Content-type', 'application/json')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .send(body)
+      .expect(200);
+
+    assert(res);
+  }
+}
+
 describe('API Gateway', () => {
   process.env.NODE_ENV = 'production';
   const apiGateway = new ApiGateway('secret', compilerApi, adapterApi, logger, {
@@ -101,6 +125,43 @@ describe('API Gateway', () => {
       .expect(200);
     console.log(res.body);
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+  });
+
+  test('dry-run', async () => {
+    const query = {
+      measures: ['Foo.bar']
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body).toStrictEqual({
+          queryType: 'regularQuery',
+          normalizedQueries: [
+            {
+              measures: ['Foo.bar'],
+              timezone: 'UTC',
+              order: [],
+              filters: [],
+              dimensions: [],
+              timeDimensions: [],
+              queryType: 'regularQuery'
+            }
+          ],
+          queryOrder: [{ id: 'desc' }],
+          pivotQuery: {
+            measures: ['Foo.bar'],
+            timezone: 'UTC',
+            order: [],
+            filters: [],
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          }
+        });
+      }
+    );
   });
 
   test('date range padding', async () => {

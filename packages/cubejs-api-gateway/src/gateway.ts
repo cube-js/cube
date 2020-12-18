@@ -21,6 +21,8 @@ import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from '
 import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, RequestContext } from './interfaces';
 import { cachedHandler } from './cached-handler';
 
+type ResponseResultFn = (message: object, extra?: { status: number }) => void;
+
 type MetaConfig = {
   config: {
     name: string,
@@ -282,6 +284,7 @@ export class ApiGateway {
       await this.dryRun({
         query: req.body.query,
         context: req.context,
+        res: this.resToResultFn(res)
       });
     }));
 
@@ -299,7 +302,11 @@ export class ApiGateway {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
-  public async runScheduledRefresh({ context, res, queryingOptions }) {
+  public async runScheduledRefresh({ context, res, queryingOptions }: {
+    context: RequestContext,
+    res: ResponseResultFn,
+    queryingOptions: any
+  }) {
     const requestStarted = new Date();
     try {
       const refreshScheduler = this.refreshScheduler();
@@ -314,7 +321,7 @@ export class ApiGateway {
     }
   }
 
-  public async meta({ context, res }) {
+  public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
       const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
@@ -363,7 +370,7 @@ export class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  public async sql({ query, context, res }) {
+  public async sql({ query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
     try {
@@ -392,7 +399,7 @@ export class ApiGateway {
     }
   }
 
-  protected async dryRun({ query, context, res }: any) {
+  protected async dryRun({ query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
     try {
