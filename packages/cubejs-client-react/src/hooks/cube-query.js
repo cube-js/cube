@@ -39,10 +39,12 @@ export default (query, options = {}) => {
           if (resetResultSetOnChange == null || resetResultSetOnChange) {
             setResultSet(null);
           }
-          setError(null);
           setCurrentQuery(query);
         }
+        
+        setError(null);
         setLoading(true);
+        
         try {
           if (subscribeRequest) {
             await subscribeRequest.unsubscribe();
