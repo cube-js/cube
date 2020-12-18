@@ -1,8 +1,21 @@
-export function requestParser(req, res) {
+import type { Request, Response } from 'express';
+
+interface RequestParserResult {
+  path: string;
+  method: string;
+  status: number;
+  ip: string;
+  time: string;
+  contentLength?: string
+  contentType?: string
+}
+
+export function requestParser(req: Request, res: Response) {
   const path = req.originalUrl || req.path || req.url;
   const httpHeader = req.header && req.header('x-forwarded-for');
-  const ip = req.ip || httpHeader || req.connection.remoteAddress;
-  const requestData = {
+  const ip: any = req.ip || httpHeader || req.connection.remoteAddress;
+
+  const requestData: RequestParserResult = {
     path,
     method: req.method,
     status: res.statusCode,
