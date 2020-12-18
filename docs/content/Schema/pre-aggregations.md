@@ -504,6 +504,15 @@ cube(`Orders`, {
 });
 ```
 
+## refreshRangeStart and refreshRangeEnd
+
+Refresh range defines what partitions should be refreshed by scheduled refresh.
+Scheduled refresh will never look beyond this range.
+
+Refresh range can be used together with `updateWindow` to define granular update settings.
+Set `updateWindow` to interval in which your data can change and `refreshRangeStart` to the earliest point of time when history should be available.
+For example if `updateWindow` is `1 week` and `refreshRangeStart` is `SELECT NOW() - interval '365 day'` scheduled refresh will build historic partitions for 365 days in past and will refresh only one last week according to the `refreshKey` setting.
+
 Refresh range for partitioned pre-aggregations can be controlled using `refreshRangeStart` and `refreshRangeEnd` params:
 
 ```javascript
