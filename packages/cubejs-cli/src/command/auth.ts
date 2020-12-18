@@ -8,7 +8,7 @@ const authenticate = async (currentToken: string) => {
   await config.addAuthToken(currentToken);
 
   await event({
-    name: 'Cube Cloud CLI Authenticate'
+    event: 'Cube Cloud CLI Authenticate'
   });
 
   console.log('Token successfully added!');

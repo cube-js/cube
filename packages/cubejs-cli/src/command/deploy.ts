@@ -19,7 +19,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     await config.addAuthToken(token);
 
     await event({
-      name: 'Cube Cloud CLI Authenticate'
+      event: 'Cube Cloud CLI Authenticate'
     });
 
     console.log('Token successfully added!');

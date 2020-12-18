@@ -26,7 +26,7 @@ const create = async (projectName, options) => {
   const createAppOptions = { projectName, dbType: options.dbType, template: options.template };
 
   event({
-    name: 'Create App',
+    event: 'Create App',
     ...createAppOptions,
   });
 
@@ -153,7 +153,7 @@ const create = async (projectName, options) => {
   }
 
   await event({
-    name: 'Create App Success',
+    event: 'Create App Success',
     projectName,
     dbType: options.dbType
   });
