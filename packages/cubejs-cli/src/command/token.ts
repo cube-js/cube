@@ -28,7 +28,7 @@ type TokenOptions = {
 
 export const token = async (options: TokenOptions) => {
   event({
-    name: 'Generate Token'
+    event: 'Generate Token'
   });
 
   const cubejsServer = await requireFromPackage<any>('@cubejs-backend/server', {
@@ -66,7 +66,7 @@ export const token = async (options: TokenOptions) => {
   console.log(`Token: ${chalk.green(signedToken)}`);
 
   await event({
-    name: 'Generate Token Success'
+    event: 'Generate Token Success'
   });
 
   return signedToken;
