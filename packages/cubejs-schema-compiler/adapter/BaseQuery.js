@@ -836,13 +836,25 @@ class BaseQuery {
     const joins = join.joins.map(
       j => {
         const [cubeSql, cubeAlias, conditions] = this.rewriteInlineCubeSql(j.originalTo, true);
-        return `LEFT JOIN ${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}
-      ON ${this.evaluateSql(j.originalFrom, j.join.sql)}${conditions ? ` AND (${conditions})` : ''}`;
+        return {
+          sql: cubeSql,
+          alias: cubeAlias,
+          on: `${this.evaluateSql(j.originalFrom, j.join.sql)}${conditions ? ` AND (${conditions})` : ''}`
+        };
       }
     ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
 
     const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(join.root);
-    return `${cubeSql} ${this.asSyntaxJoin} ${cubeAlias}\n${joins.join('\n')}`;
+    return this.joinSql([{ sql: cubeSql, alias: cubeAlias }, ...joins]);
+  }
+
+  joinSql(toJoin) {
+    const [root, ...rest] = toJoin;
+    const joins = rest.map(
+      j => `LEFT JOIN ${j.sql} ${this.asSyntaxJoin} ${j.alias} ON ${j.on}`
+    );
+
+    return [`${root.sql} ${this.asSyntaxJoin} ${root.alias}`, ...joins].join('\n');
   }
 
   subQueryJoin(dimension) {
@@ -854,8 +866,11 @@ class BaseQuery {
     const sql = subQuery.evaluateSymbolSqlWithContext(() => subQuery.buildParamAnnotatedSql(), {
       collectOriginalSqlPreAggregations
     });
-    return `LEFT JOIN (${sql}) ${this.asSyntaxJoin} ${subQueryAlias}
-    ON ${subQueryAlias}.${primaryKey.aliasName()} = ${this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName)}`;
+    return {
+      sql: `(${sql})`,
+      alias: subQueryAlias,
+      on: `${subQueryAlias}.${primaryKey.aliasName()} = ${this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName)}`
+    };
   }
 
   get filtersWithoutSubQueries() {
@@ -974,12 +989,18 @@ class BaseQuery {
       `${this.cubeAlias(keyCubeName)}.${primaryKeyDimension.aliasName()}` :
       this.dimensionSql(primaryKeyDimension);
     const subQueryJoins =
-      shouldBuildJoinForMeasureSelect ? '' : measureSubQueryDimensions.map(d => this.subQueryJoin(d)).join('\n');
-    return `SELECT ${columnsForSelect} FROM (${this.keysQuery(primaryKeyDimension, filters)}) ${this.asSyntaxTable} ${this.escapeColumnName('keys')} ` +
-      `LEFT OUTER JOIN ${keyCubeSql} ${this.asSyntaxJoin} ${keyCubeAlias} ON
-      ${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect}
-      ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}` +
-      subQueryJoins +
+      shouldBuildJoinForMeasureSelect ? [] : measureSubQueryDimensions.map(d => this.subQueryJoin(d));
+    const joinSql = this.joinSql([
+      { sql: `(${this.keysQuery(primaryKeyDimension, filters)})`, alias: this.escapeColumnName('keys') },
+      {
+        sql: keyCubeSql,
+        alias: keyCubeAlias,
+        on: `${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect}
+             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`
+      },
+      ...subQueryJoins
+    ]);
+    return `SELECT ${columnsForSelect} FROM ${joinSql}` +
       (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
@@ -1271,12 +1292,20 @@ class BaseQuery {
     }
   }
 
+  pushMemberNameForCollectionIfNecessary(cubeName, name) {
+    this.pushCubeNameForCollectionIfNecessary(cubeName);
+    const context = this.safeEvaluateSymbolContext();
+    if (context.memberNames && name) {
+      context.memberNames.push(this.cubeEvaluator.pathFromArray([cubeName, name]));
+    }
+  }
+
   safeEvaluateSymbolContext() {
     return this.evaluateSymbolContext || {};
   }
 
   evaluateSymbolSql(cubeName, name, symbol) {
-    this.pushCubeNameForCollectionIfNecessary(cubeName);
+    this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     if (this.cubeEvaluator.isMeasure([cubeName, name])) {
       let parentMeasure;
       if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
@@ -1363,7 +1392,8 @@ class BaseQuery {
     return `${cubeName}.${primaryKey}`;
   }
 
-  evaluateSql(cubeName, sql) {
+  evaluateSql(cubeName, sql, options) {
+    options = options || {};
     const self = this;
     const { cubeEvaluator } = this;
     this.pushCubeNameForCollectionIfNecessary(cubeName);
@@ -1381,7 +1411,7 @@ class BaseQuery {
       }
       return self.evaluateSymbolSql(nextCubeName, name, resolvedSymbol);
     }, {
-      sqlResolveFn: (symbol, cube, n) => self.evaluateSymbolSql(cube, n, symbol),
+      sqlResolveFn: options.sqlResolveFn || ((symbol, cube, n) => self.evaluateSymbolSql(cube, n, symbol)),
       cubeAliasFn: self.cubeAlias.bind(self),
       contextSymbols: this.parametrizedContextSymbols(),
       query: this
@@ -1405,6 +1435,16 @@ class BaseQuery {
     );
 
     return R.uniq(context.cubeNames);
+  }
+
+  collectMemberNamesFor(fn) {
+    const context = { memberNames: [] };
+    this.evaluateSymbolSqlWithContext(
+      fn,
+      context
+    );
+
+    return R.uniq(context.memberNames);
   }
 
   collectMultipliedMeasures(fn) {

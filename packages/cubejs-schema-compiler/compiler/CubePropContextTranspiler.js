@@ -34,7 +34,7 @@ class CubePropContextTranspiler {
 
   sqlAndReferencesFieldVisitor(cubeName) {
     return this.knownIdentifiersInjectVisitor(
-      /^(sql|measureReferences|dimensionReferences|segmentReferences|timeDimensionReference|drillMembers|drillMemberReferences|contextMembers|columns)$/,
+      /^(sql|measureReferences|dimensionReferences|segmentReferences|timeDimensionReference|rollupReferences|drillMembers|drillMemberReferences|contextMembers|columns)$/,
       name => this.cubeSymbols.resolveSymbol(cubeName, name) || this.cubeSymbols.isCurrentCube(name)
     );
   }
