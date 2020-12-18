@@ -1,7 +1,6 @@
 import {
   useContext, useEffect, useState, useRef
 } from 'react';
-import { equals } from 'ramda';
 import CubeContext from '../CubeContext';
 import isQueryPresent from '../isQueryPresent';
 import useDeepCompareMemoize from './deep-compare-memoize';
@@ -10,7 +9,6 @@ export default function useDryRun(query, options = {}) {
   const context = useContext(CubeContext);
   const mutexRef = useRef({});
   const [response, setResponse] = useState(null);
-  const [currentQuery, setCurrentQuery] = useState(null);
   const [isLoading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -24,12 +22,9 @@ export default function useDryRun(query, options = {}) {
     
     async function loadQuery() {
       if (!skip && query && isQueryPresent(query)) {
-        if (!equals(currentQuery, query)) {
-          setError(null);
-          setCurrentQuery(query);
-        }
+        setError(null);
         setLoading(true);
-        
+
         try {
           setResponse(
             await cubejsApi.dryRun(query, {
