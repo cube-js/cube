@@ -939,6 +939,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn group_by_decimal() {
+        Config::run_test("group_by_decimal", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value DECIMAL)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 100), (2, 200), (3, 100), (4, 100), (5, 200)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.decimal_group").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5)]));
+
+            let result = service.exec_query("SELECT count(*) from foo.decimal_group where decimal_value = 200").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+
+            let result = service.exec_query("SELECT g.decimal_value, count(*) from foo.decimal_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("100".to_string()), TableValue::Int(3)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Decimal("200".to_string()), TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn over_2k_booleans() {
         Config::test("over_2k_booleans").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
