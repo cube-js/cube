@@ -1,6 +1,6 @@
 use super::TimestampValue;
 use crate::metastore::{Column, ColumnType, Index};
-use crate::table::{Row, TableStore, TableValue, RowSortKey};
+use crate::table::{Row, RowSortKey, TableStore, TableValue};
 use crate::CubeError;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::ExecutionPlan;
@@ -385,11 +385,15 @@ pub struct SplitRowParquetWriter {
     min_max_rows: Vec<(u64, (Row, Row))>,
     first_row: Option<Row>,
     last_row: Option<Row>,
-    sort_key_size: u64
+    sort_key_size: u64,
 }
 
 impl SplitRowParquetWriter {
-    pub fn new(writers: Vec<RowParquetWriter>, total_row_number: usize, sort_key_size: u64) -> SplitRowParquetWriter {
+    pub fn new(
+        writers: Vec<RowParquetWriter>,
+        total_row_number: usize,
+        sort_key_size: u64,
+    ) -> SplitRowParquetWriter {
         let chunk_size = div_ceil(total_row_number, writers.len());
         SplitRowParquetWriter {
             writers,
@@ -400,7 +404,7 @@ impl SplitRowParquetWriter {
             min_max_rows: Vec::new(),
             first_row: None,
             last_row: None,
-            sort_key_size
+            sort_key_size,
         }
     }
 
@@ -412,7 +416,8 @@ impl SplitRowParquetWriter {
             self.first_row = Some(rows[0].clone());
         }
         let mut remaining_slice = rows;
-        while remaining_slice.len() + self.rows_written > (self.current_writer + 1) * self.chunk_size
+        while remaining_slice.len() + self.rows_written
+            > (self.current_writer + 1) * self.chunk_size
         {
             let target_split_at = (self.current_writer + 1) * self.chunk_size;
             let mut split_at = if self.rows_written > target_split_at {
@@ -421,8 +426,10 @@ impl SplitRowParquetWriter {
                 target_split_at - self.rows_written
             };
             // move to the last position with a matching sort_key
-            while split_at < remaining_slice.len() &&
-                Some(remaining_slice[split_at].sort_key(self.sort_key_size)) == self.get_current_key(remaining_slice, split_at) {
+            while split_at < remaining_slice.len()
+                && Some(remaining_slice[split_at].sort_key(self.sort_key_size))
+                    == self.get_current_key(remaining_slice, split_at)
+            {
                 split_at += 1;
             }
             if split_at == remaining_slice.len() - 1 {
@@ -432,10 +439,7 @@ impl SplitRowParquetWriter {
                 self.min_max_rows.push((
                     self.rows_written_current_file,
                     (
-                        self.first_row
-                            .as_ref()
-                            .unwrap()
-                            .clone(),
+                        self.first_row.as_ref().unwrap().clone(),
                         self.last_row.as_ref().unwrap().clone(),
                     ),
                 ));
@@ -472,9 +476,15 @@ impl SplitRowParquetWriter {
         Ok(())
     }
 
-    fn get_current_key<'a>(&'a self, remaining_slice: &'a [Row], split_at: usize) -> Option<RowSortKey<'a>> {
+    fn get_current_key<'a>(
+        &'a self,
+        remaining_slice: &'a [Row],
+        split_at: usize,
+    ) -> Option<RowSortKey<'a>> {
         if split_at == 0 {
-            self.last_row.as_ref().map(|v| v.sort_key(self.sort_key_size))
+            self.last_row
+                .as_ref()
+                .map(|v| v.sort_key(self.sort_key_size))
         } else {
             Some(remaining_slice[split_at - 1].sort_key(self.sort_key_size))
         }
@@ -497,12 +507,19 @@ impl SplitRowParquetWriter {
             w.close()?;
         }
         let sort_key_size = self.sort_key_size as usize;
-        Ok(self.min_max_rows.into_iter().map(|(c, (min, max))| {
-            (c, (
-                Row::new(min.values.into_iter().take(sort_key_size).collect()),
-                Row::new(max.values.into_iter().take(sort_key_size).collect())
-            ))
-        }).collect())
+        Ok(self
+            .min_max_rows
+            .into_iter()
+            .map(|(c, (min, max))| {
+                (
+                    c,
+                    (
+                        Row::new(min.values.into_iter().take(sort_key_size).collect()),
+                        Row::new(max.values.into_iter().take(sort_key_size).collect()),
+                    ),
+                )
+            })
+            .collect())
     }
 }
 
@@ -855,7 +872,11 @@ mod tests {
         let mut first_rows = (0..40)
             .map(|i| {
                 Row::new(vec![
-                    if i % 5 != 0 { TableValue::Int(i % 20) } else { TableValue::Null },
+                    if i % 5 != 0 {
+                        TableValue::Int(i % 20)
+                    } else {
+                        TableValue::Null
+                    },
                     TableValue::String(format!("Foo {}", i)),
                     if i % 7 == 0 {
                         TableValue::Null
@@ -863,7 +884,11 @@ mod tests {
                         TableValue::String(format!("Boo {}", i))
                     },
                     TableValue::Boolean(i % 5 == 0),
-                    if i % 5 != 0 { TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()) } else { TableValue::Null },
+                    if i % 5 != 0 {
+                        TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string())
+                    } else {
+                        TableValue::Null
+                    },
                 ])
             })
             .collect::<Vec<_>>();

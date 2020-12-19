@@ -371,7 +371,7 @@ impl SerializedPlan {
         plan: Arc<LogicalPlan>,
         meta_store: Arc<dyn MetaStore>,
         index_snapshots: Vec<IndexSnapshot>,
-        join_on: Option<Vec<String>>
+        join_on: Option<Vec<String>>,
     ) -> BoxFuture<'static, Result<Vec<IndexSnapshot>, CubeError>> {
         async move { Self::index_snapshots_from_plan(plan, meta_store, index_snapshots, join_on).await }
             .boxed()
@@ -381,7 +381,7 @@ impl SerializedPlan {
         plan: Arc<LogicalPlan>,
         meta_store: Arc<dyn MetaStore>,
         mut index_snapshots: Vec<IndexSnapshot>,
-        join_on: Option<Vec<String>>
+        join_on: Option<Vec<String>>,
     ) -> Result<Vec<IndexSnapshot>, CubeError> {
         match plan.as_ref() {
             LogicalPlan::EmptyRelation { .. } => Ok(index_snapshots),
@@ -410,19 +410,31 @@ impl SerializedPlan {
                         .into_iter()
                         .filter_map(|i| {
                             if let Some(join_on_columns) = join_on.as_ref() {
-                                let join_columns_in_index = join_on_columns.iter().map(
-                                    |c| i.get_row().get_columns().iter().find(|ic| ic.get_name().as_str() == c.as_str()).clone()
-                                ).collect::<Vec<_>>();
+                                let join_columns_in_index = join_on_columns
+                                    .iter()
+                                    .map(|c| {
+                                        i.get_row()
+                                            .get_columns()
+                                            .iter()
+                                            .find(|ic| ic.get_name().as_str() == c.as_str())
+                                            .clone()
+                                    })
+                                    .collect::<Vec<_>>();
                                 if join_columns_in_index.iter().any(|c| c.is_none()) {
                                     return None;
                                 }
-                                let join_columns_indices =
-                                    CubeTable::project_to_index_positions(
-                                        &join_columns_in_index.into_iter().map(|c| c.unwrap().clone()).collect(),
-                                        &i
-                                    );
-                                if (0..join_columns_indices.len()).map(|i| Some(i)).collect::<HashSet<_>>() !=
-                                    join_columns_indices.into_iter().collect::<HashSet<_>>() {
+                                let join_columns_indices = CubeTable::project_to_index_positions(
+                                    &join_columns_in_index
+                                        .into_iter()
+                                        .map(|c| c.unwrap().clone())
+                                        .collect(),
+                                    &i,
+                                );
+                                if (0..join_columns_indices.len())
+                                    .map(|i| Some(i))
+                                    .collect::<HashSet<_>>()
+                                    != join_columns_indices.into_iter().collect::<HashSet<_>>()
+                                {
                                     return None;
                                 }
                             }
@@ -446,7 +458,7 @@ impl SerializedPlan {
                                 join_on_columns.join("_"),
                                 name_split.join("."),
                                 join_on_columns.join(", ")
-                            )))
+                            )));
                         }
                         default_index
                     }
@@ -456,7 +468,7 @@ impl SerializedPlan {
                             "Can't find index to join table {} on {} and projection push down optimization has been disabled. Invalid state.",
                             name_split.join("."),
                             join_on_columns.join(", ")
-                        )))
+                        )));
                     }
                     default_index
                 };
@@ -491,24 +503,49 @@ impl SerializedPlan {
                 Ok(index_snapshots)
             }
             LogicalPlan::Projection { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots, join_on)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Filter { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots, join_on)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Aggregate { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots, join_on)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Sort { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots, join_on)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Limit { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots, join_on)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::CreateExternalTable { .. } => Ok(index_snapshots),
             LogicalPlan::Explain { .. } => Ok(index_snapshots),
@@ -520,32 +557,52 @@ impl SerializedPlan {
                         i.clone(),
                         meta_store.clone(),
                         snapshots,
-                        join_on.clone()
+                        join_on.clone(),
                     )
                     .await?;
                 }
                 Ok(snapshots)
             }
-            LogicalPlan::Join { left, right, on, .. } => {
+            LogicalPlan::Join {
+                left, right, on, ..
+            } => {
                 let mut snapshots = index_snapshots;
                 snapshots = Self::index_snapshots_from_plan_boxed(
                     left.clone(),
                     meta_store.clone(),
                     snapshots,
                     Some(
-                        join_on.as_ref().unwrap_or(&Vec::new()).iter().map(|c| c.to_string())
-                        .chain(on.iter().map(|(l, _)| l.split(".").last().unwrap().to_string())).collect()
-                    )
-                ).await?;
+                        join_on
+                            .as_ref()
+                            .unwrap_or(&Vec::new())
+                            .iter()
+                            .map(|c| c.to_string())
+                            .chain(
+                                on.iter()
+                                    .map(|(l, _)| l.split(".").last().unwrap().to_string()),
+                            )
+                            .collect(),
+                    ),
+                )
+                .await?;
                 snapshots = Self::index_snapshots_from_plan_boxed(
                     right.clone(),
                     meta_store.clone(),
                     snapshots,
                     Some(
-                        join_on.as_ref().unwrap_or(&Vec::new()).iter().map(|c| c.to_string())
-                            .chain(on.iter().map(|(_, r)| r.split(".").last().unwrap().to_string())).collect()
-                    )
-                ).await?;
+                        join_on
+                            .as_ref()
+                            .unwrap_or(&Vec::new())
+                            .iter()
+                            .map(|c| c.to_string())
+                            .chain(
+                                on.iter()
+                                    .map(|(_, r)| r.split(".").last().unwrap().to_string()),
+                            )
+                            .collect(),
+                    ),
+                )
+                .await?;
                 Ok(snapshots)
             }
         }
