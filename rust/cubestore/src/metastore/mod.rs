@@ -590,7 +590,12 @@ pub trait MetaStore: Send + Sync {
     ) -> Result<(), CubeError>;
 
     fn index_table(&self) -> Box<dyn MetaStoreTable<T = Index>>;
-    async fn create_index(&self, schema_name: String, table_name: String, index_def: IndexDef) -> Result<IdRow<Index>, CubeError>;
+    async fn create_index(
+        &self,
+        schema_name: String,
+        table_name: String,
+        index_def: IndexDef,
+    ) -> Result<IdRow<Index>, CubeError>;
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
     async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
     async fn get_active_partitions_by_index_id(
@@ -615,6 +620,11 @@ pub trait MetaStore: Send + Sync {
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn deactivate_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
+    async fn swap_chunks(
+        &self,
+        deactivate_ids: Vec<u64>,
+        uploaded_ids: Vec<u64>,
+    ) -> Result<(), CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
@@ -1646,7 +1656,6 @@ impl RocksMetaStore {
     }
 }
 
-
 impl RocksMetaStore {
     fn add_index(
         batch_pipe: &mut BatchPipe,
@@ -1654,10 +1663,19 @@ impl RocksMetaStore {
         rocks_partition: &PartitionRocksTable,
         index_cols: &Vec<Column>,
         table_id: &IdRow<Table>,
-        index_def: IndexDef) -> Result<IdRow<Index>, CubeError>
-    {
-        if let Some(not_found) = index_def.columns.iter().find(|dc| index_cols.iter().all(|c| c.name.as_str() != dc.as_str())) {
-            return Err(CubeError::user(format!("Column {} in index {} not found in table {}", not_found, index_def.name, table_id.get_row().get_table_name())));
+        index_def: IndexDef,
+    ) -> Result<IdRow<Index>, CubeError> {
+        if let Some(not_found) = index_def
+            .columns
+            .iter()
+            .find(|dc| index_cols.iter().all(|c| c.name.as_str() != dc.as_str()))
+        {
+            return Err(CubeError::user(format!(
+                "Column {} in index {} not found in table {}",
+                not_found,
+                index_def.name,
+                table_id.get_row().get_table_name()
+            )));
         }
         let (mut sorted, mut unsorted) =
             index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
@@ -1685,7 +1703,12 @@ impl RocksMetaStore {
         Ok(index_id)
     }
 
-    fn get_table_by_name(schema_name: String, table_name: String, rocks_table: TableRocksTable, rocks_schema: SchemaRocksTable) -> Result<IdRow<Table>, CubeError> {
+    fn get_table_by_name(
+        schema_name: String,
+        table_name: String,
+        rocks_table: TableRocksTable,
+        rocks_schema: SchemaRocksTable,
+    ) -> Result<IdRow<Table>, CubeError> {
         let schema_id =
             rocks_schema.get_single_row_by_index(&schema_name, &SchemaRocksIndex::Name)?;
         let index_key = TableIndexKey::ByName(schema_id.get_id(), table_name.to_string());
@@ -1879,7 +1902,14 @@ impl MetaStore for RocksMetaStore {
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
             for index_def in indexes.into_iter() {
-                RocksMetaStore::add_index(batch_pipe, &rocks_index, &rocks_partition, &index_cols, &table_id, index_def)?;
+                RocksMetaStore::add_index(
+                    batch_pipe,
+                    &rocks_index,
+                    &rocks_partition,
+                    &index_cols,
+                    &table_id,
+                    index_def,
+                )?;
             }
 
             let (mut sorted, mut unsorted) =
@@ -1920,7 +1950,12 @@ impl MetaStore for RocksMetaStore {
         self.read_operation(move |db_ref| {
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref);
-            let table = RocksMetaStore::get_table_by_name(schema_name, table_name, rocks_table, rocks_schema)?;
+            let table = RocksMetaStore::get_table_by_name(
+                schema_name,
+                table_name,
+                rocks_table,
+                rocks_schema,
+            )?;
             Ok(table)
         })
         .await
@@ -2110,21 +2145,43 @@ impl MetaStore for RocksMetaStore {
         })
     }
 
-    async fn create_index(&self, schema_name: String, table_name: String, index_def: IndexDef) -> Result<IdRow<Index>, CubeError> {
+    async fn create_index(
+        &self,
+        schema_name: String,
+        table_name: String,
+        index_def: IndexDef,
+    ) -> Result<IdRow<Index>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_index = IndexRocksTable::new(db_ref.clone());
             let rocks_partition = PartitionRocksTable::new(db_ref.clone());
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
 
-            let table = RocksMetaStore::get_table_by_name(schema_name, table_name, rocks_table, rocks_schema)?;
+            let table = RocksMetaStore::get_table_by_name(
+                schema_name,
+                table_name,
+                rocks_table,
+                rocks_schema,
+            )?;
 
             if *table.get_row().has_data() {
-                return Err(CubeError::user(format!("Can't create '{}' index because '{}' table already has data", index_def.name, table.get_row().get_table_name())))
+                return Err(CubeError::user(format!(
+                    "Can't create '{}' index because '{}' table already has data",
+                    index_def.name,
+                    table.get_row().get_table_name()
+                )));
             }
 
-            Ok(RocksMetaStore::add_index(batch_pipe, &rocks_index, &rocks_partition, table.get_row().get_columns(), &table, index_def)?)
-        }).await
+            Ok(RocksMetaStore::add_index(
+                batch_pipe,
+                &rocks_index,
+                &rocks_partition,
+                table.get_row().get_columns(),
+                &table,
+                index_def,
+            )?)
+        })
+        .await
     }
 
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError> {
@@ -2235,17 +2292,18 @@ impl MetaStore for RocksMetaStore {
             for partition_id in partitions_up_to_root.into_iter() {
                 chunks.extend(
                     table
-                    .get_rows_by_index(
-                        &ChunkIndexKey::ByPartitionId(partition_id),
-                        &ChunkRocksIndex::PartitionId,
-                    )?
-                    .into_iter()
-                    .filter(|c| c.get_row().uploaded() && c.get_row().active())
+                        .get_rows_by_index(
+                            &ChunkIndexKey::ByPartitionId(partition_id),
+                            &ChunkRocksIndex::PartitionId,
+                        )?
+                        .into_iter()
+                        .filter(|c| c.get_row().uploaded() && c.get_row().active()),
                 );
             }
 
             Ok(chunks)
-        }).await
+        })
+        .await
     }
 
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {
@@ -2276,6 +2334,24 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn swap_chunks(
+        &self,
+        deactivate_ids: Vec<u64>,
+        uploaded_ids: Vec<u64>,
+    ) -> Result<(), CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let table = ChunkRocksTable::new(db_ref.clone());
+            for id in deactivate_ids {
+                table.update_with_fn(id, |row| row.deactivate(), batch_pipe)?;
+            }
+            for id in uploaded_ids {
+                table.update_with_fn(id, |row| row.set_uploaded(true), batch_pipe)?;
+            }
+            Ok(())
+        })
+        .await
+    }
+
     fn chunks_table(&self) -> Box<dyn MetaStoreTable<T = Chunk>> {
         Box::new(MetaStoreTableImpl {
             rocks_meta_store: self.clone(),
@@ -2286,8 +2362,11 @@ impl MetaStore for RocksMetaStore {
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_wal = WALRocksTable::new(db_ref.clone());
-            TableRocksTable::new(db_ref.clone())
-                .update_with_fn(table_id, |t| t.update_has_data(true), batch_pipe)?;
+            TableRocksTable::new(db_ref.clone()).update_with_fn(
+                table_id,
+                |t| t.update_has_data(true),
+                batch_pipe,
+            )?;
 
             let wal = WAL::new(table_id, row_count);
             let id_row = rocks_wal.insert(wal, batch_pipe)?;
@@ -2421,7 +2500,6 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 }
-
 
 #[cfg(test)]
 mod tests {
