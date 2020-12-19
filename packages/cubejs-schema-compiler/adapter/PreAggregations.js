@@ -23,7 +23,7 @@ class PreAggregations {
     if (!isInPreAggregationQuery) {
       const preAggregationForQuery = this.findPreAggregationForQuery();
       if (preAggregationForQuery) {
-        return this.preAggregationDescriptionsFor(preAggregationForQuery.cube, preAggregationForQuery);
+        return this.preAggregationDescriptionsFor(preAggregationForQuery);
       }
     }
     if (
@@ -33,7 +33,7 @@ class PreAggregations {
         R.map(cube => {
           const foundPreAggregation = this.findPreAggregationToUseForCube(cube);
           if (foundPreAggregation) {
-            return this.preAggregationDescriptionsFor(cube, foundPreAggregation);
+            return this.preAggregationDescriptionsFor(foundPreAggregation);
           }
           return null;
         }),
@@ -49,7 +49,7 @@ class PreAggregations {
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }
 
-  preAggregationDescriptionsFor(cube, foundPreAggregation) {
+  preAggregationDescriptionsFor(foundPreAggregation) {
     let preAggregations = [foundPreAggregation];
     if (foundPreAggregation.preAggregation.type === 'rollupJoin') {
       preAggregations = foundPreAggregation.preAggregationsToJoin;
@@ -382,7 +382,7 @@ class PreAggregations {
         );
         if (preAggregation.type === 'rollupJoin') {
           // TODO evaluation optimizations. Should be cached or moved to compile time.
-          const preAggregationsToJoin = preAggObj.canUsePreAggregation ? preAggObj.references.rollups.map(
+          const preAggregationsToJoin = preAggObj.references.rollups.map(
             name => {
               const [joinCube, joinPreAggregationName] = this.query.cubeEvaluator.parsePath('preAggregations', name);
               return this.evaluatedPreAggregationObj(
@@ -392,12 +392,11 @@ class PreAggregations {
                 canUsePreAggregation
               );
             }
-          ) : null;
+          );
           return {
             ...preAggObj,
             preAggregationsToJoin,
-            // TODO evaluation optimizations. Should be cached or moved to compile time.
-            rollupJoin: preAggObj.canUsePreAggregation ? this.buildRollupJoin(preAggObj, preAggregationsToJoin) : null
+            rollupJoin: this.buildRollupJoin(preAggObj, preAggregationsToJoin)
           };
         } else {
           return preAggObj;
@@ -406,32 +405,37 @@ class PreAggregations {
     )(preAggregations);
   }
 
-  // TODO cache, check multiplication factor didn't change
+  // TODO check multiplication factor didn't change
   buildRollupJoin(preAggObj, preAggObjsToJoin) {
-    const targetJoins = this.resolveJoinMembers(
-      this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(preAggObj))
+    return this.query.cacheValue(
+      ['buildRollupJoin', JSON.stringify(preAggObj), JSON.stringify(preAggObjsToJoin)],
+      () => {
+        const targetJoins = this.resolveJoinMembers(
+          this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(preAggObj))
+        );
+        const existingJoins = R.unnest(preAggObjsToJoin.map(
+          p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p)))
+        ));
+        const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
+          existing => existing.originalFrom === target.originalFrom &&
+            existing.originalTo === target.originalTo &&
+            R.eq(existing.fromMembers, target.fromMembers) &&
+            R.eq(existing.toMembers, target.toMembers)
+        ));
+        if (!nonExistingJoins.length) {
+          throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
+        }
+        return nonExistingJoins.map(join => {
+          const fromPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.fromMembers, join);
+          const toPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.toMembers, join);
+          return {
+            ...join,
+            fromPreAggObj,
+            toPreAggObj
+          };
+        });
+      }
     );
-    const existingJoins = R.unnest(preAggObjsToJoin.map(
-      p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p)))
-    ));
-    const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
-      existing => existing.originalFrom === target.originalFrom &&
-        existing.originalTo === target.originalTo &&
-        R.eq(existing.fromMembers, target.fromMembers) &&
-        R.eq(existing.toMembers, target.toMembers)
-    ));
-    if (!nonExistingJoins.length) {
-      throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
-    }
-    return nonExistingJoins.map(join => {
-      const fromPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.fromMembers, join);
-      const toPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.toMembers, join);
-      return {
-        ...join,
-        fromPreAggObj,
-        toPreAggObj
-      };
-    });
   }
 
   preAggObjForJoin(preAggObjsToJoin, joinMembers, join) {
@@ -492,7 +496,8 @@ class PreAggregations {
 
   rollupMatchResultDescriptions() {
     return this.rollupMatchResults().map(p => ({
-      ...this.preAggregationDescriptionFor(p.cube, p),
+      name: this.query.cubeEvaluator.pathFromArray([p.cube, p.preAggregationName]),
+      tableName: this.preAggregationTableName(p.cube, p.preAggregationName, p.preAggregation),
       references: p.references,
       canUsePreAggregation: p.canUsePreAggregation
     }));
