@@ -474,19 +474,14 @@ impl SerializedPlan {
                 };
 
                 let partitions = meta_store
-                    .get_active_partitions_by_index_id(index.get_id())
+                    .get_active_partitions_and_chunks_by_index_id(index.get_id())
                     .await?;
-
-                let meta_store_to_move = meta_store.clone();
 
                 let mut partition_snapshots = Vec::new();
 
-                for partition in partitions.into_iter() {
+                for (partition, chunks) in partitions.into_iter() {
                     partition_snapshots.push(PartitionSnapshot {
-                        chunks: meta_store_to_move
-                            .clone()
-                            .get_chunks_by_partition_with_non_repartitioned(partition.get_id())
-                            .await?,
+                        chunks,
                         partition,
                     });
                 }
