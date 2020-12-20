@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.24.14",
+  "version": "0.24.15",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.24.13",
-    "@cubejs-backend/schema-compiler": "^0.24.14",
+    "@cubejs-backend/schema-compiler": "^0.24.15",
     "generic-pool": "^3.6.0",
     "moment-timezone": "^0.5.31",
     "mysql": "^2.16.0"

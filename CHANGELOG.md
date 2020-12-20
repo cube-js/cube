@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.24.15](https://github.com/cube-js/cube.js/compare/v0.24.14...v0.24.15) (2020-12-20)
+
+
+### Bug Fixes
+
+* **cubestore:** Atomic chunks repartition ([b1a23da](https://github.com/cube-js/cube.js/commit/b1a23dac8b82e2ab997ec060109948c355e37764))
+* **cubestore:** Atomic index snapshotting ([8a50f34](https://github.com/cube-js/cube.js/commit/8a50f34c22db7cc9ddd13c4aa33c864a90e29b4f))
+
+
+### Features
+
+* Allow joins between data sources for external queries ([1dbfe2c](https://github.com/cube-js/cube.js/commit/1dbfe2cdc1b1904ce8567a7599b24e660c5047f3))
+* **cubestore:** Support GROUP BY DECIMAL ([#1652](https://github.com/cube-js/cube.js/issues/1652)) ([4ad97dc](https://github.com/cube-js/cube.js/commit/4ad97dc8ae618fccb98020b50e335c5e8cf47459))
+
+
+
+
+
 ## [0.24.14](https://github.com/cube-js/cube.js/compare/v0.24.13...v0.24.14) (2020-12-19)
 
 
