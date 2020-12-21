@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-schema-compiler"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "files": [
     "dist/src",

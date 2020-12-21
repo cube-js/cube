@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-dremio-driver"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "main": "driver/DremioDriver.js",
   "scripts": {
