@@ -1053,7 +1053,10 @@ class MainComponent {
         this.chartType$ = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"]('line');
     }
     ngOnInit() {
-        window.dispatchEvent(new CustomEvent('cubejsChartReady'));
+        const { onChartRendererReady } = window.parent.window['__cubejsPlayground'] || {};
+        if (typeof onChartRendererReady === 'function') {
+            onChartRendererReady();
+        }
     }
     onCubejsEvent(event) {
         const { query, pivotConfig, chartType, chartingLibrary } = event.detail;

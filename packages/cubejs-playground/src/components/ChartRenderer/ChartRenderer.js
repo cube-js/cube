@@ -22,15 +22,6 @@ export default function ChartRenderer({
   }, []);
 
   useEffect(() => {
-    if (iframeRef.current) {
-      iframeRef.current.addEventListener('load', () => {
-        onChartRendererReadyChange(true);
-      });
-    }
-    // eslint-disable-next-line
-  }, [iframeRef]);
-
-  useEffect(() => {
     if (isChartRendererReady && iframeRef.current) {
       dispatchChartEvent(iframeRef.current.contentDocument, {
         pivotConfig,
