@@ -8,7 +8,6 @@ import CubeCore, {
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
 import express from 'express';
-import https from 'https';
 import http from 'http';
 import util from 'util';
 import bodyParser from 'body-parser';
@@ -50,8 +49,6 @@ export class CubejsServer {
 
   protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http'>;
 
-  protected redirector: http.Server | null = null;
-
   protected server: GracefulHttpServer | null = null;
 
   protected socketServer: WebSocketServer | null = null;
@@ -72,11 +69,10 @@ export class CubejsServer {
     };
 
     this.core = CubeCore.create(config);
-    this.redirector = null;
     this.server = null;
   }
 
-  public async listen(options: https.ServerOptions | http.ServerOptions = {}) {
+  public async listen(options: http.ServerOptions = {}) {
     try {
       if (this.server) {
         throw new Error('CubeServer is already listening');
@@ -96,57 +92,24 @@ export class CubejsServer {
 
       await this.core.initApp(app);
 
-      const PORT = getEnv('port');
-      const TLS_PORT = getEnv('tlsPort');
-
       const enableTls = getEnv('tls');
       if (enableTls) {
-        process.emitWarning(
-          'Environment variable CUBEJS_ENABLE_TLS was deprecated and will be removed. \n' +
-          'Use own reverse proxy in front of Cube.js for proxying HTTPS traffic.',
-          'DeprecationWarning',
-        );
-
-        this.redirector = http.createServer((req, res) => {
-          if (req.headers.host) {
-            res.writeHead(301, {
-              Location: `https://${req.headers.host.split(':')[0]}:${TLS_PORT}${req.url}`
-            });
-          }
-
-          res.end();
-        });
-
-        this.redirector.listen(PORT);
+        throw new Error('CUBEJS_ENABLE_TLS has been deprecated and removed.');
       }
 
-      if (enableTls) {
-        this.server = gracefulHttp(https.createServer(options, app));
-      } else {
-        const [major] = process.version.split('.');
-        if (major === '8' && Object.keys(options).length) {
-          process.emitWarning(
-            'There is no support for passing options inside listen method in Node.js 8.',
-            'CustomWarning',
-          );
-
-          this.server = gracefulHttp(http.createServer(app));
-        } else {
-          this.server = gracefulHttp(http.createServer(options, app));
-        }
-      }
+      this.server = gracefulHttp(http.createServer(options, app));
 
       if (this.config.webSockets) {
         this.socketServer = new WebSocketServer(this.core, this.config);
         this.socketServer.initServer(this.server);
       }
 
-      await this.server.listen(enableTls ? TLS_PORT : PORT);
+      const PORT = getEnv('port');
+      await this.server.listen(PORT);
 
       return {
         app,
         port: PORT,
-        tlsPort: enableTls ? TLS_PORT : undefined,
         server: this.server,
         version
       };
@@ -156,6 +119,7 @@ export class CubejsServer {
           error: (e.stack || e.message || e).toString()
         });
       }
+
       throw e;
     }
   }
@@ -191,12 +155,6 @@ export class CubejsServer {
 
       await util.promisify(this.server.close)();
       this.server = null;
-
-      if (this.redirector) {
-        await util.promisify(this.redirector.close)();
-
-        this.redirector = null;
-      }
 
       await this.core.releaseConnections();
     } catch (e) {
@@ -241,10 +199,6 @@ export class CubejsServer {
       );
 
       this.status.shutdown();
-
-      if (this.redirector) {
-        this.redirector.close();
-      }
 
       const locks: Promise<any>[] = [
         this.core.beforeShutdown()
