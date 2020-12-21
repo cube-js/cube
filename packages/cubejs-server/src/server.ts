@@ -124,7 +124,7 @@ export class CubejsServer {
       }
 
       if (this.config.webSockets) {
-        this.socketServer = new WebSocketServer(this.core, this.core.options);
+        this.socketServer = new WebSocketServer(this.core, this.config);
         this.socketServer.initServer(this.server);
       }
 

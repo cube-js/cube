@@ -40,6 +40,10 @@ const variables = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
+  refreshTimer: () => get('CUBEJS_SCHEDULED_REFRESH_TIMER')
+    .asInt(),
+  scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
+    .asBool(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
   // It's only excepted for CI, nothing else.

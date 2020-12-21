@@ -1,25 +1,35 @@
 /* eslint-disable global-require */
-const crypto = require('crypto');
-const fs = require('fs-extra');
-const path = require('path');
-const LRUCache = require('lru-cache');
-const SqlString = require('sqlstring');
-const R = require('ramda');
-const isDocker = require('is-docker');
+import crypto from 'crypto';
+import fs from 'fs-extra';
+import path from 'path';
+import LRUCache from 'lru-cache';
+import isDocker from 'is-docker';
 
-const { ApiGateway } = require('@cubejs-backend/api-gateway');
-const { track, internalExceptions, getEnv, getAnonymousId } = require('@cubejs-backend/shared');
+import { ApiGateway } from '@cubejs-backend/api-gateway';
+import { getAnonymousId, getEnv, internalExceptions, track } from '@cubejs-backend/shared';
+import type { Application as ExpressApplication } from 'express';
+import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import type {
+  CreateOptions,
+  DatabaseType,
+  DriverContext,
+  RequestContext,
+  SchemaFileRepository,
+} from './types';
 
-const CompilerApi = require('./CompilerApi');
-const OrchestratorApi = require('./OrchestratorApi');
-const RefreshScheduler = require('./RefreshScheduler');
-const FileRepository = require('./FileRepository');
-const DevServer = require('./DevServer');
-const agentCollect = require('./agentCollect');
-const { version } = require('../package.json');
-const DriverDependencies = require('./DriverDependencies');
-const optionsValidate = require('./optionsValidate');
-const DataSourceStorage = require('./DataSourceStorage');
+import { FileRepository } from './FileRepository';
+import { RefreshScheduler } from './RefreshScheduler';
+import { OrchestratorApi } from './OrchestratorApi';
+import { CompilerApi } from './CompilerApi';
+import { DevServer } from './DevServer';
+import agentCollect from './agentCollect';
+import { OrchestratorStorage } from './OrchestratorStorage';
+import { prodLogger, devLogger } from './logger';
+
+import DriverDependencies from './DriverDependencies';
+import optionsValidate from './optionsValidate';
+
+const { version } = require('../../../package.json');
 
 const checkEnvForPlaceholders = () => {
   const placeholderSubstr = '<YOUR_DB_';
@@ -38,131 +48,83 @@ const checkEnvForPlaceholders = () => {
   }
 };
 
-const devLogger = (level) => (type, { error, warning, ...message }) => {
-  const colors = {
-    red: '31', // ERROR
-    green: '32', // INFO
-    yellow: '33', // WARNING
-  };
+type RequireOne<T, K extends keyof T> = {
+  [X in Exclude<keyof T, K>]?: T[X]
+} & {
+  [P in K]-?: T[P]
+}
 
-  const withColor = (str, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
-  const format = ({
-    requestId, duration, allSqlLines, query, values, showRestParams, ...json
-  }) => {
-    const restParams = JSON.stringify(json, null, 2);
-    const durationStr = duration ? `(${duration}ms)` : '';
-    const prefix = `${requestId} ${durationStr}`;
-    if (query && values) {
-      const queryMaxLines = 50;
-      query = query.replace(/\$(\d+)/g, '?');
-      let formatted = SqlString.format(query, values).split('\n');
-      if (formatted.length > queryMaxLines && !allSqlLines) {
-        formatted = R.take(queryMaxLines / 2, formatted)
-          .concat(['.....', '.....', '.....'])
-          .concat(R.takeLast(queryMaxLines / 2, formatted));
-      }
-      return `${prefix}\n--\n  ${formatted.join('\n')}\n--${showRestParams ? `\n${restParams}` : ''}`;
-    } else if (query) {
-      return `${prefix}\n--\n${JSON.stringify(query, null, 2)}\n--${showRestParams ? `\n${restParams}` : ''}`;
-    }
-    return `${prefix}${showRestParams ? `\n${restParams}` : ''}`;
-  };
+type ServerCoreOptions = RequireOne<
+  CreateOptions,
+  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'driverFactory' | 'dialectFactory'
+>;
 
-  const logWarning = () => console.log(
-    `${withColor(type, colors.yellow)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${withColor(warning, colors.yellow)}`
-  );
-  const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${error}`);
-  const logDetails = (showRestParams) => console.log(`${withColor(type)}: ${format({ ...message, showRestParams })}`);
+export class CubejsServerCore {
+  protected readonly repository: FileRepository;
 
-  if (error) {
-    logError();
-    return;
-  }
+  protected readonly driverFactory: (context: DriverContext) => any;
 
-  // eslint-disable-next-line default-case
-  switch ((level || 'info').toLowerCase()) {
-    case 'trace': {
-      if (!error && !warning) {
-        logDetails(true);
-        break;
-      }
-    }
-    // eslint-disable-next-line no-fallthrough
-    case 'info': {
-      if (!error && !warning && [
-        'Executing SQL',
-        'Executing Load Pre Aggregation SQL',
-        'Load Request Success',
-        'Performing query',
-        'Performing query completed',
-      ].includes(type)) {
-        logDetails();
-        break;
-      }
-    }
-    // eslint-disable-next-line no-fallthrough
-    case 'warn': {
-      if (!error && warning) {
-        logWarning();
-        break;
-      }
-    }
-    // eslint-disable-next-line no-fallthrough
-    case 'error': {
-      if (error) {
-        logError();
-        break;
-      }
-    }
-  }
-};
+  protected readonly externalDriverFactory: (context: RequestContext) => any;
 
-const prodLogger = (level) => (msg, params) => {
-  const { error, warning } = params;
+  protected readonly externalDialectFactory: any;
 
-  const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
-  // eslint-disable-next-line default-case
-  switch ((level || 'warn').toLowerCase()) {
-    case 'trace': {
-      if (!error && !warning) {
-        logMessage();
-        break;
-      }
-    }
-    // eslint-disable-next-line no-fallthrough
-    case 'info':
-      if ([
-        'REST API Request',
-      ].includes(msg)) {
-        logMessage();
-        break;
-      }
-    // eslint-disable-next-line no-fallthrough
-    case 'warn': {
-      if (!error && warning) {
-        logMessage();
-        break;
-      }
-    }
-    // eslint-disable-next-line no-fallthrough
-    case 'error': {
-      if (error) {
-        logMessage();
-        break;
-      }
-    }
-  }
-};
+  protected devServer: DevServer|undefined;
 
-class CubejsServerCore {
-  constructor(options) {
-    optionsValidate(options);
-    options = options || {};
-    options = {
-      driverFactory: () => typeof options.dbType === 'string' && CubejsServerCore.createDriver(options.dbType),
-      dialectFactory: () => typeof options.dbType === 'string' &&
-        CubejsServerCore.lookupDriverClass(options.dbType).dialectClass &&
-        CubejsServerCore.lookupDriverClass(options.dbType).dialectClass(),
+  protected dialectFactory: any;
+
+  protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
+
+  protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
+
+  protected contextToDbType: any;
+
+  protected contextToExternalDbType: any;
+
+  protected compilerCache: LRUCache<string, CompilerApi>;
+
+  protected contextToAppId: any;
+
+  protected contextToOrchestratorId: any;
+
+  protected preAggregationsSchema: any;
+
+  protected readonly orchestratorOptions: any;
+
+  protected logger: any;
+
+  protected preAgentLogger: any;
+
+  protected readonly options: ServerCoreOptions;
+
+  protected readonly standalone: boolean;
+
+  protected scheduledRefreshTimerInterval: NodeJS.Timeout|undefined;
+
+  protected driver: BaseDriver|null = null;
+
+  protected apiGatewayInstance: ApiGateway|null = null;
+
+  public readonly event: (name: string, props?: object) => Promise<void>;
+
+  public projectFingerprint: string|null = null;
+
+  public anonymousId: string|null = null;
+
+  public coreServerVersion: string|null = null;
+
+  public constructor(opts: CreateOptions = {}) {
+    optionsValidate(opts);
+
+    const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
+    const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
+
+    const options: ServerCoreOptions = {
+      dbType,
+      externalDbType,
+      driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
+      dialectFactory: () => typeof dbType === 'string' &&
+        CubejsServerCore.lookupDriverClass(dbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(dbType).dialectClass(),
       externalDriverFactory: process.env.CUBEJS_EXT_DB_TYPE && (
         () => new (CubejsServerCore.lookupDriverClass(process.env.CUBEJS_EXT_DB_TYPE))({
           host: process.env.CUBEJS_EXT_DB_HOST,
@@ -172,22 +134,21 @@ class CubejsServerCore {
           password: process.env.CUBEJS_EXT_DB_PASS,
         })
       ),
-      externalDialectFactory: () => typeof options.externalDbType === 'string' &&
-        CubejsServerCore.lookupDriverClass(options.externalDbType).dialectClass &&
-        CubejsServerCore.lookupDriverClass(options.externalDbType).dialectClass(),
-      externalDbType: process.env.CUBEJS_EXT_DB_TYPE,
+      externalDialectFactory: () => typeof externalDbType === 'string' &&
+        CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(externalDbType).dialectClass(),
       apiSecret: process.env.CUBEJS_API_SECRET,
-      dbType: process.env.CUBEJS_DB_TYPE,
       devServer: process.env.NODE_ENV !== 'production',
       telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
-      scheduledRefreshTimer: process.env.CUBEJS_SCHEDULED_REFRESH_TIMER || process.env.CUBEJS_SCHEDULED_REFRESH,
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],
       basePath: '/cubejs-api',
       scheduledRefreshConcurrency: parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
-      ...options
+      ...opts,
+      schemaPath: opts.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema',
     };
+
     if (
       !options.driverFactory ||
       !options.apiSecret ||
@@ -195,34 +156,34 @@ class CubejsServerCore {
     ) {
       throw new Error('driverFactory, apiSecret, dbType are required options');
     }
+
     this.options = options;
     this.driverFactory = options.driverFactory;
     this.externalDriverFactory = options.externalDriverFactory;
     this.dialectFactory = options.dialectFactory;
     this.externalDialectFactory = options.externalDialectFactory;
-    this.apiSecret = options.apiSecret;
-    this.schemaPath = options.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema';
-    this.dbType = options.dbType;
-    this.logger = options.logger ||
-      (process.env.NODE_ENV !== 'production' ?
-        devLogger(process.env.CUBEJS_LOG_LEVEL) :
-        prodLogger(process.env.CUBEJS_LOG_LEVEL)
-      );
-    this.repository = new FileRepository(this.schemaPath);
+
+    this.logger = options.logger || (
+      process.env.NODE_ENV !== 'production'
+        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
+        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
+    );
+
+    this.repository = new FileRepository(options.schemaPath);
     this.repositoryFactory = options.repositoryFactory || (() => this.repository);
     this.contextToDbType = typeof options.dbType === 'function' ? options.dbType : () => options.dbType;
-    this.contextToExternalDbType = typeof options.externalDbType === 'function' ?
-      options.externalDbType :
-      () => options.externalDbType;
-    this.preAggregationsSchema =
-      typeof options.preAggregationsSchema === 'function' ? options.preAggregationsSchema : () => options.preAggregationsSchema;
-    this.compilerCache = new LRUCache({
+    this.contextToExternalDbType = typeof options.externalDbType === 'function'
+      ? options.externalDbType
+      : () => options.externalDbType;
+    this.preAggregationsSchema = typeof options.preAggregationsSchema === 'function'
+      ? options.preAggregationsSchema :
+      () => options.preAggregationsSchema;
+
+    this.compilerCache = new LRUCache<string, CompilerApi>({
       max: options.compilerCacheSize || 250,
       maxAge: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     });
-
-    this.orchestratorStorage = new DataSourceStorage();
 
     if (this.options.contextToAppId) {
       this.contextToAppId = options.contextToAppId;
@@ -233,8 +194,9 @@ class CubejsServerCore {
     }
 
     if (options.contextToDataSourceId) {
-      throw new Error(`contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.`);
+      throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
     }
+
     this.contextToOrchestratorId = options.contextToOrchestratorId || this.contextToAppId;
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
@@ -246,49 +208,30 @@ class CubejsServerCore {
       setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
     }
 
-    this.scheduledRefreshTimer = options.scheduledRefreshTimer;
-    this.scheduledRefreshTimeZones = options.scheduledRefreshTimeZones;
-    this.scheduledRefreshContexts = options.scheduledRefreshContexts;
-
-    if (this.scheduledRefreshTimer && (
-      typeof this.scheduledRefreshTimer === 'number' ||
-      typeof this.scheduledRefreshTimer === 'string' && this.scheduledRefreshTimer.match(/^\d+$/)
-    )) {
-      this.scheduledRefreshTimer = parseInt(this.scheduledRefreshTimer, 10) * 1000;
-    }
-
-    if (this.scheduledRefreshTimer && typeof this.scheduledRefreshTimer === 'string') {
-      this.scheduledRefreshTimer = this.scheduledRefreshTimer.toLowerCase() === 'true';
-    }
-
-    if (this.scheduledRefreshTimer == null) {
-      this.scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
-    }
-
-    if (typeof this.scheduledRefreshTimer === 'boolean' && this.scheduledRefreshTimer) {
-      this.scheduledRefreshTimer = 30000;
-    }
-
-    if (
-      this.scheduledRefreshTimer
-    ) {
+    const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
+      options.scheduledRefreshTimer || getEnv('refreshTimer') || getEnv('scheduledRefresh')
+    );
+    if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = setInterval(
         async () => {
-          const contexts = await this.scheduledRefreshContexts();
+          const contexts = await options.scheduledRefreshContexts();
           if (contexts.length < 1) {
             this.logger('Refresh Scheduler Error', {
               error: 'At least one context should be returned by scheduledRefreshContexts'
             });
           }
+
           await Promise.all(contexts.map(async context => {
-            const queryingOptions = { concurrency: this.options.scheduledRefreshConcurrency };
-            if (this.scheduledRefreshTimeZones) {
-              queryingOptions.timezones = this.scheduledRefreshTimeZones;
+            const queryingOptions: any = { concurrency: options.scheduledRefreshConcurrency };
+
+            if (options.scheduledRefreshTimeZones) {
+              queryingOptions.timezones = options.scheduledRefreshTimeZones;
             }
+
             await this.runScheduledRefresh(context, queryingOptions);
           }));
         },
-        this.scheduledRefreshTimer
+        scheduledRefreshTimer
       );
     }
 
@@ -376,21 +319,47 @@ class CubejsServerCore {
     } else {
       const oldLogger = this.logger;
       let loadRequestCount = 0;
+
       this.logger = ((msg, params) => {
         if (msg === 'Load Request Success') {
           loadRequestCount++;
         }
         oldLogger(msg, params);
       });
+
       setInterval(() => {
         this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount });
         loadRequestCount = 0;
       }, 60000);
+
       this.event('Server Start');
     }
   }
 
-  initAgent() {
+  protected detectScheduledRefreshTimer(scheduledRefreshTimer?: string | number | boolean): number|null {
+    if (scheduledRefreshTimer && (
+      typeof scheduledRefreshTimer === 'number' ||
+      typeof scheduledRefreshTimer === 'string' && scheduledRefreshTimer.match(/^\d+$/)
+    )) {
+      scheduledRefreshTimer = parseInt(<any>scheduledRefreshTimer, 10) * 1000;
+    }
+
+    if (scheduledRefreshTimer && typeof scheduledRefreshTimer === 'string') {
+      scheduledRefreshTimer = scheduledRefreshTimer.toLowerCase() === 'true';
+    }
+
+    if (scheduledRefreshTimer == null) {
+      scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
+    }
+
+    if (typeof scheduledRefreshTimer === 'boolean' && scheduledRefreshTimer) {
+      scheduledRefreshTimer = 30000;
+    }
+
+    return <any>scheduledRefreshTimer;
+  }
+
+  protected initAgent() {
     if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
       const oldLogger = this.logger;
       this.preAgentLogger = oldLogger;
@@ -408,7 +377,7 @@ class CubejsServerCore {
     }
   }
 
-  async flushAgent() {
+  protected async flushAgent() {
     if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
       await agentCollect(
         { msg: 'Flush Agent' },
@@ -418,18 +387,18 @@ class CubejsServerCore {
     }
   }
 
-  static create(options) {
+  public static create(options) {
     return new CubejsServerCore(options);
   }
 
-  async initApp(app) {
+  public async initApp(app: ExpressApplication) {
     checkEnvForPlaceholders();
 
     const apiGateway = this.apiGateway();
     apiGateway.initApp(app);
 
     if (this.options.devServer) {
-      this.devServer.initDevEnv(app);
+      this.devServer.initDevEnv(app, this.options);
     } else {
       app.get('/', (req, res) => {
         res.status(200)
@@ -438,17 +407,17 @@ class CubejsServerCore {
     }
   }
 
-  initSubscriptionServer(sendMessage) {
+  public initSubscriptionServer(sendMessage) {
     checkEnvForPlaceholders();
 
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
   }
 
-  apiGateway() {
+  protected apiGateway() {
     if (!this.apiGatewayInstance) {
       this.apiGatewayInstance = new ApiGateway(
-        this.apiSecret,
+        this.options.apiSecret,
         this.getCompilerApi.bind(this),
         this.getOrchestratorApi.bind(this),
         this.logger, {
@@ -463,10 +432,11 @@ class CubejsServerCore {
         }
       );
     }
+
     return this.apiGatewayInstance;
   }
 
-  getCompilerApi(context) {
+  public getCompilerApi(context) {
     const appId = this.contextToAppId(context);
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
@@ -491,7 +461,7 @@ class CubejsServerCore {
     return compilerApi;
   }
 
-  getOrchestratorApi(context) {
+  public getOrchestratorApi(context: RequestContext) {
     const orchestratorId = this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
@@ -538,9 +508,9 @@ class CubejsServerCore {
     return orchestratorApi;
   }
 
-  createCompilerApi(repository, options) {
+  protected createCompilerApi(repository, options) {
     options = options || {};
-    return new CompilerApi(repository, options.dbType || this.dbType, {
+    return new CompilerApi(repository, options.dbType || this.options.dbType, {
       schemaVersion: options.schemaVersion || this.options.schemaVersion,
       devServer: this.options.devServer,
       logger: this.logger,
@@ -554,7 +524,7 @@ class CubejsServerCore {
     });
   }
 
-  createOrchestratorApi(options) {
+  protected createOrchestratorApi(options) {
     options = options || {};
 
     return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
@@ -564,21 +534,22 @@ class CubejsServerCore {
     });
   }
 
-  async runScheduledRefresh(context, queryingOptions) {
+  public async runScheduledRefresh(context, queryingOptions?: any) {
     const scheduler = new RefreshScheduler(this);
     return scheduler.runScheduledRefresh(context, queryingOptions);
   }
 
-  async getDriver() {
+  protected async getDriver() {
     if (!this.driver) {
-      const driver = this.driverFactory({});
+      const driver = this.driverFactory(<any>{});
       await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }
+
     return this.driver;
   }
 
-  static createDriver(dbType) {
+  public static createDriver(dbType: DatabaseType) {
     checkEnvForPlaceholders();
 
     const module = CubejsServerCore.lookupDriverClass(dbType);
@@ -591,7 +562,7 @@ class CubejsServerCore {
     return new module();
   }
 
-  static lookupDriverClass(dbType) {
+  protected static lookupDriverClass(dbType) {
     // eslint-disable-next-line global-require,import/no-dynamic-require
     const module = require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
     if (module.default) {
@@ -601,20 +572,21 @@ class CubejsServerCore {
     return module;
   }
 
-  static driverDependencies(dbType) {
+  public static driverDependencies(dbType: DatabaseType) {
     if (DriverDependencies[dbType]) {
       return DriverDependencies[dbType];
     } else if (fs.existsSync(path.join('node_modules', `${dbType}-cubejs-driver`))) {
       return `${dbType}-cubejs-driver`;
     }
+
     throw new Error(`Unsupported db type: ${dbType}`);
   }
 
-  async testConnections() {
+  public async testConnections() {
     return this.orchestratorStorage.testConnections();
   }
 
-  async releaseConnections() {
+  public async releaseConnections() {
     await this.orchestratorStorage.releaseConnections();
 
     if (this.scheduledRefreshTimerInterval) {
@@ -622,9 +594,7 @@ class CubejsServerCore {
     }
   }
 
-  static version() {
+  public static version() {
     return version;
   }
 }
-
-module.exports = CubejsServerCore;

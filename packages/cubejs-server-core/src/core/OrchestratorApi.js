@@ -2,7 +2,7 @@
 const pt = require('promise-timeout');
 const { QueryOrchestrator, ContinueWaitError } = require('@cubejs-backend/query-orchestrator');
 
-class OrchestratorApi {
+export class OrchestratorApi {
   constructor(driverFactory, logger, options) {
     options = options || {};
     this.options = options;
@@ -111,5 +111,3 @@ class OrchestratorApi {
     this.seenDataSources[dataSource] = true;
   }
 }
-
-module.exports = OrchestratorApi;

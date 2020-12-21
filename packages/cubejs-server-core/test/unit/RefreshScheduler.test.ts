@@ -1,10 +1,10 @@
 /* eslint-disable no-new */
 /* globals describe,test,expect,jest,beforeAll */
 
-const R = require('ramda');
-const RefreshScheduler = require('./RefreshScheduler');
-const CubejsServerCore = require('./index');
-const CompilerApi = require('./CompilerApi');
+import R from 'ramda';
+import { CubejsServerCore } from '../../src';
+import { RefreshScheduler } from '../../src/core/RefreshScheduler';
+import { CompilerApi } from '../../src/core/CompilerApi';
 
 const schemaContent = `
 cube('Foo', {
@@ -100,11 +100,13 @@ const repository = {
 };
 
 class OrchestratorApiMock {
-  constructor() {
+  public createdTables: any = [];
+
+  public constructor() {
     this.createdTables = [];
   }
 
-  async executeQuery(query) {
+  public async executeQuery(query) {
     console.log('Executing query', query);
     if (query.query && query.query.match(/min\(.*timestamp.*foo/)) {
       return {
@@ -147,6 +149,14 @@ class OrchestratorApiMock {
       data: [],
     };
   }
+
+  public getCompilerApi() {
+    //
+  }
+
+  public getOrchestratorApi() {
+    //
+  }
 }
 
 describe('Refresh Scheduler', () => {
@@ -161,9 +171,12 @@ describe('Refresh Scheduler', () => {
         console.log(msg, params);
       },
     });
+
     const orchestratorApi = new OrchestratorApiMock();
+
     jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(() => compilerApi);
-    jest.spyOn(serverCore, 'getOrchestratorApi').mockImplementation(() => orchestratorApi);
+    jest.spyOn(serverCore, 'getOrchestratorApi').mockImplementation(() => <any>orchestratorApi);
+
     const refreshScheduler = new RefreshScheduler(serverCore);
     return { refreshScheduler, orchestratorApi };
   };

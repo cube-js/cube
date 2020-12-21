@@ -1,9 +1,15 @@
-/* eslint-disable no-new */
-/* globals describe,test,expect */
+/* eslint-disable @typescript-eslint/no-empty-function */
 
-const CubejsServerCore = require('./index');
+import { CubejsServerCore } from '../../src';
+import { DatabaseType } from '../../src/core/types';
 
 process.env.CUBEJS_API_SECRET = 'api-secret';
+
+class CubejsServerCoreOpen extends CubejsServerCore {
+  public detectScheduledRefreshTimer(scheduledRefreshTimer?:string | number | boolean) {
+    return super.detectScheduledRefreshTimer(scheduledRefreshTimer);
+  }
+}
 
 describe('index.test', () => {
   test('Should create instance of CubejsServerCore, dbType as string', () => {
@@ -13,23 +19,23 @@ describe('index.test', () => {
   });
 
   test('Should create instance of CubejsServerCore, dbType as func', () => {
-    const options = { dbType: () => {} };
+    const options = { dbType: () => <DatabaseType>'postgres' };
 
     expect(new CubejsServerCore(options))
       .toBeInstanceOf(CubejsServerCore);
   });
 
   test('Should throw error, unknown dbType', () => {
-    const options = { dbType: 'unknown-db' };
+    const options = { dbType: <any>'unknown-db' };
 
-    expect(() => { new CubejsServerCore(options); })
+    expect(() => new CubejsServerCore(options))
       .toThrowError(/"dbType" must be one of/);
   });
 
   test('Should throw error, invalid options', () => {
     const options = {
-      dbType: 'mysql',
-      externalDbType: 'mysql',
+      dbType: <DatabaseType>'mysql',
+      externalDbType: <DatabaseType>'mysql',
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
@@ -37,12 +43,12 @@ describe('index.test', () => {
       compilerCacheSize: -10,
     };
 
-    expect(() => { new CubejsServerCore(options); })
+    expect(() => new CubejsServerCore(options))
       .toThrowError(/"compilerCacheSize" must be larger than or equal to 0/);
   });
 
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {
-    const options = { dbType: 'mysql', orchestratorOptions: () => {} };
+    const options = { dbType: <DatabaseType>'mysql', orchestratorOptions: () => <any>{} };
 
     expect(new CubejsServerCore(options))
       .toBeInstanceOf(CubejsServerCore);
@@ -60,8 +66,8 @@ describe('index.test', () => {
     };
 
     const options = {
-      dbType: 'mysql',
-      externalDbType: 'mysql',
+      dbType: <any>'mysql',
+      externalDbType: <any>'mysql',
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
@@ -72,8 +78,8 @@ describe('index.test', () => {
       logger: () => {},
       driverFactory: () => {},
       externalDriverFactory: () => {},
-      contextToAppId: () => {},
-      contextToOrchestratorId: () => {},
+      contextToAppId: () => 'STANDALONE',
+      contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
       checkAuth: () => {},
       checkAuthMiddleware: () => {},
@@ -106,9 +112,8 @@ describe('index.test', () => {
       allowJsDuplicatePropsInSchema: true
     };
 
-    const cubejsServerCore = new CubejsServerCore(options);
-    expect(cubejsServerCore)
-      .toBeInstanceOf(CubejsServerCore);
+    const cubejsServerCore = new CubejsServerCore(<any>options);
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
     await cubejsServerCore.releaseConnections();
   });
 
@@ -122,25 +127,28 @@ describe('index.test', () => {
   test('Should throw error, dbType is required', () => {
     delete process.env.CUBEJS_DB_TYPE;
 
-    expect(() => { new CubejsServerCore({}); })
+    expect(() => new CubejsServerCore({}))
       .toThrowError(/driverFactory, apiSecret, dbType are required options/);
   });
 
-  const expectRefreshTimerOption = (input, output, setProduction) => {
+  const expectRefreshTimerOption = (input, output, setProduction: boolean = false) => {
     test(`scheduledRefreshTimer option ${input}`, async () => {
       if (setProduction) {
         process.env.NODE_ENV = 'production';
       }
-      const cubejsServerCore = new CubejsServerCore({
+
+      const cubejsServerCore = new CubejsServerCoreOpen({
         dbType: 'mysql',
         apiSecret: 'secret',
         scheduledRefreshTimer: input
       });
       expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
-      expect(cubejsServerCore.scheduledRefreshTimer).toBe(output);
+      expect(cubejsServerCore.detectScheduledRefreshTimer(input)).toBe(output);
 
       await cubejsServerCore.releaseConnections();
       delete process.env.NODE_ENV;
+
+      await new Promise((resolve => { setTimeout(resolve, 1000); }));
     });
   };
 
