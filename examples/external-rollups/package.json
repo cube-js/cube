@@ -8,7 +8,6 @@
   "devDependencies":  {
     "@cubejs-backend/bigquery-driver": "^0.24.5",
     "@cubejs-backend/mysql-driver": "^0.24.5",
-    "@cubejs-backend/server": "^0.24.5",
-    "@cubejs-backend/cubestore-driver": "^0.24.5"
+    "@cubejs-backend/server": "^0.24.5"
   }
 }
