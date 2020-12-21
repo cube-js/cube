@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
 ## [0.24.13](https://github.com/cube-js/cube.js/compare/v0.24.12...v0.24.13) (2020-12-18)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver
