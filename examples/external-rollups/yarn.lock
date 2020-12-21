@@ -844,7 +844,7 @@
     ramda "^0.27.0"
     uuid "^3.3.3"
 
-"@cubejs-backend/bigquery-driver@^0.24.13":
+"@cubejs-backend/bigquery-driver@^0.24.5":
   version "0.24.13"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/bigquery-driver/-/bigquery-driver-0.24.13.tgz#f0cf73bca8c4e356ac7790137c7263a4c86f251a"
   integrity sha512-yPC++Sv91c7XEBvzkaBJy+8Aw/+0EiqqjibWmLJVRPZT6vrEIIcpylejY3ZbqttzeARWgJ/iNNYjhHhdkfCwFw==
@@ -853,14 +853,15 @@
     "@google-cloud/bigquery" "^4.1.4"
     ramda "^0.27.0"
 
-"@cubejs-backend/mysql-driver@^0.24.13":
-  version "0.24.13"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/mysql-driver/-/mysql-driver-0.24.13.tgz#efb77c1af5af538a731616e3e501758e8a1af231"
-  integrity sha512-Omx046WLtpBJiD6K0no06KLpSWUrcqd2AlTzXjoc9FwikfcRjUMZvkf2btLDWhnfHU8iteQQPG4Vs8IpDeWZXw==
+"@cubejs-backend/cubestore-driver@^0.24.5":
+  version "0.24.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore-driver/-/cubestore-driver-0.24.15.tgz#709fdfa79a2b7fccfa4d7dc2463be308c1662da3"
+  integrity sha512-thsEvBHZ9v6ytDLdC31n+g/9E04GOMy2p258sd3jGRUDTICdecPZicllS6k5FpGZUeH5e7l4YasRxCiELEcOfQ==
   dependencies:
     "@cubejs-backend/query-orchestrator" "^0.24.13"
-    "@types/mysql" "^2.15.15"
+    "@cubejs-backend/schema-compiler" "^0.24.15"
     generic-pool "^3.6.0"
+    moment-timezone "^0.5.31"
     mysql "^2.16.0"
 
 "@cubejs-backend/query-orchestrator@^0.24.13":
@@ -926,7 +927,7 @@
     sqlstring "^2.3.1"
     uuid "^3.3.3"
 
-"@cubejs-backend/server@^0.24.15":
+"@cubejs-backend/server@^0.24.5":
   version "0.24.15"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.24.15.tgz#60c9e43f6b8fc1b7bc160816e915efd8eb4e904d"
   integrity sha512-oeR9aLT6IKLC4urJurrMjlxaYpjfWfTD07RGcKCXTKCi/XoDpyVcTS/MbSz25PIj8BOOHvto0isCU2sU2VavOw==
@@ -1142,18 +1143,6 @@
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@tootallnate/once/-/once-1.1.2.tgz#ccb91445360179a04e7fe6aff78c00ffc1eeaf82"
   integrity sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==
-
-"@types/mysql@^2.15.15":
-  version "2.15.15"
-  resolved "https://registry.yarnpkg.com/@types/mysql/-/mysql-2.15.15.tgz#af2223d2841091a5a819eabee6dff19567f1cf1f"
-  integrity sha512-1GJnq7RwuFPRicMHdT53vza5v39nep9OKIbozxNUpFXP04CydcdWrqpZQ+MlVdlLFCisWnnt09xughajjWpFsw==
-  dependencies:
-    "@types/node" "*"
-
-"@types/node@*":
-  version "14.14.9"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.14.9.tgz#04afc9a25c6ff93da14deabd65dc44485b53c8d6"
-  integrity sha512-JsoLXFppG62tWTklIoO4knA+oDTYsmqWxHRvd4lpmfQRNhX6osheUOWETP2jMoV/2bEHuMra8Pp3Dmo/stBFcw==
 
 "@yarnpkg/lockfile@^1.1.0":
   version "1.1.0"
