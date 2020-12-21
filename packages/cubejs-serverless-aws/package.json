@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-serverless-aws"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "main": "index.js",
   "dependencies": {
