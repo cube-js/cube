@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-mysql-driver"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "main": "driver/MySqlDriver.js",
   "typings": "driver/index.d.ts",

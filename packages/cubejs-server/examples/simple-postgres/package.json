@@ -4,7 +4,7 @@
   "author": "Statsbot, Inc.",
   "version": "0.0.1",
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "scripts": {
     "test": "mocha"
