@@ -747,7 +747,13 @@ class PreAggregationLoader {
 }
 
 export class PreAggregations {
-  public options: any;
+  public options: {
+    preAggregationsSchemaCacheExpire?: number;
+    loadCacheQueueOptions?: any;
+    queueOptions?: object | ((dataSource: String) => object);
+    redisPool?: any;
+    cacheAndQueueDriver?: 'redis' | 'memory'
+  };
 
   private redisPrefix: string;
 
@@ -863,7 +869,10 @@ export class PreAggregations {
         logger: this.logger,
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
         redisPool: this.options.redisPool,
-        ...this.options.queueOptions
+        ...(typeof this.options.queueOptions === 'function' ?
+          this.options.queueOptions(dataSource) :
+          this.options.queueOptions
+        )
       });
     }
     return this.queue[dataSource];
