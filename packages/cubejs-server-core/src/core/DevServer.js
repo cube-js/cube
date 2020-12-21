@@ -14,16 +14,16 @@ const repo = {
   name: 'cubejs-playground-templates'
 };
 
-class DevServer {
+export class DevServer {
   constructor(cubejsServer) {
     this.cubejsServer = cubejsServer;
   }
 
-  initDevEnv(app) {
+  initDevEnv(app, options) {
     const port = process.env.PORT || 4000; // TODO
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
     const jwt = require('jsonwebtoken');
-    const cubejsToken = jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' });
+    const cubejsToken = jwt.sign({}, options.apiSecret, { expiresIn: '1d' });
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.');
     } else {
@@ -46,7 +46,7 @@ class DevServer {
     app.get('/playground/context', catchErrors((req, res) => {
       this.cubejsServer.event('Dev Server Env Open');
       res.json({
-        cubejsToken: jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }),
+        cubejsToken: jwt.sign({}, options.apiSecret, { expiresIn: '1d' }),
         apiUrl: process.env.CUBEJS_API_URL,
         basePath: this.cubejsServer.options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
@@ -94,13 +94,13 @@ class DevServer {
       const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver);
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables);
 
-      const schemaPath = this.cubejsServer.options.schemaPath || 'schema';
+      const schemaPath = options.schemaPath || 'schema';
 
       await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, file.fileName), file.content)));
       res.json({ files });
     }));
 
-    const dashboardAppPath = this.cubejsServer.options.dashboardAppPath || 'dashboard-app';
+    const dashboardAppPath = options.dashboardAppPath || 'dashboard-app';
 
     let lastApplyTemplatePackagesError = null;
 
@@ -145,7 +145,7 @@ class DevServer {
       });
     }));
 
-    const dashboardAppPort = this.cubejsServer.options.dashboardAppPort || 3000;
+    const dashboardAppPort = options.dashboardAppPort || 3000;
 
     app.get('/playground/start-dashboard-app', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Start Dashboard App');
@@ -258,7 +258,7 @@ class DevServer {
       res.json(await fetcher.manifestJSON());
     }));
 
-    app.use(serveStatic(path.join(__dirname, '../playground'), {
+    app.use(serveStatic(path.join(__dirname, '../../../playground'), {
       lastModified: false,
       etag: false,
       setHeaders: (res, url) => {
@@ -269,5 +269,3 @@ class DevServer {
     }));
   }
 }
-
-module.exports = DevServer;

@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const R = require('ramda');
 
-class FileRepository {
+export class FileRepository {
   constructor(repositoryPath) {
     this.repositoryPath = repositoryPath;
   }
@@ -77,5 +77,3 @@ class FileRepository {
     )).reduce((a, b) => a.concat(b), []);
   }
 }
-
-module.exports = FileRepository;

@@ -2,7 +2,7 @@ const QueryBuilder = require('@cubejs-backend/schema-compiler/adapter/QueryBuild
 const PrepareCompiler = require('@cubejs-backend/schema-compiler/compiler/PrepareCompiler');
 const crypto = require('crypto');
 
-class CompilerApi {
+export class CompilerApi {
   constructor(repository, dbType, options) {
     this.repository = repository;
     this.dbType = dbType;
@@ -122,5 +122,3 @@ class CompilerApi {
     return (await this.getCompilers(options)).metaTransformer.cubes;
   }
 }
-
-module.exports = CompilerApi;

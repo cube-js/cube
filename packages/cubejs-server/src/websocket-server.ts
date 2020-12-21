@@ -43,7 +43,7 @@ export class WebSocketServer {
       connectionIdToSocket[connectionId] = ws;
 
       ws.on('message', async (message) => {
-        await subscriptionServer.processMessage(connectionId, message);
+        await subscriptionServer.processMessage(connectionId, message, true);
       });
 
       ws.on('close', async () => {
