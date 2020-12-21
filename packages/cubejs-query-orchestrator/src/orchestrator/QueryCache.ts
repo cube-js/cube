@@ -18,7 +18,15 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    protected readonly options: any = {}
+    protected readonly options: {
+      refreshKeyRenewalThreshold?: number;
+      externalQueueOptions?: any;
+      externalDriverFactory?: DriverFactory;
+      backgroundRenew?: Boolean;
+      queueOptions?: object | ((dataSource: String) => object);
+      redisPool?: any;
+      cacheAndQueueDriver?: 'redis' | 'memory';
+    } = {}
   ) {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver({ pool: options.redisPool }) :
@@ -174,7 +182,10 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
-          ...this.options.queueOptions
+          ...(typeof this.options.queueOptions === 'function' ?
+            this.options.queueOptions(dataSource) :
+            this.options.queueOptions
+          )
         }
       );
     }
