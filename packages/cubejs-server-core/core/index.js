@@ -492,10 +492,6 @@ class CubejsServerCore {
     return compilerApi;
   }
 
-  defaultContextToDataSourceId(context) {
-    return `${this.contextToAppId(context)}_${context.dataSource}`;
-  }
-
   getOrchestratorApi(context) {
     const orchestratorId = this.contextToOrchestratorId(context);
 

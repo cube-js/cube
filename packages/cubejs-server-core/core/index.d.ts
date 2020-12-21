@@ -23,7 +23,7 @@ export interface CreateOptions {
   driverFactory?: (context: DriverContext) => any;
   externalDriverFactory?: (context: RequestContext) => any;
   contextToAppId?: (context: RequestContext) => string;
-  contextToDataSourceId?: (context: RequestContext) => string;
+  contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: (
     req: ExpressRequest,
