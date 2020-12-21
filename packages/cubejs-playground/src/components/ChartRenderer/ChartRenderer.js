@@ -22,15 +22,6 @@ export default function ChartRenderer({
   }, []);
 
   useEffect(() => {
-    if (iframeRef.current) {
-      iframeRef.current.addEventListener('load', () => {
-        onChartRendererReadyChange(true);
-      });
-    }
-    // eslint-disable-next-line
-  }, [iframeRef]);
-
-  useEffect(() => {
     if (isChartRendererReady && iframeRef.current) {
       dispatchChartEvent(iframeRef.current.contentDocument, {
         pivotConfig,
@@ -55,7 +46,7 @@ export default function ChartRenderer({
           visibility: isChartRendererReady ? 'visible' : 'hidden',
         }}
         title="Chart renderer"
-        src={`./chart-renderers/${framework}/index.html`}
+        src={`/chart-renderers/${framework}/index.html`}
       />
     </div>
   );
