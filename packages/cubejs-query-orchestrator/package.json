@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-query-orchestrator"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
