@@ -147,7 +147,9 @@ describe('QueryOrchestrator', () => {
       renewQuery: true,
       requestId: 'basic'
     };
-    const result = await queryOrchestrator.fetchQuery(query);
+    const promise = queryOrchestrator.fetchQuery(query);
+    console.log(await queryOrchestrator.queryStage(query));
+    const result = await promise;
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
   });

@@ -100,8 +100,8 @@ export class QueryOrchestrator {
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
-          .map(p => this.preAggregations.getQueue(p.dataSource).getQueryStage(
-            PreAggregations.preAggregationQueryCacheKey(p), 10, preAggregationsQueryStageState(p.dataSource)
+          .map(async p => this.preAggregations.getQueue(p.dataSource).getQueryStage(
+            PreAggregations.preAggregationQueryCacheKey(p), 10, await preAggregationsQueryStageState(p.dataSource)
           ))
       )).findIndex(p => !!p);
     if (pendingPreAggregationIndex === -1) {
@@ -111,7 +111,7 @@ export class QueryOrchestrator {
     const preAggregationStage = await this.preAggregations.getQueue(preAggregation.dataSource).getQueryStage(
       PreAggregations.preAggregationQueryCacheKey(preAggregation),
       undefined,
-      preAggregationsQueryStageState(preAggregation.dataSource)
+      await preAggregationsQueryStageState(preAggregation.dataSource)
     );
     if (!preAggregationStage) {
       return undefined;
