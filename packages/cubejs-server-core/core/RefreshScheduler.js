@@ -11,7 +11,7 @@ class RefreshScheduler {
     if (preAggregation.preAggregation.partitionGranularity) {
       const dataSource = query.cubeDataSource(preAggregation.cube);
 
-      const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource });
+      const orchestratorApi = this.serverCore.getOrchestratorApi(context);
       const [startDate, endDate] =
         await Promise.all(
           compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
@@ -20,7 +20,8 @@ class RefreshScheduler {
               query: sql[0],
               values: sql[1],
               continueWait: true,
-              cacheKeyQueries: []
+              cacheKeyQueries: [],
+              dataSource
             }))
         );
 
@@ -136,7 +137,7 @@ class RefreshScheduler {
         )
       };
       const sqlQuery = await compilerApi.getSql(query);
-      const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
+      const orchestratorApi = this.serverCore.getOrchestratorApi(context);
       await orchestratorApi.executeQuery({
         ...sqlQuery,
         preAggregations: [],
@@ -157,7 +158,7 @@ class RefreshScheduler {
       for (let i = queries.length - 1; i >= 0; i--) {
         const query = queries[i];
         const sqlQuery = await compilerApi.getSql(query);
-        const orchestratorApi = this.serverCore.getOrchestratorApi({ ...context, dataSource: sqlQuery.dataSource });
+        const orchestratorApi = this.serverCore.getOrchestratorApi(context);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
           preAggregations: sqlQuery.preAggregations.map(

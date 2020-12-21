@@ -3,6 +3,7 @@ import R from 'ramda';
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
+import { DriverFactoryByDataSource } from './DriverFactory';
 
 interface QueryOrchestratorOptions {
   cacheAndQueueDriver?: 'redis' | 'memory';
@@ -20,11 +21,13 @@ export class QueryOrchestrator {
 
   protected readonly redisPool: RedisPool|undefined;
 
+  protected readonly driverFactory: DriverFactoryByDataSource;
+
   protected readonly rollupOnlyMode: boolean;
 
   public constructor(
     protected readonly redisPrefix: string,
-    protected readonly driverFactory: any,
+    driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
     options: QueryOrchestratorOptions = {}
   ) {
@@ -40,6 +43,8 @@ export class QueryOrchestrator {
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     const { externalDriverFactory } = options;
+
+    this.driverFactory = driverFactory;
 
     this.queryCache = new QueryCache(
       this.redisPrefix, this.driverFactory, this.logger, {
@@ -83,21 +88,30 @@ export class QueryOrchestrator {
   }
 
   public async queryStage(queryBody: any) {
-    const queue = this.preAggregations.getQueue();
-    const preAggregationsQueryStageState = await queue.fetchQueryStageState();
+    const preAggregationsQueryStageStateByDataSource = {};
+
+    const preAggregationsQueryStageState = async (dataSource) => {
+      if (!preAggregationsQueryStageStateByDataSource[dataSource]) {
+        const queue = this.preAggregations.getQueue(dataSource);
+        preAggregationsQueryStageStateByDataSource[dataSource] = queue.fetchQueryStageState();
+      }
+      return preAggregationsQueryStageStateByDataSource[dataSource];
+    };
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
-          .map(p => queue.getQueryStage(
-            PreAggregations.preAggregationQueryCacheKey(p), 10, preAggregationsQueryStageState
+          .map(p => this.preAggregations.getQueue(p.dataSource).getQueryStage(
+            PreAggregations.preAggregationQueryCacheKey(p), 10, preAggregationsQueryStageState(p.dataSource)
           ))
       )).findIndex(p => !!p);
     if (pendingPreAggregationIndex === -1) {
-      return this.queryCache.getQueue().getQueryStage(QueryCache.queryCacheKey(queryBody));
+      return this.queryCache.getQueue(queryBody.dataSource).getQueryStage(QueryCache.queryCacheKey(queryBody));
     }
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
-    const preAggregationStage = await queue.getQueryStage(
-      PreAggregations.preAggregationQueryCacheKey(preAggregation), undefined, preAggregationsQueryStageState
+    const preAggregationStage = await this.preAggregations.getQueue(preAggregation.dataSource).getQueryStage(
+      PreAggregations.preAggregationQueryCacheKey(preAggregation),
+      undefined,
+      preAggregationsQueryStageState(preAggregation.dataSource)
     );
     if (!preAggregationStage) {
       return undefined;

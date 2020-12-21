@@ -220,7 +220,7 @@ class CubejsServerCore {
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     });
 
-    this.dataSourceStorage = new DataSourceStorage();
+    this.orchestratorStorage = new DataSourceStorage();
 
     if (this.options.contextToAppId) {
       this.contextToAppId = options.contextToAppId;
@@ -230,7 +230,10 @@ class CubejsServerCore {
       this.standalone = true;
     }
 
-    this.contextToDataSourceId = options.contextToDataSourceId || this.defaultContextToDataSourceId.bind(this);
+    if (options.contextToDataSourceId) {
+      throw new Error(`contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.`);
+    }
+    this.contextToOrchestratorId = options.contextToOrchestratorId || this.contextToAppId;
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
         options.orchestratorOptions :
@@ -451,7 +454,7 @@ class CubejsServerCore {
         this.getOrchestratorApi.bind(this),
         this.logger, {
           standalone: this.standalone,
-          dataSourceStorage: this.dataSourceStorage,
+          dataSourceStorage: this.orchestratorStorage,
           basePath: this.options.basePath,
           checkAuthMiddleware: this.options.checkAuthMiddleware,
           checkAuth: this.options.checkAuth,
@@ -494,28 +497,29 @@ class CubejsServerCore {
   }
 
   getOrchestratorApi(context) {
-    const dataSourceId = this.contextToDataSourceId(context);
+    const orchestratorId = this.contextToOrchestratorId(context);
 
-    if (this.dataSourceStorage.has(dataSourceId)) {
-      return this.dataSourceStorage.get(dataSourceId);
+    if (this.orchestratorStorage.has(orchestratorId)) {
+      return this.orchestratorStorage.get(orchestratorId);
     }
 
-    let driverPromise;
+    const driverPromise = {};
     let externalPreAggregationsDriverPromise;
 
     const orchestratorApi = this.createOrchestratorApi({
-      getDriver: async () => {
-        if (!driverPromise) {
-          const driver = await this.driverFactory(context);
+      getDriver: async (dataSource) => {
+        if (!driverPromise[dataSource || 'default']) {
+          orchestratorApi.addDataSeenSource(dataSource);
+          const driver = await this.driverFactory({ ...context, dataSource });
           if (driver.setLogger) {
             driver.setLogger(this.logger);
           }
-          driverPromise = driver.testConnection().then(() => driver).catch(e => {
-            driverPromise = null;
+          driverPromise[dataSource || 'default'] = driver.testConnection().then(() => driver).catch(e => {
+            driverPromise[dataSource || 'default'] = null;
             throw e;
           });
         }
-        return driverPromise;
+        return driverPromise[dataSource || 'default'];
       },
       getExternalDriverFactory: this.externalDriverFactory && (async () => {
         if (!externalPreAggregationsDriverPromise) {
@@ -530,11 +534,11 @@ class CubejsServerCore {
         }
         return externalPreAggregationsDriverPromise;
       }),
-      redisPrefix: dataSourceId,
+      redisPrefix: orchestratorId,
       orchestratorOptions: this.orchestratorOptions(context)
     });
 
-    this.dataSourceStorage.set(dataSourceId, orchestratorApi);
+    this.orchestratorStorage.set(orchestratorId, orchestratorApi);
 
     return orchestratorApi;
   }
@@ -612,11 +616,11 @@ class CubejsServerCore {
   }
 
   async testConnections() {
-    return this.dataSourceStorage.testConnections();
+    return this.orchestratorStorage.testConnections();
   }
 
   async releaseConnections() {
-    await this.dataSourceStorage.releaseConnections();
+    await this.orchestratorStorage.releaseConnections();
 
     if (this.scheduledRefreshTimerInterval) {
       clearInterval(this.scheduledRefreshTimerInterval);

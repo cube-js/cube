@@ -87,7 +87,7 @@ describe('API Gateway', () => {
   process.env.NODE_ENV = 'production';
   const apiGateway = new ApiGateway('secret', compilerApi, adapterApi, logger, {
     standalone: true,
-    dataSourceStorage: new DataSourceStorageMock(),
+    orchestratorStorage: new DataSourceStorageMock(),
   });
   process.env.NODE_ENV = null;
   const app = express();

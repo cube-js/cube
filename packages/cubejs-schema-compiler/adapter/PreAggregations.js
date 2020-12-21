@@ -112,6 +112,7 @@ class PreAggregations {
       tableName,
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
+      dataSource: this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dataSource,
       invalidateKeyQueries: refreshKeyQueries.queries,
       refreshKeyRenewalThresholds: refreshKeyQueries.refreshKeyRenewalThresholds,
       external: preAggregation.external,

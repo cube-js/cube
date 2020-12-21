@@ -472,10 +472,7 @@ export class ApiGateway {
           requestId: context.requestId
         };
 
-        const response = await this.getAdapterApi({
-          ...context,
-          dataSource: sqlQuery.dataSource
-        }).executeQuery(toExecute);
+        const response = await this.getAdapterApi(context).executeQuery(toExecute);
 
         const flattenAnnotation = {
           ...annotation.measures,

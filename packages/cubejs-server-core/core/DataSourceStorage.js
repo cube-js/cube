@@ -1,18 +1,18 @@
-class DataSourceStorage {
+class OrchestratorStorage {
   constructor() {
     this.storage = new Map();
   }
 
-  has(dataSourceId) {
-    return this.storage.has(dataSourceId);
+  has(orchestratorId) {
+    return this.storage.has(orchestratorId);
   }
 
-  get(dataSourceId) {
-    return this.storage.get(dataSourceId);
+  get(orchestratorId) {
+    return this.storage.get(orchestratorId);
   }
 
-  set(dataSourceId, orchestratorApi) {
-    return this.storage.set(dataSourceId, orchestratorApi);
+  set(orchestratorId, orchestratorApi) {
+    return this.storage.set(orchestratorId, orchestratorApi);
   }
 
   testConnections() {
@@ -51,4 +51,4 @@ class DataSourceStorage {
   }
 }
 
-module.exports = DataSourceStorage;
+module.exports = OrchestratorStorage;
