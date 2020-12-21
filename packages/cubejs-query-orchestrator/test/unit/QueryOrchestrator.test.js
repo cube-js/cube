@@ -95,10 +95,19 @@ class ExternalMockDriver extends MockDriver {
 
 describe('QueryOrchestrator', () => {
   let mockDriver = null;
+  let fooMockDriver = null;
+  let barMockDriver = null;
   let externalMockDriver = null;
   const queryOrchestrator = new QueryOrchestrator(
-    'TEST',
-    async () => mockDriver,
+    'TEST', (dataSource) => {
+      if (dataSource === 'foo') {
+        return fooMockDriver;
+      } else if (dataSource === 'bar') {
+        return barMockDriver;
+      } else {
+        return mockDriver;
+      }
+    },
     (msg, params) => console.log(new Date().toJSON(), msg, params), {
       preAggregationsOptions: {
         queueOptions: {
@@ -112,6 +121,8 @@ describe('QueryOrchestrator', () => {
 
   beforeEach(() => {
     mockDriver = new MockDriver();
+    fooMockDriver = new MockDriver();
+    barMockDriver = new MockDriver();
     externalMockDriver = new ExternalMockDriver();
   });
 
@@ -194,6 +205,43 @@ describe('QueryOrchestrator', () => {
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_l3kvjcmu_khbemovd/);
     expect(externalMockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_l3kvjcmu_khbemovd/);
+  });
+
+  test('external join', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders, stb_pre_aggregations.customers',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders', []],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        external: true,
+        dataSource: 'foo'
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.customers',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.customers', []],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        external: true,
+        dataSource: 'bar'
+      }],
+      renewQuery: true,
+      requestId: 'external join',
+      dataSource: 'foo',
+      external: true
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    console.log(result.data[0]);
+    expect(fooMockDriver.executedQueries.join(',')).toMatch(/CREATE TABLE stb_pre_aggregations.orders/);
+    expect(barMockDriver.executedQueries.join(',')).toMatch(/CREATE TABLE stb_pre_aggregations.customers/);
+    expect(externalMockDriver.tables).toContainEqual(expect.stringMatching(/stb_pre_aggregations.customers/));
+    expect(externalMockDriver.tables).toContainEqual(expect.stringMatching(/stb_pre_aggregations.orders/));
+    expect(externalMockDriver.executedQueries.join(',')).toMatch(/SELECT \* FROM stb_pre_aggregations\.orders.*, stb_pre_aggregations\.customers.*/);
   });
 
   test('silent truncate', async () => {

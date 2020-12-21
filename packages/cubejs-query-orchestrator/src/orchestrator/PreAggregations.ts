@@ -6,6 +6,10 @@ import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { QueryCache } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
+import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { CacheDriverInterface } from './cache-driver.interface';
+import { BaseDriver } from '../driver';
+import { QueryQueue } from './QueryQueue';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
@@ -14,7 +18,7 @@ function encodeTimeStamp(time) {
 function version(cacheKey, isDigestKey = false) {
   let result = '';
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
-  let digestBuffer = Number(cacheKey);
+  let digestBuffer: any = Number(cacheKey);
   if (!isDigestKey) {
     digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
   }
@@ -38,7 +42,20 @@ function version(cacheKey, isDigestKey = false) {
   return result;
 }
 
-const tablesToVersionEntries = (schema, tables) => R.sortBy(
+type VersionEntry = {
+  // eslint-disable-next-line camelcase
+  table_name: string,
+  // eslint-disable-next-line camelcase
+  content_version: string,
+  // eslint-disable-next-line camelcase
+  structure_version: string,
+  // eslint-disable-next-line camelcase
+  last_updated_at: number,
+  // eslint-disable-next-line camelcase
+  naming_version?: number
+};
+
+const tablesToVersionEntries = (schema, tables: any[]): VersionEntry[] => R.sortBy(
   table => -table.last_updated_at,
   tables.map(table => {
     const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
@@ -47,7 +64,7 @@ const tablesToVersionEntries = (schema, tables) => R.sortBy(
       return null;
     }
 
-    const entity = {
+    const entity: any = {
       table_name: `${schema}.${match[1]}`,
       content_version: match[2],
       structure_version: match[3]
@@ -65,9 +82,38 @@ const tablesToVersionEntries = (schema, tables) => R.sortBy(
 );
 
 class PreAggregationLoadCache {
-  constructor(redisPrefix, clientFactory, queryCache, preAggregations, options) {
+  private redisPrefix: string;
+
+  private driverFactory: DriverFactory;
+
+  private queryCache: any;
+
+  // eslint-disable-next-line no-use-before-define
+  private preAggregations: PreAggregations;
+
+  private queryResults: any;
+
+  private cacheDriver: CacheDriverInterface;
+
+  private externalDriverFactory: any;
+
+  private requestId: any;
+
+  private versionEntries: any;
+
+  private tables: any;
+
+  private queryStageState: any;
+
+  private dataSource: string;
+
+  constructor(redisPrefix, clientFactory: DriverFactory, queryCache, preAggregations, options: {
+    requestId?: string,
+    dataSource?: string
+  }) {
     options = options || {};
-    this.redisPrefix = redisPrefix;
+    this.redisPrefix = `${redisPrefix}_${options.dataSource}`;
+    this.dataSource = options.dataSource;
     this.driverFactory = clientFactory;
     this.queryCache = queryCache;
     this.preAggregations = preAggregations;
@@ -77,10 +123,10 @@ class PreAggregationLoadCache {
     this.requestId = options.requestId;
   }
 
-  async tablesFromCache(preAggregation, forceRenew) {
+  async tablesFromCache(preAggregation, forceRenew?) {
     let tables = forceRenew ? null : await this.cacheDriver.get(this.tablesRedisKey(preAggregation));
     if (!tables) {
-      tables = await this.preAggregations.getLoadCacheQueue().executeInQueue(
+      tables = await this.preAggregations.getLoadCacheQueue(this.dataSource).executeInQueue(
         'query',
         `Fetch tables for ${preAggregation.preAggregationsSchema}`,
         {
@@ -110,7 +156,7 @@ class PreAggregationLoadCache {
   }
 
   tablesRedisKey(preAggregation) {
-    return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}${preAggregation.external ? '_EXT' : ''}`;
+    return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}_${preAggregation.dataSource}${preAggregation.external ? '_EXT' : ''}`;
   }
 
   async getTablesQuery(preAggregation) {
@@ -164,13 +210,13 @@ class PreAggregationLoadCache {
   }
 
   async getQueryStage(stageQueryKey) {
-    const queue = this.preAggregations.getQueue();
+    const queue = this.preAggregations.getQueue(this.dataSource);
     await this.fetchQueryStageState(queue);
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
   }
 
-  async fetchQueryStageState(queue) {
-    queue = queue || this.preAggregations.getQueue();
+  async fetchQueryStageState(queue?) {
+    queue = queue || this.preAggregations.getQueue(this.dataSource);
     if (!this.queryStageState) {
       this.queryStageState = await queue.fetchQueryStageState();
     }
@@ -186,12 +232,40 @@ class PreAggregationLoadCache {
 }
 
 class PreAggregationLoader {
+  private redisPrefix: string;
+
+  private driverFactory: DriverFactory;
+
+  private logger: any;
+
+  private queryCache: any;
+
+  // eslint-disable-next-line no-use-before-define
+  private preAggregations: PreAggregations;
+
+  private preAggregation: any;
+
+  private preAggregationsTablesToTempTables: any;
+
+  private loadCache: any;
+
+  private waitForRenew: boolean;
+
+  private externalDriverFactory: DriverFactory;
+
+  private requestId: string;
+
+  private structureVersionPersistTime: any;
+
+  private externalRefresh: boolean;
+
   constructor(
     redisPrefix,
-    clientFactory,
+    clientFactory: DriverFactory,
     logger,
     queryCache,
-    preAggregations,
+    // eslint-disable-next-line no-use-before-define
+    preAggregations: PreAggregations,
     preAggregation,
     preAggregationsTablesToTempTables,
     loadCache,
@@ -430,7 +504,7 @@ class PreAggregationLoader {
   }
 
   executeInQueue(invalidationKeys, priority, newVersionEntry) {
-    return this.preAggregations.getQueue().executeInQueue(
+    return this.preAggregations.getQueue(this.preAggregation.dataSource).executeInQueue(
       'query',
       this.preAggregationQueryKey(invalidationKeys),
       {
@@ -632,14 +706,25 @@ class PreAggregationLoader {
     await this.preAggregations.addTableUsed(justCreatedTable);
     const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
     const versionEntries = tablesToVersionEntries(this.preAggregation.preAggregationsSchema, actualTables);
-    const versionEntriesToSave = R.pipe(
+    const versionEntriesToSave = R.pipe<
+      VersionEntry[],
+      { [index: string]: VersionEntry[] },
+      Array<[string, VersionEntry[]]>,
+      VersionEntry[]
+    >(
       R.groupBy(v => v.table_name),
       R.toPairs,
       R.map(p => p[1][0])
     )(versionEntries);
 
-    const structureVersionsToSave = R.pipe(
-      R.filter(v => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000),
+    const structureVersionsToSave = R.pipe<
+      VersionEntry[],
+      VersionEntry[],
+      { [index: string]: VersionEntry[] },
+      Array<[string, VersionEntry[]]>,
+      VersionEntry[]
+    >(
+      R.filter((v: VersionEntry) => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000),
       R.groupBy(v => `${v.table_name}_${v.structure_version}`),
       R.toPairs,
       R.map(p => p[1][0])
@@ -662,7 +747,31 @@ class PreAggregationLoader {
 }
 
 export class PreAggregations {
-  constructor(redisPrefix, clientFactory, logger, queryCache, options) {
+  public options: any;
+
+  private redisPrefix: string;
+
+  private driverFactory: DriverFactoryByDataSource;
+
+  private logger: any;
+
+  private queryCache: QueryCache;
+
+  private cacheDriver: CacheDriverInterface;
+
+  public externalDriverFactory: any;
+
+  public structureVersionPersistTime: any;
+
+  private usedTablePersistTime: number;
+
+  private externalRefresh: boolean;
+
+  private loadCacheQueue: { [dataSource: string]: QueryQueue } = {};
+
+  private queue: { [dataSource: string]: QueryQueue } = {};
+
+  constructor(redisPrefix, clientFactory: DriverFactoryByDataSource, logger, queryCache, options) {
     this.options = options || {};
     this.redisPrefix = redisPrefix;
     this.driverFactory = clientFactory;
@@ -678,6 +787,7 @@ export class PreAggregations {
   }
 
   tablesUsedRedisKey(tableName) {
+    // TODO add dataSource?
     return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_USED_${tableName}`;
   }
 
@@ -692,19 +802,27 @@ export class PreAggregations {
 
   loadAllPreAggregationsIfNeeded(queryBody) {
     const preAggregations = queryBody.preAggregations || [];
-    const loadCache = new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this, {
-      requestId: queryBody.requestId
-    });
+
+    const loadCacheByDataSource = {};
+    const getLoadCacheByDataSource = (dataSource) => {
+      if (!loadCacheByDataSource[dataSource]) {
+        loadCacheByDataSource[dataSource] =
+          new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource || 'default'), this.queryCache, this, {
+            requestId: queryBody.requestId
+          });
+      }
+      return loadCacheByDataSource[dataSource];
+    };
     return preAggregations.map(p => (preAggregationsTablesToTempTables) => {
       const loader = new PreAggregationLoader(
         this.redisPrefix,
-        this.driverFactory,
+        () => this.driverFactory(p.dataSource || 'default'),
         this.logger,
         this.queryCache,
         this,
         p,
         preAggregationsTablesToTempTables,
-        loadCache,
+        getLoadCacheByDataSource(p.dataSource),
         { waitForRenew: queryBody.renewQuery, requestId: queryBody.requestId, externalRefresh: this.externalRefresh }
       );
       const preAggregationPromise = () => loader.loadPreAggregation().then(async targetTableName => {
@@ -716,21 +834,27 @@ export class PreAggregations {
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
   }
 
-  getQueue() {
-    if (!this.queue) {
-      this.queue = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}`, this.driverFactory, (client, q) => {
+  getQueue(dataSource: string) {
+    if (!this.queue[dataSource]) {
+      this.queue[dataSource] = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`, () => this.driverFactory(dataSource || 'default'), (client, q) => {
         const {
           preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys
         } = q;
         const loader = new PreAggregationLoader(
           this.redisPrefix,
-          this.driverFactory,
+          () => this.driverFactory(dataSource || 'default'),
           this.logger,
           this.queryCache,
           this,
           preAggregation,
           preAggregationsTablesToTempTables,
-          new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this, { requestId }),
+          new PreAggregationLoadCache(
+            this.redisPrefix,
+            () => this.driverFactory(dataSource || 'default'),
+            this.queryCache,
+            this,
+            { requestId }
+          ),
           { requestId, externalRefresh: this.externalRefresh }
         );
         return loader.refresh(newVersionEntry, invalidationKeys)(client);
@@ -742,22 +866,24 @@ export class PreAggregations {
         ...this.options.queueOptions
       });
     }
-    return this.queue;
+    return this.queue[dataSource];
   }
 
-  getLoadCacheQueue() {
-    if (!this.loadCacheQueue) {
-      this.loadCacheQueue = QueryCache.createQueue(
-        `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}`,
+  getLoadCacheQueue(dataSource: string) {
+    if (!this.loadCacheQueue[dataSource]) {
+      this.loadCacheQueue[dataSource] = QueryCache.createQueue(
+        `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}_${dataSource}`,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
-        () => {},
+        () => <BaseDriver> {},
         (_, q) => {
           const {
             preAggregation,
             requestId
           } = q;
-          const loadCache = new PreAggregationLoadCache(this.redisPrefix, this.driverFactory, this.queryCache, this,
-            { requestId });
+          const loadCache = new PreAggregationLoadCache(
+            this.redisPrefix, () => this.driverFactory(dataSource || 'default'), this.queryCache, this,
+            { requestId }
+          );
           return loadCache.fetchTables(preAggregation);
         }, {
           concurrency: 4,
@@ -768,7 +894,7 @@ export class PreAggregations {
         }
       );
     }
-    return this.loadCacheQueue;
+    return this.loadCacheQueue[dataSource];
   }
 
   static preAggregationQueryCacheKey(preAggregation) {
