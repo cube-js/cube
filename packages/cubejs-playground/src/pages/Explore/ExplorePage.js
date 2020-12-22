@@ -4,8 +4,9 @@ import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
 import { fetch } from 'whatwg-fetch';
 import PropTypes from 'prop-types';
-import DashboardSource from './DashboardSource';
-import PlaygroundQueryBuilder from './PlaygroundQueryBuilder';
+
+import DashboardSource from '../../DashboardSource';
+import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 
 class ExplorePage extends Component {
   constructor(props) {

@@ -108,12 +108,19 @@ const Header = ({ selectedKeys }) => {
           <StyledMenuItem key="/build">
             <Link to="/build">Build</Link>
           </StyledMenuItem>
+          
           <StyledMenuItem key="/dashboard">
             <Link to="/dashboard">Dashboard App</Link>
           </StyledMenuItem>
+          
           <StyledMenuItem key="/schema">
             <Link to="/schema">Schema</Link>
           </StyledMenuItem>
+          
+          <StyledMenuItem key="/connection">
+            <Link to="/connection">Connection</Link>
+          </StyledMenuItem>
+          
           <StyledMenuButton
             noMargin
             key="slack"
