@@ -1717,7 +1717,11 @@ impl RocksMetaStore {
         Ok(table)
     }
 
-    fn chunks_by_partitioned_with_non_repartitioned(partition_id: u64, table: &ChunkRocksTable, partition_table: &PartitionRocksTable) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+    fn chunks_by_partitioned_with_non_repartitioned(
+        partition_id: u64,
+        table: &ChunkRocksTable,
+        partition_table: &PartitionRocksTable,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         let mut partitions_up_to_root = Vec::new();
         let mut current_partition = partition_table.get_row_or_not_found(partition_id)?;
         partitions_up_to_root.push(current_partition.get_id());
@@ -2274,10 +2278,16 @@ impl MetaStore for RocksMetaStore {
                 .into_iter()
                 .filter(|r| r.get_row().active)
                 .map(|p| -> Result<_, _> {
-                    let chunks = Self::chunks_by_partitioned_with_non_repartitioned(p.get_id(), &rocks_chunk, &rocks_partition)?;
+                    let chunks = Self::chunks_by_partitioned_with_non_repartitioned(
+                        p.get_id(),
+                        &rocks_chunk,
+                        &rocks_partition,
+                    )?;
                     Ok((p, chunks))
-                }).collect::<Result<Vec<_>, _>>()
-        }).await
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .await
     }
 
     async fn create_chunk(

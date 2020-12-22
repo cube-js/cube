@@ -30,6 +30,7 @@ pub struct IndexSnapshot {
     table_path: TablePath,
     index: IdRow<Index>,
     partitions: Vec<PartitionSnapshot>,
+    join_on: Option<Vec<String>>,
 }
 
 impl IndexSnapshot {
@@ -47,6 +48,10 @@ impl IndexSnapshot {
 
     pub fn partitions(&self) -> &Vec<PartitionSnapshot> {
         &self.partitions
+    }
+
+    pub fn join_on(&self) -> Option<&Vec<String>> {
+        self.join_on.as_ref()
     }
 }
 
@@ -480,10 +485,7 @@ impl SerializedPlan {
                 let mut partition_snapshots = Vec::new();
 
                 for (partition, chunks) in partitions.into_iter() {
-                    partition_snapshots.push(PartitionSnapshot {
-                        chunks,
-                        partition,
-                    });
+                    partition_snapshots.push(PartitionSnapshot { chunks, partition });
                 }
 
                 index_snapshots.push(IndexSnapshot {
@@ -493,6 +495,7 @@ impl SerializedPlan {
                         table,
                         schema: Arc::new(schema),
                     },
+                    join_on,
                 });
 
                 Ok(index_snapshots)

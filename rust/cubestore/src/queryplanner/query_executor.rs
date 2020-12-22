@@ -465,14 +465,7 @@ impl CubeTable {
             self.schema.clone()
         };
 
-        let index = self.index_snapshot.index().get_row();
-        let sort_columns = (0..(index.sort_key_size() as usize))
-            .map(|c| index.columns()[c].get_name().to_string())
-            .take(projected_schema.fields().len())
-            .collect::<Vec<_>>();
-        let plan: Arc<dyn ExecutionPlan> = if sort_columns
-            .iter()
-            .all(|sort_column| projected_schema.index_of(sort_column).is_ok())
+        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.join_on()
         {
             Arc::new(MergeSortExec::try_new(
                 Arc::new(CubeTableExec {
@@ -480,7 +473,7 @@ impl CubeTable {
                     partition_execs,
                     index_snapshot: self.index_snapshot.clone(),
                 }),
-                sort_columns,
+                join_columns.clone(),
             )?)
         } else {
             Arc::new(MergeExec::new(Arc::new(CubeTableExec {

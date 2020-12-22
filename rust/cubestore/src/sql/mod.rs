@@ -625,14 +625,14 @@ mod tests {
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::WALStore;
     use itertools::Itertools;
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
     use std::collections::HashSet;
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
     use std::{env, fs};
-    use rand::{thread_rng, Rng};
-    use rand::distributions::Alphanumeric;
     use uuid::Uuid;
 
     #[actix_rt::test]
@@ -1020,7 +1020,7 @@ mod tests {
 
             service.exec_query("CREATE INDEX orders_by_email ON foo.orders (email)").await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.customers (email text, uuid text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (email text, system text, uuid text)").await.unwrap();
 
             service.exec_query("CREATE INDEX customers_by_email ON foo.customers (email)").await.unwrap();
 
@@ -1045,9 +1045,14 @@ mod tests {
                     if i % (batch + 1) == 0 {
                         let uuid = Uuid::new_v4().to_string();
                         customers.push((email.clone(), uuid.clone()));
-                        join_results.push(Row::new(vec![TableValue::Int(i), TableValue::String(email.clone()), TableValue::String(uuid)]))
+                        if i % (batch + 1 + 10) == 0 {
+                            customers.push((email.clone(), uuid.clone()));
+                            join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String(uuid), TableValue::Int(i * 2)]))
+                        } else {
+                            join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String(uuid), TableValue::Int(i)]))
+                        }
                     } else {
-                        join_results.push(Row::new(vec![TableValue::Int(i), TableValue::String(email.clone()), TableValue::String("".to_string())]))
+                        join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String("".to_string()), TableValue::Int(i)]))
                     }
                 }
 
@@ -1057,16 +1062,16 @@ mod tests {
                     &format!("INSERT INTO foo.orders (amount, email) VALUES {}", values)
                 ).await.unwrap();
 
-                let values = customers.into_iter().map(|(email, uuid)| format!("('{}', '{}')", email, uuid)).join(", ");
+                let values = customers.into_iter().map(|(email, uuid)| format!("('{}', 'system', '{}')", email, uuid)).join(", ");
 
                 service.exec_query(
-                    &format!("INSERT INTO foo.customers (email, uuid) VALUES {}", values)
+                    &format!("INSERT INTO foo.customers (email, system, uuid) VALUES {}", values)
                 ).await.unwrap();
             }
 
-            join_results.sort_by_key(|r| r.values()[1].clone());
+            join_results.sort_by_key(|r| r.values()[0].clone());
 
-            let result = service.exec_query("SELECT sum(o.amount), o.email, c.uuid from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 2, 3 ORDER BY 2 ASC").await.unwrap();
+            let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap();
 
             assert_eq!(result.get_rows().len(), join_results.len());
             for i in 0..result.get_rows().len() {
