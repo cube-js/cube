@@ -90,7 +90,7 @@ class ChartContainer extends React.Component {
           chartType: props.chartType,
           query: JSON.stringify(props.query, null, 2),
           pivotConfig: JSON.stringify(props.pivotConfig, null, 2),
-          apiUrl: `${props.apiUrl}/cubejs-api/v1`,
+          apiUrl: props.apiUrl,
           cubejsToken: props.cubejsToken
         }
       );
