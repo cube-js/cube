@@ -48,6 +48,7 @@ class DevServer {
       res.json({
         cubejsToken: jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }),
         apiUrl: process.env.CUBEJS_API_URL,
+        basePath: this.cubejsServer.options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         projectFingerprint: this.cubejsServer.projectFingerprint
