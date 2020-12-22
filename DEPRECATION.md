@@ -33,13 +33,13 @@ features:
   migrate to alternatives. In such cases, a warning may be printed, and users
   should not rely on this feature.
 
-| Status     | Feature                                                              | Deprecated | Remove    |
-| ---------- | -------------------------------------------------------------------- | ---------- | --------- |
-| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                    | v0.25.0    | v0.25.0   |
-| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express) | v0.24.0    | June 2021 |
-| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                            | v0.23.11   | June 2021 |
-| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                              | v0.23.8    | June 2021 |
-| Deprecated | [Node.js 8](#nodejs-8)                                               | v0.22.4    | v0.26.0   |
+| Status     | Feature                                                              | Deprecated | Remove       |
+| ---------- | -------------------------------------------------------------------- | ---------- | ------------ |
+| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                    | v0.25.0    | v0.25.0      |
+| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express) | v0.24.0    | June 2021    |
+| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                            | v0.23.11   | January 2021 |
+| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                              | v0.23.8    | June 2021    |
+| Deprecated | [Node.js 8](#nodejs-8)                                               | v0.22.4    | v0.26.0      |
 
 ### `contextToDataSourceId`
 
