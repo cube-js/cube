@@ -184,6 +184,7 @@ class CubejsServerCore {
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],
+      basePath: '/cubejs-api',
       ...options
     };
     if (

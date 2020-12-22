@@ -161,7 +161,7 @@ export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
   refreshScheduler: any;
-  basePath?: string;
+  basePath: string;
   extendContext?: ExtendContextFn;
   checkAuth?: CheckAuthFn;
   // @deprecated Please use checkAuth
@@ -205,7 +205,7 @@ export class ApiGateway {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
     this.standalone = options.standalone;
-    this.basePath = options.basePath || '/cubejs-api';
+    this.basePath = options.basePath;
 
     this.queryTransformer = options.queryTransformer || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
