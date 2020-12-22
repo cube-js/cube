@@ -17,18 +17,27 @@ class ExplorePage extends Component {
   async componentDidMount() {
     const res = await fetch('/playground/context');
     const result = await res.json();
+    
+    let apiUrl = result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, '');
+    apiUrl = `${apiUrl}/cubejs-api/v1`;
+    
     this.setState({
       cubejsToken: result.cubejsToken,
-      apiUrl:
-        result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, ''),
+      apiUrl
     });
+    
+    window['__cubejsPlayground'] = {
+      ...window['__cubejsPlayground'],
+      apiUrl,
+      token: result.cubejsToken
+    };
   }
 
   cubejsApi() {
     const { cubejsToken, apiUrl } = this.state;
     if (!this.cubejsApiInstance && cubejsToken) {
       this.cubejsApiInstance = cubejs(cubejsToken, {
-        apiUrl: `${apiUrl}/cubejs-api/v1`,
+        apiUrl
       });
     }
     return this.cubejsApiInstance;
