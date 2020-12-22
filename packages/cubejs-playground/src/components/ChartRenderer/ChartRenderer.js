@@ -16,7 +16,7 @@ export default function ChartRenderer({
   onChartRendererReadyChange,
 }) {
   const slowQuery = useSlowQuery();
-  
+
   useEffect(() => {
     return () => {
       onChartRendererReadyChange(false);
@@ -37,9 +37,15 @@ export default function ChartRenderer({
   }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType]));
 
   return (
-    <div>
-      {slowQuery ? <Alert message="Warning: slow query" type="warning" /> : null}
-      
+    <>
+      {slowQuery ? (
+        <Alert
+          style={{ marginBottom: 24 }}
+          message="Query is too slow to be renewed during the user request and was served from the cache. Please consider using low latency pre-aggregations."
+          type="warning"
+        />
+      ) : null}
+
       {!isChartRendererReady ? <Spin /> : null}
 
       <iframe
@@ -53,6 +59,6 @@ export default function ChartRenderer({
         title="Chart renderer"
         src={`/chart-renderers/${framework}/index.html`}
       />
-    </div>
+    </>
   );
 }

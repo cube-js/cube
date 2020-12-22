@@ -35,6 +35,7 @@ class App extends Component {
 
   async componentDidMount() {
     window['__cubejsPlayground'] = {
+      ...window['__cubejsPlayground'],
       onQueryLoad: (resultSet) => {
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
