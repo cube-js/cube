@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** chart renderer load ([#1658](https://github.com/cube-js/cube.js/issues/1658)) ([bbce716](https://github.com/cube-js/cube.js/commit/bbce71697a0d4c33a2d0bb277fd039cc5925f4ca))
+
+
+
+
+
+## [0.24.14](https://github.com/cube-js/cube.js/compare/v0.24.13...v0.24.14) (2020-12-19)
+
+
+### Bug Fixes
+
+* Rollup match results for rollupJoin ([0279b13](https://github.com/cube-js/cube.js/commit/0279b13a8696643ad95c374062ea059cea3b890b))
+
+
+
+
+
 ## [0.24.13](https://github.com/cube-js/cube.js/compare/v0.24.12...v0.24.13) (2020-12-18)
 
 **Note:** Version bump only for package @cubejs-client/playground

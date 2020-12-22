@@ -77,6 +77,13 @@ class ChartContainer extends React.Component {
     ) {
       const { __cubejsPlayground } = props.iframeRef.current.contentWindow;
 
+      if (!__cubejsPlayground) {
+        return {
+          ...state,
+          chartRendererError: 'The chart renderer failed to load',
+        }
+      }
+      
       const codesandboxFiles = __cubejsPlayground.getCodesandboxFiles(
         props.chartingLibrary,
         {
@@ -97,6 +104,7 @@ class ChartContainer extends React.Component {
 
       return {
         ...state,
+        chartRendererError: null,
         dependencies: __cubejsPlayground.getDependencies(props.chartingLibrary),
         codeExample,
         codesandboxFiles,
@@ -110,6 +118,7 @@ class ChartContainer extends React.Component {
     this.state = {
       showCode: false,
       framework: 'react',
+      chartRendererError: null
     };
   }
 
@@ -122,6 +131,7 @@ class ChartContainer extends React.Component {
       showCode,
       addingToDashboard,
       framework,
+      chartRendererError
     } = this.state;
     const {
       isChartRendererReady,
@@ -143,6 +153,10 @@ class ChartContainer extends React.Component {
       return <Redirect to="/dashboard" />;
     }
 
+    if (chartRendererError) {
+      return <div>{chartRendererError}</div>;
+    }
+    
     const parameters = isChartRendererReady
       ? getParameters(
           codeSandboxDefinition(

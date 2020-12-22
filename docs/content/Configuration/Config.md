@@ -34,7 +34,7 @@ You can provide the following configuration options to Cube.js.
   driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>,
   externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>,
   contextToAppId: (context: RequestContext) => String,
-  contextToDataSourceId: (context: RequestContext) => String,
+  contextToOrchestratorId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => SchemaFileRepository,
   checkAuth: (req: ExpressRequest, authorization: String) => any,
   checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
@@ -211,17 +211,20 @@ module.exports = {
 };
 ```
 
-### contextToDataSourceId
+### contextToOrchestratorId
 
-`contextToDataSourceId` is a function to determine a DataSource Id which is used
-to override the `contextToAppId` caching key for managing connection pools.
+`contextToOrchestratorId` is a function to determine a caching key for Query Orchestrator instance.
+Query Orchestrator instance holds database connections, execution queues, pre-aggregation table caches.
+By default, returns the same value as `contextToAppId`.
+
+Override it only in case multiple tenants should share the same execution queue and database connections while having different schemas instead of default Query Orchestrator per tenant strategy. 
 
 Called on each request.
 
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`,
-  contextToDataSourceId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`,
+  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}_${authInfo.user_id}`,
+  contextToOrchestratorId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`,
 };
 ```
 

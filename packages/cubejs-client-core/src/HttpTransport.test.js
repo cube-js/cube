@@ -13,6 +13,22 @@ describe('HttpTransport', () => {
     dimensions: ['Users.country']
   };
   const queryUrlEncoded = '%7B%22measures%22%3A%5B%22Orders.count%22%5D%2C%22dimensions%22%3A%5B%22Users.country%22%5D%7D';
+  const queryJson = '{"query":{"measures":["Orders.count"],"dimensions":["Users.country"]}}';
+
+  const ids = [];
+  for (let i = 0; i < 40; i++) ids.push('a40b2052-4137-11eb-b378-0242ac130002');
+  const LargeQuery = {
+    measures: ['Orders.count'],
+    dimensions: ['Users.country'],
+    filters: [
+      {
+        member: 'Users.id',
+        operator: 'equals',
+        values: ids
+      }
+    ]
+  };
+  const largeQueryJson = `{"query":{"measures":["Orders.count"],"dimensions":["Users.country"],"filters":[{"member":"Users.id","operator":"equals","values":${JSON.stringify(ids)}}]}}`;
 
   afterEach(() => {
     fetch.mockClear();
@@ -27,9 +43,11 @@ describe('HttpTransport', () => {
     await req.subscribe(() => { });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load?query=${queryUrlEncoded}`, {
+      method: 'GET',
       headers: {
         Authorization: 'token',
-      }
+      },
+      body: null
     });
   });
 
@@ -47,10 +65,49 @@ describe('HttpTransport', () => {
     await req.subscribe(() => { });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/meta?extraParams=${serializedExtraParams}`, {
+      method: 'GET',
       headers: {
         Authorization: 'token',
         'X-Extra-Header': '42'
-      }
+      },
+      body: null
+    });
+  });
+
+  test('it serializes the query object and sends it in the body', async () => {
+    const transport = new HttpTransport({
+      authorization: 'token',
+      apiUrl,
+      method: 'POST'
+    });
+    const req = transport.request('load', { query });
+    await req.subscribe(() => { });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'token',
+        'Content-Type': 'application/json'
+      },
+      body: queryJson
+    });
+  });
+
+  test('it use POST over GET if url length is more than 2000 characters', async () => {
+    const transport = new HttpTransport({
+      authorization: 'token',
+      apiUrl
+    });
+    const req = transport.request('load', { query: LargeQuery });
+    await req.subscribe(() => { });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'token',
+        'Content-Type': 'application/json'
+      },
+      body: largeQueryJson
     });
   });
 });

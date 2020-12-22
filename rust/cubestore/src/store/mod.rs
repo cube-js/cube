@@ -309,11 +309,18 @@ impl ChunkDataStore for ChunkStore {
         let data = self.wal_store.get_wal(wal_id).await?;
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
         for index in indexes.iter() {
-            self.partition_data_frame(
-                index.get_id(),
-                data.remap_columns(index.get_row().columns().clone())?,
-            )
-            .await?; // TODO dataframe clone
+            let new_chunks = self
+                .partition_data_frame(
+                    index.get_id(),
+                    data.remap_columns(index.get_row().columns().clone())?,
+                )
+                .await?; // TODO dataframe clone
+            self.meta_store
+                .swap_chunks(
+                    Vec::new(),
+                    new_chunks.into_iter().map(|c| c.get_id()).collect(),
+                )
+                .await?;
         }
 
         self.meta_store.delete_wal(wal_id).await?;
@@ -333,14 +340,25 @@ impl ChunkDataStore for ChunkStore {
             .meta_store
             .get_chunks_by_partition(partition_id)
             .await?;
+        let mut new_chunks = Vec::new();
+        let mut old_chunks = Vec::new();
         for chunk in chunks.into_iter() {
             let chunk_id = chunk.get_id();
+            old_chunks.push(chunk_id);
             let data = self.get_chunk(chunk).await?;
-            // TODO atomic
-            self.partition_data_frame(partition.get_row().get_index_id(), data)
-                .await?;
-            self.meta_store.deactivate_chunk(chunk_id).await?;
+            new_chunks.append(
+                &mut self
+                    .partition_data_frame(partition.get_row().get_index_id(), data)
+                    .await?,
+            )
         }
+
+        self.meta_store
+            .swap_chunks(
+                old_chunks,
+                new_chunks.into_iter().map(|c| c.get_id()).collect(),
+            )
+            .await?;
 
         Ok(())
     }
@@ -450,8 +468,23 @@ mod tests {
 
             let data_frame = DataFrame::new(col.clone(), first_rows);
 
-            store.meta_store.create_schema("s".to_string(), false).await.unwrap();
-            let table = store.meta_store.create_table("s".to_string(), "foo".to_string(), col.clone(), None, None, Vec::new()).await.unwrap();
+            store
+                .meta_store
+                .create_schema("s".to_string(), false)
+                .await
+                .unwrap();
+            let table = store
+                .meta_store
+                .create_table(
+                    "s".to_string(),
+                    "foo".to_string(),
+                    col.clone(),
+                    None,
+                    None,
+                    Vec::new(),
+                )
+                .await
+                .unwrap();
             store.add_wal(table.clone(), data_frame).await.unwrap();
             let wal = IdRow::new(1, WAL::new(1, 10));
             let restored_wal: DataFrame = store.get_wal(wal.get_id()).await.unwrap();
@@ -546,8 +579,12 @@ mod tests {
                 .unwrap();
             let partition = partitions[0].clone();
 
-            let _ = chunk_store
+            let chunk = chunk_store
                 .add_chunk(index, partition, restored_wal)
+                .await
+                .unwrap();
+            meta_store
+                .swap_chunks(Vec::new(), vec![chunk.get_id()])
                 .await
                 .unwrap();
             let chunk = meta_store.get_chunk(1).await.unwrap();
@@ -565,7 +602,11 @@ mod tests {
 }
 
 impl ChunkStore {
-    async fn partition_data_frame(&self, index_id: u64, data: DataFrame) -> Result<(), CubeError> {
+    async fn partition_data_frame(
+        &self,
+        index_id: u64,
+        data: DataFrame,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         let index = self
             .meta_store
             .index_table()
@@ -580,6 +621,8 @@ impl ChunkStore {
         let columns = data.get_columns().clone();
         let mut remaining_rows = data.into_rows();
         remaining_rows.sort_by(|a, b| a.sort_key(sort_key_size).cmp(&b.sort_key(sort_key_size)));
+
+        let mut new_chunks = Vec::new();
 
         for partition in partitions.into_iter() {
             let (to_write, next) = remaining_rows.into_iter().partition::<Vec<_>, _>(|r| {
@@ -597,19 +640,21 @@ impl ChunkStore {
                         .unwrap_or(true)
             });
             if to_write.len() > 0 {
-                self.add_chunk(
-                    index.clone(),
-                    partition,
-                    DataFrame::new(columns.clone(), to_write),
-                )
-                .await?;
+                new_chunks.push(
+                    self.add_chunk(
+                        index.clone(),
+                        partition,
+                        DataFrame::new(columns.clone(), to_write),
+                    )
+                    .await?,
+                );
             }
             remaining_rows = next;
         }
 
         assert_eq!(remaining_rows.len(), 0);
 
-        Ok(())
+        Ok(new_chunks)
     }
 
     async fn add_chunk(
@@ -617,7 +662,7 @@ impl ChunkStore {
         index: IdRow<Index>,
         partition: IdRow<Partition>,
         data: DataFrame,
-    ) -> Result<(), CubeError> {
+    ) -> Result<IdRow<Chunk>, CubeError> {
         let chunk = self
             .meta_store
             .create_chunk(partition.get_id(), data.len())
@@ -638,7 +683,6 @@ impl ChunkStore {
         self.remote_fs
             .upload_file(&ChunkStore::chunk_file_name(chunk.clone()))
             .await?;
-        self.meta_store.chunk_uploaded(chunk.get_id()).await?;
-        Ok(())
+        Ok(chunk)
     }
 }

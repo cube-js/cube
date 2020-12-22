@@ -149,11 +149,15 @@ impl SqlServiceImpl {
     ) -> Result<IdRow<Index>, CubeError> {
         Ok(self
             .db
-            .create_index(schema_name, table_name, IndexDef {
-                name,
-                columns: columns.iter().map(|c| c.value.to_string()).collect()
-            }).await?
-        )
+            .create_index(
+                schema_name,
+                table_name,
+                IndexDef {
+                    name,
+                    columns: columns.iter().map(|c| c.value.to_string()).collect(),
+                },
+            )
+            .await?)
     }
 
     async fn insert_data<'a>(
@@ -297,7 +301,10 @@ impl SqlService for SqlServiceImpl {
             } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
-                    return Err(CubeError::user(format!("Schema's name should be present in table name but found: {}", name)));
+                    return Err(CubeError::user(format!(
+                        "Schema's name should be present in table name but found: {}",
+                        name
+                    )));
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
@@ -314,13 +321,28 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(DataFrame::from(vec![res]))
             }
-            CubeStoreStatement::Statement(Statement::CreateIndex { name, table_name, columns, .. }) => {
+            CubeStoreStatement::Statement(Statement::CreateIndex {
+                name,
+                table_name,
+                columns,
+                ..
+            }) => {
                 if table_name.0.len() != 2 {
-                    return Err(CubeError::user(format!("Schema's name should be present in table name but found: {}", table_name)));
+                    return Err(CubeError::user(format!(
+                        "Schema's name should be present in table name but found: {}",
+                        table_name
+                    )));
                 }
                 let schema_name = &table_name.0[0].value;
                 let table_name = &table_name.0[1].value;
-                let res = self.create_index(schema_name.to_string(), table_name.to_string(), name.to_string(), &columns).await?;
+                let res = self
+                    .create_index(
+                        schema_name.to_string(),
+                        table_name.to_string(),
+                        name.to_string(),
+                        &columns,
+                    )
+                    .await?;
                 Ok(DataFrame::from(vec![res]))
             }
             CubeStoreStatement::Statement(Statement::Drop {
@@ -602,13 +624,13 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::WALStore;
+    use itertools::Itertools;
     use rocksdb::{Options, DB};
+    use std::collections::HashSet;
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
     use std::{env, fs};
-    use std::collections::HashSet;
-    use itertools::Itertools;
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -913,6 +935,32 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(3)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn group_by_decimal() {
+        Config::run_test("group_by_decimal", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value DECIMAL)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 100), (2, 200), (3, 100), (4, 100), (5, 200)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.decimal_group").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5)]));
+
+            let result = service.exec_query("SELECT count(*) from foo.decimal_group where decimal_value = 200").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+
+            let result = service.exec_query("SELECT g.decimal_value, count(*) from foo.decimal_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("100".to_string()), TableValue::Int(3)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Decimal("200".to_string()), TableValue::Int(2)]));
         }).await;
     }
 

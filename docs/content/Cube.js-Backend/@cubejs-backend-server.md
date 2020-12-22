@@ -53,7 +53,7 @@ This method is invoked prior to any routes having been added. Since routes can't
 An example usage is customizing the base route `/` in production mode to return a 404:
 
 `initApp.ts`
-```
+```typescript
 import type { Application, Request, Response } from 'express';
 
 export function initApp(app: Application) {
@@ -64,7 +64,7 @@ export function initApp(app: Application) {
 ```
 
 `index.ts`
-```
+```typescript
 import { initApp } from './initApp';
 
 const options = {};

@@ -325,7 +325,8 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let partition_id = *partition_id;
-                    tokio::spawn(async move { chunk_store.repartition(partition_id).await }).await??
+                    tokio::spawn(async move { chunk_store.repartition(partition_id).await })
+                        .await??
                 } else {
                     Self::fail_job_row_key(job);
                 }
@@ -334,7 +335,8 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
-                    tokio::spawn(async move { compaction_service.compact(partition_id).await }).await??
+                    tokio::spawn(async move { compaction_service.compact(partition_id).await })
+                        .await??
                 } else {
                     Self::fail_job_row_key(job);
                 }
@@ -343,7 +345,8 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
                     let import_service = self.import_service.clone();
                     let table_id = *table_id;
-                    tokio::spawn(async move { import_service.import_table(table_id).await }).await??
+                    tokio::spawn(async move { import_service.import_table(table_id).await })
+                        .await??
                 } else {
                     Self::fail_job_row_key(job);
                 }

@@ -6,9 +6,9 @@ use crate::table::parquet::ParquetTableStore;
 use crate::table::TableStore;
 use crate::CubeError;
 use async_trait::async_trait;
+use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
 use std::sync::Arc;
-use itertools::{Itertools, EitherOrBoth};
 
 #[async_trait]
 pub trait CompactionService: Send + Sync {
@@ -102,7 +102,10 @@ impl CompactionService for CompactionServiceImpl {
 
         let mut filtered_partitions = Vec::new();
 
-        for p in new_partitions.into_iter().zip_longest(count_and_min_max.iter()) {
+        for p in new_partitions
+            .into_iter()
+            .zip_longest(count_and_min_max.iter())
+        {
             match p {
                 EitherOrBoth::Both(p, _) => {
                     let new_remote_path = p.get_row().get_full_name(p.get_id()).unwrap();
@@ -113,7 +116,10 @@ impl CompactionService for CompactionServiceImpl {
                     self.meta_store.partition_table().delete(p.get_id()).await?;
                 }
                 EitherOrBoth::Right(_) => {
-                    return Err(CubeError::internal(format!("Unexpected state during partitioning: {:?}", p)))
+                    return Err(CubeError::internal(format!(
+                        "Unexpected state during partitioning: {:?}",
+                        p
+                    )))
                 }
             }
         }
@@ -127,7 +133,8 @@ impl CompactionService for CompactionServiceImpl {
                     .collect::<Vec<_>>(),
                 chunks.iter().map(|c| c.get_id()).collect(),
                 count_and_min_max
-                    .iter().zip_longest(count_and_min_max.iter().skip(1))
+                    .iter()
+                    .zip_longest(count_and_min_max.iter().skip(1))
                     .enumerate()
                     .map(|(i, item)| -> Result<_, CubeError> {
                         match item {
@@ -137,7 +144,12 @@ impl CompactionService for CompactionServiceImpl {
                                 } else if i < filtered_partitions.len() - 1 {
                                     Ok((*c, (Some(min.clone()), Some(next_min.clone()))))
                                 } else {
-                                    Err(CubeError::internal(format!("Unexpected state for {} new partitions: {}, {:?}", filtered_partitions.len(), i, item)))
+                                    Err(CubeError::internal(format!(
+                                        "Unexpected state for {} new partitions: {}, {:?}",
+                                        filtered_partitions.len(),
+                                        i,
+                                        item
+                                    )))
                                 }
                             }
                             EitherOrBoth::Left((c, (min, _))) => {
@@ -146,14 +158,29 @@ impl CompactionService for CompactionServiceImpl {
                                     assert_eq!(partition.get_row().get_max_val().is_none(), true);
                                     Ok((*c, (None, None)))
                                 } else if i == filtered_partitions.len() - 1 {
-                                    Ok(((*c, (Some(min.clone()), partition.get_row().get_max_val().clone()))))
+                                    Ok(((
+                                        *c,
+                                        (
+                                            Some(min.clone()),
+                                            partition.get_row().get_max_val().clone(),
+                                        ),
+                                    )))
                                 } else {
-                                    Err(CubeError::internal(format!("Unexpected state for {} new partitions: {}, {:?}", filtered_partitions.len(), i, item)))
+                                    Err(CubeError::internal(format!(
+                                        "Unexpected state for {} new partitions: {}, {:?}",
+                                        filtered_partitions.len(),
+                                        i,
+                                        item
+                                    )))
                                 }
                             }
-                            EitherOrBoth::Right(_) => Err(CubeError::internal(format!("Unexpected state for {} new partitions: {}, {:?}", filtered_partitions.len(), i, item)))
+                            EitherOrBoth::Right(_) => Err(CubeError::internal(format!(
+                                "Unexpected state for {} new partitions: {}, {:?}",
+                                filtered_partitions.len(),
+                                i,
+                                item
+                            ))),
                         }
-
                     })
                     .collect::<Result<Vec<_>, CubeError>>()?,
             )

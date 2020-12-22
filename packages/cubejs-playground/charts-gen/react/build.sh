@@ -7,7 +7,7 @@ echo 'Scaffolding the app'
 node react/index.js
 
 echo 'Building the app'
-cd ../charts-dist/react/react-charts && SKIP_PREFLIGHT_CHECK=true npm run build
+cd ../charts-dist/react/react-charts && SKIP_PREFLIGHT_CHECK=true GENERATE_SOURCEMAP=false npm run build
 cd -
 
 echo 'Moving files'

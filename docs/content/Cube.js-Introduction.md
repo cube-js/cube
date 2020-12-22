@@ -1,41 +1,75 @@
 ---
-title: Cube.js Introduction
-permalink: /cubejs-introduction
+title: Introduction
+permalink: /introduction
 category: Cube.js Introduction
+redirect_from:
+  - /cubejs-introduction
 ---
 
-__Cube.js is an open source modular framework to build analytical web applications__. It is primarily used to build internal business intelligence tools or to add customer-facing analytics to an existing application.
+**Cube.js is an open-source modular framework to build analytical web
+applications**. It is primarily used to build internal business intelligence
+tools or to add customer-facing analytics to an existing application.
 
-Cube.js was designed to work with Serverless Query Engines like AWS Athena and Google BigQuery. Multi-stage querying approach makes it suitable for handling trillions of data points. Most modern RDBMS work with Cube.js as well and can be tuned for adequate performance.
+Cube.js was designed to work with Serverless Query Engines like AWS Athena and
+Google BigQuery. A multi-stage querying approach makes it suitable for handling
+trillions of data points. Most modern RDBMS work with Cube.js as well and can be
+further tuned for performance.
 
-Unlike others, it is not a monolith application, but a set of modules, which does one thing well. Cube.js provides modules to run transformations and modeling in data warehouse, querying and caching, managing API gateway and building UI on top of that.
+Cube.js provides modules to run transformations and modeling in data warehouses,
+along with querying and caching, managing API gateway and building UI.
 
 ### Cube.js Backend
 
-- __Cube.js Schema.__ It acts as an ORM for analytics and allows to model everything from simple counts to cohort retention and funnel analysis.
-- __Cube.js Query Orchestration and Cache.__ It optimizes query execution by breaking queries into small, fast, reusable and materialized pieces.
-- __Cube.js API Gateway.__ It provides idempotent long polling API which guarantees analytic query results delivery without request time frame limitations and tolerant to connectivity issues.
+- **Schema.** Acts as an ORM for analytics and allows modelling everything from
+  simple counts to cohort retention and funnel analysis
+- **Query Orchestration and Cache.** Optimizes query execution by breaking
+  queries into small, fast, reusable and materialized pieces
+- **API Gateway.** Provides an idempotent long polling API as well as a
+  WebSockets API which guarantees delivery of analytical query results without
+  request timeframe limitations and tolerance to connectivity issues
 
 ### Cube.js Frontend
 
-- __Cube.js Javascript Client.__ Core set of methods to access Cube.js API Gateway and to work with query result sets.
-- __Cube.js React, Angular and Vue.__ Framework specific wrappers for Cube.js API.
+- **Javascript Client.** Core SDK for accessing the Cube.js API Gateway and
+  functionality for working with query result sets
+- **React, Angular and Vue.** Framework-specific wrappers for Cube.js API
 
 ## Why Cube.js?
 
-If you are building your own business intelligence tool or customer-facing analytics most probably you'll face following problems:
+If you are building your own business intelligence tool or customer-facing
+analytics, it is quite likely you'll face one or more of the following problems:
 
-1. __Performance.__ Most of effort time in modern analytics software development is spent to provide adequate time to insight. In the world where every company data is a big data writing just SQL query to get insight isn't enough anymore.
-2. __SQL code organization.__ Modelling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
-3. __Infrastructure.__ Key components every production-ready analytics solution requires: analytic SQL generation, query results caching and execution orchestration, data pre-aggregation, security, API for query results fetch, and visualization.
+1. **Performance.** A significant amount of effort in modern analytics software
+   development is spent providing adequate time to insight. In a world where
+   every company's data is big data, just writing SQL queries for insights isn't
+   enough anymore
+2. **SQL code organization.** Modelling even a modest number of metrics and
+   dimensions using pure SQL queries eventually becomes a maintenance nightmare,
+   which then requires engineering effort in building a modelling framework
+3. **Infrastructure.** Any production-ready analytics solution requires key
+   components such as analytic SQL generation, query results caching and
+   execution orchestration, data pre-aggregation, security, a querying API and
+   support for visualization libraries
 
-Cube.js has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
+Cube.js has the necessary infrastructure for any analytics application that
+heavily relies on a caching and pre-aggregation layer to provide insights from
+raw data within minutes and an API with sub-second response times on up to a
+trillion data points.
 
 <img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/old-was-vs-cubejs-way.png" style="border: none" />
 
 ## Architecture
-__Cube.js acts as an analytics backend__, translating business logic (metrics and dimensions) into SQL and handling database connection.
 
-The Cube.js javascript Client performs queries, expressed via dimensions, measures, and filters. The Server uses Cube.js Schema to generate a SQL code, which is executed by your database. The Server handles all the database connection, as well as pre-aggregations and caching layers. The result then sent back to the Client. The Client itself is visualization agnostic and works well with any chart library.
+**Cube.js acts as an analytics backend**, translating business logic (metrics
+and dimensions) into SQL and managing caching, queuing and database connection.
+
+The Cube.js JavaScript client sends queries conforming to the [Query
+Format][ref-query-format] to the REST API. The server uses a Schema to generate
+an SQL query, which is executed by your chosen database. The server handles all
+database connections, as well as pre-aggregations and caching layers. The result
+is then sent back to the client. The client itself is visualization-agnostic and
+works well with any chart library.
 
 <p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
+
+[ref-query-format]: https://cube.dev/docs/query-format

@@ -58,10 +58,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         logical_plan = ctx.optimize(&logical_plan)?;
 
-        trace!(
-            "Logical Plan: {:#?}",
-            &logical_plan
-        );
+        trace!("Logical Plan: {:#?}", &logical_plan);
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             QueryPlan::Select(SerializedPlan::try_new(logical_plan, self.meta_store.clone()).await?)

@@ -56,7 +56,7 @@ impl Table {
             columns,
             location,
             import_format,
-            has_data: false
+            has_data: false,
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -90,7 +90,7 @@ impl Table {
             columns: self.columns.clone(),
             location: self.location.clone(),
             import_format: self.import_format.clone(),
-            has_data
+            has_data,
         }
     }
 }

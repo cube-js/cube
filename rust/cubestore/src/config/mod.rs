@@ -90,7 +90,7 @@ pub struct ConfigObjImpl {
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
     pub bind_port: u16,
-    pub bind_address: String
+    pub bind_address: String,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -159,7 +159,7 @@ impl Config {
                 bind_port: env::var("CUBESTORE_PORT")
                     .ok()
                     .map(|v| v.parse::<u16>().unwrap())
-                    .unwrap_or(3306u16)
+                    .unwrap_or(3306u16),
             }),
         }
     }
@@ -180,22 +180,25 @@ impl Config {
                 },
                 select_worker_pool_size: 0,
                 bind_port: 3306,
-                bind_address: "0.0.0.0".to_string()
+                bind_address: "0.0.0.0".to_string(),
             }),
         }
     }
 
-    pub fn update_config(&self, update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl) -> Config {
+    pub fn update_config(
+        &self,
+        update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl,
+    ) -> Config {
         let new_config = self.config_obj.as_ref().clone();
         Self {
-            config_obj: Arc::new(update_config(new_config))
+            config_obj: Arc::new(update_config(new_config)),
         }
     }
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
-        where
-            T: Future + Send + 'static,
-            T::Output: Send + 'static,
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -322,7 +325,7 @@ impl Config {
             cluster.clone(),
             remote_fs.clone(),
             event_receiver,
-            self.config_obj.clone()
+            self.config_obj.clone(),
         );
 
         CubeServices {

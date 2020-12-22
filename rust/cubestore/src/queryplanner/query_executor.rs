@@ -85,10 +85,7 @@ impl QueryExecutor for QueryExecutorImpl {
             available_nodes,
         )?;
 
-        trace!(
-            "Router Query Physical Plan: {:#?}",
-            &split_plan
-        );
+        trace!("Router Query Physical Plan: {:#?}", &split_plan);
 
         let execution_time = SystemTime::now();
         let results = ctx.collect(split_plan.clone()).await;
@@ -141,10 +138,7 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let worker_plan = self.get_worker_split_plan(physical_plan);
 
-        trace!(
-            "Partition Query Physical Plan: {:#?}",
-            &worker_plan
-        );
+        trace!("Partition Query Physical Plan: {:#?}", &worker_plan);
 
         let execution_time = SystemTime::now();
         let results = ctx.collect(worker_plan.clone()).await;
@@ -460,7 +454,12 @@ impl CubeTable {
 
         let projected_schema = if let Some(p) = mapped_projection {
             Arc::new(Schema::new(
-                self.schema.fields().iter().enumerate().filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone())).collect(),
+                self.schema
+                    .fields()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone()))
+                    .collect(),
             ))
         } else {
             self.schema.clone()

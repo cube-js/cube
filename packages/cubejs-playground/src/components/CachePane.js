@@ -116,9 +116,9 @@ const CachePane = ({ query, cubejsApi }) => (
             scroll={{ x: true }}
             columns={[
               {
-                title: 'Rollup Table Name',
-                key: 'tableName',
-                dataIndex: 'tableName',
+                title: 'Rollup Name',
+                key: 'name',
+                dataIndex: 'name',
                 render: (text) => <b>{text}</b>,
               },
               {

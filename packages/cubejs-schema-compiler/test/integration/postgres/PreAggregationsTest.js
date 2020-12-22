@@ -1038,6 +1038,8 @@ describe('PreAggregations', function test() {
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
+    console.log(query.preAggregations.rollupMatchResultDescriptions());
+
     const queries = tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
@@ -1078,6 +1080,8 @@ describe('PreAggregations', function test() {
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
     console.log(preAggregationsDescription);
+
+    console.log(query.preAggregations.rollupMatchResultDescriptions());
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 

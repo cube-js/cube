@@ -5,19 +5,28 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
+import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 
 export class QueryCache {
   protected readonly cacheDriver: CacheDriverInterface;
 
-  protected queue: QueryQueue|null = null;
+  protected queue: { [dataSource: string]: QueryQueue } = {};
 
   protected externalQueue: QueryQueue|null = null;
 
   public constructor(
     protected readonly redisPrefix: string,
-    protected readonly driverFactory: any,
+    protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    protected readonly options: any = {}
+    protected readonly options: {
+      refreshKeyRenewalThreshold?: number;
+      externalQueueOptions?: any;
+      externalDriverFactory?: DriverFactory;
+      backgroundRenew?: Boolean;
+      queueOptions?: object | ((dataSource: String) => object);
+      redisPool?: any;
+      cacheAndQueueDriver?: 'redis' | 'memory';
+    } = {}
   ) {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver({ pool: options.redisPool }) :
@@ -53,8 +62,10 @@ export class QueryCache {
     if (!cacheKeyQueries) {
       return {
         data: await this.queryWithRetryAndRelease(query, values, {
+          cacheKey: [query, values],
           external: queryBody.external,
-          requestId: queryBody.requestId
+          requestId: queryBody.requestId,
+          dataSource: queryBody.dataSource
         })
       };
     }
@@ -66,6 +77,7 @@ export class QueryCache {
       return this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
         requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource,
         refreshKeyRenewalThresholds
       });
     }
@@ -74,6 +86,7 @@ export class QueryCache {
       const resultPromise = this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
         requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource,
         refreshKeyRenewalThresholds,
         skipRefreshKeyWaitForRenew: true
       });
@@ -97,7 +110,8 @@ export class QueryCache {
         priority: queuePriority,
         forceNoCache,
         external: queryBody.external,
-        requestId: queryBody.requestId
+        requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource
       }
     );
 
@@ -127,7 +141,7 @@ export class QueryCache {
     );
   }
 
-  protected static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
+  public static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
     const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
@@ -137,9 +151,15 @@ export class QueryCache {
   }
 
   public queryWithRetryAndRelease(query, values, {
-    priority, cacheKey, external, requestId
-  }: any) {
-    const queue = external ? this.getExternalQueue() : this.getQueue();
+    priority, cacheKey, external, requestId, dataSource
+  }: {
+    priority?: number,
+    cacheKey: object,
+    external: boolean
+    requestId?: string,
+    dataSource: string
+  }) {
+    const queue = external ? this.getExternalQueue() : this.getQueue(dataSource);
     return queue.executeInQueue('query', cacheKey, {
       queryKey: cacheKey, query, values, requestId
     }, priority, {
@@ -148,11 +168,11 @@ export class QueryCache {
     });
   }
 
-  public getQueue() {
-    if (!this.queue) {
-      this.queue = QueryCache.createQueue(
-        `SQL_QUERY_${this.redisPrefix}`,
-        this.driverFactory,
+  public getQueue(dataSource: string) {
+    if (!this.queue[dataSource]) {
+      this.queue[dataSource] = QueryCache.createQueue(
+        `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
+        () => this.driverFactory(dataSource || 'default'),
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
@@ -162,11 +182,14 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
-          ...this.options.queueOptions
+          ...(typeof this.options.queueOptions === 'function' ?
+            this.options.queueOptions(dataSource) :
+            this.options.queueOptions
+          )
         }
       );
     }
-    return this.queue;
+    return this.queue[dataSource];
   }
 
   public getExternalQueue() {
@@ -191,7 +214,7 @@ export class QueryCache {
     return this.externalQueue;
   }
 
-  public static createQueue(redisPrefix, clientFactory, executeFn, options) {
+  public static createQueue(redisPrefix, clientFactory: DriverFactory, executeFn, options) {
     options = options || {};
     const queue: any = new QueryQueue(redisPrefix, {
       queryHandlers: {
@@ -240,8 +263,14 @@ export class QueryCache {
     });
   }
 
-  public renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
-    options = options || {};
+  public renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {
+    requestId?: string,
+    skipRefreshKeyWaitForRenew?: boolean,
+    external?: boolean,
+    refreshKeyRenewalThresholds?: Array<number>
+    dataSource: string
+  }) {
+    options = options || { dataSource: 'default' };
     return Promise.all(
       cacheKeyQueries.map((q, i) => this.cacheQueryResult(
         Array.isArray(q) ? q[0] : q,
@@ -255,7 +284,8 @@ export class QueryCache {
             2 * 60,
           renewalKey: q,
           waitForRenew: !options.skipRefreshKeyWaitForRenew,
-          requestId: options.requestId
+          requestId: options.requestId,
+          dataSource: options.dataSource
         }
       ))
     )
@@ -279,7 +309,8 @@ export class QueryCache {
               ],
               waitForRenew: true,
               external: options.external,
-              requestId: options.requestId
+              requestId: options.requestId,
+              dataSource: options.dataSource
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -288,14 +319,27 @@ export class QueryCache {
       ));
   }
 
-  public cacheQueryResult(query, values, cacheKey, expiration, options) {
-    options = options || {};
+  public cacheQueryResult(query, values, cacheKey, expiration, options: {
+    renewalThreshold?: number,
+    renewalKey?: object,
+    priority?: number,
+    external?: boolean,
+    requestId?: string,
+    dataSource: string,
+    waitForRenew?: boolean,
+    forceNoCache?: boolean,
+  }) {
+    options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
     const fetchNew = () => (
       this.queryWithRetryAndRelease(query, values, {
-        priority: options.priority, cacheKey, external: options.external, requestId: options.requestId
+        priority: options.priority,
+        cacheKey,
+        external: options.external,
+        requestId: options.requestId,
+        dataSource: options.dataSource
       }).then(res => {
         const result = {
           time: (new Date()).getTime(),

@@ -3,6 +3,59 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** chart renderer load ([#1658](https://github.com/cube-js/cube.js/issues/1658)) ([bbce716](https://github.com/cube-js/cube.js/commit/bbce71697a0d4c33a2d0bb277fd039cc5925f4ca))
+* getQueryStage throws undefined is not a function ([0de1603](https://github.com/cube-js/cube.js/commit/0de1603293fc918c0da8ff8bd514b49f14de51d8))
+
+
+### Features
+
+* Allow cross data source joins ([a58336e](https://github.com/cube-js/cube.js/commit/a58336e3840f8ac02d83de43ec7661419bceb71c))
+* Allow cross data source joins: Serverless support ([034cdc8](https://github.com/cube-js/cube.js/commit/034cdc8dbf8907988df0f999fd115b8acdb4990f))
+
+
+
+
+
+## [0.24.15](https://github.com/cube-js/cube.js/compare/v0.24.14...v0.24.15) (2020-12-20)
+
+
+### Bug Fixes
+
+* **cubestore:** Atomic chunks repartition ([b1a23da](https://github.com/cube-js/cube.js/commit/b1a23dac8b82e2ab997ec060109948c355e37764))
+* **cubestore:** Atomic index snapshotting ([8a50f34](https://github.com/cube-js/cube.js/commit/8a50f34c22db7cc9ddd13c4aa33c864a90e29b4f))
+
+
+### Features
+
+* Allow joins between data sources for external queries ([1dbfe2c](https://github.com/cube-js/cube.js/commit/1dbfe2cdc1b1904ce8567a7599b24e660c5047f3))
+* **cubestore:** Support GROUP BY DECIMAL ([#1652](https://github.com/cube-js/cube.js/issues/1652)) ([4ad97dc](https://github.com/cube-js/cube.js/commit/4ad97dc8ae618fccb98020b50e335c5e8cf47459))
+
+
+
+
+
+## [0.24.14](https://github.com/cube-js/cube.js/compare/v0.24.13...v0.24.14) (2020-12-19)
+
+
+### Bug Fixes
+
+* Rollup match results for rollupJoin ([0279b13](https://github.com/cube-js/cube.js/commit/0279b13a8696643ad95c374062ea059cea3b890b))
+* **api-gateway:** Fix broken POST /v1/dry-run ([fa0cae0](https://github.com/cube-js/cube.js/commit/fa0cae01fa471e01d88d7db6f1d17046392167d0))
+
+
+### Features
+
+* Add HTTP Post to cubejs client core ([#1608](https://github.com/cube-js/cube.js/issues/1608)). Thanks to [@mnifakram](https://github.com/mnifakram)! ([1ebd6a0](https://github.com/cube-js/cube.js/commit/1ebd6a04ac97b31c6a51ef63bb1d4c040e524190))
+
+
+
+
+
 ## [0.24.13](https://github.com/cube-js/cube.js/compare/v0.24.12...v0.24.13) (2020-12-18)
 
 

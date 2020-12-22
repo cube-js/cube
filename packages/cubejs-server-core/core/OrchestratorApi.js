@@ -11,6 +11,7 @@ class OrchestratorApi {
     const { externalDriverFactory } = options;
     this.externalDriverFactory = externalDriverFactory;
     this.logger = logger;
+    this.seenDataSources = {};
   }
 
   async executeQuery(query) {
@@ -76,7 +77,7 @@ class OrchestratorApi {
 
   testConnection() {
     return Promise.all([
-      this.testDriverConnection(this.driverFactory),
+      ...Object.keys(this.seenDataSources).map(ds => this.testDriverConnection(this.driverFactory, ds)),
       this.testDriverConnection(this.externalDriverFactory)
     ]);
   }
@@ -85,28 +86,32 @@ class OrchestratorApi {
     return this.orchestrator.testConnections();
   }
 
-  async testDriverConnection(driverFn) {
+  async testDriverConnection(driverFn, dataSource) {
     if (driverFn) {
-      const driver = await driverFn();
+      const driver = await driverFn(dataSource);
       await driver.testConnection();
     }
   }
 
   release() {
     return Promise.all([
-      this.releaseDriver(this.driverFactory),
+      ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
       this.releaseDriver(this.externalDriverFactory),
       this.orchestrator.cleanup()
     ]);
   }
 
-  async releaseDriver(driverFn) {
+  async releaseDriver(driverFn, dataSource) {
     if (driverFn) {
-      const driver = await driverFn();
+      const driver = await driverFn(dataSource);
       if (driver.release) {
         await driver.release();
       }
     }
+  }
+
+  addDataSeenSource(dataSource) {
+    this.seenDataSources[dataSource] = true;
   }
 }
 

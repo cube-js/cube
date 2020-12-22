@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
@@ -86,6 +86,15 @@ export default function PlaygroundQueryBuilder({
   const ref = useRef(null);
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
+  
+  useLayoutEffect(() => {
+    window['__cubejsPlayground'] = {
+      ...window['__cubejsPlayground'],
+      onChartRendererReady() {
+        setChartRendererReady(true);
+      }
+    }
+  }, []);
 
   const { response } = useDryRun(query, {
     skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
