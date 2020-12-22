@@ -110,89 +110,11 @@ cube(`Users`, {
 
 ## asyncModule
 
-<!-- prettier-ignore-start -->
-[[warning | Note]]
-| Each `asyncModule` call will be invoked only once per schema compilation.
-<!-- prettier-ignore-end -->
+Schemas can be externally stored and retrieved through an asynchronous operation
+using the `asyncModule()`. For more information, consult the [Dynamic Schema
+Creation][ref-dynamic-schemas] page.
 
-To trigger a schema recompile based on changes of underlying input data,
-[schemaVersion][link-config-schema-version] value should change accordingly.
-
-[link-config-schema-version]:
-  https://cube.dev/docs/config#options-reference-schema-version
-
-If there's a need to generate schema based on values from external API or
-database, the `asyncModule` method can be used for such scenario. `asyncModule`
-allows registering an async function to be executed at the end of the data
-schema file compile phase so additional definitions can be added.
-
-For example:
-
-```javascript
-const fetch = require('node-fetch');
-const Funnels = require('Funnels');
-
-asyncModule(async () => {
-  const funnels = await (
-    await fetch('http://your-api-endpoint/funnels')
-  ).json();
-
-  class Funnel {
-    constructor({ title, steps }) {
-      this.title = title;
-      this.steps = steps;
-    }
-
-    get transformedSteps() {
-      return Object.keys(this.steps).map((key, index) => {
-        const value = this.steps[key];
-        let where = null;
-        if (value[0] === PAGE_VIEW_EVENT) {
-          if (value.length === 1) {
-            where = `event = '${value[0]}'`;
-          } else {
-            where = `event = '${value[0]}' AND page_title = '${value[1]}'`;
-          }
-        } else {
-          where = `event = 'se' AND se_category = '${value[0]}' AND se_action = '${value[1]}'`;
-        }
-
-        return {
-          name: key,
-          eventsView: {
-            sql: () => `select * from (${eventsSQl}) WHERE ${where}`,
-          },
-          timeToConvert: index > 0 ? '30 day' : null,
-        };
-      });
-    }
-
-    get config() {
-      return {
-        userId: {
-          sql: () => `user_id`,
-        },
-        time: {
-          sql: () => `time`,
-        },
-        steps: this.transformedSteps,
-      };
-    }
-  }
-
-  funnels.forEach((funnel) => {
-    const funnelObject = new Funnel(funnel);
-    cube(funnelObject.title, {
-      extends: Funnels.eventFunnel(funnelObject.config),
-      preAggregations: {
-        main: {
-          type: `originalSql`,
-        },
-      },
-    });
-  });
-});
-```
+[ref-dynamic-schemas]: /schema/dynamic-schema-creation
 
 ## Context symbols transpile
 
