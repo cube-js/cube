@@ -53,3 +53,4 @@ deadqueue = "0.1.0"
 ipc-channel = "0.14.1"
 reqwest = { version = "0.10.8", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
+rand = "0.8.0"

@@ -631,6 +631,9 @@ mod tests {
     use std::io::Write;
     use std::path::PathBuf;
     use std::{env, fs};
+    use rand::{thread_rng, Rng};
+    use rand::distributions::Alphanumeric;
+    use uuid::Uuid;
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -999,6 +1002,78 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(21177)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(3823)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn over_10k_join() {
+        Config::test("over_10k_join").update_config(|mut c| {
+            c.partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 50;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (amount int, email text)").await.unwrap();
+
+            service.exec_query("CREATE INDEX orders_by_email ON foo.orders (email)").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.customers (email text, uuid text)").await.unwrap();
+
+            service.exec_query("CREATE INDEX customers_by_email ON foo.customers (email)").await.unwrap();
+
+            let mut join_results = Vec::new();
+
+            for batch in 0..25 {
+                let mut orders = Vec::new();
+                let mut customers = Vec::new();
+                for i in 0..1000 {
+                    let email = String::from_utf8(thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(5)
+                        .collect()
+                    ).unwrap();
+                    let domain = String::from_utf8(thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(5)
+                        .collect()
+                    ).unwrap();
+                    let email = format!("{}@{}.com", email, domain);
+                    orders.push((i, email.clone()));
+                    if i % (batch + 1) == 0 {
+                        let uuid = Uuid::new_v4().to_string();
+                        customers.push((email.clone(), uuid.clone()));
+                        join_results.push(Row::new(vec![TableValue::Int(i), TableValue::String(email.clone()), TableValue::String(uuid)]))
+                    } else {
+                        join_results.push(Row::new(vec![TableValue::Int(i), TableValue::String(email.clone()), TableValue::String("".to_string())]))
+                    }
+                }
+
+                let values = orders.into_iter().map(|(amount, email)| format!("({}, '{}')", amount, email)).join(", ");
+
+                service.exec_query(
+                    &format!("INSERT INTO foo.orders (amount, email) VALUES {}", values)
+                ).await.unwrap();
+
+                let values = customers.into_iter().map(|(email, uuid)| format!("('{}', '{}')", email, uuid)).join(", ");
+
+                service.exec_query(
+                    &format!("INSERT INTO foo.customers (email, uuid) VALUES {}", values)
+                ).await.unwrap();
+            }
+
+            join_results.sort_by_key(|r| r.values()[1].clone());
+
+            let result = service.exec_query("SELECT sum(o.amount), o.email, c.uuid from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 2, 3 ORDER BY 2 ASC").await.unwrap();
+
+            assert_eq!(result.get_rows().len(), join_results.len());
+            for i in 0..result.get_rows().len() {
+                // println!("Actual {}: {:?}", i, &result.get_rows()[i]);
+                // println!("Expected {}: {:?}", i, &join_results[i]);
+                assert_eq!(&result.get_rows()[i], &join_results[i]);
+            }
         }).await;
     }
 
