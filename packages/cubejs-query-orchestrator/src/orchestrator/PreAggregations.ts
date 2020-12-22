@@ -15,16 +15,19 @@ function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
 }
 
-function version(cacheKey, isDigestKey = false) {
+function decodeTimeStamp(time) {
+  return parseInt(time, 32) * 1000;
+}
+
+function version(cacheKey) {
   let result = '';
+
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
-  let digestBuffer: any = Number(cacheKey);
-  if (!isDigestKey) {
-    digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
-  }
+  const digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
 
   let residue = 0;
   let shiftCounter = 0;
+
   for (let i = 0; i < 5; i++) {
     const byte = digestBuffer.readUInt8(i);
     shiftCounter += 8;
@@ -38,7 +41,9 @@ function version(cacheKey, isDigestKey = false) {
       residue = residue >> 5;
     }
   }
+
   result += hashCharset.charAt(residue % 32);
+
   return result;
 }
 
@@ -71,7 +76,7 @@ const tablesToVersionEntries = (schema, tables: any[]): VersionEntry[] => R.sort
     };
 
     if (match[4].length < 13) {
-      entity.last_updated_at = parseInt(match[4], 32) * 1000;
+      entity.last_updated_at = decodeTimeStamp(match[4]);
       entity.naming_version = 2;
     } else {
       entity.last_updated_at = parseInt(match[4], 10);
