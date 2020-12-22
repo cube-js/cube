@@ -88,6 +88,7 @@ describe('API Gateway', () => {
   const apiGateway = new ApiGateway('secret', compilerApi, adapterApi, logger, {
     standalone: true,
     orchestratorStorage: new DataSourceStorageMock(),
+    basePath: '/cubejs-api'
   });
   process.env.NODE_ENV = null;
   const app = express();
