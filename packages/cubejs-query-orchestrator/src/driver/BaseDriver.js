@@ -118,16 +118,30 @@ export class BaseDriver {
     return ssl;
   }
 
+  /**
+   * @abstract
+   * @return Promise<Array<unknown>>
+   */
   testConnection() {
     throw new Error('Not implemented');
   }
 
+  /**
+   * @abstract
+   * @param {string} query
+   * @param {Array<unknown>} values
+   * @return Promise<Array<unknown>>
+   */
   query(query, values) {
     throw new Error('Not implemented');
   }
 
   async downloadQueryResults(query, values) {
     const rows = await this.query(query, values);
+    if (rows.length === 0) {
+      throw new Error('Unable to detect column types for pre-aggregation on empty values in readOnly mode');
+    }
+
     const fields = Object.keys(rows[0]);
 
     const types = fields.map(field => ({
