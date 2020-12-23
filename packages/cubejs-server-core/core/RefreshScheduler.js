@@ -117,14 +117,16 @@ class RefreshScheduler {
 
   async refreshCubesRefreshKey(context, compilerApi, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
-    const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
-    await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
-      const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
+
+    await Promise.all(compilers.cubeEvaluator.cubeNames().map(async cube => {
+      const cubeFromPath = compilers.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
       const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
+
       if (measuresCount === 0 && dimensionsCount === 0) {
         return;
       }
+
       const query = {
         ...queryingOptions,
         ...(
@@ -136,7 +138,10 @@ class RefreshScheduler {
           { dimensions: [`${cube}.${Object.keys(cubeFromPath.dimensions)[0]}`] }
         )
       };
-      const sqlQuery = await compilerApi.getSql(query);
+      const sqlQuery = await compilerApi.getSql(query, {
+        dataSource: cubeFromPath.dataSource,
+      });
+
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
       await orchestratorApi.executeQuery({
         ...sqlQuery,
