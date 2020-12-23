@@ -462,11 +462,11 @@ class PreAggregations {
       }
       const fromMembers = memberPaths.filter(m => m[0] === j.originalFrom).map(m => m.join('.'));
       if (!fromMembers.length) {
-        throw new UserError(`From members are not found for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
+        throw new UserError(`From members are not found in [${memberPaths.map(m => m.join('.')).join(', ')}] for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
       }
       const toMembers = memberPaths.filter(m => m[0] === j.originalTo).map(m => m.join('.'));
       if (!toMembers.length) {
-        throw new UserError(`To members are not found for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
+        throw new UserError(`To members are not found in [${memberPaths.map(m => m.join('.')).join(', ')}] for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
       }
       return {
         ...j,
