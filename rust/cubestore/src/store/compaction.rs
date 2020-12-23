@@ -227,7 +227,7 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(1).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 15)
+            .create_chunk(partition.get_id(), 16)
             .await
             .unwrap();
         metastore.chunk_uploaded(2).await.unwrap();

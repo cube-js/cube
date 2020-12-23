@@ -10,7 +10,7 @@ pub mod wal;
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::{error, info};
-use rocksdb::{DBIterator, Options, WriteBatch, WriteBatchIterator, DB};
+use rocksdb::{DBIterator, Options, WriteBatch, WriteBatchIterator, DB, MergeOperands};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time};
@@ -55,6 +55,7 @@ use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
 use tokio::time::Duration;
 use wal::WALRocksTable;
+use log::{trace};
 
 #[macro_export]
 macro_rules! format_table_value {
@@ -904,8 +905,11 @@ trait RocksTable: Debug + Send + Sync + Clone {
         batch_pipe.batch().put(inserted_row.key, inserted_row.val);
 
         let index_row = self.insert_index_row(&row, row_id)?;
-        for row in index_row {
-            batch_pipe.batch().put(row.key, row.val);
+        for to_insert in index_row {
+            if self.db().get(&to_insert.key)?.is_some() {
+                return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
+            }
+            batch_pipe.batch().put(to_insert.key, to_insert.val);
         }
 
         Ok(IdRow::new(row_id, row))
@@ -1029,19 +1033,11 @@ trait RocksTable: Debug + Send + Sync + Clone {
     fn next_table_seq(&self) -> Result<u64, CubeError> {
         let ref db = self.db();
         let seq_key = RowKey::Sequence(self.table_id());
-        let result = db.get(seq_key.to_bytes())?; // TODO merge
-        let current_seq = match result {
-            Some(v) => {
-                let mut c = Cursor::new(v);
-                c.read_u64::<BigEndian>().unwrap()
-            }
-            None => 0,
-        };
-        let next_seq = current_seq + 1;
-        let mut next_val = vec![];
-        next_val.write_u64::<BigEndian>(next_seq)?;
-        db.put(seq_key.to_bytes(), next_val)?;
-        Ok(next_seq)
+        let mut increment = vec![];
+        increment.write_u64::<BigEndian>(1)?;
+        db.merge(seq_key.to_bytes(), increment)?;
+        let result = db.get(seq_key.to_bytes())?.unwrap();
+        Ok(Cursor::new(result).read_u64::<BigEndian>().unwrap())
     }
 
     fn insert_row(&self, row: Vec<u8>) -> Result<(u64, KeyVal), CubeError> {
@@ -1276,6 +1272,21 @@ impl WriteBatchIterator for WriteBatchContainer {
     }
 }
 
+fn meta_store_merge(_new_key: &[u8],
+                existing_val: Option<&[u8]>,
+                operands: &mut MergeOperands)
+                -> Option<Vec<u8>> {
+    let mut result: Vec<u8> = Vec::with_capacity(8);
+    let mut counter = existing_val.map(|v| {
+        Cursor::new(v).read_u64::<BigEndian>().unwrap()
+    }).unwrap_or(0);
+    for op in operands {
+        counter += Cursor::new(op).read_u64::<BigEndian>().unwrap()
+    }
+    result.write_u64::<BigEndian>(counter).unwrap();
+    Some(result)
+}
+
 impl RocksMetaStore {
     pub fn with_listener(
         path: impl AsRef<Path>,
@@ -1294,6 +1305,7 @@ impl RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_merge_operator("meta_store merge", meta_store_merge, None);
 
         let db = DB::open(&opts, path).unwrap();
         let db_arc = Arc::new(db);
@@ -1376,6 +1388,11 @@ impl RocksMetaStore {
 
                     return Ok(meta_store);
                 }
+            } else {
+                trace!(
+                    "Can't find metastore-current in {:?}",
+                    remote_fs
+                );
             }
             info!(
                 "Creating metastore from scratch in {}",
@@ -2113,9 +2130,18 @@ impl MetaStore for RocksMetaStore {
         compacted_chunk_ids: Vec<u64>,
         new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError> {
+        trace!(
+            "Swapping partitions: deactivating ({}), deactivating chunks ({}), activating ({})",
+            current_active.iter().join(", "),
+            compacted_chunk_ids.iter().join(", "),
+            new_active.iter().join(", ")
+        );
         self.write_operation(move |db_ref, batch_pipe| {
             let table = PartitionRocksTable::new(db_ref.clone());
             let chunk_table = ChunkRocksTable::new(db_ref.clone());
+
+            let mut deactivated_row_count = 0;
+            let mut activated_row_count = 0;
 
             for current in current_active.iter() {
                 let current_partition =
@@ -2135,6 +2161,7 @@ impl MetaStore for RocksMetaStore {
                     current_partition.get_row(),
                     batch_pipe,
                 )?;
+                deactivated_row_count += current_partition.get_row().main_table_row_count()
             }
 
             for (new, (count, (min_value, max_value))) in
@@ -2159,10 +2186,23 @@ impl MetaStore for RocksMetaStore {
                     new_partition.get_row(),
                     batch_pipe,
                 )?;
+                activated_row_count += count;
             }
 
             for chunk_id in compacted_chunk_ids.iter() {
+                deactivated_row_count += chunk_table.get_row_or_not_found(*chunk_id)?.get_row().get_row_count();
                 chunk_table.update_with_fn(*chunk_id, |row| row.deactivate(), batch_pipe)?;
+            }
+
+            if activated_row_count != deactivated_row_count {
+                return Err(CubeError::internal(format!(
+                    "Deactivated row count ({}) doesn't match activated row count ({}) during swap of partition ({}) and ({}) chunks to new partitions ({})",
+                    deactivated_row_count,
+                    activated_row_count,
+                    current_active.iter().join(", "),
+                    compacted_chunk_ids.iter().join(", "),
+                    new_active.iter().join(", ")
+                )))
             }
 
             Ok(())
@@ -2364,13 +2404,27 @@ impl MetaStore for RocksMetaStore {
         deactivate_ids: Vec<u64>,
         uploaded_ids: Vec<u64>,
     ) -> Result<(), CubeError> {
+        trace!("Swapping chunks: deactivating ({}), activating ({})", deactivate_ids.iter().join(", "), uploaded_ids.iter().join(", "));
         self.write_operation(move |db_ref, batch_pipe| {
             let table = ChunkRocksTable::new(db_ref.clone());
-            for id in deactivate_ids {
-                table.update_with_fn(id, |row| row.deactivate(), batch_pipe)?;
+            let mut deactivated_row_count = 0;
+            let mut activated_row_count = 0;
+            for id in deactivate_ids.iter() {
+                deactivated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
+                table.update_with_fn(*id, |row| row.deactivate(), batch_pipe)?;
             }
-            for id in uploaded_ids {
-                table.update_with_fn(id, |row| row.set_uploaded(true), batch_pipe)?;
+            for id in uploaded_ids.iter() {
+                activated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
+                table.update_with_fn(*id, |row| row.set_uploaded(true), batch_pipe)?;
+            }
+            if deactivate_ids.len() > 0 && activated_row_count != deactivated_row_count {
+                return Err(CubeError::internal(format!(
+                    "Deactivated row count ({}) doesn't match activated row count ({}) during swap of ({}) to ({}) chunks",
+                    deactivated_row_count,
+                    activated_row_count,
+                    deactivate_ids.iter().join(", "),
+                    uploaded_ids.iter().join(", ")
+                )))
             }
             Ok(())
         })
