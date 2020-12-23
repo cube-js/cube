@@ -15,6 +15,7 @@
     "lint": "eslint **/*.js"
   },
   "main": "driver/AthenaDriver.js",
+  "types": "driver/index.d.ts",
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.25.0",
     "aws-sdk": "^2.403.0",
