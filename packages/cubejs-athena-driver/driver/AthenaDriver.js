@@ -22,6 +22,10 @@ class AthenaDriver extends BaseDriver {
     this.athena.getQueryExecutionAsync = promisify(this.athena.getQueryExecution.bind(this.athena));
   }
 
+  readOnly() {
+    return !!this.config.readOnly;
+  }
+
   async testConnection() {
     return this.query('SELECT 1', []);
   }
@@ -91,7 +95,7 @@ class AthenaDriver extends BaseDriver {
   async tablesSchema() {
     const tablesSchema = await super.tablesSchema();
     const viewsSchema = await this.viewsSchema(tablesSchema);
-    
+
     return this.mergeSchemas([tablesSchema, viewsSchema]);
   }
 
