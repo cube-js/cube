@@ -1220,10 +1220,10 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.3.1.tgz#fa0efcf813daa43f8a6aef3ddaa80f7e66f1278e"
   integrity sha512-jUJrjU62MUgHDSu5JfONfgRM2V7GfN5KknsygfIbxwRZXGeayIzxk4O9GiYgEAr9DG5HJThTF5+a5x3wtrOKzQ==
 
-"@cubejs-client/core@^0.24.9":
-  version "0.24.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.24.9.tgz#b581ab83b1e20d0b4ac9d6dc444c035ba179e390"
-  integrity sha512-o9q3/ji9oNu6XnSv+bTvbnydfxWATBfEM951RA0DuakwPn7hW7r7AAPs52g6sUpWi8mUEsMnCw4ah4BIISzduA==
+"@cubejs-client/core@^0.25.0":
+  version "0.25.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.25.0.tgz#8b7fac7c333d72803b2dcac33d403702d9107f51"
+  integrity sha512-/Zu23svhCmWaYTCHjZbEvM4jrkFQrCe8JRYmg6GteP9fmmjH5QBnJ60qS8fyYP3c0VSWIkDNBp1e3/+DaR/s+Q==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1234,13 +1234,13 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.24.9":
-  version "0.24.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.24.9.tgz#a68ecc189deeef7e06b188dcb2ad6ca469c3c200"
-  integrity sha512-kuj7AK5cE5ib9DuVwR0Vhx6r6fuJfMLJwNEQKFg8ShPGCkbA5EySRrxnbsuN+2w5nalEhfFijOi/csvbkcFnYQ==
+"@cubejs-client/react@^0.25.0":
+  version "0.25.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.25.0.tgz#dedaa08fc4ba64060fe6173ea6e0e2bf59adbfc6"
+  integrity sha512-jfvajsQVZy5C403krOEnJwQQdb9BNnK/cElGj/+YFEmzxR5RLWe9VOTiRIEeq6XJpB0M4nJ5k4mnwMea3oqX/g==
   dependencies:
     "@babel/runtime" "^7.1.2"
-    "@cubejs-client/core" "^0.24.9"
+    "@cubejs-client/core" "^0.25.0"
     core-js "^3.6.5"
     ramda "^0.27.0"
 
@@ -3208,11 +3208,6 @@ clone-deep@^4.0.1:
     is-plain-object "^2.0.4"
     kind-of "^6.0.2"
     shallow-clone "^3.0.0"
-
-clone@^2.1.1:
-  version "2.1.2"
-  resolved "https://registry.yarnpkg.com/clone/-/clone-2.1.2.tgz#1b7f4b9f591f1e8f83670401600345a02887435f"
-  integrity sha1-G39Ln1kfHo+DZwQBYANFoCiHQ18=
 
 co@^4.6.0:
   version "4.6.0"
@@ -7045,6 +7040,11 @@ kleur@^3.0.3:
   resolved "https://registry.yarnpkg.com/kleur/-/kleur-3.0.3.tgz#a79c9ecc86ee1ce3fa6206d1216c501f147fc07e"
   integrity sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==
 
+klona@^2.0.4:
+  version "2.0.4"
+  resolved "https://registry.yarnpkg.com/klona/-/klona-2.0.4.tgz#7bb1e3affb0cb8624547ef7e8f6708ea2e39dfc0"
+  integrity sha512-ZRbnvdg/NxqzC7L9Uyqzf4psi1OM4Cuc+sJAkQPjO6XkQIJTNbfK2Rsmbw8fx1p2mkZdp2FZYo2+LwXYY/uwIA==
+
 language-subtag-registry@~0.3.2:
   version "0.3.21"
   resolved "https://registry.yarnpkg.com/language-subtag-registry/-/language-subtag-registry-0.3.21.tgz#04ac218bea46f04cb039084602c6da9e788dd45a"
@@ -7087,14 +7087,14 @@ left-pad@^1.3.0:
   resolved "https://registry.yarnpkg.com/left-pad/-/left-pad-1.3.0.tgz#5b8a3a7765dfe001261dde915589e782f8c94d1e"
   integrity sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==
 
-less-loader@^5.0.0:
-  version "5.0.0"
-  resolved "https://registry.yarnpkg.com/less-loader/-/less-loader-5.0.0.tgz#498dde3a6c6c4f887458ee9ed3f086a12ad1b466"
-  integrity sha512-bquCU89mO/yWLaUq0Clk7qCsKhsF/TZpJUzETRvJa9KSVEL9SO3ovCvdEHISBhrC81OwC8QSVX7E0bzElZj9cg==
+less-loader@^7.2.0:
+  version "7.2.0"
+  resolved "https://registry.yarnpkg.com/less-loader/-/less-loader-7.2.0.tgz#37ba9c778d999930cd24fa1b59aa4e0ba5ba0441"
+  integrity sha512-C/08kYL2+wFLFQ/c8tey4qX6xpPVtBBwGa9gtpI/bktWpSUaUkZxeOUMM2zGDrQ4s/ZVpA+Rv2RyIvwEXNVuIg==
   dependencies:
-    clone "^2.1.1"
-    loader-utils "^1.1.0"
-    pify "^4.0.1"
+    klona "^2.0.4"
+    loader-utils "^2.0.0"
+    schema-utils "^3.0.0"
 
 less@^3.10.3:
   version "3.13.0"
@@ -7186,6 +7186,15 @@ loader-utils@^1.1.0, loader-utils@^1.2.3, loader-utils@^1.4.0:
     big.js "^5.2.2"
     emojis-list "^3.0.0"
     json5 "^1.0.1"
+
+loader-utils@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/loader-utils/-/loader-utils-2.0.0.tgz#e4cace5b816d425a166b5f097e10cd12b36064b0"
+  integrity sha512-rP4F0h2RaWSvPEkD7BLDFQnvSf+nK+wr3ESUjNTyAGobqrijmW92zc+SO6d4p4B1wh7+B/Jg1mkQe5NYUEHtHQ==
+  dependencies:
+    big.js "^5.2.2"
+    emojis-list "^3.0.0"
+    json5 "^2.1.2"
 
 locate-path@^2.0.0:
   version "2.0.0"
