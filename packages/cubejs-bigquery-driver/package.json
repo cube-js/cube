@@ -15,6 +15,7 @@
   "types": "driver/index.d.ts",
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.25.1",
+    "@cubejs-backend/shared": "^0.25.0",
     "@google-cloud/bigquery": "^4.1.4",
     "ramda": "^0.27.0"
   },

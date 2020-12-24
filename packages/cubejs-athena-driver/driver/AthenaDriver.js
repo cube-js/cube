@@ -1,20 +1,29 @@
 const AWS = require('aws-sdk');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { getEnv } = require('@cubejs-backend/shared');
 const SqlString = require('sqlstring');
+
+function pause(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 const applyParams = (query, params) => SqlString.format(query, params);
 
 class AthenaDriver extends BaseDriver {
-  constructor(config) {
+  constructor(config = {}) {
     super();
+
     this.config = {
       accessKeyId: process.env.CUBEJS_AWS_KEY,
       secretAccessKey: process.env.CUBEJS_AWS_SECRET,
       region: process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
-      ...config
+      ...config,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
+
     this.athena = new AWS.Athena(this.config);
     this.athena.startQueryExecutionAsync = promisify(this.athena.startQueryExecution.bind(this.athena));
     this.athena.stopQueryExecutionAsync = promisify(this.athena.stopQueryExecution.bind(this.athena));
@@ -30,10 +39,52 @@ class AthenaDriver extends BaseDriver {
     return this.query('SELECT 1', []);
   }
 
-  sleep(ms) {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(), ms);
+  async awaitForJobStatus(QueryExecutionId, query, options) {
+    const queryExecution = await this.athena.getQueryExecutionAsync({
+      QueryExecutionId
     });
+
+    const status = queryExecution.QueryExecution.Status.State;
+    if (status === 'FAILED') {
+      throw new Error(queryExecution.QueryExecution.Status.StateChangeReason);
+    }
+
+    if (status === 'CANCELLED') {
+      throw new Error('Query has been cancelled');
+    }
+
+    if (
+      status === 'SUCCEEDED'
+    ) {
+      const allRows = [];
+      let columnInfo;
+
+      this.reportQueryUsage({
+        dataScannedInBytes: queryExecution.QueryExecution.Statistics.DataScannedInBytes
+      }, options);
+
+      for (
+        let results = await this.athena.getQueryResultsAsync({ QueryExecutionId });
+        results;
+        results = results.NextToken && (await this.athena.getQueryResultsAsync({
+          QueryExecutionId, NextToken: results.NextToken
+        }))
+      ) {
+        const [header, ...tableRows] = results.ResultSet.Rows;
+        allRows.push(...(allRows.length ? results.ResultSet.Rows : tableRows));
+        if (!columnInfo) {
+          columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
+            ? [{ Name: 'column' }]
+            : results.ResultSet.ResultSetMetadata.ColumnInfo;
+        }
+      }
+
+      return allRows.map(r => columnInfo
+        .map((c, i) => ({ [c.Name]: r.Data[i].VarCharValue }))
+        .reduce((a, b) => ({ ...a, ...b }), {}));
+    }
+
+    return null;
   }
 
   async query(query, values, options) {
@@ -43,53 +94,30 @@ class AthenaDriver extends BaseDriver {
         toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
       } : s))
     );
+
     const { QueryExecutionId } = await this.athena.startQueryExecutionAsync({
       QueryString: queryString,
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       }
     });
-    while (true) {
-      const queryExecution = await this.athena.getQueryExecutionAsync({
-        QueryExecutionId
-      });
-      const status = queryExecution.QueryExecution.Status.State;
-      if (status === 'FAILED') {
-        throw new Error(queryExecution.QueryExecution.Status.StateChangeReason);
-      }
-      if (status === 'CANCELLED') {
-        throw new Error('Query has been cancelled');
-      }
-      if (
-        status === 'SUCCEEDED'
-      ) {
-        const allRows = [];
-        let columnInfo;
-        this.reportQueryUsage({
-          dataScannedInBytes: queryExecution.QueryExecution.Statistics.DataScannedInBytes
-        }, options);
-        for (
-          let results = await this.athena.getQueryResultsAsync({ QueryExecutionId });
-          results;
-          results = results.NextToken && (await this.athena.getQueryResultsAsync({
-            QueryExecutionId, NextToken: results.NextToken
-          }))
-        ) {
-          const [header, ...tableRows] = results.ResultSet.Rows;
-          allRows.push(...(allRows.length ? results.ResultSet.Rows : tableRows));
-          if (!columnInfo) {
-            columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
-              ? [{ Name: 'column' }]
-              : results.ResultSet.ResultSetMetadata.ColumnInfo;
-          }
-        }
 
-        return allRows.map(r => columnInfo
-          .map((c, i) => ({ [c.Name]: r.Data[i].VarCharValue }))
-          .reduce((a, b) => ({ ...a, ...b }), {}));
+    const startedTime = Date.now();
+
+    for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
+      const result = await this.awaitForJobStatus(QueryExecutionId, query, options);
+      if (result) {
+        return result;
       }
-      await this.sleep(500);
+
+      await pause(
+        Math.min(this.config.pollMaxInterval, 500 * i)
+      );
     }
+
+    throw new Error(
+      `Athena job timeout reached ${this.config.pollTimeout}ms`
+    );
   }
 
   async tablesSchema() {
