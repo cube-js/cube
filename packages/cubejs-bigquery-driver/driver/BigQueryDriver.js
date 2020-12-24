@@ -17,6 +17,8 @@ class BigQueryDriver extends BaseDriver {
       scopes: ['https://www.googleapis.com/auth/bigquery', 'https://www.googleapis.com/auth/drive'],
       projectId: process.env.CUBEJS_DB_BQ_PROJECT_ID,
       keyFilename: process.env.CUBEJS_DB_BQ_KEY_FILE,
+      pollTimeout: 15 * 1000 * 60,
+      pollMaxInterval: 5000,
       credentials: process.env.CUBEJS_DB_BQ_CREDENTIALS ?
         JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
         undefined,
@@ -165,32 +167,42 @@ class BigQueryDriver extends BaseDriver {
     return this.runQueryJob(bigQueryQuery, options, false);
   }
 
+  async awaitForJobStatus(job, options, withResults) {
+    const [result] = await job.getMetadata();
+    if (result.status && result.status.state === 'DONE') {
+      if (result.status.errorResult) {
+        throw new Error(
+          result.status.errorResult.message ?
+            result.status.errorResult.message :
+            JSON.stringify(result.status.errorResult)
+        );
+      }
+      this.reportQueryUsage(result.statistics, options);
+    } else {
+      return null;
+    }
+
+    return withResults ? job.getQueryResults() : true;
+  }
+
   async runQueryJob(bigQueryQuery, options, withResults = true) {
     const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
-    const awaitForJobStatus = async () => {
-      const [result] = await job.getMetadata();
-      if (result.status && result.status.state === 'DONE') {
-        if (result.status.errorResult) {
-          throw new Error(
-            result.status.errorResult.message ?
-              result.status.errorResult.message :
-              JSON.stringify(result.status.errorResult)
-          );
-        }
-        this.reportQueryUsage(result.statistics, options);
-      } else {
-        return null;
-      }
-      return withResults ? job.getQueryResults() : true;
-    };
-    for (let i = 0; i < 15 * 60 / 5; i++) {
-      const result = await awaitForJobStatus();
+
+    for (let i = 0, elapsed = 0; elapsed <= this.options.pollTimeout; i++) {
+      const result = await this.awaitForJobStatus(job, options, withResults);
       if (result) {
         return result;
       }
-      await pause(Math.min(5000, 200 * i));
+
+      const waitInterval = Math.min(this.options.pollMaxInterval, 200 * i);
+      await pause(waitInterval);
+
+      elapsed += waitInterval;
     }
-    throw new Error('BigQuery job timeout');
+
+    throw new Error(
+      `BigQuery job timeout reached ${this.options.pollTimeout}ms`
+    );
   }
 
   quoteIdentifier(identifier) {
