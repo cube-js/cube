@@ -144,7 +144,7 @@ export class DynamoDBQueueDriverConnection {
       timeoutPromise(this.continueWaitTimeout * 1000),
     ]);
 
-    // We got our data so remove it
+    // We got our data so parse and remove it
     if (result && result.Items && result.Items[0]) {
       const item = result.Items[0];
       result = JSON.parse(item.value);
@@ -153,9 +153,12 @@ export class DynamoDBQueueDriverConnection {
         key: resultListKey,
         queryKey: this.redisHash(queryKey)
       });
+
+      return result;
     }
 
-    return result;
+    // We did not get any data, return null and query queue will throw new ContinueWaitError();
+    return null;
   }
 
   async getResult(queryKey) {
@@ -298,7 +301,11 @@ export class DynamoDBQueueDriverConnection {
     };
 
     // TODO: I removed the await here
-    await this.executeTransactWrite(transactionOptions);
+    try {
+      await this.executeTransactWrite(transactionOptions);
+    } catch (err) {
+
+    }
 
     return [JSON.parse(getQueryResult.Item.value)];
   }
